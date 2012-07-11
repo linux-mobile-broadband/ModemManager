@@ -48,7 +48,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-anydata.la \
 	libmm-plugin-linktop.la \
 	libmm-plugin-simtech.la \
-	libmm-plugin-wavecom.la
+	libmm-plugin-wavecom.la \
+	libmm-plugin-huawei.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -93,18 +94,13 @@ libmm_plugin_gobi_la_SOURCES = \
 libmm_plugin_gobi_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-#
-## Huawei
-#libmm_plugin_huawei_la_SOURCES = \
-#	mm-plugin-huawei.c \
-#	mm-plugin-huawei.h \
-#	mm-modem-huawei-gsm.c \
-#	mm-modem-huawei-gsm.h \
-#	mm-modem-huawei-cdma.c \
-#	mm-modem-huawei-cdma.h
-#libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+# Huawei
+libmm_plugin_huawei_la_SOURCES = \
+	huawei/mm-plugin-huawei.c \
+	huawei/mm-plugin-huawei.h
+libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## MBM
 #libmm_plugin_mbm_la_SOURCES = \
 #	mm-plugin-mbm.c \
