@@ -114,3 +114,8 @@ example to update the signal quality value or check registration status.
      using hardcoded values in ^SYSCFG write operations; we should instead read
      current mode or band when updating the other.
 
+  ** Huawei plugin: The K4505, at least, doesn't like the default command to
+     setup messaging related unsolicited messages:
+     > 'AT+CNMI=2,1,2,1,0'
+     +CMS ERROR: 303'
+
