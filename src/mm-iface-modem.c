@@ -3676,6 +3676,31 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
 {
     g_return_if_fail (MM_IS_IFACE_MODEM (self));
 
+    /* Remove SignalQualityCheckContext object to make sure any pending
+     * invocation of periodic_signal_quality_check is cancelled before
+     * SignalQualityUpdateContext is removed (as signal_quality_check_ready may
+     * call update_signal_quality). */
+    if (G_LIKELY (signal_quality_check_context_quark))
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_check_context_quark,
+                            NULL);
+
+    /* Remove SignalQualityUpdateContext object to make sure any pending
+     * invocation of expire_signal_quality is canceled before the DBus skeleton
+     * is removed. */
+    if (G_LIKELY (signal_quality_update_context_quark))
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_update_context_quark,
+                            NULL);
+
+    /* Remove AccessTechnologiesCheckContext object to make sure any pending
+     * invocation of periodic_access_technologies_check is canceled before the
+     * DBus skeleton is removed. */
+    if (G_LIKELY (access_technologies_check_context_quark))
+        g_object_set_qdata (G_OBJECT (self),
+                            access_technologies_check_context_quark,
+                            NULL);
+
     /* Remove SIM object */
     g_object_set (self,
                   MM_IFACE_MODEM_SIM, NULL,
