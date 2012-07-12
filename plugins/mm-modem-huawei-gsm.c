@@ -461,9 +461,8 @@ get_act_request_done (MMAtSerialPort *port,
     }
 
     if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
-        g_set_error_literal (&info->error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                             "Could not parse ^SYSINFO results.");
+        g_prefix_error (&info->error,
+                        "Could not parse ^SYSINFO results: ");
         goto done;
     }
 
@@ -561,9 +560,8 @@ send_huawei_cpin_done (MMAtSerialPort *port,
     }
 
     if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
-        g_set_error_literal (&info->error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                             "Could not parse ^CPIN results (match failed).");
+        g_prefix_error (&info->error,
+                        "Could not parse ^CPIN results (match failed): ");
         goto done;
     }
 
