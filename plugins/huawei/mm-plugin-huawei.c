@@ -25,7 +25,7 @@
 #include "mm-serial-enums-types.h"
 #include "mm-log.h"
 #include "mm-plugin-huawei.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-huawei.h"
 
 G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN)
 
@@ -423,11 +423,11 @@ create_modem (MMPlugin *self,
 {
     propagate_port_mode_results (probes);
 
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_huawei_new (sysfs_path,
+                                                         driver,
+                                                         mm_plugin_get_name (self),
+                                                         vendor,
+                                                         product));
 }
 
 static gboolean

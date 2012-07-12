@@ -97,7 +97,9 @@ libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 # Huawei
 libmm_plugin_huawei_la_SOURCES = \
 	huawei/mm-plugin-huawei.c \
-	huawei/mm-plugin-huawei.h
+	huawei/mm-plugin-huawei.h \
+	huawei/mm-broadband-modem-huawei.c \
+	huawei/mm-broadband-modem-huawei.h
 libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
