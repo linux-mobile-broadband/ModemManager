@@ -26,20 +26,24 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-utils.h"
 #include "mm-common-helpers.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-broadband-modem-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init));
 
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
@@ -1043,6 +1047,61 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* USSD encode/decode (3GPP-USSD interface) */
+
+static gchar *
+encode (MMIfaceModem3gppUssd *self,
+        const gchar *command,
+        guint *scheme,
+        GError **error)
+{
+    gchar *hex;
+    guint8 *gsm, *packed;
+    guint32 len = 0, packed_len = 0;
+
+    *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
+    gsm = mm_charset_utf8_to_unpacked_gsm (command, &len);
+
+    /* If command is a multiple of 7 characters long, Huawei firmwares
+     * apparently want that padded.  Maybe all modems?
+     */
+    if (len % 7 == 0) {
+        gsm = g_realloc (gsm, len + 1);
+        gsm[len] = 0x0d;
+        len++;
+    }
+
+    packed = gsm_pack (gsm, len, 0, &packed_len);
+    hex = utils_bin2hexstr (packed, packed_len);
+    g_free (packed);
+    g_free (gsm);
+
+    return hex;
+}
+
+static gchar *
+decode (MMIfaceModem3gppUssd *self,
+        const gchar *reply,
+        GError **error)
+{
+    gchar *bin, *utf8;
+    guint8 *unpacked;
+    gsize bin_len;
+    guint32 unpacked_len;
+
+    bin = utils_hexstr2bin (reply, &bin_len);
+    unpacked = gsm_unpack ((guint8*) bin, (bin_len * 8) / 7, 0, &unpacked_len);
+    /* if the last character in a 7-byte block is padding, then drop it */
+    if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))
+        unpacked_len--;
+    utf8 = (char*) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
+
+    g_free (bin);
+    g_free (unpacked);
+    return utf8;
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -1134,6 +1193,13 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_3gpp_disable_unsolicited_events_finish;
+}
+
+static void
+iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
+{
+    iface->encode = encode;
+    iface->decode = decode;
 }
 
 static void
