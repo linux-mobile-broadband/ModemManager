@@ -689,7 +689,7 @@ handle_mode_change (MMAtSerialPort *port,
     } else if (a == 0)
         act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     else {
-        mm_warn ("Couldn't parse mode change value: '%s'", str);
+        mm_warn ("Couldn't parse mode change value: '%d'", a);
         return;
     }
 
@@ -919,4 +919,3 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
 }
-
