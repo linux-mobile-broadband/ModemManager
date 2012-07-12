@@ -27,14 +27,17 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-huawei.h"
 
+static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemHuaweiPrivate {
@@ -52,6 +55,105 @@ struct _MMBroadbandModemHuaweiPrivate {
 };
 
 /*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static MMModemAccessTechnology
+huawei_sysinfo_to_act (gint huawei)
+{
+    switch (huawei) {
+    case 1:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    case 2:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    case 3:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    case 4:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 5:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    case 6:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    case 7:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    case 9:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    case 8:
+        /* TD-SCDMA */
+    default:
+        break;
+    }
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    const gchar *result;
+    gchar *str;
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    gint srv_stat = 0;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return FALSE;
+
+    /* Can't just use \d here since sometimes you get "^SYSINFO:2,1,0,3,1,,3" */
+    r = g_regex_new ("\\^SYSINFO:\\s*(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?)$", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, error)) {
+        g_prefix_error (error, "Could not parse ^SYSINFO results: ");
+        g_regex_unref (r);
+        return FALSE;
+    }
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str && str[0])
+        srv_stat = atoi (str);
+    g_free (str);
+
+    if (srv_stat != 0) {
+        /* Valid service */
+        str = g_match_info_fetch (match_info, 7);
+        if (str && str[0])
+            act = huawei_sysinfo_to_act (atoi (str));
+        g_free (str);
+    }
+
+    str = mm_modem_access_technology_build_string_from_mask (act);
+    mm_dbg ("Access Technology: '%s'", str);
+    g_free (str);
+
+    *access_technologies = act;
+    *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+    return TRUE;
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    mm_dbg ("loading access technology (huawei)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSINFO",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -66,6 +168,59 @@ huawei_mode_changed (MMAtSerialPort *port,
                      GMatchInfo *match_info,
                      MMBroadbandModemHuawei *self)
 {
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gchar *str;
+    gint a;
+
+    str = g_match_info_fetch (match_info, 1);
+    a = atoi (str);
+    g_free (str);
+
+    str = g_match_info_fetch (match_info, 2);
+    act = huawei_sysinfo_to_act (atoi (str));
+    g_free (str);
+
+    switch (a) {
+    case 3:
+        /* GSM/GPRS mode */
+        if (act != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN &&
+            (act < MM_MODEM_ACCESS_TECHNOLOGY_GSM ||
+             act > MM_MODEM_ACCESS_TECHNOLOGY_EDGE)) {
+            str = mm_modem_access_technology_build_string_from_mask (act);
+            mm_warn ("Unexpected access technology (%s) in GSM/GPRS mode", str);
+            g_free (str);
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        }
+        break;
+
+    case 5:
+        /* WCDMA mode */
+        if (act != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN &&
+            (act < MM_MODEM_ACCESS_TECHNOLOGY_UMTS ||
+             act > MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS)) {
+            str = mm_modem_access_technology_build_string_from_mask (act);
+            mm_warn ("Unexpected access technology (%s) in WCDMA mode", str);
+            g_free (str);
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        }
+        break;
+
+    case 0:
+        act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        break;
+
+    default:
+        mm_warn ("Unexpected mode change value reported: '%d'", a);
+        return;
+    }
+
+    str = mm_modem_access_technology_build_string_from_mask (act);
+    mm_dbg ("Access Technology: '%s'", str);
+    g_free (str);
+
+    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                               act,
+                                               MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
 }
 
 static void
@@ -275,6 +430,13 @@ finalize (GObject *object)
     g_regex_unref (self->priv->boot_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
