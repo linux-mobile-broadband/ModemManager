@@ -29,9 +29,11 @@
 
 typedef struct _MMBroadbandModemHuawei MMBroadbandModemHuawei;
 typedef struct _MMBroadbandModemHuaweiClass MMBroadbandModemHuaweiClass;
+typedef struct _MMBroadbandModemHuaweiPrivate MMBroadbandModemHuaweiPrivate;
 
 struct _MMBroadbandModemHuawei {
     MMBroadbandModem parent;
+    MMBroadbandModemHuaweiPrivate *priv;
 };
 
 struct _MMBroadbandModemHuaweiClass{
