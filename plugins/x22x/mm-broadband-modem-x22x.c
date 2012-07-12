@@ -37,6 +37,169 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemX22x, mm_broadband_modem_x22x, MM_TYPE_B
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    const gchar *response;
+    gchar *str;
+    gint mode = -1;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    r = g_regex_new ("\\+SYSSEL:\\s*(\\d),(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, error)) {
+        g_prefix_error (error,
+                        "Failed to parse mode/tech response: ");
+        g_regex_unref (r);
+        return FALSE;
+    }
+
+    str = g_match_info_fetch (match_info, 3);
+    mode = atoi (str);
+    g_free (str);
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    switch (mode) {
+    case 0:
+        *allowed = MM_MODEM_MODE_ANY;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 1:
+        *allowed = MM_MODEM_MODE_2G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 2:
+        *allowed = MM_MODEM_MODE_3G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    default:
+        break;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Failed to parse mode/tech response: Unexpected mode '%d'", mode);
+    return FALSE;
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+SYSSEL?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+allowed_mode_update_ready (MMBroadbandModemX22x *self,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *command;
+    gint syssel = -1;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_allowed_modes);
+
+    /* There is no explicit config for CS connections, we just assume we may
+     * have them as part of 2G when no GPRS is available */
+    if (allowed & MM_MODEM_MODE_CS) {
+        allowed |= MM_MODEM_MODE_2G;
+        allowed &= ~MM_MODEM_MODE_CS;
+    }
+
+    if (allowed == MM_MODEM_MODE_2G)
+        syssel = 1;
+    else if (allowed == MM_MODEM_MODE_3G)
+        syssel = 2;
+    else if (allowed == MM_MODEM_MODE_ANY &&
+             preferred == MM_MODEM_MODE_NONE)
+        syssel = 0;
+    else {
+        gchar *allowed_str;
+        gchar *preferred_str;
+
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Requested mode (allowed: '%s', preferred: '%s') not "
+                                         "supported by the modem.",
+                                         allowed_str,
+                                         preferred_str);
+        g_free (allowed_str);
+        g_free (preferred_str);
+
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    command = g_strdup_printf ("+SYSSEL=,%d,0", syssel);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)allowed_mode_update_ready,
+        result);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static gboolean
@@ -100,6 +263,10 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
 }
 
 static void
