@@ -333,6 +333,13 @@ device_removed (MMManager *self,
                      g_udev_device_get_name (udev_device),
                      g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
             mm_device_release_port (device, udev_device);
+
+            /* If port probe list gets empty, remove the device object iself */
+            if (!mm_device_peek_port_probe_list (device)) {
+                mm_dbg ("Removing empty device '%s'", mm_device_get_path (device));
+                mm_device_remove_modem (device);
+                g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+            }
         }
 
         return;
