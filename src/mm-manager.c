@@ -348,10 +348,9 @@ device_removed (MMManager *self,
      */
     device = find_device_by_udev_device (self, udev_device);
     if (device) {
-        mm_dbg ("Removing device %s",
-                g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
+        mm_dbg ("Removing device '%s'", mm_device_get_path (device));
         mm_device_remove_modem (device);
-        g_hash_table_remove (self->priv->devices, device);
+        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
         return;
     }
 
