@@ -26,6 +26,7 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-common-helpers.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -161,6 +162,21 @@ huawei_signal_changed (MMAtSerialPort *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemHuawei *self)
 {
+    guint quality = 0;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &quality))
+        return;
+
+    if (quality == 99) {
+        /* 99 means unknown */
+        quality = 0;
+    } else {
+        /* Normalize the quality */
+        quality = CLAMP (quality, 0, 31) * 100 / 31;
+    }
+
+    mm_dbg ("3GPP signal quality: %u", quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
 }
 
 static void
