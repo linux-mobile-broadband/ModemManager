@@ -230,7 +230,7 @@ load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Common band handling code */
+/* Common band/mode handling code */
 
 typedef struct {
     MMModemBand mm;
@@ -283,6 +283,7 @@ huawei_to_bands_array (guint32 huawei,
 {
     guint i;
 
+    *bands_array = NULL;
     for (i = 0; i < G_N_ELEMENTS (bands); i++) {
         if (huawei & bands[i].huawei) {
             if (G_UNLIKELY (!*bands_array))
@@ -304,8 +305,113 @@ huawei_to_bands_array (guint32 huawei,
 }
 
 static gboolean
+huawei_to_modem_mode (guint mode,
+                      guint acquisition_order,
+                      MMModemMode *allowed,
+                      MMModemMode *preferred,
+                      GError **error)
+{
+    switch (mode) {
+    case 2:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        switch (acquisition_order) {
+        case 1:
+            *preferred = MM_MODEM_MODE_2G;
+            return TRUE;
+        case 2:
+            *preferred = MM_MODEM_MODE_3G;
+            return TRUE;
+        case 0:
+            *preferred = MM_MODEM_MODE_NONE;
+            return TRUE;
+        default:
+            break;
+        }
+        break;
+
+    case 13:
+        *allowed = MM_MODEM_MODE_2G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+
+    case 14:
+        *allowed = MM_MODEM_MODE_3G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+
+    default:
+        break;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Unexpected system mode reference (%u) or "
+                 "acquisition order (%u)",
+                 mode,
+                 acquisition_order);
+    return FALSE;
+}
+
+static gboolean
+allowed_mode_to_huawei (MMModemMode allowed,
+                        MMModemMode preferred,
+                        guint *huawei_mode,
+                        guint *huawei_acquisition_order,
+                        GError **error)
+{
+    gchar *allowed_str;
+    gchar *preferred_str;
+
+    if (allowed == MM_MODEM_MODE_ANY) {
+        *huawei_mode = 2;
+        *huawei_acquisition_order = 0;
+        return TRUE;
+    }
+
+    if (allowed == MM_MODEM_MODE_2G) {
+        *huawei_mode = 13;
+        *huawei_acquisition_order = 1;
+        return TRUE;
+    }
+
+    if (allowed == MM_MODEM_MODE_3G) {
+        *huawei_mode = 14;
+        *huawei_acquisition_order = 2;
+        return TRUE;
+    }
+
+    if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        *huawei_mode = 2;
+        if (preferred == MM_MODEM_MODE_2G)
+            *huawei_acquisition_order = 1;
+        else if (preferred == MM_MODEM_MODE_3G)
+            *huawei_acquisition_order = 2;
+        else
+            *huawei_acquisition_order = 0;
+        return TRUE;
+    }
+
+    /* Not supported */
+    allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+    preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Requested mode (allowed: '%s', preferred: '%s') not "
+                 "supported by the modem.",
+                 allowed_str,
+                 preferred_str);
+    g_free (allowed_str);
+    g_free (preferred_str);
+    return FALSE;
+}
+
+static gboolean
 parse_syscfg (const gchar *response,
               GArray **bands_array,
+              MMModemMode *allowed,
+              MMModemMode *preferred,
               GError **error)
 {
     gint mode;
@@ -327,6 +433,10 @@ parse_syscfg (const gchar *response,
     }
 
     /* Build allowed/preferred modes only if requested */
+    if (allowed &&
+        preferred &&
+        !huawei_to_modem_mode (mode, acquisition_order, allowed, preferred, error))
+        return FALSE;
 
     /* Band */
     if (bands_array &&
@@ -351,7 +461,7 @@ load_current_bands_finish (MMIfaceModem *self,
     if (!response)
         return NULL;
 
-    if (!parse_syscfg (response, &bands_array, error))
+    if (!parse_syscfg (response, &bands_array, NULL, NULL, error))
         return NULL;
 
     return bands_array;
@@ -439,6 +549,114 @@ set_bands (MMIfaceModem *self,
                               result);
     g_free (cmd);
     g_free (bands_string);
+}
+
+/*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    return parse_syscfg (response, NULL, allowed, preferred, error);
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_dbg ("loading allowed_modes (huawei)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSCFG?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+allowed_mode_update_ready (MMBroadbandModemHuawei *self,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *command;
+    guint mode;
+    guint acquisition_order;
+    GError *error = NULL;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_allowed_modes);
+
+    /* There is no explicit config for CS connections, we just assume we may
+     * have them as part of 2G when no GPRS is available */
+    if (allowed & MM_MODEM_MODE_CS) {
+        allowed |= MM_MODEM_MODE_2G;
+        allowed &= ~MM_MODEM_MODE_CS;
+    }
+
+    if (!allowed_mode_to_huawei (allowed,
+                                 preferred,
+                                 &mode,
+                                 &acquisition_order,
+                                 &error)) {
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    command = g_strdup_printf ("AT^SYSCFG=%d,%d,40000000,2,4", mode, acquisition_order);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)allowed_mode_update_ready,
+        result);
+    g_free (command);
 }
 
 /*****************************************************************************/
@@ -897,6 +1115,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_bands = set_bands;
     iface->set_bands_finish = set_bands_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
 }
 
 static void

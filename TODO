@@ -108,3 +108,9 @@ example to update the signal quality value or check registration status.
      in the 3GPP disabling sequence.
 
   ** serial-parsers: convert the v1 parser to a GObject.
+
+  ** Huawei plugin: Seems to me that whenever we update the allowed modes OR the
+     bands, we're actually also changing the other one. This is because we're
+     using hardcoded values in ^SYSCFG write operations; we should instead read
+     current mode or band when updating the other.
+
