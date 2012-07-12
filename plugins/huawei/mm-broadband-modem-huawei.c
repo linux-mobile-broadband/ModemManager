@@ -73,6 +73,15 @@ huawei_status_changed (MMAtSerialPort *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemHuawei *self)
 {
+    gchar *str;
+    gint n1, n2, n3, n4, n5, n6, n7;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (sscanf (str, "%x,%x,%x,%x,%x,%x,%x", &n1, &n2, &n3, &n4, &n5, &n6, &n7)) {
+        mm_dbg ("Duration: %d Up: %d Kbps Down: %d Kbps Total: %d Total: %d\n",
+                n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
+    }
+    g_free (str);
 }
 
 static void
