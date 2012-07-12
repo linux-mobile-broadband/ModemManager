@@ -450,7 +450,7 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
     }
 
     if (!task->at_commands->response_processor (task->at_commands->command,
-                                                response->str,
+                                                response ? response->str : NULL,
                                                 !!task->at_commands[1].command,
                                                 error,
                                                 &result,
