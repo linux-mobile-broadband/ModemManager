@@ -155,6 +155,81 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMUnlockRetries *unlock_retries;
+    const gchar *result;
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    guint i;
+    MMModemLock locks[4] = {
+        MM_MODEM_LOCK_SIM_PUK,
+        MM_MODEM_LOCK_SIM_PIN,
+        MM_MODEM_LOCK_SIM_PUK2,
+        MM_MODEM_LOCK_SIM_PIN2
+    };
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return NULL;
+
+    r = g_regex_new ("\\^CPIN:\\s*([^,]+),[^,]*,(\\d+),(\\d+),(\\d+),(\\d+)",
+                     G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, error)) {
+        g_prefix_error (error,
+                        "Could not parse ^CPIN results: ");
+        g_regex_unref (r);
+        return NULL;
+    }
+
+    unlock_retries = mm_unlock_retries_new ();
+    for (i = 0; i <= 3; i++) {
+        guint num;
+
+        if (!mm_get_uint_from_match_info (match_info, i + 2, &num) ||
+            num > 10) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Could not parse ^CPIN results: "
+                         "Missing or invalid match info for lock '%s'",
+                         mm_modem_lock_get_string (locks[i]));
+            g_object_unref (unlock_retries);
+            unlock_retries = NULL;
+            break;
+        }
+
+        mm_unlock_retries_set (unlock_retries, locks[i], num);
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return unlock_retries;
+}
+
+static void
+load_unlock_retries (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_dbg ("loading unlock retries (huawei)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^CPIN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -604,6 +679,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
 }
 
 static void
