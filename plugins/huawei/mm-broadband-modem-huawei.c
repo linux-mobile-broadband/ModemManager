@@ -230,6 +230,218 @@ load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Common band handling code */
+
+typedef struct {
+    MMModemBand mm;
+    guint32 huawei;
+} BandTable;
+
+static BandTable bands[] = {
+    /* Sort 3G first since it's preferred */
+    { MM_MODEM_BAND_U2100, 0x00400000 },
+    { MM_MODEM_BAND_U1900, 0x00800000 },
+    { MM_MODEM_BAND_U850,  0x04000000 },
+    { MM_MODEM_BAND_U900,  0x00020000 },
+    { MM_MODEM_BAND_G850,  0x00080000 },
+    /* 2G second */
+    { MM_MODEM_BAND_DCS,   0x00000080 },
+    { MM_MODEM_BAND_EGSM,  0x00000100 },
+    { MM_MODEM_BAND_PCS,   0x00200000 }
+};
+
+static gboolean
+bands_array_to_huawei (GArray *bands_array,
+                       guint32 *out_huawei)
+{
+    guint i;
+
+    /* Treat ANY as a special case: All huawei flags enabled */
+    if (bands_array->len == 1 &&
+        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        *out_huawei = 0x3FFFFFFF;
+        return TRUE;
+    }
+
+    *out_huawei = 0;
+    for (i = 0; i < bands_array->len; i++) {
+        guint j;
+
+        for (j = 0; j < G_N_ELEMENTS (bands); j++) {
+            if (g_array_index (bands_array, MMModemBand, i) == bands[j].mm)
+                *out_huawei |= bands[j].huawei;
+        }
+    }
+
+    return (*out_huawei > 0 ? TRUE : FALSE);
+}
+
+static gboolean
+huawei_to_bands_array (guint32 huawei,
+                       GArray **bands_array,
+                       GError **error)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (bands); i++) {
+        if (huawei & bands[i].huawei) {
+            if (G_UNLIKELY (!*bands_array))
+                *bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+            g_array_append_val (*bands_array, bands[i].mm);
+        }
+    }
+
+    if (!*bands_array) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't build bands array from '%u'",
+                     huawei);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+parse_syscfg (const gchar *response,
+              GArray **bands_array,
+              GError **error)
+{
+    gint mode;
+    gint acquisition_order;
+    guint32 band;
+    gint roaming;
+    gint srv_domain;
+
+    if (!response ||
+        strncmp (response, "^SYSCFG:", 8) != 0 ||
+        !sscanf (response + 8, "%d,%d,%x,%d,%d", &mode, &acquisition_order, &band, &roaming, &srv_domain)) {
+        /* Dump error to upper layer */
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected SYSCFG response: '%s'",
+                     response);
+        return FALSE;
+    }
+
+    /* Build allowed/preferred modes only if requested */
+
+    /* Band */
+    if (bands_array &&
+        !huawei_to_bands_array (band, bands_array, error))
+        return FALSE;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Load current bands (Modem interface) */
+
+static GArray *
+load_current_bands_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    const gchar *response;
+    GArray *bands_array;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+
+    if (!parse_syscfg (response, &bands_array, error))
+        return NULL;
+
+    return bands_array;
+}
+
+static void
+load_current_bands (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_dbg ("loading current bands (huawei)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSCFG?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Set bands (Modem interface) */
+
+static gboolean
+set_bands_finish (MMIfaceModem *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+syscfg_set_ready (MMBaseModem *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        /* Let the error be critical */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_bands (MMIfaceModem *self,
+           GArray *bands_array,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *cmd;
+    guint32 huawei_band = 0x3FFFFFFF;
+    gchar *bands_string;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_bands);
+
+    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
+                                                 bands_array->len);
+
+    if (!bands_array_to_huawei (bands_array, &huawei_band)) {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Invalid bands requested: '%s'",
+                                         bands_string);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        g_free (bands_string);
+        return;
+    }
+
+    cmd = g_strdup_printf ("AT^SYSCFG=16,3,%X,2,4", huawei_band);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)syscfg_set_ready,
+                              result);
+    g_free (cmd);
+    g_free (bands_string);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -681,6 +893,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+    iface->load_current_bands = load_current_bands;
+    iface->load_current_bands_finish = load_current_bands_finish;
+    iface->set_bands = set_bands;
+    iface->set_bands_finish = set_bands_finish;
 }
 
 static void
