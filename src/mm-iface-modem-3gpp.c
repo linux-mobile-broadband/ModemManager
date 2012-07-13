@@ -1868,6 +1868,14 @@ mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self)
 {
     g_return_if_fail (MM_IS_IFACE_MODEM_3GPP (self));
 
+    /* Remove RegistrationCheckContext object to make sure any pending
+     * invocation of periodic_registration_check is cancelled before the
+     * DBus skeleton is removed. */
+    if (G_LIKELY (registration_check_context_quark))
+        g_object_set_qdata (G_OBJECT (self),
+                            registration_check_context_quark,
+                            NULL);
+
     /* Unexport DBus interface and remove the skeleton */
     mm_gdbus_object_skeleton_set_modem3gpp (MM_GDBUS_OBJECT_SKELETON (self), NULL);
     g_object_set (self,
