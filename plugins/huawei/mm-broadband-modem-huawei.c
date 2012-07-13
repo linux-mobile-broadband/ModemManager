@@ -1121,6 +1121,14 @@ huawei_1x_signal_changed (MMAtSerialPort *port,
                           GMatchInfo *match_info,
                           MMBroadbandModemHuawei *self)
 {
+    guint quality = 0;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &quality))
+        return;
+
+    quality = CLAMP (quality, 0, 100);
+    mm_dbg ("1X signal quality: %u", quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
 }
 
 static void
@@ -1128,6 +1136,14 @@ huawei_evdo_signal_changed (MMAtSerialPort *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemHuawei *self)
 {
+    guint quality = 0;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &quality))
+        return;
+
+    quality = CLAMP (quality, 0, 100);
+    mm_dbg ("EVDO signal quality: %u", quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
 }
 
 static void
