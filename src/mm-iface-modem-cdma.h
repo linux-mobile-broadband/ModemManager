@@ -61,6 +61,22 @@ struct _MMIfaceModemCdma {
                                 GAsyncResult *res,
                                 GError **error);
 
+    /* Asynchronous setting up unsolicited events */
+    void (* setup_unsolicited_events) (MMIfaceModemCdma *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    gboolean (* setup_unsolicited_events_finish) (MMIfaceModemCdma *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
+
+    /* Asynchronous cleaning up of unsolicited events */
+    void (* cleanup_unsolicited_events) (MMIfaceModemCdma *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (* cleanup_unsolicited_events_finish) (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
+
     /* OTA activation */
     void (* activate) (MMIfaceModemCdma *self,
                        const gchar *carrier,

@@ -30,8 +30,10 @@
 #define SUBSYSTEM_EVDO "evdo"
 
 #define REGISTRATION_CHECK_CONTEXT_TAG    "cdma-registration-check-context-tag"
+#define UNSOLICITED_EVENTS_SUPPORTED_TAG  "cdma-unsolicited-events-supported-tag"
 
 static GQuark registration_check_context_quark;
+static GQuark unsolicited_events_supported_quark;
 
 /*****************************************************************************/
 
@@ -1102,6 +1104,7 @@ static void interface_disabling_step (DisablingContext *ctx);
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
+    DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -1153,6 +1156,24 @@ mm_iface_modem_cdma_disable_finish (MMIfaceModemCdma *self,
 }
 
 static void
+cleanup_unsolicited_events_ready (MMIfaceModemCdma *self,
+                                  GAsyncResult *res,
+                                  DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't cleanup unsolicited events: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
+static void
 interface_disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
@@ -1162,6 +1183,26 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
         periodic_registration_check_disable (ctx->self);
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
+
+        /* Only try to disable if supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
+                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
+                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -1192,6 +1233,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS,
     ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
@@ -1263,6 +1305,30 @@ mm_iface_modem_cdma_enable_finish (MMIfaceModemCdma *self,
 }
 
 static void
+setup_unsolicited_events_ready (MMIfaceModemCdma *self,
+                                GAsyncResult *res,
+                                EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        /* This error shouldn't be treated as critical */
+        mm_dbg ("Setting up unsolicited events failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* Reset support flag */
+        g_object_set_qdata (G_OBJECT (self),
+                            unsolicited_events_supported_quark,
+                            GUINT_TO_POINTER (FALSE));
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 run_all_registration_checks_ready (MMIfaceModemCdma *self,
                                    GAsyncResult *res,
                                    EnablingContext *ctx)
@@ -1291,6 +1357,22 @@ interface_enabling_step (EnablingContext *ctx)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
+        /* Only try to setup unsolicited events if they are supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
+                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
+                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)setup_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -1536,6 +1618,14 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
         g_object_set (self,
                       MM_IFACE_MODEM_CDMA_DBUS_SKELETON, skeleton,
                       NULL);
+
+        /* Initially, assume we support unsolicited events */
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
+        g_object_set_qdata (G_OBJECT (self),
+                            unsolicited_events_supported_quark,
+                            GUINT_TO_POINTER (TRUE));
     }
 
     /* Perform async initialization here */
