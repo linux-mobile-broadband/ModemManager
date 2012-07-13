@@ -27,6 +27,7 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-sim-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -839,6 +840,29 @@ modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create SIM (Modem interface) */
+
+static MMSim *
+create_sim_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return mm_sim_qmi_new_finish (res, error);
+}
+
+static void
+create_sim (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    /* New QMI SIM */
+    mm_sim_qmi_new (MM_BASE_MODEM (self),
+                    NULL, /* cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -1051,6 +1075,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
+
+    /* Create QMI-specific SIM */
+    iface->create_sim = create_sim;
+    iface->create_sim_finish = create_sim_finish;
 }
 
 static void
