@@ -32,22 +32,28 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-ussd.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-broadband-modem-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModemCdma *iface_modem_cdma_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
 
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
     GRegex *rssi_regex;
+    GRegex *rssilvl_regex;
+    GRegex *hrssilvl_regex;
 
     /* Regex for access-technology related notifications */
     GRegex *mode_regex;
@@ -1108,6 +1114,137 @@ decode (MMIfaceModem3gppUssd *self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited events (CDMA interface) */
+
+static void
+huawei_1x_signal_changed (MMAtSerialPort *port,
+                          GMatchInfo *match_info,
+                          MMBroadbandModemHuawei *self)
+{
+}
+
+static void
+huawei_evdo_signal_changed (MMAtSerialPort *port,
+                            GMatchInfo *match_info,
+                            MMBroadbandModemHuawei *self)
+{
+}
+
+static void
+set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
+                                      gboolean enable)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable/disable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Signal quality related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->rssilvl_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_1x_signal_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->hrssilvl_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_evdo_signal_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+}
+
+static gboolean
+modem_cdma_setup_cleanup_unsolicited_events_finish (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_cdma_setup_unsolicited_events_ready (MMIfaceModemCdma *self,
+                                            GAsyncResult *res,
+                                            GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_cdma_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), TRUE);
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_cdma_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_cdma_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cdma_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cdma_cleanup_unsolicited_events_ready (MMIfaceModemCdma *self,
+                                              GAsyncResult *res,
+                                              GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_cdma_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_cdma_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_cdma_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cdma_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -1118,6 +1255,7 @@ setup_ports (MMBroadbandModem *self)
 
     /* Now reset the unsolicited messages we'll handle when enabled */
     set_3gpp_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
+    set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
 }
 
 /*****************************************************************************/
@@ -1148,6 +1286,10 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     /* Prepare regular expressions to setup */
     self->priv->rssi_regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->rssilvl_regex = g_regex_new ("\\r\\n\\^RSSILVL:(\\d+)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->hrssilvl_regex = g_regex_new ("\\r\\n\\^HRSSILVL:(\\d+)\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->mode_regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->dsflowrpt_regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n",
@@ -1164,6 +1306,8 @@ finalize (GObject *object)
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (object);
 
     g_regex_unref (self->priv->rssi_regex);
+    g_regex_unref (self->priv->rssilvl_regex);
+    g_regex_unref (self->priv->hrssilvl_regex);
     g_regex_unref (self->priv->mode_regex);
     g_regex_unref (self->priv->dsflowrpt_regex);
     g_regex_unref (self->priv->boot_regex);
@@ -1209,6 +1353,17 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 {
     iface->encode = encode;
     iface->decode = decode;
+}
+
+static void
+iface_modem_cdma_init (MMIfaceModemCdma *iface)
+{
+    iface_modem_cdma_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events = modem_cdma_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_cdma_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
