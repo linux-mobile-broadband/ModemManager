@@ -746,6 +746,99 @@ modem_load_unlock_required (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Check if unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+modem_load_unlock_retries_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_UNLOCK_RETRIES (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+static void
+retry_count_dms_uim_get_pin_status_ready (QmiClientDms *client,
+                                          GAsyncResult *res,
+                                          GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsUimGetPinStatusOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get unlock retries: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        MMUnlockRetries *retries;
+        guint8 verify_retries_left;
+        guint8 unblock_retries_left;
+
+        retries = mm_unlock_retries_new ();
+
+        if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
+                output,
+                NULL, /* current_status */
+                &verify_retries_left,
+                &unblock_retries_left,
+                NULL)) {
+            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, verify_retries_left);
+            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, unblock_retries_left);
+        }
+
+        if (qmi_message_dms_uim_get_pin_status_output_get_pin2_status (
+                output,
+                NULL, /* current_status */
+                &verify_retries_left,
+                &unblock_retries_left,
+                NULL)) {
+            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, verify_retries_left);
+            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, unblock_retries_left);
+        }
+
+        g_simple_async_result_set_op_res_gpointer (simple, retries, g_object_unref);
+    }
+
+    if (output)
+        qmi_message_dms_uim_get_pin_status_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_unlock_retries (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_unlock_retries);
+
+    mm_dbg ("loading unlock retries...");
+    qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (client),
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)retry_count_dms_uim_get_pin_status_ready,
+                                       result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -956,6 +1049,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->load_unlock_required = modem_load_unlock_required;
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
+    iface->load_unlock_retries = modem_load_unlock_retries;
+    iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
 }
 
 static void
