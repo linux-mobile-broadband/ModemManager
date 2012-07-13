@@ -695,20 +695,10 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
     }
 
     g_assert (ctx != NULL);
-    device_identifier = mm_create_device_identifier (
-        mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
-        mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
-        ((DeviceIdentifierContext *)ctx)->ati,
-        ((DeviceIdentifierContext *)ctx)->ati1,
-        mm_gdbus_modem_get_equipment_identifier (
-            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_revision (
-            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_model (
-            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_manufacturer (
-            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)));
-
+    device_identifier = (mm_broadband_modem_create_device_identifier (
+                             MM_BROADBAND_MODEM (self),
+                             ((DeviceIdentifierContext *)ctx)->ati,
+                             ((DeviceIdentifierContext *)ctx)->ati1));
     mm_dbg ("loaded device identifier: %s", device_identifier);
     return device_identifier;
 }
@@ -7625,6 +7615,26 @@ mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
         return str;
 
     return mm_utf8_take_and_convert_to_charset (str, self->priv->modem_current_charset);
+}
+
+gchar *
+mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
+                                             const gchar *ati,
+                                             const gchar *ati1)
+{
+    return (mm_create_device_identifier (
+                mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
+                mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
+                ati,
+                ati1,
+                mm_gdbus_modem_get_equipment_identifier (
+                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                mm_gdbus_modem_get_revision (
+                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                mm_gdbus_modem_get_model (
+                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                mm_gdbus_modem_get_manufacturer (
+                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton))));
 }
 
 /*****************************************************************************/

@@ -92,4 +92,10 @@ gchar *mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
 gchar *mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
                                                                gchar *str);
 
+/* Create a unique device identifier string using the ATI and ATI1 replies and some
+ * additional internal info */
+gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
+                                                    const gchar *ati,
+                                                    const gchar *ati1);
+
 #endif /* MM_BROADBAND_MODEM_H */
