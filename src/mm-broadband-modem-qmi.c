@@ -628,6 +628,124 @@ modem_load_own_numbers (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Check if unlock required (Modem interface) */
+
+static MMModemLock
+modem_load_unlock_required_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCK_UNKNOWN;
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                               G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static MMModemLock
+uim_pin_status_to_modem_lock (QmiDmsUimPinStatus status,
+                              gboolean pin1) /* TRUE for PIN1, FALSE for PIN2 */
+{
+    switch (status) {
+    case QMI_DMS_UIM_PIN_STATUS_NOT_INITIALIZED:
+        return MM_MODEM_LOCK_UNKNOWN;
+    case QMI_DMS_UIM_PIN_STATUS_ENABLED_NOT_VERIFIED:
+        return pin1 ? MM_MODEM_LOCK_SIM_PIN : MM_MODEM_LOCK_SIM_PIN2;
+    case QMI_DMS_UIM_PIN_STATUS_ENABLED_VERIFIED:
+        return MM_MODEM_LOCK_NONE;
+    case QMI_DMS_UIM_PIN_STATUS_DISABLED:
+        return MM_MODEM_LOCK_NONE;
+    case QMI_DMS_UIM_PIN_STATUS_BLOCKED:
+        return pin1 ? MM_MODEM_LOCK_SIM_PUK : MM_MODEM_LOCK_SIM_PUK2;
+    case QMI_DMS_UIM_PIN_STATUS_PERMANENTLY_BLOCKED:
+        return MM_MODEM_LOCK_UNKNOWN;
+    case QMI_DMS_UIM_PIN_STATUS_UNBLOCKED:
+        /* This state is possibly given when after an Unblock() operation has been performed.
+         * We'll assume the PIN is verified after this. */
+        return MM_MODEM_LOCK_NONE;
+    case QMI_DMS_UIM_PIN_STATUS_CHANGED:
+        /* This state is possibly given when after an ChangePin() operation has been performed.
+         * We'll assume the PIN is verified after this. */
+        return MM_MODEM_LOCK_NONE;
+    default:
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+}
+
+static void
+dms_uim_get_pin_status_ready (QmiClientDms *client,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsUimGetPinStatusOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get PIN status: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+        QmiDmsUimPinStatus current_status;
+
+        if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
+                output,
+                &current_status,
+                NULL, /* verify_retries_left */
+                NULL, /* unblock_retries_left */
+                NULL))
+            lock = uim_pin_status_to_modem_lock (current_status, TRUE);
+
+        if (lock == MM_MODEM_LOCK_NONE &&
+            qmi_message_dms_uim_get_pin_status_output_get_pin2_status (
+                output,
+                &current_status,
+                NULL, /* verify_retries_left */
+                NULL, /* unblock_retries_left */
+                NULL))
+            lock = uim_pin_status_to_modem_lock (current_status, FALSE);
+
+        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (lock), NULL);
+    }
+
+    if (output)
+        qmi_message_dms_uim_get_pin_status_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_unlock_required (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_unlock_required);
+
+    mm_dbg ("loading unlock required...");
+    qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (client),
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)dms_uim_get_pin_status_ready,
+                                       result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -836,6 +954,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = modem_load_device_identifier_finish;
     iface->load_own_numbers = modem_load_own_numbers;
     iface->load_own_numbers_finish = modem_load_own_numbers_finish;
+    iface->load_unlock_required = modem_load_unlock_required;
+    iface->load_unlock_required_finish = modem_load_unlock_required_finish;
 }
 
 static void
