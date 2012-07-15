@@ -159,6 +159,9 @@ add_regex (MMAtSerialPort *port, const char *match, gpointer user_data)
     g_regex_unref (regex);
 }
 
+#define TAG_DEFER_COUNTS_PREFIX "huawei-defer-counts"
+#define MAX_DEFERS 5
+
 static MMPluginSupportsResult
 supports_port (MMPluginBase *base,
                MMModem *existing,
@@ -198,8 +201,31 @@ supports_port (MMPluginBase *base,
      * we need to use the first port that does respond to probing to create the
      * right type of mode (GSM or CDMA), and then re-check the other interfaces.
      */
-    if (!existing && usbif != 0)
-        return MM_PLUGIN_SUPPORTS_PORT_DEFER;
+    if (!existing && usbif != 0) {
+        gchar *tag;
+        guint n_deferred;
+
+        /* We need to defer the probing as usbif 0 wasn't probed yet. We need to
+         * protect against the case of not having usbif 0 as an AT port, and we
+         * do that by limiting the number of times we defer the probing. */
+
+        tag = g_strdup_printf ("%s-%s/%s", TAG_DEFER_COUNTS_PREFIX, subsys, name);
+        /* First time requested will be 0 */
+        n_deferred = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (base), tag));
+        if (n_deferred < MAX_DEFERS) {
+            /* Update defer count */
+            g_object_set_data (G_OBJECT (base), tag, GUINT_TO_POINTER (n_deferred + 1));
+            g_free (tag);
+            return MM_PLUGIN_SUPPORTS_PORT_DEFER;
+        }
+
+        mm_dbg ("(%s): no longer waiting for usbif 0, will launch probing in interface (%s/%s)",
+                mm_plugin_get_name (MM_PLUGIN (base)), subsys, name);
+        g_free (tag);
+
+        /* Clear tag */
+        g_object_set_data (G_OBJECT (base), tag, NULL);
+    }
 
     /* CDMA devices don't have problems with the secondary ports, so after
      * ensuring we have a device by probing the first port, probe the secondary
