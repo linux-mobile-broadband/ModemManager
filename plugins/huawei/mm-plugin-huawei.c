@@ -97,7 +97,7 @@ huawei_custom_init_finish (MMPortProbe *probe,
 static void huawei_custom_init_step (HuaweiCustomInitContext *ctx);
 
 static void
-cache_port_mode (MMPortProbe *probe,
+cache_port_mode (MMDevice *device,
                  const gchar *reply,
                  const gchar *type,
                  const gchar *tag)
@@ -112,7 +112,7 @@ cache_port_mode (MMPortProbe *probe,
         /* shift by 1 so NULL return from g_object_get_data() means no tag */
         i = 1 + strtol (p + strlen (type), NULL, 10);
         if (i > 0 && i < 256 && errno == 0)
-            g_object_set_data (G_OBJECT (probe), tag, GINT_TO_POINTER ((gint) i));
+            g_object_set_data (G_OBJECT (device), tag, GINT_TO_POINTER ((gint) i));
     }
 }
 
@@ -139,12 +139,16 @@ getportmode_ready (MMAtSerialPort *port,
 
         /* Port mode not supported */
     } else {
+        MMDevice *device;
+
         mm_dbg ("(Huawei) port mode layout retrieved");
 
-        cache_port_mode (ctx->probe, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
-        cache_port_mode (ctx->probe, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
-        cache_port_mode (ctx->probe, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
+        /* Results are cached in the parent device object */
+        device = mm_port_probe_peek_device (ctx->probe);
+        cache_port_mode (device, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
+        cache_port_mode (device, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (device, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
+        g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
     }
 
     ctx->getportmode_done = TRUE;
@@ -371,17 +375,11 @@ huawei_custom_init (MMPortProbe *probe,
 static void
 propagate_port_mode_results (GList *probes)
 {
+    MMDevice *device;
     GList *l;
-    MMPortProbe *first_probe = NULL;
 
-    /* We first need to check which is the port probe which contains the
-     * port mode results, if any */
-    for (l = probes; l; l = g_list_next (l)) {
-        if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (l->data), TAG_GETPORTMODE_SUPPORTED))) {
-            first_probe = MM_PORT_PROBE (l->data);
-            break;
-        }
-    }
+    g_assert (probes != NULL);
+    device = mm_port_probe_peek_device (MM_PORT_PROBE (probes->data));
 
     /* Now we propagate the tags to the specific port probes */
     for (l = probes; l; l = g_list_next (l)) {
@@ -390,10 +388,10 @@ propagate_port_mode_results (GList *probes)
 
         usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
 
-        if (first_probe) {
-            if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (first_probe), TAG_HUAWEI_PCUI_PORT)))
+        if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
+            if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT)))
                 at_port_flags = MM_AT_PORT_FLAG_PRIMARY;
-            else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (first_probe), TAG_HUAWEI_MODEM_PORT)))
+            else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
                 at_port_flags = MM_AT_PORT_FLAG_PPP;
         } else if (usbif == 0 &&
                    mm_port_probe_is_at (MM_PORT_PROBE (l->data))) {
