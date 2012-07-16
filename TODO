@@ -123,3 +123,6 @@ example to update the signal quality value or check registration status.
      > AT+CPNNUM
      PIN1=3; PUK1=10; PIN2=0; PUK2=10
 
+  ** Pantech plugin: The UMW190 needs some time to settle down after sending the
+     PIN, or it will end up stuck if we ask too many PIN-related stuff one after
+     the other.
