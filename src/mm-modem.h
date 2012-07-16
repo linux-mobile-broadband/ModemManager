@@ -42,7 +42,8 @@ typedef enum {
 typedef enum {
     MM_MODEM_STATE_REASON_NONE = 0,
     MM_MODEM_STATE_REASON_USER_REQUESTED,
-    MM_MODEM_STATE_REASON_SUSPEND
+    MM_MODEM_STATE_REASON_SUSPEND,
+    MM_MODEM_STATE_REASON_ROAMING_NOT_ALLOWED
 } MMModemStateReason;
 
 #define DBUS_PATH_TAG "dbus-path"
@@ -164,6 +165,7 @@ struct _MMModem {
                             gpointer user_data);
 
     void (*disconnect) (MMModem *self,
+                        MMModemStateReason reason,
                         MMModemFn callback,
                         gpointer user_data);
 
@@ -247,6 +249,7 @@ void mm_modem_get_ip4_config (MMModem *self,
                               gpointer user_data);
 
 void mm_modem_disconnect (MMModem *self,
+                          MMModemStateReason reason,
                           MMModemFn callback,
                           gpointer user_data);
 

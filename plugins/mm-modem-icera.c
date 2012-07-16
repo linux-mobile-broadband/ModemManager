@@ -434,7 +434,7 @@ connection_enabled (MMAtSerialPort *port,
     case 0:
         /* Disconnected */
         if (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_CONNECTED)
-            mm_modem_disconnect (MM_MODEM (self), icera_disconnect_done, NULL);
+            mm_modem_disconnect (MM_MODEM (self), MM_MODEM_STATE_REASON_NONE, icera_disconnect_done, NULL);
         break;
     case 1:
         /* Connected */
