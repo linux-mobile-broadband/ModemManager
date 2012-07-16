@@ -28,6 +28,7 @@
 #include "mm-errors-types.h"
 #include "mm-utils.h"
 #include "mm-common-helpers.h"
+#include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -1326,6 +1327,10 @@ parent_setup_registration_checks_ready (MMIfaceModemCdma *self,
         if (evdo_supported)
             results.skip_at_cdma1x_serving_system_step = TRUE;
 
+        /* Force to always use the detailed registration checks, as we have
+         * ^SYSINFO for that */
+        results.skip_detailed_registration_state = FALSE;
+
         g_simple_async_result_set_op_res_gpointer (simple, &results, NULL);
     }
 
@@ -1350,6 +1355,154 @@ setup_registration_checks (MMIfaceModemCdma *self,
     iface_modem_cdma_parent->setup_registration_checks (self,
                                                         (GAsyncReadyCallback)parent_setup_registration_checks_ready,
                                                         result);
+}
+
+/*****************************************************************************/
+/* Detailed registration state (CDMA interface) */
+
+typedef struct {
+    MMModemCdmaRegistrationState detailed_cdma1x_state;
+    MMModemCdmaRegistrationState detailed_evdo_state;
+} DetailedRegistrationStateResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    DetailedRegistrationStateResults state;
+} DetailedRegistrationStateContext;
+
+static void
+detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
+{
+    /* Always not in idle! we're passing a struct in stack as result */
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+get_detailed_registration_state_finish (MMIfaceModemCdma *self,
+                                        GAsyncResult *res,
+                                        MMModemCdmaRegistrationState *detailed_cdma1x_state,
+                                        MMModemCdmaRegistrationState *detailed_evdo_state,
+                                        GError **error)
+{
+    DetailedRegistrationStateResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *detailed_cdma1x_state = results->detailed_cdma1x_state;
+    *detailed_evdo_state = results->detailed_evdo_state;
+    return TRUE;
+}
+
+static void
+sysinfo_ready (MMIfaceModemCdma *self,
+               GAsyncResult *res,
+               DetailedRegistrationStateContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *response;
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+
+    /* If error, leave superclass' reg state alone if AT^SYSINFO isn't supported. */
+    if (error) {
+        g_error_free (error);
+
+        /* NOTE: always complete NOT in idle here */
+        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
+        detailed_registration_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    response = mm_strip_tag (response, "^SYSINFO:");
+
+    /* Format is "<srv_status>,<srv_domain>,<roam_status>,<sys_mode>,<sim_state>" */
+    r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)",
+                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (r != NULL);
+
+    /* Try to parse the results */
+
+    g_regex_match (r, response, 0, &match_info);
+    if (g_match_info_get_match_count (match_info) >= 5) {
+        MMModemCdmaRegistrationState reg_state;
+        guint val = 0;
+
+        /* At this point the generic code already knows we've been registered */
+        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+
+        if (mm_get_uint_from_match_info (match_info, 1, &val)) {
+            if (val == 2) {
+                /* Service available, check roaming state */
+                val = 0;
+                if (mm_get_uint_from_match_info (match_info, 3, &val)) {
+                    if (val == 0)
+                        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+                    else if (val == 1)
+                        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+                }
+            }
+        }
+
+        /* Check service type */
+        val = 0;
+        if (mm_get_uint_from_match_info (match_info, 4, &val)) {
+            if (val == 2)
+                ctx->state.detailed_cdma1x_state = reg_state;
+            else if (val == 4)
+                ctx->state.detailed_evdo_state = reg_state;
+            else if (val == 8) {
+                ctx->state.detailed_cdma1x_state = reg_state;
+                ctx->state.detailed_evdo_state = reg_state;
+            }
+        } else {
+            /* Say we're registered to something even though sysmode parsing failed */
+            mm_dbg ("SYSMODE parsing failed: assuming registered at least in CDMA1x");
+            ctx->state.detailed_cdma1x_state = reg_state;
+        }
+    } else
+        mm_warn ("Huawei: failed to parse ^SYSINFO response: '%s'", response);
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    /* NOTE: always complete NOT in idle here */
+    g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
+    detailed_registration_state_context_complete_and_free (ctx);
+}
+
+static void
+get_detailed_registration_state (MMIfaceModemCdma *self,
+                                 MMModemCdmaRegistrationState cdma1x_state,
+                                 MMModemCdmaRegistrationState evdo_state,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    DetailedRegistrationStateContext *ctx;
+
+    /* Setup context */
+    ctx = g_new0 (DetailedRegistrationStateContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             get_detailed_registration_state);
+    ctx->state.detailed_cdma1x_state = cdma1x_state;
+    ctx->state.detailed_evdo_state = evdo_state;
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSINFO",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)sysinfo_ready,
+                              ctx);
 }
 
 /*****************************************************************************/
@@ -1474,6 +1627,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->cleanup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
     iface->setup_registration_checks = setup_registration_checks;
     iface->setup_registration_checks_finish = setup_registration_checks_finish;
+    iface->get_detailed_registration_state = get_detailed_registration_state;
+    iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
 }
 
 static void
