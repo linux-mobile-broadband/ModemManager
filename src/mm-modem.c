@@ -184,7 +184,7 @@ mm_modem_disable (MMModem *self,
         cb_data = g_malloc0 (sizeof (DisableDisconnectInfo));
         cb_data->callback = callback;
         cb_data->user_data = user_data;
-        mm_modem_disconnect (self, disable_disconnect_done, cb_data);
+        mm_modem_disconnect (self, MM_MODEM_STATE_REASON_NONE, disable_disconnect_done, cb_data);
     } else
         finish_disable (self, callback, user_data);
 }
@@ -339,6 +339,7 @@ impl_modem_get_ip4_config (MMModem *modem,
 
 void
 mm_modem_disconnect (MMModem *self,
+                     MMModemStateReason reason,
                      MMModemFn callback,
                      gpointer user_data)
 {
@@ -366,7 +367,7 @@ mm_modem_disconnect (MMModem *self,
     }
 
     if (MM_MODEM_GET_INTERFACE (self)->disconnect)
-        MM_MODEM_GET_INTERFACE (self)->disconnect (self, callback, user_data);
+        MM_MODEM_GET_INTERFACE (self)->disconnect (self, reason, callback, user_data);
     else
         async_op_not_supported (self, callback, user_data);
 }
@@ -375,7 +376,7 @@ static void
 impl_modem_disconnect (MMModem *modem,
                        DBusGMethodInvocation *context)
 {
-    mm_modem_disconnect (modem, async_call_done, context);
+    mm_modem_disconnect (modem, MM_MODEM_STATE_REASON_USER_REQUESTED, async_call_done, context);
 }
 
 static void

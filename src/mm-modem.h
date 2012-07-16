@@ -158,6 +158,7 @@ struct _MMModem {
                             gpointer user_data);
 
     void (*disconnect) (MMModem *self,
+                        MMModemStateReason reason,
                         MMModemFn callback,
                         gpointer user_data);
 
@@ -245,6 +246,7 @@ void mm_modem_get_ip4_config (MMModem *self,
                               gpointer user_data);
 
 void mm_modem_disconnect (MMModem *self,
+                          MMModemStateReason reason,
                           MMModemFn callback,
                           gpointer user_data);
 

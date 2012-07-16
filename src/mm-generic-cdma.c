@@ -928,6 +928,7 @@ disconnect_flash_done (MMSerialPort *port,
 
 static void
 disconnect (MMModem *modem,
+            MMModemStateReason reason,
             MMModemFn callback,
             gpointer user_data)
 {
@@ -947,7 +948,7 @@ disconnect (MMModem *modem,
                                GUINT_TO_POINTER (state),
                                NULL);
 
-    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, reason);
 
     dial_port = priv->primary;
     if (MM_IS_AT_SERIAL_PORT (priv->data))

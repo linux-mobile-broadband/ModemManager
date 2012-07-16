@@ -313,6 +313,12 @@
           State change was caused by a system suspend.
         </tp:docstring>
       </tp:enumvalue>
+      <tp:enumvalue suffix="ROAMING_NOT_ALLOWED" value="3">
+        <tp:docstring>
+          State change was caused because the modem is roaming and roaming
+          is not allowed.
+        </tp:docstring>
+      </tp:enumvalue>
     </tp:enum>
 
   </interface>

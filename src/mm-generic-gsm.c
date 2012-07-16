@@ -3204,7 +3204,7 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
         if (   (status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
             && (mm_modem_get_state (MM_MODEM (self)) == MM_MODEM_STATE_CONNECTED)
             && (priv->roam_allowed == FALSE)) {
-            mm_modem_disconnect (MM_MODEM (self), roam_disconnect_done, NULL);
+            mm_modem_disconnect (MM_MODEM (self), MM_MODEM_STATE_REASON_ROAMING_NOT_ALLOWED, roam_disconnect_done, NULL);
         } else {
             /* Grab the new operator name and MCC/MNC */
             if (port) {
@@ -4026,6 +4026,7 @@ real_do_disconnect (MMGenericGsm *self,
 
 static void
 disconnect (MMModem *modem,
+            MMModemStateReason reason,
             MMModemFn callback,
             gpointer user_data)
 {
@@ -4045,7 +4046,7 @@ disconnect (MMModem *modem,
                                GUINT_TO_POINTER (state),
                                NULL);
 
-    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, reason);
 
     g_assert (MM_GENERIC_GSM_GET_CLASS (self)->do_disconnect);
     MM_GENERIC_GSM_GET_CLASS (self)->do_disconnect (self, priv->cid, disconnect_done, info);
