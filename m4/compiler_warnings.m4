@@ -1,16 +1,17 @@
 AC_DEFUN([NM_COMPILER_WARNINGS],
 [AC_ARG_ENABLE(more-warnings,
-	AS_HELP_STRING([--enable-more-warnings], [Maximum compiler warnings]),
-	set_more_warnings="$enableval",set_more_warnings=yes)
-AC_MSG_CHECKING(for more warnings, including -Werror)
+	AS_HELP_STRING([--enable-more-warnings], [Possible values: no/yes/error]),
+	set_more_warnings="$enableval",set_more_warnings=error)
+AC_MSG_CHECKING(for more warnings)
 if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 	AC_MSG_RESULT(yes)
-	CFLAGS="-Wall -Werror -std=gnu89 $CFLAGS"
+	CFLAGS="-Wall -std=gnu89 $CFLAGS"
 
 	for option in -Wshadow -Wmissing-declarations -Wmissing-prototypes \
 		      -Wdeclaration-after-statement -Wstrict-prototypes \
 		      -Wfloat-equal -Wno-unused-parameter -Wno-sign-compare \
-		      -fno-strict-aliasing -Wno-deprecated-declarations; do
+		      -fno-strict-aliasing -Wno-deprecated-declarations \
+		      -Wno-unused-but-set-variable -Wundef; do
 		SAVE_CFLAGS="$CFLAGS"
 		CFLAGS="$CFLAGS $option"
 		AC_MSG_CHECKING([whether gcc understands $option])
@@ -25,6 +26,9 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 		unset SAVE_CFLAGS
 	done
 	unset option
+	if test "x$set_more_warnings" = xerror; then
+		CFLAGS="$CFLAGS -Werror"
+	fi
 else
 	AC_MSG_RESULT(no)
 fi
