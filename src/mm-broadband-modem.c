@@ -909,6 +909,23 @@ modem_load_unlock_required (MMIfaceModem *self,
 /*****************************************************************************/
 /* Supported modes loading (Modem interface) */
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModem *self;
+    MMModemMode mode;
+    gboolean run_ws46;
+    gboolean run_gcap;
+} LoadSupportedModesContext;
+
+static void
+load_supported_modes_context_complete_and_free (LoadSupportedModesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static MMModemMode
 modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
@@ -921,93 +938,211 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
                                               G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+static void load_supported_modes_step (LoadSupportedModesContext *ctx);
+
 static void
-supported_networks_query_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *operation_result)
+supported_modes_gcap_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            LoadSupportedModesContext *ctx)
 {
     const gchar *response;
     GError *error = NULL;
-    MMModemMode mode = MM_MODEM_MODE_NONE;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
+    if (!error) {
+        MMModemMode mode = MM_MODEM_MODE_NONE;
 
-    /*
-     * More than one numeric ID may appear in the list, that's why
-     * they are checked separately.
-     *
-     * NOTE: Do not skip WS46 prefix; it would break Cinterion handling.
-     *
-     * From 3GPP TS 27.007 v.11.2.0, section 5.9
-     * 12	GSM Digital Cellular Systems (GERAN only)
-     * 22	UTRAN only
-     * 25	3GPP Systems (GERAN, UTRAN and E-UTRAN)
-     * 28	E-UTRAN only
-     * 29	GERAN and UTRAN
-     * 30	GERAN and E-UTRAN
-     * 31	UTRAN and E-UTRAN
-     */
+        if (strstr (response, "IS")) {
+            /* IS-856 is the EV-DO family */
+            if (strstr (response, "856")) {
+                if (!ctx->self->priv->modem_cdma_evdo_network_supported) {
+                    ctx->self->priv->modem_cdma_evdo_network_supported = TRUE;
+                    g_object_notify (G_OBJECT (ctx->self), MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED);
+                }
+                mm_dbg ("Device allows (CDMA) 3G network mode");
+                mode |= MM_MODEM_MODE_3G;
+            }
+            /* IS-707 is the 1xRTT family, which we consider as 2G */
+            if (strstr (response, "707")) {
+                if (!ctx->self->priv->modem_cdma_cdma1x_network_supported) {
+                    ctx->self->priv->modem_cdma_cdma1x_network_supported = TRUE;
+                    g_object_notify (G_OBJECT (ctx->self), MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED);
+                }
+                mm_dbg ("Device allows (CDMA) 2G network mode");
+                mode |= MM_MODEM_MODE_2G;
+            }
+        }
 
-    if (strstr (response, "12") != NULL) {
-        mm_dbg ("Device allows 2G-only network mode");
-        mode |= MM_MODEM_MODE_2G;
-    }
-
-    if (strstr (response, "22") != NULL) {
-        mm_dbg ("Device allows 3G-only network mode");
-        mode |= MM_MODEM_MODE_3G;
-    }
-
-    if (strstr (response, "28") != NULL) {
-        mm_dbg ("Device allows 4G-only network mode");
-        mode |= MM_MODEM_MODE_4G;
-    }
-
-    if (strstr (response, "29") != NULL) {
-        mm_dbg ("Device allows 2G/3G network mode");
-        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    }
-
-    if (strstr (response, "30") != NULL) {
-        mm_dbg ("Device allows 2G/4G network mode");
-        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
-    }
-
-    if (strstr (response, "31") != NULL) {
-        mm_dbg ("Device allows 3G/4G network mode");
-        mode |= (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    }
-
-    if (strstr (response, "25") != NULL) {
-        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-            mm_dbg ("Device allows every supported 3GPP network mode (2G/3G/4G)");
-            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        /* If no expected mode found, error */
+        if (mode == MM_MODEM_MODE_NONE) {
+            /* This should really never happen in the default implementation. */
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't find specific CDMA mode in capabilities string: '%s'",
+                                 response);
         } else {
-            mm_dbg ("Device allows every supported 3GPP network mode (2G/3G)");
-            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            /* Keep our results */
+            ctx->mode |= mode;
         }
     }
 
-    /* If no expected ID found, error */
-    if (mode == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (operation_result,
+    if (error) {
+        mm_dbg ("Generic query of supported CDMA networks failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* Use defaults */
+        if (ctx->self->priv->modem_cdma_cdma1x_network_supported) {
+            mm_dbg ("Assuming device allows (CDMA) 2G network mode");
+            ctx->mode |= MM_MODEM_MODE_2G;
+        }
+        if (ctx->self->priv->modem_cdma_evdo_network_supported) {
+            mm_dbg ("Assuming device allows (CDMA) 3G network mode");
+            ctx->mode |= MM_MODEM_MODE_3G;
+        }
+    }
+
+    /* Now keep on with the loading, we're probably finishing now */
+    ctx->run_gcap = FALSE;
+    load_supported_modes_step (ctx);
+}
+
+static void
+supported_modes_ws46_test_ready (MMBroadbandModem *self,
+                                 GAsyncResult *res,
+                                 LoadSupportedModesContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!error) {
+        MMModemMode mode = MM_MODEM_MODE_NONE;
+
+        /*
+         * More than one numeric ID may appear in the list, that's why
+         * they are checked separately.
+         *
+         * NOTE: Do not skip WS46 prefix; it would break Cinterion handling.
+         *
+         * From 3GPP TS 27.007 v.11.2.0, section 5.9
+         * 12	GSM Digital Cellular Systems (GERAN only)
+         * 22	UTRAN only
+         * 25	3GPP Systems (GERAN, UTRAN and E-UTRAN)
+         * 28	E-UTRAN only
+         * 29	GERAN and UTRAN
+         * 30	GERAN and E-UTRAN
+         * 31	UTRAN and E-UTRAN
+         */
+
+        if (strstr (response, "12") != NULL) {
+            mm_dbg ("Device allows (3GPP) 2G-only network mode");
+            mode |= MM_MODEM_MODE_2G;
+        }
+
+        if (strstr (response, "22") != NULL) {
+            mm_dbg ("Device allows (3GPP) 3G-only network mode");
+            mode |= MM_MODEM_MODE_3G;
+        }
+
+        if (strstr (response, "28") != NULL) {
+            mm_dbg ("Device allows (3GPP) 4G-only network mode");
+            mode |= MM_MODEM_MODE_4G;
+        }
+
+        if (strstr (response, "29") != NULL) {
+            mm_dbg ("Device allows (3GPP) 2G/3G network mode");
+            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        }
+
+        if (strstr (response, "30") != NULL) {
+            mm_dbg ("Device allows (3GPP) 2G/4G network mode");
+            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+        }
+
+        if (strstr (response, "31") != NULL) {
+            mm_dbg ("Device allows (3GPP) 3G/4G network mode");
+            mode |= (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        }
+
+        if (strstr (response, "25") != NULL) {
+            if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
+                mm_dbg ("Device allows every supported 3GPP network mode (2G/3G/4G)");
+                mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+            } else {
+                mm_dbg ("Device allows every supported 3GPP network mode (2G/3G)");
+                mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            }
+        }
+
+        /* If no expected ID found, error */
+        if (mode == MM_MODEM_MODE_NONE) {
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Invalid list of supported networks: '%s'",
+                                 response);
+        } else {
+            /* Keep our results */
+            ctx->mode |= mode;
+        }
+    }
+
+    /* Process error, which may come either directly from the AT command or from
+     * our parsing logic. In this case, always fallback to some default guesses. */
+    if (error) {
+        mm_dbg ("Generic query of supported 3GPP networks failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* If PS supported, assume we can do both 2G and 3G, even if it may not really
+         * be true. This is the generic implementation anyway, plugins can use modem
+         * specific commands to check which technologies are supported. */
+        if (ctx->self->priv->modem_3gpp_ps_network_supported) {
+            mm_dbg ("Assuming device allows (3GPP) 2G/3G network modes");
+            ctx->mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        }
+    }
+
+    /* Now keep on with the loading, we may need CDMA-specific checks */
+    ctx->run_ws46 = FALSE;
+    load_supported_modes_step (ctx);
+}
+
+static void
+load_supported_modes_step (LoadSupportedModesContext *ctx)
+{
+    if (ctx->run_ws46) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (ctx->self),
+            "+WS46=?",
+            3,
+            TRUE, /* allow caching, it's a test command */
+            (GAsyncReadyCallback)supported_modes_ws46_test_ready,
+            ctx);
+        return;
+    }
+
+    if (ctx->run_gcap) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (ctx->self),
+            "+GCAP",
+            3,
+            TRUE, /* allow caching */
+            (GAsyncReadyCallback)supported_modes_gcap_ready,
+            ctx);
+        return;
+    }
+
+    /* All done.
+     * If no mode found, error */
+    if (ctx->mode == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
-                                         "Invalid list of supported networks: '%s'",
-                                         response);
+                                         "Couldn't retrieve supported modes");
     else
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   GUINT_TO_POINTER (mode),
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (ctx->mode),
                                                    NULL);
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    load_supported_modes_context_complete_and_free (ctx);
 }
 
 static void
@@ -1015,71 +1150,32 @@ modem_load_supported_modes (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
-    GSimpleAsyncResult *result;
-    MMModemMode mode;
+    LoadSupportedModesContext *ctx;
 
     mm_dbg ("loading initial supported modes...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_modes);
+    ctx = g_new0 (LoadSupportedModesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_supported_modes);
+    ctx->mode = MM_MODEM_MODE_NONE;
 
-    if (broadband->priv->use_ws46) {
-        /* We try to query the list of supported networks, which gives a more
-         * detailed view of the supported modes (specifically between 2G and 3G)
-         */
-        mm_base_modem_at_command (
-            MM_BASE_MODEM (self),
-            "+WS46=?",
-            3,
-            FALSE,
-            (GAsyncReadyCallback)supported_networks_query_ready,
-            result);
-        return;
-    }
-
-    /* Try to guess from capabilities */
-
-    mode = MM_MODEM_MODE_NONE;
-
-    /* If the modem has +GSM caps... */
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
-        /* Some modems, e.g. Iridium, will only support CS */
-        if (broadband->priv->modem_3gpp_cs_network_supported)
-            mode |= MM_MODEM_MODE_CS;
-        /* If PS supported, assume we can do both 2G and 3G, even if it may not really
-         * be true. This is the generic implementation anyway, plugins can use modem
-         * specific commands to check which technologies are supported. */
-        if (broadband->priv->modem_3gpp_ps_network_supported)
-            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        /* Run +WS46=? in order to know if the modem is 2G-only or 2G/3G */
+        ctx->run_ws46 = TRUE;
+
+        /* If the modem has LTE caps, it does 4G */
+        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+            ctx->mode |= MM_MODEM_MODE_4G;
     }
 
-    /* If the modem has CDMA caps... */
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
-        if (broadband->priv->modem_cdma_cdma1x_network_supported)
-            mode |= MM_MODEM_MODE_2G;
-        if (broadband->priv->modem_cdma_evdo_network_supported)
-            mode |= MM_MODEM_MODE_3G;
+        /* Run +GCAP in order to know if the modem is CDMA1x only or CDMA1x/EV-DO */
+        ctx->run_gcap = TRUE;
     }
 
-    /* If the modem has LTE caps, it does 4G */
-    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-        mode |= MM_MODEM_MODE_4G;
-
-    /* If no mode found, error */
-    if (mode == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't guess modes from capabilities");
-    else
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   GUINT_TO_POINTER (mode),
-                                                   NULL);
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    load_supported_modes_step (ctx);
 }
 
 /*****************************************************************************/
