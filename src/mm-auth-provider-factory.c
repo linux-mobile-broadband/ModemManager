@@ -32,7 +32,7 @@ mm_auth_provider_get (void)
     static MMAuthProvider *singleton;
 
     if (!singleton) {
-#if WITH_POLKIT
+#ifdef WITH_POLKIT
         singleton = (MMAuthProvider *) mm_auth_provider_polkit_new ();
 #else
         singleton = (MMAuthProvider *) mm_auth_provider_new ();
