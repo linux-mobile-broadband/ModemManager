@@ -1159,7 +1159,6 @@ mm_broadband_modem_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, MM_SMS_STORAGE_MT,
-                         MM_BROADBAND_MODEM_USE_WS46, TRUE,
                          NULL);
 }
 

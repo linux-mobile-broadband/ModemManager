@@ -68,7 +68,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
 
 enum {
     PROP_0,
-    PROP_USE_WS46,
     PROP_MODEM_DBUS_SKELETON,
     PROP_MODEM_3GPP_DBUS_SKELETON,
     PROP_MODEM_3GPP_USSD_DBUS_SKELETON,
@@ -101,9 +100,6 @@ enum {
 #define CIND_INDICATOR_IS_VALID(u) (u != CIND_INDICATOR_INVALID)
 
 struct _MMBroadbandModemPrivate {
-    /* Broadband modem specific implementation */
-    gboolean use_ws46;
-
     /*<--- Modem interface --->*/
     /* Properties */
     GObject *modem_dbus_skeleton;
@@ -7097,9 +7093,6 @@ set_property (GObject *object,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     switch (prop_id) {
-    case PROP_USE_WS46:
-        self->priv->use_ws46 = g_value_get_boolean (value);
-        break;
     case PROP_MODEM_DBUS_SKELETON:
         g_clear_object (&self->priv->modem_dbus_skeleton);
         self->priv->modem_dbus_skeleton = g_value_dup_object (value);
@@ -7199,9 +7192,6 @@ get_property (GObject *object,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     switch (prop_id) {
-    case PROP_USE_WS46:
-        g_value_set_boolean (value, self->priv->use_ws46);
-        break;
     case PROP_MODEM_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_dbus_skeleton);
         break;
@@ -7287,7 +7277,6 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_MODEM,
                                               MMBroadbandModemPrivate);
-    self->priv->use_ws46 = FALSE;
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_3gpp_registration_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->modem_current_charset = MM_MODEM_CHARSET_UNKNOWN;
@@ -7583,15 +7572,6 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     base_modem_class->disable_finish = disable_finish;
 
     klass->setup_ports = setup_ports;
-
-    g_object_class_install_property (
-        object_class,
-        PROP_USE_WS46,
-        g_param_spec_boolean (MM_BROADBAND_MODEM_USE_WS46,
-                              "Use AT+WS46",
-                              "Whether the modem should use AT+WS46=? when loading supported modes",
-                              FALSE,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,

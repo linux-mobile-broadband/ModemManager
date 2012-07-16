@@ -30,8 +30,6 @@
 #define MM_IS_BROADBAND_MODEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_MODEM))
 #define MM_BROADBAND_MODEM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_MODEM, MMBroadbandModemClass))
 
-#define MM_BROADBAND_MODEM_USE_WS46 "broadband-modem-use-ws46"
-
 typedef struct _MMBroadbandModem MMBroadbandModem;
 typedef struct _MMBroadbandModemClass MMBroadbandModemClass;
 typedef struct _MMBroadbandModemPrivate MMBroadbandModemPrivate;
