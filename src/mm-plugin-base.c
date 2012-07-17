@@ -1136,6 +1136,12 @@ supports_port (MMPlugin *plugin,
     if (!driver)
         goto out;
 
+    /* Hack for QMI-based ethernet interfaces: we don't support them yet */
+    if (g_strcmp0 (driver, "qmi_wwan") == 0 || g_strcmp0 (driver, "qmi-wwan") == 0) {
+        mm_dbg ("(%s/%s): QMI WWAN port found but unsupported, ignoring...", subsys, name);
+        goto out;
+    }
+
     task = supports_task_new (self, port, physdev_path, driver, callback, callback_data);
     g_assert (task);
     g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
