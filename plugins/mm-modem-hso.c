@@ -27,6 +27,7 @@
 
 #include "mm-modem-hso.h"
 #include "mm-modem-simple.h"
+#include "mm-modem-gsm-card.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
@@ -40,10 +41,12 @@ static void impl_hso_authenticate (MMModemHso *self,
 
 static void modem_init (MMModem *modem_class);
 static void modem_simple_init (MMModemSimple *simple_class);
+static void modem_gsm_card_init (MMModemGsmCard *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemHso, mm_modem_hso, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
 
 #define MM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HSO, MMModemHsoPrivate))
 
@@ -727,6 +730,79 @@ get_access_technology (MMGenericGsm *gsm,
     option_get_access_technology (gsm, callback, user_data);
 }
 
+static void
+send_retries_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    int matched;
+    GArray *retry_counts;
+    PinRetryCount ur[4] = {
+        {"sim-pin", 0}, {"sim-puk", 0}, {"sim-pin2", 0}, {"sim-puk2", 0}
+    };
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    matched = sscanf (response->str, "_OERCN: %d, %d", &ur[0].count, &ur[1].count);
+    if (matched == 2) {
+        if (ur[0].count > 998) {
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "Invalid PIN attempts left %d", ur[0].count);
+            ur[0].count = 0;
+        }
+
+        retry_counts = g_array_sized_new (FALSE, TRUE, sizeof (PinRetryCount), 4);
+        g_array_append_vals (retry_counts, &ur, 4);
+        mm_callback_info_set_result (info, retry_counts, NULL);
+    } else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse PIN retries results");
+    }
+
+done:
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_unlock_retries (MMModemGsmCard *modem,
+                    MMModemArrayFn callback,
+                    gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info = mm_callback_info_array_new (MM_MODEM (modem), callback, user_data);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* if the modem have not yet been enabled we need to make sure echoing is turned off */
+    mm_at_serial_port_queue_command (port, "E0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "_OERCN?", 3, send_retries_done, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -775,6 +851,12 @@ static void
 modem_simple_init (MMModemSimple *class)
 {
     class->connect = simple_connect;
+}
+
+static void
+modem_gsm_card_init (MMModemGsmCard *class)
+{
+    class->get_unlock_retries = get_unlock_retries;
 }
 
 static void
