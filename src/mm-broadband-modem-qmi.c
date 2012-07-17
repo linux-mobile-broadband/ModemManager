@@ -27,12 +27,15 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-sim-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 /*****************************************************************************/
 
@@ -1162,6 +1165,11 @@ iface_modem_init (MMIfaceModem *iface)
     /* Other actions */
     iface->factory_reset = modem_factory_reset;
     iface->factory_reset_finish = modem_factory_reset_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
 }
 
 static void
