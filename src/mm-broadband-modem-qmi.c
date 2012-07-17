@@ -945,6 +945,185 @@ modem_factory_reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Facility locks status loading (3GPP interface) */
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    QmiClient *client;
+    guint current;
+    MMModem3gppFacility facilities;
+    MMModem3gppFacility locks;
+} LoadEnabledFacilityLocksContext;
+
+static void get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx);
+
+static void
+load_enabled_facility_locks_context_complete_and_free (LoadEnabledFacilityLocksContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static MMModem3gppFacility
+modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_3GPP_FACILITY_NONE;
+
+    return ((MMModem3gppFacility) GPOINTER_TO_UINT (
+                g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+static QmiDmsUimFacility
+get_qmi_facility_from_mm_facility (MMModem3gppFacility mm)
+{
+    switch (mm) {
+    case MM_MODEM_3GPP_FACILITY_PH_SIM:
+        /* Not really sure about this one; it may be PH_FSIM? */
+        return QMI_DMS_UIM_FACILITY_PF;
+
+    case MM_MODEM_3GPP_FACILITY_NET_PERS:
+        return QMI_DMS_UIM_FACILITY_PN;
+
+    case MM_MODEM_3GPP_FACILITY_NET_SUB_PERS:
+        return QMI_DMS_UIM_FACILITY_PU;
+
+    case MM_MODEM_3GPP_FACILITY_PROVIDER_PERS:
+        return QMI_DMS_UIM_FACILITY_PP;
+
+    case MM_MODEM_3GPP_FACILITY_CORP_PERS:
+        return QMI_DMS_UIM_FACILITY_PC;
+
+    default:
+        /* Never try to ask for a facility we cannot translate */
+        g_assert_not_reached ();
+    }
+}
+
+static void
+dms_uim_get_ck_status_ready (QmiClientDms *client,
+                             GAsyncResult *res,
+                             LoadEnabledFacilityLocksContext *ctx)
+{
+    gchar *facility_str;
+    QmiMessageDmsUimGetCkStatusOutput *output;
+
+    facility_str = mm_modem_3gpp_facility_build_string_from_mask (1 << ctx->current);
+    output = qmi_client_dms_uim_get_ck_status_finish (client, res, NULL);
+    if (!output ||
+        !qmi_message_dms_uim_get_ck_status_output_get_result (output, NULL)) {
+        /* On errors, we'll just assume disabled */
+        mm_dbg ("Couldn't query facility '%s' status, assuming disabled", facility_str);
+        ctx->locks &= ~(1 << ctx->current);
+    } else {
+        QmiDmsUimFacilityState state;
+        guint8 verify_retries_left;
+        guint8 unblock_retries_left;
+
+        qmi_message_dms_uim_get_ck_status_output_get_ck_status (
+            output,
+            &state,
+            &verify_retries_left,
+            &unblock_retries_left,
+            NULL);
+
+        mm_dbg ("Facility '%s' is: '%s'",
+                facility_str,
+                qmi_dms_uim_facility_state_get_string (state));
+
+        if (state == QMI_DMS_UIM_FACILITY_STATE_ACTIVATED ||
+            state == QMI_DMS_UIM_FACILITY_STATE_BLOCKED) {
+            ctx->locks |= (1 << ctx->current);
+        }
+    }
+
+    if (output)
+        qmi_message_dms_uim_get_ck_status_output_unref (output);
+    g_free (facility_str);
+
+    /* And go on with the next one */
+    ctx->current++;
+    get_next_facility_lock_status (ctx);
+}
+
+static void
+get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
+{
+    guint i;
+
+    for (i = ctx->current; i < sizeof (MMModem3gppFacility) * 8; i++) {
+        guint32 facility = 1 << i;
+
+        /* Found the next one to query! */
+        if (ctx->facilities & facility) {
+            QmiMessageDmsUimGetCkStatusInput *input;
+
+            /* Keep the current one */
+            ctx->current = i;
+
+            /* Query current */
+            input = qmi_message_dms_uim_get_ck_status_input_new ();
+            qmi_message_dms_uim_get_ck_status_input_set_facility (
+                input,
+                get_qmi_facility_from_mm_facility (facility),
+                NULL);
+            qmi_client_dms_uim_get_ck_status (QMI_CLIENT_DMS (ctx->client),
+                                              input,
+                                              5,
+                                              NULL,
+                                              (GAsyncReadyCallback)dms_uim_get_ck_status_ready,
+                                              ctx);
+            qmi_message_dms_uim_get_ck_status_input_unref (input);
+            return;
+        }
+    }
+
+    /* No more facilities to query, all done */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (ctx->locks),
+                                               NULL);
+    load_enabled_facility_locks_context_complete_and_free (ctx);
+}
+
+static void
+modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    LoadEnabledFacilityLocksContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_new (LoadEnabledFacilityLocksContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_3gpp_load_enabled_facility_locks);
+    /* Set initial list of facilities to query */
+    ctx->facilities = (MM_MODEM_3GPP_FACILITY_PH_SIM |
+                       MM_MODEM_3GPP_FACILITY_NET_PERS |
+                       MM_MODEM_3GPP_FACILITY_NET_SUB_PERS |
+                       MM_MODEM_3GPP_FACILITY_PROVIDER_PERS |
+                       MM_MODEM_3GPP_FACILITY_CORP_PERS);
+    ctx->locks = MM_MODEM_3GPP_FACILITY_NONE;
+    ctx->current = 0;
+
+    get_next_facility_lock_status (ctx);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -1170,6 +1349,9 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    /* Initialization steps */
+    iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
+    iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 }
 
 static void
