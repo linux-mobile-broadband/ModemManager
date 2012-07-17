@@ -863,6 +863,85 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Factory reset (Modem interface) */
+
+static gboolean
+modem_factory_reset_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+dms_restore_factory_defaults_ready (QmiClientDms *client,
+                                    GAsyncResult *res,
+                                    GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsRestoreFactoryDefaultsOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_restore_factory_defaults_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_restore_factory_defaults_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't restore factory defaults: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_restore_factory_defaults_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_factory_reset (MMIfaceModem *self,
+                     const gchar *code,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    QmiMessageDmsRestoreFactoryDefaultsInput *input;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    GError *error = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_factory_reset);
+
+    input = qmi_message_dms_restore_factory_defaults_input_new ();
+    if (!qmi_message_dms_restore_factory_defaults_input_set_service_programming_code (
+            input,
+            code,
+            &error)) {
+        qmi_message_dms_restore_factory_defaults_input_unref (input);
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_dbg ("performing a factory reset...");
+    qmi_client_dms_restore_factory_defaults (QMI_CLIENT_DMS (client),
+                                             input,
+                                             10,
+                                             NULL,
+                                             (GAsyncReadyCallback)dms_restore_factory_defaults_ready,
+                                             result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -1079,6 +1158,10 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+
+    /* Other actions */
+    iface->factory_reset = modem_factory_reset;
+    iface->factory_reset_finish = modem_factory_reset_finish;
 }
 
 static void
