@@ -297,7 +297,7 @@ at_command_to_byte_array (const char *command)
     g_byte_array_append (buf, (const guint8 *) command, cmdlen);
 
     /* Make sure there's a trailing carriage return */
-    if (command[cmdlen] != '\r')
+    if (command[cmdlen - 1] != '\r')
         g_byte_array_append (buf, (const guint8 *) "\r", 1);
 
     return buf;
