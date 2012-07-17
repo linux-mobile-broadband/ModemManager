@@ -377,9 +377,11 @@ is_storage_supported (GArray *supported,
     if (preferred == MM_SMS_STORAGE_UNKNOWN)
         return TRUE;
 
-    for (i = 0; i < supported->len; i++) {
-        if (preferred == g_array_index (supported, MMSmsStorage, i))
-            return TRUE;
+    if (supported) {
+        for (i = 0; i < supported->len; i++) {
+            if (preferred == g_array_index (supported, MMSmsStorage, i))
+                return TRUE;
+        }
     }
 
     g_set_error (error,
@@ -761,7 +763,7 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
 
     storage_ctx = get_storage_context (ctx->self);
 
-    if (ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
+    if (!storage_ctx->supported_mem1 || ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
         all_loaded = TRUE;
     /* We'll skip the 'MT' storage, as that is a combination of 'SM' and 'ME' */
     else if (g_array_index (storage_ctx->supported_mem1,
