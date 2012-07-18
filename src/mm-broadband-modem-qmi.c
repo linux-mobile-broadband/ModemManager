@@ -843,6 +843,263 @@ modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported bands (Modem interface) */
+
+static GArray *
+modem_load_supported_bands_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+typedef struct {
+    QmiDmsBandCapability qmi_band;
+    MMModemBand mm_band;
+} BandsMap;
+
+static const BandsMap bands_map [] = {
+    /* CDMA bands */
+    {
+        (QMI_DMS_BAND_CAPABILITY_BAND_CLASS_0_A_SYSTEM | QMI_DMS_BAND_CAPABILITY_BAND_CLASS_0_B_SYSTEM),
+        MM_MODEM_BAND_CDMA_BC0_CELLULAR_800
+    },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_1_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC1_PCS_1900       },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_2,            MM_MODEM_BAND_CDMA_BC2_TACS           },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_3_A_SYSTEM,   MM_MODEM_BAND_CDMA_BC3_JTACS          },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_4_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS     },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_5_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC5_NMT450         },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_6,            MM_MODEM_BAND_CDMA_BC6_IMT2000        },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_7,            MM_MODEM_BAND_CDMA_BC7_CELLULAR_700   },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_8,            MM_MODEM_BAND_CDMA_BC8_1800           },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_9,            MM_MODEM_BAND_CDMA_BC9_900            },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_10,           MM_MODEM_BAND_CDMA_BC10_SECONDARY_800 },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_11,           MM_MODEM_BAND_CDMA_BC11_PAMR_400      },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_12,           MM_MODEM_BAND_CDMA_BC12_PAMR_800      },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_14,           MM_MODEM_BAND_CDMA_BC14_PCS2_1900     },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_15,           MM_MODEM_BAND_CDMA_BC15_AWS           },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_16,           MM_MODEM_BAND_CDMA_BC16_US_2500       },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_17,           MM_MODEM_BAND_CDMA_BC17_US_FLO_2500   },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_18,           MM_MODEM_BAND_CDMA_BC18_US_PS_700     },
+    { QMI_DMS_BAND_CAPABILITY_BAND_CLASS_19,           MM_MODEM_BAND_CDMA_BC19_US_LOWER_700  },
+
+    /* GSM bands */
+    { QMI_DMS_BAND_CAPABILITY_GSM_DCS,  MM_MODEM_BAND_DCS  },
+    { QMI_DMS_BAND_CAPABILITY_GSM_EGSM, MM_MODEM_BAND_EGSM },
+    { QMI_DMS_BAND_CAPABILITY_GSM_PCS,  MM_MODEM_BAND_PCS  },
+    { QMI_DMS_BAND_CAPABILITY_GSM_850,  MM_MODEM_BAND_G850 },
+
+    /* UMTS/WCDMA bands */
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_2100,       MM_MODEM_BAND_U2100 },
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_DCS_1800,   MM_MODEM_BAND_U1800 },
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_1700_US,    MM_MODEM_BAND_U17IV },
+    { QMI_DMS_BAND_CAPABILITY_QWCDMA_800,       MM_MODEM_BAND_U800  },
+    {
+        (QMI_DMS_BAND_CAPABILITY_WCDMA_850_US | QMI_DMS_BAND_CAPABILITY_WCDMA_850_JAPAN),
+        MM_MODEM_BAND_U850
+    },
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_900,        MM_MODEM_BAND_U900  },
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_1700_JAPAN, MM_MODEM_BAND_U17IX },
+    { QMI_DMS_BAND_CAPABILITY_WCDMA_2600,       MM_MODEM_BAND_U2600 }
+
+    /* NOTE. The following bands were unmatched:
+     *
+     * - QMI_DMS_BAND_CAPABILITY_GSM_PGSM
+     * - QMI_DMS_BAND_CAPABILITY_GSM_450
+     * - QMI_DMS_BAND_CAPABILITY_GSM_480
+     * - QMI_DMS_BAND_CAPABILITY_GSM_750
+     * - QMI_DMS_BAND_CAPABILITY_GSM_RAILWAILS
+     * - QMI_DMS_BAND_CAPABILITY_WCDMA_1500
+     * - MM_MODEM_BAND_CDMA_BC13_IMT2000_2500
+     * - MM_MODEM_BAND_U1900
+     */
+};
+
+static void
+add_qmi_bands (GArray *mm_bands,
+               QmiDmsBandCapability qmi_bands)
+{
+    static QmiDmsBandCapability qmi_bands_expected = 0;
+    QmiDmsBandCapability not_expected;
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    /* Build mask of expected bands only once */
+    if (G_UNLIKELY (qmi_bands_expected == 0)) {
+        for (i = 0; i < G_N_ELEMENTS (bands_map); i++) {
+            qmi_bands_expected |= bands_map[i].qmi_band;
+        }
+    }
+
+    /* Log about the bands that cannot be represented in ModemManager */
+    not_expected = ((qmi_bands_expected ^ qmi_bands) & qmi_bands);
+    if (not_expected) {
+        gchar *aux;
+
+        aux = qmi_dms_band_capability_build_string_from_mask (not_expected);
+        mm_dbg ("Cannot add the following bands: '%s'", aux);
+        g_free (aux);
+    }
+
+    /* And add the expected ones */
+    for (i = 0; i < G_N_ELEMENTS (bands_map); i++) {
+        if (qmi_bands & bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, bands_map[i].mm_band);
+    }
+}
+
+typedef struct {
+    QmiDmsLteBandCapability qmi_band;
+    MMModemBand mm_band;
+} LteBandsMap;
+
+static const LteBandsMap lte_bands_map [] = {
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_1,  MM_MODEM_BAND_EUTRAN_I       },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_2,  MM_MODEM_BAND_EUTRAN_II      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_3,  MM_MODEM_BAND_EUTRAN_III     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_4,  MM_MODEM_BAND_EUTRAN_IV      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_5,  MM_MODEM_BAND_EUTRAN_V       },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_6,  MM_MODEM_BAND_EUTRAN_VI      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_7,  MM_MODEM_BAND_EUTRAN_VII     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_8,  MM_MODEM_BAND_EUTRAN_VIII    },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_9,  MM_MODEM_BAND_EUTRAN_IX      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_10, MM_MODEM_BAND_EUTRAN_X       },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_11, MM_MODEM_BAND_EUTRAN_XI      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_12, MM_MODEM_BAND_EUTRAN_XII     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_13, MM_MODEM_BAND_EUTRAN_XIII    },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_14, MM_MODEM_BAND_EUTRAN_XIV     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_17, MM_MODEM_BAND_EUTRAN_XVII    },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_18, MM_MODEM_BAND_EUTRAN_XVIII   },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_19, MM_MODEM_BAND_EUTRAN_XIX     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_20, MM_MODEM_BAND_EUTRAN_XX      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_21, MM_MODEM_BAND_EUTRAN_XXI     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_24, MM_MODEM_BAND_EUTRAN_XXIV    },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_25, MM_MODEM_BAND_EUTRAN_XXV     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_33, MM_MODEM_BAND_EUTRAN_XXXIII  },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_34, MM_MODEM_BAND_EUTRAN_XXXIV   },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_35, MM_MODEM_BAND_EUTRAN_XXXV    },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_36, MM_MODEM_BAND_EUTRAN_XXXVI   },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_37, MM_MODEM_BAND_EUTRAN_XXXVII  },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_38, MM_MODEM_BAND_EUTRAN_XXXVIII },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_39, MM_MODEM_BAND_EUTRAN_XXXIX   },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_40, MM_MODEM_BAND_EUTRAN_XL      },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_41, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_42, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_DMS_LTE_BAND_CAPABILITY_BAND_43, MM_MODEM_BAND_EUTRAN_XLIII   }
+
+    /* NOTE. The following bands were unmatched:
+     *
+     * - MM_MODEM_BAND_EUTRAN_XXII
+     * - MM_MODEM_BAND_EUTRAN_XXIII
+     * - MM_MODEM_BAND_EUTRAN_XXVI
+     */
+};
+
+static void
+add_qmi_lte_bands (GArray *mm_bands,
+                   QmiDmsLteBandCapability qmi_bands)
+{
+    /* All QMI LTE bands have a counterpart in ModemManager, no need to check
+     * for unexpected ones */
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    for (i = 0; i < G_N_ELEMENTS (lte_bands_map); i++) {
+        if (qmi_bands & lte_bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, lte_bands_map[i].mm_band);
+    }
+}
+
+static void
+dms_get_band_capabilities_ready (QmiClientDms *client,
+                                 GAsyncResult *res,
+                                 GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsGetBandCapabilitiesOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_band_capabilities_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_get_band_capabilities_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get band capabilities: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        GArray *mm_bands;
+        QmiDmsBandCapability qmi_bands;
+        QmiDmsLteBandCapability qmi_lte_bands;
+
+        mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+        qmi_message_dms_get_band_capabilities_output_get_band_capability (
+            output,
+            &qmi_bands,
+            NULL);
+
+        add_qmi_bands (mm_bands, qmi_bands);
+
+        if (qmi_message_dms_get_band_capabilities_output_get_lte_band_capability (
+                output,
+                &qmi_lte_bands,
+                NULL)) {
+            add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+        }
+
+        if (mm_bands->len == 0) {
+            g_array_unref (mm_bands);
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't parse the list of supported bands");
+        } else {
+            g_simple_async_result_set_op_res_gpointer (simple,
+                                                       mm_bands,
+                                                       (GDestroyNotify)g_array_unref);
+        }
+    }
+
+    if (output)
+        qmi_message_dms_get_band_capabilities_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_supported_bands (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_supported_bands);
+
+    mm_dbg ("loading band capabilities...");
+    qmi_client_dms_get_band_capabilities (QMI_CLIENT_DMS (client),
+                                          NULL,
+                                          5,
+                                          NULL,
+                                          (GAsyncReadyCallback)dms_get_band_capabilities_ready,
+                                          result);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMSim *
@@ -1336,6 +1593,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
+    iface->load_supported_bands = modem_load_supported_bands;
+    iface->load_supported_bands_finish = modem_load_supported_bands_finish;
 
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
