@@ -509,112 +509,6 @@ load_supported_modes (MMIfaceModem *self,
     g_object_unref (result);
 }
 
-typedef struct {
-    MMModemMode allowed;
-    MMModemMode preferred;
-} ModePair;
-
-static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           MMModemMode *allowed,
-                           MMModemMode *preferred,
-                           GError **error)
-{
-    ModePair *pair;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    pair = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *allowed = pair->allowed;
-    *preferred = pair->preferred;
-    return TRUE;
-}
-
-static void
-load_allowed_modes_ready (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GSimpleAsyncResult *operation_result)
-{
-    const gchar *response;
-    GError *error = NULL;
-    MMModemMode allowed, preferred;
-    int mode, domain;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
-
-    allowed = preferred = MM_MODEM_MODE_NONE;
-    response = mm_strip_tag (response, "%IPSYS:");
-
-    if (sscanf (response, " %d,%d", &mode, &domain)) {
-        switch (mode) {
-            case 0:
-                allowed = preferred = MM_MODEM_MODE_2G;
-                break;
-            case 1:
-                allowed = preferred = MM_MODEM_MODE_3G;
-                break;
-            case 2:
-                allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
-                preferred = MM_MODEM_MODE_2G;
-                break;
-            case 3:
-                allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
-                preferred = MM_MODEM_MODE_3G;
-                break;
-            case 5:
-                allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
-                break;
-        }
-    }
-
-    if (allowed == MM_MODEM_MODE_NONE) {
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid supported modes response: '%s'",
-                                         response);
-    } else {
-        ModePair *pair;
-
-        pair = g_new0 (ModePair, 1);
-        pair->allowed = allowed;
-        pair->preferred = preferred;
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   pair,
-                                                   g_free);
-    }
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-}
-
-static void
-load_allowed_modes (MMIfaceModem *self,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_allowed_modes);
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        "%IPSYS?",
-        3,
-        FALSE,
-        (GAsyncReadyCallback)load_allowed_modes_ready,
-        result);
-}
-
 static gboolean
 set_allowed_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
@@ -1159,14 +1053,16 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_bands_finish = set_bands_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+
+    /* Use default Icera implementation */
+    iface->load_allowed_modes = mm_iface_icera_modem_load_allowed_modes;
+    iface->load_allowed_modes_finish = mm_iface_icera_modem_load_allowed_modes_finish;
 }
 
 static void
