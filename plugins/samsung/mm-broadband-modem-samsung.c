@@ -27,11 +27,13 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-samsung.h"
 #include "mm-broadband-modem-samsung.h"
+#include "mm-iface-icera.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
+static void iface_icera_init (MMIfaceIcera *iface);
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
@@ -39,7 +41,8 @@ static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_ICERA, iface_icera_init));
 
 struct _MMBroadbandModemSamsungPrivate {
     GRegex *nwstate_regex;
@@ -1164,6 +1167,11 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+}
+
+static void
+iface_icera_init (MMIfaceIcera *iface)
+{
 }
 
 static void
