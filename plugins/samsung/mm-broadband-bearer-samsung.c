@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <config.h>
@@ -32,17 +33,7 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerSamsung, mm_broadband_bearer_samsung, MM_TYPE_BROADBAND_BEARER);
 
-enum {
-    PROP_0,
-    PROP_USER,
-    PROP_PASSWORD,
-    PROP_LAST
-};
-
-static GParamSpec *properties[PROP_LAST];
-
 /*****************************************************************************/
-
 
 typedef struct {
     MMBroadbandBearerSamsung *self;
@@ -62,11 +53,6 @@ typedef struct {
 } DisconnectContext;
 
 struct _MMBroadbandBearerSamsungPrivate {
-    /* Username for authenticating to APN */
-    gchar *user;
-    /* Password for authenticating to APN */
-    gchar *password;
-
     guint connected_cid;
     DialContext *pending_dial;
     DisconnectContext *pending_disconnect;
@@ -312,6 +298,8 @@ dial_3gpp (MMBroadbandBearer *self,
 {
     DialContext *ctx;
     gchar *command;
+    const gchar *user;
+    const gchar *password;
 
     ctx = dial_context_new (MM_BROADBAND_BEARER_SAMSUNG (self),
                             modem,
@@ -321,16 +309,21 @@ dial_3gpp (MMBroadbandBearer *self,
                             callback,
                             user_data);
 
-    if (!ctx->self->priv->user && !ctx->self->priv->password) {
+    user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+
+    if (!user && !password) {
         command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", cid);
     } else {
-        gchar *user, *password;
-        user = mm_at_serial_port_quote_string (ctx->self->priv->user);
-        password = mm_at_serial_port_quote_string (ctx->self->priv->password);
+        gchar *quoted_user;
+        gchar *quoted_password;
+
+        quoted_user = mm_at_serial_port_quote_string (user);
+        quoted_password = mm_at_serial_port_quote_string (password);
         command = g_strdup_printf ("%%IPDPCFG=%d,0,1,%s,%s",
-                                   cid, user, password);
-        g_free (user);
-        g_free (password);
+                                   cid, quoted_user, quoted_password);
+        g_free (quoted_user);
+        g_free (quoted_password);
     }
 
     mm_base_modem_at_command (
@@ -489,99 +482,6 @@ dispose (GObject *object)
 }
 
 static void
-finalize (GObject *object)
-{
-    MMBroadbandBearerSamsung *self = MM_BROADBAND_BEARER_SAMSUNG (object);
-
-    g_free (self->priv->user);
-    g_free (self->priv->password);
-
-    G_OBJECT_CLASS (mm_broadband_bearer_samsung_parent_class)->finalize (object);
-}
-
-
-static void
-set_property (GObject *object,
-              guint prop_id,
-              const GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearerSamsung *self = MM_BROADBAND_BEARER_SAMSUNG (object);
-
-    switch (prop_id) {
-    case PROP_USER:
-        g_free (self->priv->user);
-        self->priv->user = g_value_dup_string (value);
-        break;
-    case PROP_PASSWORD:
-        g_free (self->priv->password);
-        self->priv->password = g_value_dup_string (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearerSamsung *self = MM_BROADBAND_BEARER_SAMSUNG (object);
-
-    switch (prop_id) {
-    case PROP_USER:
-        g_value_set_string (value, self->priv->user);
-        break;
-    case PROP_PASSWORD:
-        g_value_set_string (value, self->priv->password);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-
-static gboolean
-cmp_properties (MMBearer *bearer,
-                MMBearerProperties *properties)
-{
-    MMBroadbandBearerSamsung *self = MM_BROADBAND_BEARER_SAMSUNG (bearer);
-
-    return ((mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)) ==
-             mm_bearer_properties_get_allow_roaming (properties)) &&
-            (!g_strcmp0 (mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)),
-                         mm_bearer_properties_get_ip_type (properties))) &&
-            (!g_strcmp0 (mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)),
-                         mm_bearer_properties_get_apn (properties))) &&
-            (!g_strcmp0 (self->priv->user,
-                         mm_bearer_properties_get_user (properties))) &&
-            (!g_strcmp0 (self->priv->password,
-                         mm_bearer_properties_get_password (properties))));
-}
-
-static MMBearerProperties *
-expose_properties (MMBearer *bearer)
-{
-    MMBroadbandBearerSamsung *self = MM_BROADBAND_BEARER_SAMSUNG (bearer);
-    MMBearerProperties *properties;
-
-    properties = mm_bearer_properties_new ();
-    mm_bearer_properties_set_apn (properties,
-                                  mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_ip_type (properties,
-                                      mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_allow_roaming (properties,
-                                            mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_user (properties, self->priv->user);
-    mm_bearer_properties_set_password (properties, self->priv->user);
-    return properties;
-}
-
-static void
 mm_broadband_bearer_samsung_init (MMBroadbandBearerSamsung *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
@@ -589,8 +489,6 @@ mm_broadband_bearer_samsung_init (MMBroadbandBearerSamsung *self)
                                               MMBroadbandBearerSamsungPrivate);
 
     /* Set defaults */
-    self->priv->user = NULL;
-    self->priv->password = NULL;
     self->priv->connected_cid = 0;
     self->priv->pending_dial = NULL;
     self->priv->pending_disconnect = NULL;
@@ -600,40 +498,16 @@ static void
 mm_broadband_bearer_samsung_class_init (MMBroadbandBearerSamsungClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerSamsungPrivate));
 
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
     object_class->dispose = dispose;
-    object_class->finalize = finalize;
-
-    bearer_class->cmp_properties = cmp_properties;
-    bearer_class->expose_properties = expose_properties;
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
-
-    properties[PROP_USER] =
-        g_param_spec_string (MM_BROADBAND_BEARER_SAMSUNG_USER,
-                             "User",
-                             "Username to authenticate to APN",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_USER, properties[PROP_USER]);
-
-    properties[PROP_PASSWORD] =
-        g_param_spec_string (MM_BROADBAND_BEARER_SAMSUNG_PASSWORD,
-                             "Password",
-                             "Password to authenticate to APN",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_PASSWORD, properties[PROP_PASSWORD]);
-
 }
 
 MMBearer *
@@ -660,7 +534,7 @@ mm_broadband_bearer_samsung_new_finish (GAsyncResult *res,
 
 void
 mm_broadband_bearer_samsung_new (MMBroadbandModemSamsung *modem,
-                                 MMBearerProperties *properties,
+                                 MMBearerProperties *config,
                                  GCancellable *cancellable,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -672,10 +546,6 @@ mm_broadband_bearer_samsung_new (MMBroadbandModemSamsung *modem,
         callback,
         user_data,
         MM_BEARER_MODEM, modem,
-        MM_BROADBAND_BEARER_3GPP_APN,         mm_bearer_properties_get_apn (properties),
-        MM_BROADBAND_BEARER_IP_TYPE,          mm_bearer_properties_get_ip_type (properties),
-        MM_BROADBAND_BEARER_ALLOW_ROAMING,    mm_bearer_properties_get_allow_roaming (properties),
-        MM_BROADBAND_BEARER_SAMSUNG_USER,     mm_bearer_properties_get_user (properties),
-        MM_BROADBAND_BEARER_SAMSUNG_PASSWORD, mm_bearer_properties_get_password (properties),
+        MM_BEARER_CONFIG, config,
         NULL);
 }

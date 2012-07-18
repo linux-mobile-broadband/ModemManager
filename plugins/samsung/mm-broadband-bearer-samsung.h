@@ -13,6 +13,7 @@
  * Author: Nathan Williams <njw@google.com>
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #ifndef MM_BROADBAND_BEARER_SAMSUNG_H
@@ -33,9 +34,6 @@
 #define MM_IS_BROADBAND_BEARER_SAMSUNG_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_SAMSUNG))
 #define MM_BROADBAND_BEARER_SAMSUNG_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_SAMSUNG, MMBroadbandBearerSamsungClass))
 
-#define MM_BROADBAND_BEARER_SAMSUNG_USER         "broadband-bearer-samsung-user"
-#define MM_BROADBAND_BEARER_SAMSUNG_PASSWORD     "broadband-bearer-samsung-password"
-
 typedef struct _MMBroadbandBearerSamsung MMBroadbandBearerSamsung;
 typedef struct _MMBroadbandBearerSamsungClass MMBroadbandBearerSamsungClass;
 typedef struct _MMBroadbandBearerSamsungPrivate MMBroadbandBearerSamsungPrivate;
@@ -53,7 +51,7 @@ GType mm_broadband_bearer_samsung_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
 void mm_broadband_bearer_samsung_new (MMBroadbandModemSamsung *modem,
-                                      MMBearerProperties *properties,
+                                      MMBearerProperties *config,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
