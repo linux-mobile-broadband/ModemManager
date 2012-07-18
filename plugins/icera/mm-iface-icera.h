@@ -57,4 +57,13 @@ gboolean mm_iface_icera_modem_set_allowed_modes_finish (MMIfaceModem *self,
 void     mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
                                                                gboolean enable);
 
+void     mm_iface_icera_modem_load_access_technologies        (MMIfaceModem *self,
+                                                               GAsyncReadyCallback callback,
+                                                               gpointer user_data);
+gboolean mm_iface_icera_modem_load_access_technologies_finish (MMIfaceModem *self,
+                                                               GAsyncResult *res,
+                                                               MMModemAccessTechnology *access_technologies,
+                                                               guint *mask,
+                                                               GError **error);
+
 #endif /* MM_IFACE_ICERA_H */

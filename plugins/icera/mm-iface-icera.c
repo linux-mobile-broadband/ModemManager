@@ -358,6 +358,75 @@ mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+gboolean
+mm_iface_icera_modem_load_access_technologies_finish (MMIfaceModem *self,
+                                                      GAsyncResult *res,
+                                                      MMModemAccessTechnology *access_technologies,
+                                                      guint *mask,
+                                                      GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    *access_technologies = ((MMModemAccessTechnology) GPOINTER_TO_UINT (
+                                g_simple_async_result_get_op_res_gpointer (
+                                    G_SIMPLE_ASYNC_RESULT (res))));
+    *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    return TRUE;
+}
+
+static void
+nwstate_query_ready (MMBaseModem *self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't query access technology: '%s'", error->message);
+        g_simple_async_result_take_error (operation_result, error);
+    } else {
+        IceraContext *ctx;
+
+        /*
+         * The unsolicited message handler will already have run and
+         * removed the NWSTATE response, so we use the result from there.
+         */
+        ctx = get_icera_context (MM_BROADBAND_MODEM (self));
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   GUINT_TO_POINTER (ctx->last_act),
+                                                   NULL);
+    }
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+void
+mm_iface_icera_modem_load_access_technologies (MMIfaceModem *self,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_icera_modem_load_access_technologies);
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%NWSTATE",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)nwstate_query_ready,
+        result);
+}
+
+/*****************************************************************************/
 
 static void
 iface_icera_init (gpointer g_iface)
