@@ -480,35 +480,6 @@ set_bands (MMIfaceModem *self,
                         ctx);
 }
 
-static MMModemMode
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
-{
-    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-load_supported_modes (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
-
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               GUINT_TO_POINTER (MM_MODEM_MODE_2G |
-                                                                 MM_MODEM_MODE_3G),
-                                               NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
-}
-
 MMBroadbandModemSamsung *
 mm_broadband_modem_samsung_new (const gchar *device,
                                  const gchar *driver,
@@ -968,8 +939,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_bands = set_bands;
     iface->set_bands_finish = set_bands_finish;
-    iface->load_supported_modes = load_supported_modes;
-    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
