@@ -44,4 +44,13 @@ gboolean mm_iface_icera_modem_load_allowed_modes_finish (MMIfaceModem *self,
                                                          MMModemMode *preferred,
                                                          GError **error);
 
+void     mm_iface_icera_modem_set_allowed_modes        (MMIfaceModem *self,
+                                                        MMModemMode allowed,
+                                                        MMModemMode preferred,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+gboolean mm_iface_icera_modem_set_allowed_modes_finish (MMIfaceModem *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+
 #endif /* MM_IFACE_ICERA_H */
