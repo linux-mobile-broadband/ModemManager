@@ -509,89 +509,6 @@ load_supported_modes (MMIfaceModem *self,
     g_object_unref (result);
 }
 
-static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-set_allowed_modes_ready (MMBaseModem *self,
-                         GAsyncResult *res,
-                         GSimpleAsyncResult *operation_result)
-{
-    GError *error = NULL;
-
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        /* Let the error be critical */
-        g_simple_async_result_take_error (operation_result, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-}
-
-static void
-set_allowed_modes (MMIfaceModem *self,
-                   MMModemMode modes,
-                   MMModemMode preferred,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-    gint value;
-    gchar *command;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_allowed_modes);
-
-    /*
-     * The core has checked the following:
-     *  - that 'modes' are a subset of the allowed modes
-     *  - that 'preferred' is one mode, and a subset of 'modes'
-     */
-    if (modes == MM_MODEM_MODE_2G)
-        value = 0;
-    else if (modes == MM_MODEM_MODE_3G)
-        value = 1;
-    else if (modes == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G) &&
-             preferred == MM_MODEM_MODE_2G)
-        value = 2;
-    else if (modes == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G) &&
-             preferred == MM_MODEM_MODE_3G)
-        value = 3;
-    else if (modes == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G) &&
-             preferred == MM_MODEM_MODE_NONE)
-        value = 5;
-    else {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_INVALID_ARGS,
-                                         "Couldn't set allowed modes, "
-                                         "unsupported combination of allowed (%d) and "
-                                         "preferred (%d)",
-                                         modes, preferred);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
-    command = g_strdup_printf ("%%IPSYS=%d", value);
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        command,
-        3,
-        FALSE,
-        (GAsyncReadyCallback)set_allowed_modes_ready,
-        result);
-    g_free (command);
-}
-
 MMBroadbandModemSamsung *
 mm_broadband_modem_samsung_new (const gchar *device,
                                  const gchar *driver,
@@ -1053,8 +970,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_bands_finish = set_bands_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
@@ -1063,6 +978,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Use default Icera implementation */
     iface->load_allowed_modes = mm_iface_icera_modem_load_allowed_modes;
     iface->load_allowed_modes_finish = mm_iface_icera_modem_load_allowed_modes_finish;
+    iface->set_allowed_modes = mm_iface_icera_modem_set_allowed_modes;
+    iface->set_allowed_modes_finish = mm_iface_icera_modem_set_allowed_modes_finish;
 }
 
 static void
