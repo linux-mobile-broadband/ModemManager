@@ -23,7 +23,7 @@
 #ifndef MM_PLUGIN_SAMSUNG_H
 #define MM_PLUGIN_SAMSUNG_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_SAMSUNG            (mm_plugin_samsung_get_type ())
 #define MM_PLUGIN_SAMSUNG(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_SAMSUNG, MMPluginSamsung))
@@ -33,11 +33,11 @@
 #define MM_PLUGIN_SAMSUNG_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_SAMSUNG, MMPluginSamsungClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginSamsung;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginSamsungClass;
 
 GType mm_plugin_samsung_get_type (void);
