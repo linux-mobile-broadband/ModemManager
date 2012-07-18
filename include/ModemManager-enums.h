@@ -240,9 +240,7 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_CDMA_BC19_US_LOWER_700: CDMA Band Class 19 (US Lower 700MHz).
  * @MM_MODEM_BAND_ANY: For certain operations, allow the modem to select a band automatically.
  *
- * A 64-bit wide bitfield describing the specific radio bands supported by
- * the device and the radio bands the device is allowed to use when
- * connecting to a mobile network.
+ * Radio bands supported by the device when connecting to a mobile network.
  */
 typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_UNKNOWN = 0,
