@@ -29,6 +29,51 @@
 #include "mm-base-modem-at.h"
 
 /*****************************************************************************/
+/* Icera context */
+
+#define ICERA_CONTEXT_TAG "icera-context"
+static GQuark icera_context_quark;
+
+typedef struct {
+    GRegex *nwstate_regex;
+
+    /* Cache of the most recent value seen by the unsolicited message handler */
+    MMModemAccessTechnology last_act;
+} IceraContext;
+
+static void
+icera_context_free (IceraContext *ctx)
+{
+    g_regex_unref (ctx->nwstate_regex);
+    g_slice_free (IceraContext, ctx);
+}
+
+static IceraContext *
+get_icera_context (MMBroadbandModem *self)
+{
+    IceraContext *ctx;
+
+    if (G_UNLIKELY (!icera_context_quark))
+        icera_context_quark = (g_quark_from_static_string (
+                                   ICERA_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), icera_context_quark);
+    if (!ctx) {
+        ctx = g_slice_new (IceraContext);
+        ctx->nwstate_regex = (g_regex_new (
+                                  "%NWSTATE:\\s*(-?\\d+),(\\d+),([^,]*),([^,]*),(\\d+)",
+                                  G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL));
+        ctx->last_act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        g_object_set_qdata_full (G_OBJECT (self),
+                                 icera_context_quark,
+                                 ctx,
+                                 (GDestroyNotify)icera_context_free);
+    }
+
+    return ctx;
+}
+
+/*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
 
 gboolean
@@ -202,6 +247,114 @@ mm_iface_icera_modem_set_allowed_modes (MMIfaceModem *self,
         (GAsyncReadyCallback)allowed_mode_update_ready,
         result);
     g_free (command);
+}
+
+/*****************************************************************************/
+/* Icera-specific unsolicited events handling */
+
+static MMModemAccessTechnology
+nwstate_to_act (const gchar *str)
+{
+    /* small 'g' means CS, big 'G' means PS */
+    if (!strcmp (str, "2g"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    else if (!strcmp (str, "2G-GPRS"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    else if (!strcmp (str, "2G-EDGE"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    else if (!strcmp (str, "3G"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    else if (!strcmp (str, "3g"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    else if (!strcmp (str, "R99"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    else if (!strcmp (str, "3G-HSDPA") || !strcmp (str, "HSDPA"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    else if (!strcmp (str, "3G-HSUPA") || !strcmp (str, "HSUPA"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    else if (!strcmp (str, "3G-HSDPA-HSUPA") || !strcmp (str, "HSDPA-HSUPA"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static void
+nwstate_changed (MMAtSerialPort *port,
+                 GMatchInfo *info,
+                 MMBroadbandModem *self)
+{
+    IceraContext *ctx;
+    gchar *str;
+
+    /*
+     * %NWSTATE: <rssi>,<mccmnc>,<tech>,<connection state>,<regulation>
+     *
+     * <connection state> shows the actual access technology in-use when a
+     * PS connection is active.
+     */
+
+    ctx = get_icera_context (self);
+
+    /* Process signal quality... */
+    str = g_match_info_fetch (info, 1);
+    if (str) {
+        gint rssi;
+
+        rssi = atoi (str);
+        rssi = CLAMP (rssi, 0, 5) * 100 / 5;
+        g_free (str);
+
+        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self),
+                                              (guint)rssi);
+    }
+
+    /* Process access technology... */
+    str = g_match_info_fetch (info, 4);
+    if (!str || (strcmp (str, "-") == 0)) {
+        g_free (str);
+        str = g_match_info_fetch (info, 3);
+    }
+    if (str) {
+        MMModemAccessTechnology act;
+
+        act = nwstate_to_act (str);
+        g_free (str);
+
+        /* Cache last received value, needed for explicit access technology
+         * query handling */
+        ctx->last_act = act;
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   act,
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_ANY);
+    }
+}
+
+void
+mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
+                                                      gboolean enable)
+{
+    IceraContext *ctx;
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    ctx = get_icera_context (self);
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Access technology related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            ctx->nwstate_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)nwstate_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
 }
 
 /*****************************************************************************/

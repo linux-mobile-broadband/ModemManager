@@ -18,6 +18,7 @@
 #define MM_IFACE_ICERA_H
 
 #include "mm-iface-modem.h"
+#include "mm-broadband-modem.h"
 
 #define MM_TYPE_IFACE_ICERA            (mm_iface_icera_get_type ())
 #define MM_IFACE_ICERA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_ICERA, MMIfaceIcera))
@@ -52,5 +53,8 @@ void     mm_iface_icera_modem_set_allowed_modes        (MMIfaceModem *self,
 gboolean mm_iface_icera_modem_set_allowed_modes_finish (MMIfaceModem *self,
                                                         GAsyncResult *res,
                                                         GError **error);
+
+void     mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
+                                                               gboolean enable);
 
 #endif /* MM_IFACE_ICERA_H */
