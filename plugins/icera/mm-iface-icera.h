@@ -32,4 +32,16 @@ struct _MMIfaceIcera {
 
 GType mm_iface_icera_get_type (void);
 
+/*****************************************************************************/
+/* Modem interface specific implementations */
+
+void     mm_iface_icera_modem_load_allowed_modes        (MMIfaceModem *self,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+gboolean mm_iface_icera_modem_load_allowed_modes_finish (MMIfaceModem *self,
+                                                         GAsyncResult *res,
+                                                         MMModemMode *allowed,
+                                                         MMModemMode *preferred,
+                                                         GError **error);
+
 #endif /* MM_IFACE_ICERA_H */

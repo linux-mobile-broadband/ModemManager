@@ -24,8 +24,84 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 #include "mm-iface-icera.h"
-#include "mm-iface-modem.h"
+#include "mm-base-modem-at.h"
+
+/*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+gboolean
+mm_iface_icera_modem_load_allowed_modes_finish (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                MMModemMode *allowed,
+                                                MMModemMode *preferred,
+                                                GError **error)
+{
+    const gchar *response;
+    const gchar *str;
+    gint mode, domain;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    str = mm_strip_tag (response, "%IPSYS:");
+
+    if (!sscanf (str, "%d,%d", &mode, &domain)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse %%IPSYS response: '%s'",
+                     response);
+        return FALSE;
+    }
+
+    switch (mode) {
+    case 0:
+        *allowed = MM_MODEM_MODE_2G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 1:
+        *allowed = MM_MODEM_MODE_3G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 2:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_2G;
+        return TRUE;
+    case 3:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_3G;
+        return TRUE;
+    case 5: /* any */
+        *allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    default:
+        break;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't parse unexpected %%IPSYS response: '%s'",
+                 response);
+    return FALSE;
+}
+
+void
+mm_iface_icera_modem_load_allowed_modes (MMIfaceModem *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%IPSYS?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
 
 /*****************************************************************************/
 
