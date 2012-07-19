@@ -30,6 +30,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 #include "mm-utils.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerIcera, mm_broadband_bearer_icera, MM_TYPE_BROADBAND_BEARER);
@@ -553,6 +554,40 @@ connect_cancelled_cb (GCancellable *cancellable,
 }
 
 static void
+ier_query_ready (MMBaseModem *modem,
+                 GAsyncResult *res,
+                 Dial3gppContext *ctx)
+{
+    const gchar *response;
+    GError *activation_error = NULL;
+
+    response = mm_base_modem_at_command_full_finish (modem, res, NULL);
+    if (response) {
+        gint nw_activation_err;
+
+        response = mm_strip_tag (response, "%IER:");
+        if (sscanf (response, "%*d,%*d,%d", &nw_activation_err)) {
+            /* 3GPP TS 24.008 Annex G error codes:
+             * 27 - Unknown or missing access point name
+             * 33 - Requested service option not subscribed
+             */
+            if (nw_activation_err == 27 || nw_activation_err == 33)
+                activation_error = mm_mobile_equipment_error_for_code (
+                    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED);
+        }
+    }
+
+    if (activation_error)
+        g_simple_async_result_take_error (ctx->result, activation_error);
+    else
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Call setup failed");
+    dial_3gpp_context_complete_and_free (ctx);
+}
+
+static void
 report_connect_status (MMBroadbandBearerIcera *self,
                        MMBroadbandBearerIceraConnectionStatus status)
 {
@@ -591,11 +626,16 @@ report_connect_status (MMBroadbandBearerIcera *self,
         if (!ctx)
             break;
 
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Call setup failed");
-        dial_3gpp_context_complete_and_free (ctx);
+        /* Try to gather additional info about the connection failure */
+        mm_base_modem_at_command_full (
+            ctx->modem,
+            ctx->primary,
+            "%IER?",
+            60,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)ier_query_ready,
+            ctx);
         return;
 
     case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED:
