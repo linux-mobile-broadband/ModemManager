@@ -746,7 +746,7 @@ mm_iface_icera_modem_time_load_network_timezone (MMIfaceModemTime *self,
                                                  gpointer user_data)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "%TLTS",
+                              "*TLTS",
                               3,
                               FALSE,
                               callback,
@@ -776,7 +776,7 @@ mm_iface_icera_modem_time_load_network_time (MMIfaceModemTime *self,
                                              gpointer user_data)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "%TLTS",
+                              "*TLTS",
                               3,
                               FALSE,
                               callback,
