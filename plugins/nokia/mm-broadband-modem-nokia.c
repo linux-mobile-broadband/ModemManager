@@ -152,7 +152,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
 
-    /* Nokia headsets (at least N85) do not support "power on"; they do
+    /* Nokia handsets (at least N85) do not support "power on"; they do
      * support "power off" but you proabably do not want to turn off the
      * power on your telephone if something went wrong with connecting
      * process. So, disabling both these operations.  The Nokia GSM/UMTS command
