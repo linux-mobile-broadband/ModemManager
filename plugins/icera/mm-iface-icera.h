@@ -99,6 +99,31 @@ MMUnlockRetries *mm_iface_icera_modem_load_unlock_retries_finish (MMIfaceModem *
                                                                   GAsyncResult *res,
                                                                   GError **error);
 
+void     mm_iface_icera_modem_load_supported_bands (MMIfaceModem *self,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data);
+
+GArray  *mm_iface_icera_modem_load_supported_bands_finish (MMIfaceModem *self,
+                                                           GAsyncResult *res,
+                                                           GError **error);
+
+void     mm_iface_icera_modem_load_current_bands (MMIfaceModem *self,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+
+GArray  *mm_iface_icera_modem_load_current_bands_finish (MMIfaceModem *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
+void     mm_iface_icera_modem_set_bands (MMIfaceModem *self,
+                                         GArray *bands_array,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+
+gboolean mm_iface_icera_modem_set_bands_finish (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
 /*****************************************************************************/
 /* Modem 3GPP interface specific implementations */
 
