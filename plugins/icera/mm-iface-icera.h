@@ -91,6 +91,13 @@ gboolean mm_iface_icera_modem_reset_finish (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error);
 
+void             mm_iface_icera_modem_load_unlock_retries (MMIfaceModem *self,
+                                                           GAsyncReadyCallback callback,
+                                                           gpointer user_data);
+
+MMUnlockRetries *mm_iface_icera_modem_load_unlock_retries_finish (MMIfaceModem *self,
+                                                                  GAsyncResult *res,
+                                                                  GError **error);
 
 /*****************************************************************************/
 /* Modem 3GPP interface specific implementations */
