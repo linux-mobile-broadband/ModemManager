@@ -19,6 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-time.h"
 #include "mm-broadband-modem.h"
 
 #define MM_TYPE_IFACE_ICERA            (mm_iface_icera_get_type ())
@@ -98,5 +99,15 @@ void mm_iface_icera_modem_3gpp_disable_unsolicited_events            (MMIfaceMod
 gboolean mm_iface_icera_modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
                                                                       GAsyncResult *res,
                                                                       GError **error);
+
+/*****************************************************************************/
+/* Modem Time interface specific implementations */
+
+void               mm_iface_icera_modem_time_load_network_timezone        (MMIfaceModemTime *self,
+                                                                           GAsyncReadyCallback callback,
+                                                                           gpointer user_data);
+MMNetworkTimezone *mm_iface_icera_modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
+                                                                           GAsyncResult *res,
+                                                                           GError **error);
 
 #endif /* MM_IFACE_ICERA_H */

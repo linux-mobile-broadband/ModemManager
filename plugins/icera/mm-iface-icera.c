@@ -660,6 +660,96 @@ void mm_iface_icera_modem_reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load network timezone (Time interface) */
+
+static gboolean
+parse_tlts_query_reply (const gchar *response,
+                        gchar **iso8601,
+                        MMNetworkTimezone **tz)
+{
+    gint year;
+    gint month;
+    gint day;
+    gint hour;
+    gint minute;
+    gint second;
+    gchar sign;
+    gint offset;
+
+    response = mm_strip_tag (response, "*TLTS: ");
+    if (sscanf (response,
+                "\"%02d/%02d/%02d,%02d:%02d:%02d%c%02d\"",
+                &year,
+                &month,
+                &day,
+                &hour,
+                &minute,
+                &second,
+                &sign,
+                &offset) == 8) {
+        /* Offset comes in 15-min intervals */
+        offset *= 15;
+        /* Apply sign to offset */
+        if (sign == '-')
+            offset *= -1;
+
+        /* If asked for it, build timezone information */
+        if (tz) {
+            *tz = mm_network_timezone_new ();
+            mm_network_timezone_set_offset (*tz, offset);
+        }
+
+        if (iso8601) {
+            /* don't give tz info in the date/time string, we have another
+             * property for that */
+            *iso8601 = g_strdup_printf ("%02d/%02d/%02d %02d:%02d:%02d",
+                                        year, month, day,
+                                        hour, minute, second);
+        }
+
+        return TRUE;
+    }
+
+    mm_warn ("Unknown *TLTS response: %s", response);
+    return FALSE;
+}
+
+MMNetworkTimezone *
+mm_iface_icera_modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
+                                                        GAsyncResult *res,
+                                                        GError **error)
+{
+    const gchar *response;
+    MMNetworkTimezone *tz;
+
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    if (!response) {
+        /* We'll assume we can retry a bit later */
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_RETRY,
+                     "Retry");
+        return NULL;
+    }
+
+    return (parse_tlts_query_reply (response, NULL, &tz) ? tz : NULL);
+}
+
+void
+mm_iface_icera_modem_time_load_network_timezone (MMIfaceModemTime *self,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%TLTS",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 static void
 iface_icera_init (gpointer g_iface)
