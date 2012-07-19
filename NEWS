@@ -1,3 +1,18 @@
+Overview of changes in ModemManager 0.6
+----------------------------------------
+
+Significant changes over ModemManager 0.5 include:
+
+- More flexible and reliable port probing and modem setup
+- New plugin for some Cinterion modems
+- New plugin for some Iridium satellite modems
+- New API for modem firmware management
+- New API for network-provided date and time
+- New API for indicating remaining PIN/PUK unlock retries
+- New API for indicating enabled facility locks
+- Plugins can now suggest and IP timeout value for connection managers
+
+
 Overview of changes in ModemManager 0.5
 ----------------------------------------
 
