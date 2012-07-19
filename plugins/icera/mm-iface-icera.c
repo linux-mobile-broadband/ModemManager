@@ -751,6 +751,36 @@ mm_iface_icera_modem_time_load_network_timezone (MMIfaceModemTime *self,
 
 /*****************************************************************************/
 
+gchar *
+mm_iface_icera_modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    const gchar *response;
+    gchar *iso8601;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+
+    return (parse_tlts_query_reply (response, &iso8601, NULL, error) ? iso8601 : NULL);
+}
+
+void
+mm_iface_icera_modem_time_load_network_time (MMIfaceModemTime *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%TLTS",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+
 static void
 iface_icera_init (gpointer g_iface)
 {

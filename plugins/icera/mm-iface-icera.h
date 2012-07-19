@@ -103,6 +103,13 @@ gboolean mm_iface_icera_modem_3gpp_disable_unsolicited_events_finish (MMIfaceMod
 /*****************************************************************************/
 /* Modem Time interface specific implementations */
 
+void   mm_iface_icera_modem_time_load_network_time        (MMIfaceModemTime *self,
+                                                           GAsyncReadyCallback callback,
+                                                           gpointer user_data);
+gchar *mm_iface_icera_modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                                           GAsyncResult *res,
+                                                           GError **error);
+
 void               mm_iface_icera_modem_time_load_network_timezone        (MMIfaceModemTime *self,
                                                                            GAsyncReadyCallback callback,
                                                                            gpointer user_data);
