@@ -1,6 +1,15 @@
 AC_PREREQ([2.60])
 
-AC_INIT([ModemManager],[0.5.999],[dcbw@redhat.com],[ModemManager])
+dnl The MM version number
+m4_define([mm_major_version], [0])
+m4_define([mm_minor_version], [5])
+m4_define([mm_micro_version], [995])
+m4_define([mm_nano_version],  [0])
+m4_define([mm_version],
+          [mm_major_version.mm_minor_version.mm_micro_version.mm_nano_version])
+
+AC_INIT([ModemManager],[mm_version],[dcbw@redhat.com],[ModemManager])
+
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-bzip2 -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_MAINTAINER_MODE
