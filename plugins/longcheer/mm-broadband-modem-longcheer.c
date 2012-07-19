@@ -233,6 +233,82 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    return (MMUnlockRetries *) g_object_ref (g_simple_async_result_get_op_res_gpointer (
+                                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_unlock_retries_ready (MMBaseModem *self,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error;
+    int pin1, puk1, pin2, puk2;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    /* That's right; no +CPNNUM: prefix, it looks like this:
+     *
+     * AT+CPNNUM
+     * PIN1=3; PUK1=10; PIN2=3; PUK2=10
+     * OK
+     */
+    if (sscanf (response, "PIN1=%d; PUK1=%d; PIN2=%d; PUK2=%d", &pin1, &puk1, &pin2, &puk2) == 4) {
+        MMUnlockRetries *retries;
+        retries = mm_unlock_retries_new ();
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, pin1);
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, puk1);
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, pin2);
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2);
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   retries,
+                                                   (GDestroyNotify)g_object_unref);
+    } else {
+        g_simple_async_result_set_error (operation_result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Invalid unlock retries response: '%s'",
+                                         response);
+    }
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+load_unlock_retries (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CPNNUM",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)load_unlock_retries_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_unlock_retries));
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemLongcheer *
 mm_broadband_modem_longcheer_new (const gchar *device,
@@ -264,6 +340,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
 }
 
 static void
