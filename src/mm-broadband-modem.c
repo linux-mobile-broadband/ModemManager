@@ -2153,13 +2153,15 @@ modem_init_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Init command */
-    { "Z E0 V1", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
-
-    /* Ensure echo is off after the init command; some modems ignore the
-     * E0 when it's in the same line as ATZ (Option GIO322).
+    /* Init command. ITU rec v.250 (6.1.1) says:
+     *   The DTE should not include additional commands on the same command line
+     *   after the Z command because such commands may be ignored.
+     * So run ATZ alone.
      */
-    { "E0",      3, FALSE, NULL },
+    { "Z", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
+
+    /* Ensure echo is off after the init command */
+    { "E0 V1",      3, FALSE, NULL },
 
     /* Some phones (like Blackberries) don't support +CMEE=1, so make it
      * optional.  It completely violates 3GPP TS 27.007 (9.1) but what can we do...
