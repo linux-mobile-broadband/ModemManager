@@ -42,7 +42,7 @@ typedef struct _MMAtSerialPortClass MMAtSerialPortClass;
  */
 typedef enum {
     MM_AT_PORT_FLAG_NONE    = 0x0000,
-    /* This port is preferred for command and status */ 
+    /* This port is preferred for command and status */
     MM_AT_PORT_FLAG_PRIMARY = 0x0001,
     /* Use port for command and status if the primary port is connected */
     MM_AT_PORT_FLAG_SECONDARY = 0x0002,

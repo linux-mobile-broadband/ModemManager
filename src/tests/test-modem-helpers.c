@@ -1237,45 +1237,45 @@ typedef void (*TCFunc)(void);
 
 int main (int argc, char **argv)
 {
-	GTestSuite *suite;
+    GTestSuite *suite;
     TestData *data;
     gint result;
     DevidItem *item = &devids[0];
 
-	g_test_init (&argc, &argv, NULL);
+    g_test_init (&argc, &argv, NULL);
 
-	suite = g_test_get_root ();
+    suite = g_test_get_root ();
     data = test_data_new ();
 
-	g_test_suite_add (suite, TESTCASE (test_cops_response_tm506, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gt3gplus, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_ac881, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gtmax36, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_ac860, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gtm378, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_motoc, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_mf627a, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_mf627b, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_e160g, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_mercury, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_quicksilver, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_icon225, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_icon452, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_f3507g, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_f3607gw, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_mc8775, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_n80, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_e1550, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_mf622, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_e226, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_xu870, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gtultraexpress, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_tm506, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gt3gplus, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_ac881, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gtmax36, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_ac860, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gtm378, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_motoc, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_mf627a, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_mf627b, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_e160g, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_mercury, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_quicksilver, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_icon225, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_icon452, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_f3507g, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_f3607gw, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_mc8775, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_n80, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_e1550, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_mf622, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_e226, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_xu870, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gtultraexpress, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_creg1_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, data));

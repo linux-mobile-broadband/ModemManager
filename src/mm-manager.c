@@ -303,7 +303,7 @@ check_export_modem (MMManager *self, MMModem *modem)
     if (   g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG)
         || !mm_modem_get_valid (modem))
         return;
-    
+
     path = g_strdup_printf (MM_DBUS_PATH "/Modems/%d", id++);
     dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
     g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);

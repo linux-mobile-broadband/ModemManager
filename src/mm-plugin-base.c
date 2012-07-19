@@ -435,27 +435,27 @@ mm_plugin_base_supports_task_class_init (MMPluginBaseSupportsTaskClass *klass)
 #define CAP_GSM_OR_CDMA (MM_PLUGIN_BASE_PORT_CAP_CDMA | MM_PLUGIN_BASE_PORT_CAP_GSM)
 
 struct modem_caps {
-	char *name;
-	guint32 bits;
+    char *name;
+    guint32 bits;
 };
 
 static struct modem_caps modem_caps[] = {
-	{"+CGSM",     MM_PLUGIN_BASE_PORT_CAP_GSM},
-	{"+CIS707-A", MM_PLUGIN_BASE_PORT_CAP_IS707_A},
-	{"+CIS707A",  MM_PLUGIN_BASE_PORT_CAP_IS707_A}, /* Cmotech */
-	{"+CIS707",   MM_PLUGIN_BASE_PORT_CAP_IS707_A},
-	{"CIS707",    MM_PLUGIN_BASE_PORT_CAP_IS707_A}, /* Qualcomm Gobi */
-	{"+CIS707P",  MM_PLUGIN_BASE_PORT_CAP_IS707_P},
-	{"CIS-856",   MM_PLUGIN_BASE_PORT_CAP_IS856},
-	{"+IS-856",   MM_PLUGIN_BASE_PORT_CAP_IS856},   /* Cmotech */
-	{"CIS-856-A", MM_PLUGIN_BASE_PORT_CAP_IS856_A},
-	{"CIS-856A",  MM_PLUGIN_BASE_PORT_CAP_IS856_A}, /* Kyocera KPC680 */
-	{"+DS",       MM_PLUGIN_BASE_PORT_CAP_DS},
-	{"+ES",       MM_PLUGIN_BASE_PORT_CAP_ES},
-	{"+MS",       MM_PLUGIN_BASE_PORT_CAP_MS},
-	{"+FCLASS",   MM_PLUGIN_BASE_PORT_CAP_FCLASS},
+    {"+CGSM",     MM_PLUGIN_BASE_PORT_CAP_GSM},
+    {"+CIS707-A", MM_PLUGIN_BASE_PORT_CAP_IS707_A},
+    {"+CIS707A",  MM_PLUGIN_BASE_PORT_CAP_IS707_A}, /* Cmotech */
+    {"+CIS707",   MM_PLUGIN_BASE_PORT_CAP_IS707_A},
+    {"CIS707",    MM_PLUGIN_BASE_PORT_CAP_IS707_A}, /* Qualcomm Gobi */
+    {"+CIS707P",  MM_PLUGIN_BASE_PORT_CAP_IS707_P},
+    {"CIS-856",   MM_PLUGIN_BASE_PORT_CAP_IS856},
+    {"+IS-856",   MM_PLUGIN_BASE_PORT_CAP_IS856},   /* Cmotech */
+    {"CIS-856-A", MM_PLUGIN_BASE_PORT_CAP_IS856_A},
+    {"CIS-856A",  MM_PLUGIN_BASE_PORT_CAP_IS856_A}, /* Kyocera KPC680 */
+    {"+DS",       MM_PLUGIN_BASE_PORT_CAP_DS},
+    {"+ES",       MM_PLUGIN_BASE_PORT_CAP_ES},
+    {"+MS",       MM_PLUGIN_BASE_PORT_CAP_MS},
+    {"+FCLASS",   MM_PLUGIN_BASE_PORT_CAP_FCLASS},
     {"+WIRIDIUM", MM_PLUGIN_BASE_PORT_CAP_IRIDIUM},
-	{NULL}
+    {NULL}
 };
 
 static guint32
