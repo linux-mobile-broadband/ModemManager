@@ -38,7 +38,171 @@ struct _MMBroadbandBearerIceraPrivate {
     gpointer connect_pending;
     guint connect_pending_id;
     gulong connect_cancellable_id;
+
+    /* Disconnection related */
+    gpointer disconnect_pending;
+    guint disconnect_pending_id;
 };
+
+/*****************************************************************************/
+/* 3GPP disconnection */
+
+typedef struct {
+    MMBroadbandBearerIcera *self;
+    GSimpleAsyncResult *result;
+} Disconnect3gppContext;
+
+static void
+disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+disconnect_3gpp_finish (MMBroadbandBearer *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+disconnect_3gpp_timed_out_cb (MMBroadbandBearerIcera *self)
+{
+    Disconnect3gppContext *ctx;
+
+    /* Recover context */
+    ctx = self->priv->disconnect_pending;
+
+    self->priv->disconnect_pending = NULL;
+    self->priv->disconnect_pending_id = 0;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_SERIAL_ERROR,
+                                     MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
+                                     "Disconnection attempt timed out");
+
+    disconnect_3gpp_context_complete_and_free (ctx);
+    return FALSE;
+}
+
+static void
+report_disconnect_status (MMBroadbandBearerIcera *self,
+                          MMBroadbandBearerIceraConnectionStatus status)
+{
+    Disconnect3gppContext *ctx;
+
+    /* Recover context */
+    ctx = self->priv->disconnect_pending;
+    self->priv->disconnect_pending = NULL;
+
+    /* Cleanup timeout, if any */
+    if (self->priv->disconnect_pending_id) {
+        g_source_remove (self->priv->disconnect_pending_id);
+        self->priv->disconnect_pending_id = 0;
+    }
+
+    switch (status) {
+    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN:
+        g_warn_if_reached ();
+        break;
+
+    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED:
+        if (!ctx)
+            break;
+
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Disconnection failed");
+        disconnect_3gpp_context_complete_and_free (ctx);
+        return;
+
+    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED:
+        if (!ctx)
+            break;
+
+        /* Well, this actually means disconnection, right? */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_3gpp_context_complete_and_free (ctx);
+        return;
+
+    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED:
+        if (!ctx) {
+            mm_dbg ("Received spontaneous %%IPDPACT disconnect");
+            mm_bearer_report_disconnection (MM_BEARER (self));
+            break;
+        }
+
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_3gpp_context_complete_and_free (ctx);
+        return;
+    }
+}
+
+static void
+disconnect_ipdpact_ready (MMBaseModem *modem,
+                          GAsyncResult *res,
+                          Disconnect3gppContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+
+        ctx->self->priv->disconnect_pending = NULL;
+
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_3gpp_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Set a 60-second disconnection-failure timeout */
+    ctx->self->priv->disconnect_pending_id = g_timeout_add_seconds (60,
+                                                                    (GSourceFunc)disconnect_3gpp_timed_out_cb,
+                                                                    ctx->self);
+}
+
+static void
+disconnect_3gpp (MMBroadbandBearer *bearer,
+                 MMBroadbandModem *modem,
+                 MMAtSerialPort *primary,
+                 MMAtSerialPort *secondary,
+                 MMPort *data,
+                 guint cid,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (bearer);
+    gchar *command;
+    Disconnect3gppContext *ctx;
+
+    ctx = g_new0 (Disconnect3gppContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disconnect_3gpp);
+
+    command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
+    mm_base_modem_at_command_full (
+        MM_BASE_MODEM (modem),
+        primary,
+        command,
+        60,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)disconnect_ipdpact_ready,
+        ctx);
+    g_free (command);
+
+    /* Keep the context in the private info, we'll get disconnection
+     * status via unsolicited messages */
+    self->priv->disconnect_pending = ctx;
+}
 
 /*****************************************************************************/
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
@@ -420,6 +584,9 @@ mm_broadband_bearer_icera_report_connection_status (MMBroadbandBearerIcera *self
 {
     if (self->priv->connect_pending)
         report_connect_status (self, status);
+
+    if (self->priv->disconnect_pending)
+        report_disconnect_status (self, status);
 }
 
 /*****************************************************************************/
@@ -481,4 +648,6 @@ mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 }
