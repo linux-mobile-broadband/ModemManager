@@ -18,7 +18,6 @@
 #include <config.h>
 
 #include <stdio.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -120,7 +119,6 @@ ip_config_ready (MMBaseModem *modem,
     gchar *dns[3] = { 0 };
     guint i;
     guint dns_i;
-    guint32 tmp;
 
     response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
     if (error) {
@@ -147,11 +145,10 @@ ip_config_ready (MMBaseModem *modem,
 
     for (i = 0, dns_i = 0; items[i]; i++) {
         if (i == 0) { /* CID */
-            glong num;
+            gint num;
 
-            errno = 0;
-            num = strtol (items[i], NULL, 10);
-            if (errno != 0 || num < 0 || (gint) num != ctx->cid) {
+            if (!mm_get_int_from_str (items[i], &num) ||
+                num != ctx->cid) {
                 error = g_error_new (MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
                                      "Unknown CID in OWANDATA response ("
@@ -159,6 +156,8 @@ ip_config_ready (MMBaseModem *modem,
                 break;
             }
         } else if (i == 1) { /* IP address */
+            guint32 tmp;
+
             if (!inet_pton (AF_INET, items[i], &tmp))
                 break;
 
@@ -166,6 +165,8 @@ ip_config_ready (MMBaseModem *modem,
             mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_STATIC);
             mm_bearer_ip_config_set_address (ip_config,  items[i]);
         } else if (i == 3 || i == 4) { /* DNS entries */
+            guint32 tmp;
+
             if (!inet_pton (AF_INET, items[i], &tmp)) {
                 g_clear_object (&ip_config);
                 break;
