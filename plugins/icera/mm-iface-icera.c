@@ -427,6 +427,56 @@ mm_iface_icera_modem_load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Disable unsolicited events (3GPP interface) */
+
+gboolean
+mm_iface_icera_modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                             GAsyncResult *res,
+                                                             GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+void
+mm_iface_icera_modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%NWSTATE=0",
+        3,
+        FALSE,
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
+/* Enable unsolicited events (3GPP interface) */
+
+gboolean
+mm_iface_icera_modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                            GAsyncResult *res,
+                                                            GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+void
+mm_iface_icera_modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%NWSTATE=1",
+        3,
+        FALSE,
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 
 static void
 iface_icera_init (gpointer g_iface)
@@ -450,7 +500,7 @@ mm_iface_icera_get_type (void)
                                                    &info,
                                                    0);
 
-        g_type_interface_add_prerequisite (iface_icera_type, MM_TYPE_IFACE_MODEM);
+        g_type_interface_add_prerequisite (iface_icera_type, MM_TYPE_BROADBAND_MODEM);
     }
 
     return iface_icera_type;

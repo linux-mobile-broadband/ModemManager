@@ -18,6 +18,7 @@
 #define MM_IFACE_ICERA_H
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem.h"
 
 #define MM_TYPE_IFACE_ICERA            (mm_iface_icera_get_type ())
@@ -65,5 +66,21 @@ gboolean mm_iface_icera_modem_load_access_technologies_finish (MMIfaceModem *sel
                                                                MMModemAccessTechnology *access_technologies,
                                                                guint *mask,
                                                                GError **error);
+
+/*****************************************************************************/
+/* Modem 3GPP interface specific implementations */
+
+void mm_iface_icera_modem_3gpp_enable_unsolicited_events             (MMIfaceModem3gpp *self,
+                                                                      GAsyncReadyCallback callback,
+                                                                      gpointer user_data);
+gboolean mm_iface_icera_modem_3gpp_enable_unsolicited_events_finish  (MMIfaceModem3gpp *self,
+                                                                      GAsyncResult *res,
+                                                                      GError **error);
+void mm_iface_icera_modem_3gpp_disable_unsolicited_events            (MMIfaceModem3gpp *self,
+                                                                      GAsyncReadyCallback callback,
+                                                                      gpointer user_data);
+gboolean mm_iface_icera_modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                                      GAsyncResult *res,
+                                                                      GError **error);
 
 #endif /* MM_IFACE_ICERA_H */
