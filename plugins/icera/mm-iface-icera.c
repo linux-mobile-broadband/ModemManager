@@ -28,6 +28,7 @@
 #include "mm-iface-icera.h"
 #include "mm-broadband-bearer-icera.h"
 #include "mm-base-modem-at.h"
+#include "mm-bearer-list.h"
 
 /*****************************************************************************/
 /* Icera context */
@@ -38,6 +39,7 @@ static GQuark icera_context_quark;
 typedef struct {
     GRegex *nwstate_regex;
     GRegex *pacsp_regex;
+    GRegex *ipdpact_regex;
 
     /* Cache of the most recent value seen by the unsolicited message handler */
     MMModemAccessTechnology last_act;
@@ -48,6 +50,7 @@ icera_context_free (IceraContext *ctx)
 {
     g_regex_unref (ctx->nwstate_regex);
     g_regex_unref (ctx->pacsp_regex);
+    g_regex_unref (ctx->ipdpact_regex);
     g_slice_free (IceraContext, ctx);
 }
 
@@ -69,6 +72,9 @@ get_icera_context (MMBroadbandModem *self)
         ctx->pacsp_regex = (g_regex_new (
                                 "\\r\\n\\+PACSP(\\d)\\r\\n",
                                 G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL));
+        ctx->ipdpact_regex = (g_regex_new (
+                                  "\\r\\n%IPDPACT:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)\\r\\n",
+                                  G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL));
         ctx->last_act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         g_object_set_qdata_full (G_OBJECT (self),
                                  icera_context_quark,
@@ -258,6 +264,80 @@ mm_iface_icera_modem_set_allowed_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Icera-specific unsolicited events handling */
 
+typedef struct {
+    guint cid;
+    MMBroadbandBearerIceraConnectionStatus status;
+} BearerListReportStatusForeachContext;
+
+static void
+bearer_list_report_status_foreach (MMBearer *bearer,
+                                   BearerListReportStatusForeachContext *ctx)
+{
+    if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
+        return;
+
+    if (!MM_IS_BROADBAND_BEARER_ICERA (bearer))
+        return;
+
+    mm_broadband_bearer_icera_report_connection_status (MM_BROADBAND_BEARER_ICERA (bearer),
+                                                        ctx->status);
+}
+
+static void
+ipdpact_received (MMAtSerialPort *port,
+                  GMatchInfo *match_info,
+                  MMBroadbandModem *self)
+{
+    MMBearerList *list = NULL;
+    BearerListReportStatusForeachContext ctx;
+    guint cid;
+    guint status;
+
+    /* Ensure we got proper parsed values */
+    if (!mm_get_uint_from_match_info (match_info, 1, &cid) ||
+        !mm_get_uint_from_match_info (match_info, 2, &status))
+        return;
+
+    /* Setup context */
+    ctx.cid = 0;
+    ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN;
+
+    switch (status) {
+    case 0:
+        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED;
+        break;
+    case 1:
+        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED;
+        break;
+    case 2:
+        /* activating */
+        break;
+    case 3:
+        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED;
+        break;
+    default:
+        mm_warn ("Unknown Icera connect status %d", status);
+        break;
+    }
+
+    /* If unknown status, don't try to report anything */
+    if (ctx.status == MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN)
+        return;
+
+    /* If empty bearer list, nothing else to do */
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    if (!list)
+        return;
+
+    /* Will report status only in the bearer with the specific CID */
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_list_report_status_foreach,
+                            &ctx);
+    g_object_unref (list);
+}
+
 static MMModemAccessTechnology
 nwstate_to_act (const gchar *str)
 {
@@ -358,6 +438,14 @@ mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
             ports[i],
             ctx->nwstate_regex,
             enable ? (MMAtSerialUnsolicitedMsgFn)nwstate_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+
+        /* Connection status related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            ctx->ipdpact_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)ipdpact_received : NULL,
             enable ? self : NULL,
             NULL);
 
