@@ -780,6 +780,30 @@ mm_iface_icera_modem_time_load_network_time (MMIfaceModemTime *self,
 }
 
 /*****************************************************************************/
+/* Check Icera support */
+
+gboolean
+mm_iface_icera_check_support_finish (MMBroadbandModem *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+void
+mm_iface_icera_check_support (MMBroadbandModem *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%IPSYS?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 static void
 iface_icera_init (gpointer g_iface)

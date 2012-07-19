@@ -35,6 +35,14 @@ struct _MMIfaceIcera {
 
 GType mm_iface_icera_get_type (void);
 
+
+void     mm_iface_icera_check_support        (MMBroadbandModem *self,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+gboolean mm_iface_icera_check_support_finish (MMBroadbandModem *self,
+                                              GAsyncResult *res,
+                                              GError **error);
+
 /*****************************************************************************/
 /* Modem interface specific implementations */
 
