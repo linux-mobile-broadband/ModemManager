@@ -28,11 +28,9 @@
 
 typedef struct _MMBroadbandModemSamsung MMBroadbandModemSamsung;
 typedef struct _MMBroadbandModemSamsungClass MMBroadbandModemSamsungClass;
-typedef struct _MMBroadbandModemSamsungPrivate MMBroadbandModemSamsungPrivate;
 
 struct _MMBroadbandModemSamsung {
     MMBroadbandModem parent;
-    MMBroadbandModemSamsungPrivate *priv;
 };
 
 struct _MMBroadbandModemSamsungClass{
