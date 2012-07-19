@@ -25,7 +25,6 @@
 
 #include "ModemManager.h"
 #include "mm-base-modem-at.h"
-#include "mm-broadband-bearer-samsung.h"
 #include "mm-broadband-modem-samsung.h"
 #include "mm-iface-icera.h"
 #include "mm-iface-modem.h"
@@ -396,61 +395,6 @@ mm_broadband_modem_samsung_new (const gchar *device,
                          NULL);
 }
 
-static MMBearer *
-modem_create_bearer_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
-{
-    MMBearer *bearer;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    return g_object_ref (bearer);
-}
-
-static void
-broadband_bearer_new_ready (GObject *source,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
-{
-    MMBearer *bearer = NULL;
-    GError *error = NULL;
-
-    bearer = mm_broadband_bearer_samsung_new_finish (res, &error);
-    if (!bearer)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   (GDestroyNotify)g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
-modem_create_bearer (MMIfaceModem *self,
-                     MMBearerProperties *properties,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    /* Set a new ref to the bearer object as result */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_bearer);
-
-    mm_broadband_bearer_samsung_new (MM_BROADBAND_MODEM_SAMSUNG (self),
-                                     properties,
-                                     NULL, /* cancellable */
-                                     (GAsyncReadyCallback)broadband_bearer_new_ready,
-                                     result);
-}
-
 static MMUnlockRetries *
 load_unlock_retries_finish (MMIfaceModem *self,
                             GAsyncResult *res,
@@ -752,8 +696,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    iface->create_bearer = modem_create_bearer;
-    iface->create_bearer_finish = modem_create_bearer_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
@@ -770,6 +712,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = mm_iface_icera_modem_set_allowed_modes_finish;
     iface->load_access_technologies = mm_iface_icera_modem_load_access_technologies;
     iface->load_access_technologies_finish = mm_iface_icera_modem_load_access_technologies_finish;
+    iface->create_bearer = mm_iface_icera_modem_create_bearer;
+    iface->create_bearer_finish = mm_iface_icera_modem_create_bearer_finish;
 }
 
 static void
