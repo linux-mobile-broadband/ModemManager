@@ -33,6 +33,13 @@
 #define MM_IS_BROADBAND_BEARER_ICERA_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_ICERA))
 #define MM_BROADBAND_BEARER_ICERA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_ICERA, MMBroadbandBearerIceraClass))
 
+typedef enum {
+    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN,
+    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED,
+    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED,
+    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED
+} MMBroadbandBearerIceraConnectionStatus;
+
 typedef struct _MMBroadbandBearerIcera MMBroadbandBearerIcera;
 typedef struct _MMBroadbandBearerIceraClass MMBroadbandBearerIceraClass;
 typedef struct _MMBroadbandBearerIceraPrivate MMBroadbandBearerIceraPrivate;
@@ -56,5 +63,8 @@ void      mm_broadband_bearer_icera_new        (MMBroadbandModem *modem,
                                                 gpointer user_data);
 MMBearer *mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
                                                 GError **error);
+
+void mm_broadband_bearer_icera_report_connection_status (MMBroadbandBearerIcera *self,
+                                                         MMBroadbandBearerIceraConnectionStatus status);
 
 #endif /* MM_BROADBAND_BEARER_ICERA_H */
