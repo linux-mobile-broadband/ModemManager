@@ -36,6 +36,7 @@ static GQuark icera_context_quark;
 
 typedef struct {
     GRegex *nwstate_regex;
+    GRegex *pacsp_regex;
 
     /* Cache of the most recent value seen by the unsolicited message handler */
     MMModemAccessTechnology last_act;
@@ -45,6 +46,7 @@ static void
 icera_context_free (IceraContext *ctx)
 {
     g_regex_unref (ctx->nwstate_regex);
+    g_regex_unref (ctx->pacsp_regex);
     g_slice_free (IceraContext, ctx);
 }
 
@@ -63,6 +65,9 @@ get_icera_context (MMBroadbandModem *self)
         ctx->nwstate_regex = (g_regex_new (
                                   "%NWSTATE:\\s*(-?\\d+),(\\d+),([^,]*),([^,]*),(\\d+)",
                                   G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL));
+        ctx->pacsp_regex = (g_regex_new (
+                                "\\r\\n\\+PACSP(\\d)\\r\\n",
+                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL));
         ctx->last_act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         g_object_set_qdata_full (G_OBJECT (self),
                                  icera_context_quark,
@@ -354,6 +359,16 @@ mm_iface_icera_modem_set_unsolicited_events_handlers (MMBroadbandModem *self,
             enable ? (MMAtSerialUnsolicitedMsgFn)nwstate_changed : NULL,
             enable ? self : NULL,
             NULL);
+
+        /* Always to ignore */
+        if (!enable) {
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                ports[i],
+                ctx->pacsp_regex,
+                NULL,
+                NULL,
+                NULL);
+        }
     }
 }
 
