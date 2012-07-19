@@ -732,6 +732,8 @@ static void
 iface_modem_time_init (MMIfaceModemTime *iface)
 {
     /* Use default Icera implementation */
+    iface->load_network_time = mm_iface_icera_modem_time_load_network_time;
+    iface->load_network_time_finish = mm_iface_icera_modem_time_load_network_time_finish;
     iface->load_network_timezone = mm_iface_icera_modem_time_load_network_timezone;
     iface->load_network_timezone_finish = mm_iface_icera_modem_time_load_network_timezone_finish;
 }
