@@ -67,6 +67,14 @@ gboolean mm_iface_icera_modem_load_access_technologies_finish (MMIfaceModem *sel
                                                                guint *mask,
                                                                GError **error);
 
+void      mm_iface_icera_modem_create_bearer        (MMIfaceModem *self,
+                                                     MMBearerProperties *properties,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+MMBearer *mm_iface_icera_modem_create_bearer_finish (MMIfaceModem *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
+
 /*****************************************************************************/
 /* Modem 3GPP interface specific implementations */
 
