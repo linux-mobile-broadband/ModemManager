@@ -29,18 +29,21 @@
 #include "mm-iface-icera.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-time.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
 static void iface_icera_init (MMIfaceIcera *iface);
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_ICERA, iface_icera_init));
 
 /*****************************************************************************/
@@ -723,6 +726,14 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = mm_iface_icera_modem_load_access_technologies_finish;
     iface->create_bearer = mm_iface_icera_modem_create_bearer;
     iface->create_bearer_finish = mm_iface_icera_modem_create_bearer_finish;
+}
+
+static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+    /* Use default Icera implementation */
+    iface->load_network_timezone = mm_iface_icera_modem_time_load_network_timezone;
+    iface->load_network_timezone_finish = mm_iface_icera_modem_time_load_network_timezone_finish;
 }
 
 static void

@@ -665,7 +665,8 @@ void mm_iface_icera_modem_reset (MMIfaceModem *self,
 static gboolean
 parse_tlts_query_reply (const gchar *response,
                         gchar **iso8601,
-                        MMNetworkTimezone **tz)
+                        MMNetworkTimezone **tz,
+                        GError **error)
 {
     gint year;
     gint month;
@@ -710,7 +711,11 @@ parse_tlts_query_reply (const gchar *response,
         return TRUE;
     }
 
-    mm_warn ("Unknown *TLTS response: %s", response);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Unknown *TLTS response: %s",
+                 response);
     return FALSE;
 }
 
@@ -722,7 +727,6 @@ mm_iface_icera_modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
     const gchar *response;
     MMNetworkTimezone *tz;
 
-
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
     if (!response) {
         /* We'll assume we can retry a bit later */
@@ -733,7 +737,7 @@ mm_iface_icera_modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
         return NULL;
     }
 
-    return (parse_tlts_query_reply (response, NULL, &tz) ? tz : NULL);
+    return (parse_tlts_query_reply (response, NULL, &tz, error) ? tz : NULL);
 }
 
 void
