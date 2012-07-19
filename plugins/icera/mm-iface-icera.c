@@ -637,6 +637,29 @@ mm_iface_icera_modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+gboolean
+mm_iface_icera_modem_reset_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+void mm_iface_icera_modem_reset (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%IRESET",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 static void
 iface_icera_init (gpointer g_iface)
