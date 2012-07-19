@@ -461,6 +461,32 @@ load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+     * keeps access to the SIM */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=4",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static gboolean
@@ -733,6 +759,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_bands_finish = set_bands_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_down_finish;
 
     /* Use default Icera implementation */
     iface->load_allowed_modes = mm_iface_icera_modem_load_allowed_modes;
