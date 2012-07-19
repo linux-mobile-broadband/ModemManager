@@ -44,6 +44,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_ICERA, iface_icera_init));
 
 /*****************************************************************************/
+/* Load supported bands (Modem interface) */
 
 typedef struct {
     MMModemBand band;
@@ -115,6 +116,9 @@ load_supported_bands (MMIfaceModem *self,
     g_object_unref (result);
 }
 
+/*****************************************************************************/
+/* Load current bands (Modem interface) */
+
 static GArray *
 load_current_bands_finish (MMIfaceModem *self,
                            GAsyncResult *res,
@@ -139,7 +143,7 @@ load_current_bands_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query supported bands: '%s'", error->message);
+        mm_dbg ("Couldn't query current bands: '%s'", error->message);
         g_simple_async_result_take_error (operation_result, error);
         g_simple_async_result_complete (operation_result);
         g_object_unref (operation_result);
@@ -210,6 +214,8 @@ load_current_bands (MMIfaceModem *self,
         result);
 }
 
+/*****************************************************************************/
+/* Set bands (Modem interface) */
 
 typedef struct {
     GSimpleAsyncResult *result;
@@ -379,21 +385,8 @@ set_bands (MMIfaceModem *self,
                         ctx);
 }
 
-MMBroadbandModemSamsung *
-mm_broadband_modem_samsung_new (const gchar *device,
-                                 const gchar *driver,
-                                 const gchar *plugin,
-                                 guint16 vendor_id,
-                                 guint16 product_id)
-{
-    return g_object_new (MM_TYPE_BROADBAND_MODEM_SAMSUNG,
-                         MM_BASE_MODEM_DEVICE, device,
-                         MM_BASE_MODEM_DRIVER, driver,
-                         MM_BASE_MODEM_PLUGIN, plugin,
-                         MM_BASE_MODEM_VENDOR_ID, vendor_id,
-                         MM_BASE_MODEM_PRODUCT_ID, product_id,
-                         NULL);
-}
+/*****************************************************************************/
+/* Load unlock retries (Modem interface) */
 
 static MMUnlockRetries *
 load_unlock_retries_finish (MMIfaceModem *self,
@@ -672,6 +665,22 @@ setup_ports (MMBroadbandModem *self)
 }
 
 /*****************************************************************************/
+
+MMBroadbandModemSamsung *
+mm_broadband_modem_samsung_new (const gchar *device,
+                                const gchar *driver,
+                                const gchar *plugin,
+                                guint16 vendor_id,
+                                guint16 product_id)
+{
+    return g_object_new (MM_TYPE_BROADBAND_MODEM_SAMSUNG,
+                         MM_BASE_MODEM_DEVICE, device,
+                         MM_BASE_MODEM_DRIVER, driver,
+                         MM_BASE_MODEM_PLUGIN, plugin,
+                         MM_BASE_MODEM_VENDOR_ID, vendor_id,
+                         MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         NULL);
+}
 
 static void
 mm_broadband_modem_samsung_init (MMBroadbandModemSamsung *self)
