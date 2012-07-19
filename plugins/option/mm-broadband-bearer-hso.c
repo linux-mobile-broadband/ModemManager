@@ -468,10 +468,8 @@ activate_ready (MMBaseModem *modem,
         return;
     }
 
-    /* We will now setup a timeout and keep the context in the bearer's private.
-     * Reports of modem being connected will arrive via unsolicited messages. */
-    g_assert (ctx->self->priv->connect_pending == NULL);
-    ctx->self->priv->connect_pending = ctx;
+    /* We will now setup a timeout so that we don't wait forever to get the
+     * connection on */
     ctx->self->priv->connect_pending_id = g_timeout_add_seconds (30,
                                                                  (GSourceFunc)connect_timed_out_cb,
                                                                  ctx->self);
@@ -516,6 +514,11 @@ authenticate_ready (MMBaseModem *modem,
                                    (GAsyncReadyCallback)activate_ready,
                                    ctx);
     g_free (command);
+
+    /* We will now keep the context in the bearer's private.
+     * Reports of modem being connected will arrive via unsolicited messages. */
+    g_assert (ctx->self->priv->connect_pending == NULL);
+    ctx->self->priv->connect_pending = ctx;
 }
 
 const gchar *auth_commands[] = {
