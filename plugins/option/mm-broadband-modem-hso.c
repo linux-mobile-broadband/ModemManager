@@ -143,7 +143,7 @@ load_unlock_retries_ready (MMBaseModem *self,
     }
 
     response = mm_strip_tag (response, "_OERCN:");
-    if (sscanf (response, " %d, %d", &pin1, &puk1) == 4) {
+    if (sscanf (response, " %d, %d", &pin1, &puk1) == 2) {
         MMUnlockRetries *retries;
         retries = mm_unlock_retries_new ();
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, pin1);
