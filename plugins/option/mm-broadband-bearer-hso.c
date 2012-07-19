@@ -464,8 +464,7 @@ activate_ready (MMBaseModem *modem,
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
-        g_simple_async_result_complete (ctx->result);
-        g_object_unref (ctx->result);
+        dial_3gpp_context_complete_and_free (ctx);
         return;
     }
 
