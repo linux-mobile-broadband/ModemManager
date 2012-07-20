@@ -56,7 +56,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-huawei.la \
 	libmm-plugin-longcheer.la \
 	libmm-plugin-x22x.la \
-	libmm-plugin-pantech.la
+	libmm-plugin-pantech.la \
+	libmm-plugin-zte.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -194,15 +195,13 @@ libmm_plugin_nokia_icera_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_nokia_icera_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
 udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
-## Zte
-#libmm_plugin_zte_la_SOURCES = \
-#	mm-plugin-zte.c \
-#	mm-plugin-zte.h \
-#	mm-modem-zte.c \
-#	mm-modem-zte.h
-#libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#libmm_plugin_zte_la_LIBADD = $(builddir)/libicera-utils.la
+# Zte
+libmm_plugin_zte_la_SOURCES = \
+	zte/mm-plugin-zte.c \
+	zte/mm-plugin-zte.h
+libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += zte/77-mm-zte-port-types.rules
 
 # Longcheer (and rebranded dongles)
 libmm_plugin_longcheer_la_SOURCES = \
