@@ -733,36 +733,119 @@ mm_iface_icera_modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load supported bands (Modem interface) */
+/* Generic band handling utilities */
 
 typedef struct {
     MMModemBand band;
-    const char *name;
-} BandTable;
+    char *name;
+    gboolean enabled;
+} Band;
 
-static BandTable modem_bands[] = {
+static void
+band_free (Band *b)
+{
+    g_free (b->name);
+    g_free (b);
+}
+
+static const Band modem_bands[] = {
     /* Sort 3G first since it's preferred */
-    { MM_MODEM_BAND_U2100, "FDD_BAND_I" },
-    { MM_MODEM_BAND_U1900, "FDD_BAND_II" },
-    /*
-     * Several bands are forbidden to set and will always read as
-     * disabled, so we won't present them to the rest of
-     * modemmanager.
-     */
-    /* { MM_MODEM_BAND_U1800, "FDD_BAND_III" }, */
-    /* { MM_MODEM_BAND_U17IV, "FDD_BAND_IV" },  */
-    /* { MM_MODEM_BAND_U800,  "FDD_BAND_VI" },  */
-    { MM_MODEM_BAND_U850,  "FDD_BAND_V" },
-    { MM_MODEM_BAND_U900,  "FDD_BAND_VIII" },
-    { MM_MODEM_BAND_G850,  "G850" },
+    { MM_MODEM_BAND_U2100, "FDD_BAND_I",    FALSE },
+    { MM_MODEM_BAND_U1900, "FDD_BAND_II",   FALSE },
+    { MM_MODEM_BAND_U1800, "FDD_BAND_III",  FALSE },
+    { MM_MODEM_BAND_U17IV, "FDD_BAND_IV",   FALSE },
+    { MM_MODEM_BAND_U800,  "FDD_BAND_VI",   FALSE },
+    { MM_MODEM_BAND_U850,  "FDD_BAND_V",    FALSE },
+    { MM_MODEM_BAND_U900,  "FDD_BAND_VIII", FALSE },
     /* 2G second */
-    { MM_MODEM_BAND_DCS,   "DCS" },
-    { MM_MODEM_BAND_EGSM,  "EGSM" },
-    { MM_MODEM_BAND_PCS,   "PCS" },
+    { MM_MODEM_BAND_G850,  "G850",          FALSE },
+    { MM_MODEM_BAND_DCS,   "DCS",           FALSE },
+    { MM_MODEM_BAND_EGSM,  "EGSM",          FALSE },
+    { MM_MODEM_BAND_PCS,   "PCS",           FALSE },
     /* And ANY last since it's most inclusive */
-    { MM_MODEM_BAND_ANY,   "ANY" },
+    { MM_MODEM_BAND_ANY,   "ANY",           FALSE },
 };
 
+static MMModemBand
+icera_band_to_mm (const char *icera)
+{
+    int i;
+
+    for (i = 0 ; i < G_N_ELEMENTS (modem_bands); i++) {
+        if (g_strcmp0 (icera, modem_bands[i].name) == 0)
+            return modem_bands[i].band;
+    }
+    return MM_MODEM_BAND_UNKNOWN;
+}
+
+static GSList *
+parse_bands (const gchar *response, guint32 *out_len)
+{
+    GRegex *r;
+    GMatchInfo *info;
+    GSList *bands = NULL;
+
+    g_return_val_if_fail (out_len != NULL, NULL);
+
+    /*
+     * Response is a number of lines of the form:
+     *   "EGSM": 0
+     *   "FDD_BAND_I": 1
+     *   ...
+     * with 1 and 0 indicating whether the particular band is enabled or not.
+     */
+    r = g_regex_new ("^\"(\\w+)\": (\\d)",
+                     G_REGEX_MULTILINE, G_REGEX_MATCH_NEWLINE_ANY,
+                     NULL);
+    g_assert (r != NULL);
+
+    g_regex_match (r, response, 0, &info);
+    while (g_match_info_matches (info)) {
+        gchar *name, *enabled;
+        Band *b;
+        MMModemBand band;
+
+        name = g_match_info_fetch (info, 1);
+        enabled = g_match_info_fetch (info, 2);
+        band = icera_band_to_mm (name);
+        if (band != MM_MODEM_BAND_UNKNOWN) {
+            b = g_malloc0 (sizeof (Band));
+            b->band = band;
+            b->name = g_strdup (name);
+            b->enabled = (enabled[0] == '1' ? TRUE : FALSE);
+            bands = g_slist_append (bands, b);
+            *out_len = *out_len + 1;
+        }
+        g_free (name);
+        g_free (enabled);
+        g_match_info_next (info, NULL);
+    }
+    g_match_info_free (info);
+    g_regex_unref (r);
+
+    return bands;
+}
+
+/*****************************************************************************/
+/* Load supported bands (Modem interface) */
+
+typedef struct {
+    MMBaseModemAtCommand *cmds;
+    GSList *bands;
+    guint32 idx;
+} SupportedBandsContext;
+
+static void
+supported_bands_context_free (SupportedBandsContext *ctx)
+{
+    guint i;
+
+    for (i = 0; ctx->cmds[i].command; i++)
+        g_free (ctx->cmds[i].command);
+    g_free (ctx->cmds);
+    g_slist_free_full (ctx->bands, (GDestroyNotify) band_free);
+    g_free (ctx);
+}
 
 GArray *
 mm_iface_icera_modem_load_supported_bands_finish (MMIfaceModem *self,
@@ -774,35 +857,131 @@ mm_iface_icera_modem_load_supported_bands_finish (MMIfaceModem *self,
                                        G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+static void
+load_supported_bands_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    SupportedBandsContext *ctx = NULL;
+    GArray *bands;
+    GSList *iter;
+
+    mm_base_modem_at_sequence_finish (self, res, (gpointer) &ctx, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), ctx->idx);
+        for (iter = ctx->bands; iter; iter = g_slist_next (iter)) {
+            Band *b = iter->data;
+
+            /* 'enabled' here really means supported/unsupported */
+            if (b->enabled)
+                g_array_append_val (bands, b->band);
+        }
+
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bands,
+                                                   (GDestroyNotify) g_array_unref);
+    }
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static gboolean
+load_supported_bands_response_processor (MMBaseModem *self,
+                                         gpointer context,
+                                         const gchar *command,
+                                         const gchar *response,
+                                         gboolean last_command,
+                                         const GError *error,
+                                         GVariant **result,
+                                         GError **result_error)
+{
+    SupportedBandsContext *ctx = context;
+    Band *b = g_slist_nth_data (ctx->bands, ctx->idx++);
+
+    /* If there was no error setting the band, that band is supported.  We
+     * abuse the 'enabled' item to mean supported/unsupported.
+     */
+    b->enabled = !error;
+
+    /* Continue to next band */
+    return FALSE;
+}
+
+static void
+load_supported_bands_get_bands_ready (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GSimpleAsyncResult *operation_result)
+{
+    SupportedBandsContext *ctx;
+    const gchar *response;
+    GError *error;
+    GSList *iter;
+    guint32 len = 0, i;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't query current bands: '%s'", error->message);
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    ctx = g_new0 (SupportedBandsContext, 1);
+
+    /* For each reported band, build up an AT command to set that band
+     * to its current enabled/disabled state.
+     */
+    ctx->bands = parse_bands (response, &len);
+    ctx->cmds = g_new0 (MMBaseModemAtCommand, len + 1);
+
+    for (iter = ctx->bands, i = 0; iter; iter = g_slist_next (iter), i++) {
+        Band *b = iter->data;
+
+        ctx->cmds[i].command = g_strdup_printf ("%%IPBM=\"%s\",%c",
+                                                b->name,
+                                                b->enabled ? '1' : '0');
+        ctx->cmds[i].timeout = 3;
+        ctx->cmds[i].allow_cached = FALSE;
+        ctx->cmds[i].response_processor = load_supported_bands_response_processor;
+    }
+
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               ctx->cmds,
+                               ctx,
+                               (GDestroyNotify) supported_bands_context_free,
+                               (GAsyncReadyCallback) load_supported_bands_ready,
+                               operation_result);
+}
+
 void
 mm_iface_icera_modem_load_supported_bands (MMIfaceModem *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    GArray *bands;
-    guint i;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         mm_iface_icera_modem_load_supported_bands);
 
-    /*
-     * The modem doesn't support telling us what bands are supported;
-     * list everything we know about.
+    /* The modems report some bands as disabled that they don't actually
+     * support enabling.  Thanks Icera!  So we have to try setting each
+     * band to it's current enabled/disabled value, and the modem will
+     * return an error if it doesn't support that band at all.
      */
-    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), G_N_ELEMENTS (modem_bands));
-    for (i = 0 ; i < G_N_ELEMENTS (modem_bands) ; i++) {
-        if (modem_bands[i].band != MM_MODEM_BAND_ANY)
-            g_array_append_val(bands, modem_bands[i].band);
-    }
 
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%IPBM?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)load_supported_bands_get_bands_ready,
+        result);
 }
 
 /*****************************************************************************/
@@ -824,11 +1003,11 @@ load_current_bands_ready (MMIfaceModem *self,
                           GAsyncResult *res,
                           GSimpleAsyncResult *operation_result)
 {
-    GRegex *r;
-    GMatchInfo *info;
     GArray *bands;
     const gchar *response;
     GError *error;
+    GSList *parsed, *iter;
+    guint32 len = 0;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -836,51 +1015,23 @@ load_current_bands_ready (MMIfaceModem *self,
         g_simple_async_result_take_error (operation_result, error);
         g_simple_async_result_complete (operation_result);
         g_object_unref (operation_result);
-        return;
-    }
+    } else {
+        /* Parse bands from Icera response into MM band numbers */
+        parsed = parse_bands (response, &len);
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), len);
+        for (iter = parsed; iter; iter = g_slist_next (iter)) {
+            Band *b = iter->data;
 
-    /*
-     * Response is a number of lines of the form:
-     *   "EGSM": 0
-     *   "FDD_BAND_I": 1
-     *   ...
-     * with 1 and 0 indicating whether the particular band is enabled or not.
-     */
-    r = g_regex_new ("^\"(\\w+)\": (\\d)",
-                     G_REGEX_MULTILINE, G_REGEX_MATCH_NEWLINE_ANY,
-                     NULL);
-    g_assert (r != NULL);
-
-    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand),
-                               G_N_ELEMENTS (modem_bands));
-
-    g_regex_match (r, response, 0, &info);
-    while (g_match_info_matches (info)) {
-        gchar *band, *enabled;
-
-        band = g_match_info_fetch (info, 1);
-        enabled = g_match_info_fetch (info, 2);
-        if (enabled[0] == '1') {
-            guint i;
-            for (i = 0 ; i < G_N_ELEMENTS (modem_bands); i++) {
-                if (!strcmp (band, modem_bands[i].name)) {
-                    g_array_append_val (bands, modem_bands[i].band);
-                    break;
-                }
-            }
+            g_array_append_val (bands, b->band);
         }
-        g_free (band);
-        g_free (enabled);
-        g_match_info_next (info, NULL);
-    }
-    g_match_info_free (info);
-    g_regex_unref (r);
+        g_slist_free_full (parsed, (GDestroyNotify) band_free);
 
-    g_simple_async_result_set_op_res_gpointer (operation_result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   bands,
+                                                   (GDestroyNotify)g_array_unref);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+    }
 }
 
 void
