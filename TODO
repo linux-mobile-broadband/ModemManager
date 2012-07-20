@@ -109,6 +109,9 @@ example to update the signal quality value or check registration status.
 
   ** serial-parsers: convert the v1 parser to a GObject.
 
+  ** Modem iface: Provide a list of drivers instead of just one, so that we list
+     all drivers of all ports grabbed.
+
   ** MMBroadbandBearer: include additional step for authentication, with
      retries.
 
