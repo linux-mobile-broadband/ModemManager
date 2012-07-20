@@ -255,7 +255,9 @@ libmm_plugin_samsung_la_SOURCES = \
 	samsung/mm-plugin-samsung.c \
 	samsung/mm-plugin-samsung.h \
 	samsung/mm-broadband-modem-samsung.c \
-	samsung/mm-broadband-modem-samsung.h
+	samsung/mm-broadband-modem-samsung.h \
+	samsung/mm-broadband-bearer-samsung.c \
+	samsung/mm-broadband-bearer-samsung.h
 libmm_plugin_samsung_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_samsung_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_samsung_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
