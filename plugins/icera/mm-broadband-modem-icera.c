@@ -47,7 +47,17 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIcera, mm_broadband_modem_icera, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
+enum {
+    PROP_0,
+    PROP_DEFAULT_IP_METHOD,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 struct _MMBroadbandModemIceraPrivate {
+    MMBearerIpMethod default_ip_method;
+
     GRegex *nwstate_regex;
     GRegex *pacsp_regex;
     GRegex *ipdpact_regex;
@@ -735,6 +745,7 @@ modem_create_bearer (MMIfaceModem *self,
 {
     mm_broadband_bearer_icera_new (
         MM_BROADBAND_MODEM (self),
+        MM_BROADBAND_MODEM_ICERA (self)->priv->default_ip_method,
         properties,
         NULL, /* cancellable */
         (GAsyncReadyCallback)broadband_bearer_icera_new_ready,
@@ -1487,6 +1498,42 @@ mm_broadband_modem_icera_new (const gchar *device,
 }
 
 static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandModemIcera *self = MM_BROADBAND_MODEM_ICERA (object);
+
+    switch (prop_id) {
+    case PROP_DEFAULT_IP_METHOD:
+        self->priv->default_ip_method = g_value_get_enum (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandModemIcera *self = MM_BROADBAND_MODEM_ICERA (object);
+
+    switch (prop_id) {
+    case PROP_DEFAULT_IP_METHOD:
+        g_value_set_enum (value, self->priv->default_ip_method);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
 mm_broadband_modem_icera_init (MMBroadbandModemIcera *self)
 {
     /* Initialize private data */
@@ -1501,6 +1548,7 @@ mm_broadband_modem_icera_init (MMBroadbandModemIcera *self)
     self->priv->ipdpact_regex = g_regex_new ("\\r\\n%IPDPACT:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)\\r\\n",
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
+    self->priv->default_ip_method = MM_BEARER_IP_METHOD_STATIC;
     self->priv->last_act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 }
 
@@ -1572,6 +1620,17 @@ mm_broadband_modem_icera_class_init (MMBroadbandModemIceraClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemIceraPrivate));
 
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
     object_class->finalize = finalize;
     broadband_modem_class->setup_ports = setup_ports;
+
+    properties[PROP_DEFAULT_IP_METHOD] =
+        g_param_spec_enum (MM_BROADBAND_MODEM_ICERA_DEFAULT_IP_METHOD,
+                           "Default IP method",
+                           "Default IP Method (static or DHCP) to use.",
+                           MM_TYPE_BEARER_IP_METHOD,
+                           MM_BEARER_IP_METHOD_STATIC,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DEFAULT_IP_METHOD, properties[PROP_DEFAULT_IP_METHOD]);
 }

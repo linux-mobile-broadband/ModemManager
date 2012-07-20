@@ -27,6 +27,8 @@
 #define MM_IS_BROADBAND_MODEM_ICERA_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_MODEM_ICERA))
 #define MM_BROADBAND_MODEM_ICERA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_MODEM_ICERA, MMBroadbandModemIceraClass))
 
+#define MM_BROADBAND_MODEM_ICERA_DEFAULT_IP_METHOD "broadband-modem-icera-default-ip-method"
+
 typedef struct _MMBroadbandModemIcera MMBroadbandModemIcera;
 typedef struct _MMBroadbandModemIceraClass MMBroadbandModemIceraClass;
 typedef struct _MMBroadbandModemIceraPrivate MMBroadbandModemIceraPrivate;

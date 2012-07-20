@@ -631,6 +631,7 @@ mm_iface_icera_modem_create_bearer (MMIfaceModem *self,
                                         mm_iface_icera_modem_create_bearer);
 
     mm_broadband_bearer_icera_new (MM_BROADBAND_MODEM (self),
+                                   MM_BEARER_IP_METHOD_STATIC,
                                    properties,
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)broadband_bearer_icera_new_ready,

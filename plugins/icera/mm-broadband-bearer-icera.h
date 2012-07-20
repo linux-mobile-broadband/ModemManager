@@ -33,6 +33,8 @@
 #define MM_IS_BROADBAND_BEARER_ICERA_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_ICERA))
 #define MM_BROADBAND_BEARER_ICERA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_ICERA, MMBroadbandBearerIceraClass))
 
+#define MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD "broadband-bearer-icera-default-ip-method"
+
 typedef enum {
     MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN,
     MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED,
@@ -57,6 +59,7 @@ GType mm_broadband_bearer_icera_get_type (void);
 
 /* Default bearer creation implementation */
 void      mm_broadband_bearer_icera_new        (MMBroadbandModem *modem,
+                                                MMBearerIpMethod ip_method,
                                                 MMBearerProperties *config,
                                                 GCancellable *cancellable,
                                                 GAsyncReadyCallback callback,

@@ -35,7 +35,17 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerIcera, mm_broadband_bearer_icera, MM_TYPE_BROADBAND_BEARER);
 
+enum {
+    PROP_0,
+    PROP_DEFAULT_IP_METHOD,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 struct _MMBroadbandBearerIceraPrivate {
+    MMBearerIpMethod default_ip_method;
+
     /* Connection related */
     gpointer connect_pending;
     guint connect_pending_id;
@@ -82,7 +92,7 @@ get_ip_config_3gpp_context_new (MMBroadbandBearerIcera *self,
 static void
 get_ip_config_context_complete_and_free (GetIpConfig3gppContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
@@ -216,23 +226,45 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    gchar *command;
+    GetIpConfig3gppContext *ctx;
 
-    command = g_strdup_printf ("%%IPDPADDR=%d", cid);
-    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
-                                   primary,
-                                   command,
-                                   3,
-                                   FALSE,
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback)ip_config_ready,
-                                   get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_ICERA (self),
-                                                                   MM_BASE_MODEM (modem),
-                                                                   primary,
-                                                                   cid,
-                                                                   callback,
-                                                                   user_data));
-    g_free (command);
+    ctx = get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_ICERA (self),
+                                          MM_BASE_MODEM (modem),
+                                          primary,
+                                          cid,
+                                          callback,
+                                          user_data);
+
+    if (ctx->self->priv->default_ip_method == MM_BEARER_IP_METHOD_STATIC) {
+        gchar *command;
+
+        command = g_strdup_printf ("%%IPDPADDR=%d", cid);
+        mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                       primary,
+                                       command,
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)ip_config_ready,
+                                       ctx);
+        g_free (command);
+        return;
+    }
+
+    /* Otherwise, DHCP */
+    if (ctx->self->priv->default_ip_method == MM_BEARER_IP_METHOD_DHCP) {
+        MMBearerIpConfig *ip_config;
+
+        ip_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_DHCP);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   ip_config,
+                                                   (GDestroyNotify)g_object_unref);
+        get_ip_config_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -887,6 +919,7 @@ mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
 
 void
 mm_broadband_bearer_icera_new (MMBroadbandModem *modem,
+                               MMBearerIpMethod ip_method,
                                MMBearerProperties *config,
                                GCancellable *cancellable,
                                GAsyncReadyCallback callback,
@@ -900,7 +933,43 @@ mm_broadband_bearer_icera_new (MMBroadbandModem *modem,
         user_data,
         MM_BEARER_MODEM, modem,
         MM_BEARER_CONFIG, config,
+        MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD, ip_method,
         NULL);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (object);
+
+    switch (prop_id) {
+    case PROP_DEFAULT_IP_METHOD:
+        self->priv->default_ip_method = g_value_get_enum (value);
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (object);
+
+    switch (prop_id) {
+    case PROP_DEFAULT_IP_METHOD:
+        g_value_set_enum (value, self->priv->default_ip_method);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -910,6 +979,9 @@ mm_broadband_bearer_icera_init (MMBroadbandBearerIcera *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_BEARER_ICERA,
                                               MMBroadbandBearerIceraPrivate);
+
+    /* Defaults */
+    self->priv->default_ip_method = MM_BEARER_IP_METHOD_STATIC;
 }
 
 static void
@@ -920,10 +992,21 @@ mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerIceraPrivate));
 
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;
     broadband_bearer_class->get_ip_config_3gpp_finish = get_ip_config_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
+
+    properties[PROP_DEFAULT_IP_METHOD] =
+        g_param_spec_enum (MM_BASE_MODEM_DEVICE,
+                           "Default IP method",
+                           "Default IP Method (static or DHCP) to use.",
+                           MM_TYPE_BEARER_IP_METHOD,
+                           MM_BEARER_IP_METHOD_STATIC,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DEFAULT_IP_METHOD, properties[PROP_DEFAULT_IP_METHOD]);
 }
