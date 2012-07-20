@@ -465,6 +465,9 @@ activate_ready (MMBaseModem *modem,
      * context was already completed and we have nothing else to do. */
     ctx = self->priv->connect_pending;
 
+    /* Balance refcount with the extra ref we passed to command_full() */
+    g_object_unref (self);
+
     if (!ctx) {
         mm_dbg ("Connection context was finished already by an unsolicited message");
 
@@ -536,7 +539,7 @@ authenticate_ready (MMBaseModem *modem,
                                    FALSE,
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)activate_ready,
-                                   ctx->self); /* we pass the bearer object! */
+                                   g_object_ref (ctx->self)); /* we pass the bearer object! */
     g_free (command);
 }
 
