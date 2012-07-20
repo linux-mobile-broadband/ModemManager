@@ -18,7 +18,7 @@
 #ifndef MM_BROADBAND_MODEM_SAMSUNG_H
 #define MM_BROADBAND_MODEM_SAMSUNG_H
 
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-icera.h"
 
 #define MM_TYPE_BROADBAND_MODEM_SAMSUNG            (mm_broadband_modem_samsung_get_type ())
 #define MM_BROADBAND_MODEM_SAMSUNG(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BROADBAND_MODEM_SAMSUNG, MMBroadbandModemSamsung))
@@ -31,11 +31,11 @@ typedef struct _MMBroadbandModemSamsung MMBroadbandModemSamsung;
 typedef struct _MMBroadbandModemSamsungClass MMBroadbandModemSamsungClass;
 
 struct _MMBroadbandModemSamsung {
-    MMBroadbandModem parent;
+    MMBroadbandModemIcera parent;
 };
 
 struct _MMBroadbandModemSamsungClass{
-    MMBroadbandModemClass parent;
+    MMBroadbandModemIceraClass parent;
 };
 
 GType mm_broadband_modem_samsung_get_type (void);
