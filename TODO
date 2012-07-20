@@ -131,3 +131,6 @@ example to update the signal quality value or check registration status.
 
   ** HSO plugin: shouldn't we have the same logic for unsolicited messages
      handling in both connect and disconnect contexts? See Icera plugin for ref.
+
+  ** Icera plugin: retry authentication step in 3gpp dialling to 3 times with 1s
+     delay.
