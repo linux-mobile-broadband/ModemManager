@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- *
+ * Copyright (C) 2011 Samsung Electronics, Inc.
  * Copyright (C) 2012 Google Inc.
  * Author: Nathan Williams <njw@google.com>
  */

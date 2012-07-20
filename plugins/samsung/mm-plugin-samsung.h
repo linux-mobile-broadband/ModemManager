@@ -16,6 +16,7 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
+ * Copyright (C) 2011 Samsung Electronics, Inc.
  * Copyright (C) 2012 Google Inc.
  * Author: Nathan Williams <njw@google.com>
  */
