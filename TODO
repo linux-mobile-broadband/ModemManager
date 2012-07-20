@@ -128,3 +128,6 @@ example to update the signal quality value or check registration status.
   ** Pantech plugin: The UMW190 needs some time to settle down after sending the
      PIN, or it will end up stuck if we ask too many PIN-related stuff one after
      the other.
+
+  ** HSO plugin: shouldn't we have the same logic for unsolicited messages
+     handling in both connect and disconnect contexts? See Icera plugin for ref.
