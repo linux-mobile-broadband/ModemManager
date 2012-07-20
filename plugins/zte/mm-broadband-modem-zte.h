@@ -29,9 +29,11 @@
 
 typedef struct _MMBroadbandModemZte MMBroadbandModemZte;
 typedef struct _MMBroadbandModemZteClass MMBroadbandModemZteClass;
+typedef struct _MMBroadbandModemZtePrivate MMBroadbandModemZtePrivate;
 
 struct _MMBroadbandModemZte {
     MMBroadbandModem parent;
+    MMBroadbandModemZtePrivate *priv;
 };
 
 struct _MMBroadbandModemZteClass{
