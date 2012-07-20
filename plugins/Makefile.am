@@ -27,6 +27,8 @@ noinst_LTLIBRARIES = libmm-utils-icera.la
 libmm_utils_icera_la_SOURCES = \
 	icera/mm-iface-icera.h \
 	icera/mm-iface-icera.c \
+	icera/mm-broadband-modem-icera.h \
+	icera/mm-broadband-modem-icera.c \
 	icera/mm-broadband-bearer-icera.h \
 	icera/mm-broadband-bearer-icera.c
 libmm_utils_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
