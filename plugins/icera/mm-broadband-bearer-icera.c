@@ -337,24 +337,35 @@ report_disconnect_status (MMBroadbandBearerIcera *self,
 static void
 disconnect_ipdpact_ready (MMBaseModem *modem,
                           GAsyncResult *res,
-                          Disconnect3gppContext *ctx)
+                          MMBroadbandBearerIcera *self)
 {
+    Disconnect3gppContext *ctx;
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    /* Try to recover the disconnection context. If none found, it means the
+     * context was already completed and we have nothing else to do. */
+    ctx = self->priv->disconnect_pending;
+    if (!ctx) {
+        mm_dbg ("Disconnection context was finished already by an unsolicited message");
+
+        /* Run _finish() to finalize the async call, even if we don't care
+         * the result */
+        mm_base_modem_at_command_full_finish (modem, res, NULL);
+        return;
+    }
+
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
     if (error) {
-
-        ctx->self->priv->disconnect_pending = NULL;
-
+        self->priv->disconnect_pending = NULL;
         g_simple_async_result_take_error (ctx->result, error);
         disconnect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
     /* Set a 60-second disconnection-failure timeout */
-    ctx->self->priv->disconnect_pending_id = g_timeout_add_seconds (60,
-                                                                    (GSourceFunc)disconnect_3gpp_timed_out_cb,
-                                                                    ctx->self);
+    self->priv->disconnect_pending_id = g_timeout_add_seconds (60,
+                                                               (GSourceFunc)disconnect_3gpp_timed_out_cb,
+                                                               self);
 }
 
 static void
@@ -378,6 +389,15 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
                                              user_data,
                                              disconnect_3gpp);
 
+    /* The unsolicited response to %IPDPACT may come before the OK does.
+     * We will keep the disconnection context in the bearer private data so
+     * that it is accessible from the unsolicited message handler. Note
+     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
+     * may not be valid any more when the callback is called (it may be
+     * already completed in the unsolicited handling) */
+    g_assert (ctx->self->priv->disconnect_pending == NULL);
+    ctx->self->priv->disconnect_pending = ctx;
+
     command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (modem),
@@ -387,12 +407,8 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_ipdpact_ready,
-        ctx);
+        ctx->self); /* we pass the bearer object! */
     g_free (command);
-
-    /* Keep the context in the private info, we'll get disconnection
-     * status via unsolicited messages */
-    self->priv->disconnect_pending = ctx;
 }
 
 /*****************************************************************************/
@@ -603,7 +619,7 @@ report_connect_status (MMBroadbandBearerIcera *self,
         self->priv->connect_pending_id = 0;
     }
 
-    if (self->priv->connect_cancellable_id) {
+    if (ctx && self->priv->connect_cancellable_id) {
         g_cancellable_disconnect (ctx->cancellable,
                                   self->priv->connect_cancellable_id);
         self->priv->connect_cancellable_id = 0;
@@ -656,14 +672,26 @@ report_connect_status (MMBroadbandBearerIcera *self,
 static void
 activate_ready (MMBaseModem *modem,
                 GAsyncResult *res,
-                Dial3gppContext *ctx)
+                MMBroadbandBearerIcera *self)
 {
+    Dial3gppContext *ctx;
     GError *error = NULL;
 
-    /* From now on, if we get cancelled, we'll need to run the connection
-     * reset ourselves just in case */
+    /* Try to recover the connection context. If none found, it means the
+     * context was already completed and we have nothing else to do. */
+    ctx = self->priv->connect_pending;
+    if (!ctx) {
+        mm_dbg ("Connection context was finished already by an unsolicited message");
 
+        /* Run _finish() to finalize the async call, even if we don't care
+         * the result */
+        mm_base_modem_at_command_full_finish (modem, res, NULL);
+        return;
+    }
+
+    /* Errors on the dial command are fatal */
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
+        self->priv->connect_pending = NULL;
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
@@ -671,13 +699,16 @@ activate_ready (MMBaseModem *modem,
 
     /* We will now setup a timeout and keep the context in the bearer's private.
      * Reports of modem being connected will arrive via unsolicited messages. */
-    ctx->self->priv->connect_pending_id = g_timeout_add_seconds (60,
-                                                                 (GSourceFunc)connect_timed_out_cb,
-                                                                 ctx->self);
-    ctx->self->priv->connect_cancellable_id = g_cancellable_connect (ctx->cancellable,
-                                                                     G_CALLBACK (connect_cancelled_cb),
-                                                                     ctx->self,
-                                                                     NULL);
+    self->priv->connect_pending_id = g_timeout_add_seconds (60,
+                                                            (GSourceFunc)connect_timed_out_cb,
+                                                            self);
+
+    /* From now on, if we get cancelled, we'll need to run the connection
+     * reset ourselves just in case */
+    self->priv->connect_cancellable_id = g_cancellable_connect (ctx->cancellable,
+                                                                G_CALLBACK (connect_cancelled_cb),
+                                                                self,
+                                                                NULL);
 }
 
 static void
@@ -694,6 +725,15 @@ deactivate_ready (MMBaseModem *modem,
      */
     mm_base_modem_at_command_full_finish (modem, res, NULL);
 
+    /* The unsolicited response to %IPDPACT may come before the OK does.
+     * We will keep the connection context in the bearer private data so
+     * that it is accessible from the unsolicited message handler. Note
+     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
+     * may not be valid any more when the callback is called (it may be
+     * already completed in the unsolicited handling) */
+    g_assert (ctx->self->priv->connect_pending == NULL);
+    ctx->self->priv->connect_pending = ctx;
+
     command = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
     mm_base_modem_at_command_full (
         ctx->modem,
@@ -703,12 +743,8 @@ deactivate_ready (MMBaseModem *modem,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)activate_ready,
-        ctx);
+        ctx->self); /* we pass the bearer object! */
     g_free (command);
-
-    /* The unsolicited response to %IPDPACT may come before the OK does */
-    g_assert (ctx->self->priv->connect_pending == NULL);
-    ctx->self->priv->connect_pending = ctx;
 }
 
 static void
