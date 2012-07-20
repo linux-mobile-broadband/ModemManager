@@ -22,7 +22,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-zte.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-zte.h"
 
 G_DEFINE_TYPE (MMPluginZte, mm_plugin_zte, MM_TYPE_PLUGIN)
 
@@ -58,11 +58,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_zte_new (sysfs_path,
+                                                      driver,
+                                                      mm_plugin_get_name (self),
+                                                      vendor,
+                                                      product));
 }
 
 static gboolean

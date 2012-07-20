@@ -198,7 +198,9 @@ udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 # Zte
 libmm_plugin_zte_la_SOURCES = \
 	zte/mm-plugin-zte.c \
-	zte/mm-plugin-zte.h
+	zte/mm-plugin-zte.h \
+	zte/mm-broadband-modem-zte.h \
+	zte/mm-broadband-modem-zte.c
 libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += zte/77-mm-zte-port-types.rules
