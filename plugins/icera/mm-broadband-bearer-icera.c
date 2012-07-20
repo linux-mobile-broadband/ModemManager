@@ -345,6 +345,10 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
     /* Try to recover the disconnection context. If none found, it means the
      * context was already completed and we have nothing else to do. */
     ctx = self->priv->disconnect_pending;
+
+    /* Balance refcount with the extra ref we passed to command_full() */
+    g_object_unref (self);
+
     if (!ctx) {
         mm_dbg ("Disconnection context was finished already by an unsolicited message");
 
@@ -407,7 +411,7 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_ipdpact_ready,
-        ctx->self); /* we pass the bearer object! */
+        g_object_ref (ctx->self)); /* we pass the bearer object! */
     g_free (command);
 }
 
@@ -680,6 +684,10 @@ activate_ready (MMBaseModem *modem,
     /* Try to recover the connection context. If none found, it means the
      * context was already completed and we have nothing else to do. */
     ctx = self->priv->connect_pending;
+
+    /* Balance refcount with the extra ref we passed to command_full() */
+    g_object_unref (self);
+
     if (!ctx) {
         mm_dbg ("Connection context was finished already by an unsolicited message");
 
@@ -743,7 +751,7 @@ deactivate_ready (MMBaseModem *modem,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)activate_ready,
-        ctx->self); /* we pass the bearer object! */
+        g_object_ref (ctx->self)); /* we pass the bearer object! */
     g_free (command);
 }
 
