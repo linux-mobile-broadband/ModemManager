@@ -106,6 +106,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                       MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                       MM_PLUGIN_ALLOWED_SINGLE_AT,  TRUE, /* only 1 AT port expected! */
+                      MM_PLUGIN_FORBIDDEN_ICERA,    TRUE, /* No Nokia/Icera modems */
                       NULL));
 }
 
