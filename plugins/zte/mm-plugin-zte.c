@@ -23,6 +23,7 @@
 #include "mm-log.h"
 #include "mm-plugin-zte.h"
 #include "mm-broadband-modem-zte.h"
+#include "mm-broadband-modem-zte-icera.h"
 
 G_DEFINE_TYPE (MMPluginZte, mm_plugin_zte, MM_TYPE_PLUGIN)
 
@@ -58,6 +59,21 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+    GList *l;
+    gboolean is_icera;
+
+    for (l = probes, is_icera = FALSE; l && !is_icera; l = g_list_next (l)) {
+        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)))
+            is_icera = TRUE;
+    }
+
+    if (is_icera)
+        return MM_BASE_MODEM (mm_broadband_modem_zte_icera_new (sysfs_path,
+                                                                driver,
+                                                                mm_plugin_get_name (self),
+                                                                vendor,
+                                                                product));
+
     return MM_BASE_MODEM (mm_broadband_modem_zte_new (sysfs_path,
                                                       driver,
                                                       mm_plugin_get_name (self),
@@ -108,6 +124,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
+                      MM_PLUGIN_ICERA_PROBE,        TRUE,
                       NULL));
 }
 

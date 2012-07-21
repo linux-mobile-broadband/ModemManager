@@ -200,9 +200,12 @@ libmm_plugin_zte_la_SOURCES = \
 	zte/mm-plugin-zte.c \
 	zte/mm-plugin-zte.h \
 	zte/mm-broadband-modem-zte.h \
-	zte/mm-broadband-modem-zte.c
-libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+	zte/mm-broadband-modem-zte.c \
+	zte/mm-broadband-modem-zte-icera.h \
+	zte/mm-broadband-modem-zte-icera.c
+libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_zte_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
 udevrules_DATA += zte/77-mm-zte-port-types.rules
 
 # Longcheer (and rebranded dongles)
