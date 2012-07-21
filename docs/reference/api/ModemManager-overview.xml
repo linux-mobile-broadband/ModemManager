@@ -238,6 +238,20 @@
               by the plugin.
             </para>
           </listitem>
+          <listitem>
+            <para><emphasis>Check Icera support</emphasis></para>
+            <para>
+              This boolean property allows plugins to specify that they want to have the Icera
+              support checks included in the probing sequence. They can afterwards get the result
+              of the support check to decide whether they want to create a Icera-based modem
+              object or not.
+            </para>
+            <para>
+              This configuration is specified by the <type>MM_PLUGIN_ICERA_PROBE</type>
+              property in the <structname>MMPlugin</structname> object provided
+              by the plugin.
+            </para>
+          </listitem>
         </itemizedlist>
       </section>
 
@@ -281,6 +295,21 @@
               This filter is specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_STRINGS</type>
               property in the <structname>MMPlugin</structname> object provided
               by the plugin.
+            </para>
+          </listitem>
+          <listitem>
+            <para><emphasis>Icera support</emphasis></para>
+            <para>
+              Plugins can specify that they only support Icera-based modems, or that they
+              do not support any Icera-based modem. When either of this configurations is
+              enabled, the Icera support checks will be included in the
+              probing sequence, and the result of the check will help to determine whether
+              the plugin supports the modem or not.
+            </para>
+            <para>
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_ICERA</type> and
+              <type>MM_PLUGIN_FORBIDDEN_ICERA</type> properties in the
+              <structname>MMPlugin</structname> object provided by the plugin.
             </para>
           </listitem>
         </itemizedlist>

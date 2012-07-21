@@ -61,6 +61,9 @@ struct _MMPluginPrivate {
     gboolean at;
     gboolean single_at;
     gboolean qcdm;
+    gboolean icera_probe;
+    gboolean allowed_icera;
+    gboolean forbidden_icera;
     MMPortProbeAtCommand *custom_at_probe;
     MMAsyncMethod *custom_init;
     guint64 send_delay;
@@ -80,6 +83,9 @@ enum {
     PROP_ALLOWED_AT,
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
+    PROP_ICERA_PROBE,
+    PROP_ALLOWED_ICERA,
+    PROP_FORBIDDEN_ICERA,
     PROP_CUSTOM_AT_PROBE,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
@@ -372,6 +378,22 @@ apply_post_probing_filters (MMPlugin *self,
         return product_filtered;
     }
 
+    /* The plugin may specify that only Icera-based modems are supported.
+     * If that is the case, filter by allowed Icera support */
+    if (self->priv->allowed_icera &&
+        !mm_port_probe_is_icera (probe)) {
+        /* Unsupported! */
+        return TRUE;
+    }
+
+    /* The plugin may specify that Icera-based modems are NOT supported.
+     * If that is the case, filter by forbidden Icera support */
+    if (self->priv->forbidden_icera &&
+        mm_port_probe_is_icera (probe)) {
+        /* Unsupported! */
+        return TRUE;
+    }
+
     return FALSE;
 }
 
@@ -542,6 +564,8 @@ mm_plugin_supports_port (MMPlugin *self,
         probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
     if (self->priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
+    if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
+        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
 
     g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
 
@@ -714,6 +738,18 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->qcdm = g_value_get_boolean (value);
         break;
+    case PROP_ICERA_PROBE:
+        /* Construct only */
+        self->priv->icera_probe = g_value_get_boolean (value);
+        break;
+    case PROP_ALLOWED_ICERA:
+        /* Construct only */
+        self->priv->allowed_icera = g_value_get_boolean (value);
+        break;
+    case PROP_FORBIDDEN_ICERA:
+        /* Construct only */
+        self->priv->forbidden_icera = g_value_get_boolean (value);
+        break;
     case PROP_CUSTOM_AT_PROBE:
         /* Construct only */
         self->priv->custom_at_probe = g_value_dup_boxed (value);
@@ -776,6 +812,15 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         g_value_set_boxed (value, self->priv->udev_tags);
+        break;
+    case PROP_ICERA_PROBE:
+        g_value_set_boolean (value, self->priv->icera_probe);
+        break;
+    case PROP_ALLOWED_ICERA:
+        g_value_set_boolean (value, self->priv->allowed_icera);
+        break;
+    case PROP_FORBIDDEN_ICERA:
+        g_value_set_boolean (value, self->priv->forbidden_icera);
         break;
     case PROP_CUSTOM_AT_PROBE:
         g_value_set_boxed (value, self->priv->custom_at_probe);
@@ -916,6 +961,30 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_ALLOWED_QCDM,
                                "Allowed QCDM",
                                "Whether QCDM ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ICERA_PROBE,
+         g_param_spec_boolean (MM_PLUGIN_ICERA_PROBE,
+                               "Icera probe",
+                               "Request to probe for Icera support.",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_ICERA,
+         g_param_spec_boolean (MM_PLUGIN_ALLOWED_ICERA,
+                               "Allowed Icera",
+                               "Whether Icera support is allowed in this plugin.",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_FORBIDDEN_ICERA,
+         g_param_spec_boolean (MM_PLUGIN_FORBIDDEN_ICERA,
+                               "Allowed Icera",
+                               "Whether Icera support is forbidden in this plugin.",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
