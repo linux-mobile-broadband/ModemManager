@@ -53,6 +53,108 @@ struct _MMBroadbandModemZtePrivate {
 };
 
 /*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemZte *self;
+    GSimpleAsyncResult *result;
+    guint retries;
+} ModemAfterSimUnlockContext;
+
+static void
+modem_after_sim_unlock_context_complete_and_free (ModemAfterSimUnlockContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void modem_after_sim_unlock_context_step (ModemAfterSimUnlockContext *ctx);
+
+static gboolean
+cpms_timeout_cb (ModemAfterSimUnlockContext *ctx)
+{
+    ctx->retries--;
+    modem_after_sim_unlock_context_step (ctx);
+    return FALSE;
+}
+
+static void
+cpms_try_ready (MMBaseModem *self,
+                GAsyncResult *res,
+                ModemAfterSimUnlockContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error) &&
+        g_error_matches (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY)) {
+            /* Retry in 2 seconds */
+        g_timeout_add_seconds (2, (GSourceFunc)cpms_timeout_cb, ctx);
+        return;
+    }
+
+    /* Well, we're done */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    modem_after_sim_unlock_context_complete_and_free (ctx);
+}
+
+static void
+modem_after_sim_unlock_context_step (ModemAfterSimUnlockContext *ctx)
+{
+    if (ctx->retries == 0) {
+        /* Well... just return without error */
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Consumed all attempts to wait for SIM not being busy");
+        modem_after_sim_unlock_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                              "+CPMS?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)cpms_try_ready,
+                              ctx);
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    ModemAfterSimUnlockContext *ctx;
+
+    ctx = g_new0 (ModemAfterSimUnlockContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_after_sim_unlock);
+    ctx->retries = 3;
+
+    /* Attempt to disable floods of "+ZUSIMR:2" unsolicited responses that
+     * eventually fill up the device's buffers and make it crash.  Normally
+     * done during probing, but if the device has a PIN enabled it won't
+     * accept the +CPMS? during the probe and we have to do it here.
+     */
+    modem_after_sim_unlock_context_step (ctx);
+}
+
+/*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
 
 static gboolean
@@ -516,6 +618,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_allowed_modes = load_allowed_modes;
