@@ -78,6 +78,14 @@ struct _MMBroadbandBearerPrivate {
 
 /*****************************************************************************/
 
+guint
+mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
+{
+    return self->priv->cid;
+}
+
+/*****************************************************************************/
+
 static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON_LAST] = {
     "none",
     "Not registered in the network",
