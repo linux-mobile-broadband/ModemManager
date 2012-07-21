@@ -1972,12 +1972,41 @@ reinitialize_ready (MMBaseModem *self,
     }
 }
 
-static gboolean
-restart_initialize_idle (MMIfaceModem *self)
+static void
+modem_after_sim_unlock_ready (MMIfaceModem *self,
+                              GAsyncResult *res)
 {
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
+        mm_warn ("After SIM unlock failed setup: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on */
     mm_base_modem_initialize (MM_BASE_MODEM (self),
                               (GAsyncReadyCallback) reinitialize_ready,
                               NULL);
+}
+
+static gboolean
+restart_initialize_idle (MMIfaceModem *self)
+{
+    /* If we were asked to run something after having sent the PIN unlock,
+     * do it now. This may be just a timeout or some other command that gives us
+     * the real SIM state */
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock != NULL &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish != NULL) {
+        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock(
+            self,
+            (GAsyncReadyCallback)modem_after_sim_unlock_ready,
+            NULL);
+    } else {
+        /* If no wait needed, just go on */
+        mm_base_modem_initialize (MM_BASE_MODEM (self),
+                                  (GAsyncReadyCallback) reinitialize_ready,
+                                  NULL);
+    }
     return FALSE;
 }
 
