@@ -573,7 +573,8 @@ mm_plugin_supports_port (MMPlugin *self,
      * expected, check if we alredy got the single AT port. And if so, we know this
      * port being probed won't be AT. */
     if (self->priv->single_at &&
-        mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device))) {
+        mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device)) &&
+        !mm_port_probe_is_at (probe)) {
         mm_dbg ("(%s)   not setting up AT probing tasks for (%s,%s): "
                 "modem already has the expected single AT port",
                 self->priv->name,
