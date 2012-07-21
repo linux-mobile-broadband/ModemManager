@@ -57,40 +57,6 @@ create_modem (MMPlugin *self,
                                                         product));
 }
 
-static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
-{
-    GUdevDevice *port;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
-
-    /* The Nokia plugin cannot do anything with non-AT */
-    if (!mm_port_probe_is_at (probe)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Ignoring non-AT port");
-        return FALSE;
-    }
-
-    port = mm_port_probe_peek_port (probe);
-
-    /* Look for port type hints */
-    if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
-    else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX"))
-        pflags = MM_AT_PORT_FLAG_SECONDARY;
-
-    return mm_base_modem_grab_port (modem,
-                                    mm_port_probe_get_port_subsys (probe),
-                                    mm_port_probe_get_port_name (probe),
-                                    mm_port_probe_get_port_type (probe),
-                                    pflags,
-                                    error);
-}
-
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -121,5 +87,4 @@ mm_plugin_nokia_class_init (MMPluginNokiaClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = grab_port;
 }
