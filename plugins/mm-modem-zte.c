@@ -118,13 +118,8 @@ get_allowed_mode_done (MMAtSerialPort *port,
         goto done;
     }
 
-    r = g_regex_new ("+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Failed to parse the allowed mode response");
-        goto done;
-    }
+    r = g_regex_new ("\\+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
 
     if (g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
         MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
@@ -759,4 +754,3 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
-
