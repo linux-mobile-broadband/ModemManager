@@ -40,6 +40,7 @@ ICERA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-icera.la
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
 	libmm-plugin-nokia.la \
+	libmm-plugin-nokia-icera.la \
 	libmm-plugin-cinterion.la \
 	libmm-plugin-iridium.la \
 	libmm-plugin-gobi.la \
@@ -183,6 +184,14 @@ libmm_plugin_nokia_la_SOURCES = \
 	nokia/mm-broadband-modem-nokia.h
 libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Nokia (Icera)
+libmm_plugin_nokia_icera_la_SOURCES = \
+	nokia/mm-plugin-nokia-icera.c \
+	nokia/mm-plugin-nokia-icera.h
+libmm_plugin_nokia_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
+libmm_plugin_nokia_icera_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_nokia_icera_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
 udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
 ## Zte
