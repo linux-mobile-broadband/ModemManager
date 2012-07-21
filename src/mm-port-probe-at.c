@@ -91,3 +91,22 @@ mm_port_probe_response_processor_string (const gchar *command,
 
     return TRUE;
 }
+
+/* ---- Other ---- */
+
+gboolean
+mm_port_probe_response_processor_no_error (const gchar *command,
+                                           const gchar *response,
+                                           gboolean last_command,
+                                           const GError *error,
+                                           GVariant **result,
+                                           GError **result_error)
+{
+    if (error) {
+        *result = g_variant_new_boolean (FALSE);
+        return TRUE;
+    }
+
+    *result = g_variant_new_boolean (TRUE);
+    return TRUE;
+}

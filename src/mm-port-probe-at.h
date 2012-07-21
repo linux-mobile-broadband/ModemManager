@@ -75,5 +75,13 @@ gboolean mm_port_probe_response_processor_is_at (const gchar *command,
                                                  const GError *error,
                                                  GVariant **result,
                                                  GError **result_error);
+/* Generic response parser which returns TRUE if no error  */
+gboolean mm_port_probe_response_processor_no_error (const gchar *command,
+                                                    const gchar *response,
+                                                    gboolean last_command,
+                                                    const GError *error,
+                                                    GVariant **result,
+                                                    GError **result_error);
+
 
 #endif /* MM_PORT_PROBE_AT_H */

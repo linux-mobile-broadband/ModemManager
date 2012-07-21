@@ -39,7 +39,8 @@ typedef enum { /*< underscore_name=mm_port_probe_flag >*/
 	MM_PORT_PROBE_AT         = 1 << 0,
 	MM_PORT_PROBE_AT_VENDOR  = 1 << 1,
 	MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
-	MM_PORT_PROBE_QCDM       = 1 << 3,
+	MM_PORT_PROBE_AT_ICERA   = 1 << 3,
+	MM_PORT_PROBE_QCDM       = 1 << 4,
 } MMPortProbeFlag;
 
 typedef struct _MMPortProbe MMPortProbe;
@@ -90,6 +91,8 @@ void mm_port_probe_set_result_at_vendor  (MMPortProbe *self,
                                           const gchar *at_vendor);
 void mm_port_probe_set_result_at_product (MMPortProbe *self,
                                           const gchar *at_product);
+void mm_port_probe_set_result_at_icera   (MMPortProbe *self,
+                                          gboolean is_icera);
 void mm_port_probe_set_result_qcdm       (MMPortProbe *self,
                                           gboolean qcdm);
 
@@ -114,6 +117,7 @@ gboolean      mm_port_probe_is_at            (MMPortProbe *self);
 gboolean      mm_port_probe_is_qcdm          (MMPortProbe *self);
 const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
+gboolean      mm_port_probe_is_icera         (MMPortProbe *self);
 
 /* Additional helpers */
 gboolean mm_port_probe_list_has_at_port (GList *list);

@@ -41,6 +41,7 @@
  *   |----> AT?
  *      |----> Vendor
  *      |----> Product
+ *      |----> Is Icera?
  * ----> QCDM Serial Open
  *   |----> QCDM?
  */
@@ -94,6 +95,7 @@ struct _MMPortProbePrivate {
     gboolean is_qcdm;
     gchar *vendor;
     gchar *product;
+    gboolean is_icera;
 
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
@@ -120,7 +122,10 @@ mm_port_probe_set_result_at (MMPortProbe *self,
                 g_udev_device_get_name (self->priv->port));
         self->priv->vendor = NULL;
         self->priv->product = NULL;
-        self->priv->flags |= (MM_PORT_PROBE_AT_VENDOR | MM_PORT_PROBE_AT_PRODUCT);
+        self->priv->is_icera = FALSE;
+        self->priv->flags |= (MM_PORT_PROBE_AT_VENDOR |
+                              MM_PORT_PROBE_AT_PRODUCT |
+                              MM_PORT_PROBE_AT_ICERA);
     }
 }
 
@@ -164,6 +169,25 @@ mm_port_probe_set_result_at_product (MMPortProbe *self,
 }
 
 void
+mm_port_probe_set_result_at_icera (MMPortProbe *self,
+                                   gboolean is_icera)
+{
+    if (is_icera) {
+        mm_dbg ("(%s/%s) Modem is Icera-based",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+        self->priv->is_icera = TRUE;
+        self->priv->flags |= MM_PORT_PROBE_AT_ICERA;
+    } else {
+        mm_dbg ("(%s/%s) Modem is NOT Icera-based",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+        self->priv->is_icera = FALSE;
+        self->priv->flags |= MM_PORT_PROBE_AT_ICERA;
+    }
+}
+
+void
 mm_port_probe_set_result_qcdm (MMPortProbe *self,
                                gboolean qcdm)
 {
@@ -179,9 +203,11 @@ mm_port_probe_set_result_qcdm (MMPortProbe *self,
         self->priv->is_at = FALSE;
         self->priv->vendor = NULL;
         self->priv->product = NULL;
+        self->priv->is_icera = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_AT |
                               MM_PORT_PROBE_AT_VENDOR |
-                              MM_PORT_PROBE_AT_PRODUCT);
+                              MM_PORT_PROBE_AT_PRODUCT |
+                              MM_PORT_PROBE_AT_ICERA);
     } else
         mm_dbg ("(%s/%s) port is not QCDM-capable",
                 g_udev_device_get_subsystem (self->priv->port),
@@ -398,6 +424,23 @@ serial_probe_qcdm (MMPortProbe *self)
 }
 
 static void
+serial_probe_at_icera_result_processor (MMPortProbe *self,
+                                        GVariant *result)
+{
+    if (result) {
+        /* If any result given, it must be a boolean */
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_BOOLEAN));
+
+        if (g_variant_get_boolean (result)) {
+            mm_port_probe_set_result_at_icera (self, TRUE);
+            return;
+        }
+    }
+
+    mm_port_probe_set_result_at_icera (self, FALSE);
+}
+
+static void
 serial_probe_at_product_result_processor (MMPortProbe *self,
                                           GVariant *result)
 {
@@ -567,6 +610,11 @@ static const MMPortProbeAtCommand product_probing[] = {
     { NULL }
 };
 
+static const MMPortProbeAtCommand icera_probing[] = {
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { NULL }
+};
+
 static void
 at_custom_init_ready (MMPortProbe *self,
                       GAsyncResult *res)
@@ -634,6 +682,13 @@ serial_probe_schedule (MMPortProbe *self)
         /* Prepare AT product probing */
         task->at_result_processor = serial_probe_at_product_result_processor;
         task->at_commands = product_probing;
+    }
+    /* Icera support check requested and not already done? */
+    else if ((task->flags & MM_PORT_PROBE_AT_ICERA) &&
+             !(self->priv->flags & MM_PORT_PROBE_AT_ICERA)) {
+        /* Prepare AT product probing */
+        task->at_result_processor = serial_probe_at_icera_result_processor;
+        task->at_commands = icera_probing;
     }
 
     /* If a next AT group detected, go for it */
@@ -930,7 +985,8 @@ mm_port_probe_run (MMPortProbe *self,
     /* If any AT probing is needed, start by opening as AT port */
     if (task->flags & MM_PORT_PROBE_AT ||
         task->flags & MM_PORT_PROBE_AT_VENDOR ||
-        task->flags & MM_PORT_PROBE_AT_PRODUCT) {
+        task->flags & MM_PORT_PROBE_AT_PRODUCT ||
+        task->flags & MM_PORT_PROBE_AT_ICERA) {
         task->at_probing_cancellable = g_cancellable_new ();
         task->source_id = g_idle_add ((GSourceFunc)serial_open_at, self);
         return;
@@ -1062,6 +1118,19 @@ mm_port_probe_get_product (MMPortProbe *self)
     return (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT ?
             self->priv->product :
             NULL);
+}
+
+gboolean
+mm_port_probe_is_icera (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+        return FALSE;
+
+    return (self->priv->flags & MM_PORT_PROBE_AT_ICERA ?
+            self->priv->is_icera :
+            FALSE);
 }
 
 const gchar *
