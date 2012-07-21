@@ -243,6 +243,45 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load access technology (Modem interface) */
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    /* Sample response from an MF626:
+     *   +ZPAS: "GPRS/EDGE","CS_ONLY"
+     */
+    response = mm_strip_tag (response, "+ZPAS:");
+    *access_technologies = mm_string_to_access_tech (response);
+    *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+    return TRUE;
+}
+
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+ZPAS?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -461,6 +500,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;

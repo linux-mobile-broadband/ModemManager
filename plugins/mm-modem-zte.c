@@ -759,4 +759,3 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
-
