@@ -3460,7 +3460,7 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               at_command,
                               3,
-                              TRUE,
+                              FALSE,
                               (GAsyncReadyCallback)ussd_send_command_ready,
                               result);
     g_free (at_command);
