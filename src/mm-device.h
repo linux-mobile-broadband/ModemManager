@@ -66,6 +66,8 @@ void     mm_device_release_port (MMDevice    *self,
                                  GUdevDevice *udev_port);
 gboolean mm_device_owns_port    (MMDevice    *self,
                                  GUdevDevice *udev_port);
+void     mm_device_ignore_port  (MMDevice *self,
+                                 GUdevDevice *udev_port);
 
 gboolean mm_device_create_modem (MMDevice                  *self,
                                  GDBusObjectManagerServer  *object_manager,

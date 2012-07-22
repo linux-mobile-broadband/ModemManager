@@ -59,8 +59,9 @@ struct _MMDevicePrivate {
     /* Best plugin to manage this device */
     MMPlugin *plugin;
 
-    /* List of port probes in the device */
+    /* Lists of port probes in the device */
     GList *port_probes;
+    GList *ignored_port_probes;
 
     /* The Modem object for this device */
     MMBaseModem *modem;
@@ -73,11 +74,23 @@ struct _MMDevicePrivate {
 
 static MMPortProbe *
 device_find_probe_with_device (MMDevice    *self,
-                               GUdevDevice *udev_port)
+                               GUdevDevice *udev_port,
+                               gboolean lookup_ignored)
 {
     GList *l;
 
     for (l = self->priv->port_probes; l; l = g_list_next (l)) {
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
+                         g_udev_device_get_sysfs_path (udev_port)))
+            return probe;
+    }
+
+    if (!lookup_ignored)
+        return NULL;
+
+    for (l = self->priv->ignored_port_probes; l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
         if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
@@ -92,7 +105,7 @@ gboolean
 mm_device_owns_port (MMDevice    *self,
                      GUdevDevice *udev_port)
 {
-    return !!device_find_probe_with_device (self, udev_port);
+    return !!device_find_probe_with_device (self, udev_port, FALSE);
 }
 
 static gboolean
@@ -239,12 +252,29 @@ mm_device_release_port (MMDevice    *self,
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port);
+    probe = device_find_probe_with_device (self, udev_port, TRUE);
     if (probe) {
         /* Found, remove from list and destroy probe */
         self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
         g_signal_emit (self, signals[SIGNAL_PORT_RELEASED], 0, mm_port_probe_peek_port (probe));
         g_object_unref (probe);
+    }
+}
+
+void
+mm_device_ignore_port  (MMDevice *self,
+                        GUdevDevice *udev_port)
+{
+    MMPortProbe *probe;
+
+    probe = device_find_probe_with_device (self, udev_port, FALSE);
+    if (probe) {
+        /* Found, remove from list and add to the ignored list */
+        mm_dbg ("Fully ignoring port '%s/%s' from now on",
+                g_udev_device_get_subsystem (udev_port),
+                g_udev_device_get_name (udev_port));
+        self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
+        self->priv->ignored_port_probes = g_list_prepend (self->priv->ignored_port_probes, probe);
     }
 }
 
@@ -485,7 +515,7 @@ mm_device_peek_port_probe (MMDevice *self,
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port);
+    probe = device_find_probe_with_device (self, udev_port, FALSE);
     return (probe ? G_OBJECT (probe) : NULL);
 }
 
@@ -495,7 +525,7 @@ mm_device_get_port_probe (MMDevice *self,
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port);
+    probe = device_find_probe_with_device (self, udev_port, FALSE);
     return (probe ? g_object_ref (probe) : NULL);
 }
 
@@ -594,6 +624,7 @@ dispose (GObject *object)
     g_clear_object (&(self->priv->udev_device));
     g_clear_object (&(self->priv->plugin));
     g_list_free_full (self->priv->port_probes, (GDestroyNotify)g_object_unref);
+    g_list_free_full (self->priv->ignored_port_probes, (GDestroyNotify)g_object_unref);
     g_clear_object (&(self->priv->modem));
 
     G_OBJECT_CLASS (mm_device_parent_class)->dispose (object);

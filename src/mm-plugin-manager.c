@@ -138,6 +138,9 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
                 g_udev_device_get_subsystem (port_probe_ctx->port),
                 g_udev_device_get_name (port_probe_ctx->port));
 
+        /* Tell the device to ignore this port */
+        mm_device_ignore_port (ctx->device, port_probe_ctx->port);
+
         /* If this is the last valid probe which was running (i.e. the last one
          * not being deferred-until-suggested), cancel all remaining ones. */
         cancel_remaining = TRUE;
