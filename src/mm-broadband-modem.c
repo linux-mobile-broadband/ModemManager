@@ -130,6 +130,7 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_3gpp_ussd_dbus_skeleton;
     /* Implementation helpers */
+    gboolean use_unencoded_ussd;
     GSimpleAsyncResult *pending_ussd_action;
 
     /*<--- Modem CDMA interface --->*/
@@ -3387,6 +3388,29 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *self,
 /*****************************************************************************/
 /* Send command (3GPP/USSD interface) */
 
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    gchar *command;
+    gboolean current_is_unencoded;
+    gboolean encoded_used;
+    gboolean unencoded_used;
+} Modem3gppUssdSendContext;
+
+static void
+modem_3gpp_ussd_send_context_complete_and_free (Modem3gppUssdSendContext *ctx)
+{
+    /* We check for result, as we may have already set it in
+     * priv->pending_ussd_request */
+    if (ctx->result) {
+        g_simple_async_result_complete_in_idle (ctx->result);
+        g_object_unref (ctx->result);
+    }
+    g_object_unref (ctx->self);
+    g_free (ctx->command);
+    g_free (ctx);
+}
+
 static const gchar *
 modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
                              GAsyncResult *res,
@@ -3401,29 +3425,133 @@ modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
     return (const gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 }
 
+static void modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx);
+
 static void
 ussd_send_command_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         Modem3gppUssdSendContext *ctx)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         /* Some immediate error happened when sending the USSD request */
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        mm_dbg ("Error sending USSD request: '%s'", error->message);
+        g_error_free (error);
 
-        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
-                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+        modem_3gpp_ussd_context_step (ctx);
         return;
+    }
+
+    /* Cache the hint for the next time we send something */
+    if (!ctx->self->priv->use_unencoded_ussd &&
+        ctx->current_is_unencoded) {
+        mm_dbg ("Will assume we want unencoded USSD commands");
+        ctx->self->priv->use_unencoded_ussd = TRUE;
+    } else if (ctx->self->priv->use_unencoded_ussd &&
+               !ctx->current_is_unencoded) {
+        mm_dbg ("Will assume we want encoded USSD commands");
+        ctx->self->priv->use_unencoded_ussd = FALSE;
     }
 
     /* Cache the action, as it will be completed via URCs.
      * There shouldn't be any previous action pending. */
     g_warn_if_fail (self->priv->pending_ussd_action == NULL);
-    self->priv->pending_ussd_action = simple;
+    self->priv->pending_ussd_action = ctx->result;
+
+    /* Reset result so that it doesn't get completed */
+    ctx->result = NULL;
+    modem_3gpp_ussd_send_context_complete_and_free (ctx);
+}
+
+static void
+modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
+{
+    gchar *at_command = NULL;
+    GError *error = NULL;
+    guint scheme = 0;
+    gchar *encoded;
+
+    /* Encode USSD command */
+    encoded = mm_iface_modem_3gpp_ussd_encode (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               ctx->command,
+                                               &scheme,
+                                               &error);
+    if (!encoded) {
+        g_simple_async_result_take_error (ctx->result, error);
+        modem_3gpp_ussd_send_context_complete_and_free (ctx);
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+        return;
+    }
+
+    /* Build AT command */
+    ctx->encoded_used = TRUE;
+    ctx->current_is_unencoded = FALSE;
+    at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", encoded, scheme);
+    g_free (encoded);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                              at_command,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)ussd_send_command_ready,
+                              ctx);
+    g_free (at_command);
+}
+
+static void
+modem_3gpp_ussd_context_send_unencoded (Modem3gppUssdSendContext *ctx)
+{
+    gchar *at_command = NULL;
+
+    /* Build AT command with action unencoded */
+    ctx->unencoded_used = TRUE;
+    ctx->current_is_unencoded = TRUE;
+    at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d",
+                                  ctx->command,
+                                  MM_MODEM_GSM_USSD_SCHEME_7BIT);
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                              at_command,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)ussd_send_command_ready,
+                              ctx);
+    g_free (at_command);
+}
+
+static void
+modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx)
+{
+    if (ctx->encoded_used &&
+        ctx->unencoded_used) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Sending USSD command failed");
+        modem_3gpp_ussd_send_context_complete_and_free (ctx);
+
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+        return;
+    }
+
+    if (ctx->self->priv->use_unencoded_ussd) {
+        if (!ctx->unencoded_used)
+            modem_3gpp_ussd_context_send_unencoded (ctx);
+        else if (!ctx->encoded_used)
+            modem_3gpp_ussd_context_send_encoded (ctx);
+        else
+            g_assert_not_reached ();
+    } else {
+        if (!ctx->encoded_used)
+            modem_3gpp_ussd_context_send_encoded (ctx);
+        else if (!ctx->unencoded_used)
+            modem_3gpp_ussd_context_send_unencoded (ctx);
+        else
+            g_assert_not_reached ();
+    }
 }
 
 static void
@@ -3432,43 +3560,20 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GError *error = NULL;
-    GSimpleAsyncResult *result;
-    gchar *at_command;
-    gchar *hex;
-    guint scheme = 0;
+    Modem3gppUssdSendContext *ctx;
 
+    ctx = g_new0 (Modem3gppUssdSendContext, 1);
     /* We're going to steal the string result in finish() so we must have a
      * callback specified. */
     g_assert (callback != NULL);
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_ussd_send);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_3gpp_ussd_send);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup (command);
 
-    /* Encode USSD command */
-    hex = mm_iface_modem_3gpp_ussd_encode (MM_IFACE_MODEM_3GPP_USSD (self),
-                                           command,
-                                           &scheme,
-                                           &error);
-    if (!hex) {
-        g_simple_async_result_take_error (result, error);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
-    /* Build AT command */
-    at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", hex, scheme);
-    g_free (hex);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              at_command,
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)ussd_send_command_ready,
-                              result);
-    g_free (at_command);
+    modem_3gpp_ussd_context_step (ctx);
 
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
                                            MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
