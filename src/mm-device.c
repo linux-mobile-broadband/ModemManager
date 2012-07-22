@@ -372,7 +372,14 @@ mm_device_create_modem (MMDevice                  *self,
 {
     g_assert (self->priv->modem == NULL);
     g_assert (self->priv->object_manager == NULL);
-    g_assert (self->priv->port_probes != NULL);
+
+    if (!self->priv->port_probes) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Not creating a device without ports");
+        return FALSE;
+    }
 
     mm_info ("Creating modem with plugin '%s' and '%u' ports",
              mm_plugin_get_name (self->priv->plugin),
