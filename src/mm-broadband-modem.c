@@ -3342,6 +3342,17 @@ cancel_command_ready (MMBroadbandModem *self,
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 
+    /* Complete the pending action, if any */
+    if (self->priv->pending_ussd_action) {
+        g_simple_async_result_set_error (self->priv->pending_ussd_action,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "USSD session was cancelled");
+        g_simple_async_result_complete_in_idle (self->priv->pending_ussd_action);
+        g_object_unref (self->priv->pending_ussd_action);
+        self->priv->pending_ussd_action = NULL;
+    }
+
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
                                            MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
 }
