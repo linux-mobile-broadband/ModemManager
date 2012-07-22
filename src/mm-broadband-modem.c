@@ -3425,7 +3425,6 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
     GError *error = NULL;
     GSimpleAsyncResult *result;
     gchar *at_command;
@@ -3446,10 +3445,9 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                                            &scheme,
                                            &error);
     if (!hex) {
-        g_simple_async_result_take_error (broadband->priv->pending_ussd_action, error);
-        g_simple_async_result_complete_in_idle (broadband->priv->pending_ussd_action);
-        g_object_unref (broadband->priv->pending_ussd_action);
-        broadband->priv->pending_ussd_action = NULL;
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
         return;
     }
 
