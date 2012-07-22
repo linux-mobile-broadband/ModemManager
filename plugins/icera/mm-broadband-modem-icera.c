@@ -791,6 +791,32 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+     * keeps access to the SIM */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=4",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Reset (Modem interface) */
 
 static gboolean
@@ -1614,6 +1640,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_current_bands = modem_load_current_bands;
     iface->load_current_bands_finish = modem_load_current_bands_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_down_finish;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
     iface->set_bands = modem_set_bands;
