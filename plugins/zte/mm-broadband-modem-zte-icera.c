@@ -24,18 +24,114 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-common-zte.h"
 #include "mm-broadband-modem-zte-icera.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMBroadbandModemZteIcera, mm_broadband_modem_zte_icera, MM_TYPE_BROADBAND_MODEM_ICERA);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemZteIcera, mm_broadband_modem_zte_icera, MM_TYPE_BROADBAND_MODEM_ICERA, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemZteIceraPrivate {
     /* Unsolicited messaging setup */
     MMCommonZteUnsolicitedSetup *unsolicited_setup;
 };
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        mm_common_zte_set_unsolicited_events_handlers (MM_BROADBAND_MODEM (self),
+                                                       MM_BROADBAND_MODEM_ZTE_ICERA (self)->priv->unsolicited_setup,
+                                                       TRUE);
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_3gpp_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    mm_common_zte_set_unsolicited_events_handlers (MM_BROADBAND_MODEM (self),
+                                                   MM_BROADBAND_MODEM_ZTE_ICERA (self)->priv->unsolicited_setup,
+                                                   FALSE);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_3gpp_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
+        result);
+}
 
 /*****************************************************************************/
 /* Setup ports (Broadband modem class) */
@@ -104,6 +200,18 @@ finalize (GObject *object)
     mm_common_zte_unsolicited_setup_free (self->priv->unsolicited_setup);
 
     G_OBJECT_CLASS (mm_broadband_modem_zte_icera_parent_class)->finalize (object);
+}
+
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
