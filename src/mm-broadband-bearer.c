@@ -1443,6 +1443,7 @@ primary_flash_3gpp_ready (MMSerialPort *port,
     /* Don't bother doing the CGACT again if it was done on a secondary port
      * or if not needed */
     if (ctx->cgact_sent) {
+        mm_dbg ("PDP disconnection already sent in secondary port");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
@@ -1455,6 +1456,7 @@ primary_flash_3gpp_ready (MMSerialPort *port,
         /* Port is disconnected; update the state */
         mm_port_set_connected (ctx->data, FALSE);
 
+    mm_dbg ("Sending PDP context deactivation in primary port...");
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    ctx->cgact_command,
@@ -1478,6 +1480,7 @@ cgact_secondary_ready (MMBaseModem *modem,
     else
         g_error_free (error);
 
+    mm_dbg ("Flash primary port...");
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
                           1000,
                           TRUE,
@@ -1519,6 +1522,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
      */
     if (ctx->secondary &&
         mm_port_get_connected (MM_PORT (ctx->primary))) {
+        mm_dbg ("Sending PDP context deactivation in secondary port...");
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->secondary,
                                        ctx->cgact_command,
@@ -1531,6 +1535,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     }
 
     /* If no secondary port, go on to flash the primary port */
+    mm_dbg ("Flash primary port...");
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
                           1000,
                           TRUE,
