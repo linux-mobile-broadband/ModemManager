@@ -571,6 +571,8 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disabling_context_complete_and_free (ctx);
         return;
@@ -714,6 +716,8 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         enabling_context_complete_and_free (ctx);
         return;
