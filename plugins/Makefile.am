@@ -199,6 +199,8 @@ udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 libmm_plugin_zte_la_SOURCES = \
 	zte/mm-plugin-zte.c \
 	zte/mm-plugin-zte.h \
+	zte/mm-common-zte.h \
+	zte/mm-common-zte.c \
 	zte/mm-broadband-modem-zte.h \
 	zte/mm-broadband-modem-zte.c \
 	zte/mm-broadband-modem-zte-icera.h \
