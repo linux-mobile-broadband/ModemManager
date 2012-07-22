@@ -125,8 +125,13 @@ example to update the signal quality value or check registration status.
 
   ** Huawei plugin: The K4505, at least, doesn't like the default command to
      setup messaging related unsolicited messages:
-     > 'AT+CNMI=2,1,2,1,0'
-     +CMS ERROR: 303'
+     > AT+CNMI=2,1,2,1,0
+     +CMS ERROR: 303
+
+  ** ZTE plugin: The MF637, at least, doesn't like the default command to setup
+     messaging related unsolicited messages:
+     > AT+CNMI=2,1,2,1,0
+     +CMS ERROR: 303
 
   ** Pantech plugin: The UMW190 needs some time to settle down after sending the
      PIN, or it will end up stuck if we ask too many PIN-related stuff one after
