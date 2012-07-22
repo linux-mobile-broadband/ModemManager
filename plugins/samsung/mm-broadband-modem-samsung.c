@@ -27,40 +27,10 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-samsung.h"
 #include "mm-broadband-bearer-icera.h"
-#include "mm-iface-modem.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-
-G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM_ICERA, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
-
-/*****************************************************************************/
-/* Modem power down (Modem interface) */
-
-static gboolean
-modem_power_down_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
-{
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-}
-
-static void
-modem_power_down (MMIfaceModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
-{
-    /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
-     * keeps access to the SIM */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CFUN=4",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
+G_DEFINE_TYPE (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM_ICERA);
 
 /*****************************************************************************/
 /* Setup ports (Broadband modem class) */
@@ -112,13 +82,6 @@ mm_broadband_modem_samsung_new (const gchar *device,
 static void
 mm_broadband_modem_samsung_init (MMBroadbandModemSamsung *self)
 {
-}
-
-static void
-iface_modem_init (MMIfaceModem *iface)
-{
-    iface->modem_power_down = modem_power_down;
-    iface->modem_power_down_finish = modem_power_down_finish;
 }
 
 static void
