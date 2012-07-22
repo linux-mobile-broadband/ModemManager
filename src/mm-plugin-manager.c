@@ -233,19 +233,23 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
             /* If we got a task deferred until a suggestion comes,
              * complete it */
             if (port_probe_ctx->defer_until_suggested) {
-                if (suggested_plugin)
+                if (suggested_plugin) {
                     mm_dbg ("(%s): (%s/%s) deferred task completed, got suggested plugin",
                             mm_plugin_get_name (suggested_plugin),
                             g_udev_device_get_subsystem (port_probe_ctx->port),
                             g_udev_device_get_name (port_probe_ctx->port));
-                else
+                    /* Advance to the suggested plugin and re-check support there */
+                    port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                                           port_probe_ctx->suggested_plugin);
+                } else {
                     mm_dbg ("(%s/%s) deferred task cancelled, no suggested plugin",
                             g_udev_device_get_subsystem (port_probe_ctx->port),
                             g_udev_device_get_name (port_probe_ctx->port));
+                    port_probe_ctx->best_plugin = NULL;
+                    port_probe_ctx->current = NULL;
+                }
 
                 /* Schedule checking support, which will end the operation */
-                port_probe_ctx->best_plugin = g_object_ref (port_probe_ctx->suggested_plugin);
-                port_probe_ctx->current = NULL;
                 g_assert (port_probe_ctx->defer_id == 0);
                 port_probe_ctx->defer_id = g_idle_add ((GSourceFunc)deferred_support_check_idle,
                                                        port_probe_ctx);
@@ -356,14 +360,23 @@ plugin_supports_port_ready (MMPlugin *plugin,
     case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
         /* If we arrived here and we already have a plugin suggested, use it */
         if (port_probe_ctx->suggested_plugin) {
-            mm_dbg ("(%s): (%s/%s) task completed, got suggested plugin",
-                    mm_plugin_get_name (port_probe_ctx->suggested_plugin),
-                    g_udev_device_get_subsystem (port_probe_ctx->port),
-                    g_udev_device_get_name (port_probe_ctx->port));
-            /* Schedule checking support, which will end the operation */
-            port_probe_ctx->best_plugin = g_object_ref (port_probe_ctx->suggested_plugin);
-            port_probe_ctx->current = NULL;
+            if (port_probe_ctx->suggested_plugin == plugin) {
+                mm_dbg ("(%s): (%s/%s) task completed, got suggested plugin",
+                        mm_plugin_get_name (port_probe_ctx->suggested_plugin),
+                        g_udev_device_get_subsystem (port_probe_ctx->port),
+                        g_udev_device_get_name (port_probe_ctx->port));
+                port_probe_ctx->best_plugin = g_object_ref (port_probe_ctx->suggested_plugin);
+                port_probe_ctx->current = NULL;
+            } else {
+                mm_dbg ("(%s): (%s/%s) re-checking support on deferred task, got suggested plugin",
+                        mm_plugin_get_name (port_probe_ctx->suggested_plugin),
+                        g_udev_device_get_subsystem (port_probe_ctx->port),
+                        g_udev_device_get_name (port_probe_ctx->port));
+                port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                                       port_probe_ctx->suggested_plugin);
+            }
 
+            /* Schedule checking support, which will end the operation */
             port_probe_context_step (port_probe_ctx);
             return;
         }
