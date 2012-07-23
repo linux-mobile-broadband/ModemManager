@@ -682,6 +682,32 @@ grab_port (MMModem *modem,
     return !!port;
 }
 
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+         * keeps access to the SIM */
+        g_value_set_string (value, "+CFUN=4");
+        break;
+    default:
+        break;
+    }
+}
+
 /*****************************************************************************/
 
 static MMModemIceraPrivate *
@@ -763,6 +789,13 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
 
     mm_modem_zte_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemZtePrivate));
+
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
 
     object_class->dispose = dispose;
     gsm_class->do_enable = do_enable;
