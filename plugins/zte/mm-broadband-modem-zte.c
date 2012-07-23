@@ -150,6 +150,32 @@ modem_after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+     * keeps access to the SIM */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=4",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
 
 static gboolean
@@ -542,6 +568,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_down_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_allowed_modes = load_allowed_modes;
