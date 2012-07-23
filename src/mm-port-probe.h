@@ -35,13 +35,13 @@
 
 /* Flags to request port probing */
 typedef enum { /*< underscore_name=mm_port_probe_flag >*/
-	MM_PORT_PROBE_NONE       = 0,
-	MM_PORT_PROBE_AT         = 1 << 0,
-	MM_PORT_PROBE_AT_VENDOR  = 1 << 1,
-	MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
-	MM_PORT_PROBE_AT_ICERA   = 1 << 3,
-	MM_PORT_PROBE_QCDM       = 1 << 4,
-	MM_PORT_PROBE_QMI        = 1 << 5
+    MM_PORT_PROBE_NONE       = 0,
+    MM_PORT_PROBE_AT         = 1 << 0,
+    MM_PORT_PROBE_AT_VENDOR  = 1 << 1,
+    MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
+    MM_PORT_PROBE_AT_ICERA   = 1 << 3,
+    MM_PORT_PROBE_QCDM       = 1 << 4,
+    MM_PORT_PROBE_QMI        = 1 << 5
 } MMPortProbeFlag;
 
 typedef struct _MMPortProbe MMPortProbe;
