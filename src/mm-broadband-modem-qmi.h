@@ -27,9 +27,11 @@
 
 typedef struct _MMBroadbandModemQmi MMBroadbandModemQmi;
 typedef struct _MMBroadbandModemQmiClass MMBroadbandModemQmiClass;
+typedef struct _MMBroadbandModemQmiPrivate MMBroadbandModemQmiPrivate;
 
 struct _MMBroadbandModemQmi {
     MMBroadbandModem parent;
+    MMBroadbandModemQmiPrivate *priv;
 };
 
 struct _MMBroadbandModemQmiClass{

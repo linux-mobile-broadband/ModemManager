@@ -38,6 +38,11 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
+struct _MMBroadbandModemQmiPrivate {
+    /* Signal quality related */
+    gboolean has_get_signal_info;
+};
+
 /*****************************************************************************/
 
 static gboolean
@@ -1114,6 +1119,232 @@ modem_load_supported_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load signal quality (Modem interface) */
+
+/* Limit the value betweeen [-113,-51] and scale it to a percentage */
+#define STRENGTH_TO_QUALITY(strength)                                   \
+    (100 - ((CLAMP (strength, -113, -51) + 51) * 100 / (-113 + 51)))
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClient *client;
+    GSimpleAsyncResult *result;
+} LoadSignalQualityContext;
+
+static void
+load_signal_quality_context_complete_and_free (LoadSignalQualityContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static guint
+load_signal_quality_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return 0;
+
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void load_signal_quality_context_step (LoadSignalQualityContext *ctx);
+
+static gint8
+signal_info_get_quality (MMBroadbandModemQmi *self,
+                         QmiMessageNasGetSignalInfoOutput *output)
+{
+    gint8 rssi_max = 0;
+    gint8 rssi;
+
+    /* We do not report per-technology signal quality, so just get the highest
+     * one of the ones reported. */
+
+    if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL) &&
+        rssi > rssi_max)
+        rssi_max = rssi;
+
+    if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL) &&
+        rssi > rssi_max)
+        rssi_max = rssi;
+
+    if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL) &&
+        rssi > rssi_max)
+        rssi_max = rssi;
+
+    if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL) &&
+        rssi > rssi_max)
+        rssi_max = rssi;
+
+    if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL) &&
+        rssi > rssi_max)
+        rssi_max = rssi;
+
+    /* This RSSI comes as negative dBms */
+    return STRENGTH_TO_QUALITY (rssi_max);
+}
+
+static void
+get_signal_info_ready (QmiClientNas *client,
+                       GAsyncResult *res,
+                       LoadSignalQualityContext *ctx)
+{
+    QmiMessageNasGetSignalInfoOutput *output;
+    GError *error = NULL;
+    guint quality;
+
+    output = qmi_client_nas_get_signal_info_finish (client, res, &error);
+    if (!output) {
+        /* If the command is not supported, fallback to the deprecated one */
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED)) {
+            g_error_free (error);
+            ctx->self->priv->has_get_signal_info = FALSE;
+            load_signal_quality_context_step (ctx);
+            return;
+        }
+
+        g_simple_async_result_take_error (ctx->result, error);
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_nas_get_signal_info_output_get_result (output, &error)) {
+        qmi_message_nas_get_signal_info_output_unref (output);
+        g_simple_async_result_take_error (ctx->result, error);
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
+
+    quality = signal_info_get_quality (ctx->self, output);
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        GUINT_TO_POINTER (quality),
+        NULL);
+
+    qmi_message_nas_get_signal_info_output_unref (output);
+    load_signal_quality_context_complete_and_free (ctx);
+}
+
+static gint8
+signal_strength_get_quality (MMBroadbandModemQmi *self,
+                             QmiMessageNasGetSignalStrengthOutput *output)
+{
+    GArray *array = NULL;
+    gint8 signal_max = 0;
+
+    /* We do not report per-technology signal quality, so just get the highest
+     * one of the ones reported. */
+
+    /* The mandatory one is always present */
+    qmi_message_nas_get_signal_strength_output_get_signal_strength (output, &signal_max, NULL, NULL);
+
+    /* On multimode devices we may get more */
+    if (qmi_message_nas_get_signal_strength_output_get_strength_list (output, &array, NULL)) {
+        guint i;
+
+        for (i = 0; i < array->len; i++) {
+            QmiMessageNasGetSignalStrengthOutputStrengthListElement *element;
+
+            element = &g_array_index (array, QmiMessageNasGetSignalStrengthOutputStrengthListElement, i);
+            if (element->strength > signal_max)
+                signal_max = element->strength;
+        }
+    }
+
+    /* This signal strength comes as negative dBms */
+    return STRENGTH_TO_QUALITY (signal_max);
+}
+
+static void
+get_signal_strength_ready (QmiClientNas *client,
+                           GAsyncResult *res,
+                           LoadSignalQualityContext *ctx)
+{
+    QmiMessageNasGetSignalStrengthOutput *output;
+    GError *error = NULL;
+    guint quality;
+
+    output = qmi_client_nas_get_signal_strength_finish (client, res, &error);
+    if (!output) {
+        g_simple_async_result_take_error (ctx->result, error);
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_nas_get_signal_strength_output_get_result (output, &error)) {
+        qmi_message_nas_get_signal_strength_output_unref (output);
+        g_simple_async_result_take_error (ctx->result, error);
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
+
+    quality = signal_strength_get_quality (ctx->self, output);
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        GUINT_TO_POINTER (quality),
+        NULL);
+
+    qmi_message_nas_get_signal_strength_output_unref (output);
+    load_signal_quality_context_complete_and_free (ctx);
+}
+
+static void
+load_signal_quality_context_step (LoadSignalQualityContext *ctx)
+{
+    if (ctx->self->priv->has_get_signal_info) {
+        qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (ctx->client),
+                                        NULL,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback)get_signal_info_ready,
+                                        ctx);
+        return;
+    }
+
+    /* Fallback to the deprecated mode if the new one not supported */
+    qmi_client_nas_get_signal_strength (QMI_CLIENT_NAS (ctx->client),
+                                        NULL,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback)get_signal_strength_ready,
+                                        ctx);
+}
+
+static void
+load_signal_quality (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    LoadSignalQualityContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_new0 (LoadSignalQualityContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_signal_quality);
+
+    mm_dbg ("loading signal quality...");
+    load_signal_quality_context_step (ctx);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMSim *
@@ -1763,6 +1994,13 @@ mm_broadband_modem_qmi_new (const gchar *device,
 static void
 mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_MODEM_QMI,
+                                              MMBroadbandModemQmiPrivate);
+
+    /* Always try to use the newest command available first */
+    self->priv->has_get_signal_info = TRUE;
 }
 
 static void
@@ -1805,6 +2043,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_supported_bands = modem_load_supported_bands;
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
+    iface->load_signal_quality = load_signal_quality;
+    iface->load_signal_quality_finish = load_signal_quality_finish;
 
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
@@ -1832,6 +2072,8 @@ mm_broadband_modem_qmi_class_init (MMBroadbandModemQmiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemQmiPrivate));
 
     object_class->finalize = finalize;
 
