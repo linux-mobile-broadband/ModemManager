@@ -26,6 +26,7 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-sim-qmi.h"
@@ -1381,6 +1382,202 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Scan networks (3GPP interface) */
+
+static GList *
+modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    /* We return the GList as it is */
+    return (GList *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static MMModem3gppNetworkAvailability
+network_availability_from_qmi_nas_network_status (QmiNasNetworkStatus qmi)
+{
+    if (qmi & QMI_NAS_NETWORK_STATUS_CURRENT_SERVING)
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT;
+
+    if (qmi & QMI_NAS_NETWORK_STATUS_AVAILABLE) {
+        if (qmi & QMI_NAS_NETWORK_STATUS_FORBIDDEN)
+            return MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN;
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE;
+    }
+
+    return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
+}
+
+static MM3gppNetworkInfo *
+get_3gpp_network_info (QmiMessageNasNetworkScanOutputNetworkInformationElement *element)
+{
+    GString *aux;
+    MM3gppNetworkInfo *info;
+
+    info = g_new (MM3gppNetworkInfo, 1);
+    info->status = network_availability_from_qmi_nas_network_status (element->network_status);
+
+    aux = g_string_new ("");
+    if (element->mcc >= 100)
+        g_string_append_printf (aux, "%.3"G_GUINT16_FORMAT, element->mcc);
+    else
+        g_string_append_printf (aux, "%.2"G_GUINT16_FORMAT, element->mcc);
+    if (element->mnc >= 100)
+        g_string_append_printf (aux, "%.3"G_GUINT16_FORMAT, element->mnc);
+    else
+        g_string_append_printf (aux, "%.2"G_GUINT16_FORMAT, element->mnc);
+
+    info->operator_code = g_string_free (aux, FALSE);
+    info->operator_short = NULL;
+    info->operator_long = g_strdup (element->description);
+    info->access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    return info;
+}
+
+static MMModemAccessTechnology
+access_technology_from_qmi_rat (QmiNasRadioInterface interface)
+{
+    switch (interface) {
+    case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case QMI_NAS_RADIO_INTERFACE_GSM:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    case QMI_NAS_RADIO_INTERFACE_UMTS:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case QMI_NAS_RADIO_INTERFACE_LTE:
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
+    case QMI_NAS_RADIO_INTERFACE_AMPS:
+    case QMI_NAS_RADIO_INTERFACE_NONE:
+    default:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    }
+}
+
+static MMModemAccessTechnology
+get_3gpp_access_technology (GArray *array,
+                            gboolean *array_used_flags,
+                            guint16 mcc,
+                            guint16 mnc)
+{
+    guint i;
+
+    for (i = 0; i < array->len; i++) {
+        QmiMessageNasNetworkScanOutputRadioAccessTechnologyElement *element;
+
+        if (array_used_flags[i])
+            continue;
+
+        element = &g_array_index (array, QmiMessageNasNetworkScanOutputRadioAccessTechnologyElement, i);
+        if (element->mcc == mcc &&
+            element->mnc == mnc) {
+            array_used_flags[i] = TRUE;
+            return access_technology_from_qmi_rat (element->rat);
+        }
+    }
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static void
+nas_network_scan_ready (QmiClientNas *client,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    QmiMessageNasNetworkScanOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_network_scan_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_nas_network_scan_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't scan networks: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        GList *scan_result = NULL;
+        GArray *info_array = NULL;
+
+        if (qmi_message_nas_network_scan_output_get_network_information (output, &info_array, NULL)) {
+            GArray *rat_array = NULL;
+            gboolean *rat_array_used_flags = NULL;
+            guint i;
+
+            /* Get optional RAT array */
+            qmi_message_nas_network_scan_output_get_radio_access_technology (output, &rat_array, NULL);
+            if (rat_array)
+                rat_array_used_flags = g_new0 (gboolean, rat_array->len);
+
+            for (i = 0; i < info_array->len; i++) {
+                QmiMessageNasNetworkScanOutputNetworkInformationElement *info_element;
+                MM3gppNetworkInfo *info;
+
+                info_element = &g_array_index (info_array, QmiMessageNasNetworkScanOutputNetworkInformationElement, i);
+
+                info = get_3gpp_network_info (info_element);
+                if (rat_array)
+                    info->access_tech = get_3gpp_access_technology (rat_array,
+                                                                    rat_array_used_flags,
+                                                                    info_element->mcc,
+                                                                    info_element->mnc);
+
+                scan_result = g_list_append (scan_result, info);
+            }
+
+            g_free (rat_array_used_flags);
+        }
+
+        /* We *require* a callback in the async method, as we're not setting a
+         * GDestroyNotify callback */
+        g_simple_async_result_set_op_res_gpointer (simple, scan_result, NULL);
+    }
+
+    if (output)
+        qmi_message_nas_network_scan_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    /* We will pass the GList in the GSimpleAsyncResult, so we must
+     * ensure that there is a callback so that we get it properly
+     * passed to the caller and deallocated afterwards */
+    g_assert (callback != NULL);
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_scan_networks);
+
+    mm_dbg ("Scanning networks...");
+    qmi_client_nas_network_scan (QMI_CLIENT_NAS (client),
+                                 NULL,
+                                 100,
+                                 NULL,
+                                 (GAsyncReadyCallback)nas_network_scan_ready,
+                                 result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -1611,6 +1808,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* Initialization steps */
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
+
+    /* Other actions */
+    iface->scan_networks = modem_3gpp_scan_networks;
+    iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
 }
 
 static void
