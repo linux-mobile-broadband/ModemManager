@@ -184,8 +184,8 @@ context_free (Context *ctx)
 static void
 ensure_modem_location (void)
 {
-    if (mm_modem_get_unlock_required (mm_object_peek_modem (ctx->object)) != MM_MODEM_LOCK_NONE) {
-        g_printerr ("error: modem not unlocked yet\n");
+    if (mm_modem_get_state (mm_object_peek_modem (ctx->object)) < MM_MODEM_STATE_ENABLED) {
+        g_printerr ("error: modem not enabled yet\n");
         exit (EXIT_FAILURE);
     }
 
