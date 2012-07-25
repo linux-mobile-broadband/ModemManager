@@ -33,6 +33,8 @@ void test_com_read_roam_pref (void *f, void *data);
 
 void test_com_read_mode_pref (void *f, void *data);
 
+void test_com_read_hybrid_pref (void *f, void *data);
+
 void test_com_read_hdr_rev_pref (void *f, void *data);
 
 void test_com_status (void *f, void *data);

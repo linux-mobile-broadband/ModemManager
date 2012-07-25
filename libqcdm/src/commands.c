@@ -988,6 +988,94 @@ qcdm_cmd_nv_set_mode_pref_result (const char *buf, size_t len, int *out_error)
 
 /**********************************************************************/
 
+size_t
+qcdm_cmd_nv_get_hybrid_pref_new (char *buf, size_t len)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = htole16 (DIAG_NV_HYBRID_PREF);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_nv_get_hybrid_pref_result (const char *buf, size_t len, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemHybridPref *hybrid;
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), out_error))
+        return NULL;
+
+    if (!check_nv_cmd (rsp, DIAG_NV_HYBRID_PREF, out_error))
+        return NULL;
+
+    hybrid = (DMNVItemHybridPref *) &rsp->data[0];
+
+    if (hybrid->hybrid_pref > 1)
+        qcdm_warn (0, "Unknown hybrid preference 0x%X", hybrid->hybrid_pref);
+
+    result = qcdm_result_new ();
+    qcdm_result_add_u8 (result, QCDM_CMD_NV_GET_HYBRID_PREF_ITEM_HYBRID_PREF, hybrid->hybrid_pref);
+
+    return result;
+}
+
+size_t
+qcdm_cmd_nv_set_hybrid_pref_new (char *buf,
+                                 size_t len,
+                                 u_int8_t hybrid_pref)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemHybridPref *req;
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    if (hybrid_pref > QCDM_CMD_NV_HYBRID_PREF_ITEM_REV_HYBRID_ON) {
+        qcdm_err (0, "Invalid hybrid preference %d", hybrid_pref);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_WRITE;
+    cmd->nv_item = htole16 (DIAG_NV_HYBRID_PREF);
+
+    req = (DMNVItemHybridPref *) &cmd->data[0];
+    if (hybrid_pref == QCDM_CMD_NV_HYBRID_PREF_ITEM_REV_HYBRID_OFF)
+        req->hybrid_pref = DIAG_NV_HYBRID_PREF_OFF;
+    else if (hybrid_pref == QCDM_CMD_NV_HYBRID_PREF_ITEM_REV_HYBRID_ON)
+        req->hybrid_pref = DIAG_NV_HYBRID_PREF_ON;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_nv_set_hybrid_pref_result (const char *buf, size_t len, int *out_error)
+{
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), out_error))
+        return NULL;
+
+    if (!check_nv_cmd ((DMCmdNVReadWrite *) buf, DIAG_NV_HYBRID_PREF, out_error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
 static qcdmbool
 hdr_rev_pref_validate (u_int8_t dm)
 {

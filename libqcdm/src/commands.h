@@ -312,6 +312,29 @@ QcdmResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
 
 /**********************************************************************/
 
+enum {
+    QCDM_CMD_NV_HYBRID_PREF_ITEM_REV_HYBRID_OFF = 0x00,
+    QCDM_CMD_NV_HYBRID_PREF_ITEM_REV_HYBRID_ON = 0x01,
+};
+
+#define QCDM_CMD_NV_GET_HYBRID_PREF_ITEM_HYBRID_PREF "hybrid-pref"
+
+size_t      qcdm_cmd_nv_get_hybrid_pref_new    (char *buf, size_t len);
+
+QcdmResult *qcdm_cmd_nv_get_hybrid_pref_result (const char *buf,
+                                                size_t len,
+                                                int *out_error);
+
+size_t      qcdm_cmd_nv_set_hybrid_pref_new    (char *buf,
+                                                size_t len,
+                                                u_int8_t hybrid_pref);
+
+QcdmResult *qcdm_cmd_nv_set_hybrid_pref_result (const char *buf,
+                                                size_t len,
+                                                int *out_error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF */
 enum {
     QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_0 = 0x00,
