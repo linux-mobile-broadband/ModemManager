@@ -248,6 +248,9 @@ get_manager_ready (GObject      *source,
 {
     ctx->manager = mmcli_get_manager_finish (result);
 
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->manager));
+
     /* Request to set log level? */
     if (set_logging_str) {
         mm_manager_set_logging (ctx->manager,
@@ -326,6 +329,9 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
     /* Initialize context */
     ctx = g_new0 (Context, 1);
     ctx->manager = mmcli_get_manager_sync (connection);
+
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->manager));
 
     /* Request to set log level? */
     if (set_logging_str) {

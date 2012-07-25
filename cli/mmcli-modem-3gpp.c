@@ -405,6 +405,12 @@ get_modem_ready (GObject      *source,
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
     ctx->modem_3gpp_ussd = mm_object_get_modem_3gpp_ussd (ctx->object);
 
+    /* Setup operation timeout */
+    if (ctx->modem_3gpp)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp));
+    if (ctx->modem_3gpp_ussd)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp_ussd));
+
     ensure_modem_3gpp ();
 
     if (ussd_status_flag)
@@ -501,6 +507,12 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
                                         &ctx->manager);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
     ctx->modem_3gpp_ussd = mm_object_get_modem_3gpp_ussd (ctx->object);
+
+    /* Setup operation timeout */
+    if (ctx->modem_3gpp)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp));
+    if (ctx->modem_3gpp_ussd)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp_ussd));
 
     ensure_modem_3gpp ();
 

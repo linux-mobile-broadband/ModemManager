@@ -45,6 +45,7 @@ static GCancellable *cancellable;
 static gboolean verbose_flag;
 static gboolean version_flag;
 static gboolean async_flag;
+static gint timeout = 30; /* by default, use 30s for all operations */
 
 static GOptionEntry main_entries[] = {
     { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose_flag,
@@ -58,6 +59,10 @@ static GOptionEntry main_entries[] = {
     { "async", 'a', 0, G_OPTION_ARG_NONE, &async_flag,
       "Use asynchronous methods",
       NULL
+    },
+    { "timeout", 0, 0, G_OPTION_ARG_INT, &timeout,
+      "Timeout for the operation",
+      "[SECONDS]"
     },
     { NULL }
 };
@@ -161,6 +166,12 @@ mmcli_force_sync_operation (void)
         g_debug ("Ignoring request to run asynchronously");
         async_flag = FALSE;
     }
+}
+
+void
+mmcli_force_operation_timeout (GDBusProxy *proxy)
+{
+    g_dbus_proxy_set_default_timeout (proxy, timeout * 1000);
 }
 
 gint

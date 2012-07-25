@@ -220,6 +220,8 @@ get_sms_ready (GObject      *source,
     ctx->sms = mmcli_get_sms_finish (result,
                                      &ctx->manager,
                                      &ctx->object);
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->sms));
 
     if (info_flag)
         g_assert_not_reached ();
@@ -273,6 +275,9 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
                                    mmcli_get_common_sms_string (),
                                    &ctx->manager,
                                    &ctx->object);
+
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->sms));
 
     /* Request to get info from SMS? */
     if (info_flag) {

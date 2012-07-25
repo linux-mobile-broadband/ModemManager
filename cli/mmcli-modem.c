@@ -771,6 +771,14 @@ get_modem_ready (GObject      *source,
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
     ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
 
+    /* Setup operation timeout */
+    if (ctx->modem)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem));
+    if (ctx->modem_3gpp)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp));
+    if (ctx->modem_cdma)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_cdma));
+
     if (info_flag)
         g_assert_not_reached ();
 
@@ -957,6 +965,14 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     ctx->modem = mm_object_get_modem (ctx->object);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
     ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
+
+    /* Setup operation timeout */
+    if (ctx->modem)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem));
+    if (ctx->modem_3gpp)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp));
+    if (ctx->modem_cdma)
+        mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_cdma));
 
     /* Request to get info from modem? */
     if (info_flag) {

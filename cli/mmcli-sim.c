@@ -315,6 +315,9 @@ get_sim_ready (GObject      *source,
                                      &ctx->manager,
                                      &ctx->object);
 
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->sim));
+
     if (info_flag)
         g_assert_not_reached ();
 
@@ -401,6 +404,9 @@ mmcli_sim_run_synchronous (GDBusConnection *connection)
                                    mmcli_get_common_sim_string (),
                                    &ctx->manager,
                                    &ctx->object);
+
+    /* Setup operation timeout */
+    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->sim));
 
     /* Request to get info from SIM? */
     if (info_flag) {
