@@ -956,6 +956,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                         &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
+    ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
 
     /* Request to get info from modem? */
     if (info_flag) {
