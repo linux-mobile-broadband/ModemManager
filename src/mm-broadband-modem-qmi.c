@@ -29,14 +29,17 @@
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-sim-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
 
 struct _MMBroadbandModemQmiPrivate {
     /* Cached device IDs, retrieved by the modem interface when loading device
@@ -2295,6 +2298,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* Other actions */
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
+}
+
+static void
+iface_modem_cdma_init (MMIfaceModemCdma *iface)
+{
 }
 
 static void
