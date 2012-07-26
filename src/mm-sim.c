@@ -563,7 +563,11 @@ unlock_check_ready (MMIfaceModem *modem,
     MMModemLock lock;
 
     lock = mm_iface_modem_unlock_check_finish (modem, res, &error);
-    if (lock != MM_MODEM_LOCK_NONE) {
+    /* Even if we may be SIM-PIN2/PUK2 locked, we don't consider this an error
+     * in the PIN/PUK sending */
+    if (lock != MM_MODEM_LOCK_NONE &&
+        lock != MM_MODEM_LOCK_SIM_PIN2 &&
+        lock != MM_MODEM_LOCK_SIM_PUK2) {
         /* Device is locked. Now:
          *   - If we got an error in the original send-pin action, report it.
          *   - If we got an error in the pin-check action, report it.
