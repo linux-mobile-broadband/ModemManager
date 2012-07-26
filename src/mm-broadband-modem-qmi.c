@@ -1612,6 +1612,49 @@ modem_factory_reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* IMEI loading (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    gchar *imei;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    imei = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded IMEI: %s", imei);
+    return imei;
+}
+
+static void
+modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_imei);
+
+    if (self->priv->imei)
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   self->priv->imei,
+                                                   NULL);
+    else
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Device doesn't report a valid IMEI");
+    g_simple_async_result_complete_in_idle (result);
+}
+
+/*****************************************************************************/
 /* Facility locks status loading (3GPP interface) */
 
 typedef struct {
@@ -2244,6 +2287,8 @@ static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     /* Initialization steps */
+    iface->load_imei = modem_3gpp_load_imei;
+    iface->load_imei_finish = modem_3gpp_load_imei_finish;
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 
