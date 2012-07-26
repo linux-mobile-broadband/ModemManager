@@ -2076,6 +2076,49 @@ modem_cdma_load_meid (MMIfaceModemCdma *_self,
 }
 
 /*****************************************************************************/
+/* ESN loading (CDMA interface) */
+
+static gchar *
+modem_cdma_load_esn_finish (MMIfaceModemCdma *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    gchar *esn;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    esn = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded ESN: %s", esn);
+    return esn;
+}
+
+static void
+modem_cdma_load_esn (MMIfaceModemCdma *_self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_cdma_load_esn);
+
+    if (self->priv->esn)
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   self->priv->esn,
+                                                   NULL);
+    else
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Device doesn't report a valid ESN");
+    g_simple_async_result_complete_in_idle (result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -2348,6 +2391,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
     iface->load_meid = modem_cdma_load_meid;
     iface->load_meid_finish = modem_cdma_load_meid_finish;
+    iface->load_esn = modem_cdma_load_esn;
+    iface->load_esn_finish = modem_cdma_load_esn_finish;
 }
 
 static void
