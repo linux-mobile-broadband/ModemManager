@@ -39,6 +39,12 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemQmiPrivate {
+    /* Cached device IDs, retrieved by the modem interface when loading device
+     * IDs, and used afterwards in the 3GPP and CDMA interfaces. */
+    gchar *imei;
+    gchar *meid;
+    gchar *esn;
+
     /* Signal quality related */
     gboolean has_get_signal_info;
 };
@@ -419,6 +425,22 @@ modem_load_revision (MMIfaceModem *self,
 /*****************************************************************************/
 /* Equipment Identifier loading (Modem interface) */
 
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClient *client;
+    GSimpleAsyncResult *result;
+} LoadEquipmentIdentifierContext;
+
+static void
+load_equipment_identifier_context_complete_and_free (LoadEquipmentIdentifierContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static gchar *
 modem_load_equipment_identifier_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
@@ -437,58 +459,68 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
 static void
 dms_get_ids_ready (QmiClientDms *client,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   LoadEquipmentIdentifierContext *ctx)
 {
     QmiMessageDmsGetIdsOutput *output = NULL;
     GError *error = NULL;
+    const gchar *str;
 
     output = qmi_client_dms_get_ids_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
-    } else if (!qmi_message_dms_get_ids_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't get IDs: ");
-        g_simple_async_result_take_error (simple, error);
-    } else {
-        const gchar *str = NULL;
-
-        /* In order:
-         * If we have a IMEI, use it...
-         * Otherwise, if we have a ESN, use it...
-         * Otherwise, if we have a MEID, use it...
-         * Otherwise, 'unknown'
-         */
-
-        if (qmi_message_dms_get_ids_output_get_imei (output, &str, NULL)) {
-            if (str && (str[0] == '\0' || str[0] == '0'))
-                str = NULL;
-        }
-
-        if (!str &&
-            qmi_message_dms_get_ids_output_get_esn (output, &str, NULL)) {
-            if (str && (str[0] == '\0' || str[0] == '0'))
-                str = NULL;
-        }
-
-        if (!str &&
-            qmi_message_dms_get_ids_output_get_meid (output, &str, NULL)) {
-            if (str && (str[0] == '\0' || str[0] == '0'))
-                str = NULL;
-        }
-
-        if (!str)
-            str = "unknown";
-
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+        g_simple_async_result_take_error (ctx->result, error);
+        load_equipment_identifier_context_complete_and_free (ctx);
+        return;
     }
 
-    if (output)
+    if (!qmi_message_dms_get_ids_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get IDs: ");
+        g_simple_async_result_take_error (ctx->result, error);
         qmi_message_dms_get_ids_output_unref (output);
+        load_equipment_identifier_context_complete_and_free (ctx);
+        return;
+    }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    /* In order:
+     * If we have a IMEI, use it...
+     * Otherwise, if we have a ESN, use it...
+     * Otherwise, if we have a MEID, use it...
+     * Otherwise, 'unknown'
+     */
+
+    if (qmi_message_dms_get_ids_output_get_imei (output, &str, NULL) &&
+        str[0] != '\0' && str[0] != '0') {
+        g_free (ctx->self->priv->imei);
+        ctx->self->priv->imei = g_strdup (str);
+    }
+
+    if (qmi_message_dms_get_ids_output_get_esn (output, &str, NULL) &&
+        str[0] != '\0' && str[0] != '0') {
+        g_free (ctx->self->priv->esn);
+        ctx->self->priv->esn = g_strdup (str);
+    }
+
+    if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
+        str[0] != '\0' && str[0] != '0') {
+        g_free (ctx->self->priv->meid);
+        ctx->self->priv->meid = g_strdup (str);
+    }
+
+    if (ctx->self->priv->imei)
+        str = ctx->self->priv->imei;
+    else if (ctx->self->priv->esn)
+        str = ctx->self->priv->esn;
+    else if (ctx->self->priv->meid)
+        str = ctx->self->priv->meid;
+    else
+        str = "unknown";
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               g_strdup (str),
+                                               (GDestroyNotify)g_free);
+
+    qmi_message_dms_get_ids_output_unref (output);
+    load_equipment_identifier_context_complete_and_free (ctx);
 }
 
 static void
@@ -496,7 +528,7 @@ modem_load_equipment_identifier (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    LoadEquipmentIdentifierContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -504,10 +536,13 @@ modem_load_equipment_identifier (MMIfaceModem *self,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_equipment_identifier);
+    ctx = g_new (LoadEquipmentIdentifierContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_equipment_identifier);
 
     mm_dbg ("loading equipment identifier...");
     qmi_client_dms_get_ids (QMI_CLIENT_DMS (client),
@@ -515,7 +550,7 @@ modem_load_equipment_identifier (MMIfaceModem *self,
                             5,
                             NULL,
                             (GAsyncReadyCallback)dms_get_ids_ready,
-                            result);
+                            ctx);
 }
 
 /*****************************************************************************/
@@ -2145,6 +2180,10 @@ finalize (GObject *object)
         mm_qmi_port_is_open (qmi)) {
         mm_qmi_port_close (qmi);
     }
+
+    g_free (self->priv->imei);
+    g_free (self->priv->meid);
+    g_free (self->priv->esn);
 
     G_OBJECT_CLASS (mm_broadband_modem_qmi_parent_class)->finalize (object);
 }
