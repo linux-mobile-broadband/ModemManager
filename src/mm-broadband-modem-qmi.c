@@ -1366,6 +1366,115 @@ load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Powering up the modem (Modem interface) */
+
+static gboolean
+modem_power_up_down_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+dms_set_operating_mode_ready (QmiClientDms *client,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsSetOperatingModeOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output) {
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED)) {
+            mm_dbg ("Device doesn't support operating mode setting. Ignoring power up/down");
+            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+            g_error_free (error);
+        } else {
+            g_prefix_error (&error, "QMI operation failed: ");
+            g_simple_async_result_take_error (simple, error);
+        }
+    } else if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set operating mode: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_set_operating_mode_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+common_power_up_down (MMIfaceModem *self,
+                      QmiDmsOperatingMode mode,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    GError *error = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_power_up_down);
+
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    if (!qmi_message_dms_set_operating_mode_input_set_mode (
+            input,
+            mode,
+            &error)) {
+        qmi_message_dms_set_operating_mode_input_unref (input);
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_dbg ("Setting device operating mode...");
+    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)dms_set_operating_mode_ready,
+                                       result);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    common_power_up_down (self,
+                          QMI_DMS_OPERATING_MODE_OFFLINE,
+                          callback,
+                          user_data);
+}
+
+static void
+modem_power_up (MMIfaceModem *self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    common_power_up_down (self,
+                          QMI_DMS_OPERATING_MODE_ONLINE,
+                          callback,
+                          user_data);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMSim *
@@ -2064,6 +2173,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_supported_bands = modem_load_supported_bands;
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
+
+    /* Enabling/disabling */
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = modem_power_up_down_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
 
