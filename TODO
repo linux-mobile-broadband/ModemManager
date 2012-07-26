@@ -139,3 +139,12 @@ example to update the signal quality value or check registration status.
 
   ** Icera plugin: retry authentication step in 3gpp dialling to 3 times with 1s
      delay.
+
+  ** QMI: Gobi 2k devices don't like the SYNC command, which is supposed to
+     release all previously allocated clients. It gets worse, as if clients are
+     not cleanly released by ModemManager (e.g. a segfault), the device reaches
+     a point where it doesn't allow allocating more:
+       couldn't create client for the 'nas' service:
+         QMI protocol error (5): 'client-ids-exhausted'
+     This may force us to have something like a state file in /tmp with the IDs
+     currently allocated, so that ModemManager can re-use them if needed.
