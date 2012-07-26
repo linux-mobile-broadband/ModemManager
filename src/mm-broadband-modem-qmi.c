@@ -2033,6 +2033,49 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* MEID loading (CDMA interface) */
+
+static gchar *
+modem_cdma_load_meid_finish (MMIfaceModemCdma *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    gchar *meid;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    meid = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded MEID: %s", meid);
+    return meid;
+}
+
+static void
+modem_cdma_load_meid (MMIfaceModemCdma *_self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_cdma_load_meid);
+
+    if (self->priv->meid)
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   self->priv->meid,
+                                                   NULL);
+    else
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Device doesn't report a valid MEID");
+    g_simple_async_result_complete_in_idle (result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -2303,6 +2346,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
+    iface->load_meid = modem_cdma_load_meid;
+    iface->load_meid_finish = modem_cdma_load_meid_finish;
 }
 
 static void
