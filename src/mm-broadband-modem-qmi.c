@@ -2183,6 +2183,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_after_power_up_finish = NULL;
     iface->setup_flow_control = NULL;
     iface->setup_flow_control_finish = NULL;
+    iface->load_supported_charsets = NULL;
+    iface->load_supported_charsets_finish = NULL;
+    iface->setup_charset = NULL;
+    iface->setup_charset_finish = NULL;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->load_signal_quality = load_signal_quality;
