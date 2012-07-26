@@ -2534,13 +2534,19 @@ enabling_context_complete_and_free (EnablingContext *ctx)
                                      MM_MODEM_STATE_ENABLED,
                                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     else {
+        MMModemLock lock;
+
         /* Fallback to DISABLED/LOCKED */
+        lock = mm_gdbus_modem_get_unlock_required (ctx->skeleton);
         mm_iface_modem_update_state (
             ctx->self,
-            (mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE ?
+            ((lock == MM_MODEM_LOCK_NONE ||
+              lock == MM_MODEM_LOCK_SIM_PIN2 ||
+              lock == MM_MODEM_LOCK_SIM_PUK2) ?
              MM_MODEM_STATE_DISABLED :
              MM_MODEM_STATE_LOCKED),
             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
         /* Close the ports if enabling failed */
         if (ctx->primary_open)
             mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
