@@ -274,51 +274,6 @@ get_band (MMModemGsmNetwork *modem,
 }
 
 static void
-send_samsung_pinnum_done (MMAtSerialPort *port,
-                          GString *response,
-                          GError *error,
-                          gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int matched;
-    GArray *retry_counts;
-    PinRetryCount ur[4] = {
-        {"sim-pin", 0}, {"sim-puk", 0}, {"sim-pin2", 0}, {"sim-puk2", 0}
-    };
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        goto done;
-    }
-
-    matched = sscanf (response->str, "%%PINNUM: %d, %d, %d, %d",
-                      &ur[0].count, &ur[1].count, &ur[2].count, &ur[3].count);
-    if (matched == 4) {
-        if (ur[0].count > 998) {
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "Invalid PIN attempts left %d", ur[0].count);
-            ur[0].count = 0;
-        }
-
-        retry_counts = g_array_sized_new (FALSE, TRUE, sizeof (PinRetryCount), 4);
-        g_array_append_vals (retry_counts, &ur, 4);
-        mm_callback_info_set_result (info, retry_counts, NULL);
-    } else {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse PIN retries results");
-    }
-
-done:
-    mm_serial_port_close (MM_SERIAL_PORT (port));
-    mm_callback_info_schedule (info);
-}
-
-static void
 reset (MMModem *modem,
        MMModemFn callback,
        gpointer user_data)
@@ -340,31 +295,7 @@ get_unlock_retries (MMModemGsmCard *modem,
                     MMModemArrayFn callback,
                     gpointer user_data)
 {
-    MMAtSerialPort *port;
-    MMCallbackInfo *info = mm_callback_info_array_new (MM_MODEM (modem), callback, user_data);
-
-    mm_dbg ("get_unlock_retries");
-
-    /* Ensure we have a usable port to use for the command */
-    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    /* Modem may not be enabled yet, which sometimes can't be done until
-     * the device has been unlocked.  In this case we have to open the port
-     * ourselves.
-     */
-    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    /* if the modem have not yet been enabled we need to make sure echoing is turned off */
-    mm_at_serial_port_queue_command (port, "E0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (port, "%PINNUM?", 3, send_samsung_pinnum_done, info);
-
+    mm_modem_icera_get_unlock_retries (MM_MODEM_ICERA (modem), callback, user_data);
 }
 
 static void

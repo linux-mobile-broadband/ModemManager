@@ -110,5 +110,9 @@ void mm_modem_icera_get_local_timestamp (MMModemIcera *self,
                                          MMModemIceraTimestampFn callback,
                                          gpointer user_data);
 
+void mm_modem_icera_get_unlock_retries (MMModemIcera *self,
+                                        MMModemArrayFn callback,
+                                        gpointer user_data);
+
 #endif  /* MM_MODEM_ICERA_H */
 
