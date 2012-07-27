@@ -31,7 +31,6 @@
 #include "mm-modem-gsm-card.h"
 #include "mm-log.h"
 #include "mm-modem-icera.h"
-#include "mm-utils.h"
 #include "mm-modem-time.h"
 
 static void modem_init (MMModem *modem_class);
@@ -53,9 +52,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemSamsungGsm, mm_modem_samsung_gsm, MM_TYPE_GENERIC
 
 typedef struct {
     gboolean disposed;
-
     MMModemIceraPrivate *icera;
-    char *band;
 } MMModemSamsungGsmPrivate;
 
 #define IPDPADDR_TAG "%IPDPADDR: "
@@ -84,44 +81,6 @@ mm_modem_samsung_gsm_new (const char *device,
     return modem;
 }
 
-typedef struct {
-    MMModemGsmBand mm;
-    char band[50];
-} BandTable;
-
-static BandTable bands[12] = {
-    /* Sort 3G first since it's preferred */
-    { MM_MODEM_GSM_BAND_U2100, "FDD_BAND_I" },
-    { MM_MODEM_GSM_BAND_U1900, "FDD_BAND_II" },
-    { MM_MODEM_GSM_BAND_U1800, "FDD_BAND_III" },
-    { MM_MODEM_GSM_BAND_U17IV, "FDD_BAND_IV" },
-    { MM_MODEM_GSM_BAND_U850,  "FDD_BAND_V" },
-    { MM_MODEM_GSM_BAND_U800,  "FDD_BAND_VI" },
-    { MM_MODEM_GSM_BAND_U900,  "FDD_BAND_VIII" },
-    { MM_MODEM_GSM_BAND_G850, "G850" },
-    /* 2G second */
-    { MM_MODEM_GSM_BAND_DCS,   "DCS" },
-    { MM_MODEM_GSM_BAND_EGSM,  "EGSM" }, /* 0x100 = Extended GSM, 0x200 = Primary GSM */
-    { MM_MODEM_GSM_BAND_PCS,   "PCS" },
-    /* And ANY last since it's most inclusive */
-    { MM_MODEM_GSM_BAND_ANY,   "ANY" },
-};
-
-static gboolean
-band_mm_to_samsung (MMModemGsmBand band, MMModemGsmNetwork *modem)
-{
-    int i;
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (modem);
-
-    for (i = 0; i < sizeof (bands) / sizeof (BandTable); i++) {
-        if (bands[i].mm == band) {
-            priv->band = bands[i].band;
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
 static void
 get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
@@ -140,117 +99,12 @@ set_allowed_mode (MMGenericGsm *gsm,
 }
 
 static void
-set_band_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error)
-        info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
-}
-
-static void
 set_band (MMModemGsmNetwork *modem,
           MMModemGsmBand band,
           MMModemFn callback,
           gpointer user_data)
 {
-    MMCallbackInfo *info;
-    MMAtSerialPort *port;
-    char *command;
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (modem);
-
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-
-    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    /* TODO: Check how to pass more than one band in the same AT%%IPBM command */
-    if (!utils_check_for_single_value (band)) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Cannot set more than one band.");
-        mm_callback_info_schedule (info);
-    } else if (!band_mm_to_samsung (band, modem)) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
-        mm_callback_info_schedule (info);
-    } else {
-        mm_callback_info_set_data (info, "band", g_strdup(priv->band), NULL);
-        command = g_strdup_printf ("AT%%IPBM=\"%s\",1", priv->band);
-        mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
-        g_free (command);
-        priv->band = NULL;
-    }
-}
-
-static gboolean
-parse_ipbm (const char *reply, MMModemGsmBand *band)
-{
-    int enable[12];
-
-    g_return_val_if_fail (band != NULL, FALSE);
-    g_return_val_if_fail (reply != NULL, FALSE);
-
-    if (sscanf (reply, "\"ANY\": %d\r\n\"EGSM\": %d\r\n\"DCS\": %d\r\n\"PCS\": %d\r\n\"G850\": %d\r\n\"FDD_BAND_I\": %d\r\n\"FDD_BAND_II\": %d\r\n\"FDD_BAND_III\": %d\r\n\"FDD_BAND_IV\": %d\r\n\"FDD_BAND_V\": %d\r\n\"FDD_BAND_VI\": %d\r\n\"FDD_BAND_VIII\": %d", &enable[0], &enable[1], &enable[2], &enable[3], &enable[4], &enable[5], &enable[6], &enable[7], &enable[8], &enable[9], &enable[10], &enable[11]) != 12)
-        return FALSE;
-
-    *band = 0;
-    if (enable[5] == 1)
-        *band |= MM_MODEM_GSM_BAND_U2100;
-    if (enable[6] == 1)
-        *band |= MM_MODEM_GSM_BAND_U1900;
-    if (enable[7] == 1)
-        *band |= MM_MODEM_GSM_BAND_U1800;
-    if (enable[8] == 1)
-        *band |= MM_MODEM_GSM_BAND_U17IV;
-    if (enable[9] == 1)
-        *band |= MM_MODEM_GSM_BAND_U850;
-    if (enable[10] == 1)
-        *band |= MM_MODEM_GSM_BAND_U800;
-    if (enable[11] == 1)
-        *band |= MM_MODEM_GSM_BAND_U900;
-    if (enable[1] == 1)
-        *band |= MM_MODEM_GSM_BAND_EGSM;
-    if (enable[2] == 1)
-        *band |= MM_MODEM_GSM_BAND_DCS;
-    if (enable[3] == 1)
-        *band |= MM_MODEM_GSM_BAND_PCS;
-    if (enable[4] == 1)
-        *band |= MM_MODEM_GSM_BAND_G850;
-
-    return (*band > 0 ? TRUE : FALSE);
-}
-
-static void
-get_band_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error)
-        info->error = g_error_copy (error);
-    else if (parse_ipbm (response->str, &mm_band))
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
-
-    mm_callback_info_schedule (info);
+    mm_modem_icera_set_band (MM_MODEM_ICERA (modem), band, callback, user_data);
 }
 
 static void
@@ -258,19 +112,7 @@ get_band (MMModemGsmNetwork *modem,
           MMModemUIntFn callback,
           gpointer user_data)
 {
-    MMAtSerialPort *port;
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    /* Otherwise ask the modem */
-    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_band_done, info);
+    mm_modem_icera_get_band (MM_MODEM_ICERA (modem), callback, user_data);
 }
 
 static void
