@@ -114,9 +114,13 @@ void mm_modem_icera_get_unlock_retries (MMModemIcera *self,
                                         MMModemArrayFn callback,
                                         gpointer user_data);
 
-void mm_modem_icera_get_band (MMModemIcera *self,
-                              MMModemUIntFn callback,
-                              gpointer user_data);
+void mm_modem_icera_get_current_bands (MMModemIcera *self,
+                                       MMModemUIntFn callback,
+                                       gpointer user_data);
+
+void mm_modem_icera_get_supported_bands (MMModemIcera *self,
+                                         MMModemUIntFn callback,
+                                         gpointer user_data);
 
 void mm_modem_icera_set_band (MMModemIcera *self,
                               MMModemGsmBand band,

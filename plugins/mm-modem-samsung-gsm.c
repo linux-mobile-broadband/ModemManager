@@ -53,6 +53,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemSamsungGsm, mm_modem_samsung_gsm, MM_TYPE_GENERIC
 typedef struct {
     gboolean disposed;
     MMModemIceraPrivate *icera;
+    MMModemGsmBand supported_bands;
 } MMModemSamsungGsmPrivate;
 
 #define IPDPADDR_TAG "%IPDPADDR: "
@@ -112,7 +113,15 @@ get_band (MMModemGsmNetwork *modem,
           MMModemUIntFn callback,
           gpointer user_data)
 {
-    mm_modem_icera_get_band (MM_MODEM_ICERA (modem), callback, user_data);
+    mm_modem_icera_get_current_bands (MM_MODEM_ICERA (modem), callback, user_data);
+}
+
+static void
+get_supported_bands (MMGenericGsm *gsm,
+                     MMModemUIntFn callback,
+                     gpointer user_data)
+{
+    mm_modem_icera_get_supported_bands (MM_MODEM_ICERA (gsm), callback, user_data);
 }
 
 static void
@@ -492,4 +501,5 @@ mm_modem_samsung_gsm_class_init (MMModemSamsungGsmClass *klass)
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
+    gsm_class->get_supported_bands = get_supported_bands;
 }

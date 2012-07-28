@@ -825,34 +825,50 @@ mm_modem_icera_get_local_timestamp (MMModemIcera *self,
 
 typedef struct {
     MMModemGsmBand band;
-    const char *name;
-} BandTable;
+    char *name;
+    gboolean enabled;
+    gpointer data;
+} Band;
 
-static BandTable modem_bands[] = {
+static void
+band_free (Band *b)
+{
+    g_free (b->name);
+    g_free (b);
+}
+
+static const Band modem_bands[] = {
     /* Sort 3G first since it's preferred */
-    { MM_MODEM_GSM_BAND_U2100, "FDD_BAND_I" },
-    { MM_MODEM_GSM_BAND_U1900, "FDD_BAND_II" },
-    /*
-     * Several bands are forbidden to set and will always read as
-     * disabled, so we won't present them to the rest of
-     * modemmanager.
-     */
-    /* { MM_MODEM_GSM_BAND_U1800, "FDD_BAND_III" }, */
-    /* { MM_MODEM_GSM_BAND_U17IV, "FDD_BAND_IV" }, */
-    /* { MM_MODEM_GSM_BAND_U800, "FDD_BAND_VI" }, */
-    { MM_MODEM_GSM_BAND_U850, "FDD_BAND_V" },
-    { MM_MODEM_GSM_BAND_U900, "FDD_BAND_VIII" },
-    { MM_MODEM_GSM_BAND_G850, "G850" },
+    { MM_MODEM_GSM_BAND_U2100, "FDD_BAND_I",    FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U1900, "FDD_BAND_II",   FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U1800, "FDD_BAND_III",  FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U17IV, "FDD_BAND_IV",   FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U800,  "FDD_BAND_VI",   FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U850,  "FDD_BAND_V",    FALSE, NULL },
+    { MM_MODEM_GSM_BAND_U900,  "FDD_BAND_VIII", FALSE, NULL },
     /* 2G second */
-    { MM_MODEM_GSM_BAND_DCS, "DCS" },
-    { MM_MODEM_GSM_BAND_EGSM, "EGSM" },
-    { MM_MODEM_GSM_BAND_PCS, "PCS" },
+    { MM_MODEM_GSM_BAND_G850,  "G850",          FALSE, NULL },
+    { MM_MODEM_GSM_BAND_DCS,   "DCS",           FALSE, NULL },
+    { MM_MODEM_GSM_BAND_EGSM,  "EGSM",          FALSE, NULL },
+    { MM_MODEM_GSM_BAND_PCS,   "PCS",           FALSE, NULL },
     /* And ANY last since it's most inclusive */
-    { MM_MODEM_GSM_BAND_ANY, "ANY" },
+    { MM_MODEM_GSM_BAND_ANY,   "ANY",           FALSE, NULL },
 };
 
+static MMModemGsmBand
+icera_band_to_mm (const char *icera)
+{
+    int i;
+
+    for (i = 0 ; i < G_N_ELEMENTS (modem_bands); i++) {
+        if (g_strcmp0 (icera, modem_bands[i].name) == 0)
+            return modem_bands[i].band;
+    }
+    return MM_MODEM_GSM_BAND_UNKNOWN;
+}
+
 static const char *
-band_mm_to_icera (MMModemGsmBand band)
+mm_band_to_icera (MMModemGsmBand band)
 {
     int i;
 
@@ -863,21 +879,19 @@ band_mm_to_icera (MMModemGsmBand band)
     return NULL;
 }
 
-
-static gboolean
-parse_ipbm (const char *reply, MMModemGsmBand *band)
+/* returns a list of 'Band' structs */
+static GSList *
+build_bands_info (const gchar *response, gboolean build_command)
 {
+    GSList *bands = NULL;
     GRegex *r;
-    GMatchInfo *info;
-
-    g_return_val_if_fail (band != NULL, FALSE);
-    g_return_val_if_fail (reply != NULL, FALSE);
+    GMatchInfo *match;
 
     /*
      * Response is a number of lines of the form:
-     * "EGSM": 0
-     * "FDD_BAND_I": 1
-     * ...
+     *   "EGSM": 0
+     *   "FDD_BAND_I": 1
+     *   ...
      * with 1 and 0 indicating whether the particular band is enabled or not.
      */
     r = g_regex_new ("^\"(\\w+)\": (\\d)",
@@ -885,57 +899,83 @@ parse_ipbm (const char *reply, MMModemGsmBand *band)
                      NULL);
     g_assert (r != NULL);
 
-    g_regex_match (r, reply, 0, &info);
-    while (g_match_info_matches (info)) {
-        gchar *b, *e;
+    g_regex_match (r, response, 0, &match);
+    while (g_match_info_matches (match)) {
+        gchar *name, *enabled;
+        Band *b;
+        MMModemGsmBand band;
 
-        b = g_match_info_fetch (info, 1);
-        e = g_match_info_fetch (info, 2);
-        if (e[0] == '1') {
-            guint i;
-            for (i = 0 ; i < G_N_ELEMENTS (modem_bands); i++) {
-                if (!strcmp (b, modem_bands[i].name)) {
-                    *band |= modem_bands[i].band;
-                    break;
-                }
+        name = g_match_info_fetch (match, 1);
+        enabled = g_match_info_fetch (match, 2);
+        band = icera_band_to_mm (name);
+        if (band != MM_MODEM_GSM_BAND_UNKNOWN && band != MM_MODEM_GSM_BAND_ANY) {
+            b = g_malloc0 (sizeof (Band));
+            b->band = band;
+            b->enabled = (enabled[0] == '1' ? TRUE : FALSE);
+            if (build_command) {
+                /* abuse 'name' for the AT command to check band support */
+                b->name = g_strdup_printf ("%%IPBM=\"%s\",%c",
+                                           name,
+                                           b->enabled ? '1' : '0');
             }
+            bands = g_slist_append (bands, b);
         }
-        g_free (b);
-        g_free (e);
-        g_match_info_next (info, NULL);
+        g_free (name);
+        g_free (enabled);
+        g_match_info_next (match, NULL);
     }
-    g_match_info_free (info);
+    g_match_info_free (match);
     g_regex_unref (r);
 
-    return (*band > 0 ? TRUE : FALSE);
+    return bands;
 }
 
 static void
-get_band_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
+get_current_bands_done (MMAtSerialPort *port,
+                        GString *response,
+                        GError *error,
+                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
+    MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_ANY;
+    GSList *bands;
+    Band *b;
+    GSList *iter;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
-    else if (parse_ipbm (response->str, &mm_band))
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
 
+    bands = build_bands_info (response->str, FALSE);
+    if (!bands) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (MM_MODEM_GSM_BAND_UNKNOWN), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    for (iter = bands; iter; iter = g_slist_next (iter)) {
+        b = iter->data;
+        if (b->enabled)
+            mm_band |= b->band;
+    }
+    g_slist_foreach (bands, (GFunc) band_free, NULL);
+    g_slist_free (bands);
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
     mm_callback_info_schedule (info);
 }
 
 void
-mm_modem_icera_get_band (MMModemIcera *self,
-                         MMModemUIntFn callback,
-                         gpointer user_data)
+mm_modem_icera_get_current_bands (MMModemIcera *self,
+                                  MMModemUIntFn callback,
+                                  gpointer user_data)
 {
     MMAtSerialPort *port;
     MMCallbackInfo *info;
@@ -949,7 +989,105 @@ mm_modem_icera_get_band (MMModemIcera *self,
         return;
     }
 
-    mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_band_done, info);
+    mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_current_bands_done, info);
+}
+
+#define NUM_BANDS_TAG "num-bands"
+#define BAND_RESULT_TAG "band-result"
+
+static void
+get_one_supported_band_done (MMAtSerialPort *port,
+                             GString *response,
+                             GError *error,
+                             gpointer user_data)
+{
+    Band *b = user_data;
+    MMCallbackInfo *info = b->data;
+    MMModemGsmBand mm_bands = MM_MODEM_GSM_BAND_UNKNOWN;
+    guint num;
+
+    if (mm_callback_info_check_modem_removed (info) == FALSE) {
+        /* Update supported bands list */
+        mm_bands = GPOINTER_TO_UINT (mm_callback_info_get_data (info, BAND_RESULT_TAG));
+        if (error == NULL) {
+            mm_bands |= b->band;
+            mm_callback_info_set_data (info, BAND_RESULT_TAG, GUINT_TO_POINTER (mm_bands), NULL);
+        }
+
+        num = GPOINTER_TO_UINT (mm_callback_info_get_data (info, NUM_BANDS_TAG)) - 1;
+        mm_callback_info_set_data (info, NUM_BANDS_TAG, GUINT_TO_POINTER (num), NULL);
+        if (num == 0) {
+            /* All done */
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_bands), NULL);
+            mm_callback_info_schedule (info);
+        }
+    }
+    band_free (b);
+}
+
+static void
+get_supported_bands_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GSList *bands, *iter;
+    Band *b;
+    guint i;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    bands = build_bands_info (response->str, TRUE);
+    if (!bands) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (MM_MODEM_GSM_BAND_UNKNOWN), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    for (iter = bands, i = 0; iter; iter = g_slist_next (iter), i++) {
+        b = iter->data;
+        b->data = info;
+        mm_at_serial_port_queue_command (port, b->name, 10, get_one_supported_band_done, b);
+    }
+    /* Free list, but not items; they are freed when the AT response comes back */
+    g_slist_free (bands);
+
+    mm_callback_info_set_data (info, NUM_BANDS_TAG, GUINT_TO_POINTER (i), NULL);
+}
+
+void
+mm_modem_icera_get_supported_bands (MMModemIcera *self,
+                                    MMModemUIntFn callback,
+                                    gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* The modems report some bands as disabled that they don't actually
+     * support enabling. Thanks Icera! So we have to try setting each
+     * band to it's current enabled/disabled value, and the modem will
+     * return an error if it doesn't support that band at all.
+     */
+    mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_supported_bands_done, info);
 }
 
 static void
@@ -997,7 +1135,7 @@ mm_modem_icera_set_band (MMModemIcera *self,
         return;
     }
 
-    icera_band = band_mm_to_icera (band);
+    icera_band = mm_band_to_icera (band);
     if (!icera_band) {
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
         mm_callback_info_schedule (info);
@@ -1005,7 +1143,7 @@ mm_modem_icera_set_band (MMModemIcera *self,
     }
 
     command = g_strdup_printf ("AT%%IPBM=\"%s\",1", icera_band);
-    mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
+    mm_at_serial_port_queue_command (port, command, 10, set_band_done, info);
     g_free (command);
 }
 
