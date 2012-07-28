@@ -29,11 +29,13 @@
 #include "mm-modem-icera.h"
 
 static void modem_init (MMModem *modem_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_icera_init (MMModemIcera *icera_class);
 static void modem_simple_init (MMModemSimple *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemSierraGsm, mm_modem_sierra_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
@@ -298,6 +300,58 @@ get_access_technology (MMGenericGsm *modem,
 }
 
 static void
+set_band (MMModemGsmNetwork *modem,
+          MMModemGsmBand band,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->is_icera)
+        mm_modem_icera_set_band (MM_MODEM_ICERA (modem), band, callback, user_data);
+    else {
+        info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_band (MMModemGsmNetwork *modem,
+          MMModemUIntFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->is_icera)
+        mm_modem_icera_get_current_bands (MM_MODEM_ICERA (modem), callback, user_data);
+    else {
+        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_supported_bands (MMGenericGsm *gsm,
+                     MMModemUIntFn callback,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->is_icera)
+        mm_modem_icera_get_supported_bands (MM_MODEM_ICERA (gsm), callback, user_data);
+    else {
+        info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
 get_sim_iccid_done (MMAtSerialPort *port,
                     GString *response,
                     GError *error,
@@ -391,20 +445,28 @@ icera_check_cb (MMModem *modem,
                 GError *error,
                 gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (!error) {
-        MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (user_data);
+        MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (info->modem);
         MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
 
         if (result) {
             priv->is_icera = TRUE;
-            g_object_set (G_OBJECT (modem),
+            g_object_set (G_OBJECT (info->modem),
                           MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
                           NULL);
 
             /* Turn on unsolicited network state messages */
-            mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (modem), TRUE);
+            mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (info->modem), TRUE);
         }
     }
+
+    if (info->modem)
+       MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_enable_power_up_done (MM_GENERIC_GSM (info->modem), NULL, NULL, info);
 }
 
 static gboolean
@@ -419,9 +481,7 @@ sierra_enabled (gpointer user_data)
         modem = MM_GENERIC_GSM (info->modem);
         priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem);
         priv->enable_wait_id = 0;
-        mm_modem_icera_is_icera (MM_MODEM_ICERA (modem), icera_check_cb, MM_MODEM_SIERRA_GSM (modem));
-
-        MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_enable_power_up_done (modem, NULL, NULL, info);
+        mm_modem_icera_is_icera (MM_MODEM_ICERA (modem), icera_check_cb, info);
     }
     return FALSE;
 }
@@ -871,6 +931,13 @@ modem_icera_init (MMModemIcera *icera)
 }
 
 static void
+modem_gsm_network_init (MMModemGsmNetwork *class)
+{
+    class->set_band = set_band;
+    class->get_band = get_band;
+}
+
+static void
 modem_simple_init (MMModemSimple *class)
 {
     class->connect = simple_connect;
@@ -913,5 +980,6 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->get_sim_iccid = get_sim_iccid;
     gsm_class->do_disconnect = do_disconnect;
+    gsm_class->get_supported_bands = get_supported_bands;
 }
 
