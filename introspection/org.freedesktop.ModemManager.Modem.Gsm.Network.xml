@@ -208,6 +208,13 @@
       </tp:docstring>
     </property>
 
+    <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_BAND">
+      <tp:docstring>
+        Bands supported by the card.  (Note for plugin writers: returned value
+        must not contain ANY)
+      </tp:docstring>
+    </property>
+
     <signal name="SignalQuality">
       <tp:docstring>
         The signal quality changed.

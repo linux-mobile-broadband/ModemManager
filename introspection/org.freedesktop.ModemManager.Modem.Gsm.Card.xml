@@ -2,9 +2,13 @@
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
   <interface name="org.freedesktop.ModemManager.Modem.Gsm.Card">
+    <tp:docstring>
+      This interface implements functionality pertaining to the SIM card.
+    </tp:docstring>
+
     <method name="GetImei">
       <tp:docstring>
-        Get the IMEI of the card.
+        Get the IMEI of the modem.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_imei"/>
@@ -132,15 +136,16 @@
 
     <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_BAND">
       <tp:docstring>
-        Bands supported by the card.  (Note for plugin writers:
-        returned value must not contain ANY)
+        DEPRECATED; should not be used in new applications.  Use the
+        SupportedBands property of the Gsm.Network interface instead.
       </tp:docstring>
     </property>
 
-    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_GSM_DEPRECATED_MODE">
       <tp:docstring>
-        Network selection modes supported by the card. (Note for plugin writers:
-        returned value must not contain ANY)
+        DEPRECATED; should not be used in new applications.  Use the
+        AccessTechnology property, AllowedMode property, and the SetAllowedMode()
+        method of the Gsm.Network interface instead.
       </tp:docstring>
     </property>
 

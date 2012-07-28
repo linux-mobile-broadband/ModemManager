@@ -2,11 +2,9 @@
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
   <interface name="org.freedesktop.ModemManager.Modem.Gsm">
-    <tp:flags name="MM_MODEM_GSM_MODE" value-prefix="MM_MODEM_GSM_MODE" type="u">
+    <tp:flags name="MM_MODEM_GSM_DEPRECATED_MODE" value-prefix="MM_MODEM_GSM_DEPRECATED_MODE" type="u">
       <tp:docstring>
-        A bitfield describing the specific access modes and technologies
-        supported by a device and the access technology in-use when connected to
-        a mobile network.
+        DEPRECATED; should not be used in new applications.
       </tp:docstring>
       <tp:flag suffix="UNKNOWN" value="0x0">
         <tp:docstring>Unknown or invalid mode.</tp:docstring>

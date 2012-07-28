@@ -643,8 +643,8 @@ mm_modem_gsm_card_init (gpointer g_iface)
     g_object_interface_install_property
         (g_iface,
          g_param_spec_uint (MM_MODEM_GSM_CARD_SUPPORTED_BANDS,
-                            "Supported Modes",
-                            "Supported frequency bands of the card",
+                            "DEPRECATED: Supported Bands",
+                            "DEPRECATED: Supported frequency bands of the card",
                             MM_MODEM_GSM_BAND_UNKNOWN,
                             G_MAXUINT32,
                             MM_MODEM_GSM_BAND_UNKNOWN,
@@ -653,11 +653,11 @@ mm_modem_gsm_card_init (gpointer g_iface)
     g_object_interface_install_property
         (g_iface,
          g_param_spec_uint (MM_MODEM_GSM_CARD_SUPPORTED_MODES,
-                            "Supported Modes",
-                            "Supported modes of the card (ex 2G preferred, 3G preferred, 2G only, etc",
-                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            "DEPRECATED: Supported Modes",
+                            "DEPRECATED: Supported modes of the card (ex 2G preferred, 3G preferred, 2G only, etc",
+                            MM_MODEM_GSM_DEPRECATED_MODE_UNKNOWN,
                             G_MAXUINT32,
-                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            MM_MODEM_GSM_DEPRECATED_MODE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_interface_install_property

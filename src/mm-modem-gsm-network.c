@@ -583,6 +583,16 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_NETWORK_SUPPORTED_BANDS,
+                            "Supported Bands",
+                            "Supported frequency bands of the card",
+                            MM_MODEM_GSM_BAND_UNKNOWN,
+                            G_MAXUINT32,
+                            MM_MODEM_GSM_BAND_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
     /* Signals */
     signals[SIGNAL_QUALITY] =
         g_signal_new ("signal-quality",
@@ -641,6 +651,10 @@ mm_modem_gsm_network_get_type (void)
         g_type_interface_add_prerequisite (network_type, G_TYPE_OBJECT);
         g_type_interface_add_prerequisite (network_type, MM_TYPE_MODEM);
         dbus_g_object_type_install_info (network_type, &dbus_glib_mm_modem_gsm_network_object_info);
+
+        dbus_g_object_type_register_shadow_property (network_type,
+                                                     "SupportedBands",
+                                                     MM_MODEM_GSM_NETWORK_SUPPORTED_BANDS);
     }
 
     return network_type;

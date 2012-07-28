@@ -50,7 +50,8 @@ typedef enum {
     MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
     MM_GENERIC_GSM_PROP_INIT_CMD,
     MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
-    MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
+    MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_BANDS,
+    MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_MODES,
     MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL,
     MM_GENERIC_GSM_PROP_ALLOWED_MODE,
     MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY,
@@ -166,6 +167,14 @@ typedef struct {
     void (*loc_get_capabilities) (MMGenericGsm *self,
                                   MMModemUIntFn callback,
                                   gpointer user_data);
+
+    /* Called by the generic class to get frequency bands supported by the
+     * modem.  Any bands returned must be able to be enabled/disabled via the
+     * Gsm.Network interface's SetBand() method.
+     */
+    void (*get_supported_bands) (MMGenericGsm *self,
+                                 MMModemUIntFn callback,
+                                 gpointer user_data);
 
     /* Called by the generic class to retrieve the SIM's ICCID */
     void (*get_sim_iccid) (MMGenericGsm *self,

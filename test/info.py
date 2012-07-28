@@ -106,38 +106,28 @@ def get_gsm_network_mode(modem):
 
     print "Mode: %s" % mode
 
-def get_gsm_band(modem):
-    band = modem.GetBand()
-    if band == 0x0:
-        band = "Unknown"
-    elif band == 0x1:
-        band = "Any"
-    elif band == 0x2:
-        band = "EGSM (900 MHz)"
-    elif band == 0x4:
-        band = "DCS (1800 MHz)"
-    elif band == 0x8:
-        band = "PCS (1900 MHz)"
-    elif band == 0x10:
-        band = "G850 (850 MHz)"
-    elif band == 0x20:
-        band = "U2100 (WCSMA 2100 MHZ, Class I)"
-    elif band == 0x40:
-        band = "U1700 (WCDMA 3GPP UMTS1800 MHz, Class III)"
-    elif band == 0x80:
-        band = "17IV (WCDMA 3GPP AWS 1700/2100 MHz, Class IV)"
-    elif band == 0x100:
-        band = "U800 (WCDMA 3GPP UMTS800 MHz, Class VI)"
-    elif band == 0x200:
-        band = "U850 (WCDMA 3GPP UMT850 MHz, Class V)"
-    elif band == 0x400:
-        band = "U900 (WCDMA 3GPP UMTS900 MHz, Class VIII)"
-    elif band == 0x800:
-        band = "U17IX (WCDMA 3GPP UMTS MHz, Class IX)"
-    else:
-        band = "(invalid)"
+blist = { 0x2:    "EGSM (900 MHz)",
+          0x4:    "DCS (1800 MHz)",
+          0x8:    "PCS (1900 MHz)",
+          0x10:   "G850 (850 MHz)",
+          0x20:   "U2100 (WCSMA 2100 MHZ, Class I)",
+          0x40:   "U1700 (WCDMA 3GPP UMTS1800 MHz, Class III)",
+          0x80:   "17IV (WCDMA 3GPP AWS 1700/2100 MHz, Class IV)",
+          0x100:  "U800 (WCDMA 3GPP UMTS800 MHz, Class VI)",
+          0x200:  "U850 (WCDMA 3GPP UMT850 MHz, Class V)",
+          0x400:  "U900 (WCDMA 3GPP UMTS900 MHz, Class VIII)",
+          0x800:  "U17IX (WCDMA 3GPP UMTS MHz, Class IX)",
+          0x1000: "U1900 (WCDMA 3GPP UMTS 1900 MHz, Class II)",
+          0x2000: "U2600 (WCDMA 3GPP UMTS 2600 MHz, Class VII)"
+        }
 
-    print "Band: %s" % band
+
+def bands_to_list(bands):
+    b = []
+    for i in sorted(blist.keys()):
+        if bands & i:
+            b.append(blist[i])
+    return b
 
 
 mm_allowed = { 0: "any",
@@ -224,6 +214,23 @@ def gsm_inspect(proxy, props):
     except dbus.exceptions.DBusException, e:
         print "Error reading current access technology: %s" % e
 
+    try:
+        bands = props.Get(MM_DBUS_INTERFACE_MODEM_GSM_NETWORK, "SupportedBands")
+        print "Supported Bands:"
+        blist = bands_to_list (bands)
+        for b in blist:
+            print "        %s" % b
+    except dbus.exceptions.DBusException, e:
+        pass
+
+    try:
+        bands = net.GetBand()
+        print "Enabled Bands:"
+        blist = bands_to_list (bands)
+        for b in blist:
+            print "        %s" % b
+    except dbus.exceptions.DBusException, e:
+        print "Error reading current bands: %s" % e
 
 
 bus = dbus.SystemBus()

@@ -145,6 +145,9 @@ typedef struct {
 
     /* Facility locks */
     MMModemGsmFacility enabled_facilities;
+
+    /* Bands */
+    MMModemGsmBand supported_bands;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info);
@@ -1327,6 +1330,18 @@ get_allowed_mode_done (MMModem *modem,
 }
 
 static void
+get_supported_bands_done (MMModem *modem,
+                          MMModemGsmBand bands,
+                          GError *error,
+                          gpointer user_data)
+{
+    if (modem && !error) {
+        MM_GENERIC_GSM_GET_PRIVATE (modem)->supported_bands = bands;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_NETWORK_SUPPORTED_BANDS);
+    }
+}
+
+static void
 ciev_received (MMAtSerialPort *port,
                GMatchInfo *info,
                gpointer user_data)
@@ -1934,6 +1949,10 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
         MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
+
+    /* Get supported bands */
+    if (MM_GENERIC_GSM_GET_CLASS (self)->get_supported_bands)
+        MM_GENERIC_GSM_GET_CLASS (self)->get_supported_bands (self, get_supported_bands_done, NULL);
 
     /* Try again to get facility locks */
     if (priv->enabled_facilities == 0)
@@ -6676,6 +6695,11 @@ mm_generic_gsm_init (MMGenericGsm *self)
     priv->sms_parts = g_hash_table_new (g_direct_hash, g_direct_equal);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_GSM_NETWORK_SUPPORTED_BANDS,
+                                                    "SupportedBands",
+                                                    MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
                                                     NULL,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
@@ -6743,7 +6767,8 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_INIT_CMD:
     case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
-    case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
+    case MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_BANDS:
+    case MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_MODES:
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
     case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
@@ -6822,9 +6847,12 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, "X4 &C1");
         break;
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
+        g_value_set_uint (value, priv->supported_bands);
+        break;
+    case MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_BANDS:
         g_value_set_uint (value, 0);
         break;
-    case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
+    case MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_MODES:
         g_value_set_uint (value, 0);
         break;
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
@@ -6963,10 +6991,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *generic_class)
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
+                                      MM_MODEM_GSM_NETWORK_SUPPORTED_BANDS);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_BANDS,
                                       MM_MODEM_GSM_CARD_SUPPORTED_BANDS);
 
     g_object_class_override_property (object_class,
-                                      MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
+                                      MM_GENERIC_GSM_PROP_DEPRECATED_SUPPORTED_MODES,
                                       MM_MODEM_GSM_CARD_SUPPORTED_MODES);
 
     g_object_class_override_property (object_class,
