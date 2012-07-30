@@ -1933,6 +1933,316 @@ load_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientNas *client;
+    GSimpleAsyncResult *result;
+    MMModemMode allowed;
+    MMModemMode preferred;
+    gboolean run_set_system_selection_preference;
+    gboolean run_set_technology_preference;
+} SetAllowedModesContext;
+
+static void
+set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void set_allowed_modes_context_step (SetAllowedModesContext *ctx);
+
+static void
+set_technology_preference_ready (QmiClientNas *client,
+                                 GAsyncResult *res,
+                                 SetAllowedModesContext *ctx)
+{
+    QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_set_technology_preference_finish (client, res, &error);
+    if (!output) {
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED))
+            ctx->self->priv->has_technology_preference = FALSE;
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_set_technology_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't set technology preference: %s", error->message);
+        g_error_free (error);
+        qmi_message_nas_set_technology_preference_output_unref (output);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_allowed_modes_context_complete_and_free (ctx);
+        qmi_message_nas_set_technology_preference_output_unref (output);
+        return;
+    }
+
+    ctx->run_set_technology_preference = FALSE;
+    set_allowed_modes_context_step (ctx);
+}
+
+static void
+allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
+                                                     GAsyncResult *res,
+                                                     SetAllowedModesContext *ctx)
+{
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED))
+            ctx->self->priv->has_system_selection_preference = FALSE;
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_DEVICE_UNSUPPORTED))
+            ctx->self->priv->has_mode_preference_in_system_selection_preference = FALSE;
+        mm_dbg ("Couldn't set system selection preference: %s", error->message);
+        g_error_free (error);
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+    } else {
+        /* Good! TODO: do we really need to wait for the indication? */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_allowed_modes_context_complete_and_free (ctx);
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+        return;
+    }
+
+    /* Try with the deprecated command */
+    ctx->run_set_system_selection_preference = FALSE;
+    set_allowed_modes_context_step (ctx);
+}
+
+static QmiNasRatModePreference
+modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
+                                               gboolean is_cdma)
+{
+    QmiNasRatModePreference pref = 0;
+
+    if (is_cdma) {
+        pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2;
+        if (mode & MM_MODEM_MODE_2G)
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL; /* CDMA */
+        if (mode & MM_MODEM_MODE_3G)
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR; /* EV-DO */
+    } else {
+        pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP;
+        if (mode & MM_MODEM_MODE_2G)
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_ANALOG; /* GSM */
+        if (mode & MM_MODEM_MODE_3G)
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL; /* WCDMA */
+    }
+
+    if (mode & MM_MODEM_MODE_4G)
+        pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE;
+
+    return pref;
+}
+
+static QmiNasRatModePreference
+modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
+                                       gboolean is_cdma,
+                                       gboolean is_3gpp)
+{
+    QmiNasRatModePreference pref = 0;
+
+    if (is_cdma) {
+        if (mode & MM_MODEM_MODE_2G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X;
+
+        if (mode & MM_MODEM_MODE_3G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO;
+    }
+
+    if (is_3gpp) {
+        if (mode & MM_MODEM_MODE_2G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_GSM;
+
+        if (mode & MM_MODEM_MODE_3G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_UMTS;
+
+        if (mode & MM_MODEM_MODE_4G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
+    }
+
+    return mode;
+}
+
+static QmiNasGsmWcdmaAcquisitionOrderPreference
+modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
+{
+    gchar *str;
+
+    /* mode is not a mask in this case, only a value */
+
+    switch (mode) {
+    case MM_MODEM_MODE_3G:
+        return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_WCDMA;
+    case MM_MODEM_MODE_2G:
+        return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_GSM;
+    case MM_MODEM_MODE_NONE:
+        return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_AUTOMATIC;
+    default:
+        break;
+    }
+
+    str = mm_modem_mode_build_string_from_mask (mode);
+    mm_dbg ("Unhandled modem mode: '%s'", str);
+    g_free (str);
+    return MM_MODEM_MODE_NONE;
+}
+
+static void
+set_allowed_modes_context_step (SetAllowedModesContext *ctx)
+{
+    if (ctx->run_set_system_selection_preference) {
+        QmiMessageNasSetSystemSelectionPreferenceInput *input;
+        QmiNasRatModePreference pref;
+
+        pref = modem_mode_to_qmi_rat_mode_preference (ctx->allowed,
+                                                      mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self)),
+                                                      mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)));
+        if (!pref) {
+            gchar *str;
+
+            str = mm_modem_mode_build_string_from_mask (ctx->allowed);
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled allowed mode setting: '%s'",
+                                             str);
+            g_free (str);
+            set_allowed_modes_context_complete_and_free (ctx);
+            return;
+        }
+
+        input = qmi_message_nas_set_system_selection_preference_input_new ();
+        qmi_message_nas_set_system_selection_preference_input_set_mode_preference (input, pref, NULL);
+
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+            QmiNasGsmWcdmaAcquisitionOrderPreference order;
+
+            order = modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
+            qmi_message_nas_set_system_selection_preference_input_set_gsm_wcdma_acquisition_order_preference (input, order, NULL);
+        }
+
+        qmi_message_nas_set_system_selection_preference_input_set_preference_duration (input, QMI_NAS_PREFERENCE_DURATION_PERMANENT, NULL);
+
+        qmi_client_nas_set_system_selection_preference (
+            ctx->client,
+            input,
+            5,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)allowed_modes_set_system_selection_preference_ready,
+            ctx);
+        qmi_message_nas_set_system_selection_preference_input_unref (input);
+        return;
+    }
+
+    if (ctx->run_set_technology_preference) {
+        QmiMessageNasSetTechnologyPreferenceInput *input;
+        QmiNasRadioTechnologyPreference pref;
+
+        if (ctx->preferred != MM_MODEM_MODE_NONE) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Cannot set specific preferred mode");
+            set_allowed_modes_context_complete_and_free (ctx);
+            return;
+        }
+
+        pref = modem_mode_to_qmi_radio_technology_preference (ctx->allowed,
+                                                              mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self)));
+        if (!pref) {
+            gchar *str;
+
+            str = mm_modem_mode_build_string_from_mask (ctx->allowed);
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled allowed mode setting: '%s'",
+                                             str);
+            g_free (str);
+            set_allowed_modes_context_complete_and_free (ctx);
+            return;
+        }
+
+        input = qmi_message_nas_set_technology_preference_input_new ();
+        qmi_message_nas_set_technology_preference_input_set_current (input, pref, QMI_NAS_PREFERENCE_DURATION_PERMANENT, NULL);
+
+        qmi_client_nas_set_technology_preference (
+            ctx->client,
+            input,
+            5,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)set_technology_preference_ready,
+            ctx);
+        qmi_message_nas_set_technology_preference_input_unref (input);
+        return;
+    }
+
+    g_simple_async_result_set_error (
+        ctx->result,
+        MM_CORE_ERROR,
+        MM_CORE_ERROR_UNSUPPORTED,
+        "Setting allowed modes is not supported by this device");
+    set_allowed_modes_context_complete_and_free (ctx);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    SetAllowedModesContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_new0 (SetAllowedModesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             set_allowed_modes);
+    ctx->allowed = allowed;
+    ctx->preferred = preferred;
+    ctx->run_set_system_selection_preference =
+        (ctx->self->priv->has_system_selection_preference &&
+         ctx->self->priv->has_mode_preference_in_system_selection_preference);
+    ctx->run_set_technology_preference = ctx->self->priv->has_technology_preference;
+
+    set_allowed_modes_context_step (ctx);
+}
+
+/*****************************************************************************/
 /* IMEI loading (3GPP interface) */
 
 static gchar *
@@ -2681,6 +2991,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_charset_finish = NULL;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->load_signal_quality = load_signal_quality;
