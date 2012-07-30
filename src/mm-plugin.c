@@ -55,8 +55,10 @@ struct _MMPluginPrivate {
     gchar **forbidden_drivers;
     guint16 *vendor_ids;
     mm_uint16_pair *product_ids;
+    mm_uint16_pair *forbidden_product_ids;
     gchar **vendor_strings;
     mm_str_pair *product_strings;
+    mm_str_pair *forbidden_product_strings;
     gchar **udev_tags;
     gboolean at;
     gboolean single_at;
@@ -77,8 +79,10 @@ enum {
     PROP_FORBIDDEN_DRIVERS,
     PROP_ALLOWED_VENDOR_IDS,
     PROP_ALLOWED_PRODUCT_IDS,
+    PROP_FORBIDDEN_PRODUCT_IDS,
     PROP_ALLOWED_VENDOR_STRINGS,
     PROP_ALLOWED_PRODUCT_STRINGS,
+    PROP_FORBIDDEN_PRODUCT_STRINGS,
     PROP_ALLOWED_UDEV_TAGS,
     PROP_ALLOWED_AT,
     PROP_ALLOWED_SINGLE_AT,
@@ -107,7 +111,9 @@ mm_plugin_cmp (const MMPlugin *plugin_a,
                const MMPlugin *plugin_b)
 {
     /* If we have any post-probing filter, we need to sort the plugin last */
-#define SORT_LAST(self) (self->priv->vendor_strings || self->priv->product_strings)
+#define SORT_LAST(self) (self->priv->vendor_strings || \
+                         self->priv->product_strings || \
+                         self->priv->forbidden_product_strings)
 
     /* The order of the plugins in the list is the same order used to check
      * whether the plugin can manage a given modem:
@@ -267,14 +273,24 @@ apply_pre_probing_filters (MMPlugin *self,
      * or product strings to compare with: unsupported */
     if ((vendor_filtered || product_filtered) &&
         !self->priv->vendor_strings &&
-        !self->priv->product_strings)
+        !self->priv->product_strings &&
+        !self->priv->forbidden_product_strings)
         return TRUE;
+
+    /* The plugin may specify that some product IDs are not supported. If
+     * that is the case, filter by forbidden vendor+product ID pair */
+    if (self->priv->forbidden_product_ids && product && vendor)
+        for (i = 0; self->priv->forbidden_product_ids[i].l; i++)
+            if (vendor == self->priv->forbidden_product_ids[i].l &&
+                product == self->priv->forbidden_product_ids[i].r)
+                return TRUE;
 
     /* If we need to filter by vendor/product strings, need to probe for both.
      * This covers the case where a RS232 modem is connected via a USB<->RS232
      * adaptor, and we get in udev the vendor ID of the adaptor */
 
-    if (self->priv->product_strings) {
+    if (self->priv->product_strings ||
+        self->priv->forbidden_product_strings) {
         *need_vendor_probing = TRUE;
         *need_product_probing = TRUE;
     } else if (self->priv->vendor_strings)
@@ -342,19 +358,44 @@ apply_post_probing_filters (MMPlugin *self,
     }
 
     /* The plugin may specify that only some vendor+product string pairs are
-     * supported. If that is the case, filter by product string */
-    if (self->priv->product_strings) {
+     * supported or unsupported. If that is the case, filter by product
+     * string */
+    if (self->priv->product_strings ||
+        self->priv->forbidden_product_strings) {
         const gchar *vendor;
         const gchar *product;
 
         vendor = mm_port_probe_get_vendor (probe);
         product = mm_port_probe_get_product (probe);
 
-        /* If we didn't get any vendor or product: filtered */
-        if (!vendor || !product)
-            return TRUE;
-        else {
-            for (i = 0; self->priv->product_strings[i].l; i++) {
+        if (self->priv->product_strings) {
+            /* If we didn't get any vendor or product: filtered */
+            if (!vendor || !product)
+                return TRUE;
+            else {
+                for (i = 0; self->priv->product_strings[i].l; i++) {
+                    gboolean found;
+                    gchar *casefolded_vendor;
+                    gchar *casefolded_product;
+
+                    casefolded_vendor = g_utf8_casefold (self->priv->product_strings[i].l, -1);
+                    casefolded_product = g_utf8_casefold (self->priv->product_strings[i].r, -1);
+                    found = (!!strstr (vendor, casefolded_vendor) &&
+                             !!strstr (product, casefolded_product));
+                    g_free (casefolded_vendor);
+                    g_free (casefolded_product);
+                    if (found)
+                        break;
+                }
+
+                /* If we didn't match any product: unsupported */
+                if (!self->priv->product_strings[i].l)
+                    return TRUE;
+            }
+        }
+
+        if (self->priv->forbidden_product_strings && vendor && product) {
+            for (i = 0; self->priv->forbidden_product_strings[i].l; i++) {
                 gboolean found;
                 gchar *casefolded_vendor;
                 gchar *casefolded_product;
@@ -366,12 +407,9 @@ apply_post_probing_filters (MMPlugin *self,
                 g_free (casefolded_vendor);
                 g_free (casefolded_product);
                 if (found)
-                    break;
+                    /* If we match a forbidden product: unsupported */
+                    return TRUE;
             }
-
-            /* If we didn't match any product: unsupported */
-            if (!self->priv->product_strings[i].l)
-                return TRUE;
         }
 
         /* Keep on with next filters */
@@ -714,6 +752,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->product_ids = g_value_dup_boxed (value);
         break;
+    case PROP_FORBIDDEN_PRODUCT_IDS:
+        /* Construct only */
+        self->priv->forbidden_product_ids = g_value_dup_boxed (value);
+        break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         /* Construct only */
         self->priv->vendor_strings = g_value_dup_boxed (value);
@@ -721,6 +763,10 @@ set_property (GObject *object,
     case PROP_ALLOWED_PRODUCT_STRINGS:
         /* Construct only */
         self->priv->product_strings = g_value_dup_boxed (value);
+        break;
+    case PROP_FORBIDDEN_PRODUCT_STRINGS:
+        /* Construct only */
+        self->priv->forbidden_product_strings = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         /* Construct only */
@@ -795,11 +841,17 @@ get_property (GObject *object,
     case PROP_ALLOWED_PRODUCT_IDS:
         g_value_set_boxed (value, self->priv->product_ids);
         break;
+    case PROP_FORBIDDEN_PRODUCT_IDS:
+        g_value_set_boxed (value, self->priv->forbidden_product_ids);
+        break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         g_value_set_boxed (value, self->priv->vendor_strings);
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
         g_value_set_boxed (value, self->priv->product_strings);
+        break;
+    case PROP_FORBIDDEN_PRODUCT_STRINGS:
+        g_value_set_boxed (value, self->priv->forbidden_product_strings);
         break;
     case PROP_ALLOWED_AT:
         g_value_set_boolean (value, self->priv->at);
@@ -912,6 +964,14 @@ mm_plugin_class_init (MMPluginClass *klass)
                              MM_TYPE_UINT16_PAIR_ARRAY,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+    g_object_class_install_property
+        (object_class, PROP_FORBIDDEN_PRODUCT_IDS,
+         g_param_spec_boxed (MM_PLUGIN_FORBIDDEN_PRODUCT_IDS,
+                             "Forbidden product IDs",
+                             "List of vendor+product ID pairs this plugin cannot support, "
+                             "should be an array of mm_uint16_pair finished with '0,0'",
+                             MM_TYPE_UINT16_PAIR_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_VENDOR_STRINGS,
@@ -927,6 +987,15 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boxed (MM_PLUGIN_ALLOWED_PRODUCT_STRINGS,
                              "Allowed product strings",
                              "List of vendor+product string pairs this plugin can support, "
+                             "should be an array of mm_str_pair finished with 'NULL,NULL'",
+                             MM_TYPE_STR_PAIR_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_FORBIDDEN_PRODUCT_STRINGS,
+         g_param_spec_boxed (MM_PLUGIN_FORBIDDEN_PRODUCT_STRINGS,
+                             "Forbidden product strings",
+                             "List of vendor+product string pairs this plugin cannot support, "
                              "should be an array of mm_str_pair finished with 'NULL,NULL'",
                              MM_TYPE_STR_PAIR_ARRAY,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));

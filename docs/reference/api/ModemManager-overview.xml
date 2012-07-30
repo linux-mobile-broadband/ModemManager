@@ -105,22 +105,29 @@
             </para>
           </listitem>
           <listitem>
-            <para><emphasis>Allowed product IDs</emphasis></para>
+            <para><emphasis>Product IDs</emphasis></para>
             <para>
               Plugins can provide a list of udev-reported pairs of vendor and product
-              IDs to be used as pre-probing filters. If the vendor ID and product ID
-              pair reported by the device via udev is found in the list provided by
-              the plugin, port probing will be launched as requested by the given
-              plugin.
+              IDs to be used as pre-probing filters.
             </para>
             <para>
-              This additional filter should be used when the plugin is
-              expected to work only with a given specific product of a given vendor.
+              If the vendor ID and product ID pair reported by the device via udev is
+              found in the list of 'allowed' pairs provided by the plugin, port probing
+              will be launched as requested by the given plugin. This additional filter
+              should be used when the plugin is expected to work only with a given
+              specific product of a given vendor.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_IDS</type>
-              property in the <structname>MMPlugin</structname> object provided
-              by the plugin.
+              If the vendor ID and product ID pair reported by the device via udev is
+              found in the list of 'forbidden' pairs provided by the plugin, port probing
+              will not be launched by this plugin. This additional filter
+              should be used when the plugin supports all devices of a given vendor
+              except for some specific ones.
+            </para>
+            <para>
+              These filters are specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_IDS</type>
+              and <type>MM_PLUGIN_FORBIDDEN_PRODUCT_IDS</type> properties in the
+              <structname>MMPlugin</structname> object provided by the plugin.
             </para>
           </listitem>
           <listitem>
@@ -280,21 +287,28 @@
             </para>
           </listitem>
           <listitem>
-            <para><emphasis>Allowed product strings</emphasis></para>
+            <para><emphasis>Product strings</emphasis></para>
             <para>
               Plugins can provide a list of pairs of vendor and product
-              strings to be used as post-probing filters. If the vendor and product string
-              pair reported by the device via AT commands is found in the list provided by
-              the plugin, the plugin will report that it can handle this modem.
+              strings to be used as post-probing filters.
             </para>
             <para>
-              This additional filter should be used when the plugin is
-              expected to work only with a given specific product of a given vendor.
+              If the vendor and product string pair reported by the device via AT
+              commands is found in the 'allowed' list provided by the plugin, the
+              plugin will report that it can handle this modem. This additional filter
+              should be used when the plugin is expected to work only with a given
+              specific product of a given vendor.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_STRINGS</type>
-              property in the <structname>MMPlugin</structname> object provided
-              by the plugin.
+              If the vendor and product string pair reported by the device via AT
+              commands is found in the 'forbidden list provided by the plugin, the
+              plugin will report that it cannot handle this modem. This additional filter
+              should be used when the plugin supports all devices of a given vendor, except for some specific ones.
+            </para>
+            <para>
+              These filters are specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_STRINGS</type>
+              and <type>MM_PLUGIN_FORBIDDEN_PRODUCT_STRINGS</type> properties in the
+              <structname>MMPlugin</structname> object provided by the plugin.
             </para>
           </listitem>
           <listitem>
