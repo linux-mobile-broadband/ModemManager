@@ -45,7 +45,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-iridium.la \
 	libmm-plugin-gobi.la \
 	libmm-plugin-motorola.la \
-	libmm-plugin-novatel.la \
+	libmm-plugin-novatel-lte.la \
 	libmm-plugin-samsung.la \
 	libmm-plugin-option.la \
 	libmm-plugin-hso.la \
@@ -297,16 +297,16 @@ libmm_plugin_iridium_la_SOURCES = \
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-# Novatel modem
-libmm_plugin_novatel_la_SOURCES = \
-	novatel/mm-plugin-novatel.c \
-	novatel/mm-plugin-novatel.h \
-	novatel/mm-broadband-modem-novatel.c \
-	novatel/mm-broadband-modem-novatel.h \
-	novatel/mm-broadband-bearer-novatel.c \
-	novatel/mm-broadband-bearer-novatel.h
-libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+# Novatel LTE modem
+libmm_plugin_novatel_lte_la_SOURCES = \
+	novatel/mm-plugin-novatel-lte.c \
+	novatel/mm-plugin-novatel-lte.h \
+	novatel/mm-broadband-modem-novatel-lte.c \
+	novatel/mm-broadband-modem-novatel-lte.h \
+	novatel/mm-broadband-bearer-novatel-lte.c \
+	novatel/mm-broadband-bearer-novatel-lte.h
+libmm_plugin_novatel_lte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_novatel_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 #	77-mm-ericsson-mbm.rules \
 #	77-mm-zte-port-types.rules \

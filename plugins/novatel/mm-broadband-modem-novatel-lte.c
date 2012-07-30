@@ -24,8 +24,8 @@
 
 #include "ModemManager.h"
 #include "mm-base-modem-at.h"
-#include "mm-broadband-bearer-novatel.h"
-#include "mm-broadband-modem-novatel.h"
+#include "mm-broadband-bearer-novatel-lte.h"
+#include "mm-broadband-modem-novatel-lte.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-log.h"
@@ -59,7 +59,7 @@ broadband_bearer_new_ready (GObject *source,
     MMBearer *bearer = NULL;
     GError *error = NULL;
 
-    bearer = mm_broadband_bearer_novatel_new_finish (res, &error);
+    bearer = mm_broadband_bearer_novatel_lte_new_finish (res, &error);
     if (!bearer)
         g_simple_async_result_take_error (simple, error);
     else
@@ -85,7 +85,7 @@ modem_create_bearer (MMIfaceModem *self,
                                         modem_create_bearer);
 
     /* We just create a MMBroadbandBearer */
-    mm_broadband_bearer_novatel_new (MM_BROADBAND_MODEM_NOVATEL (self),
+    mm_broadband_bearer_novatel_lte_new (MM_BROADBAND_MODEM_NOVATEL_LTE (self),
                                      properties,
                                      NULL, /* cancellable */
                                      (GAsyncReadyCallback)broadband_bearer_new_ready,
@@ -94,17 +94,17 @@ modem_create_bearer (MMIfaceModem *self,
 
 static void iface_modem_init (MMIfaceModem *iface);
 
-G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatelLte, mm_broadband_modem_novatel_lte, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
-MMBroadbandModemNovatel *
-mm_broadband_modem_novatel_new (const gchar *device,
-                                const gchar *driver,
-                                const gchar *plugin,
-                                guint16 vendor_id,
-                                guint16 product_id)
+MMBroadbandModemNovatelLte *
+mm_broadband_modem_novatel_lte_new (const gchar *device,
+                                    const gchar *driver,
+                                    const gchar *plugin,
+                                    guint16 vendor_id,
+                                    guint16 product_id)
 {
-    return g_object_new (MM_TYPE_BROADBAND_MODEM_NOVATEL,
+    return g_object_new (MM_TYPE_BROADBAND_MODEM_NOVATEL_LTE,
                          MM_BASE_MODEM_DEVICE, device,
                          MM_BASE_MODEM_DRIVER, driver,
                          MM_BASE_MODEM_PLUGIN, plugin,
@@ -114,7 +114,7 @@ mm_broadband_modem_novatel_new (const gchar *device,
 }
 
 static void
-mm_broadband_modem_novatel_init (MMBroadbandModemNovatel *self)
+mm_broadband_modem_novatel_lte_init (MMBroadbandModemNovatelLte *self)
 {
 }
 
@@ -364,6 +364,6 @@ iface_modem_init (MMIfaceModem *iface)
 }
 
 static void
-mm_broadband_modem_novatel_class_init (MMBroadbandModemNovatelClass *klass)
+mm_broadband_modem_novatel_lte_class_init (MMBroadbandModemNovatelLteClass *klass)
 {
 }

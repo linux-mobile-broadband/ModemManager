@@ -23,12 +23,12 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include "mm-plugin-novatel.h"
+#include "mm-plugin-novatel-lte.h"
 #include "mm-private-boxed-types.h"
-#include "mm-broadband-modem-novatel.h"
+#include "mm-broadband-modem-novatel-lte.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMPluginNovatel, mm_plugin_novatel, MM_TYPE_PLUGIN)
+G_DEFINE_TYPE (MMPluginNovatelLte, mm_plugin_novatel_lte, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -42,11 +42,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_novatel_new (sysfs_path,
-                                                          driver,
-                                                          mm_plugin_get_name (self),
-                                                          vendor,
-                                                          product));
+    return MM_BASE_MODEM (mm_broadband_modem_novatel_lte_new (sysfs_path,
+                                                              driver,
+                                                              mm_plugin_get_name (self),
+                                                              vendor,
+                                                              product));
 }
 
 /*****************************************************************************/
@@ -59,8 +59,8 @@ mm_plugin_create (void)
                                                {0, 0} };
 
     return MM_PLUGIN (
-        g_object_new (MM_TYPE_PLUGIN_NOVATEL,
-                      MM_PLUGIN_NAME,                "Novatel",
+        g_object_new (MM_TYPE_PLUGIN_NOVATEL_LTE,
+                      MM_PLUGIN_NAME,                "Novatel LTE",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
                       MM_PLUGIN_ALLOWED_PRODUCT_IDS, products,
                       MM_PLUGIN_ALLOWED_SINGLE_AT,   TRUE,
@@ -68,12 +68,12 @@ mm_plugin_create (void)
 }
 
 static void
-mm_plugin_novatel_init (MMPluginNovatel *self)
+mm_plugin_novatel_lte_init (MMPluginNovatelLte *self)
 {
 }
 
 static void
-mm_plugin_novatel_class_init (MMPluginNovatelClass *klass)
+mm_plugin_novatel_lte_class_init (MMPluginNovatelLteClass *klass)
 {
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 

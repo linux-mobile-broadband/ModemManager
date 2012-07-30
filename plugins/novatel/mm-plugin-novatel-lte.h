@@ -20,28 +20,28 @@
  * Author: Nathan Williams <njw@google.com>
  */
 
-#ifndef MM_PLUGIN_NOVATEL_H
-#define MM_PLUGIN_NOVATEL_H
+#ifndef MM_PLUGIN_NOVATEL_LTE_H
+#define MM_PLUGIN_NOVATEL_LTE_H
 
 #include "mm-plugin.h"
 
-#define MM_TYPE_PLUGIN_NOVATEL            (mm_plugin_novatel_get_type ())
-#define MM_PLUGIN_NOVATEL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_NOVATEL, MMPluginNovatel))
-#define MM_PLUGIN_NOVATEL_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PLUGIN_NOVATEL, MMPluginNovatelClass))
-#define MM_IS_PLUGIN_NOVATEL(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PLUGIN_NOVATEL))
-#define MM_IS_PLUGIN_NOVATEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PLUGIN_NOVATEL))
-#define MM_PLUGIN_NOVATEL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_NOVATEL, MMPluginNovatelClass))
+#define MM_TYPE_PLUGIN_NOVATEL_LTE            (mm_plugin_novatel_lte_get_type ())
+#define MM_PLUGIN_NOVATEL_LTE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_NOVATEL_LTE, MMPluginNovatelLte))
+#define MM_PLUGIN_NOVATEL_LTE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PLUGIN_NOVATEL_LTE, MMPluginNovatelLteClass))
+#define MM_IS_PLUGIN_NOVATEL_LTE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PLUGIN_NOVATEL_LTE))
+#define MM_IS_PLUGIN_NOVATEL_LTE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PLUGIN_NOVATEL_LTE))
+#define MM_PLUGIN_NOVATEL_LTE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_NOVATEL_LTE, MMPluginNovatelLteClass))
 
 typedef struct {
     MMPlugin parent;
-} MMPluginNovatel;
+} MMPluginNovatelLte;
 
 typedef struct {
     MMPluginClass parent;
-} MMPluginNovatelClass;
+} MMPluginNovatelLteClass;
 
-GType mm_plugin_novatel_get_type (void);
+GType mm_plugin_novatel_lte_get_type (void);
 
 G_MODULE_EXPORT MMPlugin *mm_plugin_create (void);
 
-#endif /* MM_PLUGIN_NOVATEL_H */
+#endif /* MM_PLUGIN_NOVATEL_LTE_H */

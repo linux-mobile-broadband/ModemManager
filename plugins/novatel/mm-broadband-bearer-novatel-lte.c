@@ -27,24 +27,24 @@
 #include <libmm-common.h>
 
 #include "mm-base-modem-at.h"
-#include "mm-broadband-bearer-novatel.h"
+#include "mm-broadband-bearer-novatel-lte.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-utils.h"
 
 #define CONNECTION_CHECK_TIMEOUT_SEC 5
 
-G_DEFINE_TYPE (MMBroadbandBearerNovatel, mm_broadband_bearer_novatel, MM_TYPE_BROADBAND_BEARER);
+G_DEFINE_TYPE (MMBroadbandBearerNovatelLte, mm_broadband_bearer_novatel_lte, MM_TYPE_BROADBAND_BEARER);
 
 /*****************************************************************************/
 
-struct _MMBroadbandBearerNovatelPrivate {
+struct _MMBroadbandBearerNovatelLtePrivate {
     /* timeout id for checking whether we're still connected */
     guint connection_poller;
 };
 
 typedef struct {
-    MMBroadbandBearerNovatel *self;
+    MMBroadbandBearerNovatelLte *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
     MMPort *data;
@@ -119,7 +119,7 @@ static gboolean connect_3gpp_qmistatus (DetailedConnectContext *ctx);
 static void
 poll_connection_ready (MMBaseModem *modem,
                        GAsyncResult *res,
-                       MMBroadbandBearerNovatel *bearer)
+                       MMBroadbandBearerNovatelLte *bearer)
 {
     const gchar *result;
     GError *error = NULL;
@@ -140,7 +140,7 @@ poll_connection_ready (MMBaseModem *modem,
 }
 
 static gboolean
-poll_connection (MMBroadbandBearerNovatel *bearer)
+poll_connection (MMBroadbandBearerNovatelLte *bearer)
 {
     MMBaseModem *modem = NULL;
 
@@ -412,7 +412,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
-    MMBroadbandBearerNovatel *bearer = MM_BROADBAND_BEARER_NOVATEL (self);
+    MMBroadbandBearerNovatelLte *bearer = MM_BROADBAND_BEARER_NOVATEL_LTE (self);
 
     if (bearer->priv->connection_poller) {
         g_source_remove (bearer->priv->connection_poller);
@@ -434,31 +434,31 @@ disconnect_3gpp (MMBroadbandBearer *self,
 static void
 finalize (GObject *object)
 {
-    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (object);
+    MMBroadbandBearerNovatelLte *self = MM_BROADBAND_BEARER_NOVATEL_LTE (object);
 
     if (self->priv->connection_poller)
         g_source_remove (self->priv->connection_poller);
 
-    G_OBJECT_CLASS (mm_broadband_bearer_novatel_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_broadband_bearer_novatel_lte_parent_class)->finalize (object);
 }
 
 static void
-mm_broadband_bearer_novatel_init (MMBroadbandBearerNovatel *self)
+mm_broadband_bearer_novatel_lte_init (MMBroadbandBearerNovatelLte *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_BROADBAND_BEARER_NOVATEL,
-                                              MMBroadbandBearerNovatelPrivate);
+                                              MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
+                                              MMBroadbandBearerNovatelLtePrivate);
 
     self->priv->connection_poller = 0;
 }
 
 static void
-mm_broadband_bearer_novatel_class_init (MMBroadbandBearerNovatelClass *klass)
+mm_broadband_bearer_novatel_lte_class_init (MMBroadbandBearerNovatelLteClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelLtePrivate));
 
     object_class->finalize = finalize;
 
@@ -469,8 +469,8 @@ mm_broadband_bearer_novatel_class_init (MMBroadbandBearerNovatelClass *klass)
 }
 
 MMBearer *
-mm_broadband_bearer_novatel_new_finish (GAsyncResult *res,
-                                        GError **error)
+mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
+                                            GError **error)
 {
     GObject *bearer;
     GObject *source;
@@ -489,14 +489,14 @@ mm_broadband_bearer_novatel_new_finish (GAsyncResult *res,
 }
 
 void
-mm_broadband_bearer_novatel_new (MMBroadbandModemNovatel *modem,
-                                 MMBearerProperties *config,
-                                 GCancellable *cancellable,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
+                                     MMBearerProperties *config,
+                                     GCancellable *cancellable,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
 {
     g_async_initable_new_async (
-        MM_TYPE_BROADBAND_BEARER_NOVATEL,
+        MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
         G_PRIORITY_DEFAULT,
         cancellable,
         callback,
