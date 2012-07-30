@@ -131,6 +131,20 @@ mm_manager_new_sync (GDBusConnection                *connection,
     return (ret ? MM_MANAGER (ret) : NULL);
 }
 
+/**
+ * mm_manager_get_proxy:
+ * @manager: A #MMManager.
+ *
+ * Gets the #GDBusProxy interface of the %manager.
+ *
+ * Returns: (transfer none): The #GDBusProxy interface of %manager or %NULL if the interface hasn't been created. Do not free the returned object, it is owned by @manager.
+ */
+GDBusProxy *
+mm_manager_get_proxy (MMManager *manager)
+{
+    return G_DBUS_PROXY (manager->priv->manager_iface_proxy);
+}
+
 static void
 set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
                    GAsyncResult                       *res,

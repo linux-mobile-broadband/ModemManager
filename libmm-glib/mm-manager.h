@@ -67,6 +67,8 @@ MMManager *mm_manager_new_sync (
     GCancellable                   *cancellable,
     GError                        **error);
 
+GDBusProxy *mm_manager_get_proxy (MMManager *manager);
+
 void mm_manager_set_logging (MMManager           *manager,
                              const gchar         *level,
                              GCancellable        *cancellable,
