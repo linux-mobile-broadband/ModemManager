@@ -249,7 +249,7 @@ apply_pre_probing_filters (MMPlugin *self,
      * that is the case, filter by vendor+product ID pair */
     if (self->priv->product_ids) {
         /* If we didn't get any product: filtered */
-        if (!product)
+        if (!product || !vendor)
             product_filtered = TRUE;
         else {
             for (i = 0; self->priv->product_ids[i].l; i++)
