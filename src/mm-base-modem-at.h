@@ -120,6 +120,15 @@ gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
                                                               const GError *error,
                                                               GVariant **result,
                                                               GError **result_error);
+/* If error, continue sequence, otherwise finish it */
+gboolean mm_base_modem_response_processor_continue_on_error (MMBaseModem *self,
+                                                             gpointer none,
+                                                             const gchar *command,
+                                                             const gchar *response,
+                                                             gboolean last_command,
+                                                             const GError *error,
+                                                             GVariant **result,
+                                                             GError **result_error);
 
 /* Generic AT command handling, using the best AT port available and without
  * explicit cancellations. */
