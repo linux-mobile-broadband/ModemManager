@@ -304,7 +304,6 @@ apply_post_probing_filters (MMPlugin *self,
                             MMPortProbe *probe)
 {
     gboolean vendor_filtered = FALSE;
-    gboolean product_filtered = FALSE;
     guint i;
 
     /* The plugin may specify that only some vendor strings are supported. If
@@ -353,7 +352,7 @@ apply_post_probing_filters (MMPlugin *self,
 
         /* If we didn't get any vendor or product: filtered */
         if (!vendor || !product)
-            product_filtered = TRUE;
+            return TRUE;
         else {
             for (i = 0; self->priv->product_strings[i].l; i++) {
                 gboolean found;
@@ -372,10 +371,10 @@ apply_post_probing_filters (MMPlugin *self,
 
             /* If we didn't match any product: unsupported */
             if (!self->priv->product_strings[i].l)
-                product_filtered = TRUE;
+                return TRUE;
         }
 
-        return product_filtered;
+        /* Keep on with next filters */
     }
 
     /* The plugin may specify that only Icera-based modems are supported.
