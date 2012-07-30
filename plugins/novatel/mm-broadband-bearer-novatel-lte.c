@@ -36,12 +36,13 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerNovatelLte, mm_broadband_bearer_novatel_lte, MM_TYPE_BROADBAND_BEARER);
 
-/*****************************************************************************/
-
 struct _MMBroadbandBearerNovatelLtePrivate {
     /* timeout id for checking whether we're still connected */
     guint connection_poller;
 };
+
+/*****************************************************************************/
+/* 3GPP Connection sequence */
 
 typedef struct {
     MMBroadbandBearerNovatelLte *self;
@@ -293,6 +294,9 @@ connect_3gpp (MMBroadbandBearer *bearer,
     g_free (command);
 }
 
+/*****************************************************************************/
+/* 3GPP Disonnection sequence */
+
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
@@ -431,42 +435,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
         ctx); /* user_data */
 }
 
-static void
-finalize (GObject *object)
-{
-    MMBroadbandBearerNovatelLte *self = MM_BROADBAND_BEARER_NOVATEL_LTE (object);
-
-    if (self->priv->connection_poller)
-        g_source_remove (self->priv->connection_poller);
-
-    G_OBJECT_CLASS (mm_broadband_bearer_novatel_lte_parent_class)->finalize (object);
-}
-
-static void
-mm_broadband_bearer_novatel_lte_init (MMBroadbandBearerNovatelLte *self)
-{
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
-                                              MMBroadbandBearerNovatelLtePrivate);
-
-    self->priv->connection_poller = 0;
-}
-
-static void
-mm_broadband_bearer_novatel_lte_class_init (MMBroadbandBearerNovatelLteClass *klass)
-{
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
-
-    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelLtePrivate));
-
-    object_class->finalize = finalize;
-
-    broadband_bearer_class->connect_3gpp = connect_3gpp;
-    broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
-    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
-    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
-}
+/*****************************************************************************/
 
 MMBearer *
 mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
@@ -504,4 +473,41 @@ mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
         MM_BEARER_MODEM, modem,
         MM_BEARER_CONFIG, config,
         NULL);
+}
+
+static void
+mm_broadband_bearer_novatel_lte_init (MMBroadbandBearerNovatelLte *self)
+{
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
+                                              MMBroadbandBearerNovatelLtePrivate);
+
+    self->priv->connection_poller = 0;
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandBearerNovatelLte *self = MM_BROADBAND_BEARER_NOVATEL_LTE (object);
+
+    if (self->priv->connection_poller)
+        g_source_remove (self->priv->connection_poller);
+
+    G_OBJECT_CLASS (mm_broadband_bearer_novatel_lte_parent_class)->finalize (object);
+}
+
+static void
+mm_broadband_bearer_novatel_lte_class_init (MMBroadbandBearerNovatelLteClass *klass)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelLtePrivate));
+
+    object_class->finalize = finalize;
+
+    broadband_bearer_class->connect_3gpp = connect_3gpp;
+    broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 }

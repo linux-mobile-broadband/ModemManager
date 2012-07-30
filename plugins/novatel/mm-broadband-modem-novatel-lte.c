@@ -32,6 +32,10 @@
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
 
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatelLte, mm_broadband_modem_novatel_lte, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
@@ -92,34 +96,8 @@ modem_create_bearer (MMIfaceModem *self,
                                      result);
 }
 
-static void iface_modem_init (MMIfaceModem *iface);
-
-G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatelLte, mm_broadband_modem_novatel_lte, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
-
-MMBroadbandModemNovatelLte *
-mm_broadband_modem_novatel_lte_new (const gchar *device,
-                                    const gchar *driver,
-                                    const gchar *plugin,
-                                    guint16 vendor_id,
-                                    guint16 product_id)
-{
-    return g_object_new (MM_TYPE_BROADBAND_MODEM_NOVATEL_LTE,
-                         MM_BASE_MODEM_DEVICE, device,
-                         MM_BASE_MODEM_DRIVER, driver,
-                         MM_BASE_MODEM_PLUGIN, plugin,
-                         MM_BASE_MODEM_VENDOR_ID, vendor_id,
-                         MM_BASE_MODEM_PRODUCT_ID, product_id,
-                         NULL);
-}
-
-static void
-mm_broadband_modem_novatel_lte_init (MMBroadbandModemNovatelLte *self)
-{
-}
-
 /*****************************************************************************/
-/* SUPPORTED BANDS */
+/* Load supported bands (Modem interface) */
 
 /*
  * Mapping from bits set in response of $NWBAND? command to MMModemBand values.
@@ -201,6 +179,8 @@ load_supported_bands (MMIfaceModem *self,
     g_object_unref (result);
 }
 
+/*****************************************************************************/
+/* Load current bands (Modem interface) */
 
 static GArray *
 load_current_bands_finish (MMIfaceModem *self,
@@ -271,6 +251,9 @@ load_current_bands (MMIfaceModem *self,
         (GAsyncReadyCallback)load_current_bands_done,
         result);
 }
+
+/*****************************************************************************/
+/* Load access technologies (Modem interface) */
 
 static gboolean
 load_access_technologies_finish (MMIfaceModem *self,
@@ -347,6 +330,29 @@ load_access_technologies (MMIfaceModem *self,
         FALSE,
         (GAsyncReadyCallback)load_access_technologies_ready,
         result);
+}
+
+/*****************************************************************************/
+
+MMBroadbandModemNovatelLte *
+mm_broadband_modem_novatel_lte_new (const gchar *device,
+                                    const gchar *driver,
+                                    const gchar *plugin,
+                                    guint16 vendor_id,
+                                    guint16 product_id)
+{
+    return g_object_new (MM_TYPE_BROADBAND_MODEM_NOVATEL_LTE,
+                         MM_BASE_MODEM_DEVICE, device,
+                         MM_BASE_MODEM_DRIVER, driver,
+                         MM_BASE_MODEM_PLUGIN, plugin,
+                         MM_BASE_MODEM_VENDOR_ID, vendor_id,
+                         MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         NULL);
+}
+
+static void
+mm_broadband_modem_novatel_lte_init (MMBroadbandModemNovatelLte *self)
+{
 }
 
 static void
