@@ -148,3 +148,12 @@ example to update the signal quality value or check registration status.
          QMI protocol error (5): 'client-ids-exhausted'
      This may force us to have something like a state file in /tmp with the IDs
      currently allocated, so that ModemManager can re-use them if needed.
+
+  ** QMI: A device may export multiple cdc-wdm interfaces, along with multiple
+     wwan interfaces. If this is the case, we should allow configuring multiple
+     bearers. Additional comments from Bjorn Mork:
+       "The code really should try to match the wwanX and cdc-wdmY devices by
+        USB interface and not by USB device.  If we ignore the unfortunate 3.4
+        and 3.5 kernels, then a matching wwanX and cdc-wdmY set will always
+        share the same parent USB interface on QMI devices. Having the same
+        parent USB device is *not* sufficient."
