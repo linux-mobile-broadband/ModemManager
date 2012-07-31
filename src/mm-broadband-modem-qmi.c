@@ -53,8 +53,21 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean has_mode_preference_in_system_selection_preference;
     gboolean has_technology_preference;
 
-    /* Signal quality related */
-    gboolean has_get_signal_info;
+    /* Signal quality related.
+     * We assume that the presence of all these items can be controlled by the
+     * same flag:
+     *  - 'Get Signal Info'
+     *  - 'Config Signal Info'
+     *  - 'Signal Info' indications
+     *  - 'Signal Info' TLV in 'Register Indications'
+     */
+    gboolean has_signal_info;
+
+    /* Common */
+    gboolean has_register_indications;
+
+    /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
+    gboolean unsolicited_events_enabled;
 };
 
 /*****************************************************************************/
@@ -1257,7 +1270,7 @@ get_signal_info_ready (QmiClientNas *client,
                              QMI_CORE_ERROR,
                              QMI_CORE_ERROR_UNSUPPORTED)) {
             g_error_free (error);
-            ctx->self->priv->has_get_signal_info = FALSE;
+            ctx->self->priv->has_signal_info = FALSE;
             load_signal_quality_context_step (ctx);
             return;
         }
@@ -1364,7 +1377,7 @@ get_signal_strength_ready (QmiClientNas *client,
 static void
 load_signal_quality_context_step (LoadSignalQualityContext *ctx)
 {
-    if (ctx->self->priv->has_get_signal_info) {
+    if (ctx->self->priv->has_signal_info) {
         qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (ctx->client),
                                         NULL,
                                         10,
@@ -2747,6 +2760,353 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
 }
 
 /*****************************************************************************/
+/* Enabling/disabling unsolicited events (3GPP and CDMA interface) */
+
+typedef enum {
+    ENABLE_UNSOLICITED_EVENTS_STEP_FIRST = 0,
+    ENABLE_UNSOLICITED_EVENTS_STEP_CONFIG_SIGNAL_INFO,
+    ENABLE_UNSOLICITED_EVENTS_STEP_RI_SIGNAL_QUALITY,
+    ENABLE_UNSOLICITED_EVENTS_STEP_SER_SIGNAL_QUALITY,
+    ENABLE_UNSOLICITED_EVENTS_STEP_LAST
+} EnableUnsolicitedEventsStep;
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    gboolean enable;
+    GSimpleAsyncResult *result;
+    QmiClientNas *client;
+    EnableUnsolicitedEventsStep step;
+} EnableUnsolicitedEventsContext;
+
+static void
+enable_unsolicited_events_context_complete_and_free (EnableUnsolicitedEventsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+common_enable_disable_unsolicited_events_finish (MMBroadbandModemQmi *self,
+                                                 GAsyncResult *res,
+                                                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void enable_unsolicited_events_context_step (EnableUnsolicitedEventsContext *ctx);
+
+static void
+ser_signal_quality_ready (QmiClientNas *client,
+                          GAsyncResult *res,
+                          EnableUnsolicitedEventsContext *ctx)
+{
+    QmiMessageNasSetEventReportOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_set_event_report_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_set_event_report_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't set event report: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_nas_set_event_report_output_unref (output);
+
+    /* Keep on */
+    ctx->step++;
+    enable_unsolicited_events_context_step (ctx);
+}
+
+static void
+ri_signal_quality_ready (QmiClientNas *client,
+                         GAsyncResult *res,
+                         EnableUnsolicitedEventsContext *ctx)
+{
+    QmiMessageNasRegisterIndicationsOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_register_indications_finish (client, res, &error);
+    if (!output) {
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED))
+            ctx->self->priv->has_register_indications = FALSE;
+
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_register_indications_output_get_result (output, &error)) {
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED))
+            ctx->self->priv->has_signal_info = FALSE;
+
+        mm_dbg ("Couldn't register indications: '%s'", error->message);
+        g_error_free (error);
+        qmi_message_nas_register_indications_output_unref (output);
+    } else {
+        /* Signal quality related indications setup done, skip the deprecated step */
+        qmi_message_nas_register_indications_output_unref (output);
+        ctx->step = ENABLE_UNSOLICITED_EVENTS_STEP_SER_SIGNAL_QUALITY + 1;
+        enable_unsolicited_events_context_step (ctx);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    enable_unsolicited_events_context_step (ctx);
+}
+
+static void
+config_signal_info_ready (QmiClientNas *client,
+                          GAsyncResult *res,
+                          EnableUnsolicitedEventsContext *ctx)
+{
+    QmiMessageNasConfigSignalInfoOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_config_signal_info_finish (client, res, &error);
+    if (!output) {
+        /* If config signal info is unsupported, completely skip trying to
+         * use Register Indications */
+        if (g_error_matches (error,
+                             QMI_CORE_ERROR,
+                             QMI_CORE_ERROR_UNSUPPORTED)) {
+            ctx->self->priv->has_signal_info = FALSE;
+            ctx->step = ENABLE_UNSOLICITED_EVENTS_STEP_SER_SIGNAL_QUALITY;
+        } else
+            ctx->step++;
+
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+        enable_unsolicited_events_context_step (ctx);
+        return;
+    }
+
+    if (!qmi_message_nas_config_signal_info_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't config signal info: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    qmi_message_nas_config_signal_info_output_unref (output);
+
+    /* Keep on */
+    ctx->step++;
+    enable_unsolicited_events_context_step (ctx);
+}
+
+static void
+enable_unsolicited_events_context_step (EnableUnsolicitedEventsContext *ctx)
+{
+    switch (ctx->step) {
+    case ENABLE_UNSOLICITED_EVENTS_STEP_FIRST:
+        /* Fall down */
+        ctx->step++;
+
+    case ENABLE_UNSOLICITED_EVENTS_STEP_CONFIG_SIGNAL_INFO:
+        if (ctx->self->priv->has_signal_info &&
+            ctx->enable) {
+            /* RSSI values go between -105 and -60 for 3GPP technologies,
+             * and from -105 to -90 in 3GPP2 technologies (approx). */
+            static const gint8 thresholds_data[] = { -100, -97, -95, -92, -90, -85, -80, -75, -70, -65 };
+            QmiMessageNasConfigSignalInfoInput *input;
+            GArray *thresholds;
+
+            input = qmi_message_nas_config_signal_info_input_new ();
+
+            /* Prepare thresholds, separated 20 each */
+            thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
+            g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
+
+            qmi_message_nas_config_signal_info_input_set_rssi_threshold (
+                input,
+                thresholds,
+                NULL);
+            g_array_unref (thresholds);
+            qmi_client_nas_config_signal_info (
+                ctx->client,
+                input,
+                5,
+                NULL,
+                (GAsyncReadyCallback)config_signal_info_ready,
+                ctx);
+            qmi_message_nas_config_signal_info_input_unref (input);
+            return;
+        }
+        /* Fall down */
+        ctx->step++;
+
+    case ENABLE_UNSOLICITED_EVENTS_STEP_RI_SIGNAL_QUALITY:
+        if (ctx->self->priv->has_register_indications &&
+            ctx->self->priv->has_signal_info) {
+            QmiMessageNasRegisterIndicationsInput *input;
+
+            input = qmi_message_nas_register_indications_input_new ();
+            qmi_message_nas_register_indications_input_set_signal_strength (input, ctx->enable, NULL);
+            qmi_client_nas_register_indications (
+                ctx->client,
+                input,
+                5,
+                NULL,
+                (GAsyncReadyCallback)ri_signal_quality_ready,
+                ctx);
+            qmi_message_nas_register_indications_input_unref (input);
+            return;
+        }
+        /* Fall down */
+        ctx->step++;
+
+    case ENABLE_UNSOLICITED_EVENTS_STEP_SER_SIGNAL_QUALITY: {
+        /* The device doesn't really like to have many threshold values, so don't
+         * grow this array without checking first */
+        static const gint8 thresholds_data[] = { -80, -40, 0, 40, 80 };
+        QmiMessageNasSetEventReportInput *input;
+        GArray *thresholds;
+
+        input = qmi_message_nas_set_event_report_input_new ();
+
+        /* Prepare thresholds, separated 20 each */
+        thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
+
+        /* Only set thresholds during enable */
+        if (ctx->enable)
+            g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
+
+        qmi_message_nas_set_event_report_input_set_signal_strength_indicator (
+            input,
+            ctx->enable,
+            thresholds,
+            NULL);
+        g_array_unref (thresholds);
+        qmi_client_nas_set_event_report (
+            ctx->client,
+            input,
+            5,
+            NULL,
+            (GAsyncReadyCallback)ser_signal_quality_ready,
+            ctx);
+        qmi_message_nas_set_event_report_input_unref (input);
+        return;
+    }
+
+    case ENABLE_UNSOLICITED_EVENTS_STEP_LAST:
+        ctx->self->priv->unsolicited_events_enabled = ctx->enable;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enable_unsolicited_events_context_complete_and_free (ctx);
+        return;
+    }
+}
+
+static void
+common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
+                                          gboolean enable,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
+{
+    EnableUnsolicitedEventsContext *ctx;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_enable_disable_unsolicited_events);
+
+    if (enable == self->priv->unsolicited_events_enabled) {
+        mm_dbg ("Unsolicited events already %s; skipping",
+                enable ? "enabled" : "disabled");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->enable = enable;
+    ctx->result = result;
+    ctx->step = ENABLE_UNSOLICITED_EVENTS_STEP_FIRST;
+    enable_unsolicited_events_context_step (ctx);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                     GAsyncResult *res,
+                                                     GError **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_QMI (self), res, error);
+}
+
+static void
+modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                              FALSE,
+                                              callback,
+                                              user_data);
+}
+
+static void
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                              TRUE,
+                                              callback,
+                                              user_data);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (CDMA interface) */
+
+static gboolean
+modem_cdma_enable_disable_unsolicited_events_finish (MMIfaceModemCdma *self,
+                                                     GAsyncResult *res,
+                                                     GError **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_QMI (self), res, error);
+}
+
+static void
+modem_cdma_disable_unsolicited_events (MMIfaceModemCdma *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                              FALSE,
+                                              callback,
+                                              user_data);
+}
+
+static void
+modem_cdma_enable_unsolicited_events (MMIfaceModemCdma *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                              TRUE,
+                                              callback,
+                                              user_data);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -2925,10 +3285,11 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
                                               MMBroadbandModemQmiPrivate);
 
     /* Always try to use the newest command available first */
-    self->priv->has_get_signal_info = TRUE;
+    self->priv->has_signal_info = TRUE;
     self->priv->has_system_selection_preference = TRUE;
     self->priv->has_mode_preference_in_system_selection_preference = TRUE;
     self->priv->has_technology_preference = TRUE;
+    self->priv->has_register_indications = TRUE;
 }
 
 static void
@@ -3016,6 +3377,12 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 
+    /* Enabling steps */
+    iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
+
     /* Other actions */
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
@@ -3028,6 +3395,12 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->load_meid_finish = modem_cdma_load_meid_finish;
     iface->load_esn = modem_cdma_load_esn;
     iface->load_esn_finish = modem_cdma_load_esn_finish;
+
+    /* Enabling steps */
+    iface->enable_unsolicited_events = modem_cdma_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_cdma_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_cdma_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_cdma_enable_disable_unsolicited_events_finish;
 }
 
 static void
