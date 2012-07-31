@@ -113,6 +113,7 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
     /* Implementation helpers */
     MMModemCharset modem_current_charset;
+    gboolean modem_cind_support_checked;
     gboolean modem_cind_supported;
     guint modem_cind_indicator_signal_quality;
     guint modem_cind_min_signal_quality;
@@ -1490,102 +1491,6 @@ modem_load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Setting up indicators (3GPP interface) */
-
-static gboolean
-modem_3gpp_setup_indicators_finish (MMIfaceModem3gpp *self,
-                                    GAsyncResult *res,
-                                    GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-cind_format_check_ready (MMBroadbandModem *self,
-                         GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
-{
-    GHashTable *indicators = NULL;
-    GError *error = NULL;
-    const gchar *result;
-    MM3gppCindResponse *r;
-
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error ||
-        !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
-        /* quit with error */
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    /* Mark CIND as being supported and find the proper indexes for the
-     * indicators. */
-    self->priv->modem_cind_supported = TRUE;
-
-    /* Check if we support signal quality indications */
-    r = g_hash_table_lookup (indicators, "signal");
-    if (r) {
-        self->priv->modem_cind_indicator_signal_quality = mm_3gpp_cind_response_get_index (r);
-        self->priv->modem_cind_min_signal_quality = mm_3gpp_cind_response_get_min (r);
-        self->priv->modem_cind_max_signal_quality = mm_3gpp_cind_response_get_max (r);
-
-        mm_dbg ("Modem supports signal quality indications via CIND at index '%u'"
-                "(min: %u, max: %u)",
-                self->priv->modem_cind_indicator_signal_quality,
-                self->priv->modem_cind_min_signal_quality,
-                self->priv->modem_cind_max_signal_quality);
-    } else
-        self->priv->modem_cind_indicator_signal_quality = CIND_INDICATOR_INVALID;
-
-    /* Check if we support roaming indications */
-    r = g_hash_table_lookup (indicators, "roam");
-    if (r) {
-        self->priv->modem_cind_indicator_roaming = mm_3gpp_cind_response_get_index (r);
-        mm_dbg ("Modem supports roaming indications via CIND at index '%u'",
-                self->priv->modem_cind_indicator_roaming);
-    } else
-        self->priv->modem_cind_indicator_roaming = CIND_INDICATOR_INVALID;
-
-    /* Check if we support service indications */
-    r = g_hash_table_lookup (indicators, "service");
-    if (r) {
-        self->priv->modem_cind_indicator_service = mm_3gpp_cind_response_get_index (r);
-        mm_dbg ("Modem supports service indications via CIND at index '%u'",
-                self->priv->modem_cind_indicator_service);
-    } else
-        self->priv->modem_cind_indicator_service = CIND_INDICATOR_INVALID;
-
-    g_hash_table_destroy (indicators);
-
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
-modem_3gpp_setup_indicators (MMIfaceModem3gpp *self,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_setup_indicators);
-
-    /* Load supported indicators */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CIND=?",
-                              3,
-                              TRUE,
-                              (GAsyncReadyCallback)cind_format_check_ready,
-                              result);
-}
-
-/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static gboolean
@@ -1635,20 +1540,12 @@ ciev_received (MMAtSerialPort *port,
 }
 
 static void
-set_unsolicited_events_handlers (MMIfaceModem3gpp *self,
-                                 gboolean enable,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+set_unsolicited_events_handlers (MMBroadbandModem *self,
+                                 gboolean enable)
 {
-    GSimpleAsyncResult *result;
     MMAtSerialPort *ports[2];
     GRegex *ciev_regex;
     guint i;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_unsolicited_events_handlers);
 
     ciev_regex = mm_3gpp_ciev_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -1672,25 +1569,132 @@ set_unsolicited_events_handlers (MMIfaceModem3gpp *self,
     }
 
     g_regex_unref (ciev_regex);
+}
+
+static void
+cind_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GHashTable *indicators = NULL;
+    GError *error = NULL;
+    const gchar *result;
+    MM3gppCindResponse *r;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error ||
+        !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
+        /* unsupported indications */
+        mm_dbg ("Marking indications as unsupported: '%s'", error->message);
+        g_free (error);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Mark CIND as being supported and find the proper indexes for the
+     * indicators. */
+    self->priv->modem_cind_supported = TRUE;
+
+    /* Check if we support signal quality indications */
+    r = g_hash_table_lookup (indicators, "signal");
+    if (r) {
+        self->priv->modem_cind_indicator_signal_quality = mm_3gpp_cind_response_get_index (r);
+        self->priv->modem_cind_min_signal_quality = mm_3gpp_cind_response_get_min (r);
+        self->priv->modem_cind_max_signal_quality = mm_3gpp_cind_response_get_max (r);
+
+        mm_dbg ("Modem supports signal quality indications via CIND at index '%u'"
+                "(min: %u, max: %u)",
+                self->priv->modem_cind_indicator_signal_quality,
+                self->priv->modem_cind_min_signal_quality,
+                self->priv->modem_cind_max_signal_quality);
+    } else
+        self->priv->modem_cind_indicator_signal_quality = CIND_INDICATOR_INVALID;
+
+    /* Check if we support roaming indications */
+    r = g_hash_table_lookup (indicators, "roam");
+    if (r) {
+        self->priv->modem_cind_indicator_roaming = mm_3gpp_cind_response_get_index (r);
+        mm_dbg ("Modem supports roaming indications via CIND at index '%u'",
+                self->priv->modem_cind_indicator_roaming);
+    } else
+        self->priv->modem_cind_indicator_roaming = CIND_INDICATOR_INVALID;
+
+    /* Check if we support service indications */
+    r = g_hash_table_lookup (indicators, "service");
+    if (r) {
+        self->priv->modem_cind_indicator_service = mm_3gpp_cind_response_get_index (r);
+        mm_dbg ("Modem supports service indications via CIND at index '%u'",
+                self->priv->modem_cind_indicator_service);
+    } else
+        self->priv->modem_cind_indicator_service = CIND_INDICATOR_INVALID;
+
+    g_hash_table_destroy (indicators);
+
+    /* Now, keep on setting up the ports */
+    set_unsolicited_events_handlers (self, TRUE);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Load supported indicators */
+    if (!self->priv->modem_cind_support_checked) {
+        mm_dbg ("Checking indicator support...");
+        self->priv->modem_cind_support_checked = TRUE;
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CIND=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback)cind_format_check_ready,
+                                  result);
+        return;
+    }
+
+    /* If supported, go on */
+    if (self->priv->modem_cind_supported)
+        set_unsolicited_events_handlers (self, TRUE);
+
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
 
 static void
-modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
-{
-    set_unsolicited_events_handlers (self, TRUE, callback, user_data);
-}
-
-static void
-modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    set_unsolicited_events_handlers (self, FALSE, callback, user_data);
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* If supported, go on */
+    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
+        set_unsolicited_events_handlers (self, FALSE);
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -1780,38 +1784,64 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 }
 
 static void
-modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    UnsolicitedEventsContext *ctx;
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GSimpleAsyncResult *result;
 
-    ctx = g_new0 (UnsolicitedEventsContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->enable = TRUE;
-    ctx->command = g_strdup ("+CMER=3,0,0,1");
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_enable_unsolicited_events);
-    run_unsolicited_events_setup (ctx);
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_enable_unsolicited_events);
+
+    /* If supported, go on */
+    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
+        UnsolicitedEventsContext *ctx;
+
+        ctx = g_new0 (UnsolicitedEventsContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->enable = TRUE;
+        ctx->command = g_strdup ("+CMER=3,0,0,1");
+        ctx->result = result;
+        run_unsolicited_events_setup (ctx);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 static void
-modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    UnsolicitedEventsContext *ctx;
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GSimpleAsyncResult *result;
 
-    ctx = g_new0 (UnsolicitedEventsContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->command = g_strdup ("+CMER=0");
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_disable_unsolicited_events);
-    run_unsolicited_events_setup (ctx);
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_disable_unsolicited_events);
+
+    /* If supported, go on */
+    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
+        UnsolicitedEventsContext *ctx;
+
+        ctx = g_new0 (UnsolicitedEventsContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->command = g_strdup ("+CMER=0");
+        ctx->result = result;
+        run_unsolicited_events_setup (ctx);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -7878,8 +7908,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 
     /* Enabling steps */
-    iface->setup_indicators = modem_3gpp_setup_indicators;
-    iface->setup_indicators_finish = modem_3gpp_setup_indicators_finish;
     iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
