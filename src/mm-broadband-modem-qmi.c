@@ -49,8 +49,9 @@ struct _MMBroadbandModemQmiPrivate {
     gchar *esn;
 
     /* Allowed mode related */
-    gboolean has_mode_preference_in_get_system_selection_preference;
-    gboolean has_get_technology_preference;
+    gboolean has_system_selection_preference;
+    gboolean has_mode_preference_in_system_selection_preference;
+    gboolean has_technology_preference;
 
     /* Signal quality related */
     gboolean has_get_signal_info;
@@ -1705,7 +1706,7 @@ get_technology_preference_ready (QmiClientNas *client,
         if (g_error_matches (error,
                              QMI_CORE_ERROR,
                              QMI_CORE_ERROR_UNSUPPORTED))
-            ctx->self->priv->has_get_technology_preference = FALSE;
+            ctx->self->priv->has_technology_preference = FALSE;
         mm_dbg ("QMI operation failed: %s", error->message);
         g_error_free (error);
     } else if (!qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
@@ -1810,7 +1811,7 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
         if (g_error_matches (error,
                              QMI_CORE_ERROR,
                              QMI_CORE_ERROR_UNSUPPORTED))
-            ctx->self->priv->has_get_technology_preference = FALSE;
+            ctx->self->priv->has_system_selection_preference = FALSE;
         mm_dbg ("QMI operation failed: %s", error->message);
         g_error_free (error);
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
@@ -1822,7 +1823,7 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
                    NULL)) {
         /* Assuming here that Get System Selection Preference reports *always* all
          * optional fields that the current message version supports */
-        ctx->self->priv->has_get_technology_preference = FALSE;
+        ctx->self->priv->has_mode_preference_in_system_selection_preference = FALSE;
         mm_dbg ("Mode preference not reported in system selection preference");
     } else {
         MMModemMode allowed;
@@ -1923,8 +1924,10 @@ load_allowed_modes (MMIfaceModem *self,
                                              callback,
                                              user_data,
                                              load_allowed_modes);
-    ctx->run_get_system_selection_preference = ctx->self->priv->has_mode_preference_in_get_system_selection_preference;
-    ctx->run_get_technology_preference = ctx->self->priv->has_get_technology_preference;
+    ctx->run_get_system_selection_preference =
+        (ctx->self->priv->has_system_selection_preference &&
+         ctx->self->priv->has_mode_preference_in_system_selection_preference);
+    ctx->run_get_technology_preference = ctx->self->priv->has_technology_preference;
 
     load_allowed_modes_context_step (ctx);
 }
@@ -2613,8 +2616,9 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
 
     /* Always try to use the newest command available first */
     self->priv->has_get_signal_info = TRUE;
-    self->priv->has_mode_preference_in_get_system_selection_preference = TRUE;
-    self->priv->has_get_technology_preference = TRUE;
+    self->priv->has_system_selection_preference = TRUE;
+    self->priv->has_mode_preference_in_system_selection_preference = TRUE;
+    self->priv->has_technology_preference = TRUE;
 }
 
 static void
