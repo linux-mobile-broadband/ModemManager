@@ -30,10 +30,8 @@
 #define SUBSYSTEM_EVDO "evdo"
 
 #define REGISTRATION_CHECK_CONTEXT_TAG    "cdma-registration-check-context-tag"
-#define UNSOLICITED_EVENTS_SUPPORTED_TAG  "cdma-unsolicited-events-supported-tag"
 
 static GQuark registration_check_context_quark;
-static GQuark unsolicited_events_supported_quark;
 
 /*****************************************************************************/
 
@@ -1187,21 +1185,13 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
-        if (G_UNLIKELY (!unsolicited_events_supported_quark))
-            unsolicited_events_supported_quark = (g_quark_from_static_string (
-                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
-
-        /* Only try to disable if supported */
-        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                  unsolicited_events_supported_quark))) {
-            if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
-                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
-                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
-                    ctx->self,
-                    (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
-                    ctx);
-                return;
-            }
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
+                ctx);
+            return;
         }
         /* Fall down to next step */
         ctx->step++;
@@ -1316,11 +1306,6 @@ setup_unsolicited_events_ready (MMIfaceModemCdma *self,
         /* This error shouldn't be treated as critical */
         mm_dbg ("Setting up unsolicited events failed: '%s'", error->message);
         g_error_free (error);
-
-        /* Reset support flag */
-        g_object_set_qdata (G_OBJECT (self),
-                            unsolicited_events_supported_quark,
-                            GUINT_TO_POINTER (FALSE));
     }
 
     /* Go on to next step */
@@ -1361,17 +1346,13 @@ interface_enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
-        /* Only try to setup unsolicited events if they are supported */
-        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                  unsolicited_events_supported_quark))) {
-            if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
-                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
-                MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
-                    ctx->self,
-                    (GAsyncReadyCallback)setup_unsolicited_events_ready,
-                    ctx);
-                return;
-            }
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)setup_unsolicited_events_ready,
+                ctx);
+            return;
         }
         /* Fall down to next step */
         ctx->step++;
@@ -1618,14 +1599,6 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
         g_object_set (self,
                       MM_IFACE_MODEM_CDMA_DBUS_SKELETON, skeleton,
                       NULL);
-
-        /* Initially, assume we support unsolicited events */
-        if (G_UNLIKELY (!unsolicited_events_supported_quark))
-            unsolicited_events_supported_quark = (g_quark_from_static_string (
-                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
-        g_object_set_qdata (G_OBJECT (self),
-                            unsolicited_events_supported_quark,
-                            GUINT_TO_POINTER (TRUE));
     }
 
     /* Perform async initialization here */
