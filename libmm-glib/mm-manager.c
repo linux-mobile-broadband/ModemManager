@@ -132,17 +132,31 @@ mm_manager_new_sync (GDBusConnection                *connection,
 }
 
 /**
+ * mm_manager_peek_proxy:
+ * @manager: A #MMManager.
+ *
+ * Gets the #GDBusProxy interface of the %manager.
+ *
+ * Returns: (transfer none): The #GDBusProxy interface of %manager. Do not free the returned object, it is owned by @manager.
+ */
+GDBusProxy *
+mm_manager_peek_proxy (MMManager *manager)
+{
+    return G_DBUS_PROXY (manager->priv->manager_iface_proxy);
+}
+
+/**
  * mm_manager_get_proxy:
  * @manager: A #MMManager.
  *
  * Gets the #GDBusProxy interface of the %manager.
  *
- * Returns: (transfer none): The #GDBusProxy interface of %manager or %NULL if the interface hasn't been created. Do not free the returned object, it is owned by @manager.
+ * Returns: (transfer full): The #GDBusProxy interface of %manager, which must be freed with g_object_unref().
  */
 GDBusProxy *
 mm_manager_get_proxy (MMManager *manager)
 {
-    return G_DBUS_PROXY (manager->priv->manager_iface_proxy);
+    return G_DBUS_PROXY (g_object_ref (manager->priv->manager_iface_proxy));
 }
 
 static void
