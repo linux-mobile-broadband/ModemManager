@@ -68,6 +68,9 @@ struct _MMBroadbandModemQmiPrivate {
 
     /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
     gboolean unsolicited_events_enabled;
+    gboolean unsolicited_events_setup;
+    guint event_report_indication_id;
+    guint signal_info_indication_id;
 };
 
 /*****************************************************************************/
@@ -3107,6 +3110,222 @@ modem_cdma_enable_unsolicited_events (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited event handlers (3GPP and CDMA interface) */
+
+static gboolean
+common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemQmi *self,
+                                                GAsyncResult *res,
+                                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+event_report_indication_cb (QmiClientNas *client,
+                            MMBroadbandModemQmi *self,
+                            QmiIndicationNasEventReportOutput *output)
+{
+    gint8 signal_strength;
+    QmiNasRadioInterface signal_strength_radio_interface;
+
+    if (qmi_indication_nas_event_report_output_get_signal_strength (
+            output,
+            &signal_strength,
+            &signal_strength_radio_interface,
+            NULL)) {
+        guint8 quality;
+
+        /* This signal strength comes as negative dBms */
+        quality = STRENGTH_TO_QUALITY (signal_strength);
+
+        mm_dbg ("Signal strength indication (%s): %d dBm --> %u%%",
+                qmi_nas_radio_interface_get_string (signal_strength_radio_interface),
+                signal_strength,
+                quality);
+
+        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+    }
+}
+
+static void
+signal_info_indication_cb (QmiClientNas *client,
+                           MMBroadbandModemQmi *self,
+                           QmiIndicationNasSignalInfoOutput *output)
+{
+    gint8 rssi_max = 0;
+    gint8 rssi;
+    guint8 quality;
+
+    /* We do not report per-technology signal quality, so just get the highest
+     * one of the ones reported. TODO: When several technologies are in use, if
+     * the indication only contains the data of the one which passed a threshold
+     * value, we'll need to have an internal cache of per-technology values, in
+     * order to report always the one with the maximum value. */
+
+    if (qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
+        mm_dbg ("RSSI (CDMA): %d dBm", rssi);
+        rssi = MAX (rssi, rssi_max);
+    }
+
+    if (qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
+        mm_dbg ("RSSI (HDR): %d dBm", rssi);
+        rssi = MAX (rssi, rssi_max);
+    }
+
+    if (qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
+        mm_dbg ("RSSI (GSM): %d dBm", rssi);
+        rssi = MAX (rssi, rssi_max);
+    }
+
+    if (qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
+        mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
+        rssi = MAX (rssi, rssi_max);
+    }
+
+    if (qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
+        mm_dbg ("RSSI (LTE): %d dBm", rssi);
+        rssi = MAX (rssi, rssi_max);
+    }
+
+    /* This RSSI comes as negative dBms */
+    quality = STRENGTH_TO_QUALITY (rssi_max);
+
+    mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, quality);
+
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+}
+
+static void
+common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
+                                         gboolean enable,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_enable_disable_unsolicited_events);
+
+    if (enable == self->priv->unsolicited_events_setup) {
+        mm_dbg ("Unsolicited events already %s; skipping",
+                enable ? "setup" : "cleanup");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Store new state */
+    self->priv->unsolicited_events_setup = enable;
+
+    /* Connect/Disconnect "Event Report" indications */
+    if (enable) {
+        g_assert (self->priv->event_report_indication_id == 0);
+        self->priv->event_report_indication_id =
+            g_signal_connect (client,
+                              "event-report",
+                              G_CALLBACK (event_report_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->event_report_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->event_report_indication_id);
+        self->priv->event_report_indication_id = 0;
+    }
+
+    /* Connect/Disconnect "Signal Info" indications */
+    if (enable) {
+        g_assert (self->priv->signal_info_indication_id == 0);
+        self->priv->signal_info_indication_id =
+            g_signal_connect (client,
+                              "signal-info",
+                              G_CALLBACK (signal_info_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->signal_info_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->signal_info_indication_id);
+        self->priv->signal_info_indication_id = 0;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return common_setup_cleanup_unsolicited_events_finish (MM_BROADBAND_MODEM_QMI (self), res, error);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                             FALSE,
+                                             callback,
+                                             user_data);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                             TRUE,
+                                             callback,
+                                             user_data);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (CDMA interface) */
+
+static gboolean
+modem_cdma_setup_cleanup_unsolicited_events_finish (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return common_setup_cleanup_unsolicited_events_finish (MM_BROADBAND_MODEM_QMI (self), res, error);
+}
+
+static void
+modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                             FALSE,
+                                             callback,
+                                             user_data);
+}
+
+static void
+modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                             TRUE,
+                                             callback,
+                                             user_data);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -3378,6 +3597,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 
     /* Enabling steps */
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
@@ -3397,6 +3620,10 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->load_esn_finish = modem_cdma_load_esn_finish;
 
     /* Enabling steps */
+    iface->setup_unsolicited_events = modem_cdma_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_cdma_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_cdma_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_cdma_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_cdma_disable_unsolicited_events;
