@@ -466,6 +466,9 @@ mm_bearer_disconnect (MMBearer *self,
     /* If currently connecting, try to cancel that operation, and wait to get
      * disconnected. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
+        /* Set ourselves as disconnecting */
+        bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
+
         /* We MUST ensure that we get to DISCONNECTED */
         g_cancellable_cancel (self->priv->connect_cancellable);
         /* Note that we only allow to remove disconnected bearers, so should
