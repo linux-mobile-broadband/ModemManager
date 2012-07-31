@@ -1500,7 +1500,7 @@ modem_power_down (MMIfaceModem *self,
                   gpointer user_data)
 {
     common_power_up_down (self,
-                          QMI_DMS_OPERATING_MODE_OFFLINE,
+                          QMI_DMS_OPERATING_MODE_LOW_POWER,
                           callback,
                           user_data);
 }
