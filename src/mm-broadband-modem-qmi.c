@@ -2299,6 +2299,7 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
                                          MM_CORE_ERROR_FAILED,
                                          "Device doesn't report a valid IMEI");
     g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -2717,6 +2718,7 @@ modem_cdma_load_meid (MMIfaceModemCdma *_self,
                                          MM_CORE_ERROR_FAILED,
                                          "Device doesn't report a valid MEID");
     g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -2760,6 +2762,7 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
                                          MM_CORE_ERROR_FAILED,
                                          "Device doesn't report a valid ESN");
     g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
