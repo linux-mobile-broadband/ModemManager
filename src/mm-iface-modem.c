@@ -591,9 +591,12 @@ access_technologies_check_ready (MMIfaceModem *self,
     } else
         mm_iface_modem_update_access_technologies (self, access_technologies, mask);
 
-    /* Remove the running tag */
+    /* Remove the running tag. Note that the context may have been removed by
+     * mm_iface_modem_shutdown when this function is invoked as a callback of
+     * load_access_technologies. */
     ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
-    ctx->running = FALSE;
+    if (ctx)
+        ctx->running = FALSE;
 }
 
 static gboolean
@@ -843,9 +846,12 @@ signal_quality_check_ready (MMIfaceModem *self,
     } else
         update_signal_quality (self, signal_quality, TRUE);
 
-    /* Remove the running tag */
+    /* Remove the running tag. Note that the context may have been removed by
+     * mm_iface_modem_shutdown when this function is invoked as a callback of
+     * load_signal_quality. */
     ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
-    ctx->running = FALSE;
+    if (ctx)
+        ctx->running = FALSE;
 }
 
 static gboolean
