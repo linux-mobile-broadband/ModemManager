@@ -151,14 +151,6 @@ else
 fi
 AC_SUBST(PPPD_PLUGIN_DIR)
 
-AC_ARG_WITH(docs, AC_HELP_STRING([--with-docs], [Build ModemManager documentation]))
-AM_CONDITIONAL(WITH_DOCS, test "x$with_docs" = "xyes")
-case $with_docs in
-       yes) ;;
-       *)
-               with_docs=no
-               ;;
-esac
 
 dnl
 dnl Tests
