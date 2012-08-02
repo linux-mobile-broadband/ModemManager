@@ -529,6 +529,10 @@ mm_iface_modem_update_access_technologies (MMIfaceModem *self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
 
+    /* Don't process updates if the interface is shut down */
+    if (!skeleton)
+        return;
+
     old_access_tech = mm_gdbus_modem_get_access_technologies (skeleton);
 
     /* Build the new access tech */
@@ -754,6 +758,14 @@ update_signal_quality (MMIfaceModem *self,
     MmGdbusModem *skeleton = NULL;
     const gchar *dbus_path;
 
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    /* Don't process updates if the interface is shut down */
+    if (!skeleton)
+        return;
+
     if (G_UNLIKELY (!signal_quality_update_context_quark))
         signal_quality_update_context_quark = (g_quark_from_static_string (
                                                    SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
@@ -771,10 +783,6 @@ update_signal_quality (MMIfaceModem *self,
 
     /* Keep current timestamp */
     ctx->last_update = time (NULL);
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  NULL);
 
     /* Note: we always set the new value, even if the signal quality level
      * is the same, in order to provide an up to date 'recent' flag.
