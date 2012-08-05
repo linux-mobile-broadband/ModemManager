@@ -2162,7 +2162,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
             qmi_message_nas_set_system_selection_preference_input_set_gsm_wcdma_acquisition_order_preference (input, order, NULL);
         }
 
-        qmi_message_nas_set_system_selection_preference_input_set_preference_duration (input, QMI_NAS_PREFERENCE_DURATION_PERMANENT, NULL);
+        qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
 
         qmi_client_nas_set_system_selection_preference (
             ctx->client,
