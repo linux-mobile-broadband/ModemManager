@@ -2578,7 +2578,7 @@ get_3gpp_access_technology (GArray *array,
         if (element->mcc == mcc &&
             element->mnc == mnc) {
             array_used_flags[i] = TRUE;
-            return access_technology_from_qmi_rat (element->rat);
+            return access_technology_from_qmi_rat (element->radio_interface);
         }
     }
 
