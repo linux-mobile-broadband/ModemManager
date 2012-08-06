@@ -2643,6 +2643,80 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Load operator name (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *_self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    if (self->priv->current_operator_description)
+        return g_strdup (self->priv->current_operator_description);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Current operator description is still unknown");
+    return NULL;
+}
+
+static void
+modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just finish the async operation */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_operator_name);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Load operator code (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *_self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    if (self->priv->current_operator_id)
+        return g_strdup (self->priv->current_operator_id);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Current operator MCC/MNC is still unknown");
+    return NULL;
+}
+
+static void
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just finish the async operation */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_operator_code);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Registration checks (3GPP interface) */
 
 typedef struct {
@@ -4182,6 +4256,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
+    iface->load_operator_code = modem_3gpp_load_operator_code;
+    iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
+    iface->load_operator_name = modem_3gpp_load_operator_name;
+    iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
 }
 
 static void
