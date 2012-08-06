@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011-2012 Google, Inc.
  */
 
 #ifndef MM_IFACE_MODEM_3GPP_H
@@ -99,72 +99,51 @@ struct _MMIfaceModem3gpp {
                                                    GError **error);
 
     /* Setup unsolicited registration messages */
-    void (* setup_unsolicited_registration) (MMIfaceModem3gpp *self,
-                                             GAsyncReadyCallback callback,
-                                             gpointer user_data);
-    gboolean (*setup_unsolicited_registration_finish) (MMIfaceModem3gpp *self,
-                                                       GAsyncResult *res,
-                                                       GError **error);
+    void (* setup_unsolicited_registration_events) (MMIfaceModem3gpp *self,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data);
+    gboolean (*setup_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
+                                                              GAsyncResult *res,
+                                                              GError **error);
+
+    /* Asynchronous enabling of unsolicited registration events */
+    void (*enable_unsolicited_registration_events) (MMIfaceModem3gpp *self,
+                                                    gboolean cs_supported,
+                                                    gboolean ps_supported,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data);
+    gboolean (*enable_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
+                                                               GAsyncResult *res,
+                                                               GError **error);
 
     /* Cleanup unsolicited registration messages */
-    void (* cleanup_unsolicited_registration) (MMIfaceModem3gpp *self,
-                                               GAsyncReadyCallback callback,
-                                               gpointer user_data);
-    gboolean (*cleanup_unsolicited_registration_finish) (MMIfaceModem3gpp *self,
-                                                         GAsyncResult *res,
-                                                         GError **error);
+    void (* cleanup_unsolicited_registration_events) (MMIfaceModem3gpp *self,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+    gboolean (*cleanup_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
+                                                                GAsyncResult *res,
+                                                                GError **error);
+    /* Asynchronous disabling of unsolicited registration events */
+    void (*disable_unsolicited_registration_events) (MMIfaceModem3gpp *self,
+                                                     gboolean cs_supported,
+                                                     gboolean ps_supported,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+    gboolean (*disable_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
+                                                                GAsyncResult *res,
+                                                                GError **error);
 
-    /* Setup CS Registration */
-    void (* setup_cs_registration) (MMIfaceModem3gpp *self,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-    gboolean (*setup_cs_registration_finish) (MMIfaceModem3gpp *self,
-                                              GAsyncResult *res,
-                                              GError **error);
-
-    /* Cleanup CS Registration */
-    void (* cleanup_cs_registration) (MMIfaceModem3gpp *self,
+    /* Run CS/PS registration state checks..
+     * Note that no registration state is returned, implementations should call
+     * mm_iface_modem_3gpp_update_registration_state(). */
+    void (* run_registration_checks) (MMIfaceModem3gpp *self,
+                                      gboolean cs_supported,
+                                      gboolean ps_supported,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
-    gboolean (*cleanup_cs_registration_finish) (MMIfaceModem3gpp *self,
+    gboolean (*run_registration_checks_finish) (MMIfaceModem3gpp *self,
                                                 GAsyncResult *res,
                                                 GError **error);
-
-    /* Setup PS Registration */
-    void (* setup_ps_registration) (MMIfaceModem3gpp *self,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-    gboolean (*setup_ps_registration_finish) (MMIfaceModem3gpp *self,
-                                              GAsyncResult *res,
-                                              GError **error);
-
-    /* Cleanup PS Registration */
-    void (* cleanup_ps_registration) (MMIfaceModem3gpp *self,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-    gboolean (*cleanup_ps_registration_finish) (MMIfaceModem3gpp *self,
-                                              GAsyncResult *res,
-                                              GError **error);
-
-    /* Run CS registration state check.
-     * Note that no registration state is returned, implementations should call
-     * mm_iface_modem_3gpp_update_registration_state(). */
-    void (* run_cs_registration_check) (MMIfaceModem3gpp *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data);
-    gboolean (*run_cs_registration_check_finish) (MMIfaceModem3gpp *self,
-                                                  GAsyncResult *res,
-                                                  GError **error);
-
-    /* Run PS registration state check.
-     * Note that no registration state is returned, implementations should call
-     * mm_iface_modem_3gpp_update_registration_state(). */
-    void (* run_ps_registration_check) (MMIfaceModem3gpp *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data);
-    gboolean (*run_ps_registration_check_finish) (MMIfaceModem3gpp *self,
-                                                  GAsyncResult *res,
-                                                  GError **error);
 
     /* Try to register in the network */
     void (* register_in_network) (MMIfaceModem3gpp *self,
@@ -247,12 +226,12 @@ void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                        gulong cell_id);
 
 /* Run all registration checks */
-void mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gpp *self,
-                                                                 GAsyncResult *res,
-                                                                 GError **error);
+void mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+gboolean mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
+                                                             GAsyncResult *res,
+                                                             GError **error);
 
 /* Request to reload current operator */
 void mm_iface_modem_3gpp_reload_current_operator (MMIfaceModem3gpp *self);
