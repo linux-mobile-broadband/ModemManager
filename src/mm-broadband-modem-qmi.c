@@ -1660,18 +1660,18 @@ modem_mode_from_qmi_radio_technology_preference (QmiNasRatModePreference qmi)
     MMModemMode mode = MM_MODEM_MODE_NONE;
 
     if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2) {
-        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_ANALOG)
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM)
             mode |= MM_MODEM_MODE_CS; /* AMPS */
-        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL)
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
             mode |= MM_MODEM_MODE_2G; /* CDMA */
         if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR)
             mode |= MM_MODEM_MODE_3G; /* EV-DO */
     }
 
     if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP) {
-        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_ANALOG)
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM)
             mode |= (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G); /* GSM */
-        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL)
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
             mode |= MM_MODEM_MODE_3G; /* WCDMA */
     }
 
@@ -2020,15 +2020,15 @@ modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
     if (is_cdma) {
         pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2;
         if (mode & MM_MODEM_MODE_2G)
-            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL; /* CDMA */
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA; /* CDMA */
         if (mode & MM_MODEM_MODE_3G)
             pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR; /* EV-DO */
     } else {
         pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP;
         if (mode & MM_MODEM_MODE_2G)
-            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_ANALOG; /* GSM */
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM; /* GSM */
         if (mode & MM_MODEM_MODE_3G)
-            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_DIGITAL; /* WCDMA */
+            pref |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA; /* WCDMA */
     }
 
     if (mode & MM_MODEM_MODE_4G)
