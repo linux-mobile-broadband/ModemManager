@@ -57,9 +57,12 @@ struct _MMBroadbandModemQmiPrivate {
     guint event_report_indication_id;
     guint signal_info_indication_id;
 
-    /* 3GPP registration helpers */
+    /* 3GPP/CDMA registration helpers */
     gchar *current_operator_id;
     gchar *current_operator_description;
+    gboolean unsolicited_registration_events_enabled;
+    gboolean unsolicited_registration_events_setup;
+    guint serving_system_indication_id;
 };
 
 /*****************************************************************************/
@@ -2897,6 +2900,382 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable unsolicited registration events (3GPP interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientNas *client;
+    GSimpleAsyncResult *result;
+    gboolean enable; /* TRUE for enabling, FALSE for disabling */
+} UnsolicitedRegistrationEventsContext;
+
+static void
+unsolicited_registration_events_context_complete_and_free (UnsolicitedRegistrationEventsContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static UnsolicitedRegistrationEventsContext *
+unsolicited_registration_events_context_new (MMBroadbandModemQmi *self,
+                                             QmiClient *client,
+                                             gboolean enable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
+{
+    UnsolicitedRegistrationEventsContext *ctx;
+
+    ctx = g_new0 (UnsolicitedRegistrationEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             unsolicited_registration_events_context_new);
+    ctx->enable = FALSE;
+    return ctx;
+}
+
+static gboolean
+modem_3gpp_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3gpp *self,
+                                                                  GAsyncResult *res,
+                                                                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+ri_serving_system_ready (QmiClientNas *client,
+                         GAsyncResult *res,
+                         UnsolicitedRegistrationEventsContext *ctx)
+{
+    QmiMessageNasRegisterIndicationsOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_register_indications_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_register_indications_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't register indications: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_nas_register_indications_output_unref (output);
+
+    /* Just ignore errors for now */
+    ctx->self->priv->unsolicited_registration_events_enabled = ctx->enable;
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    unsolicited_registration_events_context_complete_and_free (ctx);
+}
+
+static void
+common_enable_disable_unsolicited_registration_events_serving_system (UnsolicitedRegistrationEventsContext *ctx)
+{
+    QmiMessageNasRegisterIndicationsInput *input;
+
+    input = qmi_message_nas_register_indications_input_new ();
+    qmi_message_nas_register_indications_input_set_serving_system_events (input, ctx->enable, NULL);
+    qmi_client_nas_register_indications (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)ri_serving_system_ready,
+        ctx);
+    qmi_message_nas_register_indications_input_unref (input);
+}
+
+static void
+modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                    gboolean cs_supported,
+                                                    gboolean ps_supported,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data)
+{
+    UnsolicitedRegistrationEventsContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = unsolicited_registration_events_context_new (MM_BROADBAND_MODEM_QMI (self),
+                                                       client,
+                                                       FALSE,
+                                                       callback,
+                                                       user_data);
+
+    /* Ability to explicitly enable/disable serving system indications was
+     * added in NAS 1.2 */
+    if (qmi_client_check_version (client, 1, 2)) {
+        common_enable_disable_unsolicited_registration_events_serving_system (ctx);
+        return;
+    }
+
+    /* Devices with NAS < 1.2 will just always issue serving system indications */
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Device doesn't allow disabling registration events");
+    ctx->self->priv->unsolicited_registration_events_enabled = FALSE;
+    unsolicited_registration_events_context_complete_and_free (ctx);
+}
+
+static void
+modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                   gboolean cs_supported,
+                                                   gboolean ps_supported,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data)
+{
+    UnsolicitedRegistrationEventsContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = unsolicited_registration_events_context_new (MM_BROADBAND_MODEM_QMI (self),
+                                                       client,
+                                                       TRUE,
+                                                       callback,
+                                                       user_data);
+
+    /* Ability to explicitly enable/disable serving system indications was
+     * added in NAS 1.2 */
+    if (qmi_client_check_version (client, 1, 2)) {
+        common_enable_disable_unsolicited_registration_events_serving_system (ctx);
+        return;
+    }
+
+    /* Devices with NAS < 1.2 will just always issue serving system indications */
+    mm_dbg ("Assuming serving system indications are always enabled");
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    ctx->self->priv->unsolicited_registration_events_enabled = TRUE;
+    unsolicited_registration_events_context_complete_and_free (ctx);
+}
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited registration event handlers
+ * (3GPP and CDMA interface) */
+
+static gboolean
+common_setup_cleanup_unsolicited_registration_events_finish (MMBroadbandModemQmi *self,
+                                                             GAsyncResult *res,
+                                                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+serving_system_indication_cb (QmiClientNas *client,
+                              MMBroadbandModemQmi *self,
+                              QmiIndicationNasServingSystemOutput *output)
+{
+    QmiNasRegistrationState registration_state;
+    QmiNasAttachState cs_attach_state;
+    QmiNasAttachState ps_attach_state;
+    QmiNasNetworkType selected_network;
+    GArray *radio_interfaces;
+
+    qmi_indication_nas_serving_system_output_get_serving_system (
+        output,
+        &registration_state,
+        &cs_attach_state,
+        &ps_attach_state,
+        &selected_network,
+        &radio_interfaces,
+        NULL);
+
+    /* 3GPP specific processing */
+    if (selected_network == QMI_NAS_NETWORK_TYPE_3GPP) {
+        QmiNasRoamingIndicatorStatus roaming;
+        guint16 mcc;
+        guint16 mnc;
+        const gchar *description;
+        gboolean has_pcs_digit;
+        guint16 lac;
+        guint32 cid;
+        MMModemAccessTechnology mm_access_technologies;
+        MMModem3gppRegistrationState mm_cs_registration_state;
+        MMModem3gppRegistrationState mm_ps_registration_state;
+
+        /* Get roaming status.
+         * TODO: QMI may report per-access-technology roaming indicators, for when
+         * the modem is connected to more than one network. How to handle those? */
+        roaming = QMI_NAS_ROAMING_INDICATOR_STATUS_OFF;
+        qmi_indication_nas_serving_system_output_get_roaming_indicator (output, &roaming, NULL);
+
+        /* Build MM registration states */
+        mm_cs_registration_state =
+            qmi_registration_state_to_3gpp_registration_state (
+                cs_attach_state,
+                registration_state,
+                (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
+        mm_ps_registration_state =
+            qmi_registration_state_to_3gpp_registration_state (
+                ps_attach_state,
+                registration_state,
+                (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
+
+        /* Build access technologies mask */
+        mm_access_technologies =
+            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
+
+        /* Get and cache operator ID/name */
+        if (qmi_indication_nas_serving_system_output_get_current_plmn (
+                output,
+                &mcc,
+                &mnc,
+                &description,
+                NULL)) {
+            /* When we don't have information about leading PCS digit, guess best */
+            g_free (self->priv->current_operator_id);
+            if (mnc >= 100)
+                self->priv->current_operator_id =
+                    g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
+                                     mcc,
+                                     mnc);
+            else
+                self->priv->current_operator_id =
+                    g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT,
+                                     mcc,
+                                     mnc);
+
+            g_free (self->priv->current_operator_description);
+            self->priv->current_operator_description = g_strdup (description);
+        }
+
+        /* If MNC comes with PCS digit, we must make sure the additional
+         * leading '0' is added */
+        if (qmi_indication_nas_serving_system_output_get_mnc_pcs_digit_include_status (
+                output,
+                &mcc,
+                &mnc,
+                &has_pcs_digit,
+                NULL) && has_pcs_digit) {
+            g_free (self->priv->current_operator_id);
+            self->priv->current_operator_id =
+                g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
+                                 mcc,
+                                 mnc);
+        }
+
+        /* Get 3GPP location LAC and CI */
+        lac = 0;
+        cid = 0;
+        qmi_indication_nas_serving_system_output_get_lac_3gpp (output, &lac, NULL);
+        qmi_indication_nas_serving_system_output_get_cid_3gpp (output, &cid, NULL);
+
+        /* Report new registration states */
+
+        mm_iface_modem_3gpp_update_cs_registration_state (
+            MM_IFACE_MODEM_3GPP (self),
+            mm_cs_registration_state,
+            mm_access_technologies,
+            lac,
+            cid);
+
+        mm_iface_modem_3gpp_update_ps_registration_state (
+            MM_IFACE_MODEM_3GPP (self),
+            mm_ps_registration_state,
+            mm_access_technologies,
+            lac,
+            cid);
+    }
+}
+
+static void
+common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
+                                                      gboolean enable,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_setup_cleanup_unsolicited_registration_events);
+
+    if (enable == self->priv->unsolicited_registration_events_setup) {
+        mm_dbg ("Unsolicited registration events already %s; skipping",
+                enable ? "setup" : "cleanup");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Store new state */
+    self->priv->unsolicited_registration_events_setup = enable;
+
+    /* Connect/Disconnect "Serving System" indications */
+    if (enable) {
+        g_assert (self->priv->serving_system_indication_id == 0);
+        self->priv->serving_system_indication_id =
+            g_signal_connect (client,
+                              "serving-system",
+                              G_CALLBACK (serving_system_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->serving_system_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->serving_system_indication_id);
+        self->priv->serving_system_indication_id = 0;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited registration events (3GPP interface) */
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_registration_events_finish (MMIfaceModem3gpp *self,
+                                                                 GAsyncResult *res,
+                                                                 GError **error)
+
+{    return common_setup_cleanup_unsolicited_registration_events_finish (MM_BROADBAND_MODEM_QMI (self), res, error);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_registration_events (MM_BROADBAND_MODEM_QMI (self),
+                                                          FALSE,
+                                                          callback,
+                                                          user_data);
+}
+
+static void
+modem_3gpp_setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_registration_events (MM_BROADBAND_MODEM_QMI (self),
+                                                          TRUE,
+                                                          callback,
+                                                          user_data);
+}
+
+/*****************************************************************************/
 /* MEID loading (CDMA interface) */
 
 static gchar *
@@ -3780,7 +4159,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 
-    /* Enabling steps */
+    /* Enabling/Disabling steps */
     iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
@@ -3789,6 +4168,14 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
+    iface->setup_unsolicited_registration_events = modem_3gpp_setup_unsolicited_registration_events;
+    iface->setup_unsolicited_registration_events_finish = modem_3gpp_setup_cleanup_unsolicited_registration_events_finish;
+    iface->cleanup_unsolicited_registration_events = modem_3gpp_cleanup_unsolicited_registration_events;
+    iface->cleanup_unsolicited_registration_events_finish = modem_3gpp_setup_cleanup_unsolicited_registration_events_finish;
+    iface->enable_unsolicited_registration_events = modem_3gpp_enable_unsolicited_registration_events;
+    iface->enable_unsolicited_registration_events_finish = modem_3gpp_enable_disable_unsolicited_registration_events_finish;
+    iface->disable_unsolicited_registration_events = modem_3gpp_disable_unsolicited_registration_events;
+    iface->disable_unsolicited_registration_events_finish = modem_3gpp_enable_disable_unsolicited_registration_events_finish;
 
     /* Other actions */
     iface->scan_networks = modem_3gpp_scan_networks;
