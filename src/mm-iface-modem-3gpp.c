@@ -874,6 +874,7 @@ typedef enum {
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION_EVENTS,
     DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
+    DISABLING_STEP_REGISTRATION_STATE,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -1022,6 +1023,15 @@ interface_disabling_step (DisablingContext *ctx)
                 ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_REGISTRATION_STATE:
+        update_registration_state (ctx->self,
+                                   MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
+                                   0, /* access tech */
+                                   0, /* lac */
+                                   0); /* cid */
         /* Fall down to next step */
         ctx->step++;
 
