@@ -2791,9 +2791,9 @@ qmi_radio_interface_list_to_access_technologies (GArray *radio_interfaces)
 }
 
 static void
-common_process_serving_system (MMBroadbandModemQmi *self,
-                               QmiMessageNasGetServingSystemOutput *response_output,
-                               QmiIndicationNasServingSystemOutput *indication_output)
+common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
+                                    QmiMessageNasGetServingSystemOutput *response_output,
+                                    QmiIndicationNasServingSystemOutput *indication_output)
 {
     QmiNasRegistrationState registration_state;
     QmiNasAttachState cs_attach_state;
@@ -2980,7 +2980,7 @@ get_serving_system_ready (QmiClientNas *client,
         return;
     }
 
-    common_process_serving_system (ctx->self, output, NULL);
+    common_process_serving_system_3gpp (ctx->self, output, NULL);
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_serving_system_output_unref (output);
@@ -3413,9 +3413,9 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
 }
 
 static void
-common_process_system_info (MMBroadbandModemQmi *self,
-                            QmiMessageNasGetSystemInfoOutput *response_output,
-                            QmiIndicationNasSystemInfoOutput *indication_output)
+common_process_system_info_3gpp (MMBroadbandModemQmi *self,
+                                 QmiMessageNasGetSystemInfoOutput *response_output,
+                                 QmiIndicationNasSystemInfoOutput *indication_output)
 {
     MMModemAccessTechnology access_technologies;
     MMModem3gppRegistrationState cs_registration_state;
@@ -3505,7 +3505,7 @@ get_system_info_ready (QmiClientNas *client,
         return;
     }
 
-    common_process_system_info (ctx->self, output, NULL);
+    common_process_system_info_3gpp (ctx->self, output, NULL);
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_system_info_output_unref (output);
@@ -3757,7 +3757,8 @@ system_info_indication_cb (QmiClientNas *client,
                            MMBroadbandModemQmi *self,
                            QmiIndicationNasSystemInfoOutput *output)
 {
-    common_process_system_info (self, NULL, output);
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
+        common_process_system_info_3gpp (self, NULL, output);
 }
 
 static void
@@ -3765,7 +3766,8 @@ serving_system_indication_cb (QmiClientNas *client,
                               MMBroadbandModemQmi *self,
                               QmiIndicationNasServingSystemOutput *output)
 {
-    common_process_serving_system (self, NULL, output);
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
+        common_process_serving_system_3gpp (self, NULL, output);
 }
 
 static void
