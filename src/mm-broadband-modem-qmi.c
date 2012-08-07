@@ -63,6 +63,7 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean unsolicited_registration_events_enabled;
     gboolean unsolicited_registration_events_setup;
     guint serving_system_indication_id;
+    guint system_info_indication_id;
 };
 
 /*****************************************************************************/
@@ -3022,7 +3023,8 @@ process_common_info (QmiNasServiceStatus service_status,
 }
 
 static gboolean
-process_gsm_info (QmiMessageNasGetSystemInfoOutput *output,
+process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
+                  QmiIndicationNasSystemInfoOutput *indication_output,
                   MMModemAccessTechnology *mm_access_technologies,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3047,6 +3049,9 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *output,
     gboolean egprs_support_valid;
     gboolean egprs_support;
 
+    g_assert ((response_output != NULL && indication_output == NULL) ||
+              (response_output == NULL && indication_output != NULL));
+
     *mm_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_lac = 0;
@@ -3054,28 +3059,54 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *output,
     g_free (*mm_operator_id);
     *mm_operator_id = NULL;
 
-    if (!qmi_message_nas_get_system_info_output_get_gsm_service_status (
-            output,
-            &service_status,
-            NULL, /* true_service_status */
-            NULL, /* preferred_data_path */
-            NULL) ||
-        !qmi_message_nas_get_system_info_output_get_gsm_system_info (
-            output,
-            &domain_valid,         &domain,
-            NULL, NULL, /* service_capability */
-            &roaming_status_valid, &roaming_status,
-            &forbidden_valid,      &forbidden,
-            &lac_valid,            &lac,
-            &cid_valid,            &cid,
-            NULL, NULL, NULL, /* registration_reject_info */
-            &network_id_valid,     &mcc, &mnc,
-            &egprs_support_valid,  &egprs_support,
-            NULL, NULL, /* dtm_support */
-            NULL)) {
-        mm_dbg ("No GSM service reported");
-        /* No GSM service */
-        return FALSE;
+    if (response_output) {
+        if (!qmi_message_nas_get_system_info_output_get_gsm_service_status (
+                response_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_message_nas_get_system_info_output_get_gsm_system_info (
+                response_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* dtm_support */
+                NULL)) {
+            mm_dbg ("No GSM service reported");
+            /* No GSM service */
+            return FALSE;
+        }
+    } else {
+        if (!qmi_indication_nas_system_info_output_get_gsm_service_status (
+                indication_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_indication_nas_system_info_output_get_gsm_system_info (
+                indication_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* dtm_support */
+                NULL)) {
+            mm_dbg ("No GSM service reported");
+            /* No GSM service */
+            return FALSE;
+        }
     }
 
     if (!process_common_info (service_status,
@@ -3102,7 +3133,8 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *output,
 }
 
 static gboolean
-process_wcdma_info (QmiMessageNasGetSystemInfoOutput *output,
+process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
+                    QmiIndicationNasSystemInfoOutput *indication_output,
                     MMModemAccessTechnology *mm_access_technologies,
                     MMModem3gppRegistrationState *mm_cs_registration_state,
                     MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3127,6 +3159,9 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *output,
     gboolean hs_service_valid;
     QmiNasWcdmaHsService hs_service;
 
+    g_assert ((response_output != NULL && indication_output == NULL) ||
+              (response_output == NULL && indication_output != NULL));
+
     *mm_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_lac = 0;
@@ -3134,29 +3169,56 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *output,
     g_free (*mm_operator_id);
     *mm_operator_id = NULL;
 
-    if (!qmi_message_nas_get_system_info_output_get_wcdma_service_status (
-            output,
-            &service_status,
-            NULL, /* true_service_status */
-            NULL, /* preferred_data_path */
-            NULL) ||
-        !qmi_message_nas_get_system_info_output_get_wcdma_system_info (
-            output,
-            &domain_valid,         &domain,
-            NULL, NULL, /* service_capability */
-            &roaming_status_valid, &roaming_status,
-            &forbidden_valid,      &forbidden,
-            &lac_valid,            &lac,
-            &cid_valid,            &cid,
-            NULL, NULL, NULL, /* registration_reject_info */
-            &network_id_valid,     &mcc, &mnc,
-            NULL, NULL, /* hs_call_status */
-            &hs_service_valid,     &hs_service,
-            NULL, NULL, /* primary_scrambling_code */
-            NULL)) {
-        mm_dbg ("No WCDMA service reported");
-        /* No GSM service */
-        return FALSE;
+    if (response_output) {
+        if (!qmi_message_nas_get_system_info_output_get_wcdma_service_status (
+                response_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_message_nas_get_system_info_output_get_wcdma_system_info (
+                response_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                NULL, NULL, /* hs_call_status */
+                &hs_service_valid,     &hs_service,
+                NULL, NULL, /* primary_scrambling_code */
+                NULL)) {
+            mm_dbg ("No WCDMA service reported");
+            /* No GSM service */
+            return FALSE;
+        }
+    } else {
+        if (!qmi_indication_nas_system_info_output_get_wcdma_service_status (
+                indication_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_indication_nas_system_info_output_get_wcdma_system_info (
+                indication_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                NULL, NULL, /* hs_call_status */
+                &hs_service_valid,     &hs_service,
+                NULL, NULL, /* primary_scrambling_code */
+                NULL)) {
+            mm_dbg ("No WCDMA service reported");
+            /* No GSM service */
+            return FALSE;
+        }
     }
 
     if (!process_common_info (service_status,
@@ -3202,7 +3264,8 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *output,
 }
 
 static gboolean
-process_lte_info (QmiMessageNasGetSystemInfoOutput *output,
+process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
+                  QmiIndicationNasSystemInfoOutput *indication_output,
                   MMModemAccessTechnology *mm_access_technologies,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3225,6 +3288,9 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *output,
     const gchar *mcc;
     const gchar *mnc;
 
+    g_assert ((response_output != NULL && indication_output == NULL) ||
+              (response_output == NULL && indication_output != NULL));
+
     *mm_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_lac = 0;
@@ -3232,27 +3298,52 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *output,
     g_free (*mm_operator_id);
     *mm_operator_id = NULL;
 
-    if (!qmi_message_nas_get_system_info_output_get_lte_service_status (
-            output,
-            &service_status,
-            NULL, /* true_service_status */
-            NULL, /* preferred_data_path */
-            NULL) ||
-        !qmi_message_nas_get_system_info_output_get_lte_system_info (
-            output,
-            &domain_valid,         &domain,
-            NULL, NULL, /* service_capability */
-            &roaming_status_valid, &roaming_status,
-            &forbidden_valid,      &forbidden,
-            &lac_valid,            &lac,
-            &cid_valid,            &cid,
-            NULL, NULL, NULL, /* registration_reject_info */
-            &network_id_valid,     &mcc, &mnc,
-            NULL, NULL, /* tac */
-            NULL)) {
-        mm_dbg ("No LTE service reported");
-        /* No GSM service */
-        return FALSE;
+    if (response_output) {
+        if (!qmi_message_nas_get_system_info_output_get_lte_service_status (
+                response_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_message_nas_get_system_info_output_get_lte_system_info (
+                response_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                NULL, NULL, /* tac */
+                NULL)) {
+            mm_dbg ("No LTE service reported");
+            /* No GSM service */
+            return FALSE;
+        }
+    } else {
+        if (!qmi_indication_nas_system_info_output_get_lte_service_status (
+                indication_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_indication_nas_system_info_output_get_lte_system_info (
+                indication_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                NULL, NULL, /* tac */
+                NULL)) {
+            mm_dbg ("No LTE service reported");
+            /* No GSM service */
+            return FALSE;
+        }
     }
 
     if (!process_common_info (service_status,
@@ -3276,18 +3367,81 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *output,
 }
 
 static void
-get_system_info_ready (QmiClientNas *client,
-                       GAsyncResult *res,
-                       RunRegistrationChecksContext *ctx)
+common_process_system_info (MMBroadbandModemQmi *self,
+                            QmiMessageNasGetSystemInfoOutput *response_output,
+                            QmiIndicationNasSystemInfoOutput *indication_output)
 {
-    QmiMessageNasGetSystemInfoOutput *output;
-    GError *error = NULL;
     MMModemAccessTechnology access_technologies;
     MMModem3gppRegistrationState cs_registration_state;
     MMModem3gppRegistrationState ps_registration_state;
     guint16 lac;
     guint32 cid;
     gchar *operator_id;
+
+    access_technologies = 0;
+    ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    lac = 0;
+    cid = 0;
+    operator_id = NULL;
+
+    /* Process infos, with the following priority:
+     *   LTE > WCDMA > GSM
+     * The first one giving results will be the one reported.
+     */
+    if (!process_lte_info (response_output, indication_output,
+                           &access_technologies,
+                           &cs_registration_state,
+                           &ps_registration_state,
+                           &lac,
+                           &cid,
+                           &operator_id) &&
+        !process_wcdma_info (response_output, indication_output,
+                             &access_technologies,
+                             &cs_registration_state,
+                             &ps_registration_state,
+                             &lac,
+                             &cid,
+                             &operator_id) &&
+        !process_gsm_info (response_output, indication_output,
+                           &access_technologies,
+                           &cs_registration_state,
+                           &ps_registration_state,
+                           &lac,
+                           &cid,
+                           &operator_id)) {
+        mm_dbg ("No service (GSM, WCDMA or LTE) reported");
+    }
+
+    /* Cache current operator ID */
+    if (operator_id) {
+        g_free (self->priv->current_operator_id);
+        self->priv->current_operator_id = operator_id;
+    }
+
+    /* Report new registration states */
+    mm_iface_modem_3gpp_update_cs_registration_state (
+        MM_IFACE_MODEM_3GPP (self),
+        cs_registration_state,
+        access_technologies,
+        lac,
+        cid);
+
+    mm_iface_modem_3gpp_update_ps_registration_state (
+        MM_IFACE_MODEM_3GPP (self),
+        ps_registration_state,
+        access_technologies,
+        lac,
+        cid);
+}
+
+static void
+get_system_info_ready (QmiClientNas *client,
+                       GAsyncResult *res,
+                       RunRegistrationChecksContext *ctx)
+{
+    QmiMessageNasGetSystemInfoOutput *output;
+    GError *error = NULL;
 
     output = qmi_client_nas_get_system_info_finish (client, res, &error);
     if (!output) {
@@ -3305,63 +3459,7 @@ get_system_info_ready (QmiClientNas *client,
         return;
     }
 
-    access_technologies = 0;
-    ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    lac = 0;
-    cid = 0;
-    operator_id = NULL;
-
-    /* Process infos, with the following priority:
-     *   LTE > WCDMA > GSM
-     * The first one giving results will be the one reported.
-     */
-    if (!process_lte_info (output,
-                           &access_technologies,
-                           &cs_registration_state,
-                           &ps_registration_state,
-                           &lac,
-                           &cid,
-                           &operator_id) &&
-        !process_wcdma_info (output,
-                             &access_technologies,
-                             &cs_registration_state,
-                             &ps_registration_state,
-                             &lac,
-                             &cid,
-                             &operator_id) &&
-        !process_gsm_info (output,
-                           &access_technologies,
-                           &cs_registration_state,
-                           &ps_registration_state,
-                           &lac,
-                           &cid,
-                           &operator_id)) {
-        mm_dbg ("No service (GSM, WCDMA or LTE) reported");
-    }
-
-    /* Cache current operator ID */
-    if (operator_id) {
-        g_free (ctx->self->priv->current_operator_id);
-        ctx->self->priv->current_operator_id = operator_id;
-    }
-
-    /* Report new registration states */
-    if (ctx->cs_supported)
-        mm_iface_modem_3gpp_update_cs_registration_state (
-            MM_IFACE_MODEM_3GPP (ctx->self),
-            cs_registration_state,
-            access_technologies,
-            lac,
-            cid);
-
-    if (ctx->ps_supported)
-        mm_iface_modem_3gpp_update_ps_registration_state (
-            MM_IFACE_MODEM_3GPP (ctx->self),
-            ps_registration_state,
-            access_technologies,
-            lac,
-            cid);
+    common_process_system_info (ctx->self, output, NULL);
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_system_info_output_unref (output);
@@ -3459,9 +3557,9 @@ modem_3gpp_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3g
 }
 
 static void
-ri_serving_system_ready (QmiClientNas *client,
-                         GAsyncResult *res,
-                         UnsolicitedRegistrationEventsContext *ctx)
+ri_serving_system_or_system_info_ready (QmiClientNas *client,
+                                        GAsyncResult *res,
+                                        UnsolicitedRegistrationEventsContext *ctx)
 {
     QmiMessageNasRegisterIndicationsOutput *output = NULL;
     GError *error = NULL;
@@ -3496,7 +3594,24 @@ common_enable_disable_unsolicited_registration_events_serving_system (Unsolicite
         input,
         5,
         NULL,
-        (GAsyncReadyCallback)ri_serving_system_ready,
+        (GAsyncReadyCallback)ri_serving_system_or_system_info_ready,
+        ctx);
+    qmi_message_nas_register_indications_input_unref (input);
+}
+
+static void
+common_enable_disable_unsolicited_registration_events_system_info (UnsolicitedRegistrationEventsContext *ctx)
+{
+    QmiMessageNasRegisterIndicationsInput *input;
+
+    input = qmi_message_nas_register_indications_input_new ();
+    qmi_message_nas_register_indications_input_set_system_info (input, ctx->enable, NULL);
+    qmi_client_nas_register_indications (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)ri_serving_system_or_system_info_ready,
         ctx);
     qmi_message_nas_register_indications_input_unref (input);
 }
@@ -3521,6 +3636,12 @@ modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                        FALSE,
                                                        callback,
                                                        user_data);
+
+    /* System Info was added in NAS 1.8 */
+    if (qmi_client_check_version (client, 1, 8)) {
+        common_enable_disable_unsolicited_registration_events_system_info (ctx);
+        return;
+    }
 
     /* Ability to explicitly enable/disable serving system indications was
      * added in NAS 1.2 */
@@ -3583,6 +3704,14 @@ common_setup_cleanup_unsolicited_registration_events_finish (MMBroadbandModemQmi
                                                              GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+system_info_indication_cb (QmiClientNas *client,
+                           MMBroadbandModemQmi *self,
+                           QmiIndicationNasSystemInfoOutput *output)
+{
+    common_process_system_info (self, NULL, output);
 }
 
 static void
@@ -3734,18 +3863,35 @@ common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
     /* Store new state */
     self->priv->unsolicited_registration_events_setup = enable;
 
-    /* Connect/Disconnect "Serving System" indications */
-    if (enable) {
-        g_assert (self->priv->serving_system_indication_id == 0);
-        self->priv->serving_system_indication_id =
-            g_signal_connect (client,
-                              "serving-system",
-                              G_CALLBACK (serving_system_indication_cb),
-                              self);
+    /* Signal info introduced in NAS 1.8 */
+    if (qmi_client_check_version (client, 1, 8)) {
+        /* Connect/Disconnect "System Info" indications */
+        if (enable) {
+            g_assert (self->priv->system_info_indication_id == 0);
+            self->priv->system_info_indication_id =
+                g_signal_connect (client,
+                                  "system-info",
+                                  G_CALLBACK (system_info_indication_cb),
+                                  self);
+        } else {
+            g_assert (self->priv->system_info_indication_id != 0);
+            g_signal_handler_disconnect (client, self->priv->system_info_indication_id);
+            self->priv->system_info_indication_id = 0;
+        }
     } else {
-        g_assert (self->priv->serving_system_indication_id != 0);
-        g_signal_handler_disconnect (client, self->priv->serving_system_indication_id);
-        self->priv->serving_system_indication_id = 0;
+        /* Connect/Disconnect "Serving System" indications */
+        if (enable) {
+            g_assert (self->priv->serving_system_indication_id == 0);
+            self->priv->serving_system_indication_id =
+                g_signal_connect (client,
+                                  "serving-system",
+                                  G_CALLBACK (serving_system_indication_cb),
+                                  self);
+        } else {
+            g_assert (self->priv->serving_system_indication_id != 0);
+            g_signal_handler_disconnect (client, self->priv->serving_system_indication_id);
+            self->priv->serving_system_indication_id = 0;
+        }
     }
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
