@@ -157,3 +157,6 @@ example to update the signal quality value or check registration status.
         and 3.5 kernels, then a matching wwanX and cdc-wdmY set will always
         share the same parent USB interface on QMI devices. Having the same
         parent USB device is *not* sufficient."
+
+  ** QMI: in NAS >= 1.8 we don't have the operator name given in the
+     registration status queries, we'll need to get it with "NAS Get PLMN Name".
