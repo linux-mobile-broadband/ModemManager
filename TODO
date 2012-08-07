@@ -160,3 +160,6 @@ example to update the signal quality value or check registration status.
 
   ** QMI: in NAS >= 1.8 we don't have the operator name given in the
      registration status queries, we'll need to get it with "NAS Get PLMN Name".
+
+  ** QMI: For the operator ID provisioned in the SIM, should we be using "Get
+     Home Network"?
