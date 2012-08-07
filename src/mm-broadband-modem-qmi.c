@@ -2791,12 +2791,10 @@ qmi_radio_interface_list_to_access_technologies (GArray *radio_interfaces)
 }
 
 static void
-get_serving_system_ready (QmiClientNas *client,
-                          GAsyncResult *res,
-                          RunRegistrationChecksContext *ctx)
+common_process_serving_system (MMBroadbandModemQmi *self,
+                               QmiMessageNasGetServingSystemOutput *response_output,
+                               QmiIndicationNasServingSystemOutput *indication_output)
 {
-    QmiMessageNasGetServingSystemOutput *output;
-    GError *error = NULL;
     QmiNasRegistrationState registration_state;
     QmiNasAttachState cs_attach_state;
     QmiNasAttachState ps_attach_state;
@@ -2813,41 +2811,39 @@ get_serving_system_ready (QmiClientNas *client,
     MMModem3gppRegistrationState mm_cs_registration_state;
     MMModem3gppRegistrationState mm_ps_registration_state;
 
-    output = qmi_client_nas_get_serving_system_finish (client, res, &error);
-    if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        run_registration_checks_context_complete_and_free (ctx);
-        return;
-    }
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_serving_system (
+            response_output,
+            &registration_state,
+            &cs_attach_state,
+            &ps_attach_state,
+            &selected_network,
+            &radio_interfaces,
+            NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_serving_system (
+            indication_output,
+            &registration_state,
+            &cs_attach_state,
+            &ps_attach_state,
+            &selected_network,
+            &radio_interfaces,
+            NULL);
 
-    if (!qmi_message_nas_get_serving_system_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't get serving system: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        qmi_message_nas_get_serving_system_output_unref (output);
-        run_registration_checks_context_complete_and_free (ctx);
-        return;
-    }
-
-    qmi_message_nas_get_serving_system_output_get_serving_system (
-        output,
-        &registration_state,
-        &cs_attach_state,
-        &ps_attach_state,
-        &selected_network,
-        &radio_interfaces,
-        NULL);
-
-    /* If we're getting reported about registration NOT in a 3GPP system,
-     * just return with error */
+    /* Only process 3GPP info */
     if (selected_network != QMI_NAS_NETWORK_TYPE_3GPP) {
-        g_simple_async_result_set_error (
-            ctx->result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Cannot get 3GPP registration state, serving system is not 3GPP");
-        qmi_message_nas_get_serving_system_output_unref (output);
-        run_registration_checks_context_complete_and_free (ctx);
+        g_free (self->priv->current_operator_id);
+        self->priv->current_operator_id = NULL;
+        g_free (self->priv->current_operator_description);
+        self->priv->current_operator_description = NULL;
+        mm_iface_modem_3gpp_update_cs_registration_state (
+            MM_IFACE_MODEM_3GPP (self),
+            MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
+            0, 0, 0);
+        mm_iface_modem_3gpp_update_ps_registration_state (
+            MM_IFACE_MODEM_3GPP (self),
+            MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
+            0, 0, 0);
         return;
     }
 
@@ -2855,7 +2851,10 @@ get_serving_system_ready (QmiClientNas *client,
      * TODO: QMI may report per-access-technology roaming indicators, for when
      * the modem is connected to more than one network. How to handle those? */
     roaming = QMI_NAS_ROAMING_INDICATOR_STATUS_OFF;
-    qmi_message_nas_get_serving_system_output_get_roaming_indicator (output, &roaming, NULL);
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_roaming_indicator (response_output, &roaming, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_roaming_indicator (indication_output, &roaming, NULL);
 
     /* Build MM registration states */
     mm_cs_registration_state =
@@ -2874,39 +2873,56 @@ get_serving_system_ready (QmiClientNas *client,
         qmi_radio_interface_list_to_access_technologies (radio_interfaces);
 
     /* Get and cache operator ID/name */
-    if (qmi_message_nas_get_serving_system_output_get_current_plmn (
-            output,
-            &mcc,
-            &mnc,
-            &description,
-            NULL)) {
+    if ((response_output &&
+         qmi_message_nas_get_serving_system_output_get_current_plmn (
+             response_output,
+             &mcc,
+             &mnc,
+             &description,
+             NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_serving_system_output_get_current_plmn (
+             indication_output,
+             &mcc,
+             &mnc,
+             &description,
+             NULL))) {
         /* When we don't have information about leading PCS digit, guess best */
-        g_free (ctx->self->priv->current_operator_id);
+        g_free (self->priv->current_operator_id);
         if (mnc >= 100)
-            ctx->self->priv->current_operator_id =
+            self->priv->current_operator_id =
                 g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
                                  mcc,
                                  mnc);
         else
-            ctx->self->priv->current_operator_id =
+            self->priv->current_operator_id =
                 g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT,
                                  mcc,
                                  mnc);
 
-        g_free (ctx->self->priv->current_operator_description);
-        ctx->self->priv->current_operator_description = g_strdup (description);
+        g_free (self->priv->current_operator_description);
+        self->priv->current_operator_description = g_strdup (description);
     }
 
     /* If MNC comes with PCS digit, we must make sure the additional
      * leading '0' is added */
-    if (qmi_message_nas_get_serving_system_output_get_mnc_pcs_digit_include_status (
-            output,
-            &mcc,
-            &mnc,
-            &has_pcs_digit,
-            NULL) && has_pcs_digit) {
-        g_free (ctx->self->priv->current_operator_id);
-        ctx->self->priv->current_operator_id =
+    if (((response_output &&
+          qmi_message_nas_get_serving_system_output_get_mnc_pcs_digit_include_status (
+              response_output,
+              &mcc,
+              &mnc,
+              &has_pcs_digit,
+              NULL)) ||
+         (indication_output &&
+          qmi_indication_nas_serving_system_output_get_mnc_pcs_digit_include_status (
+              indication_output,
+              &mcc,
+              &mnc,
+              &has_pcs_digit,
+              NULL))) &&
+        has_pcs_digit) {
+        g_free (self->priv->current_operator_id);
+        self->priv->current_operator_id =
             g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
                              mcc,
                              mnc);
@@ -2915,26 +2931,56 @@ get_serving_system_ready (QmiClientNas *client,
     /* Get 3GPP location LAC and CI */
     lac = 0;
     cid = 0;
-    qmi_message_nas_get_serving_system_output_get_lac_3gpp (output, &lac, NULL);
-    qmi_message_nas_get_serving_system_output_get_cid_3gpp (output, &cid, NULL);
+    if (response_output) {
+        qmi_message_nas_get_serving_system_output_get_lac_3gpp (response_output, &lac, NULL);
+        qmi_message_nas_get_serving_system_output_get_cid_3gpp (response_output, &cid, NULL);
+    } else {
+        qmi_indication_nas_serving_system_output_get_lac_3gpp (indication_output, &lac, NULL);
+        qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL);
+    }
 
     /* Report new registration states */
 
-    if (ctx->cs_supported)
-        mm_iface_modem_3gpp_update_cs_registration_state (
-            MM_IFACE_MODEM_3GPP (ctx->self),
-            mm_cs_registration_state,
-            mm_access_technologies,
-            lac,
-            cid);
+    mm_iface_modem_3gpp_update_cs_registration_state (
+        MM_IFACE_MODEM_3GPP (self),
+        mm_cs_registration_state,
+        mm_access_technologies,
+        lac,
+        cid);
 
-    if (ctx->ps_supported)
-        mm_iface_modem_3gpp_update_ps_registration_state (
-            MM_IFACE_MODEM_3GPP (ctx->self),
-            mm_ps_registration_state,
-            mm_access_technologies,
-            lac,
-            cid);
+    mm_iface_modem_3gpp_update_ps_registration_state (
+        MM_IFACE_MODEM_3GPP (self),
+        mm_ps_registration_state,
+        mm_access_technologies,
+        lac,
+        cid);
+}
+
+static void
+get_serving_system_ready (QmiClientNas *client,
+                          GAsyncResult *res,
+                          RunRegistrationChecksContext *ctx)
+{
+    QmiMessageNasGetServingSystemOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_serving_system_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        run_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_nas_get_serving_system_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get serving system: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_nas_get_serving_system_output_unref (output);
+        run_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    common_process_serving_system (ctx->self, output, NULL);
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_serving_system_output_unref (output);
@@ -3719,117 +3765,7 @@ serving_system_indication_cb (QmiClientNas *client,
                               MMBroadbandModemQmi *self,
                               QmiIndicationNasServingSystemOutput *output)
 {
-    QmiNasRegistrationState registration_state;
-    QmiNasAttachState cs_attach_state;
-    QmiNasAttachState ps_attach_state;
-    QmiNasNetworkType selected_network;
-    GArray *radio_interfaces;
-
-    qmi_indication_nas_serving_system_output_get_serving_system (
-        output,
-        &registration_state,
-        &cs_attach_state,
-        &ps_attach_state,
-        &selected_network,
-        &radio_interfaces,
-        NULL);
-
-    /* 3GPP specific processing */
-    if (selected_network == QMI_NAS_NETWORK_TYPE_3GPP) {
-        QmiNasRoamingIndicatorStatus roaming;
-        guint16 mcc;
-        guint16 mnc;
-        const gchar *description;
-        gboolean has_pcs_digit;
-        guint16 lac;
-        guint32 cid;
-        MMModemAccessTechnology mm_access_technologies;
-        MMModem3gppRegistrationState mm_cs_registration_state;
-        MMModem3gppRegistrationState mm_ps_registration_state;
-
-        /* Get roaming status.
-         * TODO: QMI may report per-access-technology roaming indicators, for when
-         * the modem is connected to more than one network. How to handle those? */
-        roaming = QMI_NAS_ROAMING_INDICATOR_STATUS_OFF;
-        qmi_indication_nas_serving_system_output_get_roaming_indicator (output, &roaming, NULL);
-
-        /* Build MM registration states */
-        mm_cs_registration_state =
-            qmi_registration_state_to_3gpp_registration_state (
-                cs_attach_state,
-                registration_state,
-                (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
-        mm_ps_registration_state =
-            qmi_registration_state_to_3gpp_registration_state (
-                ps_attach_state,
-                registration_state,
-                (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
-
-        /* Build access technologies mask */
-        mm_access_technologies =
-            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
-
-        /* Get and cache operator ID/name */
-        if (qmi_indication_nas_serving_system_output_get_current_plmn (
-                output,
-                &mcc,
-                &mnc,
-                &description,
-                NULL)) {
-            /* When we don't have information about leading PCS digit, guess best */
-            g_free (self->priv->current_operator_id);
-            if (mnc >= 100)
-                self->priv->current_operator_id =
-                    g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
-                                     mcc,
-                                     mnc);
-            else
-                self->priv->current_operator_id =
-                    g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT,
-                                     mcc,
-                                     mnc);
-
-            g_free (self->priv->current_operator_description);
-            self->priv->current_operator_description = g_strdup (description);
-        }
-
-        /* If MNC comes with PCS digit, we must make sure the additional
-         * leading '0' is added */
-        if (qmi_indication_nas_serving_system_output_get_mnc_pcs_digit_include_status (
-                output,
-                &mcc,
-                &mnc,
-                &has_pcs_digit,
-                NULL) && has_pcs_digit) {
-            g_free (self->priv->current_operator_id);
-            self->priv->current_operator_id =
-                g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
-                                 mcc,
-                                 mnc);
-        }
-
-        /* Get 3GPP location LAC and CI */
-        lac = 0;
-        cid = 0;
-        qmi_indication_nas_serving_system_output_get_lac_3gpp (output, &lac, NULL);
-        qmi_indication_nas_serving_system_output_get_cid_3gpp (output, &cid, NULL);
-
-        /* Report new registration states */
-
-        mm_iface_modem_3gpp_update_cs_registration_state (
-            MM_IFACE_MODEM_3GPP (self),
-            mm_cs_registration_state,
-            mm_access_technologies,
-            lac,
-            cid);
-
-        mm_iface_modem_3gpp_update_ps_registration_state (
-            MM_IFACE_MODEM_3GPP (self),
-            mm_ps_registration_state,
-            mm_access_technologies,
-            lac,
-            cid);
-    }
+    common_process_serving_system (self, NULL, output);
 }
 
 static void
