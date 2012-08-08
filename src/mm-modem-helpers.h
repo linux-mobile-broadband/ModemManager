@@ -152,6 +152,11 @@ MMModemAccessTechnology mm_string_to_access_tech (const gchar *string);
 gchar *mm_3gpp_parse_operator (const gchar *reply,
                                MMModemCharset cur_charset);
 
+gboolean mm_3gpp_parse_operator_id (const gchar *operator_id,
+                                    guint16 *mcc,
+                                    guint16 *mnc,
+                                    GError **error);
+
 const gchar      *mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family);
 MMBearerIpFamily  mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type);
 

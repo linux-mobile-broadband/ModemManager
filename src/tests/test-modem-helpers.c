@@ -1407,6 +1407,77 @@ test_cnum_response_generic_multiple_numbers (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test operator ID parsing */
+
+static void
+common_parse_operator_id (const gchar *operator_id,
+                          gboolean expected_success,
+                          guint16 expected_mcc,
+                          guint16 expected_mnc)
+{
+    guint16 mcc;
+    guint16 mnc;
+    gboolean result;
+    GError *error = NULL;
+
+    if (expected_mcc) {
+        g_print ("Parsing Operator ID '%s' "
+                 "(%" G_GUINT16_FORMAT ", %" G_GUINT16_FORMAT  ")...\n",
+                 operator_id, expected_mcc, expected_mnc);
+        result = mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error);
+    } else {
+        g_print ("Validating Operator ID '%s'...\n", operator_id);
+        result = mm_3gpp_parse_operator_id (operator_id, NULL, NULL, &error);
+    }
+
+    if (error)
+        g_printerr ("\tGot %s error: %s...\n",
+                    expected_success ? "unexpected" : "expected",
+                    error->message);
+
+    g_assert (result == expected_success);
+
+    if (expected_success) {
+        g_assert_no_error (error);
+        if (expected_mcc) {
+            g_assert_cmpuint (expected_mcc, ==, mcc);
+            g_assert_cmpuint (expected_mnc, ==, mnc);
+        }
+    } else {
+        g_assert (error != NULL);
+        g_error_free (error);
+    }
+}
+
+
+static void
+test_parse_operator_id (void *f, gpointer d)
+{
+    g_print ("\n");
+    /* Valid MCC+MNC(2) */
+    common_parse_operator_id ("41201",  TRUE, 412, 1);
+    common_parse_operator_id ("41201",  TRUE, 0, 0);
+    /* Valid MCC+MNC(3) */
+    common_parse_operator_id ("342600", TRUE, 342, 600);
+    common_parse_operator_id ("342600", TRUE, 0, 0);
+    /* Valid MCC+MNC(2, == 0) */
+    common_parse_operator_id ("72400", TRUE, 724, 0);
+    common_parse_operator_id ("72400", TRUE, 0, 0);
+    /* Valid MCC+MNC(3, == 0) */
+    common_parse_operator_id ("724000", TRUE, 724, 0);
+    common_parse_operator_id ("724000", TRUE, 0, 0);
+
+    /* Invalid MCC=0 */
+    common_parse_operator_id ("000600", FALSE, 0, 0);
+    /* Invalid, non-digits */
+    common_parse_operator_id ("000Z00", FALSE, 0, 0);
+    /* Invalid, short */
+    common_parse_operator_id ("123", FALSE, 0, 0);
+    /* Invalid, long */
+    common_parse_operator_id ("1234567", FALSE, 0, 0);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1512,6 +1583,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_detail_unquoted, NULL));
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_international_number, NULL));
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_multiple_numbers, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_parse_operator_id, NULL));
 
     result = g_test_run ();
 

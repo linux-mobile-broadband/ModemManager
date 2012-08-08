@@ -1466,6 +1466,66 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 /*************************************************************************/
 
 gboolean
+mm_3gpp_parse_operator_id (const gchar *operator_id,
+                           guint16 *mcc,
+                           guint16 *mnc,
+                           GError **error)
+{
+    guint len;
+    guint i;
+    gchar aux[4];
+    guint16 tmp;
+
+    g_assert (operator_id != NULL);
+
+    len = strlen (operator_id);
+    if (len != 5 && len != 6) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Operator ID must have 5 or 6 digits");
+        return FALSE;
+    }
+
+    for (i = 0; i < len; i++) {
+        if (!g_ascii_isdigit (operator_id[i])) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Operator ID must only contain digits");
+            return FALSE;
+        }
+    }
+
+    memcpy (&aux[0], operator_id, 3);
+    aux[3] = '\0';
+    tmp = atoi (aux);
+    if (tmp == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "MCC must not be zero");
+        return FALSE;
+    }
+
+    if (mcc)
+        *mcc = tmp;
+
+    if (mnc) {
+        if (len == 5) {
+            memcpy (&aux[0], &operator_id[3], 2);
+            aux[2] = '\0';
+        } else
+            memcpy (&aux[0], &operator_id[3], 3);
+        *mnc = atoi (aux);
+    }
+
+    return TRUE;
+}
+
+/*************************************************************************/
+
+gboolean
 mm_cdma_parse_spservice_read_response (const gchar *reply,
                                        MMModemCdmaRegistrationState *out_cdma_1x_state,
                                        MMModemCdmaRegistrationState *out_evdo_state)
