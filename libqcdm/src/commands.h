@@ -146,6 +146,10 @@ QcdmResult *qcdm_cmd_sw_version_result (const char *buf,
 
 /**********************************************************************/
 
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_ESN                "esn"
+
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_HOME_MCC           "mcc"
+
 /* One of QCDM_CDMA_BAND_CLASS_* */
 #define QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS         "band-class"
 
