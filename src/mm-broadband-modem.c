@@ -5362,6 +5362,7 @@ modem_cdma_get_service_status (MMIfaceModemCdma *self,
 
 /*****************************************************************************/
 /* Detailed registration state (CDMA interface) */
+
 typedef struct {
     MMModemCdmaRegistrationState detailed_cdma1x_state;
     MMModemCdmaRegistrationState detailed_evdo_state;
@@ -5771,31 +5772,29 @@ modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
      state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||   \
      state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
 
-static void run_all_cdma_registration_checks_ready (MMBroadbandModem *self,
-                                                    GAsyncResult *res,
-                                                    RegisterInCdmaNetworkContext *ctx);
+static void run_cdma_registration_checks_ready (MMBroadbandModem *self,
+                                                GAsyncResult *res,
+                                                RegisterInCdmaNetworkContext *ctx);
 
 static gboolean
-run_all_cdma_registration_checks_again (RegisterInCdmaNetworkContext *ctx)
+run_cdma_registration_checks_again (RegisterInCdmaNetworkContext *ctx)
 {
     /* Get fresh registration state */
-    mm_iface_modem_cdma_run_all_registration_checks (
+    mm_iface_modem_cdma_run_registration_checks (
         MM_IFACE_MODEM_CDMA (ctx->self),
-        (GAsyncReadyCallback)run_all_cdma_registration_checks_ready,
+        (GAsyncReadyCallback)run_cdma_registration_checks_ready,
         ctx);
     return FALSE;
 }
 
 static void
-run_all_cdma_registration_checks_ready (MMBroadbandModem *self,
-                                        GAsyncResult *res,
-                                        RegisterInCdmaNetworkContext *ctx)
+run_cdma_registration_checks_ready (MMBroadbandModem *self,
+                                    GAsyncResult *res,
+                                    RegisterInCdmaNetworkContext *ctx)
 {
     GError *error = NULL;
 
-    mm_iface_modem_cdma_run_all_registration_checks_finish (MM_IFACE_MODEM_CDMA (self),
-                                                            res,
-                                                            &error);
+    mm_iface_modem_cdma_run_registration_checks_finish (MM_IFACE_MODEM_CDMA (self), res, &error);
 
     if (error) {
         mm_dbg ("CDMA registration check failed: '%s'", error->message);
@@ -5845,7 +5844,7 @@ run_all_cdma_registration_checks_ready (MMBroadbandModem *self,
     /* Check again in a few seconds. */
     mm_dbg ("Modem not yet registered in a CDMA network... will recheck soon");
     g_timeout_add_seconds (3,
-                           (GSourceFunc)run_all_cdma_registration_checks_again,
+                           (GSourceFunc)run_cdma_registration_checks_again,
                            ctx);
 }
 
@@ -5880,9 +5879,9 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
     /* Get fresh registration state */
     ctx->timer = g_timer_new ();
-    mm_iface_modem_cdma_run_all_registration_checks (
+    mm_iface_modem_cdma_run_registration_checks (
         MM_IFACE_MODEM_CDMA (self),
-        (GAsyncReadyCallback)run_all_cdma_registration_checks_ready,
+        (GAsyncReadyCallback)run_cdma_registration_checks_ready,
         ctx);
 }
 

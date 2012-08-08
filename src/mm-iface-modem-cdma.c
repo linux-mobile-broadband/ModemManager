@@ -454,7 +454,7 @@ struct _RunAllRegistrationChecksContext {
 };
 
 static void
-run_all_registration_checks_context_complete_and_free (RunAllRegistrationChecksContext *ctx)
+run_registration_checks_context_complete_and_free (RunAllRegistrationChecksContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -463,9 +463,9 @@ run_all_registration_checks_context_complete_and_free (RunAllRegistrationChecksC
 }
 
 gboolean
-mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdma *self,
-                                                        GAsyncResult *res,
-                                                        GError **error)
+mm_iface_modem_cdma_run_registration_checks_finish (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -488,7 +488,7 @@ setup_registration_checks_ready (MMIfaceModemCdma *self,
             &error)) {
         /* Make it fatal */
         g_simple_async_result_take_error (ctx->result, error);
-        run_all_registration_checks_context_complete_and_free (ctx);
+        run_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -605,7 +605,7 @@ get_service_status_ready (MMIfaceModemCdma *self,
                                                                               &error)) {
         mm_warn ("Could not get service status: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
-        run_all_registration_checks_context_complete_and_free (ctx);
+        run_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -641,7 +641,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
                               MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK)) {
             mm_warn ("Could not get serving system: %s", error->message);
             g_simple_async_result_take_error (ctx->result, error);
-            run_all_registration_checks_context_complete_and_free (ctx);
+            run_registration_checks_context_complete_and_free (ctx);
             return;
         }
 
@@ -847,7 +847,7 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
                                                             ctx->evdo_state);
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        run_all_registration_checks_context_complete_and_free (ctx);
+        run_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -855,9 +855,9 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
 }
 
 void
-mm_iface_modem_cdma_run_all_registration_checks (MMIfaceModemCdma *self,
-                                                 GAsyncReadyCallback callback,
-                                                 gpointer user_data)
+mm_iface_modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
 {
     RunAllRegistrationChecksContext *ctx;
 
@@ -866,7 +866,7 @@ mm_iface_modem_cdma_run_all_registration_checks (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_iface_modem_cdma_run_all_registration_checks);
+                                             mm_iface_modem_cdma_run_registration_checks);
     ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     ctx->call_manager_system_mode = QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE;
@@ -1028,7 +1028,7 @@ periodic_registration_checks_ready (MMIfaceModemCdma *self,
     RegistrationCheckContext *ctx;
     GError *error = NULL;
 
-    mm_iface_modem_cdma_run_all_registration_checks_finish (self, res, &error);
+    mm_iface_modem_cdma_run_registration_checks_finish (self, res, &error);
     if (error) {
         mm_dbg ("Couldn't refresh CDMA registration status: '%s'", error->message);
         g_error_free (error);
@@ -1048,7 +1048,7 @@ periodic_registration_check (MMIfaceModemCdma *self)
     ctx = g_object_get_qdata (G_OBJECT (self), registration_check_context_quark);
     if (!ctx->running) {
         ctx->running = TRUE;
-        mm_iface_modem_cdma_run_all_registration_checks (
+        mm_iface_modem_cdma_run_registration_checks (
             self,
             (GAsyncReadyCallback)periodic_registration_checks_ready,
             NULL);
@@ -1260,7 +1260,7 @@ typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
-    ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS,
+    ENABLING_STEP_RUN_REGISTRATION_CHECKS,
     ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
 } EnablingStep;
@@ -1369,15 +1369,13 @@ enable_unsolicited_events_ready (MMIfaceModemCdma *self,
 }
 
 static void
-run_all_registration_checks_ready (MMIfaceModemCdma *self,
+run_registration_checks_ready (MMIfaceModemCdma *self,
                                    GAsyncResult *res,
                                    EnablingContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_cdma_run_all_registration_checks_finish (self,
-                                                                 res,
-                                                                 &error)) {
+    if (!mm_iface_modem_cdma_run_registration_checks_finish (self, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         enabling_context_complete_and_free (ctx);
         return;
@@ -1424,10 +1422,10 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS:
-        mm_iface_modem_cdma_run_all_registration_checks (ctx->self,
-                                                         (GAsyncReadyCallback)run_all_registration_checks_ready,
-                                                         ctx);
+    case ENABLING_STEP_RUN_REGISTRATION_CHECKS:
+        mm_iface_modem_cdma_run_registration_checks (ctx->self,
+                                                     (GAsyncReadyCallback)run_registration_checks_ready,
+                                                     ctx);
         return;
 
     case ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS:

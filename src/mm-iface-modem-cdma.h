@@ -229,12 +229,12 @@ void mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                          MMModemCdmaRegistrationState state);
 
 /* Run all registration checks */
-void     mm_iface_modem_cdma_run_all_registration_checks        (MMIfaceModemCdma *self,
-                                                                 GAsyncReadyCallback callback,
-                                                                 gpointer user_data);
-gboolean mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdma *self,
-                                                                 GAsyncResult *res,
-                                                                 GError **error);
+void     mm_iface_modem_cdma_run_registration_checks        (MMIfaceModemCdma *self,
+                                                             GAsyncReadyCallback callback,
+                                                             gpointer user_data);
+gboolean mm_iface_modem_cdma_run_registration_checks_finish (MMIfaceModemCdma *self,
+                                                             GAsyncResult *res,
+                                                             GError **error);
 
 /* Register in network */
 void     mm_iface_modem_cdma_register_in_network        (MMIfaceModemCdma *self,
