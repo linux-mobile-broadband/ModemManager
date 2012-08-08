@@ -112,6 +112,44 @@ struct _MMIfaceModemCdma {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Try to register in the CDMA network. This implementation is just making
+     * sure that the modem is registered, and if it's not it will wait until it
+     * is.
+     */
+    void (* register_in_network) (MMIfaceModemCdma *self,
+                                  guint max_registration_time,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gboolean (*register_in_network_finish) (MMIfaceModemCdma *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+
+    /* Run CDMA1x/EV-DO registration state checks..
+     * Note that no registration state is returned, implementations should call
+     * mm_iface_modem_cdma_update_registration_state().
+     *
+     * NOTE: Plugins implementing this method will NOT execute the generic
+     * registration check logic involving setup_registration_checks(),
+     * get_call_manager_state(), get_hdr_state(), get_service_status(),
+     * get_cdma1x_serving_system() and get_detailed_registration_state().
+     *
+     * In other words, it is fine to leave this callback to NULL if you want
+     * the generic steps to run. This callback may be implemented if there
+     * is a completely independent way/command which can gather both CDMA1x
+     * and EV-DO registration states, SID and NID.
+     */
+    void (* run_registration_checks) (MMIfaceModemCdma *self,
+                                      gboolean cdma1x_supported,
+                                      gboolean evdo_supported,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (* run_registration_checks_finish) (MMIfaceModemCdma *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
+    /* The following steps will only be run if run_registration_checks() is NOT
+     * given by the object implementing the interface */
+
     /* Setup registration checks */
     void (* setup_registration_checks) (MMIfaceModemCdma *self,
                                         GAsyncReadyCallback callback,
@@ -124,7 +162,6 @@ struct _MMIfaceModemCdma {
                                                    gboolean *skip_at_cdma1x_serving_system_step,
                                                    gboolean *skip_detailed_registration_state,
                                                    GError **error);
-
     /* Get call manager state */
     void (* get_call_manager_state) (MMIfaceModemCdma *self,
                                      GAsyncReadyCallback callback,
@@ -134,7 +171,6 @@ struct _MMIfaceModemCdma {
                                                 guint *operating_mode,
                                                 guint *system_mode,
                                                 GError **error);
-
     /* Get HDR state */
     void (* get_hdr_state) (MMIfaceModemCdma *self,
                             GAsyncReadyCallback callback,
@@ -145,7 +181,6 @@ struct _MMIfaceModemCdma {
                                        guint8 *session_state,
                                        guint8 *almp_state,
                                        GError **error);
-
     /* Get service status */
     void (* get_service_status) (MMIfaceModemCdma *self,
                                  GAsyncReadyCallback callback,
@@ -154,7 +189,6 @@ struct _MMIfaceModemCdma {
                                             GAsyncResult *res,
                                             gboolean *has_cdma_service,
                                             GError **error);
-
     /* Get CDMA1x serving system */
     void (* get_cdma1x_serving_system) (MMIfaceModemCdma *self,
                                         GAsyncReadyCallback callback,
@@ -166,7 +200,6 @@ struct _MMIfaceModemCdma {
                                                    guint *sid,
                                                    guint *nid,
                                                    GError **error);
-
     /* Get detailed registration state */
     void (* get_detailed_registration_state) (MMIfaceModemCdma *self,
                                               MMModemCdmaRegistrationState cdma1x_state,
@@ -178,15 +211,6 @@ struct _MMIfaceModemCdma {
                                                          MMModemCdmaRegistrationState *detailed_cdma1x_state,
                                                          MMModemCdmaRegistrationState *detailed_evdo_state,
                                                          GError **error);
-
-    /* Try to register in the CDMA network */
-    void (* register_in_network) (MMIfaceModemCdma *self,
-                                  guint max_registration_time,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-    gboolean (*register_in_network_finish) (MMIfaceModemCdma *self,
-                                            GAsyncResult *res,
-                                            GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);

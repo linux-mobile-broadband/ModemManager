@@ -406,8 +406,8 @@ mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
 /*****************************************************************************/
 
-typedef struct _RunAllRegistrationChecksContext RunAllRegistrationChecksContext;
-static void registration_check_step (RunAllRegistrationChecksContext *ctx);
+typedef struct _RunRegistrationChecksContext RunRegistrationChecksContext;
+static void registration_check_step (RunRegistrationChecksContext *ctx);
 
 typedef enum {
     REGISTRATION_CHECK_STEP_FIRST,
@@ -425,7 +425,7 @@ typedef enum {
     REGISTRATION_CHECK_STEP_LAST,
 } RegistrationCheckStep;
 
-struct _RunAllRegistrationChecksContext {
+struct _RunRegistrationChecksContext {
     MMIfaceModemCdma *self;
     GSimpleAsyncResult *result;
     RegistrationCheckStep step;
@@ -454,7 +454,7 @@ struct _RunAllRegistrationChecksContext {
 };
 
 static void
-run_registration_checks_context_complete_and_free (RunAllRegistrationChecksContext *ctx)
+run_registration_checks_context_complete_and_free (RunRegistrationChecksContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -473,7 +473,7 @@ mm_iface_modem_cdma_run_registration_checks_finish (MMIfaceModemCdma *self,
 static void
 setup_registration_checks_ready (MMIfaceModemCdma *self,
                                  GAsyncResult *res,
-                                 RunAllRegistrationChecksContext *ctx)
+                                 RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
 
@@ -500,7 +500,7 @@ setup_registration_checks_ready (MMIfaceModemCdma *self,
 static void
 get_call_manager_state_ready (MMIfaceModemCdma *self,
                               GAsyncResult *res,
-                              RunAllRegistrationChecksContext *ctx)
+                              RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
 
@@ -533,7 +533,7 @@ get_call_manager_state_ready (MMIfaceModemCdma *self,
 static void
 get_hdr_state_ready (MMIfaceModemCdma *self,
                      GAsyncResult *res,
-                     RunAllRegistrationChecksContext *ctx)
+                     RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
 
@@ -558,7 +558,7 @@ get_hdr_state_ready (MMIfaceModemCdma *self,
 }
 
 static void
-parse_qcdm_results (RunAllRegistrationChecksContext *ctx)
+parse_qcdm_results (RunRegistrationChecksContext *ctx)
 {
     /* Set QCDM-obtained registration info */
     switch (ctx->call_manager_system_mode) {
@@ -594,7 +594,7 @@ parse_qcdm_results (RunAllRegistrationChecksContext *ctx)
 static void
 get_service_status_ready (MMIfaceModemCdma *self,
                           GAsyncResult *res,
-                          RunAllRegistrationChecksContext *ctx)
+                          RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
     gboolean has_service = FALSE;
@@ -623,7 +623,7 @@ get_service_status_ready (MMIfaceModemCdma *self,
 static void
 get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
                                  GAsyncResult *res,
-                                 RunAllRegistrationChecksContext *ctx)
+                                 RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
 
@@ -657,7 +657,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
 }
 
 static void
-parse_at_results (RunAllRegistrationChecksContext *ctx)
+parse_at_results (RunRegistrationChecksContext *ctx)
 {
     /* 99999 means unknown/no service */
     if (ctx->cdma1x_sid == MM_MODEM_CDMA_SID_UNKNOWN &&
@@ -678,7 +678,7 @@ parse_at_results (RunAllRegistrationChecksContext *ctx)
 static void
 get_detailed_registration_state_ready (MMIfaceModemCdma *self,
                                        GAsyncResult *res,
-                                       RunAllRegistrationChecksContext *ctx)
+                                       RunRegistrationChecksContext *ctx)
 {
     GError *error = NULL;
     MMModemCdmaRegistrationState detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -704,7 +704,7 @@ get_detailed_registration_state_ready (MMIfaceModemCdma *self,
 }
 
 static void
-registration_check_step (RunAllRegistrationChecksContext *ctx)
+registration_check_step (RunRegistrationChecksContext *ctx)
 {
     switch (ctx->step) {
     case REGISTRATION_CHECK_STEP_FIRST:
@@ -854,36 +854,84 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
     g_assert_not_reached ();
 }
 
+static void
+custom_run_registration_checks_ready (MMIfaceModemCdma *self,
+                                      GAsyncResult *res,
+                                      GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
 void
 mm_iface_modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data)
 {
-    RunAllRegistrationChecksContext *ctx;
+    GSimpleAsyncResult *result;
+    gboolean cdma1x_supported;
+    gboolean evdo_supported;
 
-    ctx = g_new0 (RunAllRegistrationChecksContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_cdma_run_registration_checks);
-    ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    ctx->call_manager_system_mode = QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE;
-    ctx->hdr_session_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED;
-    ctx->hdr_almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
-    ctx->hdr_hybrid_mode = 0;
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_cdma_run_registration_checks);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED, &ctx->evdo_supported,
-                  MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, &ctx->cdma1x_supported,
+                  MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,   &evdo_supported,
+                  MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, &cdma1x_supported,
                   NULL);
 
     mm_dbg ("Running registration checks (CDMA1x: '%s', EV-DO: '%s')",
-            ctx->cdma1x_supported ? "yes" : "no",
-            ctx->evdo_supported ? "yes" : "no");
+            cdma1x_supported ? "yes" : "no",
+            evdo_supported ? "yes" : "no");
 
-    registration_check_step (ctx);
+    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks &&
+        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks_finish) {
+        /* Plugins implementing full custom registration checks shouldn't implement
+         * sub-steps of the generic registration check sequence */
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state_finish != NULL);
+
+        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks (
+            self,
+            cdma1x_supported,
+            evdo_supported,
+            (GAsyncReadyCallback)custom_run_registration_checks_ready,
+            result);
+    } else {
+        RunRegistrationChecksContext *ctx;
+
+        ctx = g_new0 (RunRegistrationChecksContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->result = result;
+        ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        ctx->call_manager_system_mode = QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE;
+        ctx->hdr_session_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED;
+        ctx->hdr_almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
+        ctx->hdr_hybrid_mode = 0;
+        ctx->evdo_supported = evdo_supported;
+        ctx->cdma1x_supported = cdma1x_supported;
+
+        registration_check_step (ctx);
+    }
 }
 
 /*****************************************************************************/
