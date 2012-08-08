@@ -2,11 +2,16 @@ Overview of changes in ModemManager 0.5.4
 ------------------------------------------
 
 - Better handling of PPP auth methods
-- Support for PPP-based ZTE modems that use Icera chipsets
 - Stability fixes for Huawei modems
 - Ignore unsupported QMI ethernet ports
 - Better support for sending SMS messages on some modems
 - Use SMS PDU mode by default
+- Fix QCDM registration checking
+- ZTE: support more devices
+- ZTE: support for PPP-based devices that use Icera chipsets
+- ZTE: fix allowed mode response handling
+- ZTE: power modems down when disabled
+- Huawei: fix intermittent issue with newer devices not being recognized
 
 
 Overview of changes in ModemManager 0.5.2
