@@ -2823,6 +2823,17 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
     RegisterIn3gppNetworkContext *ctx;
     gchar *command = NULL;
+    GError *error = NULL;
+
+    /* Validate input MCC/MNC */
+    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, NULL, NULL, &error)) {
+        g_assert (error != NULL);
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
 
     /* (Try to) cancel previous registration request */
     if (broadband->priv->modem_3gpp_pending_registration_cancellable) {
