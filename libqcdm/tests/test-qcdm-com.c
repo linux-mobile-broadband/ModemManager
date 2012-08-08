@@ -887,6 +887,7 @@ test_com_status_snapshot (void *f, void *data)
     QcdmResult *result;
     gsize reply_len;
     guint8 n8;
+    guint32 n32;
 
     len = qcdm_cmd_status_snapshot_new (buf, sizeof (buf));
     g_assert (len == 4);
@@ -908,6 +909,10 @@ test_com_status_snapshot (void *f, void *data)
     g_assert (result);
 
     g_print ("\n");
+
+    n32 = 0;
+    qcdm_result_get_u32 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_HOME_MCC, &n32);
+    g_message ("%s: Home MCC: %d", __func__, n32);
 
     n8 = 0;
     qcdm_result_get_u8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS, &n8);

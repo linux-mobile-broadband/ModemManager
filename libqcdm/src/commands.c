@@ -507,11 +507,26 @@ snapshot_state_to_qcdm (u_int8_t cdma_state)
     return cdma_state + 1;
 }
 
+static inline u_int8_t
+digit_fixup (u_int8_t d)
+{
+    /* CDMA MCC/IMSI conversion adds 1 to each digit, and digits equal to
+     * 10 are really zero.
+     */
+    if (d + 1 < 10)
+        return d + 1;
+    return 0;
+}
+
 QcdmResult *
 qcdm_cmd_status_snapshot_result (const char *buf, size_t len, int *out_error)
 {
     QcdmResult *result = NULL;
     DMCmdStatusSnapshotRsp *rsp = (DMCmdStatusSnapshotRsp *) buf;
+    char *tmp;
+    u_int8_t swapped[4];
+    u_int8_t tmcc[3];
+    u_int16_t mcc, hmcc;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -519,6 +534,27 @@ qcdm_cmd_status_snapshot_result (const char *buf, size_t len, int *out_error)
         return NULL;
 
     result = qcdm_result_new ();
+
+    /* Convert the ESN from binary to a hex string; it's LE so we have to
+     * swap it to get the correct ordering.
+     */
+    swapped[0] = rsp->esn[3];
+    swapped[1] = rsp->esn[2];
+    swapped[2] = rsp->esn[1];
+    swapped[3] = rsp->esn[0];
+
+    tmp = bin2hexstr (&swapped[0], sizeof (swapped));
+    qcdm_result_add_string (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_ESN, tmp);
+    free (tmp);
+
+    /* Cheap binary -> decimal conversion */
+    hmcc = le16toh (rsp->mcc);
+    tmcc[2] = hmcc / 100;
+    tmcc[1] = (hmcc - (tmcc[2] * 100)) / 10;
+    tmcc[0] = (hmcc - (tmcc[2] * 100) - (tmcc[1] * 10));
+
+    mcc = (100 * digit_fixup (tmcc[2])) + (10 * digit_fixup (tmcc[1])) + digit_fixup (tmcc[0]);
+    qcdm_result_add_u32 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_HOME_MCC, mcc);
 
     qcdm_result_add_u8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS, cdma_band_class_to_qcdm (rsp->band_class));
     qcdm_result_add_u8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BASE_STATION_PREV, cdma_prev_to_qcdm (rsp->prev));
