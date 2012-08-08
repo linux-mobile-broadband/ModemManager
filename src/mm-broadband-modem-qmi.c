@@ -3854,8 +3854,8 @@ common_setup_cleanup_unsolicited_registration_events_finish (MMBroadbandModemQmi
 
 static void
 system_info_indication_cb (QmiClientNas *client,
-                           MMBroadbandModemQmi *self,
-                           QmiIndicationNasSystemInfoOutput *output)
+                           QmiIndicationNasSystemInfoOutput *output,
+                           MMBroadbandModemQmi *self)
 {
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
         common_process_system_info_3gpp (self, NULL, output);
@@ -3863,8 +3863,8 @@ system_info_indication_cb (QmiClientNas *client,
 
 static void
 serving_system_indication_cb (QmiClientNas *client,
-                              MMBroadbandModemQmi *self,
-                              QmiIndicationNasServingSystemOutput *output)
+                              QmiIndicationNasServingSystemOutput *output,
+                              MMBroadbandModemQmi *self)
 {
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
         common_process_serving_system_3gpp (self, NULL, output);
@@ -4378,8 +4378,8 @@ common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemQmi *self,
 
 static void
 event_report_indication_cb (QmiClientNas *client,
-                            MMBroadbandModemQmi *self,
-                            QmiIndicationNasEventReportOutput *output)
+                            QmiIndicationNasEventReportOutput *output,
+                            MMBroadbandModemQmi *self)
 {
     gint8 signal_strength;
     QmiNasRadioInterface signal_strength_radio_interface;
@@ -4405,8 +4405,8 @@ event_report_indication_cb (QmiClientNas *client,
 
 static void
 signal_info_indication_cb (QmiClientNas *client,
-                           MMBroadbandModemQmi *self,
-                           QmiIndicationNasSignalInfoOutput *output)
+                           QmiIndicationNasSignalInfoOutput *output,
+                           MMBroadbandModemQmi *self)
 {
     gint8 rssi_max = 0;
     gint8 rssi;
