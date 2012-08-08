@@ -1586,7 +1586,7 @@ cind_format_check_ready (MMBroadbandModem *self,
         !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
         /* unsupported indications */
         mm_dbg ("Marking indications as unsupported: '%s'", error->message);
-        g_free (error);
+        g_error_free (error);
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
         g_simple_async_result_complete (simple);
         g_object_unref (simple);
