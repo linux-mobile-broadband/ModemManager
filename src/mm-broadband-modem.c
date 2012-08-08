@@ -129,8 +129,6 @@ struct _MMBroadbandModemPrivate {
     gboolean modem_3gpp_ps_network_supported;
     /* Implementation helpers */
     GPtrArray *modem_3gpp_registration_regex;
-    gboolean modem_3gpp_manual_registration;
-    GCancellable *modem_3gpp_pending_registration_cancellable;
 
     /*<--- Modem 3GPP USSD interface --->*/
     /* Properties */
@@ -2655,252 +2653,44 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
-typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    GTimer *timer;
-    guint max_registration_time;
-} RegisterIn3gppNetworkContext;
-
-static void
-register_in_3gpp_network_context_complete_and_free (RegisterIn3gppNetworkContext *ctx)
-{
-    /* If our cancellable reference is still around, clear it */
-    if (ctx->self->priv->modem_3gpp_pending_registration_cancellable ==
-        ctx->cancellable) {
-        g_clear_object (&ctx->self->priv->modem_3gpp_pending_registration_cancellable);
-    }
-
-    if (ctx->timer)
-        g_timer_destroy (ctx->timer);
-
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-#undef REG_IS_IDLE
-#define REG_IS_IDLE(state)                                  \
-    (state != MM_MODEM_3GPP_REGISTRATION_STATE_HOME &&      \
-     state != MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING && \
-     state != MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-
-#undef REG_IS_DONE
-#define REG_IS_DONE(state)                                  \
-    (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||      \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING ||   \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
-
-static void run_3gpp_registration_checks_ready (MMBroadbandModem *self,
-                                                GAsyncResult *res,
-                                                RegisterIn3gppNetworkContext *ctx);
-
-static gboolean
-run_3gpp_registration_checks_again (RegisterIn3gppNetworkContext *ctx)
-{
-    /* Get fresh registration state */
-    mm_iface_modem_3gpp_run_registration_checks (
-        MM_IFACE_MODEM_3GPP (ctx->self),
-        (GAsyncReadyCallback)run_3gpp_registration_checks_ready,
-        ctx);
-    return FALSE;
-}
-
-static void
-run_3gpp_registration_checks_ready (MMBroadbandModem *self,
-                                    GAsyncResult *res,
-                                    RegisterIn3gppNetworkContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_iface_modem_3gpp_run_registration_checks_finish (MM_IFACE_MODEM_3GPP (self),
-                                                        res,
-                                                        &error);
-
-    if (error) {
-        mm_dbg ("3GPP registration check failed: '%s'", error->message);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        g_simple_async_result_take_error (ctx->result, error);
-        register_in_3gpp_network_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If we got registered, end registration checks */
-    if (REG_IS_DONE (self->priv->modem_3gpp_registration_state)) {
-        mm_dbg ("Modem is currently registered in a 3GPP network");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        register_in_3gpp_network_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Don't spend too much time waiting to get registered */
-    if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
-        mm_dbg ("3GPP registration check timed out");
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        g_simple_async_result_take_error (
-            ctx->result,
-            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
-        register_in_3gpp_network_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If we're still waiting for automatic registration to complete or
-     * fail, check again in a few seconds.
-     *
-     * This 3s timeout will catch results from automatic registrations as
-     * well.
-     */
-    mm_dbg ("Modem not yet registered in a 3GPP network... will recheck soon");
-    g_timeout_add_seconds (3,
-                           (GSourceFunc)run_3gpp_registration_checks_again,
-                           ctx);
-}
-
-static void
-register_in_3gpp_network_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                RegisterIn3gppNetworkContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
-
-    if (error) {
-        /* Propagate error in COPS, if any */
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                          MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                          0, 0);
-        g_simple_async_result_take_error (ctx->result, error);
-        register_in_3gpp_network_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Get fresh registration state */
-    ctx->timer = g_timer_new ();
-    mm_iface_modem_3gpp_run_registration_checks (
-        MM_IFACE_MODEM_3GPP (self),
-        (GAsyncReadyCallback)run_3gpp_registration_checks_ready,
-        ctx);
+    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
 }
 
 static void
 modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                 const gchar *operator_id,
-                                guint max_registration_time,
+                                GCancellable *cancellable,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
-    RegisterIn3gppNetworkContext *ctx;
-    gchar *command = NULL;
-    GError *error = NULL;
-
-    /* Validate input MCC/MNC */
-    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, NULL, NULL, &error)) {
-        g_assert (error != NULL);
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
-        return;
-    }
-
-    /* (Try to) cancel previous registration request */
-    if (broadband->priv->modem_3gpp_pending_registration_cancellable) {
-        g_cancellable_cancel (broadband->priv->modem_3gpp_pending_registration_cancellable);
-        g_clear_object (&broadband->priv->modem_3gpp_pending_registration_cancellable);
-    }
-
-    ctx = g_new0 (RegisterIn3gppNetworkContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->max_registration_time = max_registration_time;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_register_in_network);
-    ctx->cancellable = g_cancellable_new ();
-
-    /* Keep an accessible reference to the cancellable, so that we can cancel
-     * previous request when needed */
-    broadband->priv->modem_3gpp_pending_registration_cancellable =
-        g_object_ref (ctx->cancellable);
+    gchar *command;
 
     /* If the user sent a specific network to use, lock it in. */
-    if (operator_id && operator_id[0]) {
+    if (operator_id)
         command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
-        broadband->priv->modem_3gpp_manual_registration = TRUE;
-    }
     /* If no specific network was given, and the modem is not registered and not
      * searching, kick it to search for a network. Also do auto registration if
      * the modem had been set to manual registration last time but now is not.
      */
-    else if (REG_IS_IDLE (broadband->priv->modem_3gpp_registration_state) ||
-             broadband->priv->modem_3gpp_manual_registration) {
+    else
         /* Note that '+COPS=0,,' (same but with commas) won't work in some Nokia
          * phones */
         command = g_strdup ("+COPS=0");
-        broadband->priv->modem_3gpp_manual_registration = FALSE;
-    }
 
-    if (command) {
-        /* Don't setup an additional timeout to handle registration timeouts. We
-         * already do this with the 120s timeout in the AT command: if that times
-         * out, we can consider the registration itself timed out.
-         *
-         * NOTE that we provide our own Cancellable here; we want to be able to
-         * cancel the operation at any time. */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                       command,
-                                       120,
-                                       FALSE,
-                                       FALSE, /* raw */
-                                       ctx->cancellable,
-                                       (GAsyncReadyCallback)register_in_3gpp_network_ready,
-                                       ctx);
-        g_free (command);
-        return;
-    }
-
-    /* Just rely on the unsolicited registration and periodic registration checks */
-    mm_dbg ("Not launching any new network selection request");
-
-    /* Get fresh registration state */
-    ctx->timer = g_timer_new ();
-    mm_iface_modem_3gpp_run_registration_checks (
-        MM_IFACE_MODEM_3GPP (self),
-        (GAsyncReadyCallback)run_3gpp_registration_checks_ready,
-        ctx);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                                   command,
+                                   120,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   cancellable,
+                                   callback,
+                                   user_data);
 }
 
 /*****************************************************************************/

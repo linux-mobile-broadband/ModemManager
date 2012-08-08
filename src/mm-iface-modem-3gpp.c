@@ -24,6 +24,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 #include "mm-log.h"
 
 #define REGISTRATION_CHECK_TIMEOUT_SEC 30
@@ -65,6 +66,128 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMModem3gppRegistrationState cs;
+    MMModem3gppRegistrationState ps;
+    gboolean manual_registration;
+    GCancellable *pending_registration_cancellable;
+} RegistrationStateContext;
+
+static void
+registration_state_context_free (RegistrationStateContext *ctx)
+{
+    if (ctx->pending_registration_cancellable) {
+        g_cancellable_cancel (ctx->pending_registration_cancellable);
+        g_object_unref (ctx->pending_registration_cancellable);
+    }
+    g_slice_free (RegistrationStateContext, ctx);
+}
+
+static RegistrationStateContext *
+get_registration_state_context (MMIfaceModem3gpp *self)
+{
+    RegistrationStateContext *ctx;
+
+    if (G_UNLIKELY (!registration_state_context_quark))
+        registration_state_context_quark =  (g_quark_from_static_string (
+                                                 REGISTRATION_STATE_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), registration_state_context_quark);
+    if (!ctx) {
+        /* Create context and keep it as object data */
+        ctx = g_slice_new0 (RegistrationStateContext);
+        ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
+        g_object_set_qdata_full (
+            G_OBJECT (self),
+            registration_state_context_quark,
+            ctx,
+            (GDestroyNotify)registration_state_context_free);
+    }
+
+    return ctx;
+}
+
+static MMModem3gppRegistrationState
+get_consolidated_reg_state (RegistrationStateContext *ctx)
+{
+    /* Some devices (Blackberries for example) will respond to +CGREG, but
+     * return ERROR for +CREG, probably because their firmware is just stupid.
+     * So here we prefer the +CREG response, but if we never got a successful
+     * +CREG response, we'll take +CGREG instead.
+     */
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return ctx->cs;
+
+    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return ctx->ps;
+
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->cs;
+
+    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->ps;
+
+    return ctx->cs;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MMIfaceModem3gpp *self;
+    MmGdbusModem3gpp *skeleton;
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar *operator_id;
+    GTimer *timer;
+    guint max_registration_time;
+} RegisterInNetworkContext;
+
+static void
+register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+
+    if (ctx->timer)
+        g_timer_destroy (ctx->timer);
+
+    if (ctx->cancellable) {
+        RegistrationStateContext *registration_state_context;
+
+        /* Clear our cancellable if still around */
+        registration_state_context = get_registration_state_context (ctx->self);
+        if (registration_state_context->pending_registration_cancellable == ctx->cancellable)
+            g_clear_object (&registration_state_context->pending_registration_cancellable);
+
+        g_object_unref (ctx->cancellable);
+    }
+
+    g_free (ctx->operator_id);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->self);
+    g_slice_free (RegisterInNetworkContext, ctx);
+}
+
+static void
+register_in_network_context_failed (RegisterInNetworkContext *ctx,
+                                    GError *error)
+{
+    mm_iface_modem_3gpp_update_cs_registration_state (ctx->self,
+                                                      MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
+                                                      MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                      0, 0);
+    mm_iface_modem_3gpp_update_ps_registration_state (ctx->self,
+                                                      MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
+                                                      MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                      0, 0);
+
+    g_simple_async_result_take_error (ctx->result, error);
+}
+
 gboolean
 mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                                 GAsyncResult *res,
@@ -73,19 +196,101 @@ mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static void run_registration_checks_ready (MMIfaceModem3gpp *self,
+                                           GAsyncResult *res,
+                                           RegisterInNetworkContext *ctx);
+
+static gboolean
+run_registration_checks_again (RegisterInNetworkContext *ctx)
+{
+    /* Get fresh registration state */
+    mm_iface_modem_3gpp_run_registration_checks (
+        ctx->self,
+        (GAsyncReadyCallback)run_registration_checks_ready,
+        ctx);
+    return FALSE;
+}
+
+static void
+run_registration_checks_ready (MMIfaceModem3gpp *self,
+                               GAsyncResult *res,
+                               RegisterInNetworkContext *ctx)
+{
+    GError *error = NULL;
+    RegistrationStateContext *registration_state_context;
+    MMModem3gppRegistrationState current_registration_state;
+
+    mm_iface_modem_3gpp_run_registration_checks_finish (MM_IFACE_MODEM_3GPP (self), res, &error);
+    if (error) {
+        mm_dbg ("3GPP registration check failed: '%s'", error->message);
+        register_in_network_context_failed (ctx, error);
+        register_in_network_context_complete_and_free (ctx);
+        return;
+    }
+
+    registration_state_context = get_registration_state_context (ctx->self);
+    current_registration_state = get_consolidated_reg_state (registration_state_context);
+
+    /* If we got a final state and it's denied, we can assume the registration is
+     * finished */
+    if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) {
+        mm_dbg ("Registration denied");
+        register_in_network_context_failed (
+            ctx,
+            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED));
+        register_in_network_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* If we got registered, end registration checks */
+    if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        mm_dbg ("Modem is currently registered in a 3GPP network");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        register_in_network_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Don't spend too much time waiting to get registered */
+    if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
+        mm_dbg ("3GPP registration check timed out");
+        register_in_network_context_failed (
+            ctx,
+            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
+        register_in_network_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* If we're still waiting for automatic registration to complete or
+     * fail, check again in a few seconds.
+     *
+     * This 3s timeout will catch results from automatic registrations as
+     * well.
+     */
+    mm_dbg ("Modem not yet registered in a 3GPP network... will recheck soon");
+    g_timeout_add_seconds (3, (GSourceFunc)run_registration_checks_again, ctx);
+}
+
 static void
 register_in_network_ready (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
-                           GSimpleAsyncResult *simple)
+                           RegisterInNetworkContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res, &error)) {
+        /* Propagate error when trying to lock to network */
+        register_in_network_context_failed (ctx, error);
+        register_in_network_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Now try to gather current registration status until we're registered or
+     * the time goes off */
+    mm_iface_modem_3gpp_run_registration_checks (
+        self,
+        (GAsyncReadyCallback)run_registration_checks_ready,
+        ctx);
 }
 
 void
@@ -95,38 +300,93 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-    MmGdbusModem3gpp *skeleton;
+    RegisterInNetworkContext *ctx;
     const gchar *current_operator_code;
+    RegistrationStateContext *registration_state_context;
+    GError *error = NULL;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_3gpp_register_in_network);
-
-    /* If no operator ID given, or if we're already registered with the requested one,
-     * then we're done */
+    ctx = g_slice_new0 (RegisterInNetworkContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_3gpp_register_in_network);
+    ctx->operator_id = (operator_id && operator_id[0]) ? g_strdup (operator_id) : NULL;
+    ctx->max_registration_time = max_registration_time;
     g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
-    current_operator_code = mm_gdbus_modem3gpp_get_operator_code (skeleton);
-    if (current_operator_code &&
-        (!operator_id || g_str_equal (current_operator_code, operator_id))) {
-        /* Already registered, no need to request it again */
-        mm_dbg ("Already registered in network '%s'...", current_operator_code);
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-    } else {
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
-            self,
-            operator_id,
-            max_registration_time,
-            (GAsyncReadyCallback)register_in_network_ready,
-            result);
+
+    /* Validate input MCC/MNC */
+    if (ctx->operator_id && !mm_3gpp_parse_operator_id (ctx->operator_id, NULL, NULL, &error)) {
+        g_assert (error != NULL);
+        g_simple_async_result_take_error (ctx->result, error);
+        register_in_network_context_complete_and_free (ctx);
+        return;
     }
 
-    g_object_unref (skeleton);
+    /* Get registration state context */
+    registration_state_context = get_registration_state_context (self);
+
+    /* (Try to) cancel previous registration request */
+    if (registration_state_context->pending_registration_cancellable) {
+        g_cancellable_cancel (registration_state_context->pending_registration_cancellable);
+        g_clear_object (&registration_state_context->pending_registration_cancellable);
+    }
+
+    current_operator_code = mm_gdbus_modem3gpp_get_operator_code (ctx->skeleton);
+
+    /* Manual registration requested? */
+    if (ctx->operator_id) {
+        /* If already registered with the requested operator, we're done */
+        if (current_operator_code &&
+            g_str_equal (current_operator_code, ctx->operator_id)) {
+            registration_state_context->manual_registration = TRUE;
+            mm_dbg ("Already registered in selected network '%s'...",
+                    current_operator_code);
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            register_in_network_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Manual registration to a new operator required */
+        mm_dbg ("Launching manual network registration (%s)...",
+                ctx->operator_id);
+        registration_state_context->manual_registration = TRUE;
+    }
+    /* Automatic registration requested? */
+    else {
+        /* If the modem is already registered and the last time it was asked
+         * automatic registration, we're done */
+        if (current_operator_code &&
+            !registration_state_context->manual_registration) {
+            mm_dbg ("Already registered in network '%s',"
+                    " automatic registration not launched...",
+                    current_operator_code);
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            register_in_network_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Automatic registration to a new operator requested */
+        mm_dbg ("Launching automatic network registration...");
+        registration_state_context->manual_registration = FALSE;
+    }
+
+    ctx->cancellable = g_cancellable_new ();
+
+    /* Keep an accessible reference to the cancellable, so that we can cancel
+     * previous request when needed */
+    registration_state_context->pending_registration_cancellable =
+        g_object_ref (ctx->cancellable);
+
+    ctx->timer = g_timer_new ();
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+        self,
+        ctx->operator_id,
+        ctx->cancellable,
+        (GAsyncReadyCallback)register_in_network_ready,
+        ctx);
 }
 
 typedef struct {
@@ -436,8 +696,8 @@ handle_scan (MmGdbusModem3gpp *skeleton,
 
 gboolean
 mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
-                                                        GAsyncResult *res,
-                                                        GError **error)
+                                                    GAsyncResult *res,
+                                                    GError **error)
 {
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks_finish != NULL);
     return MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks_finish (self, res, error);
@@ -663,62 +923,6 @@ update_registration_state (MMIfaceModem3gpp *self,
     }
 
     g_object_unref (skeleton);
-}
-
-typedef struct {
-    MMModem3gppRegistrationState cs;
-    MMModem3gppRegistrationState ps;
-} RegistrationStateContext;
-
-static RegistrationStateContext *
-get_registration_state_context (MMIfaceModem3gpp *self)
-{
-    RegistrationStateContext *ctx;
-
-    if (G_UNLIKELY (!registration_state_context_quark))
-        registration_state_context_quark =  (g_quark_from_static_string (
-                                                 REGISTRATION_STATE_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), registration_state_context_quark);
-    if (!ctx) {
-        /* Create context and keep it as object data */
-        ctx = g_new0 (RegistrationStateContext, 1);
-        ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-        ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-
-        g_object_set_qdata_full (
-            G_OBJECT (self),
-            registration_state_context_quark,
-            ctx,
-            (GDestroyNotify)g_free);
-    }
-
-    return ctx;
-}
-
-static MMModem3gppRegistrationState
-get_consolidated_reg_state (RegistrationStateContext *ctx)
-{
-    /* Some devices (Blackberries for example) will respond to +CGREG, but
-     * return ERROR for +CREG, probably because their firmware is just stupid.
-     * So here we prefer the +CREG response, but if we never got a successful
-     * +CREG response, we'll take +CGREG instead.
-     */
-    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-        return ctx->cs;
-
-    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-        return ctx->ps;
-
-    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
-        return ctx->cs;
-
-    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
-        return ctx->ps;
-
-    return ctx->cs;
 }
 
 void
