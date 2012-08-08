@@ -1047,6 +1047,31 @@ finalize (GObject *object)
 }
 
 static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        /* Use AT+CFUN=4 for power down. */
+        g_value_set_string (value, "+CFUN=4");
+        break;
+    default:
+        break;
+    }
+}
+
+static void
 mm_modem_mbm_class_init (MMModemMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -1057,6 +1082,12 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
 
     /* Virtual methods */
     object_class->finalize = finalize;
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
 
     gsm_class->port_grabbed = port_grabbed;
     gsm_class->ports_organized = ports_organized;
