@@ -2741,8 +2741,16 @@ initiate_network_register_ready (QmiClientNas *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_nas_initiate_network_register_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't initiate network register: ");
-        g_simple_async_result_take_error (simple, error);
+        /* NOFX is not an error, they actually play pretty well */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_error_free (error);
+            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        } else {
+            g_prefix_error (&error, "Couldn't initiate network register: ");
+            g_simple_async_result_take_error (simple, error);
+        }
     } else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
 
