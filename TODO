@@ -163,3 +163,6 @@ example to update the signal quality value or check registration status.
 
   ** QMI: For the operator ID provisioned in the SIM, should we be using "Get
      Home Network"?
+
+  ** QMI: mark the modem as invalid if we lose the QMI and/or WWAN ports. For
+     example, we should handle 'sudo rmmod qmi_wwan && sudo modprobe qmi_wwan'
