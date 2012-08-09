@@ -4134,6 +4134,8 @@ serving_system_indication_cb (QmiClientNas *client,
 {
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
         common_process_serving_system_3gpp (self, NULL, output);
+    else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
+        common_process_serving_system_cdma (self, NULL, output);
 }
 
 static void
