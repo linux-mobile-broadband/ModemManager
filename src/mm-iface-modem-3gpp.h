@@ -211,19 +211,19 @@ gboolean mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
 /* Shutdown Modem 3GPP interface */
 void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
-/* Objects implementing this interface can report new registration states.
+/* Objects implementing this interface can report new registration states,
+ * access technologies and location.
  * This may happen when handling unsolicited registration messages, or when
  * the interface asks to run registration state checks. */
 void mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
-                                                       MMModem3gppRegistrationState state,
-                                                       MMModemAccessTechnology access_tech,
-                                                       gulong location_area_code,
-                                                       gulong cell_id);
+                                                       MMModem3gppRegistrationState state);
 void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
-                                                       MMModem3gppRegistrationState state,
-                                                       MMModemAccessTechnology access_tech,
-                                                       gulong location_area_code,
-                                                       gulong cell_id);
+                                                       MMModem3gppRegistrationState state);
+void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
+                                                     MMModemAccessTechnology access_tech);
+void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,
+                                                     gulong location_area_code,
+                                                     gulong cell_id);
 
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,

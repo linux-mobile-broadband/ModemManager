@@ -176,14 +176,10 @@ static void
 register_in_network_context_failed (RegisterInNetworkContext *ctx,
                                     GError *error)
 {
-    mm_iface_modem_3gpp_update_cs_registration_state (ctx->self,
-                                                      MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                      MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                      0, 0);
-    mm_iface_modem_3gpp_update_ps_registration_state (ctx->self,
-                                                      MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                      MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                      0, 0);
+    mm_iface_modem_3gpp_update_cs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_ps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+    mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
 
     g_simple_async_result_take_error (ctx->result, error);
 }
@@ -852,12 +848,61 @@ mm_iface_modem_3gpp_reload_current_operator (MMIfaceModem3gpp *self)
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
+                                                MMModemAccessTechnology access_tech)
+{
+    MMModem3gppRegistrationState state;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
+                  NULL);
+
+    /* Even if registration state didn't change, report access technology,
+     * but only if something valid to report */
+    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       access_tech,
+                                                       MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    } else
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                   MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+}
+
+void
+mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
+                                     gulong location_area_code,
+                                     gulong cell_id)
+{
+    MMModem3gppRegistrationState state;
+
+    if (!MM_IS_IFACE_MODEM_LOCATION (self))
+        return;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
+                  NULL);
+
+    /* Even if registration state didn't change, report access technology or
+     * location updates, but only if something valid to report */
+    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        if (location_area_code > 0 && cell_id > 0)
+            mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
+                                                        location_area_code,
+                                                        cell_id);
+    } else
+        mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
+}
+
+/*****************************************************************************/
+
 static void
 update_registration_state (MMIfaceModem3gpp *self,
-                           MMModem3gppRegistrationState new_state,
-                           MMModemAccessTechnology access_tech,
-                           gulong location_area_code,
-                           gulong cell_id)
+                           MMModem3gppRegistrationState new_state)
 {
     MMModem3gppRegistrationState old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     MmGdbusModem3gpp *skeleton = NULL;
@@ -905,37 +950,12 @@ update_registration_state (MMIfaceModem3gpp *self,
         }
     }
 
-    /* Even if registration state didn't change, report access technology or
-     * location updates, but only if something valid to report */
-    if (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       access_tech,
-                                                       MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
-        if (MM_IS_IFACE_MODEM_LOCATION (self) &&
-            location_area_code > 0 &&
-            cell_id > 0)
-            mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
-                                                        location_area_code,
-                                                        cell_id);
-    } else {
-        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                   MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
-        if (MM_IS_IFACE_MODEM_LOCATION (self))
-            mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
-    }
-
     g_object_unref (skeleton);
 }
 
 void
 mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
-                                                  MMModem3gppRegistrationState state,
-                                                  MMModemAccessTechnology access_tech,
-                                                  gulong location_area_code,
-                                                  gulong cell_id)
+                                                  MMModem3gppRegistrationState state)
 {
     RegistrationStateContext *ctx;
     gboolean supported = FALSE;
@@ -949,19 +969,12 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->cs = state;
-    update_registration_state (self,
-                               get_consolidated_reg_state (ctx),
-                               access_tech,
-                               location_area_code,
-                               cell_id);
+    update_registration_state (self, get_consolidated_reg_state (ctx));
 }
 
 void
 mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
-                                                  MMModem3gppRegistrationState state,
-                                                  MMModemAccessTechnology access_tech,
-                                                  gulong location_area_code,
-                                                  gulong cell_id)
+                                                  MMModem3gppRegistrationState state)
 {
     RegistrationStateContext *ctx;
     gboolean supported = FALSE;
@@ -975,11 +988,7 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->ps = state;
-    update_registration_state (self,
-                               get_consolidated_reg_state (ctx),
-                               access_tech,
-                               location_area_code,
-                               cell_id);
+    update_registration_state (self, get_consolidated_reg_state (ctx));
 }
 
 /*****************************************************************************/
@@ -1239,11 +1248,9 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_REGISTRATION_STATE:
-        update_registration_state (ctx->self,
-                                   MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
-                                   0, /* access tech */
-                                   0, /* lac */
-                                   0); /* cid */
+        update_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
         /* Fall down to next step */
         ctx->step++;
 

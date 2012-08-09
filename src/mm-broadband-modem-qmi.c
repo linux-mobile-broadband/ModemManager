@@ -2942,14 +2942,10 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         self->priv->current_operator_id = NULL;
         g_free (self->priv->current_operator_description);
         self->priv->current_operator_description = NULL;
-        mm_iface_modem_3gpp_update_cs_registration_state (
-            MM_IFACE_MODEM_3GPP (self),
-            MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
-            0, 0, 0);
-        mm_iface_modem_3gpp_update_ps_registration_state (
-            MM_IFACE_MODEM_3GPP (self),
-            MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
-            0, 0, 0);
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0);
         return;
     }
 
@@ -3046,20 +3042,10 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     }
 
     /* Report new registration states */
-
-    mm_iface_modem_3gpp_update_cs_registration_state (
-        MM_IFACE_MODEM_3GPP (self),
-        mm_cs_registration_state,
-        mm_access_technologies,
-        lac,
-        cid);
-
-    mm_iface_modem_3gpp_update_ps_registration_state (
-        MM_IFACE_MODEM_3GPP (self),
-        mm_ps_registration_state,
-        mm_access_technologies,
-        lac,
-        cid);
+    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state);
+    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), mm_access_technologies);
+    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
 }
 
 static void
@@ -3572,19 +3558,10 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     }
 
     /* Report new registration states */
-    mm_iface_modem_3gpp_update_cs_registration_state (
-        MM_IFACE_MODEM_3GPP (self),
-        cs_registration_state,
-        access_technologies,
-        lac,
-        cid);
-
-    mm_iface_modem_3gpp_update_ps_registration_state (
-        MM_IFACE_MODEM_3GPP (self),
-        ps_registration_state,
-        access_technologies,
-        lac,
-        cid);
+    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), cs_registration_state);
+    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), access_technologies);
+    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
 }
 
 static void
