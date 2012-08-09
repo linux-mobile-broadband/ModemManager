@@ -3883,6 +3883,230 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Registration checks (CDMA interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientNas *client;
+    GSimpleAsyncResult *result;
+} RunCdmaRegistrationChecksContext;
+
+static void
+run_cdma_registration_checks_context_complete_and_free (RunCdmaRegistrationChecksContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (RunCdmaRegistrationChecksContext, ctx);
+}
+
+static gboolean
+modem_cdma_run_registration_checks_finish (MMIfaceModemCdma *self,
+                                           GAsyncResult *res,
+                                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static MMModemCdmaRegistrationState
+qmi_registration_state_to_cdma_registration_state (QmiNasRegistrationState registration_state)
+{
+    switch (registration_state) {
+    case QMI_NAS_REGISTRATION_STATE_REGISTERED:
+        return MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+    case QMI_NAS_REGISTRATION_STATE_NOT_REGISTERED:
+    case QMI_NAS_REGISTRATION_STATE_NOT_REGISTERED_SEARCHING:
+    case QMI_NAS_REGISTRATION_STATE_REGISTRATION_DENIED:
+    case QMI_NAS_REGISTRATION_STATE_UNKNOWN:
+    default:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    }
+}
+
+static void
+common_process_serving_system_cdma (MMBroadbandModemQmi *self,
+                                    QmiMessageNasGetServingSystemOutput *response_output,
+                                    QmiIndicationNasServingSystemOutput *indication_output)
+{
+    QmiNasRegistrationState registration_state;
+    QmiNasNetworkType selected_network;
+    GArray *radio_interfaces;
+    GArray *data_service_capabilities;
+    QmiNasServiceStatus hdr_status;
+    gboolean hdr_hybrid;
+    MMModemAccessTechnology mm_access_technologies;
+    MMModemCdmaRegistrationState mm_cdma1x_registration_state;
+    MMModemCdmaRegistrationState mm_evdo_registration_state;
+    guint16 sid;
+    guint16 nid;
+
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_serving_system (
+            response_output,
+            &registration_state,
+            NULL, /* cs_attach_state */
+            NULL, /* ps_attach_state */
+            &selected_network,
+            &radio_interfaces,
+            NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_serving_system (
+            indication_output,
+            &registration_state,
+            NULL, /* cs_attach_state */
+            NULL, /* ps_attach_state */
+            &selected_network,
+            &radio_interfaces,
+            NULL);
+
+    /* Only process 3GPP2 info */
+    if (selected_network != QMI_NAS_NETWORK_TYPE_3GPP2) {
+        mm_iface_modem_cdma_update_cdma1x_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                              0, 0);
+        mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
+                                                        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        return;
+    }
+
+    /* Get SID/NID */
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_cdma_system_id (response_output, &sid, &nid, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_cdma_system_id (indication_output, &sid, &nid, NULL);
+
+    /* Build access technologies mask */
+    data_service_capabilities = NULL;
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_data_service_capability (response_output,
+                                                                               &data_service_capabilities,
+                                                                               NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_data_service_capability (indication_output,
+                                                                              &data_service_capabilities,
+                                                                              NULL);
+    if (data_service_capabilities)
+        mm_access_technologies =
+            qmi_data_capability_list_to_access_technologies (data_service_capabilities);
+    else
+        mm_access_technologies =
+            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
+
+    /* TODO: Roaming flags */
+
+    /* Build registration states */
+    mm_cdma1x_registration_state = qmi_registration_state_to_cdma_registration_state (registration_state);
+
+    hdr_status = QMI_NAS_SERVICE_STATUS_NONE;
+    hdr_hybrid = FALSE;
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_detailed_service_status (
+            response_output,
+            NULL, /* status */
+            NULL, /* capability */
+            &hdr_status,
+            &hdr_hybrid,
+            NULL, /* forbidden */
+            NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_detailed_service_status (
+            indication_output,
+            NULL, /* status */
+            NULL, /* capability */
+            &hdr_status,
+            &hdr_hybrid,
+            NULL, /* forbidden */
+            NULL);
+
+    if (hdr_hybrid &&
+        (hdr_status == QMI_NAS_SERVICE_STATUS_LIMITED ||
+         hdr_status == QMI_NAS_SERVICE_STATUS_AVAILABLE ||
+         hdr_status == QMI_NAS_SERVICE_STATUS_LIMITED_REGIONAL ||
+         hdr_status == QMI_NAS_SERVICE_STATUS_POWER_SAVE))
+        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+    else
+        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    /* Report new registration states */
+    mm_iface_modem_cdma_update_cdma1x_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                          mm_cdma1x_registration_state,
+                                                          sid,
+                                                          nid);
+    mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                        mm_evdo_registration_state);
+    mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
+                                                    mm_access_technologies);
+}
+
+static void
+get_serving_system_cdma_ready (QmiClientNas *client,
+                               GAsyncResult *res,
+                               RunCdmaRegistrationChecksContext *ctx)
+{
+    QmiMessageNasGetServingSystemOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_serving_system_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        run_cdma_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_nas_get_serving_system_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get serving system: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_nas_get_serving_system_output_unref (output);
+        run_cdma_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    common_process_serving_system_cdma (ctx->self, output, NULL);
+
+    qmi_message_nas_get_serving_system_output_unref (output);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    run_cdma_registration_checks_context_complete_and_free (ctx);
+}
+
+static void
+modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
+                                    gboolean cdma1x_supported,
+                                    gboolean evdo_supported,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+    RunCdmaRegistrationChecksContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    /* Setup context */
+    ctx = g_slice_new0 (RunCdmaRegistrationChecksContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_cdma_run_registration_checks);
+
+    /* TODO: Run Get System Info in NAS >= 1.8 */
+
+    qmi_client_nas_get_serving_system (ctx->client,
+                                       NULL,
+                                       10,
+                                       NULL,
+                                       (GAsyncReadyCallback)get_serving_system_cdma_ready,
+                                       ctx);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited registration event handlers
  * (3GPP and CDMA interface) */
 
@@ -4935,7 +5159,7 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->load_esn = modem_cdma_load_esn;
     iface->load_esn_finish = modem_cdma_load_esn_finish;
 
-    /* Enabling steps */
+    /* Enabling/Disabling steps */
     iface->setup_unsolicited_events = modem_cdma_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_cdma_cleanup_unsolicited_events;
@@ -4944,6 +5168,10 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->enable_unsolicited_events_finish = modem_cdma_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_cdma_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_cdma_enable_disable_unsolicited_events_finish;
+
+    /* Other actions */
+    iface->run_registration_checks = modem_cdma_run_registration_checks;
+    iface->run_registration_checks_finish = modem_cdma_run_registration_checks_finish;
 }
 
 static void
