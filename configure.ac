@@ -170,6 +170,21 @@ case $with_tests in
         ;;
 esac
 
+dnl
+dnl Newest QMI commands
+dnl
+AC_ARG_WITH(newest_qmi_commands, AS_HELP_STRING([--with-newest-qmi-commands], [Try to avoid deprecated QMI commands]))
+AM_CONDITIONAL(WITH_NEWEST_QMI_COMMANDS, test "x$with_newest_qmi_commands" = "xyes")
+case $with_newest_qmi_commands in
+    yes)
+        AC_DEFINE(WITH_NEWEST_QMI_COMMANDS, 1, [Define if we enable new QMI commands support])
+        with_newest_qmi_commands=yes
+        ;;
+    *)
+        with_newest_qmi_commands=no
+        ;;
+esac
+
 NM_COMPILER_WARNINGS
 
 
@@ -233,4 +248,5 @@ echo "
     PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}
     Documentation:           ${with_docs}
+    Newest QMI commands:     ${with_newest_qmi_commands}
 "

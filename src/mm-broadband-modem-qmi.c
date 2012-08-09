@@ -49,13 +49,17 @@ struct _MMBroadbandModemQmiPrivate {
     gchar *esn;
 
     /* Allowed mode related */
+#if defined WITH_NEWEST_QMI_COMMANDS
     gboolean has_mode_preference_in_system_selection_preference;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
     gboolean unsolicited_events_enabled;
     gboolean unsolicited_events_setup;
     guint event_report_indication_id;
+#if defined WITH_NEWEST_QMI_COMMANDS
     guint signal_info_indication_id;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     /* 3GPP/CDMA registration helpers */
     gchar *current_operator_id;
@@ -63,7 +67,9 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean unsolicited_registration_events_enabled;
     gboolean unsolicited_registration_events_setup;
     guint serving_system_indication_id;
+#if defined WITH_NEWEST_QMI_COMMANDS
     guint system_info_indication_id;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 };
 
 /*****************************************************************************/
@@ -1243,6 +1249,8 @@ load_signal_quality_finish (MMIfaceModem *self,
                                  G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static gint8
 signal_info_get_quality (MMBroadbandModemQmi *self,
                          QmiMessageNasGetSignalInfoOutput *output)
@@ -1319,6 +1327,8 @@ get_signal_info_ready (QmiClientNas *client,
     qmi_message_nas_get_signal_info_output_unref (output);
     load_signal_quality_context_complete_and_free (ctx);
 }
+
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 static gint8
 signal_strength_get_quality (MMBroadbandModemQmi *self,
@@ -1419,21 +1429,25 @@ load_signal_quality (MMIfaceModem *self,
 
     mm_dbg ("loading signal quality...");
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
-    if (qmi_client_check_version (ctx->client, 1, 8))
+    if (qmi_client_check_version (ctx->client, 1, 8)) {
         qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (ctx->client),
                                         NULL,
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)get_signal_info_ready,
                                         ctx);
-    else
-        qmi_client_nas_get_signal_strength (QMI_CLIENT_NAS (ctx->client),
-                                            NULL,
-                                            10,
-                                            NULL,
-                                            (GAsyncReadyCallback)get_signal_strength_ready,
-                                            ctx);
+        return;
+    }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
+    qmi_client_nas_get_signal_strength (QMI_CLIENT_NAS (ctx->client),
+                                        NULL,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback)get_signal_strength_ready,
+                                        ctx);
 }
 
 /*****************************************************************************/
@@ -1654,7 +1668,9 @@ typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientNas *client;
     GSimpleAsyncResult *result;
+#if defined WITH_NEWEST_QMI_COMMANDS
     gboolean run_get_system_selection_preference;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
     gboolean run_get_technology_preference;
 } LoadAllowedModesContext;
 
@@ -1776,6 +1792,8 @@ get_technology_preference_ready (QmiClientNas *client,
     load_allowed_modes_context_complete_and_free (ctx);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static MMModemMode
 modem_mode_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
 {
@@ -1891,9 +1909,12 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
     load_allowed_modes_context_complete_and_free (ctx);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static void
 load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
 {
+#if defined WITH_NEWEST_QMI_COMMANDS
     if (ctx->run_get_system_selection_preference) {
         qmi_client_nas_get_system_selection_preference (
             ctx->client,
@@ -1904,6 +1925,7 @@ load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
             ctx);
         return;
     }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     if (ctx->run_get_technology_preference) {
         qmi_client_nas_get_technology_preference (
@@ -1945,12 +1967,15 @@ load_allowed_modes (MMIfaceModem *self,
                                              user_data,
                                              load_allowed_modes);
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* System selection preference introduced in NAS 1.1
      * TODO: Not sure when the System Selection Preference got the
      * 'Mode Preference' TLV, so we'll need to handle the fallback. */
     ctx->run_get_system_selection_preference =
         (qmi_client_check_version (client, 1, 1) &&
          ctx->self->priv->has_mode_preference_in_system_selection_preference);
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
     /* Technology preference introduced in NAS 1.7 */
     ctx->run_get_technology_preference = qmi_client_check_version (client, 1, 7);
 
@@ -1966,7 +1991,9 @@ typedef struct {
     GSimpleAsyncResult *result;
     MMModemMode allowed;
     MMModemMode preferred;
+#if defined WITH_NEWEST_QMI_COMMANDS
     gboolean run_set_system_selection_preference;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
     gboolean run_set_technology_preference;
 } SetAllowedModesContext;
 
@@ -2017,6 +2044,8 @@ set_technology_preference_ready (QmiClientNas *client,
     set_allowed_modes_context_step (ctx);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static void
 allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
@@ -2050,6 +2079,8 @@ allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
     set_allowed_modes_context_step (ctx);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static QmiNasRatModePreference
 modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
                                                gboolean is_cdma)
@@ -2075,6 +2106,8 @@ modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
 
     return pref;
 }
+
+#if defined WITH_NEWEST_QMI_COMMANDS
 
 static QmiNasRatModePreference
 modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
@@ -2129,9 +2162,12 @@ modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
     return MM_MODEM_MODE_NONE;
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static void
 set_allowed_modes_context_step (SetAllowedModesContext *ctx)
 {
+#if defined WITH_NEWEST_QMI_COMMANDS
     if (ctx->run_set_system_selection_preference) {
         QmiMessageNasSetSystemSelectionPreferenceInput *input;
         QmiNasRatModePreference pref;
@@ -2175,6 +2211,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
         qmi_message_nas_set_system_selection_preference_input_unref (input);
         return;
     }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     if (ctx->run_set_technology_preference) {
         QmiMessageNasSetTechnologyPreferenceInput *input;
@@ -2251,12 +2288,16 @@ set_allowed_modes (MMIfaceModem *self,
                                              set_allowed_modes);
     ctx->allowed = allowed;
     ctx->preferred = preferred;
+
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* System selection preference introduced in NAS 1.1
      * TODO: Not sure when the System Selection Preference got the
      * 'Mode Preference' TLV, so we'll need to handle the fallback. */
     ctx->run_set_system_selection_preference =
         (qmi_client_check_version (client, 1, 1) &&
          ctx->self->priv->has_mode_preference_in_system_selection_preference);
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
     /* Technology preference introduced in NAS 1.7 */
     ctx->run_set_technology_preference = qmi_client_check_version (client, 1, 7);
 
@@ -3178,6 +3219,8 @@ get_serving_system_3gpp_ready (QmiClientNas *client,
     run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static gboolean
 process_common_info (QmiNasServiceStatus service_status,
                      gboolean domain_valid,
@@ -3694,6 +3737,8 @@ get_system_info_ready (QmiClientNas *client,
     run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static void
 modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     gboolean cs_supported,
@@ -3717,21 +3762,25 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                              user_data,
                                              modem_3gpp_run_registration_checks);
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* System Info was added in NAS 1.8 */
-    if (qmi_client_check_version (client, 1, 8))
+    if (qmi_client_check_version (client, 1, 8)) {
         qmi_client_nas_get_system_info (ctx->client,
                                         NULL,
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)get_system_info_ready,
                                         ctx);
-    else
-        qmi_client_nas_get_serving_system (ctx->client,
-                                           NULL,
-                                           10,
-                                           NULL,
-                                           (GAsyncReadyCallback)get_serving_system_3gpp_ready,
-                                           ctx);
+        return;
+    }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
+    qmi_client_nas_get_serving_system (ctx->client,
+                                       NULL,
+                                       10,
+                                       NULL,
+                                       (GAsyncReadyCallback)get_serving_system_3gpp_ready,
+                                       ctx);
 }
 
 /*****************************************************************************/
@@ -3825,6 +3874,7 @@ common_enable_disable_unsolicited_registration_events_serving_system (Unsolicite
     qmi_message_nas_register_indications_input_unref (input);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
 static void
 common_enable_disable_unsolicited_registration_events_system_info (UnsolicitedRegistrationEventsContext *ctx)
 {
@@ -3841,6 +3891,7 @@ common_enable_disable_unsolicited_registration_events_system_info (UnsolicitedRe
         ctx);
     qmi_message_nas_register_indications_input_unref (input);
 }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 static void
 modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
@@ -3863,11 +3914,13 @@ modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                        callback,
                                                        user_data);
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* System Info was added in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
         common_enable_disable_unsolicited_registration_events_system_info (ctx);
         return;
     }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     /* Ability to explicitly enable/disable serving system indications was
      * added in NAS 1.2 */
@@ -4156,6 +4209,7 @@ common_setup_cleanup_unsolicited_registration_events_finish (MMBroadbandModemQmi
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
 static void
 system_info_indication_cb (QmiClientNas *client,
                            QmiIndicationNasSystemInfoOutput *output,
@@ -4164,6 +4218,7 @@ system_info_indication_cb (QmiClientNas *client,
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
         common_process_system_info_3gpp (self, NULL, output);
 }
+#endif
 
 static void
 serving_system_indication_cb (QmiClientNas *client,
@@ -4207,6 +4262,7 @@ common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
     /* Store new state */
     self->priv->unsolicited_registration_events_setup = enable;
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
         /* Connect/Disconnect "System Info" indications */
@@ -4222,7 +4278,9 @@ common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
             g_signal_handler_disconnect (client, self->priv->system_info_indication_id);
             self->priv->system_info_indication_id = 0;
         }
-    } else {
+    } else
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+    {
         /* Connect/Disconnect "Serving System" indications */
         if (enable) {
             g_assert (self->priv->serving_system_indication_id == 0);
@@ -4460,6 +4518,8 @@ common_enable_disable_unsolicited_events_signal_strength (EnableUnsolicitedEvent
     qmi_message_nas_set_event_report_input_unref (input);
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static void
 ri_signal_info_ready (QmiClientNas *client,
                       GAsyncResult *res,
@@ -4563,6 +4623,8 @@ common_enable_disable_unsolicited_events_signal_info_config (EnableUnsolicitedEv
     qmi_message_nas_config_signal_info_input_unref (input);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static void
 common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
                                           gboolean enable,
@@ -4598,11 +4660,15 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     ctx->enable = enable;
     ctx->result = result;
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
-    if (qmi_client_check_version (client, 1, 8))
+    if (qmi_client_check_version (client, 1, 8)) {
         common_enable_disable_unsolicited_events_signal_info_config (ctx);
-    else
-        common_enable_disable_unsolicited_events_signal_strength (ctx);
+        return;
+    }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
+common_enable_disable_unsolicited_events_signal_strength (ctx);
 }
 
 /*****************************************************************************/
@@ -4709,6 +4775,8 @@ event_report_indication_cb (QmiClientNas *client,
     }
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static void
 signal_info_indication_cb (QmiClientNas *client,
                            QmiIndicationNasSignalInfoOutput *output,
@@ -4757,6 +4825,8 @@ signal_info_indication_cb (QmiClientNas *client,
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
 static void
 common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
                                          gboolean enable,
@@ -4802,6 +4872,7 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
         self->priv->event_report_indication_id = 0;
     }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* Connect/Disconnect "Signal Info" indications.
      * Signal info introduced in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
@@ -4818,6 +4889,7 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
             self->priv->signal_info_indication_id = 0;
         }
     }
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
@@ -5068,9 +5140,11 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
                                               MM_TYPE_BROADBAND_MODEM_QMI,
                                               MMBroadbandModemQmiPrivate);
 
+#if defined WITH_NEWEST_QMI_COMMANDS
     /* Some initial defaults for when we need to gather info about
      * supported commands/TLVs */
     self->priv->has_mode_preference_in_system_selection_preference = TRUE;
+#endif /* WITH_NEWEST_QMI_COMMANDS */
 }
 
 static void
