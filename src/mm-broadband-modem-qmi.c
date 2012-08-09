@@ -2896,6 +2896,56 @@ qmi_radio_interface_list_to_access_technologies (GArray *radio_interfaces)
     return access_technology;
 }
 
+static MMModemAccessTechnology
+access_technology_from_qmi_data_capability (QmiNasDataCapability cap)
+{
+    switch (cap) {
+    case QMI_NAS_DATA_CAPABILITY_GPRS:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    case QMI_NAS_DATA_CAPABILITY_EDGE:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    case QMI_NAS_DATA_CAPABILITY_HSDPA:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    case QMI_NAS_DATA_CAPABILITY_HSUPA:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    case QMI_NAS_DATA_CAPABILITY_WCDMA:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case QMI_NAS_DATA_CAPABILITY_CDMA:
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case QMI_NAS_DATA_CAPABILITY_EVDO_REV_0:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case QMI_NAS_DATA_CAPABILITY_EVDO_REV_A:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    case QMI_NAS_DATA_CAPABILITY_GSM:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    case QMI_NAS_DATA_CAPABILITY_EVDO_REV_B:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+    case QMI_NAS_DATA_CAPABILITY_LTE:
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    case QMI_NAS_DATA_CAPABILITY_HSDPA_PLUS:
+    case QMI_NAS_DATA_CAPABILITY_DC_HSDPA_PLUS:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    default:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    }
+}
+
+static MMModemAccessTechnology
+qmi_data_capability_list_to_access_technologies (GArray *data_capabilities)
+{
+    MMModemAccessTechnology access_technology = 0;
+    guint i;
+
+    for (i = 0; i < data_capabilities->len; i++) {
+        QmiNasDataCapability cap;
+
+        cap = g_array_index (data_capabilities, QmiNasDataCapability, i);
+        access_technology |= access_technology_from_qmi_data_capability (cap);
+    }
+
+    return access_technology;
+}
+
 static void
 common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
                                     QmiMessageNasGetServingSystemOutput *response_output,
@@ -2906,6 +2956,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     QmiNasAttachState ps_attach_state;
     QmiNasNetworkType selected_network;
     GArray *radio_interfaces;
+    GArray *data_service_capabilities;
     QmiNasRoamingIndicatorStatus roaming;
     guint16 mcc;
     guint16 mnc;
@@ -2971,8 +3022,18 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
             (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
 
     /* Build access technologies mask */
-    mm_access_technologies =
-        qmi_radio_interface_list_to_access_technologies (radio_interfaces);
+    data_service_capabilities = NULL;
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_data_service_capability (response_output, &data_service_capabilities, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_data_service_capability (indication_output, &data_service_capabilities, NULL);
+
+    if (data_service_capabilities)
+        mm_access_technologies =
+            qmi_data_capability_list_to_access_technologies (data_service_capabilities);
+    else
+        mm_access_technologies =
+            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
 
     /* Get and cache operator ID/name */
     if ((response_output &&
