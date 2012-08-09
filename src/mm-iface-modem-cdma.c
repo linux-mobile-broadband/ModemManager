@@ -846,6 +846,23 @@ registration_check_step (RunRegistrationChecksContext *ctx)
         mm_iface_modem_cdma_update_evdo_registration_state (ctx->self,
                                                             ctx->evdo_state);
 
+        /* Update access technologies.
+         * TODO: proper EV-DO revision reporting */
+        {
+            MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+            if (ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
+                ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+                ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
+                act |= MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK;
+
+            if (ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
+                ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+                ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
+                act |= MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
+            mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (ctx->self), act);
+        }
+
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         run_registration_checks_context_complete_and_free (ctx);
         return;
@@ -936,17 +953,35 @@ mm_iface_modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
 
 /*****************************************************************************/
 
-#define ALL_CDMA_ACCESS_TECHNOLOGIES_MASK           \
-    (ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK |     \
-     ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK)
+void
+mm_iface_modem_cdma_update_access_technologies (MMIfaceModemCdma *self,
+                                                MMModemAccessTechnology access_tech)
+{
+    MMModemCdmaRegistrationState cdma1x_state;
+    MMModemCdmaRegistrationState evdo_state;
 
-#define ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK      \
-    (MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 |             \
-     MM_MODEM_ACCESS_TECHNOLOGY_EVDOA |             \
-     MM_MODEM_ACCESS_TECHNOLOGY_EVDOB)
+    g_object_get (self,
+                  MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE, &cdma1x_state,
+                  MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE, &evdo_state,
+                  NULL);
 
-#define ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK    \
-    (MM_MODEM_ACCESS_TECHNOLOGY_1XRTT)
+    /* Even if registration state didn't change, report access technology,
+     * but only if something valid to report */
+    if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
+        cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+        cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED ||
+        evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
+        evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+        evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED) {
+        if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       access_tech,
+                                                       MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK);
+    } else
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                   MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK);
+}
 
 void
 mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
@@ -977,19 +1012,12 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_EVDO,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            /* TODO: report proper EVDO revision (0/A/B) */
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       MM_MODEM_ACCESS_TECHNOLOGY_EVDO0,
-                                                       ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
             break;
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_EVDO,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                       ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
             break;
         }
     }
@@ -1030,9 +1058,6 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       MM_MODEM_ACCESS_TECHNOLOGY_1XRTT,
-                                                       ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
             break;
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
             if (mm_gdbus_modem_cdma_get_sid (skeleton) != MM_MODEM_CDMA_SID_UNKNOWN)
@@ -1044,9 +1069,6 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                       ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
             break;
         }
     }

@@ -5794,6 +5794,10 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
         mm_iface_modem_cdma_update_evdo_registration_state (
             MM_IFACE_MODEM_CDMA (self),
             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_cdma_update_access_technologies (
+            MM_IFACE_MODEM_CDMA (self),
+            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
         g_simple_async_result_take_error (ctx->result, error);
         register_in_cdma_network_context_complete_and_free (ctx);
         return;
@@ -5822,6 +5826,9 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
         mm_iface_modem_cdma_update_evdo_registration_state (
             MM_IFACE_MODEM_CDMA (self),
             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_cdma_update_access_technologies (
+            MM_IFACE_MODEM_CDMA (self),
+            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         g_simple_async_result_take_error (
             ctx->result,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
