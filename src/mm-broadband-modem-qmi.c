@@ -2832,10 +2832,10 @@ typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientNas *client;
     GSimpleAsyncResult *result;
-} RunRegistrationChecksContext;
+} Run3gppRegistrationChecksContext;
 
 static void
-run_registration_checks_context_complete_and_free (RunRegistrationChecksContext *ctx)
+run_3gpp_registration_checks_context_complete_and_free (Run3gppRegistrationChecksContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
@@ -3063,9 +3063,9 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
 }
 
 static void
-get_serving_system_ready (QmiClientNas *client,
-                          GAsyncResult *res,
-                          RunRegistrationChecksContext *ctx)
+get_serving_system_3gpp_ready (QmiClientNas *client,
+                               GAsyncResult *res,
+                               Run3gppRegistrationChecksContext *ctx)
 {
     QmiMessageNasGetServingSystemOutput *output;
     GError *error = NULL;
@@ -3074,7 +3074,7 @@ get_serving_system_ready (QmiClientNas *client,
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (ctx->result, error);
-        run_registration_checks_context_complete_and_free (ctx);
+        run_3gpp_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -3082,7 +3082,7 @@ get_serving_system_ready (QmiClientNas *client,
         g_prefix_error (&error, "Couldn't get serving system: ");
         g_simple_async_result_take_error (ctx->result, error);
         qmi_message_nas_get_serving_system_output_unref (output);
-        run_registration_checks_context_complete_and_free (ctx);
+        run_3gpp_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -3090,7 +3090,7 @@ get_serving_system_ready (QmiClientNas *client,
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_serving_system_output_unref (output);
-    run_registration_checks_context_complete_and_free (ctx);
+    run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
 static gboolean
@@ -3590,7 +3590,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
 static void
 get_system_info_ready (QmiClientNas *client,
                        GAsyncResult *res,
-                       RunRegistrationChecksContext *ctx)
+                       Run3gppRegistrationChecksContext *ctx)
 {
     QmiMessageNasGetSystemInfoOutput *output;
     GError *error = NULL;
@@ -3599,7 +3599,7 @@ get_system_info_ready (QmiClientNas *client,
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (ctx->result, error);
-        run_registration_checks_context_complete_and_free (ctx);
+        run_3gpp_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -3607,7 +3607,7 @@ get_system_info_ready (QmiClientNas *client,
         g_prefix_error (&error, "Couldn't get system info: ");
         g_simple_async_result_take_error (ctx->result, error);
         qmi_message_nas_get_system_info_output_unref (output);
-        run_registration_checks_context_complete_and_free (ctx);
+        run_3gpp_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
@@ -3615,7 +3615,7 @@ get_system_info_ready (QmiClientNas *client,
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     qmi_message_nas_get_system_info_output_unref (output);
-    run_registration_checks_context_complete_and_free (ctx);
+    run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
 static void
@@ -3625,7 +3625,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    RunRegistrationChecksContext *ctx;
+    Run3gppRegistrationChecksContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -3633,7 +3633,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                             callback, user_data))
         return;
 
-    ctx = g_new0 (RunRegistrationChecksContext, 1);
+    ctx = g_new0 (Run3gppRegistrationChecksContext, 1);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
@@ -3654,7 +3654,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                            NULL,
                                            10,
                                            NULL,
-                                           (GAsyncReadyCallback)get_serving_system_ready,
+                                           (GAsyncReadyCallback)get_serving_system_3gpp_ready,
                                            ctx);
 }
 
