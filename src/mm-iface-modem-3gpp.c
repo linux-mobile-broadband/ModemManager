@@ -718,10 +718,15 @@ mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
                   NULL);
 
+    mm_dbg ("Running registration checks (CS: '%s', PS: '%s')",
+            cs_supported ? "yes" : "no",
+            ps_supported ? "yes" : "no");
+
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks (self,
                                                                        cs_supported,
                                                                        ps_supported,
-                                                                       callback, user_data);
+                                                                       callback,
+                                                                       user_data);
 }
 
 /*****************************************************************************/
