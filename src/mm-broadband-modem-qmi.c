@@ -2832,8 +2832,6 @@ typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientNas *client;
     GSimpleAsyncResult *result;
-    gboolean cs_supported;
-    gboolean ps_supported;
 } RunRegistrationChecksContext;
 
 static void
@@ -3642,8 +3640,6 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                              callback,
                                              user_data,
                                              modem_3gpp_run_registration_checks);
-    ctx->cs_supported = cs_supported;
-    ctx->ps_supported = ps_supported;
 
     /* System Info was added in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8))
