@@ -96,8 +96,12 @@ cpms_try_ready (MMBaseModem *self,
                          MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY)) {
             /* Retry in 2 seconds */
         g_timeout_add_seconds (2, (GSourceFunc)cpms_timeout_cb, ctx);
+        g_error_free (error);
         return;
     }
+
+    if (error)
+        g_error_free (error);
 
     /* Well, we're done */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
