@@ -2124,9 +2124,9 @@ unlock_check_ready (MMIfaceModem *self,
                 error->message);
         g_error_free (error);
 
-        /* Retry up to 3 times */
+        /* Retry up to 6 times */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
-            ++ctx->pin_check_tries < 3) {
+            ++ctx->pin_check_tries < 6) {
             mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
             if (ctx->pin_check_timeout_id)
                 g_source_remove (ctx->pin_check_timeout_id);
