@@ -3066,8 +3066,29 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
             &radio_interfaces,
             NULL);
 
-    /* Only process 3GPP info */
-    if (selected_network != QMI_NAS_NETWORK_TYPE_3GPP) {
+    /* Build access technologies mask */
+    data_service_capabilities = NULL;
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_data_service_capability (response_output, &data_service_capabilities, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_data_service_capability (indication_output, &data_service_capabilities, NULL);
+
+    if (data_service_capabilities)
+        mm_access_technologies =
+            qmi_data_capability_list_to_access_technologies (data_service_capabilities);
+    else
+        mm_access_technologies =
+            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
+
+    /* Only process 3GPP info.
+     * Seen the case already where 'selected_network' gives UNKNOWN but we still
+     * have valid LTE info around. */
+    if (selected_network == QMI_NAS_NETWORK_TYPE_3GPP ||
+        (selected_network == QMI_NAS_NETWORK_TYPE_UNKNOWN &&
+         (mm_access_technologies & MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK))) {
+        mm_dbg ("Processing 3GPP info...");
+    } else {
+        mm_dbg ("No 3GPP info given...");
         g_free (self->priv->current_operator_id);
         self->priv->current_operator_id = NULL;
         g_free (self->priv->current_operator_description);
@@ -3099,20 +3120,6 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
             ps_attach_state,
             registration_state,
             (roaming == QMI_NAS_ROAMING_INDICATOR_STATUS_ON));
-
-    /* Build access technologies mask */
-    data_service_capabilities = NULL;
-    if (response_output)
-        qmi_message_nas_get_serving_system_output_get_data_service_capability (response_output, &data_service_capabilities, NULL);
-    else
-        qmi_indication_nas_serving_system_output_get_data_service_capability (indication_output, &data_service_capabilities, NULL);
-
-    if (data_service_capabilities)
-        mm_access_technologies =
-            qmi_data_capability_list_to_access_technologies (data_service_capabilities);
-    else
-        mm_access_technologies =
-            qmi_radio_interface_list_to_access_technologies (radio_interfaces);
 
     /* Get and cache operator ID/name */
     if ((response_output &&
@@ -4051,24 +4058,6 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
             &radio_interfaces,
             NULL);
 
-    /* Only process 3GPP2 info */
-    if (selected_network != QMI_NAS_NETWORK_TYPE_3GPP2) {
-        mm_iface_modem_cdma_update_cdma1x_registration_state (MM_IFACE_MODEM_CDMA (self),
-                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
-                                                              0, 0);
-        mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
-                                                             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-        mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
-                                                        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-        return;
-    }
-
-    /* Get SID/NID */
-    if (response_output)
-        qmi_message_nas_get_serving_system_output_get_cdma_system_id (response_output, &sid, &nid, NULL);
-    else
-        qmi_indication_nas_serving_system_output_get_cdma_system_id (indication_output, &sid, &nid, NULL);
-
     /* Build access technologies mask */
     data_service_capabilities = NULL;
     if (response_output)
@@ -4085,6 +4074,29 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     else
         mm_access_technologies =
             qmi_radio_interface_list_to_access_technologies (radio_interfaces);
+
+    /* Only process 3GPP2 info */
+    if (selected_network == QMI_NAS_NETWORK_TYPE_3GPP2 ||
+        (selected_network == QMI_NAS_NETWORK_TYPE_UNKNOWN &&
+         (mm_access_technologies & MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK))) {
+        mm_dbg ("Processing CDMA info...");
+    } else {
+        mm_dbg ("No CDMA info given...");
+        mm_iface_modem_cdma_update_cdma1x_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                              0, 0);
+        mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
+                                                             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
+                                                        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        return;
+    }
+
+    /* Get SID/NID */
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_cdma_system_id (response_output, &sid, &nid, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_cdma_system_id (indication_output, &sid, &nid, NULL);
 
     /* TODO: Roaming flags */
 
