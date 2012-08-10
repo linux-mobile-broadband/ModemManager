@@ -4031,8 +4031,6 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     QmiNasNetworkType selected_network;
     GArray *radio_interfaces;
     GArray *data_service_capabilities;
-    QmiNasServiceStatus hdr_status;
-    gboolean hdr_hybrid;
     MMModemAccessTechnology mm_access_technologies;
     MMModemCdmaRegistrationState mm_cdma1x_registration_state;
     MMModemCdmaRegistrationState mm_evdo_registration_state;
@@ -4101,37 +4099,18 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     /* TODO: Roaming flags */
 
     /* Build registration states */
-    mm_cdma1x_registration_state = qmi_registration_state_to_cdma_registration_state (registration_state);
 
-    hdr_status = QMI_NAS_SERVICE_STATUS_NONE;
-    hdr_hybrid = FALSE;
-    if (response_output)
-        qmi_message_nas_get_serving_system_output_get_detailed_service_status (
-            response_output,
-            NULL, /* status */
-            NULL, /* capability */
-            &hdr_status,
-            &hdr_hybrid,
-            NULL, /* forbidden */
-            NULL);
+    if (mm_access_technologies & MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK)
+        mm_cdma1x_registration_state = qmi_registration_state_to_cdma_registration_state (registration_state);
     else
-        qmi_indication_nas_serving_system_output_get_detailed_service_status (
-            indication_output,
-            NULL, /* status */
-            NULL, /* capability */
-            &hdr_status,
-            &hdr_hybrid,
-            NULL, /* forbidden */
-            NULL);
+        mm_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
 
-    if (hdr_hybrid &&
-        (hdr_status == QMI_NAS_SERVICE_STATUS_LIMITED ||
-         hdr_status == QMI_NAS_SERVICE_STATUS_AVAILABLE ||
-         hdr_status == QMI_NAS_SERVICE_STATUS_LIMITED_REGIONAL ||
-         hdr_status == QMI_NAS_SERVICE_STATUS_POWER_SAVE))
-        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+    if (mm_access_technologies & MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK)
+        mm_evdo_registration_state = qmi_registration_state_to_cdma_registration_state (registration_state);
     else
         mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    /* Note: don't rely on the 'Detailed Service Status', it's not always given. */
 
     /* Report new registration states */
     mm_iface_modem_cdma_update_cdma1x_registration_state (MM_IFACE_MODEM_CDMA (self),
