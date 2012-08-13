@@ -26,15 +26,18 @@
 #include "ModemManager.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-novatel.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 /*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
@@ -273,6 +276,31 @@ modem_load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Enable unsolicited events (SMS indications) (Messaging interface) */
+
+static gboolean
+messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                            GAsyncResult *res,
+                                            GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    /* Many Qualcomm chipsets don't support mode=2 */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=1,1,2,1,0",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static const MMBaseModemAtCommand nwdmat_sequence[] = {
@@ -324,6 +352,13 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies_finish = modem_load_access_technologies_finish;
     iface->load_access_technologies = modem_load_access_technologies;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
 }
 
 static void
