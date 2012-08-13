@@ -226,6 +226,53 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static gboolean
+modem_load_access_technologies_finish (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       MMModemAccessTechnology *access_technologies,
+                                       guint *mask,
+                                       GError **error)
+{
+    const gchar *response;
+    const gchar *p;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    p = mm_strip_tag (response, "$CNTI:");
+    p = strchr (p, ',');
+    if (p) {
+        *access_technologies = mm_string_to_access_tech (p);
+        *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+        return TRUE;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't parse $CNTI result '%s'",
+                 response);
+    return FALSE;
+}
+
+static void
+modem_load_access_technologies (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "$CNTI=0",
+        3,
+        FALSE,
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static const MMBaseModemAtCommand nwdmat_sequence[] = {
@@ -275,6 +322,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_access_technologies_finish = modem_load_access_technologies_finish;
+    iface->load_access_technologies = modem_load_access_technologies;
 }
 
 static void
