@@ -36,6 +36,8 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
+static MMIfaceModem *iface_modem_parent;
+
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
@@ -385,6 +387,151 @@ modem_load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Signal quality loading (Modem interface) */
+
+static guint
+modem_load_signal_quality_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return 0;
+
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_signal_quality_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    guint signal_quality;
+
+    signal_quality = iface_modem_parent->load_signal_quality_finish (self, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (signal_quality),
+                                                   NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static gint
+get_one_quality (const gchar *reply,
+                 const gchar *tag)
+{
+    gint quality = -1;
+    const gchar *p;
+    gint dbm;
+    gboolean success = FALSE;
+
+    p = strstr (reply, tag);
+    if (!p)
+        return -1;
+
+    /* Skip the tag */
+    p += strlen (tag);
+
+    /* Skip spaces */
+    while (isspace (*p))
+        p++;
+
+    if (mm_get_int_from_str (p, &dbm)) {
+        if (*p == '-') {
+            /* Some cards appear to use RX0/RX1 and output RSSI in negative dBm */
+            if (dbm < 0)
+                success = TRUE;
+        } else if (isdigit (*p) && (dbm > 0) && (dbm < 115)) {
+            /* S720 appears to use "1x RSSI" and print RSSI in dBm without '-' */
+            dbm *= -1;
+            success = TRUE;
+        }
+    }
+
+    if (success) {
+        dbm = CLAMP (dbm, -113, -51);
+        quality = 100 - ((dbm + 51) * 100 / (-113 + 51));
+    }
+
+    return quality;
+}
+
+static void
+nwrssi_ready (MMBaseModem *self,
+              GAsyncResult *res,
+              GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    gint quality;
+
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (!response) {
+        /* Fallback to parent's method */
+        iface_modem_parent->load_signal_quality (
+            MM_IFACE_MODEM (self),
+            (GAsyncReadyCallback)parent_load_signal_quality_ready,
+            simple);
+        return;
+    }
+
+    /* Parse the signal quality */
+    quality = get_one_quality (response, "RX0=");
+    if (quality < 0)
+        quality = get_one_quality (response, "1x RSSI=");
+    if (quality < 0)
+        quality = get_one_quality (response, "RX1=");
+
+    if (quality >= 0)
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER ((guint)quality),
+                                                   NULL);
+    else
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't parse $NWRSSI response: '%s'",
+                                         response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_signal_quality (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    mm_dbg ("loading signal quality...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_signal_quality);
+
+    /* 3GPP modems can just run parent's signal quality loading */
+    if (mm_iface_modem_is_3gpp (self)) {
+        iface_modem_parent->load_signal_quality (
+            self,
+            (GAsyncReadyCallback)parent_load_signal_quality_ready,
+            result);
+        return;
+    }
+
+    /* CDMA modems need custom signal quality loading */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "$NWRSSI",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)nwrssi_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 
 static gboolean
@@ -459,12 +606,16 @@ mm_broadband_modem_novatel_init (MMBroadbandModemNovatel *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies_finish = modem_load_access_technologies_finish;
     iface->load_access_technologies = modem_load_access_technologies;
+    iface->load_signal_quality = modem_load_signal_quality;
+    iface->load_signal_quality_finish = modem_load_signal_quality_finish;
 }
 
 static void
