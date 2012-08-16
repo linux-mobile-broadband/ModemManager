@@ -178,4 +178,5 @@ modem_manager_SOURCES += $(loc_sources)
 
 BUILT_SOURCES += mm-modem-location-glue.h mm-modem-firmware-glue.h mm-modem-time-glue.h
 
-CLEANFILES = $(BUILT_SOURCES)
+# Clean marshallers left over from git master too
+CLEANFILES = $(BUILT_SOURCES) mm-marshal.c mm-marshal.h
