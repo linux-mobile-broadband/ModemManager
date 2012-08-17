@@ -948,6 +948,7 @@ set_property (GObject *object,
     switch (prop_id) {
     case PROP_DEFAULT_IP_METHOD:
         self->priv->default_ip_method = g_value_get_enum (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
