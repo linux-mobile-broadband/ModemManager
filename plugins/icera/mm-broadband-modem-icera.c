@@ -946,6 +946,8 @@ static const Band modem_bands[] = {
     { MM_MODEM_BAND_ANY,   "ANY",           FALSE },
 };
 
+static const guint modem_band_any_bit = 1 << (G_N_ELEMENTS (modem_bands) - 1);
+
 static MMModemBand
 icera_band_to_mm (const char *icera)
 {
@@ -1200,7 +1202,8 @@ load_current_bands_ready (MMIfaceModem *self,
         for (iter = parsed; iter; iter = g_slist_next (iter)) {
             Band *b = iter->data;
 
-            g_array_append_val (bands, b->band);
+            if (b->enabled)
+                g_array_append_val (bands, b->band);
         }
         g_slist_free_full (parsed, (GDestroyNotify) band_free);
 
@@ -1387,15 +1390,14 @@ modem_set_bands (MMIfaceModem *self,
     ctx->bandbits = band_array_to_bandbits (bands_array);
 
     /*
-     * For the sake of efficiency, convert "ANY" to the actual set of
-     * bands; this matches what we get from load_current_bands and
-     * minimizes the number of changes we need to make.
-     *
-     * This requires that ANY is last in modem_bands and that all the
-     * other bits are valid.
-     */
-    if (ctx->bandbits == (1 << (G_N_ELEMENTS (modem_bands) - 1)))
-        ctx->bandbits--; /* clear the top bit, set all lower bits */
+     * If ANY is requested, simply enable ANY to activate all bands except for
+     * those forbidden. */
+    if (ctx->bandbits & modem_band_any_bit) {
+        ctx->enablebits = modem_band_any_bit;
+        ctx->disablebits = 0;
+        set_one_band (self, ctx);
+        return;
+    }
 
     modem_load_current_bands (self,
                               (GAsyncReadyCallback)set_bands_got_current_bands,
