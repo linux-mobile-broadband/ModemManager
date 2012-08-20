@@ -27,20 +27,25 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-novatel.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
+#include "libqcdm/src/commands.h"
+#include "libqcdm/src/result.h"
 #include "mm-log.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
 static MMIfaceModem *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
 
 /*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
@@ -557,6 +562,163 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Detailed registration state (CDMA interface) */
+
+typedef struct {
+    MMModemCdmaRegistrationState detailed_cdma1x_state;
+    MMModemCdmaRegistrationState detailed_evdo_state;
+} DetailedRegistrationStateResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    DetailedRegistrationStateResults state;
+} DetailedRegistrationStateContext;
+
+static void
+detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
+{
+    /* Always not in idle! we're passing a struct in stack as result */
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+modem_cdma_get_detailed_registration_state_finish (MMIfaceModemCdma *self,
+                                                   GAsyncResult *res,
+                                                   MMModemCdmaRegistrationState *detailed_cdma1x_state,
+                                                   MMModemCdmaRegistrationState *detailed_evdo_state,
+                                                   GError **error)
+{
+    DetailedRegistrationStateResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *detailed_cdma1x_state = results->detailed_cdma1x_state;
+    *detailed_evdo_state = results->detailed_evdo_state;
+    return TRUE;
+}
+
+static void
+parse_modem_snapshot (DetailedRegistrationStateContext *ctx,
+                      QcdmResult *result)
+{
+    MMModemCdmaRegistrationState new_state;
+    guint8 eri = 0;
+
+    /* Roaming? */
+    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
+        gchar *str;
+        gboolean roaming = FALSE;
+
+        str = g_strdup_printf ("%u", eri);
+        if (mm_cdma_parse_speri_read_response (str, &roaming, NULL, NULL)) {
+            new_state = roaming ? MM_MODEM_CDMA_REGISTRATION_STATE_HOME : MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+            if (ctx->state.detailed_cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+                ctx->state.detailed_cdma1x_state = new_state;
+            if (ctx->state.detailed_evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+                ctx->state.detailed_evdo_state = new_state;
+        }
+        g_free (str);
+    }
+}
+
+static void
+reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    DetailedRegistrationStateContext *ctx = user_data;
+
+    if (error) {
+        /* Just ignore the error and complete with the input info */
+        mm_dbg ("Couldn't run QCDM MSM6500 snapshot: '%s'", error->message);
+    } else {
+        QcdmResult *result;
+
+        result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+        if (result) {
+            parse_modem_snapshot (ctx, result);
+            qcdm_result_unref (result);
+        }
+    }
+
+    /* NOTE: always complete NOT in idle here */
+    g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
+    detailed_registration_state_context_complete_and_free (ctx);
+}
+
+static void
+reg_nwsnap_6800_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    DetailedRegistrationStateContext *ctx = user_data;
+
+    if (error) {
+        /* Just ignore the error and complete with the input info */
+        mm_dbg ("Couldn't run QCDM MSM6800 snapshot: '%s'", error->message);
+    } else {
+        QcdmResult *result;
+        GByteArray *nwsnap;
+
+        /* Parse the response */
+        result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+        if (result) {
+            parse_modem_snapshot (ctx, result);
+            qcdm_result_unref (result);
+        } else {
+            /* Try for MSM6500 */
+            nwsnap = g_byte_array_sized_new (25);
+            nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
+            g_assert (nwsnap->len);
+            mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, reg_nwsnap_6500_cb, ctx);
+            return;
+        }
+    }
+
+    /* NOTE: always complete NOT in idle here */
+    g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
+    detailed_registration_state_context_complete_and_free (ctx);
+}
+
+static void
+modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
+                                            MMModemCdmaRegistrationState cdma1x_state,
+                                            MMModemCdmaRegistrationState evdo_state,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data)
+{
+    DetailedRegistrationStateContext *ctx;
+    GByteArray *nwsnap;
+    MMQcdmSerialPort *port;
+
+    /* Setup context */
+    ctx = g_new0 (DetailedRegistrationStateContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_cdma_get_detailed_registration_state);
+    ctx->state.detailed_cdma1x_state = cdma1x_state;
+    ctx->state.detailed_evdo_state = evdo_state;
+
+    port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
+
+    /* Try MSM6800 first since newer cards use that */
+    nwsnap = g_byte_array_sized_new (25);
+    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
+    g_assert (nwsnap->len);
+    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, reg_nwsnap_6800_cb, ctx);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static const MMBaseModemAtCommand nwdmat_sequence[] = {
@@ -623,6 +785,13 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
     iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
+}
+
+static void
+iface_modem_cdma_init (MMIfaceModemCdma *iface)
+{
+    iface->get_detailed_registration_state = modem_cdma_get_detailed_registration_state;
+    iface->get_detailed_registration_state_finish = modem_cdma_get_detailed_registration_state_finish;
 }
 
 static void
