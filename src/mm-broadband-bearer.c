@@ -670,13 +670,13 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self,
                                                                       res,
                                                                       &error)) {
+        /* Clear CID when it failed to connect. */
+        ctx->self->priv->cid = 0;
         g_simple_async_result_take_error (ctx->result, error);
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
-    /* Keep CID around while connected */
-    ctx->self->priv->cid = ctx->cid;
 
     if (MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp &&
         MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish) {
@@ -732,6 +732,9 @@ initialize_pdp_context_ready (MMBaseModem *modem,
         return;
     }
 
+    /* Keep CID around after initializing the PDP context in order to
+     * handle corresponding unsolicited PDP activation responses. */
+    ctx->self->priv->cid = ctx->cid;
     MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
                                                           ctx->modem,
                                                           ctx->primary,

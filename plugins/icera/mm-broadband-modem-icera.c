@@ -280,7 +280,7 @@ ipdpact_received (MMAtSerialPort *port,
         return;
 
     /* Setup context */
-    ctx.cid = 0;
+    ctx.cid = cid;
     ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN;
 
     switch (status) {
