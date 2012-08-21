@@ -479,7 +479,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
      * even better approach would likely be to query which PDP types the
      * modem supports (using AT+CGDCONT=?), and set the default accordingly
      */
-    self->priv->ip_type = g_strdup ("IP");
+    self->priv->ip_type = g_strdup ("IPV4");
 }
 
 static void
