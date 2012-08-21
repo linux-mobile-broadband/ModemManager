@@ -33,12 +33,6 @@
 #define MM_IS_BROADBAND_BEARER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER))
 #define MM_BROADBAND_BEARER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER, MMBroadbandBearerClass))
 
-#define MM_BROADBAND_BEARER_3GPP_APN         "broadband-bearer-3gpp-apn"
-#define MM_BROADBAND_BEARER_CDMA_NUMBER      "broadband-bearer-cdma-number"
-#define MM_BROADBAND_BEARER_CDMA_RM_PROTOCOL "broadband-bearer-cdma-rm-protocol"
-#define MM_BROADBAND_BEARER_IP_TYPE          "broadband-bearer-ip-type"
-#define MM_BROADBAND_BEARER_ALLOW_ROAMING    "broadband-bearer-allow-roaming"
-
 typedef struct _MMBroadbandBearer MMBroadbandBearer;
 typedef struct _MMBroadbandBearerClass MMBroadbandBearerClass;
 typedef struct _MMBroadbandBearerPrivate MMBroadbandBearerPrivate;
