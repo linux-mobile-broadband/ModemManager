@@ -168,6 +168,54 @@ start_network_ready (QmiClientWds *client,
     connect_context_step (ctx);
 }
 
+static QmiMessageWdsStartNetworkInput *
+build_start_network_input (MMBearerQmi *self)
+{
+    QmiMessageWdsStartNetworkInput *input;
+    MMBearerProperties *properties = NULL;
+    const gchar *str;
+    QmiWdsIpFamily ip_type;
+
+    g_object_get (self,
+                  MM_BEARER_CONFIG, &properties,
+                  NULL);
+
+    if (!properties)
+        return NULL;
+
+    input = qmi_message_wds_start_network_input_new ();
+
+    str = mm_bearer_properties_get_apn (properties);
+    if (str)
+        qmi_message_wds_start_network_input_set_apn (input, str, NULL);
+
+    str = mm_bearer_properties_get_user (properties);
+    if (str)
+        qmi_message_wds_start_network_input_set_username (input, str, NULL);
+
+    str = mm_bearer_properties_get_password (properties);
+    if (str)
+        qmi_message_wds_start_network_input_set_password (input, str, NULL);
+
+    switch (mm_bearer_properties_get_ip_type (properties)) {
+    case MM_BEARER_IP_FAMILY_IPV4:
+        ip_type = QMI_WDS_IP_FAMILY_IPV4;
+        break;
+    case MM_BEARER_IP_FAMILY_IPV6:
+        ip_type = QMI_WDS_IP_FAMILY_IPV6;
+        break;
+    case MM_BEARER_IP_FAMILY_IPV4V6:
+        /* dual stack, we assume unspecified */
+    case MM_BEARER_IP_FAMILY_UNKNOWN:
+        ip_type = QMI_WDS_IP_FAMILY_UNSPECIFIED;
+        break;
+    }
+
+    qmi_message_wds_start_network_input_set_ip_family_preference (input, ip_type, NULL);
+
+    return input;
+}
+
 static void
 qmi_port_allocate_client_ready (MMQmiPort *qmi,
                                 GAsyncResult *res,
@@ -252,14 +300,20 @@ connect_context_step (ConnectContext *ctx)
         ctx->client = QMI_CLIENT_WDS (client);
     }
 
-    case CONNECT_STEP_START_NETWORK:
+    case CONNECT_STEP_START_NETWORK: {
+        QmiMessageWdsStartNetworkInput *input;
+
+        input = build_start_network_input (ctx->self);
         qmi_client_wds_start_network (ctx->client,
-                                      NULL, /* allow NULL input for now */
+                                      input,
                                       10,
                                       ctx->cancellable,
                                       (GAsyncReadyCallback)start_network_ready,
                                       ctx);
+        if (input)
+            qmi_message_wds_start_network_input_unref (input);
         return;
+    }
 
     case CONNECT_STEP_LAST: {
         MMBearerIpConfig *config;
