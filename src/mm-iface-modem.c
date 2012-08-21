@@ -3315,9 +3315,15 @@ interface_initialization_step (InitializationContext *ctx)
                       NULL);
 
         if (!list) {
-            list = mm_bearer_list_new (1, 1);
+            guint n;
+
+            /* The maximum number of available/connected modems is guessed from
+             * the size of the data ports list. */
+            n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (ctx->self)));
+            mm_dbg ("Modem allows up to %u bearers", n);
 
             /* Create new default list */
+            list = mm_bearer_list_new (n, n);
             g_object_set (ctx->self,
                           MM_IFACE_MODEM_BEARER_LIST, list,
                           NULL);
