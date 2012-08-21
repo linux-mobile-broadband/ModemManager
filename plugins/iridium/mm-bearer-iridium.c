@@ -281,6 +281,7 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
         g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
+    g_free (ctx);
 }
 
 static gboolean
