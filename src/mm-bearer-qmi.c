@@ -130,34 +130,47 @@ start_network_ready (QmiClientWds *client,
     }
 
     if (!qmi_message_wds_start_network_output_get_result (output, &error)) {
-        mm_info ("error: couldn't start network: %s", error->message);
+        /* No-effect errors should be ignored. The modem will keep the
+         * connection active as long as there is a WDS client which requested
+         * to start the network. If ModemManager crashed while a connection was
+         * active, we would be leaving an unreleased WDS client around and the
+         * modem would just keep connected. */
         if (g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_CALL_FAILED)) {
-            guint16 cer;
-            guint16 verbose_cer_type;
-            guint16 verbose_cer_reason;
+                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_error_free (error);
 
-            if (qmi_message_wds_start_network_output_get_call_end_reason (
-                    output,
-                    &cer,
-                    NULL))
-                mm_info ("call end reason: %u", cer);
+            /* Fall down to a successful connection */
+        } else {
+            mm_info ("error: couldn't start network: %s", error->message);
+            if (g_error_matches (error,
+                                 QMI_PROTOCOL_ERROR,
+                                 QMI_PROTOCOL_ERROR_CALL_FAILED)) {
+                guint16 cer;
+                guint16 verbose_cer_type;
+                guint16 verbose_cer_reason;
 
-            if (qmi_message_wds_start_network_output_get_verbose_call_end_reason (
-                    output,
-                    &verbose_cer_type,
-                    &verbose_cer_reason,
-                    NULL))
-                mm_info ("verbose call end reason: %u, %u",
-                         verbose_cer_type,
-                         verbose_cer_reason);
+                if (qmi_message_wds_start_network_output_get_call_end_reason (
+                        output,
+                        &cer,
+                        NULL))
+                    mm_info ("call end reason: %u", cer);
+
+                if (qmi_message_wds_start_network_output_get_verbose_call_end_reason (
+                        output,
+                        &verbose_cer_type,
+                        &verbose_cer_reason,
+                        NULL))
+                    mm_info ("verbose call end reason: %u, %u",
+                             verbose_cer_type,
+                             verbose_cer_reason);
+            }
+
+            g_simple_async_result_take_error (ctx->result, error);
+            connect_context_complete_and_free (ctx);
+            qmi_message_wds_start_network_output_unref (output);
+            return;
         }
-
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
-        qmi_message_wds_start_network_output_unref (output);
-        return;
     }
 
     qmi_message_wds_start_network_output_get_packet_data_handle (output, &ctx->packet_data_handle, NULL);
