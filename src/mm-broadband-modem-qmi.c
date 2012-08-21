@@ -5094,9 +5094,8 @@ initialization_started (MMBroadbandModem *self,
 
     /* Setup services to open */
     ctx->services[0] = QMI_SERVICE_DMS;
-    ctx->services[1] = QMI_SERVICE_WDS;
-    ctx->services[2] = QMI_SERVICE_NAS;
-    ctx->services[3] = QMI_SERVICE_UNKNOWN;
+    ctx->services[1] = QMI_SERVICE_NAS;
+    ctx->services[2] = QMI_SERVICE_UNKNOWN;
 
     /* Now open our QMI port */
     mm_qmi_port_open (ctx->qmi,
