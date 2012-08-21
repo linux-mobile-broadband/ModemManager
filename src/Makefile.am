@@ -156,6 +156,8 @@ ModemManager_SOURCES = \
 	mm-plugin-manager.h \
 	mm-sim.h \
 	mm-sim.c \
+	mm-sim-qmi.h \
+	mm-sim-qmi.c \
 	mm-bearer.h \
 	mm-bearer.c \
 	mm-broadband-bearer.h \
@@ -170,8 +172,6 @@ ModemManager_SOURCES = \
 	mm-sms-part.c \
 	mm-sms.h \
 	mm-sms.c \
-	mm-sim-qmi.h \
-	mm-sim-qmi.c \
 	mm-sms-list.h \
 	mm-sms-list.c \
 	mm-iface-modem.h \
