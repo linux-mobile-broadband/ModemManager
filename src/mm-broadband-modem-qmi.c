@@ -33,6 +33,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sim-qmi.h"
+#include "mm-bearer-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -103,6 +104,47 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
 
     *o_client = client;
     return TRUE;
+}
+
+/*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+modem_create_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMBearer *bearer;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+
+    return g_object_ref (bearer);
+}
+
+static void
+modem_create_bearer (MMIfaceModem *self,
+                     MMBearerProperties *properties,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBearer *bearer;
+    GSimpleAsyncResult *result;
+
+    /* Set a new ref to the bearer object as result */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_bearer);
+
+    /* We just create a MMBearerQmi */
+    mm_dbg ("Creating QMI bearer in QMI modem");
+    bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self),
+                                properties);
+
+    g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -5217,6 +5259,10 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+
+    /* Create QMI-specific bearer */
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
 
     /* Other actions */
     iface->factory_reset = modem_factory_reset;
