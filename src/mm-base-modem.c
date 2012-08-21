@@ -165,7 +165,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* Only allow 'tty', 'net' and 'cdc-wdm' ports */
     if (!g_str_equal (subsys, "net") &&
         !g_str_equal (subsys, "tty") &&
-        !(g_str_equal (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm"))) {
+        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm"))) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
@@ -234,7 +234,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                       NULL));
     }
     /* QMI ports... */
-    else if (g_str_equal (subsys, "usb") &&
+    else if (g_str_has_prefix (subsys, "usb") &&
              g_str_has_prefix (name, "cdc-wdm")) {
         port = MM_PORT (mm_qmi_port_new (name));
     } else

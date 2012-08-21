@@ -1119,7 +1119,7 @@ mm_port_probe_is_at (MMPortProbe *self)
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
     if (g_str_equal (subsys, "net") ||
-        (g_str_equal (subsys, "usb") &&
+        (g_str_has_prefix (subsys, "usb") &&
          g_str_has_prefix (name, "cdc-wdm")))
         return FALSE;
 
@@ -1154,7 +1154,7 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
     if (g_str_equal (subsys, "net") ||
-        (g_str_equal (subsys, "usb") &&
+        (g_str_has_prefix (subsys, "usb") &&
          g_str_has_prefix (name, "cdc-wdm")))
         return FALSE;
 
@@ -1173,7 +1173,7 @@ mm_port_probe_is_qmi (MMPortProbe *self)
 
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
-    if (!g_str_equal (subsys, "usb") ||
+    if (!g_str_has_prefix (subsys, "usb") ||
         !name ||
         !g_str_has_prefix (name, "cdc-wdm"))
         return FALSE;
@@ -1208,7 +1208,7 @@ mm_port_probe_get_port_type (MMPortProbe *self)
     if (g_str_equal (subsys, "net"))
         return MM_PORT_TYPE_NET;
 
-    if (g_str_equal (subsys, "usb") &&
+    if (g_str_has_prefix (subsys, "usb") &&
         g_str_has_prefix (name, "cdc-wdm") &&
         self->priv->is_qmi)
         return MM_PORT_TYPE_QMI;
@@ -1267,7 +1267,7 @@ mm_port_probe_get_vendor (MMPortProbe *self)
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
     if (g_str_equal (subsys, "net") ||
-        (g_str_equal (subsys, "usb") &&
+        (g_str_has_prefix (subsys, "usb") &&
          g_str_has_prefix (name, "cdc-wdm")))
         return NULL;
 
@@ -1287,7 +1287,7 @@ mm_port_probe_get_product (MMPortProbe *self)
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
     if (g_str_equal (subsys, "net") ||
-        (g_str_equal (subsys, "usb") &&
+        (g_str_has_prefix (subsys, "usb") &&
          g_str_has_prefix (name, "cdc-wdm")))
         return NULL;
 

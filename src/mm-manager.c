@@ -167,7 +167,7 @@ find_physical_device (GUdevDevice *child)
     while (iter && i++ < 8) {
         subsys = g_udev_device_get_subsystem (iter);
         if (subsys) {
-            if (is_usb || !strcmp (subsys, "usb")) {
+            if (is_usb || g_str_has_prefix (subsys, "usb")) {
                 is_usb = TRUE;
                 type = g_udev_device_get_devtype (iter);
                 if (type && !strcmp (type, "usb_device")) {
@@ -329,7 +329,7 @@ device_removed (MMManager *self,
     subsys = g_udev_device_get_subsystem (udev_device);
     name = g_udev_device_get_name (udev_device);
 
-    if (!g_str_equal (subsys, "usb") ||
+    if (!g_str_has_prefix (subsys, "usb") ||
         (name && g_str_has_prefix (name, "cdc-wdm"))) {
         /* Handle tty/net/wdm port removal */
         device = find_device_by_port (self, udev_device);
@@ -386,14 +386,14 @@ handle_uevent (GUdevClient *client,
     /* A bit paranoid */
     subsys = g_udev_device_get_subsystem (device);
     g_return_if_fail (subsys != NULL);
-    g_return_if_fail (g_str_equal (subsys, "tty") || g_str_equal (subsys, "net") || g_str_equal (subsys, "usb"));
+    g_return_if_fail (g_str_equal (subsys, "tty") || g_str_equal (subsys, "net") || g_str_has_prefix (subsys, "usb"));
 
     /* We only care about tty/net and usb/cdc-wdm devices when adding modem ports,
      * but for remove, also handle usb parent device remove events
      */
     name = g_udev_device_get_name (device);
     if (   (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change"))
-        && (!g_str_equal (subsys, "usb") || (name && g_str_has_prefix (name, "cdc-wdm"))))
+        && (!g_str_has_prefix (subsys, "usb") || (name && g_str_has_prefix (name, "cdc-wdm"))))
         device_added (self, device);
     else if (g_str_equal (action, "remove"))
         device_removed (self, device);
@@ -424,6 +424,18 @@ mm_manager_start (MMManager *manager)
     g_list_free (devices);
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "usb");
+    for (iter = devices; iter; iter = g_list_next (iter)) {
+        const gchar *name;
+
+        name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
+        if (name && g_str_has_prefix (name, "cdc-wdm"))
+            device_added (manager, G_UDEV_DEVICE (iter->data));
+        g_object_unref (G_OBJECT (iter->data));
+    }
+    g_list_free (devices);
+
+    /* Newer kernels report 'usbmisc' subsystem */
+    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "usbmisc");
     for (iter = devices; iter; iter = g_list_next (iter)) {
         const gchar *name;
 
@@ -672,7 +684,7 @@ static void
 mm_manager_init (MMManager *manager)
 {
     MMManagerPrivate *priv;
-    const char *subsys[4] = { "tty", "net", "usb", NULL };
+    const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
 
     /* Setup private data */
     manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE ((manager),
