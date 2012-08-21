@@ -162,6 +162,8 @@ ModemManager_SOURCES = \
 	mm-bearer.c \
 	mm-broadband-bearer.h \
 	mm-broadband-bearer.c \
+	mm-bearer-qmi.h \
+	mm-bearer-qmi.c \
 	mm-bearer-list.h \
 	mm-bearer-list.c \
 	mm-base-modem-at.h \
