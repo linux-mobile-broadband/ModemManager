@@ -31,18 +31,21 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-iface-modem-cdma.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-sim-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 struct _MMBroadbandModemQmiPrivate {
     /* Cached device IDs, retrieved by the modem interface when loading device
@@ -5289,6 +5292,14 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     /* Other actions */
     iface->run_registration_checks = modem_cdma_run_registration_checks;
     iface->run_registration_checks_finish = modem_cdma_run_registration_checks_finish;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    /* Assume we don't have messaging support */
+    iface->check_support = NULL;
+    iface->check_support_finish = NULL;
 }
 
 static void
