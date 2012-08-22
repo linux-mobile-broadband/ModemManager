@@ -35,4 +35,6 @@ MMSim *mm_common_sierra_create_sim_finish (MMIfaceModem *self,
                                            GAsyncResult *res,
                                            GError **error);
 
+void mm_common_sierra_setup_ports (MMBroadbandModem *self);
+
 #endif /* MM_COMMON_SIERRA_H */

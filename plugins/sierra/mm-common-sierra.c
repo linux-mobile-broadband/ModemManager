@@ -159,3 +159,35 @@ mm_common_sierra_create_sim (MMIfaceModem *self,
                        callback,
                        user_data);
 }
+
+/*****************************************************************************/
+/* Setup ports */
+
+void
+mm_common_sierra_setup_ports (MMBroadbandModem *self)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+    GRegex *pacsp0_regex;
+
+    pacsp0_regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        g_object_set (ports[i],
+                      MM_PORT_CARRIER_DETECT, FALSE,
+                      NULL);
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            pacsp0_regex,
+            NULL, NULL, NULL);
+    }
+
+    g_regex_unref (pacsp0_regex);
+}

@@ -384,6 +384,18 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_sierra_parent_class)->setup_ports (self);
+
+    mm_common_sierra_setup_ports (self);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemSierra *
 mm_broadband_modem_sierra_new (const gchar *device,
@@ -424,4 +436,7 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_sierra_class_init (MMBroadbandModemSierraClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }

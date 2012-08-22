@@ -36,6 +36,18 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierraIcera, mm_broadband_modem_sierra_i
                             G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_sierra_icera_parent_class)->setup_ports (self);
+
+    mm_common_sierra_setup_ports (self);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemSierraIcera *
 mm_broadband_modem_sierra_icera_new (const gchar *device,
@@ -70,4 +82,7 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_sierra_icera_class_init (MMBroadbandModemSierraIceraClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
