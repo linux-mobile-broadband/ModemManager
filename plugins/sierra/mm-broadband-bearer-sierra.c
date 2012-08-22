@@ -275,6 +275,101 @@ dial_3gpp (MMBroadbandBearer *self,
 }
 
 /*****************************************************************************/
+/* 3GPP disconnect */
+
+static gboolean
+disconnect_3gpp_finish (MMBroadbandBearer *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->disconnect_3gpp_finish (self, res, &error)) {
+        mm_dbg ("Parent disconnection failed (not fatal): %s", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+disconnect_scact_ready (MMBaseModem *modem,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    /* Ignore errors for now */
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        mm_dbg ("Disconnection failed (not fatal): %s", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+disconnect_3gpp (MMBroadbandBearer *self,
+                 MMBroadbandModem *modem,
+                 MMAtSerialPort *primary,
+                 MMAtSerialPort *secondary,
+                 MMPort *data,
+                 guint cid,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    g_assert (primary != NULL);
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        disconnect_3gpp);
+
+    if (!MM_IS_AT_SERIAL_PORT (data)) {
+        gchar *command;
+
+        /* Use specific CID */
+        command = g_strdup_printf ("!SCACT=0,%u", cid);
+        mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                       primary,
+                                       command,
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)disconnect_scact_ready,
+                                       result);
+        g_free (command);
+        return;
+    }
+
+    /* Chain up parent's disconnection if we don't have a net port */
+    MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->disconnect_3gpp (
+        self,
+        modem,
+        primary,
+        secondary,
+        data,
+        cid,
+        (GAsyncReadyCallback)parent_disconnect_3gpp_ready,
+        result);
+}
+
+/*****************************************************************************/
 
 MMBearer *
 mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
@@ -326,4 +421,6 @@ mm_broadband_bearer_sierra_class_init (MMBroadbandBearerSierraClass *klass)
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 }
