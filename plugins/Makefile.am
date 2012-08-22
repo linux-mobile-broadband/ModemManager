@@ -150,6 +150,8 @@ libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-plugin-sierra.h \
 	sierra/mm-common-sierra.c \
 	sierra/mm-common-sierra.h \
+	sierra/mm-sim-sierra.c \
+	sierra/mm-sim-sierra.h \
 	sierra/mm-broadband-modem-sierra.c \
 	sierra/mm-broadband-modem-sierra.h \
 	sierra/mm-broadband-modem-sierra-icera.c \

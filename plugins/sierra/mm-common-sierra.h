@@ -28,4 +28,11 @@ gboolean mm_common_sierra_modem_power_up_finish (MMIfaceModem *self,
                                                  GAsyncResult *res,
                                                  GError **error);
 
+void   mm_common_sierra_create_sim        (MMIfaceModem *self,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data);
+MMSim *mm_common_sierra_create_sim_finish (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           GError **error);
+
 #endif /* MM_COMMON_SIERRA_H */

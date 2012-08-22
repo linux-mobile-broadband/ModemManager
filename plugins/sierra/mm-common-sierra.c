@@ -19,6 +19,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-sim-sierra.h"
 
 /*****************************************************************************/
 /* Modem power up (Modem interface) */
@@ -134,4 +135,27 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
                               FALSE,
                               (GAsyncReadyCallback)get_current_functionality_status_ready,
                               result);
+}
+
+/*****************************************************************************/
+/* Create SIM (Modem interface) */
+
+MMSim *
+mm_common_sierra_create_sim_finish (MMIfaceModem *self,
+                                    GAsyncResult *res,
+                                    GError **error)
+{
+    return mm_sim_sierra_new_finish (res, error);
+}
+
+void
+mm_common_sierra_create_sim (MMIfaceModem *self,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
+{
+    /* New Sierra SIM */
+    mm_sim_sierra_new (MM_BASE_MODEM (self),
+                       NULL, /* cancellable */
+                       callback,
+                       user_data);
 }
