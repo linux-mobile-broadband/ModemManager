@@ -82,8 +82,8 @@
           <varlistentry><term><literal>"ip-type"</literal></term>
             <listitem>
               For GSM/UMTS and LTE devices the IP addressing type to use,
-              one of "IPV4", "IPV4V6" or "IPV6".
-              Given as a string value (signature <literal>"s"</literal>).
+              given as a <link linkend="MMBearerIpFamily">MMBearerIpFamily</link>
+              value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"user"</literal></term>

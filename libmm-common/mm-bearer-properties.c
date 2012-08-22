@@ -33,7 +33,7 @@ struct _MMBearerPropertiesPrivate {
     /* APN */
     gchar *apn;
     /* IP type */
-    gchar *ip_type;
+    MMBearerIpFamily ip_type;
     /* Number */
     gchar *number;
     /* User */
@@ -81,12 +81,11 @@ mm_bearer_properties_set_password (MMBearerProperties *self,
 
 void
 mm_bearer_properties_set_ip_type (MMBearerProperties *self,
-                                  const gchar *ip_type)
+                                  MMBearerIpFamily ip_type)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    g_free (self->priv->ip_type);
-    self->priv->ip_type = g_strdup (ip_type);
+    self->priv->ip_type = ip_type;
 }
 
 void
@@ -144,10 +143,10 @@ mm_bearer_properties_get_password (MMBearerProperties *self)
     return self->priv->password;
 }
 
-const gchar *
+MMBearerIpFamily
 mm_bearer_properties_get_ip_type (MMBearerProperties *self)
 {
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
 
     return self->priv->ip_type;
 }
@@ -209,11 +208,11 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_PASSWORD,
                                g_variant_new_string (self->priv->password));
 
-    if (self->priv->ip_type)
+    if (self->priv->ip_type != MM_BEARER_IP_FAMILY_UNKNOWN)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_IP_TYPE,
-                               g_variant_new_string (self->priv->ip_type));
+                               g_variant_new_uint32 (self->priv->ip_type));
 
     if (self->priv->number)
         g_variant_builder_add (&builder,
@@ -252,9 +251,17 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
         mm_bearer_properties_set_user (self, value);
     else if (g_str_equal (key, PROPERTY_PASSWORD))
         mm_bearer_properties_set_password (self, value);
-    else if (g_str_equal (key, PROPERTY_IP_TYPE))
-        mm_bearer_properties_set_ip_type (self, value);
-    else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
+    else if (g_str_equal (key, PROPERTY_IP_TYPE)) {
+        GError *inner_error = NULL;
+        MMBearerIpFamily ip_type;
+
+        ip_type = mm_common_get_ip_type_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_bearer_properties_set_ip_type (self, ip_type);
+    } else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
         GError *inner_error = NULL;
         gboolean allow_roaming;
 
@@ -352,7 +359,7 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
     else if (g_str_equal (key, PROPERTY_IP_TYPE))
         mm_bearer_properties_set_ip_type (
             properties,
-            g_variant_get_string (value, NULL));
+            g_variant_get_uint32 (value));
     else if (g_str_equal (key, PROPERTY_NUMBER))
         mm_bearer_properties_set_number (
             properties,
@@ -445,7 +452,7 @@ mm_bearer_properties_cmp (MMBearerProperties *a,
                           MMBearerProperties *b)
 {
     return ((!g_strcmp0 (a->priv->apn, b->priv->apn)) &&
-            (!g_strcmp0 (a->priv->ip_type, b->priv->ip_type)) &&
+            (a->priv->ip_type == b->priv->ip_type) &&
             (!g_strcmp0 (a->priv->number, b->priv->number)) &&
             (!g_strcmp0 (a->priv->user, b->priv->user)) &&
             (!g_strcmp0 (a->priv->password, b->priv->password)) &&
@@ -479,7 +486,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
      * even better approach would likely be to query which PDP types the
      * modem supports (using AT+CGDCONT=?), and set the default accordingly
      */
-    self->priv->ip_type = g_strdup ("IPV4");
+    self->priv->ip_type = MM_BEARER_IP_FAMILY_IPV4;
 }
 
 static void
@@ -490,7 +497,6 @@ finalize (GObject *object)
     g_free (self->priv->apn);
     g_free (self->priv->user);
     g_free (self->priv->password);
-    g_free (self->priv->ip_type);
     g_free (self->priv->number);
 
     G_OBJECT_CLASS (mm_bearer_properties_parent_class)->finalize (object);

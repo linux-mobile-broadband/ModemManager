@@ -36,6 +36,8 @@ gboolean              mm_common_get_boolean_from_string     (const gchar *value,
                                                              GError **error);
 MMModemCdmaRmProtocol mm_common_get_rm_protocol_from_string (const gchar *str,
                                                              GError **error);
+MMBearerIpFamily      mm_common_get_ip_type_from_string     (const gchar *str,
+                                                             GError **error);
 
 GArray      *mm_common_bands_variant_to_garray (GVariant *variant);
 MMModemBand *mm_common_bands_variant_to_array  (GVariant *variant,

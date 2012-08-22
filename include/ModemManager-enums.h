@@ -445,6 +445,22 @@ typedef enum { /*< underscore_name=mm_bearer_ip_method >*/
 } MMBearerIpMethod;
 
 /**
+ * MMBearerIpFamily:
+ * @MM_BEARER_IP_FAMILY_UNKNOWN: Unknown.
+ * @MM_BEARER_IP_FAMILY_IPV4: IPv4.
+ * @MM_BEARER_IP_FAMILY_IPV6: IPv6.
+ * @MM_BEARER_IP_FAMILY_IPV4V6: IPv4 and IPv6.
+ *
+ * Type of IP family to be used in a given Bearer.
+ */
+typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
+    MM_BEARER_IP_FAMILY_UNKNOWN = 0,
+    MM_BEARER_IP_FAMILY_IPV4    = 4,
+    MM_BEARER_IP_FAMILY_IPV6    = 6,
+    MM_BEARER_IP_FAMILY_IPV4V6  = 10
+} MMBearerIpFamily;
+
+/**
  * MMModemCdmaRegistrationState:
  * @MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN: Registration status is unknown or the device is not registered.
  * @MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED: Registered, but roaming status is unknown or cannot be provided by the device. The device may or may not be roaming.

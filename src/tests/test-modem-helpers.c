@@ -1244,7 +1244,7 @@ test_cgdcont_results (const gchar *desc,
             if (pdp->cid == expected->cid) {
                 found = TRUE;
 
-                g_assert_cmpstr (pdp->pdp_type, ==, expected->pdp_type);
+                g_assert_cmpuint (pdp->pdp_type, ==, expected->pdp_type);
                 g_assert_cmpstr (pdp->apn, ==, expected->apn);
             }
         }
@@ -1260,7 +1260,7 @@ test_cgdcont_response_nokia (void *f, gpointer d)
 {
     const gchar *reply = "+CGDCONT: 1,\"IP\",,,0,0";
     static MM3gppPdpContext expected[] = {
-        { 1, "IP", NULL }
+        { 1, MM_BEARER_IP_FAMILY_IPV4, NULL }
     };
 
     test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));

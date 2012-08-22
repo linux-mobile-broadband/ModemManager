@@ -58,7 +58,7 @@ void mm_bearer_properties_set_user          (MMBearerProperties *properties,
 void mm_bearer_properties_set_password      (MMBearerProperties *properties,
                                              const gchar *password);
 void mm_bearer_properties_set_ip_type       (MMBearerProperties *properties,
-                                             const gchar *ip_type);
+                                             MMBearerIpFamily ip_type);
 void mm_bearer_properties_set_allow_roaming (MMBearerProperties *properties,
                                              gboolean allow_roaming);
 void mm_bearer_properties_set_number        (MMBearerProperties *properties,
@@ -69,7 +69,7 @@ void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *properties,
 const gchar           *mm_bearer_properties_get_apn           (MMBearerProperties *properties);
 const gchar           *mm_bearer_properties_get_user          (MMBearerProperties *properties);
 const gchar           *mm_bearer_properties_get_password      (MMBearerProperties *properties);
-const gchar           *mm_bearer_properties_get_ip_type       (MMBearerProperties *properties);
+MMBearerIpFamily       mm_bearer_properties_get_ip_type       (MMBearerProperties *properties);
 gboolean               mm_bearer_properties_get_allow_roaming (MMBearerProperties *properties);
 const gchar           *mm_bearer_properties_get_number        (MMBearerProperties *properties);
 MMModemCdmaRmProtocol  mm_bearer_properties_get_rm_protocol   (MMBearerProperties *properties);

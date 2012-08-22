@@ -500,9 +500,8 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
 static void
 mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
 {
-    g_free (pdp->pdp_type);
     g_free (pdp->apn);
-    g_free (pdp);
+    g_slice_free (MM3gppPdpContext, pdp);
 }
 
 void
@@ -540,21 +539,31 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
 
         while (!inner_error &&
                g_match_info_matches (match_info)) {
-            MM3gppPdpContext *pdp;
+            gchar *str;
+            MMBearerIpFamily ip_family;
 
-            pdp = g_new0 (MM3gppPdpContext, 1);
-            if (!mm_get_uint_from_match_info (match_info, 1, &pdp->cid)) {
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_FAILED,
-                                           "Couldn't parse CID from reply: '%s'",
-                                           reply);
-                break;
+            str = mm_get_string_unquoted_from_match_info (match_info, 2);
+            ip_family = mm_3gpp_get_ip_family_from_pdp_type (str);
+            if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN)
+                mm_dbg ("Ignoring PDP context type: '%s'", str);
+            else {
+                MM3gppPdpContext *pdp;
+
+                pdp = g_slice_new0 (MM3gppPdpContext);
+                if (!mm_get_uint_from_match_info (match_info, 1, &pdp->cid)) {
+                    inner_error = g_error_new (MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "Couldn't parse CID from reply: '%s'",
+                                               reply);
+                    break;
+                }
+                pdp->pdp_type = ip_family;
+                pdp->apn = mm_get_string_unquoted_from_match_info (match_info, 3);
+
+                list = g_list_prepend (list, pdp);
             }
-            pdp->pdp_type = mm_get_string_unquoted_from_match_info (match_info, 2);
-            pdp->apn = mm_get_string_unquoted_from_match_info (match_info, 3);
 
-            list = g_list_prepend (list, pdp);
-
+            g_free (str);
             g_match_info_next (match_info, &inner_error);
         }
 
@@ -1423,6 +1432,35 @@ mm_3gpp_parse_operator (const gchar *reply,
     }
 
     return operator;
+}
+
+/*************************************************************************/
+
+const gchar *
+mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family)
+{
+    switch (family) {
+    case MM_BEARER_IP_FAMILY_IPV4:
+        return "IP";
+    case MM_BEARER_IP_FAMILY_IPV6:
+        return "IPV6";
+    case MM_BEARER_IP_FAMILY_IPV4V6:
+        return "IPV4V6";
+    default:
+        return NULL;
+    }
+}
+
+MMBearerIpFamily
+mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
+{
+    if (g_str_equal (pdp_type, "IP"))
+        return MM_BEARER_IP_FAMILY_IPV4;
+    if (g_str_equal (pdp_type, "IPV6"))
+        return MM_BEARER_IP_FAMILY_IPV6;
+    if (g_str_equal (pdp_type, "IPV4V6"))
+        return MM_BEARER_IP_FAMILY_IPV4V6;
+    return MM_BEARER_IP_FAMILY_UNKNOWN;
 }
 
 /*************************************************************************/

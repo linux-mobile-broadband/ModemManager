@@ -1,6 +1,7 @@
 <SECTION>
 <FILE>mm-enums</FILE>
 <TITLE>Flags and Enumerations</TITLE>
+MMBearerIpFamily
 MMBearerIpMethod
 MMModem3gppFacility
 MMModem3gppNetworkAvailability

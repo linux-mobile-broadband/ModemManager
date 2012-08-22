@@ -124,7 +124,7 @@ mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
 
 void
 mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
-                                          const gchar *ip_type)
+                                          MMBearerIpFamily ip_type)
 {
     g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
 
@@ -228,10 +228,10 @@ mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_password (self->priv->bearer_properties);
 }
 
-const gchar *
+MMBearerIpFamily
 mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
 {
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
 
     return mm_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }
