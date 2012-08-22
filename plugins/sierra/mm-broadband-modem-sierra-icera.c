@@ -25,10 +25,15 @@
 
 #include "ModemManager.h"
 #include "mm-broadband-modem-sierra-icera.h"
+#include "mm-iface-modem.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
+#include "mm-common-sierra.h"
 
-G_DEFINE_TYPE (MMBroadbandModemSierraIcera, mm_broadband_modem_sierra_icera, MM_TYPE_BROADBAND_MODEM_ICERA)
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierraIcera, mm_broadband_modem_sierra_icera, MM_TYPE_BROADBAND_MODEM_ICERA, 0,
+                            G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
 /*****************************************************************************/
 
@@ -51,6 +56,13 @@ mm_broadband_modem_sierra_icera_new (const gchar *device,
 static void
 mm_broadband_modem_sierra_icera_init (MMBroadbandModemSierraIcera *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->modem_power_up = mm_common_sierra_modem_power_up;
+    iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
 }
 
 static void
