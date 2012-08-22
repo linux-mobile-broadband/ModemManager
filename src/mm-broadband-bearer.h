@@ -71,6 +71,7 @@ struct _MMBroadbandBearerClass {
     void     (* dial_3gpp)        (MMBroadbandBearer *self,
                                    MMBaseModem *modem,
                                    MMAtSerialPort *primary,
+                                   MMPort *data,
                                    guint cid,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,

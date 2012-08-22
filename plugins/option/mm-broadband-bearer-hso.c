@@ -598,6 +598,7 @@ static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMAtSerialPort *primary,
+           MMPort *data, /* unused by us */
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
