@@ -25,10 +25,104 @@
 
 #include "ModemManager.h"
 #include "mm-broadband-modem-sierra.h"
+#include "mm-base-modem-at.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 #include "mm-errors-types.h"
+#include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 
-G_DEFINE_TYPE (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
+                            G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+
+/*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    /* We are reporting ALL 3GPP access technologies here */
+    *access_technologies = ((MMModemAccessTechnology) GPOINTER_TO_UINT (
+                                g_simple_async_result_get_op_res_gpointer (
+                                    G_SIMPLE_ASYNC_RESULT (res))));
+    *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+    return TRUE;
+}
+
+static void
+cnti_set_ready (MMBaseModem *self,
+                GAsyncResult *res,
+                GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        const gchar *p;
+
+        p = mm_strip_tag (response, "*CNTI:");
+        p = strchr (p, ',');
+        if (p)
+            act = mm_string_to_access_tech (p + 1);
+
+        if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            g_simple_async_result_set_error (
+                simple,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_FAILED,
+                "Couldn't parse access technologies result: '%s'",
+                response);
+        else
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (act), NULL);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_access_technologies);
+
+    if (mm_iface_modem_is_3gpp (self)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "*CNTI=0",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)cnti_set_ready,
+                                  result);
+        return;
+    }
+
+    /* Cannot do this in CDMA modems */
+    g_simple_async_result_set_error (result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "Cannot load access technologies in CDMA modems");
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
 
 /*****************************************************************************/
 
@@ -51,6 +145,13 @@ mm_broadband_modem_sierra_new (const gchar *device,
 static void
 mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
