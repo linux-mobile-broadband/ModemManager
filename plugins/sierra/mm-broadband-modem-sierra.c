@@ -269,6 +269,121 @@ load_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+selrat_set_ready (MMBaseModem *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMAtSerialPort *primary;
+    gint idx = -1;
+    gchar *command;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_allowed_modes);
+
+    if (!mm_iface_modem_is_3gpp (self)) {
+        /* Cannot do this in CDMA modems */
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Cannot set allowed modes in CDMA modems");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Sierra secondary ports don't have full AT command interpreters */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary || mm_port_get_connected (MM_PORT (primary))) {
+        g_simple_async_result_set_error (
+            result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Cannot set allowed modes while connected");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    if (allowed == MM_MODEM_MODE_3G)
+        idx = 1;
+    else if (allowed == MM_MODEM_MODE_2G)
+        idx = 2;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        if (preferred == MM_MODEM_MODE_3G)
+            idx = 3;
+        else if (preferred == MM_MODEM_MODE_2G)
+            idx = 4;
+        else if (preferred == MM_MODEM_MODE_NONE)
+            idx = 0;
+    } else if (allowed == MM_MODEM_MODE_ANY)
+        idx = 0;
+
+    if (idx < 0) {
+        gchar *allowed_str;
+        gchar *preferred_str;
+
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Requested mode (allowed: '%s', preferred: '%s') not "
+                                         "supported by the modem.",
+                                         allowed_str,
+                                         preferred_str);
+        g_free (allowed_str);
+        g_free (preferred_str);
+
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    command = g_strdup_printf ("!SELRAT=%d", idx);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   primary,
+                                   command,
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)selrat_set_ready,
+                                   result);
+    g_free (command);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemSierra *
 mm_broadband_modem_sierra_new (const gchar *device,
@@ -296,6 +411,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->modem_power_up = mm_common_sierra_modem_power_up;
