@@ -23,6 +23,7 @@
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
 #include "mm-broadband-modem.h"
+#include "mm-broadband-modem-icera.h"
 
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN)
 
@@ -161,6 +162,21 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+    GList *l;
+    gboolean is_icera;
+
+    for (l = probes, is_icera = FALSE; l && !is_icera; l = g_list_next (l)) {
+        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)))
+            is_icera = TRUE;
+    }
+
+    if (is_icera)
+        return MM_BASE_MODEM (mm_broadband_modem_icera_new (sysfs_path,
+                                                            driver,
+                                                            mm_plugin_get_name (self),
+                                                            vendor,
+                                                            product));
+
     return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
                                                   driver,
                                                   mm_plugin_get_name (self),
@@ -214,6 +230,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
                       MM_PLUGIN_CUSTOM_INIT,        &custom_init,
+                      MM_PLUGIN_ICERA_PROBE,        TRUE,
                       NULL));
 }
 
