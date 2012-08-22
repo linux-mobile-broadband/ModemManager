@@ -147,7 +147,9 @@ libmm_plugin_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 # Sierra
 libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-plugin-sierra.c \
-	sierra/mm-plugin-sierra.h
+	sierra/mm-plugin-sierra.h \
+	sierra/mm-broadband-modem-sierra.c \
+	sierra/mm-broadband-modem-sierra.h
 libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_sierra_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)

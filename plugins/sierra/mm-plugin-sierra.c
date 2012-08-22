@@ -22,7 +22,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-sierra.h"
 #include "mm-broadband-modem-icera.h"
 
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN)
@@ -177,11 +177,11 @@ create_modem (MMPlugin *self,
                                                             vendor,
                                                             product));
 
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_sierra_new (sysfs_path,
+                                                         driver,
+                                                         mm_plugin_get_name (self),
+                                                         vendor,
+                                                         product));
 }
 
 static gboolean
