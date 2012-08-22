@@ -270,12 +270,10 @@ dial_cdma_ready (MMBaseModem *modem,
 
     /* else... Yuhu! */
 
-    /* If serial port, set PPP method. Otherwise, assume DHCP is needed. */
+    /* Generic CDMA connections are done over PPP always */
+    g_assert (MM_IS_AT_SERIAL_PORT (ctx->data));
     config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config,
-                                    (MM_IS_AT_SERIAL_PORT (ctx->data) ?
-                                     MM_BEARER_IP_METHOD_PPP :
-                                     MM_BEARER_IP_METHOD_DHCP));
+    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_PPP);
 
     /* Assume only IPv4 is given */
     g_simple_async_result_set_op_res_gpointer (
@@ -416,14 +414,22 @@ connect_cdma (MMBroadbandBearer *self,
               gpointer user_data)
 {
     DetailedConnectContext *ctx;
+    MMPort *real_data;
 
     g_assert (primary != NULL);
+
+    if (MM_IS_AT_SERIAL_PORT (data))
+        real_data = data;
+    else {
+        mm_dbg ("Ignoring 'net' interface in CDMA connection");
+        real_data = MM_PORT (primary);
+    }
 
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
                                         NULL,
-                                        data,
+                                        real_data,
                                         cancellable,
                                         callback,
                                         user_data);
