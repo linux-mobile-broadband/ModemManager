@@ -62,6 +62,7 @@ struct _MMBroadbandBearerClass {
                                       gpointer user_data);
     gboolean (* connect_3gpp_finish) (MMBroadbandBearer *self,
                                       GAsyncResult *res,
+                                      MMPort **data,
                                       MMBearerIpConfig **ipv4_config,
                                       MMBearerIpConfig **ipv6_config,
                                       GError **error);
@@ -118,6 +119,7 @@ struct _MMBroadbandBearerClass {
                                       gpointer user_data);
     gboolean (* connect_cdma_finish) (MMBroadbandBearer *self,
                                       GAsyncResult *res,
+                                      MMPort **data,
                                       MMBearerIpConfig **ipv4_config,
                                       MMBearerIpConfig **ipv6_config,
                                       GError **error);

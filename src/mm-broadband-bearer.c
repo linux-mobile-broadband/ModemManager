@@ -33,6 +33,7 @@
 #include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-serial-enums-types.h"
 
 static void async_initable_iface_init (GAsyncInitableIface *iface);
 
@@ -95,6 +96,7 @@ static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON
 /*****************************************************************************/
 /* Detailed connect result, used in both CDMA and 3GPP sequences */
 typedef struct {
+    MMPort *data;
     MMBearerIpConfig *ipv4_config;
     MMBearerIpConfig *ipv6_config;
 } DetailedConnectResult;
@@ -106,16 +108,21 @@ detailed_connect_result_free (DetailedConnectResult *result)
         g_object_unref (result->ipv4_config);
     if (result->ipv6_config)
         g_object_unref (result->ipv6_config);
-    g_free (result);
+    if (result->data)
+        g_object_unref (result->data);
+    g_slice_free (DetailedConnectResult, result);
 }
 
 static DetailedConnectResult *
-detailed_connect_result_new (MMBearerIpConfig *ipv4_config,
+detailed_connect_result_new (MMPort *data,
+                             MMBearerIpConfig *ipv4_config,
                              MMBearerIpConfig *ipv6_config)
 {
     DetailedConnectResult *result;
 
-    result = g_new0 (DetailedConnectResult, 1);
+    result = g_slice_new0 (DetailedConnectResult);
+    if (data)
+        result->data = g_object_ref (data);
     if (ipv4_config)
         result->ipv4_config = g_object_ref (ipv4_config);
     if (ipv6_config)
@@ -142,6 +149,7 @@ typedef struct {
 static gboolean
 detailed_connect_finish (MMBroadbandBearer *self,
                          GAsyncResult *res,
+                         MMPort **data,
                          MMBearerIpConfig **ipv4_config,
                          MMBearerIpConfig **ipv6_config,
                          GError **error)
@@ -153,6 +161,7 @@ detailed_connect_finish (MMBroadbandBearer *self,
 
     result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
+    *data = (result->data ? g_object_ref (result->data) : NULL);
     *ipv4_config = (result->ipv4_config ? g_object_ref (result->ipv4_config) : NULL);
     *ipv6_config = (result->ipv6_config ? g_object_ref (result->ipv6_config) : NULL);
     return TRUE;
@@ -271,7 +280,7 @@ dial_cdma_ready (MMBaseModem *modem,
     /* Assume only IPv4 is given */
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
-        detailed_connect_result_new (config, NULL),
+        detailed_connect_result_new (ctx->data, config, NULL),
         (GDestroyNotify)detailed_connect_result_free);
     detailed_connect_context_complete_and_free (ctx);
 
@@ -453,11 +462,11 @@ typedef struct {
 
 static Dial3gppContext *
 dial_3gpp_context_new (MMBroadbandBearer *self,
-                           MMBaseModem *modem,
-                           MMAtSerialPort *primary,
-                           GCancellable *cancellable,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+                       MMBaseModem *modem,
+                       MMAtSerialPort *primary,
+                       GCancellable *cancellable,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
 {
     Dial3gppContext *ctx;
 
@@ -649,7 +658,7 @@ get_ip_config_3gpp_ready (MMBroadbandModem *modem,
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
-        detailed_connect_result_new (ipv4_config, ipv6_config),
+        detailed_connect_result_new (ctx->data, ipv4_config, ipv6_config),
         (GDestroyNotify)detailed_connect_result_free);
     detailed_connect_context_complete_and_free (ctx);
 
@@ -676,7 +685,6 @@ dial_3gpp_ready (MMBroadbandModem *modem,
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
-
 
     if (MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp &&
         MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish) {
@@ -705,7 +713,7 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
-        detailed_connect_result_new (config, NULL),
+        detailed_connect_result_new (ctx->data, config, NULL),
         (GDestroyNotify)detailed_connect_result_free);
     detailed_connect_context_complete_and_free (ctx);
 
@@ -1026,7 +1034,7 @@ connect_result_free (ConnectResult *result)
 typedef struct {
     MMBroadbandBearer *self;
     GSimpleAsyncResult *result;
-    MMPort *data;
+    MMPort *suggested_data;
 } ConnectContext;
 
 static void
@@ -1034,7 +1042,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->data);
+    g_object_unref (ctx->suggested_data);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -1063,21 +1071,34 @@ connect_finish (MMBearer *self,
 static void
 connect_succeeded (ConnectContext *ctx,
                    ConnectionType connection_type,
+                   MMPort *data,
                    MMBearerIpConfig *ipv4_config,
                    MMBearerIpConfig *ipv6_config)
 {
     ConnectResult *result;
+    MMPort *real_data;
+
+    if (data) {
+        if (data != ctx->suggested_data)
+            mm_dbg ("Suggested to use port '%s/%s' for connection, but using '%s/%s' instead",
+                    mm_port_subsys_get_string (mm_port_get_subsys (ctx->suggested_data)),
+                    mm_port_get_device (ctx->suggested_data),
+                    mm_port_subsys_get_string (mm_port_get_subsys (data)),
+                    mm_port_get_device (data));
+        real_data = data;
+    } else
+        real_data = g_object_ref (ctx->suggested_data);
 
     /* Port is connected; update the state */
-    mm_port_set_connected (ctx->data, TRUE);
+    mm_port_set_connected (real_data, TRUE);
 
     /* Keep connected port and type of connection */
-    ctx->self->priv->port = g_object_ref (ctx->data);
+    ctx->self->priv->port = g_object_ref (real_data);
     ctx->self->priv->connection_type = connection_type;
 
     /* Build result */
     result = g_new0 (ConnectResult, 1);
-    result->data = g_object_ref (ctx->data);
+    result->data = real_data;
     result->ipv4_config = ipv4_config;
     result->ipv6_config = ipv6_config;
 
@@ -1094,8 +1115,8 @@ connect_failed (ConnectContext *ctx,
                 GError *error)
 {
     /* On errors, close the data port */
-    if (MM_IS_AT_SERIAL_PORT (ctx->data))
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+    if (MM_IS_AT_SERIAL_PORT (ctx->suggested_data))
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->suggested_data));
 
     g_simple_async_result_take_error (ctx->result, error);
     connect_context_complete_and_free (ctx);
@@ -1109,15 +1130,17 @@ connect_cdma_ready (MMBroadbandBearer *self,
     GError *error = NULL;
     MMBearerIpConfig *ipv4_config = NULL;
     MMBearerIpConfig *ipv6_config = NULL;
+    MMPort *data = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma_finish (self,
                                                                     res,
+                                                                    &data,
                                                                     &ipv4_config,
                                                                     &ipv6_config,
                                                                     &error))
         connect_failed (ctx, error);
     else
-        connect_succeeded (ctx, CONNECTION_TYPE_CDMA, ipv4_config, ipv6_config);
+        connect_succeeded (ctx, CONNECTION_TYPE_CDMA, data, ipv4_config, ipv6_config);
 }
 
 static void
@@ -1128,15 +1151,17 @@ connect_3gpp_ready (MMBroadbandBearer *self,
     GError *error = NULL;
     MMBearerIpConfig *ipv4_config = NULL;
     MMBearerIpConfig *ipv6_config = NULL;
+    MMPort *data = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp_finish (self,
                                                                     res,
+                                                                    &data,
                                                                     &ipv4_config,
                                                                     &ipv6_config,
                                                                     &error))
         connect_failed (ctx, error);
     else
-        connect_succeeded (ctx, CONNECTION_TYPE_3GPP, ipv4_config, ipv6_config);
+        connect_succeeded (ctx, CONNECTION_TYPE_3GPP, data, ipv4_config, ipv6_config);
 }
 
 static void
@@ -1147,7 +1172,7 @@ connect (MMBearer *self,
 {
     MMBaseModem *modem = NULL;
     MMAtSerialPort *primary;
-    MMPort *data;
+    MMPort *suggested_data;
     ConnectContext *ctx;
 
     /* Don't try to connect if already connected */
@@ -1196,8 +1221,8 @@ connect (MMBearer *self,
     }
 
     /* Look for best data port, NULL if none available. */
-    data = mm_base_modem_peek_best_data_port (modem);
-    if (!data) {
+    suggested_data = mm_base_modem_peek_best_data_port (modem);
+    if (!suggested_data) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
@@ -1214,10 +1239,10 @@ connect (MMBearer *self,
      * which is actually always right now, this is already ensured because the
      * primary port is kept open as long as the modem is enabled, but anyway
      * there's no real problem in keeping an open count here as well. */
-    if (MM_IS_AT_SERIAL_PORT (data)) {
+    if (MM_IS_AT_SERIAL_PORT (suggested_data)) {
         GError *error = NULL;
 
-        if (!mm_serial_port_open (MM_SERIAL_PORT (data), &error)) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (suggested_data), &error)) {
             g_prefix_error (&error, "Couldn't connect: cannot keep data port open.");
             g_simple_async_report_take_gerror_in_idle (
                 G_OBJECT (self),
@@ -1232,7 +1257,7 @@ connect (MMBearer *self,
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_new0 (ConnectContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->data = g_object_ref (data);
+    ctx->suggested_data = g_object_ref (suggested_data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1247,7 +1272,7 @@ connect (MMBearer *self,
                 MM_BROADBAND_MODEM (modem),
                 primary,
                 mm_base_modem_peek_port_secondary (modem),
-                data,
+                suggested_data,
                 cancellable,
                 (GAsyncReadyCallback) connect_3gpp_ready,
                 ctx);
@@ -1268,7 +1293,7 @@ connect (MMBearer *self,
                 MM_BROADBAND_MODEM (modem),
                 primary,
                 mm_base_modem_peek_port_secondary (modem),
-                data,
+                suggested_data,
                 cancellable,
                 (GAsyncReadyCallback) connect_cdma_ready,
                 ctx);
@@ -1288,6 +1313,7 @@ connect (MMBearer *self,
 
 /*****************************************************************************/
 /* Detailed disconnect context, used in both CDMA and 3GPP sequences */
+
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;

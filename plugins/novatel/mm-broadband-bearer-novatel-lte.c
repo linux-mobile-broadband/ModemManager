@@ -98,6 +98,7 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
 static gboolean
 connect_3gpp_finish (MMBroadbandBearer *self,
                      GAsyncResult *res,
+                     MMPort **data,
                      MMBearerIpConfig **ipv4_config,
                      MMBearerIpConfig **ipv6_config,
                      GError **error)
@@ -112,6 +113,9 @@ connect_3gpp_finish (MMBroadbandBearer *self,
     /* In the default implementation, we assume only IPv4 is supported */
     *ipv4_config = g_object_ref (config);
     *ipv6_config = NULL;
+    /* We used the input suggested data port */
+    *data = NULL;
+
     return TRUE;
 }
 
