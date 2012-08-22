@@ -31,6 +31,7 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-common-sierra.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -152,6 +153,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->modem_power_up = mm_common_sierra_modem_power_up;
+    iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
 }
 
 static void
