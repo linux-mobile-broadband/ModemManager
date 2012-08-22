@@ -316,7 +316,7 @@ create_sim_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return mm_sim_new_finish (res, error);
+    return mm_sim_iridium_new_finish (res, error);
 }
 
 static void
