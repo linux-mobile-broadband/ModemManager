@@ -57,6 +57,8 @@ struct _MMBroadbandModemMbmPrivate {
 
     gboolean have_emrdy;
 
+    GRegex *e2nap_regex;
+    GRegex *e2nap_ext_regex;
     GRegex *emrdy_regex;
     GRegex *pacsp_regex;
     GRegex *estksmenu_regex;
@@ -393,6 +395,14 @@ modem_power_up (MMIfaceModem *_self,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
+e2nap_received (MMAtSerialPort *port,
+                GMatchInfo *info,
+                MMBroadbandModemMbm *self)
+{
+    /* Just receive them from now */
+}
+
+static void
 erinfo_received (MMAtSerialPort *port,
                  GMatchInfo *info,
                  MMBroadbandModemMbm *self)
@@ -452,6 +462,20 @@ set_unsolicited_events_handlers (MMBroadbandModemMbm *self,
             ports[i],
             self->priv->erinfo_regex,
             enable ? (MMAtSerialUnsolicitedMsgFn)erinfo_received : NULL,
+            enable ? self : NULL,
+            NULL);
+
+        /* Connection related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->e2nap_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)e2nap_received : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->e2nap_ext_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)e2nap_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -770,6 +794,10 @@ mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
     self->priv->network_mode = MBM_NETWORK_MODE_ANY;
 
     /* Prepare regular expressions to setup */
+    self->priv->e2nap_regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n",
+                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->e2nap_ext_regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d),.*\\r\\n",
+                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->emrdy_regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->pacsp_regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n",
@@ -787,6 +815,8 @@ finalize (GObject *object)
 {
     MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (object);
 
+    g_regex_unref (self->priv->e2nap_regex);
+    g_regex_unref (self->priv->e2nap_ext_regex);
     g_regex_unref (self->priv->emrdy_regex);
     g_regex_unref (self->priv->pacsp_regex);
     g_regex_unref (self->priv->estksmenu_regex);
