@@ -441,6 +441,62 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+pcstate_disable_ready (MMBaseModem *self,
+                       GAsyncResult *res,
+                       GSimpleAsyncResult *simple)
+{
+    /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
+     * at!pcstate.
+     */
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_common_sierra_modem_power_up);
+
+    /* For CDMA modems, run !pcstate */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "!pcstate=0",
+                                  5,
+                                  FALSE,
+                                  (GAsyncReadyCallback)pcstate_disable_ready,
+                                  result);
+        return;
+    }
+
+    /* For 3GPP modems we should call parent's power down, but there is no
+     * such power down command in MMBroadbandModem, so just finish here. */
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -486,6 +542,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->modem_power_up = mm_common_sierra_modem_power_up;
     iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_down_finish;
     iface->create_sim = mm_common_sierra_create_sim;
     iface->create_sim_finish = mm_common_sierra_create_sim_finish;
     iface->create_bearer = modem_create_bearer;
