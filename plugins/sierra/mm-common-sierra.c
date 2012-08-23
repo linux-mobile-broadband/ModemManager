@@ -117,6 +117,21 @@ get_current_functionality_status_ready (MMBaseModem *self,
                               simple);
 }
 
+static void
+pcstate_enable_ready (MMBaseModem *self,
+                      GAsyncResult *res,
+                      GSimpleAsyncResult *simple)
+{
+    /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
+     * at!pcstate.
+     */
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
 void
 mm_common_sierra_modem_power_up (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
@@ -129,6 +144,18 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
                                         user_data,
                                         mm_common_sierra_modem_power_up);
 
+    /* For CDMA modems, run !pcstate */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "!pcstate=1",
+                                  5,
+                                  FALSE,
+                                  (GAsyncReadyCallback)pcstate_enable_ready,
+                                  result);
+        return;
+    }
+
+    /* For 3GPP modems, check if we'll need the power up */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN?",
                               3,
