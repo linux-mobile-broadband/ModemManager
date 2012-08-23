@@ -229,6 +229,8 @@ mm_plugin_create (void)
                       MM_PLUGIN_NAME,               "Sierra",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
+                      MM_PLUGIN_ALLOWED_AT,         TRUE,
+                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_CUSTOM_INIT,        &custom_init,
                       MM_PLUGIN_ICERA_PROBE,        TRUE,
                       NULL));
