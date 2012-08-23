@@ -24,7 +24,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-mbm.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-mbm.h"
 
 G_DEFINE_TYPE (MMPluginMbm, mm_plugin_mbm, MM_TYPE_PLUGIN)
 
@@ -42,11 +42,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_mbm_new (sysfs_path,
+                                                      driver,
+                                                      mm_plugin_get_name (self),
+                                                      vendor,
+                                                      product));
 }
 
 /*****************************************************************************/
