@@ -59,7 +59,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-x22x.la \
 	libmm-plugin-pantech.la \
 	libmm-plugin-zte.la \
-	libmm-plugin-sierra.la
+	libmm-plugin-sierra.la \
+	libmm-plugin-mbm.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -113,14 +114,13 @@ libmm_plugin_huawei_la_SOURCES = \
 libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-## MBM
-#libmm_plugin_mbm_la_SOURCES = \
-#	mm-plugin-mbm.c \
-#	mm-plugin-mbm.h \
-#	mm-modem-mbm.c \
-#	mm-modem-mbm.h
-#libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+# MBM
+libmm_plugin_mbm_la_SOURCES = \
+	mbm/mm-plugin-mbm.c \
+	mbm/mm-plugin-mbm.h
+libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
 
 # Option
 libmm_plugin_option_la_SOURCES = \
