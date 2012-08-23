@@ -33,13 +33,19 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-modem-helpers.h"
 #include "mm-broadband-modem-mbm.h"
+#include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+
+#define MBM_NETWORK_MODE_ANY  1
+#define MBM_NETWORK_MODE_2G   5
+#define MBM_NETWORK_MODE_3G   6
 
 /*****************************************************************************/
 /* After SIM unlock (Modem interface) */
@@ -77,6 +83,63 @@ modem_after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    const gchar *response;
+    guint a;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    if (mm_get_uint_from_str (mm_strip_tag (response, "CFUN:"), &a)) {
+        /* No settings to set preferred */
+        *preferred = MM_MODEM_MODE_NONE;
+
+        switch (a) {
+        case MBM_NETWORK_MODE_2G:
+            *allowed = MM_MODEM_MODE_2G;
+            break;
+        case MBM_NETWORK_MODE_3G:
+            *allowed = MM_MODEM_MODE_3G;
+            break;
+        default:
+            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            break;
+        }
+
+        return TRUE;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't parse +CFUN response: '%s'",
+                 response);
+    return FALSE;
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbm *
 mm_broadband_modem_mbm_new (const gchar *device,
@@ -104,6 +167,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
 }
 
 static void
