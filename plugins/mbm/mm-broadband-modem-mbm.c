@@ -392,6 +392,32 @@ modem_power_up (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+reset_finish (MMIfaceModem *self,
+              GAsyncResult *res,
+              GError **error)
+{
+    /* Ignore errors */
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    return TRUE;
+}
+
+static void
+reset (MMIfaceModem *self,
+       GAsyncReadyCallback callback,
+       gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "*E2RESET",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -839,6 +865,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
+    iface->reset = reset;
+    iface->reset_finish = reset_finish;
 }
 
 static void
