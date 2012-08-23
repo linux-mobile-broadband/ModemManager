@@ -62,24 +62,6 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-sierra.la \
 	libmm-plugin-mbm.la
 
-#pkglib_LTLIBRARIES = \
-#	libmm-plugin-generic.la \
-#	libmm-plugin-moto-c.la \
-#	libmm-plugin-huawei.la \
-#	libmm-plugin-sierra.la \
-#	libmm-plugin-novatel.la \
-#	libmm-plugin-nokia.la \
-#	libmm-plugin-zte.la \
-#	libmm-plugin-mbm.la \
-#	libmm-plugin-longcheer.la \
-#	libmm-plugin-anydata.la \
-#	libmm-plugin-simtech.la \
-#	libmm-plugin-x22x.la \
-#	libmm-plugin-linktop.la \
-#	libmm-plugin-samsung.la \
-#	libmm-plugin-wavecom.la \
-#	libmm-plugin-iridium.la
-
 # Generic
 libmm_plugin_generic_la_SOURCES = \
 	generic/mm-plugin-generic.c \
@@ -174,17 +156,6 @@ libmm_plugin_wavecom_la_SOURCES = \
 	wavecom/mm-broadband-modem-wavecom.h
 libmm_plugin_wavecom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_wavecom_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-
-## Novatel
-#libmm_plugin_novatel_la_SOURCES = \
-#	mm-plugin-novatel.c \
-#	mm-plugin-novatel.h \
-#	mm-modem-novatel-gsm.c \
-#	mm-modem-novatel-gsm.h \
-#	mm-modem-novatel-cdma.c \
-#	mm-modem-novatel-cdma.h
-#libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Nokia
 libmm_plugin_nokia_la_SOURCES = \
@@ -327,13 +298,6 @@ libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-broadband-modem-novatel.h
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-
-#	77-mm-ericsson-mbm.rules \
-#	77-mm-zte-port-types.rules \
-#	77-mm-longcheer-port-types.rules \
-#	77-mm-simtech-port-types.rules \
-#	77-mm-x22x-port-types.rules \
-#
 
 # Additional files to include in the distribution
 EXTRA_DIST = \
