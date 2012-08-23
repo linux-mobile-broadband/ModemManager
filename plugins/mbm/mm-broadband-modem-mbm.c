@@ -32,6 +32,7 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-bearer-list.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-broadband-modem-mbm.h"
@@ -52,6 +53,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
 #define MBM_NETWORK_MODE_ANY  1
 #define MBM_NETWORK_MODE_2G   5
 #define MBM_NETWORK_MODE_3G   6
+
+#define MBM_E2NAP_DISCONNECTED 0
+#define MBM_E2NAP_CONNECTED    1
+#define MBM_E2NAP_CONNECTING   2
 
 struct _MMBroadbandModemMbmPrivate {
     guint network_mode;
@@ -582,12 +587,64 @@ load_unlock_retries (MMIfaceModem *self,
 /*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
+typedef struct {
+    MMBroadbandBearerMbmConnectionStatus status;
+} BearerListReportStatusForeachContext;
+
+static void
+bearer_list_report_status_foreach (MMBearer *bearer,
+                                   BearerListReportStatusForeachContext *ctx)
+{
+    mm_broadband_bearer_mbm_report_connection_status (MM_BROADBAND_BEARER_MBM (bearer),
+                                                      ctx->status);
+}
+
 static void
 e2nap_received (MMAtSerialPort *port,
                 GMatchInfo *info,
                 MMBroadbandModemMbm *self)
 {
-    /* Just receive them from now */
+    MMBearerList *list = NULL;
+    guint state;
+    BearerListReportStatusForeachContext ctx;
+
+    if (!mm_get_uint_from_match_info (info, 1, &state))
+        return;
+
+    ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN;
+
+    switch (state) {
+    case MBM_E2NAP_DISCONNECTED:
+        mm_dbg ("disconnected");
+        ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_DISCONNECTED;
+        break;
+    case MBM_E2NAP_CONNECTED:
+        mm_dbg ("connected");
+        ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_CONNECTED;
+        break;
+    case MBM_E2NAP_CONNECTING:
+        mm_dbg ("connecting");
+        break;
+    default:
+        /* Should not happen */
+        mm_dbg ("unhandled E2NAP state %d", state);
+    }
+
+    /* If unknown status, don't try to report anything */
+    if (ctx.status == MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN)
+        return;
+
+    /* If empty bearer list, nothing else to do */
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    if (!list)
+        return;
+
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_list_report_status_foreach,
+                            &ctx);
+    g_object_unref (list);
 }
 
 static void
@@ -779,6 +836,12 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
     g_object_unref (simple);
 }
 
+static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
+    { "*ERINFO=1", 5, FALSE, NULL },
+    { "*E2NAP=1",  5, FALSE, NULL },
+    { NULL }
+};
+
 static void
 parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                         GAsyncResult *res,
@@ -793,12 +856,15 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
     }
 
     /* Our own enable now */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "*ERINFO=1",
-                              5,
-                              FALSE,
-                              (GAsyncReadyCallback)own_enable_unsolicited_events_ready,
-                              simple);
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_enable_sequence,
+        NULL,  /* response_processor_context */
+        NULL,  /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_enable_unsolicited_events_ready,
+        simple);
 }
 
 static void
@@ -853,7 +919,7 @@ own_disable_unsolicited_events_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
     if (error) {
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
@@ -868,6 +934,12 @@ own_disable_unsolicited_events_ready (MMBaseModem *self,
         simple);
 }
 
+static const MMBaseModemAtCommand unsolicited_disable_sequence[] = {
+    { "*ERINFO=0", 5, FALSE, NULL },
+    { "*E2NAP=0",  5, FALSE, NULL },
+    { NULL }
+};
+
 static void
 modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
@@ -881,12 +953,15 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                         modem_3gpp_disable_unsolicited_events);
 
     /* Our own disable first */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "*ERINFO=0",
-                              5,
-                              FALSE,
-                              (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
-                              result);
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_disable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
+        result);
 }
 
 /*****************************************************************************/

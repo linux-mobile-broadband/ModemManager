@@ -40,12 +40,19 @@
 #define MM_IS_BROADBAND_BEARER_MBM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_MBM))
 #define MM_BROADBAND_BEARER_MBM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_MBM, MMBroadbandBearerMbmClass))
 
+typedef enum {
+    MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN,
+    MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_CONNECTED,
+    MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_DISCONNECTED
+} MMBroadbandBearerMbmConnectionStatus;
+
 typedef struct _MMBroadbandBearerMbm MMBroadbandBearerMbm;
 typedef struct _MMBroadbandBearerMbmClass MMBroadbandBearerMbmClass;
 typedef struct _MMBroadbandBearerMbmPrivate MMBroadbandBearerMbmPrivate;
 
 struct _MMBroadbandBearerMbm {
     MMBroadbandBearer parent;
+    MMBroadbandBearerMbmPrivate *priv;
 };
 
 struct _MMBroadbandBearerMbmClass {
@@ -62,5 +69,8 @@ void mm_broadband_bearer_mbm_new (MMBroadbandModemMbm *modem,
                                   gpointer user_data);
 MMBearer *mm_broadband_bearer_mbm_new_finish (GAsyncResult *res,
                                               GError **error);
+
+void mm_broadband_bearer_mbm_report_connection_status (MMBroadbandBearerMbm *self,
+                                                       MMBroadbandBearerMbmConnectionStatus status);
 
 #endif /* MM_BROADBAND_BEARER_MBM_H */
