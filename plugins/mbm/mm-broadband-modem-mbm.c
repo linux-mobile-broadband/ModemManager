@@ -35,6 +35,7 @@
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-broadband-modem-mbm.h"
+#include "mm-broadband-bearer-mbm.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -65,6 +66,62 @@ struct _MMBroadbandModemMbmPrivate {
     GRegex *emwi_regex;
     GRegex *erinfo_regex;
 };
+
+/*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+modem_create_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMBearer *bearer;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New MBM bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+
+    return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_mbm_new_ready (GObject *source,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *simple)
+{
+    MMBearer *bearer = NULL;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_mbm_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_create_bearer (MMIfaceModem *self,
+                     MMBearerProperties *properties,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_bearer);
+
+    mm_dbg ("Creating MBM bearer...");
+    mm_broadband_bearer_mbm_new (MM_BROADBAND_MODEM_MBM (self),
+                                 properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_mbm_new_ready,
+                                 result);
+}
 
 /*****************************************************************************/
 /* After SIM unlock (Modem interface) */
@@ -960,6 +1017,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_allowed_modes = load_allowed_modes;

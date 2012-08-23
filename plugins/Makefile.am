@@ -119,7 +119,9 @@ libmm_plugin_mbm_la_SOURCES = \
 	mbm/mm-plugin-mbm.c \
 	mbm/mm-plugin-mbm.h \
 	mbm/mm-broadband-modem-mbm.c \
-	mbm/mm-broadband-modem-mbm.h
+	mbm/mm-broadband-modem-mbm.h \
+	mbm/mm-broadband-bearer-mbm.c \
+	mbm/mm-broadband-bearer-mbm.h
 libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
