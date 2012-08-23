@@ -418,6 +418,52 @@ reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Factory reset (Modem interface) */
+
+static gboolean
+factory_reset_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    /* Ignore errors */
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, NULL);
+    return TRUE;
+}
+
+static const MMBaseModemAtCommand factory_reset_sequence[] = {
+    /* Init command */
+    { "&F +CMEE=0", 3, FALSE, NULL },
+    { "+COPS=0", 3, FALSE, NULL },
+    { "+CR=0", 3, FALSE, NULL },
+    { "+CRC=0", 3, FALSE, NULL },
+    { "+CREG=0", 3, FALSE, NULL },
+    { "+CMER=0", 3, FALSE, NULL },
+    { "*EPEE=0", 3, FALSE, NULL },
+    { "+CNMI=2, 0, 0, 0, 0", 3, FALSE, NULL },
+    { "+CGREG=0", 3, FALSE, NULL },
+    { "*EIAD=0", 3, FALSE, NULL },
+    { "+CGSMS=3", 3, FALSE, NULL },
+    { "+CSCA=\"\",129", 3, FALSE, NULL },
+    { NULL }
+};
+
+static void
+factory_reset (MMIfaceModem *self,
+               const gchar *code,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    mm_dbg ("Ignoring factory reset code: '%s'", code);
+
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               factory_reset_sequence,
+                               NULL,  /* response_processor_context */
+                               NULL,  /* response_processor_context_free */
+                               callback,
+                               user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -867,6 +913,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = modem_power_up_finish;
     iface->reset = reset;
     iface->reset_finish = reset_finish;
+    iface->factory_reset = factory_reset;
+    iface->factory_reset_finish = factory_reset_finish;
 }
 
 static void
