@@ -464,6 +464,65 @@ factory_reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMUnlockRetries *unlock_retries;
+    const gchar *response;
+    gint matched;
+    guint a, b, c ,d;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+
+    matched = sscanf (response, "*EPIN: %d, %d, %d, %d",
+                      &a, &b, &c, &d);
+    if (matched != 4) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse PIN retries results: '%s'",
+                     response);
+        return NULL;
+    }
+
+    if (a > 998) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Invalid PIN attempts left: '%u'",
+                     a);
+        return NULL;
+    }
+
+    unlock_retries = mm_unlock_retries_new ();
+    mm_unlock_retries_set (unlock_retries, MM_MODEM_LOCK_SIM_PIN, a);
+    mm_unlock_retries_set (unlock_retries, MM_MODEM_LOCK_SIM_PUK, b);
+    mm_unlock_retries_set (unlock_retries, MM_MODEM_LOCK_SIM_PIN2, c);
+    mm_unlock_retries_set (unlock_retries, MM_MODEM_LOCK_SIM_PUK2, d);
+    return unlock_retries;
+}
+
+static void
+load_unlock_retries (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_dbg ("loading unlock retries (mbm)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "*EPIN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -915,6 +974,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->reset_finish = reset_finish;
     iface->factory_reset = factory_reset;
     iface->factory_reset_finish = factory_reset_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
 }
 
 static void
