@@ -5640,7 +5640,7 @@ speri_ready (MMIfaceModemCdma *self,
     /* Try to parse the results */
     response = mm_strip_tag (response, "$SPERI:");
     if (!response ||
-        !mm_cdma_parse_speri_read_response (response, &roaming, NULL, NULL)) {
+        !mm_cdma_parse_eri (response, &roaming, NULL, NULL)) {
         mm_warn ("Couldn't parse SPERI response '%s'", response);
         detailed_registration_state_context_complete_and_free (ctx);
         return;

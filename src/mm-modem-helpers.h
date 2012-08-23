@@ -164,11 +164,11 @@ gboolean mm_cdma_parse_spservice_read_response (const gchar *reply,
                                                 MMModemCdmaRegistrationState *out_cdma_1x_state,
                                                 MMModemCdmaRegistrationState *out_evdo_state);
 
-/* AT$SPERI? response parser */
-gboolean mm_cdma_parse_speri_read_response (const gchar *reply,
-                                            gboolean *out_roaming,
-                                            guint32 *out_ind,
-                                            const gchar **out_desc);
+/* Generic ERI response parser */
+gboolean mm_cdma_parse_eri (const gchar *reply,
+                            gboolean *out_roaming,
+                            guint32 *out_ind,
+                            const gchar **out_desc);
 
 /* AT+CRM=? response parser */
 gboolean mm_cdma_parse_crm_test_response (const gchar *reply,

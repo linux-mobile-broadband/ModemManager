@@ -1701,10 +1701,10 @@ static const EriItem eris[] = {
 };
 
 gboolean
-mm_cdma_parse_speri_read_response (const gchar *reply,
-                                   gboolean *out_roaming,
-                                   guint *out_ind,
-                                   const gchar **out_desc)
+mm_cdma_parse_eri (const gchar *reply,
+                   gboolean *out_roaming,
+                   guint *out_ind,
+                   const gchar **out_desc)
 {
     guint ind;
     const EriItem *iter = &eris[0];

@@ -616,7 +616,7 @@ parse_modem_snapshot (DetailedRegistrationStateContext *ctx,
         gboolean roaming = FALSE;
 
         str = g_strdup_printf ("%u", eri);
-        if (mm_cdma_parse_speri_read_response (str, &roaming, NULL, NULL)) {
+        if (mm_cdma_parse_eri (str, &roaming, NULL, NULL)) {
             new_state = roaming ? MM_MODEM_CDMA_REGISTRATION_STATE_HOME : MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
             if (ctx->state.detailed_cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
                 ctx->state.detailed_cdma1x_state = new_state;
