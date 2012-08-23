@@ -554,6 +554,13 @@ setup_ports (MMBroadbandModem *_self)
         if (!ports[i])
             continue;
 
+        /* The Ericsson modems always have a free AT command port, so we
+         * don't need to flash the ports when disconnecting to get back to
+         * command mode.  F5521gw R2A07 resets port properties like echo when
+         * flashed, leading to confusion.  bgo #650740
+         */
+        g_object_set (G_OBJECT (ports[i]), MM_SERIAL_PORT_FLASH_OK, FALSE, NULL);
+
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
             self->priv->emrdy_regex,
