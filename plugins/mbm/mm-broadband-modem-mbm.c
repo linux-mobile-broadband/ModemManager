@@ -52,6 +52,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
 #define MBM_NETWORK_MODE_2G   5
 #define MBM_NETWORK_MODE_3G   6
 
+struct _MMBroadbandModemMbmPrivate {
+    guint network_mode;
+};
+
 /*****************************************************************************/
 /* After SIM unlock (Modem interface) */
 
@@ -173,12 +177,13 @@ allowed_mode_update_ready (MMBaseModem *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_allowed_modes (MMIfaceModem *_self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
     GSimpleAsyncResult *result;
     gchar *command;
     gint mbm_mode = -1;
@@ -218,6 +223,9 @@ set_allowed_modes (MMIfaceModem *self,
         return;
     }
 
+    /* Cache the value for next power-ups */
+    self->priv->network_mode = mbm_mode;
+
     command = g_strdup_printf ("+CFUN=%d", mbm_mode);
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
@@ -226,6 +234,37 @@ set_allowed_modes (MMIfaceModem *self,
         FALSE,
         (GAsyncReadyCallback)allowed_mode_update_ready,
         result);
+    g_free (command);
+}
+
+/*****************************************************************************/
+/* Powering up the modem (Modem interface) */
+
+static gboolean
+modem_power_up_finish (MMIfaceModem *self,
+                       GAsyncResult *res,
+                       GError **error)
+{
+    /* By default, errors in the power up command are ignored. */
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    return TRUE;
+}
+
+static void
+modem_power_up (MMIfaceModem *_self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
+    gchar *command;
+
+    command = g_strdup_printf ("+CFUN=%u", self->priv->network_mode);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              5,
+                              FALSE,
+                              callback,
+                              user_data);
     g_free (command);
 }
 
@@ -387,6 +426,12 @@ mm_broadband_modem_mbm_new (const gchar *device,
 static void
 mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_MODEM_MBM,
+                                              MMBroadbandModemMbmPrivate);
+
+    self->priv->network_mode = MBM_NETWORK_MODE_ANY;
 }
 
 static void
@@ -398,6 +443,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = modem_power_up_finish;
 }
 
 static void
@@ -414,4 +461,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 mm_broadband_modem_mbm_class_init (MMBroadbandModemMbmClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbmPrivate));
 }
