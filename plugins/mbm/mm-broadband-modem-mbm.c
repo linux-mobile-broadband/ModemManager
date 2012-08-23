@@ -34,8 +34,47 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-broadband-modem-mbm.h"
+#include "mm-iface-modem.h"
 
-G_DEFINE_TYPE (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BROADBAND_MODEM)
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+
+/*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return FALSE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    /* wait so sim pin is done */
+    g_timeout_add (500, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
 
 /*****************************************************************************/
 
@@ -58,6 +97,13 @@ mm_broadband_modem_mbm_new (const gchar *device,
 static void
 mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
 }
 
 static void
