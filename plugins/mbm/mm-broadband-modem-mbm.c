@@ -54,6 +54,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
 
 struct _MMBroadbandModemMbmPrivate {
     guint network_mode;
+
+    gboolean have_emrdy;
+
+    GRegex *emrdy_regex;
 };
 
 /*****************************************************************************/
@@ -240,6 +244,20 @@ set_allowed_modes (MMIfaceModem *_self,
 /*****************************************************************************/
 /* Initializing the modem (Modem interface) */
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModemMbm *self;
+} ModemInitContext;
+
+static void
+modem_init_context_complete_and_free (ModemInitContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (ModemInitContext, ctx);
+}
+
 static gboolean
 modem_init_finish (MMIfaceModem *self,
                    GAsyncResult *res,
@@ -248,6 +266,16 @@ modem_init_finish (MMIfaceModem *self,
     /* Ignore errors */
     mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, NULL);
     return TRUE;
+}
+
+static void
+init_sequence_ready (MMBaseModem *self,
+                     GAsyncResult *res,
+                     ModemInitContext *ctx)
+{
+    mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    modem_init_context_complete_and_free (ctx);
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
@@ -259,16 +287,71 @@ static const MMBaseModemAtCommand modem_init_sequence[] = {
 };
 
 static void
+run_init_sequence (ModemInitContext *ctx)
+{
+    mm_base_modem_at_sequence (MM_BASE_MODEM (ctx->self),
+                               modem_init_sequence,
+                               NULL,  /* response_processor_context */
+                               NULL,  /* response_processor_context_free */
+                               (GAsyncReadyCallback)init_sequence_ready,
+                               ctx);
+}
+
+static void
+emrdy_ready (MMBaseModem *self,
+             GAsyncResult *res,
+             ModemInitContext *ctx)
+{
+    GError *error = NULL;
+
+    /* EMRDY unsolicited response might have happened between the command
+     * submission and the response.  This was seen once:
+     *
+     * (ttyACM0): --> 'AT*EMRDY?<CR>'
+     * (ttyACM0): <-- 'T*EMRD<CR><LF>*EMRDY: 1<CR><LF>Y?'
+     *
+     * So suppress the warning if the unsolicited handler handled the response
+     * before we get here.
+     */
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        if (g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            mm_warn ("timed out waiting for EMRDY response.");
+        else
+            ctx->self->priv->have_emrdy = TRUE;
+        g_error_free (error);
+    }
+
+    run_init_sequence (ctx);
+}
+
+static void
 modem_init (MMIfaceModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                               modem_init_sequence,
-                               NULL,  /* response_processor_context */
-                               NULL,  /* response_processor_context_free */
-                               callback,
-                               user_data);
+    ModemInitContext *ctx;
+
+    ctx = g_slice_new0 (ModemInitContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_init);
+    ctx->self = g_object_ref (self);
+
+    /* Modem is ready?, no need to check EMRDY */
+    if (ctx->self->priv->have_emrdy) {
+        run_init_sequence (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "*EMRDY?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)emrdy_ready,
+                              ctx);
 }
 
 /*****************************************************************************/
@@ -440,6 +523,45 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+emrdy_received (MMAtSerialPort *port,
+                GMatchInfo *info,
+                MMBroadbandModemMbm *self)
+{
+    self->priv->have_emrdy = TRUE;
+}
+
+static void
+setup_ports (MMBroadbandModem *_self)
+{
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbm_parent_class)->setup_ports (_self);
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Setup unsolicited handlers which should be always on */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->emrdy_regex,
+            (MMAtSerialUnsolicitedMsgFn)emrdy_received,
+            self,
+            NULL);
+    }
+
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbm *
 mm_broadband_modem_mbm_new (const gchar *device,
@@ -466,6 +588,20 @@ mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
                                               MMBroadbandModemMbmPrivate);
 
     self->priv->network_mode = MBM_NETWORK_MODE_ANY;
+
+    /* Prepare regular expressions to setup */
+    self->priv->emrdy_regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n",
+                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (object);
+
+    g_regex_unref (self->priv->emrdy_regex);
+
+    G_OBJECT_CLASS (mm_broadband_modem_mbm_parent_class)->finalize (object);
 }
 
 static void
@@ -498,6 +634,10 @@ static void
 mm_broadband_modem_mbm_class_init (MMBroadbandModemMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbmPrivate));
+
+    object_class->finalize = finalize;
+    broadband_modem_class->setup_ports = setup_ports;
 }
