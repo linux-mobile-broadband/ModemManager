@@ -238,6 +238,40 @@ set_allowed_modes (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
+/* Initializing the modem (Modem interface) */
+
+static gboolean
+modem_init_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    /* Ignore errors */
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, NULL);
+    return TRUE;
+}
+
+static const MMBaseModemAtCommand modem_init_sequence[] = {
+    /* Init command */
+    { "&F E0 V1 X4 &C1 +CMEE=1", 3, FALSE, NULL },
+    /* Ensure disconnected */
+    { "*ENAP=0", 3, FALSE, NULL },
+    { NULL }
+};
+
+static void
+modem_init (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               modem_init_sequence,
+                               NULL,  /* response_processor_context */
+                               NULL,  /* response_processor_context_free */
+                               callback,
+                               user_data);
+}
+
+/*****************************************************************************/
 /* Powering up the modem (Modem interface) */
 
 static gboolean
@@ -443,6 +477,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->modem_init = modem_init;
+    iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
 }
