@@ -58,6 +58,9 @@ struct _MMBroadbandModemMbmPrivate {
     gboolean have_emrdy;
 
     GRegex *emrdy_regex;
+    GRegex *pacsp_regex;
+    GRegex *estksmenu_regex;
+    GRegex *emwi_regex;
 };
 
 /*****************************************************************************/
@@ -557,6 +560,22 @@ setup_ports (MMBroadbandModem *_self)
             (MMAtSerialUnsolicitedMsgFn)emrdy_received,
             self,
             NULL);
+
+        /* Several unsolicited messages to always ignore... */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->pacsp_regex,
+            NULL, NULL, NULL);
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->estksmenu_regex,
+            NULL, NULL, NULL);
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->emwi_regex,
+            NULL, NULL, NULL);
     }
 
 }
@@ -592,6 +611,12 @@ mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
     /* Prepare regular expressions to setup */
     self->priv->emrdy_regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->pacsp_regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n",
+                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->estksmenu_regex = g_regex_new ("\\R\\*ESTKSMENU:.*\\R",
+                                               G_REGEX_RAW | G_REGEX_OPTIMIZE | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF, G_REGEX_MATCH_NEWLINE_CRLF, NULL);
+    self->priv->emwi_regex = g_regex_new ("\\r\\n\\*EMWI: (\\d),(\\d).*\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -600,6 +625,9 @@ finalize (GObject *object)
     MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (object);
 
     g_regex_unref (self->priv->emrdy_regex);
+    g_regex_unref (self->priv->pacsp_regex);
+    g_regex_unref (self->priv->estksmenu_regex);
+    g_regex_unref (self->priv->emwi_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_mbm_parent_class)->finalize (object);
 }
