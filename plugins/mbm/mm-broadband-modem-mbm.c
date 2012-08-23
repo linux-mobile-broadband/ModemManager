@@ -61,6 +61,7 @@ struct _MMBroadbandModemMbmPrivate {
     GRegex *pacsp_regex;
     GRegex *estksmenu_regex;
     GRegex *emwi_regex;
+    GRegex *erinfo_regex;
 };
 
 /*****************************************************************************/
@@ -389,6 +390,157 @@ modem_power_up (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static void
+erinfo_received (MMAtSerialPort *port,
+                 GMatchInfo *info,
+                 MMBroadbandModemMbm *self)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    guint mode;
+
+    if (mm_get_uint_from_match_info (info, 2, &mode)) {
+        switch (mode) {
+        case 1:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+            break;
+        case 2:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+            break;
+        default:
+            break;
+        }
+    }
+
+    /* 3G modes take precedence */
+    if (mm_get_uint_from_match_info (info, 3, &mode)) {
+        switch (mode) {
+        case 1:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+            break;
+        case 2:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+            break;
+        default:
+            break;
+        }
+    }
+
+    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                               act,
+                                               MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+}
+
+static void
+set_unsolicited_events_handlers (MMBroadbandModemMbm *self,
+                                 gboolean enable)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Access technology related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->erinfo_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)erinfo_received : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+}
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MBM (self), TRUE);
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_3gpp_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MBM (self), FALSE);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_3gpp_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Enabling unsolicited events (3GPP interface) */
 
 static gboolean
@@ -585,6 +737,8 @@ setup_ports (MMBroadbandModem *_self)
             NULL, NULL, NULL);
     }
 
+    /* Now reset the unsolicited messages we'll handle when enabled */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MBM (self), FALSE);
 }
 
 /*****************************************************************************/
@@ -624,6 +778,8 @@ mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
                                                G_REGEX_RAW | G_REGEX_OPTIMIZE | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF, G_REGEX_MATCH_NEWLINE_CRLF, NULL);
     self->priv->emwi_regex = g_regex_new ("\\r\\n\\*EMWI: (\\d),(\\d).*\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->erinfo_regex = g_regex_new ("\\r\\n\\*ERINFO:\\s*(\\d),(\\d),(\\d).*\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);;
 }
 
 static void
@@ -635,6 +791,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->pacsp_regex);
     g_regex_unref (self->priv->estksmenu_regex);
     g_regex_unref (self->priv->emwi_regex);
+    g_regex_unref (self->priv->erinfo_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_mbm_parent_class)->finalize (object);
 }
@@ -663,6 +820,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_3gpp_disable_unsolicited_events_finish;
+
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
