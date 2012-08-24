@@ -1551,7 +1551,9 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
 {
     SetBandsContext *ctx;
     GArray *supported_bands_array;
+    GArray *current_bands_array;
     GError *error = NULL;
+    gchar *bands_string;
 
     /* If setting allowed bands is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands ||
@@ -1565,6 +1567,9 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
         return;
     }
 
+    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
+                                                 bands_array->len);
+
     /* Setup context */
     ctx = g_new0 (SetBandsContext, 1);
     ctx->self = g_object_ref (self);
@@ -1575,29 +1580,75 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
-    ctx->bands_array = g_array_ref (bands_array);
 
     /* Get list of supported bands */
     supported_bands_array = (mm_common_bands_variant_to_garray (
                                  mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
 
+    /* Set ctx->bands_array to target list of bands before comparing with current list
+     * of bands. If input list of bands contains only ANY, target list of bands is set
+     * to list of supported bands excluding ANY. */
+    if (bands_array->len == 1 &&
+        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        guint i;
+        ctx->bands_array = g_array_sized_new (FALSE,
+                                              FALSE,
+                                              sizeof (MMModemBand),
+                                              supported_bands_array->len);
+        for (i = 0; i < supported_bands_array->len; i++) {
+            MMModemBand band = g_array_index (supported_bands_array, MMModemBand, i);
+            if (band != MM_MODEM_BAND_ANY)
+                g_array_insert_val (ctx->bands_array, i, band);
+        }
+    } else {
+        ctx->bands_array = g_array_ref (bands_array);
+    }
+
+    /* Simply return if target list of bands equals to current list of bands */
+    current_bands_array = (mm_common_bands_variant_to_garray (
+                              mm_gdbus_modem_get_bands (ctx->skeleton)));
+    if (mm_common_bands_garray_cmp (ctx->bands_array, current_bands_array)) {
+        mm_dbg ("Requested list of bands (%s) is equal to the current ones, skipping re-set",
+                bands_string);
+        g_free (bands_string);
+        g_array_unref (supported_bands_array);
+        g_array_unref (current_bands_array);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_bands_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Done comparison with current list of bands. Always use input list of bands
+     * when setting bands */
+    if (ctx->bands_array != bands_array) {
+        g_array_unref (ctx->bands_array);
+        ctx->bands_array = g_array_ref (bands_array);
+    }
+
     /* Validate input list of bands */
     if (!validate_bands (supported_bands_array,
                          ctx->bands_array,
                          &error)) {
+        mm_dbg ("Requested list of bands (%s) cannot be handled",
+                bands_string);
+        g_free (bands_string);
         g_array_unref (supported_bands_array);
+        g_array_unref (current_bands_array);
         g_simple_async_result_take_error (ctx->result, error);
         set_bands_context_complete_and_free (ctx);
         return;
     }
 
+    mm_dbg ("Setting new list of bands: '%s'", bands_string);
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands (
         self,
-        bands_array,
+        ctx->bands_array,
         (GAsyncReadyCallback)set_bands_ready,
         ctx);
 
     g_array_unref (supported_bands_array);
+    g_array_unref (current_bands_array);
+    g_free (bands_string);
 }
 
 typedef struct {
