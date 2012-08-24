@@ -49,6 +49,20 @@ struct _MMModemIceraPrivate {
 
 #define MM_MODEM_ICERA_GET_PRIVATE(m) (MM_MODEM_ICERA_GET_INTERFACE (m)->get_private(m))
 
+static void connect_pending_done (MMModemIcera *self);
+
+
+static void
+cleanup_configure_context (MMModemIcera *self)
+{
+    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
+
+    if (priv->configure_context_id != 0) {
+        g_source_remove (priv->configure_context_id);
+        priv->configure_context_id = 0;
+    }
+}
+
 static void
 get_allowed_mode_done (MMAtSerialPort *port,
                        GString *response,
@@ -325,6 +339,10 @@ mm_modem_icera_do_disconnect (MMGenericGsm *gsm,
     MMAtSerialPort *primary;
     char *command;
 
+    /* Cleanup any running connect stuff */
+    cleanup_configure_context (MM_MODEM_ICERA (gsm));
+    connect_pending_done (MM_MODEM_ICERA (gsm));
+
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
@@ -564,8 +582,8 @@ old_context_clear_done (MMAtSerialPort *port,
     icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_connected, info);
 }
 
-static void configure_context(MMAtSerialPort *port, MMCallbackInfo *info,
-                              char *username, char *password, gint cid);
+static void configure_context (MMAtSerialPort *port, MMCallbackInfo *info,
+                               char *username, char *password, gint cid);
 
 static gboolean
 retry_config_context (gpointer data)
@@ -578,7 +596,7 @@ retry_config_context (gpointer data)
     priv->configure_context_id = 0;
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    configure_context (primary, info, priv->username, priv->password, _get_cid(self));
+    configure_context (primary, info, priv->username, priv->password, _get_cid (self));
     return FALSE;
 }
 
@@ -653,7 +671,7 @@ mm_modem_icera_do_connect (MMModemIcera *self,
     g_assert (primary);
 
     priv->configure_context_tries = 0;
-    configure_context(primary, info, priv->username, priv->password, _get_cid(self));
+    configure_context (primary, info, priv->username, priv->password, _get_cid (self));
 }
 
 /****************************************************************/
@@ -874,10 +892,7 @@ mm_modem_icera_cleanup (MMModemIcera *self)
 
     /* Clear the pending connection if necessary */
     connect_pending_done (self);
-    if (priv->configure_context_id != 0) {
-        g_source_remove (priv->configure_context_id);
-        priv->configure_context_id = 0;
-    }
+    cleanup_configure_context (self);
 
     g_free (priv->username);
     priv->username = NULL;
