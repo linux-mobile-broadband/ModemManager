@@ -10,7 +10,8 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 	for option in -Wmissing-declarations -Wmissing-prototypes \
 		      -Wdeclaration-after-statement -Wstrict-prototypes \
 		      -Wno-unused-parameter -Wno-sign-compare \
-		      -fno-strict-aliasing -Wno-deprecated-declarations; do
+		      -fno-strict-aliasing -Wno-deprecated-declarations \
+		      -Wno-unused-but-set-variable; do
 		SAVE_CFLAGS="$CFLAGS"
 		CFLAGS="$CFLAGS $option"
 		AC_MSG_CHECKING([whether gcc understands $option])
