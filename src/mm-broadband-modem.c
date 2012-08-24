@@ -1364,6 +1364,7 @@ signal_quality_cind (SignalQualityContext *ctx)
                                    "+CIND?",
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)signal_quality_cind_ready,
                                    ctx);
@@ -1772,6 +1773,7 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
                                        ctx->command,
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)unsolicited_events_setup_ready,
                                        ctx);
@@ -2881,6 +2883,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                        command,
                                        120,
                                        FALSE,
+                                       FALSE, /* raw */
                                        ctx->cancellable,
                                        (GAsyncReadyCallback)register_in_3gpp_network_ready,
                                        ctx);
@@ -3317,6 +3320,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
                 g_variant_get_string (command, NULL),
                 3,
                 FALSE,
+                FALSE, /* raw */
                 NULL, /* cancellable */
                 (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
                 ctx);
@@ -6366,12 +6370,12 @@ open_ports_initialization (MMBroadbandModem *self,
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    ctx->primary,
                                    "E0", 3,
-                                   FALSE, NULL, NULL, NULL);
+                                   FALSE, FALSE, NULL, NULL, NULL);
     /* Try to get extended errors */
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    ctx->primary,
                                    "+CMEE=1", 3,
-                                   FALSE, NULL, NULL, NULL);
+                                   FALSE, FALSE, NULL, NULL, NULL);
 
     return TRUE;
 }

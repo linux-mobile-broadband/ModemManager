@@ -1054,6 +1054,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
         "^CURC=0",
         5,
         FALSE, /* allow_cached */
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
         result);

@@ -173,6 +173,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                        "+CGATT=1",
                                        10,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)cgatt_ready,
                                        ctx);
@@ -201,6 +202,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                            command,
                                            3,
                                            FALSE,
+                                           FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)authenticate_ready,
                                            ctx);
@@ -218,6 +220,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                            command,
                                            3,
                                            FALSE,
+                                           FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)scact_ready,
                                            ctx);
@@ -350,6 +353,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        command,
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)disconnect_scact_ready,
                                        result);

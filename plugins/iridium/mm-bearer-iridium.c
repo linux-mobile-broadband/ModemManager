@@ -155,6 +155,7 @@ dial_ready (MMBaseModem *modem,
             "+CEER",
             3,
             FALSE,
+            FALSE, /* raw */
             NULL, /* cancellable */
             (GAsyncReadyCallback)connect_report_ready,
             ctx);
@@ -215,6 +216,7 @@ service_type_ready (MMBaseModem *modem,
         "ATDT008816000025",
         60,
         FALSE,
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)dial_ready,
         ctx);
@@ -255,6 +257,7 @@ connect (MMBearer *self,
         "+CBST=71,0,1",
         3,
         FALSE,
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)service_type_ready,
         ctx);

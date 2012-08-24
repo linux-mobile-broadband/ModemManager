@@ -451,8 +451,8 @@ at_command_context_free (AtCommandContext *ctx)
 
 const gchar *
 mm_base_modem_at_command_full_finish (MMBaseModem *self,
-                                         GAsyncResult *res,
-                                         GError **error)
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
@@ -497,6 +497,7 @@ mm_base_modem_at_command_full (MMBaseModem *self,
                                const gchar *command,
                                guint timeout,
                                gboolean allow_cached,
+                               gboolean is_raw,
                                GCancellable *cancellable,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
@@ -531,14 +532,13 @@ mm_base_modem_at_command_full (MMBaseModem *self,
                                                    NULL);
     }
 
-
     /* Go on with the command */
     if (allow_cached)
         mm_at_serial_port_queue_command_cached (
             port,
             command,
             timeout,
-            FALSE,
+            is_raw,
             ctx->cancellable,
             (MMAtSerialResponseFn)at_command_parse_response,
             ctx);
@@ -547,7 +547,7 @@ mm_base_modem_at_command_full (MMBaseModem *self,
             port,
             command,
             timeout,
-            FALSE,
+            is_raw,
             ctx->cancellable,
             (MMAtSerialResponseFn)at_command_parse_response,
             ctx);
@@ -588,6 +588,7 @@ mm_base_modem_at_command (MMBaseModem *self,
                                    command,
                                    timeout,
                                    allow_cached,
+                                   FALSE,
                                    NULL,
                                    callback,
                                    user_data);

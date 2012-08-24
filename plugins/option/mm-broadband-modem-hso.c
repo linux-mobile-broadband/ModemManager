@@ -481,6 +481,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
                                        "_OGPS=0",
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)gps_disabled_ready,
                                        result);
@@ -582,6 +583,7 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
                                        "_OGPS=2",
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)gps_enabled_ready,
                                        ctx);
@@ -659,7 +661,7 @@ setup_ports (MMBroadbandModem *self)
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                        gps_control_port,
                                        "_OGPS=0",
-                                       3, FALSE, NULL, NULL, NULL);
+                                       3, FALSE, FALSE, NULL, NULL, NULL);
 
         /* Add handler for the NMEA traces */
         mm_gps_serial_port_add_trace_handler (gps_data_port,

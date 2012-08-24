@@ -267,6 +267,7 @@ load_allowed_modes (MMIfaceModem *self,
                                    "!SELRAT?",
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)selrat_query_ready,
                                    result);
@@ -381,6 +382,7 @@ set_allowed_modes (MMIfaceModem *self,
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)selrat_set_ready,
                                    result);

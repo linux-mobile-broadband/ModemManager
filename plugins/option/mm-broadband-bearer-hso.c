@@ -212,19 +212,21 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
     gchar *command;
 
     command = g_strdup_printf ("AT_OWANDATA=%d", cid);
-    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
-                                   primary,
-                                   command,
-                                   3,
-                                   FALSE,
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback)ip_config_ready,
-                                   get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_HSO (self),
-                                                                   MM_BASE_MODEM (modem),
-                                                                   primary,
-                                                                   cid,
-                                                                   callback,
-                                                                   user_data));
+    mm_base_modem_at_command_full (
+        MM_BASE_MODEM (modem),
+        primary,
+        command,
+        3,
+        FALSE,
+        FALSE, /* raw */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)ip_config_ready,
+        get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_HSO (self),
+                                        MM_BASE_MODEM (modem),
+                                        primary,
+                                        cid,
+                                        callback,
+                                        user_data));
     g_free (command);
 }
 
@@ -401,6 +403,7 @@ connect_reset (Dial3gppContext *ctx)
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)connect_reset_ready,
                                    ctx);
@@ -537,6 +540,7 @@ authenticate_ready (MMBaseModem *modem,
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)activate_ready,
                                    g_object_ref (ctx->self)); /* we pass the bearer object! */
@@ -588,6 +592,7 @@ authenticate (Dial3gppContext *ctx)
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)authenticate_ready,
                                    ctx);
@@ -693,6 +698,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)disconnect_owancall_ready,
                                    ctx);

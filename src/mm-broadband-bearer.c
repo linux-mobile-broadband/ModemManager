@@ -306,6 +306,7 @@ cdma_connect_context_dial (DetailedConnectContext *ctx)
                                    command,
                                    90,
                                    FALSE,
+                                   FALSE,
                                    NULL,
                                    (GAsyncReadyCallback)dial_cdma_ready,
                                    ctx);
@@ -392,6 +393,7 @@ current_rm_protocol_ready (MMBaseModem *self,
                                        command,
                                        3,
                                        FALSE,
+                                       FALSE,
                                        NULL,
                                        (GAsyncReadyCallback)set_rm_protocol_ready,
                                        ctx);
@@ -444,6 +446,7 @@ connect_cdma (MMBroadbandBearer *self,
                                        "+CRM?",
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)current_rm_protocol_ready,
                                        ctx);
@@ -584,6 +587,7 @@ atd_ready (MMBaseModem *modem,
                                        "+CEER",
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)extended_error_ready,
                                        ctx);
@@ -623,6 +627,7 @@ dial_3gpp (MMBroadbandBearer *self,
                                    command,
                                    60,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)atd_ready,
                                    ctx);
@@ -805,6 +810,7 @@ find_cid_ready (MMBaseModem *modem,
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)initialize_pdp_context_ready,
                                    ctx);
@@ -1511,6 +1517,7 @@ primary_flash_3gpp_ready (MMSerialPort *port,
                                    ctx->cgact_command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)cgact_primary_ready,
                                    ctx);
@@ -1577,6 +1584,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        ctx->cgact_command,
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)cgact_secondary_ready,
                                        ctx);
@@ -1990,6 +1998,7 @@ interface_initialization_step (InitAsyncContext *ctx)
                                            "+CRM=?",
                                            3,
                                            TRUE, /* getting range, so reply can be cached */
+                                           FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)crm_range_ready,
                                            ctx);

@@ -244,6 +244,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
                                        command,
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)ip_config_ready,
                                        ctx);
@@ -441,6 +442,7 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
         command,
         60,
         FALSE,
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_ipdpact_ready,
         g_object_ref (ctx->self)); /* we pass the bearer object! */
@@ -553,6 +555,7 @@ connect_reset (Dial3gppContext *ctx)
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)connect_reset_ready,
                                    ctx);
@@ -685,6 +688,7 @@ report_connect_status (MMBroadbandBearerIcera *self,
             "%IER?",
             60,
             FALSE,
+            FALSE, /* raw */
             NULL, /* cancellable */
             (GAsyncReadyCallback)ier_query_ready,
             ctx);
@@ -781,6 +785,7 @@ deactivate_ready (MMBaseModem *modem,
         command,
         60,
         FALSE,
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)activate_ready,
         g_object_ref (ctx->self)); /* we pass the bearer object! */
@@ -820,6 +825,7 @@ authenticate_ready (MMBaseModem *modem,
         command,
         60,
         FALSE,
+        FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)deactivate_ready,
         ctx);
@@ -856,6 +862,7 @@ authenticate (Dial3gppContext *ctx)
                                    command,
                                    60,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)authenticate_ready,
                                    ctx);

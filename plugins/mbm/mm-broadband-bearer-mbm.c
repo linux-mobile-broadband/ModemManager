@@ -287,6 +287,7 @@ poll_timeout_cb (MMBroadbandBearerMbm *self)
                                    "AT*ENAP?",
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)poll_ready,
                                    g_object_ref (ctx->self)); /* we pass the bearer object! */
@@ -360,6 +361,7 @@ activate (Dial3gppContext *ctx)
                                    command,
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)activate_ready,
                                    g_object_ref (ctx->self)); /* we pass the bearer object! */
@@ -416,6 +418,7 @@ authenticate (Dial3gppContext *ctx)
                                        command,
                                        3,
                                        FALSE,
+                                       FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)authenticate_ready,
                                        ctx);
@@ -522,6 +525,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                    "*ENAP=0",
                                    3,
                                    FALSE,
+                                   FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)disconnect_enap_ready,
                                    ctx);

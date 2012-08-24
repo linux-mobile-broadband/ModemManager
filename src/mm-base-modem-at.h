@@ -149,6 +149,7 @@ void mm_base_modem_at_command_full                (MMBaseModem *self,
                                                    const gchar *command,
                                                    guint timeout,
                                                    gboolean allow_cached,
+                                                   gboolean is_raw,
                                                    GCancellable *cancellable,
                                                    GAsyncReadyCallback callback,
                                                    gpointer user_data);
