@@ -26,7 +26,7 @@
 
 #include "mm-plugin-novatel.h"
 #include "mm-private-boxed-types.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-novatel.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginNovatel, mm_plugin_novatel, MM_TYPE_PLUGIN)
@@ -43,11 +43,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_novatel_new (sysfs_path,
+                                                          driver,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
 }
 
 /*****************************************************************************/
