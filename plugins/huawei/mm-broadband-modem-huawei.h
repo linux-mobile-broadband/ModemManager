@@ -43,7 +43,7 @@ struct _MMBroadbandModemHuaweiClass{
 GType mm_broadband_modem_huawei_get_type (void);
 
 MMBroadbandModemHuawei *mm_broadband_modem_huawei_new (const gchar *device,
-                                                       const gchar *driver,
+                                                       const gchar **driver,
                                                        const gchar *plugin,
                                                        guint16 vendor_id,
                                                        guint16 product_id);

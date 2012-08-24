@@ -47,6 +47,8 @@ full_functionality_status_ready (MMBaseModem *self,
                                  GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
+    guint i;
+    const gchar **drivers;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
         g_simple_async_result_take_error (simple, error);
@@ -59,11 +61,14 @@ full_functionality_status_ready (MMBaseModem *self,
      * away but need some time to finish initialization.  Anything driven by
      * 'sierra' is new enough to need no delay.
      */
-    if (g_str_equal (mm_base_modem_get_driver (MM_BASE_MODEM (self)), "sierra")) {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
+    drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
+    for (i = 0; drivers[i]; i++) {
+        if (g_str_equal (drivers[i], "sierra")) {
+            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+            g_simple_async_result_complete (simple);
+            g_object_unref (simple);
+            return;
+        }
     }
 
     /* The modem object will be valid in the callback as 'result' keeps a

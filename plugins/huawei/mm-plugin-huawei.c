@@ -415,7 +415,7 @@ propagate_port_mode_results (GList *probes)
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
-              const gchar *driver,
+              const gchar **drivers,
               guint16 vendor,
               guint16 product,
               GList *probes,
@@ -424,7 +424,7 @@ create_modem (MMPlugin *self,
     propagate_port_mode_results (probes);
 
     return MM_BASE_MODEM (mm_broadband_modem_huawei_new (sysfs_path,
-                                                         driver,
+                                                         drivers,
                                                          mm_plugin_get_name (self),
                                                          vendor,
                                                          product));

@@ -220,6 +220,7 @@ print_bearer_short_info (MMBearer *bearer)
 static void
 print_modem_info (void)
 {
+    gchar *drivers_string;
     gchar *prefixed_revision;
     gchar *capabilities_string;
     gchar *access_technologies_string;
@@ -272,6 +273,15 @@ print_modem_info (void)
     } else
         own_numbers_string = NULL;
 
+    if (mm_modem_get_drivers (ctx->modem)) {
+        drivers_string = g_strjoinv (", ", (gchar **)mm_modem_get_drivers (ctx->modem));
+        if (!drivers_string[0]) {
+            g_free (drivers_string);
+            drivers_string = NULL;
+        }
+    } else
+        drivers_string = NULL;
+
     /* Rework possible multiline strings */
     prefixed_revision = mmcli_prefix_newlines ("           |                  ",
                                                mm_modem_get_revision (ctx->modem));
@@ -298,10 +308,10 @@ print_modem_info (void)
     /* System related stuff */
     g_print ("  -------------------------\n"
              "  System   |         device: '%s'\n"
-             "           |         driver: '%s'\n"
+             "           |        drivers: '%s'\n"
              "           |         plugin: '%s'\n",
              VALIDATE_UNKNOWN (mm_modem_get_device (ctx->modem)),
-             VALIDATE_UNKNOWN (mm_modem_get_driver (ctx->modem)),
+             VALIDATE_UNKNOWN (drivers_string),
              VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)));
 
     /* Numbers related stuff */
@@ -410,6 +420,7 @@ print_modem_info (void)
     g_free (supported_modes_string);
     g_free (unlock_retries_string);
     g_free (own_numbers_string);
+    g_free (drivers_string);
 }
 
 static void

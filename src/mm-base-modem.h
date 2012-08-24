@@ -44,7 +44,7 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 #define MM_BASE_MODEM_MAX_TIMEOUTS   "base-modem-max-timeouts"
 #define MM_BASE_MODEM_VALID          "base-modem-valid"
 #define MM_BASE_MODEM_DEVICE         "base-modem-device"
-#define MM_BASE_MODEM_DRIVER         "base-modem-driver"
+#define MM_BASE_MODEM_DRIVERS        "base-modem-drivers"
 #define MM_BASE_MODEM_PLUGIN         "base-modem-plugin"
 #define MM_BASE_MODEM_VENDOR_ID      "base-modem-vendor-id"
 #define MM_BASE_MODEM_PRODUCT_ID     "base-modem-product-id"
@@ -131,9 +131,9 @@ void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
 gboolean mm_base_modem_get_valid    (MMBaseModem *self);
 
-const gchar *mm_base_modem_get_device (MMBaseModem *self);
-const gchar *mm_base_modem_get_driver (MMBaseModem *self);
-const gchar *mm_base_modem_get_plugin (MMBaseModem *self);
+const gchar  *mm_base_modem_get_device  (MMBaseModem *self);
+const gchar **mm_base_modem_get_drivers (MMBaseModem *self);
+const gchar  *mm_base_modem_get_plugin  (MMBaseModem *self);
 
 guint mm_base_modem_get_vendor_id  (MMBaseModem *self);
 guint mm_base_modem_get_product_id (MMBaseModem *self);

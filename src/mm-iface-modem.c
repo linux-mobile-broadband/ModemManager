@@ -3185,14 +3185,14 @@ interface_initialization_step (InitializationContext *ctx)
             g_free (device);
         }
         /* Load driver if not done before */
-        if (!mm_gdbus_modem_get_driver (ctx->skeleton)) {
-            gchar *driver;
+        if (!mm_gdbus_modem_get_drivers (ctx->skeleton)) {
+            gchar **drivers;
 
             g_object_get (ctx->self,
-                          MM_BASE_MODEM_DRIVER, &driver,
+                          MM_BASE_MODEM_DRIVERS, &drivers,
                           NULL);
-            mm_gdbus_modem_set_driver (ctx->skeleton, driver);
-            g_free (driver);
+            mm_gdbus_modem_set_drivers (ctx->skeleton, (const gchar * const *)drivers);
+            g_strfreev (drivers);
         }
         /* Load plugin if not done before */
         if (!mm_gdbus_modem_get_plugin (ctx->skeleton)) {
@@ -3563,7 +3563,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_own_numbers (skeleton, NULL);
         mm_gdbus_modem_set_device_identifier (skeleton, NULL);
         mm_gdbus_modem_set_device (skeleton, NULL);
-        mm_gdbus_modem_set_driver (skeleton, NULL);
+        mm_gdbus_modem_set_drivers (skeleton, NULL);
         mm_gdbus_modem_set_plugin (skeleton, NULL);
         mm_gdbus_modem_set_equipment_identifier (skeleton, NULL);
         mm_gdbus_modem_set_unlock_required (skeleton, MM_MODEM_LOCK_UNKNOWN);

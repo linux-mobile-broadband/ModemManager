@@ -43,7 +43,7 @@ struct _MMBroadbandModemNovatelClass{
 GType mm_broadband_modem_novatel_get_type (void);
 
 MMBroadbandModemNovatel *mm_broadband_modem_novatel_new (const gchar *device,
-                                                         const gchar *driver,
+                                                         const gchar **drivers,
                                                          const gchar *plugin,
                                                          guint16 vendor_id,
                                                          guint16 product_id);

@@ -199,34 +199,45 @@ apply_pre_probing_filters (MMPlugin *self,
      * drivers are not supported. If that is the case, filter by driver */
     if (self->priv->drivers ||
         self->priv->forbidden_drivers) {
-        const gchar *driver;
+        static const gchar *virtual_drivers [] = { "virtual", NULL };
+        const gchar **drivers;
 
         /* Detect any modems accessible through the list of virtual ports */
-        driver = (is_virtual_port (g_udev_device_get_name (port)) ?
-                  "virtual" :
-                  mm_device_get_driver (device));
+        drivers = (is_virtual_port (g_udev_device_get_name (port)) ?
+                   virtual_drivers :
+                   mm_device_get_drivers (device));
 
         /* If error retrieving driver: unsupported */
-        if (!driver)
+        if (!drivers)
             return TRUE;
 
         /* Filtering by allowed drivers */
         if (self->priv->drivers) {
-            for (i = 0; self->priv->drivers[i]; i++) {
-                if (g_str_equal (driver, self->priv->drivers[i]))
-                    break;
+            gboolean found = FALSE;
+
+            for (i = 0; self->priv->drivers[i] && !found; i++) {
+                guint j;
+
+                for (j = 0; drivers[j] && !found; j++) {
+                    if (g_str_equal (drivers[j], self->priv->drivers[i]))
+                        found = TRUE;
+                }
             }
 
             /* If we didn't match any driver: unsupported */
-            if (!self->priv->drivers[i])
+            if (!found)
                 return TRUE;
         }
         /* Filtering by forbidden drivers */
         else {
             for (i = 0; self->priv->forbidden_drivers[i]; i++) {
-                /* If we match a forbidden driver: unsupported */
-                if (g_str_equal (driver, self->priv->forbidden_drivers[i]))
-                    return TRUE;
+                guint j;
+
+                for (j = 0; drivers[j]; j++) {
+                    /* If we match a forbidden driver: unsupported */
+                    if (g_str_equal (drivers[j], self->priv->forbidden_drivers[i]))
+                        return TRUE;
+                }
             }
         }
     }
@@ -662,7 +673,7 @@ mm_plugin_create_modem (MMPlugin  *self,
     /* Let the plugin create the modem from the port probe results */
     modem = MM_PLUGIN_GET_CLASS (self)->create_modem (MM_PLUGIN (self),
                                                       mm_device_get_path (device),
-                                                      mm_device_get_driver (device),
+                                                      mm_device_get_drivers (device),
                                                       mm_device_get_vendor (device),
                                                       mm_device_get_product (device),
                                                       port_probes,

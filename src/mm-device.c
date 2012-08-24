@@ -53,8 +53,8 @@ struct _MMDevicePrivate {
     guint16 vendor;
     guint16 product;
 
-    /* Kernel driver managing this device */
-    gchar *driver;
+    /* Kernel drivers managing this device */
+    gchar **drivers;
 
     /* Best plugin to manage this device */
     MMPlugin *plugin;
@@ -217,6 +217,37 @@ get_driver_name (GUdevDevice *device)
     return ret;
 }
 
+static void
+add_port_driver (MMDevice *self,
+                 GUdevDevice *udev_port)
+{
+    gchar *driver = NULL;
+    guint n_items;
+    guint i;
+
+    driver = get_driver_name (udev_port);
+
+    n_items = (self->priv->drivers ? g_strv_length (self->priv->drivers) : 0);
+    if (n_items > 0) {
+        /* Add driver to our list of drivers, if not already there */
+        for (i = 0; self->priv->drivers[i]; i++) {
+            if (g_str_equal (self->priv->drivers[i], driver)) {
+                g_free (driver);
+                driver = NULL;
+                break;
+            }
+        }
+    }
+
+    if (!driver)
+        return;
+
+    self->priv->drivers = g_realloc (self->priv->drivers,
+                                     (n_items + 2) * sizeof (gchar *));
+    self->priv->drivers[n_items] = driver;
+    self->priv->drivers[n_items + 1] = NULL;
+}
+
 void
 mm_device_grab_port (MMDevice    *self,
                      GUdevDevice *udev_port)
@@ -226,10 +257,8 @@ mm_device_grab_port (MMDevice    *self,
     if (mm_device_owns_port (self, udev_port))
         return;
 
-    /* Get the driver name and vendor/product IDs out of the first port
-     * grabbed */
+    /* Get the vendor/product IDs out of the first port grabbed */
     if (!self->priv->port_probes) {
-        self->priv->driver = get_driver_name (udev_port);
         if (!get_device_ids (udev_port,
                              &self->priv->vendor,
                              &self->priv->product)) {
@@ -237,6 +266,9 @@ mm_device_grab_port (MMDevice    *self,
                     self->priv->udev_device_path);
         }
     }
+
+    /* Add new port driver */
+    add_port_driver (self, udev_port);
 
     /* Create and store new port probe */
     probe = mm_port_probe_new (self, udev_port);
@@ -438,10 +470,10 @@ mm_device_get_path (MMDevice *self)
     return self->priv->udev_device_path;
 }
 
-const gchar *
-mm_device_get_driver (MMDevice *self)
+const gchar **
+mm_device_get_drivers (MMDevice *self)
 {
-    return self->priv->driver;
+    return (const gchar **)self->priv->drivers;
 }
 
 guint16
@@ -636,7 +668,7 @@ finalize (GObject *object)
     MMDevice *self = MM_DEVICE (object);
 
     g_free (self->priv->udev_device_path);
-    g_free (self->priv->driver);
+    g_strfreev (self->priv->drivers);
 
     G_OBJECT_CLASS (mm_device_parent_class)->finalize (object);
 }

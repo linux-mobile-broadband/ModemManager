@@ -280,12 +280,12 @@
     <property name="Device" type="s" access="read" />
 
     <!--
-        Driver:
+        Drivers:
 
-        The Operating System device driver handling communication with the modem
+        The Operating System device drivers handling communication with the modem
         hardware.
     -->
-    <property name="Driver" type="s" access="read" />
+    <property name="Drivers" type="as" access="read" />
 
     <!--
         Plugin:

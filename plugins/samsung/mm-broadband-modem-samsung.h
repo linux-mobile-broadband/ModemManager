@@ -41,7 +41,7 @@ struct _MMBroadbandModemSamsungClass{
 GType mm_broadband_modem_samsung_get_type (void);
 
 MMBroadbandModemSamsung *mm_broadband_modem_samsung_new (const gchar *device,
-                                                         const gchar *driver,
+                                                         const gchar **drivers,
                                                          const gchar *plugin,
                                                          guint16 vendor_id,
                                                          guint16 product_id);

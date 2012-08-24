@@ -74,18 +74,18 @@ gboolean mm_device_create_modem (MMDevice                  *self,
                                  GError                   **error);
 void     mm_device_remove_modem (MMDevice  *self);
 
-const gchar *mm_device_get_path         (MMDevice *self);
-const gchar *mm_device_get_driver       (MMDevice *self);
-guint16      mm_device_get_vendor       (MMDevice *self);
-guint16      mm_device_get_product      (MMDevice *self);
-GUdevDevice *mm_device_peek_udev_device (MMDevice *self);
-GUdevDevice *mm_device_get_udev_device  (MMDevice *self);
-void         mm_device_set_plugin       (MMDevice *self,
-                                         GObject  *plugin);
-GObject     *mm_device_peek_plugin      (MMDevice *self);
-GObject     *mm_device_get_plugin       (MMDevice *self);
-MMBaseModem *mm_device_peek_modem       (MMDevice *self);
-MMBaseModem *mm_device_get_modem        (MMDevice *self);
+const gchar  *mm_device_get_path         (MMDevice *self);
+const gchar **mm_device_get_drivers      (MMDevice *self);
+guint16       mm_device_get_vendor       (MMDevice *self);
+guint16       mm_device_get_product      (MMDevice *self);
+GUdevDevice  *mm_device_peek_udev_device (MMDevice *self);
+GUdevDevice  *mm_device_get_udev_device  (MMDevice *self);
+void          mm_device_set_plugin       (MMDevice *self,
+                                          GObject  *plugin);
+GObject      *mm_device_peek_plugin      (MMDevice *self);
+GObject      *mm_device_get_plugin       (MMDevice *self);
+MMBaseModem  *mm_device_peek_modem       (MMDevice *self);
+MMBaseModem  *mm_device_get_modem        (MMDevice *self);
 
 GObject     *mm_device_peek_port_probe      (MMDevice *self,
                                              GUdevDevice *udev_port);

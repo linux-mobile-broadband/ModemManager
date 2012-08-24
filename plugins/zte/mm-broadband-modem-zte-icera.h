@@ -43,7 +43,7 @@ struct _MMBroadbandModemZteIceraClass{
 GType mm_broadband_modem_zte_icera_get_type (void);
 
 MMBroadbandModemZteIcera *mm_broadband_modem_zte_icera_new (const gchar *device,
-                                                            const gchar *driver,
+                                                            const gchar **drivers,
                                                             const gchar *plugin,
                                                             guint16 vendor_id,
                                                             guint16 product_id);

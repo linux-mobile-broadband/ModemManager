@@ -43,7 +43,7 @@ struct _MMBroadbandModemOptionClass{
 GType mm_broadband_modem_option_get_type (void);
 
 MMBroadbandModemOption *mm_broadband_modem_option_new (const gchar *device,
-                                                       const gchar *driver,
+                                                       const gchar **drivers,
                                                        const gchar *plugin,
                                                        guint16 vendor_id,
                                                        guint16 product_id);

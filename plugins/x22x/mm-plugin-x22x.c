@@ -181,14 +181,14 @@ x22x_custom_init (MMPortProbe *probe,
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
-              const gchar *driver,
+              const gchar **drivers,
               guint16 vendor,
               guint16 product,
               GList *probes,
               GError **error)
 {
     return MM_BASE_MODEM (mm_broadband_modem_x22x_new (sysfs_path,
-                                                       driver,
+                                                       drivers,
                                                        mm_plugin_get_name (self),
                                                        vendor,
                                                        product));

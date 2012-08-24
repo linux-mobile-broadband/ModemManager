@@ -382,41 +382,39 @@ mm_modem_dup_device (MMModem *self)
 }
 
 /**
- * mm_modem_get_driver:
+ * mm_modem_get_drivers:
  * @self: A #MMModem.
  *
- * Gets the Operating System device driver handling communication with the modem
+ * Gets the Operating System device drivers handling communication with the modem
  * hardware.
  *
  * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_modem_dup_driver() if on another thread.</warning>
  *
- * Returns: (transfer none): The driver, or %NULL if none available.
+ * Returns: (transfer none): The drivers, or %NULL if none available.
  */
-const gchar *
-mm_modem_get_driver (MMModem *self)
+const gchar * const *
+mm_modem_get_drivers (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_modem_get_driver (self));
+    return mm_gdbus_modem_get_drivers (self);
 }
 
 /**
- * mm_modem_dup_driver:
+ * mm_modem_dup_drivers:
  * @self: A #MMModem.
  *
  * Gets a copy of the Operating System device driver handling communication with the modem
  * hardware.
  *
- * Returns: (transfer full): The driver, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The drivers, or %NULL if none available. The returned value should be freed with g_strfreev().
  */
-gchar *
-mm_modem_dup_driver (MMModem *self)
+gchar **
+mm_modem_dup_drivers (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    RETURN_NON_EMPTY_STRING (
-        mm_gdbus_modem_dup_driver (self));
+    return mm_gdbus_modem_dup_drivers (self);
 }
 
 /**
