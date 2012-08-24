@@ -1054,11 +1054,12 @@ try_open (gpointer user_data)
     return FALSE;
 }
 
-gboolean
-mm_plugin_base_probe_port (MMPluginBase *self,
-                           MMPluginBaseSupportsTask *task,
-                           guint64 send_delay_us,
-                           GError **error)
+static gboolean
+_internal_probe_port (MMPluginBase *self,
+                      MMPluginBaseSupportsTask *task,
+                      guint64 send_delay_us,
+                      gboolean remove_echo,
+                      GError **error)
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMAtSerialPort *serial;
@@ -1085,6 +1086,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
                   MM_SERIAL_PORT_SEND_DELAY, send_delay_us,
                   MM_PORT_CARRIER_DETECT, FALSE,
                   MM_SERIAL_PORT_SPEW_CONTROL, TRUE,
+                  MM_AT_SERIAL_PORT_REMOVE_ECHO, remove_echo,
                   NULL);
 
     mm_at_serial_port_set_response_parser (serial,
@@ -1097,6 +1099,24 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     task_priv->cur_custom = task_priv->custom;
     task_priv->open_id = g_idle_add (try_open, task);
     return TRUE;
+}
+
+gboolean
+mm_plugin_base_probe_port (MMPluginBase *self,
+                           MMPluginBaseSupportsTask *task,
+                           guint64 send_delay_us,
+                           GError **error)
+{
+    return _internal_probe_port (self, task, send_delay_us, TRUE, error);
+}
+
+gboolean
+mm_plugin_base_probe_port_leave_echo (MMPluginBase *self,
+                                      MMPluginBaseSupportsTask *task,
+                                      guint64 send_delay_us,
+                                      GError **error)
+{
+    return _internal_probe_port (self, task, send_delay_us, FALSE, error);
 }
 
 gboolean
