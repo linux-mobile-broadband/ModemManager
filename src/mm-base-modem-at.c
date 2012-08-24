@@ -561,13 +561,14 @@ mm_base_modem_at_command_finish (MMBaseModem *self,
     return mm_base_modem_at_command_full_finish (self, res, error);
 }
 
-void
-mm_base_modem_at_command (MMBaseModem *self,
-                          const gchar *command,
-                          guint timeout,
-                          gboolean allow_cached,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+static void
+_at_command (MMBaseModem *self,
+             const gchar *command,
+             guint timeout,
+             gboolean allow_cached,
+             gboolean is_raw,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
 {
     MMAtSerialPort *port;
     GError *error = NULL;
@@ -588,8 +589,30 @@ mm_base_modem_at_command (MMBaseModem *self,
                                    command,
                                    timeout,
                                    allow_cached,
-                                   FALSE,
+                                   is_raw,
                                    NULL,
                                    callback,
                                    user_data);
+}
+
+void
+mm_base_modem_at_command (MMBaseModem *self,
+                          const gchar *command,
+                          guint timeout,
+                          gboolean allow_cached,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    _at_command (self, command, timeout, allow_cached, FALSE, callback, user_data);
+}
+
+void
+mm_base_modem_at_command_raw (MMBaseModem *self,
+                              const gchar *command,
+                              guint timeout,
+                              gboolean allow_cached,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    _at_command (self, command, timeout, allow_cached, TRUE, callback, user_data);
 }
