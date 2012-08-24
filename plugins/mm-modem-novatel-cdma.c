@@ -193,7 +193,7 @@ parse_modem_snapshot (MMCallbackInfo *info, QcdmResult *result)
     cdma1x_state = mm_generic_cdma_query_reg_state_get_callback_1x_state (info);
 
     /* Roaming? */
-    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
+    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri) == 0) {
         char *str;
         gboolean roaming = FALSE;
 
