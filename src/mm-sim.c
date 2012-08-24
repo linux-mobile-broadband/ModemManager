@@ -1066,15 +1066,43 @@ load_sim_identifier (MMSim *self,
 /* IMSI */
 
 static gchar *
+parse_imsi (const gchar *response,
+            GError **error)
+{
+    const gchar *s;
+    gint len;
+
+    g_assert (response != NULL);
+
+    for (s = response, len = 0; *s; ++s, ++len) {
+        /* IMSI is a number with 15 or less decimal digits. */
+        if (!isdigit (*s) || len > 15) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Invalid +CIMI response '%s'", response ? response : "<null>");
+            return NULL;
+        }
+    }
+
+    return g_strdup (response);
+}
+
+static gchar *
 load_imsi_finish (MMSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
+    const gchar *result;
     gchar *imsi;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    imsi = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    imsi = parse_imsi (result, error);
+    if (!imsi)
+        return NULL;
 
     mm_dbg ("loaded IMSI: %s", imsi);
     return imsi;
@@ -1093,7 +1121,7 @@ load_imsi (MMSim *self,
         MM_BASE_MODEM (self->priv->modem),
         "+CIMI",
         3,
-        TRUE,
+        FALSE,
         (GAsyncReadyCallback)load_imsi_command_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
