@@ -83,6 +83,7 @@ typedef struct {
     /* Regular expressions for successful replies */
     GRegex *regex_ok;
     GRegex *regex_connect;
+    GRegex *regex_sms;
     GRegex *regex_custom_successful;
     /* Regular expressions for error replies */
     GRegex *regex_cme_error;
@@ -105,6 +106,7 @@ mm_serial_parser_v1_new (void)
 
     parser->regex_ok = g_regex_new ("\\r\\nOK(\\r\\n)+$", flags, 0, NULL);
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
+    parser->regex_sms = g_regex_new ("\\r\\n>\\s*$", flags, 0, NULL);
     parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cms_error = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR:\\s*([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
@@ -173,10 +175,18 @@ mm_serial_parser_v1_parse (gpointer data,
                                     0, 0, NULL, NULL);
         if (found)
             remove_matches (parser->regex_ok, response);
-        else
-            found = g_regex_match_full (parser->regex_connect,
-                                        response->str, response->len,
-                                        0, 0, NULL, NULL);
+    }
+
+    if (!found) {
+        found = g_regex_match_full (parser->regex_connect,
+                                    response->str, response->len,
+                                    0, 0, NULL, NULL);
+    }
+
+    if (!found) {
+        found = g_regex_match_full (parser->regex_sms,
+                                    response->str, response->len,
+                                    0, 0, NULL, NULL);
     }
 
     if (found) {
@@ -328,6 +338,7 @@ mm_serial_parser_v1_destroy (gpointer data)
 
     g_regex_unref (parser->regex_ok);
     g_regex_unref (parser->regex_connect);
+    g_regex_unref (parser->regex_sms);
     g_regex_unref (parser->regex_cme_error);
     g_regex_unref (parser->regex_cms_error);
     g_regex_unref (parser->regex_cme_error_str);

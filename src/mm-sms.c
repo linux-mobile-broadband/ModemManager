@@ -404,20 +404,23 @@ mm_sms_has_part_index (MMSms *self,
 
 /*****************************************************************************/
 
-static gchar *
+static gboolean
 sms_get_store_or_send_command (MMSmsPart *part,
                                gboolean text_or_pdu,   /* TRUE for PDU */
                                gboolean store_or_send, /* TRUE for send */
+                               gchar **out_cmd,
+                               gchar **out_msg_data,
                                GError **error)
 {
-    gchar *cmd;
+    g_assert (out_cmd != NULL);
+    g_assert (out_msg_data != NULL);
 
     if (!text_or_pdu) {
         /* Text mode */
-        cmd = g_strdup_printf ("+CMG%c=\"%s\"\r%s\x1a",
-                               store_or_send ? 'S' : 'W',
-                               mm_sms_part_get_number (part),
-                               mm_sms_part_get_text (part));
+        *out_cmd = g_strdup_printf ("+CMG%c=\"%s\"",
+                                    store_or_send ? 'S' : 'W',
+                                    mm_sms_part_get_number (part));
+        *out_msg_data = g_strdup_printf ("%s\x1a", mm_sms_part_get_text (part));
     } else {
         guint8 *pdu;
         guint pdulen = 0;
@@ -428,7 +431,8 @@ sms_get_store_or_send_command (MMSmsPart *part,
 
         pdu = mm_sms_part_get_submit_pdu (part, &pdulen, &msgstart, error);
         if (!pdu)
-            return NULL;
+            /* 'error' should already be set */
+            return FALSE;
 
         /* Convert PDU to hex */
         hex = utils_bin2hexstr (pdu, pdulen);
@@ -439,18 +443,18 @@ sms_get_store_or_send_command (MMSmsPart *part,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
                          "Not enough memory to send SMS PDU");
-            return NULL;
+            return FALSE;
         }
 
         /* CMGW/S length is the size of the PDU without SMSC information */
-        cmd = g_strdup_printf ("+CMG%c=%d\r%s\x1a",
-                               store_or_send ? 'S' : 'W',
-                               pdulen - msgstart,
-                               hex);
+        *out_cmd = g_strdup_printf ("+CMG%c=%d",
+                                    store_or_send ? 'S' : 'W',
+                                    pdulen - msgstart);
+        *out_msg_data = g_strdup_printf ("%s\x1a", hex);
         g_free (hex);
     }
 
-    return cmd;
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -459,6 +463,7 @@ sms_get_store_or_send_command (MMSmsPart *part,
 typedef struct {
     MMSms *self;
     MMBaseModem *modem;
+    char *msg_data;
     GSimpleAsyncResult *result;
 } SmsStoreContext;
 
@@ -469,6 +474,7 @@ sms_store_context_complete_and_free (SmsStoreContext *ctx)
     g_object_unref (ctx->result);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
+    g_free (ctx->msg_data);
     g_free (ctx);
 }
 
@@ -481,9 +487,9 @@ sms_store_finish (MMSms *self,
 }
 
 static void
-store_ready (MMBaseModem *modem,
-             GAsyncResult *res,
-             SmsStoreContext *ctx)
+store_msg_data_ready (MMBaseModem *modem,
+                      GAsyncResult *res,
+                      SmsStoreContext *ctx)
 {
     const gchar *response;
     GError *error = NULL;
@@ -515,6 +521,30 @@ store_ready (MMBaseModem *modem,
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     sms_store_context_complete_and_free (ctx);
+}
+
+static void
+store_ready (MMBaseModem *modem,
+             GAsyncResult *res,
+             SmsStoreContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Send the actual message data */
+    mm_base_modem_at_command_raw (ctx->modem,
+                                  ctx->msg_data,
+                                  10,
+                                  FALSE,
+                                  (GAsyncReadyCallback) store_msg_data_ready,
+                                  ctx);
 }
 
 static void
@@ -554,15 +584,19 @@ sms_store (MMSms *self,
                   MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &use_pdu_mode,
                   NULL);
 
-    cmd = sms_get_store_or_send_command ((MMSmsPart *)ctx->self->priv->parts->data,
-                                         use_pdu_mode,
-                                         FALSE,
-                                         &error);
-    if (!cmd) {
+    if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->self->priv->parts->data,
+                                        use_pdu_mode,
+                                        FALSE,
+                                        &cmd,
+                                        &ctx->msg_data,
+                                        &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_store_context_complete_and_free (ctx);
         return;
     }
+
+    g_assert (cmd != NULL);
+    g_assert (ctx->msg_data != NULL);
 
     mm_base_modem_at_command (ctx->modem,
                               cmd,
@@ -579,6 +613,7 @@ sms_store (MMSms *self,
 typedef struct {
     MMSms *self;
     MMBaseModem *modem;
+    char *msg_data;
     GSimpleAsyncResult *result;
 } SmsSendContext;
 
@@ -601,9 +636,9 @@ sms_send_finish (MMSms *self,
 }
 
 static void
-send_generic_ready (MMBaseModem *modem,
-                    GAsyncResult *res,
-                    SmsSendContext *ctx)
+send_generic_msg_data_ready (MMBaseModem *modem,
+                             GAsyncResult *res,
+                             SmsSendContext *ctx)
 {
     GError *error = NULL;
 
@@ -619,6 +654,29 @@ send_generic_ready (MMBaseModem *modem,
 }
 
 static void
+send_generic_ready (MMBaseModem *modem,
+                    GAsyncResult *res,
+                    SmsSendContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Send the actual message data */
+    mm_base_modem_at_command_raw (ctx->modem,
+                                  ctx->msg_data,
+                                  10,
+                                  FALSE,
+                                  (GAsyncReadyCallback)send_generic_msg_data_ready,
+                                  ctx);
+}
+
+static void
 sms_send_generic (SmsSendContext *ctx)
 {
     gchar *cmd;
@@ -630,15 +688,19 @@ sms_send_generic (SmsSendContext *ctx)
                   MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &use_pdu_mode,
                   NULL);
 
-    cmd = sms_get_store_or_send_command ((MMSmsPart *)ctx->self->priv->parts->data,
-                                         use_pdu_mode,
-                                         FALSE,
-                                         &error);
-    if (!cmd) {
+    if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->self->priv->parts->data,
+                                        use_pdu_mode,
+                                        TRUE,
+                                        &cmd,
+                                        &ctx->msg_data,
+                                        &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_send_context_complete_and_free (ctx);
         return;
     }
+
+    g_assert (cmd != NULL);
+    g_assert (ctx->msg_data != NULL);
 
     mm_base_modem_at_command (ctx->modem,
                               cmd,
