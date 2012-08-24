@@ -153,6 +153,7 @@ grab_port (MMPluginBase *base,
     MMPortType ptype;
     guint16 vendor = 0, product = 0;
     MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
+    gboolean sierra_app1_port;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -164,7 +165,8 @@ grab_port (MMPluginBase *base,
     ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
 
     /* Is it a GSM secondary port? */
-    if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT)) {
+    sierra_app1_port = !!g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT);
+    if (sierra_app1_port) {
         if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK))
             pflags = MM_AT_PORT_FLAG_PPP;
         else
@@ -185,7 +187,7 @@ grab_port (MMPluginBase *base,
 
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
-        if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || (ptype != MM_PORT_TYPE_UNKNOWN)) {
+        if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || sierra_app1_port) {
             modem = mm_modem_sierra_gsm_new (sysfs_path,
                                              mm_plugin_base_supports_task_get_driver (task),
                                              mm_plugin_get_name (MM_PLUGIN (base)),
