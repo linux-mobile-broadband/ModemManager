@@ -220,6 +220,7 @@ build_start_network_input (MMBearerQmi *self)
     case MM_BEARER_IP_FAMILY_IPV4V6:
         /* dual stack, we assume unspecified */
     case MM_BEARER_IP_FAMILY_UNKNOWN:
+    default:
         ip_type = QMI_WDS_IP_FAMILY_UNSPECIFIED;
         break;
     }
