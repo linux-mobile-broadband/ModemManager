@@ -22,6 +22,7 @@ EXTRA_DIST = \
 	mm-test.py \
 	disable.py \
 	enable.py \
+	disconnect.py \
 	info.py \
 	list-modems.py \
 	location.py \
