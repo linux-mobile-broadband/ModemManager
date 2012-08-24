@@ -153,6 +153,15 @@ gboolean mm_plugin_base_probe_port (MMPluginBase *self,
                                     guint64 send_delay_us,
                                     GError **error);
 
+/* Same as mm_plugin_base_probe_port() but does not strip possible
+ * echoed characters before the first <cr><lf>.  (ie, sets the probe port's
+ * MM_AT_SERIAL_PORT_REMOVE_ECHO property to FALSE)
+ */
+gboolean mm_plugin_base_probe_port_leave_echo (MMPluginBase *self,
+                                               MMPluginBaseSupportsTask *task,
+                                               guint64 send_delay_us,
+                                               GError **error);
+
 /* Returns TRUE if the port was previously probed, FALSE if not */
 gboolean mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
                                                       GUdevDevice *port,
