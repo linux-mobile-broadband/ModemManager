@@ -130,6 +130,7 @@ longcheer_custom_init_step (LongcheerCustomInitContext *ctx)
         ctx->port,
         "AT+GMR",
         3,
+        FALSE, /* raw */
         ctx->cancellable,
         (MMAtSerialResponseFn)gmr_ready,
         ctx);

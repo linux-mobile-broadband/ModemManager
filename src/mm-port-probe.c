@@ -583,6 +583,7 @@ serial_probe_at (MMPortProbe *self)
         MM_AT_SERIAL_PORT (task->serial),
         task->at_commands->command,
         task->at_commands->timeout,
+        FALSE,
         task->at_probing_cancellable,
         (MMAtSerialResponseFn)serial_probe_at_parse_response,
         self);

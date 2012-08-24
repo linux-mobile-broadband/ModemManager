@@ -129,6 +129,7 @@ x22x_custom_init_step (X22xCustomInitContext *ctx)
         ctx->port,
         "AT+GMR",
         3,
+        FALSE, /* raw */
         ctx->cancellable,
         (MMAtSerialResponseFn)gmr_ready,
         ctx);

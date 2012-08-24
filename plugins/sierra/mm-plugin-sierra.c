@@ -124,6 +124,7 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
         ctx->port,
         "AT+GCAP",
         3,
+        FALSE, /* raw */
         ctx->cancellable,
         (MMAtSerialResponseFn)gcap_ready,
         ctx);

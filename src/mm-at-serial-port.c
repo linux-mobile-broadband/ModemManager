@@ -281,7 +281,7 @@ parse_unsolicited (MMSerialPort *port, GByteArray *response)
 /*****************************************************************************/
 
 static GByteArray *
-at_command_to_byte_array (const char *command)
+at_command_to_byte_array (const char *command, gboolean is_raw)
 {
     GByteArray *buf;
     int cmdlen;
@@ -291,14 +291,19 @@ at_command_to_byte_array (const char *command)
     cmdlen = strlen (command);
     buf = g_byte_array_sized_new (cmdlen + 3);
 
-    /* Make sure there's an AT in the front */
-    if (!g_str_has_prefix (command, "AT"))
-        g_byte_array_append (buf, (const guint8 *) "AT", 2);
+    if (!is_raw) {
+        /* Make sure there's an AT in the front */
+        if (!g_str_has_prefix (command, "AT"))
+            g_byte_array_append (buf, (const guint8 *) "AT", 2);
+    }
+
     g_byte_array_append (buf, (const guint8 *) command, cmdlen);
 
-    /* Make sure there's a trailing carriage return */
-    if (command[cmdlen - 1] != '\r')
-        g_byte_array_append (buf, (const guint8 *) "\r", 1);
+    if (!is_raw) {
+        /* Make sure there's a trailing carriage return */
+        if (command[cmdlen - 1] != '\r')
+            g_byte_array_append (buf, (const guint8 *) "\r", 1);
+    }
 
     return buf;
 }
@@ -307,6 +312,7 @@ void
 mm_at_serial_port_queue_command (MMAtSerialPort *self,
                                  const char *command,
                                  guint32 timeout_seconds,
+                                 gboolean is_raw,
                                  GCancellable *cancellable,
                                  MMAtSerialResponseFn callback,
                                  gpointer user_data)
@@ -317,7 +323,7 @@ mm_at_serial_port_queue_command (MMAtSerialPort *self,
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
     g_return_if_fail (command != NULL);
 
-    buf = at_command_to_byte_array (command);
+    buf = at_command_to_byte_array (command, is_raw);
     g_return_if_fail (buf != NULL);
 
     mm_serial_port_queue_command (MM_SERIAL_PORT (self),
@@ -333,6 +339,7 @@ void
 mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
                                         const char *command,
                                         guint32 timeout_seconds,
+                                        gboolean is_raw,
                                         GCancellable *cancellable,
                                         MMAtSerialResponseFn callback,
                                         gpointer user_data)
@@ -343,7 +350,7 @@ mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
     g_return_if_fail (command != NULL);
 
-    buf = at_command_to_byte_array (command);
+    buf = at_command_to_byte_array (command, is_raw);
     g_return_if_fail (buf != NULL);
 
     mm_serial_port_queue_command_cached (MM_SERIAL_PORT (self),

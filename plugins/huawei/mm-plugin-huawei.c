@@ -213,6 +213,7 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
             ctx->port,
             "AT^CURC=0",
             3,
+            FALSE, /* raw */
             ctx->cancellable,
             (MMAtSerialResponseFn)curc_ready,
             ctx);
@@ -232,6 +233,7 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
             ctx->port,
             "AT^GETPORTMODE",
             3,
+            FALSE, /* raw */
             ctx->cancellable,
             (MMAtSerialResponseFn)getportmode_ready,
             ctx);
