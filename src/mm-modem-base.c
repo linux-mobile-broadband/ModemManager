@@ -987,6 +987,10 @@ mm_modem_base_init (MMModemBase *self)
     priv->tz_poll_id = 0;
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_STATE,
+                                                    NULL,
+                                                    MM_DBUS_INTERFACE_MODEM);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
                                                     NULL,
                                                     MM_DBUS_INTERFACE_MODEM);
