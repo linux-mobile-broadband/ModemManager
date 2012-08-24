@@ -629,6 +629,10 @@ mm_modem_base_init (MMModemBase *self)
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_STATE,
+                                                    NULL,
+                                                    MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
                                                     NULL,
                                                     MM_MODEM_DBUS_INTERFACE);
