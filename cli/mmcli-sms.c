@@ -195,7 +195,7 @@ store_process_reply (gboolean      result,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully sent the SMS\n");
+    g_print ("successfully stored the SMS\n");
 }
 
 static void
