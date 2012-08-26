@@ -440,11 +440,12 @@ mm_sms_part_new_from_pdu (guint index,
     sender_addr_num_octets = (sender_addr_num_digits + 1) >> 1;
     variable_length_items += sender_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        *error = g_error_new (MM_CORE_ERROR,
-                              MM_CORE_ERROR_FAILED,
-                              "PDU too short (2): %zd < %d",
-                              pdu_len,
-                              variable_length_items + SMS_MIN_PDU_LEN);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "PDU too short (2): %zd < %d",
+                     pdu_len,
+                     variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
         return NULL;
     }
