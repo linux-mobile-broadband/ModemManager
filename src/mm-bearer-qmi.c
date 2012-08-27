@@ -82,6 +82,7 @@ typedef struct {
     gchar *user;
     gchar *password;
     gchar *apn;
+    gboolean no_ip_family_preference;
 
     gboolean ipv4;
     gboolean running_ipv4;
@@ -234,10 +235,15 @@ build_start_network_input (ConnectContext *ctx)
     if (ctx->password)
         qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
 
-    qmi_message_wds_start_network_input_set_ip_family_preference (
-        input,
-        (ctx->running_ipv6 ? QMI_WDS_IP_FAMILY_IPV6 : QMI_WDS_IP_FAMILY_IPV4),
-        NULL);
+    /* Only add the IP family preference TLV if explicitly requested a given
+     * family. This TLV may be newer than the Start Network command itself, so
+     * we'll just allow the case where none is specified */
+    if (!ctx->no_ip_family_preference) {
+        qmi_message_wds_start_network_input_set_ip_family_preference (
+            input,
+            (ctx->running_ipv6 ? QMI_WDS_IP_FAMILY_IPV6 : QMI_WDS_IP_FAMILY_IPV4),
+            NULL);
+    }
 
     return input;
 }
@@ -583,6 +589,7 @@ connect (MMBearer *self,
         case MM_BEARER_IP_FAMILY_UNKNOWN:
         default:
             mm_dbg ("No specific IP family requested, defaulting to IPv4");
+            ctx->no_ip_family_preference = TRUE;
             ctx->ipv4 = TRUE;
             ctx->ipv6 = FALSE;
             break;
