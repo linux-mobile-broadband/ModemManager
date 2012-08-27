@@ -193,6 +193,7 @@ static void cusd_received (MMAtSerialPort *port,
 #define GS_HASH_TAG "get-sms"
 static GValue *simple_string_value (const char *str);
 static GValue *simple_uint_value (guint32 i);
+static GValue *simple_byte_array_value (const GByteArray *array);
 static void simple_free_gvalue (gpointer data);
 
 MMModem *
@@ -1439,10 +1440,10 @@ sms_cache_lookup_full (MMModem *modem,
     SMSMultiPartMessage *mpm;
     GHashTable *full, *part, *first;
     GHashTableIter iter;
-    gpointer key, value;
-    char *fulltext;
-    char **textparts;
-    GValue *ref, *idx, *text;
+    GByteArray *fulldata, *partdata;
+    GValue *ref, *idx, *text, *data, *value;
+    GString *fulltext;
+    const char *key;
 
     ref = g_hash_table_lookup (properties, "concat-reference");
     if (ref == NULL)
@@ -1474,7 +1475,8 @@ sms_cache_lookup_full (MMModem *modem,
         return NULL;
 
     /* Complete multipart message is present. Assemble it */
-    textparts = g_malloc0((1 + mpm->numparts) * sizeof (*textparts));
+    fulltext = g_string_new ("");
+    fulldata = g_byte_array_sized_new (160 * mpm->numparts);
     for (i = 0 ; i < mpm->numparts ; i++) {
         part = g_hash_table_lookup (priv->sms_contents,
                                     GUINT_TO_POINTER (mpm->parts[i]));
@@ -1482,54 +1484,53 @@ sms_cache_lookup_full (MMModem *modem,
             g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                          "Internal error - part %d (index %d) is missing",
                          i, mpm->parts[i]);
-            g_free (textparts);
+            g_string_free (fulltext, TRUE);
+            g_byte_array_free (fulldata, TRUE);
             return NULL;
         }
         text = g_hash_table_lookup (part, "text");
-        if (text == NULL) {
+        data = g_hash_table_lookup (part, "data");
+        if (!text || !data) {
             g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                         "Internal error - part %d (index %d) has no text element",
+                         "Internal error - part %d (index %d) has no text or data element",
                          i, mpm->parts[i]);
-            g_free (textparts);
+            g_string_free (fulltext, TRUE);
+            g_byte_array_free (fulldata, TRUE);
             return NULL;
         }
-        textparts[i] = g_value_dup_string (text);
-    }
-    textparts[i] = NULL;
-    fulltext = g_strjoinv (NULL, textparts);
-    g_strfreev (textparts);
 
-    first = g_hash_table_lookup (priv->sms_contents,
-                                 GUINT_TO_POINTER (mpm->parts[0]));
-    full = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
-                                  simple_free_gvalue);
+        g_string_append (fulltext, g_value_get_string (text));
+        partdata = g_value_get_boxed (data);
+        g_byte_array_append (fulldata, partdata->data, partdata->len);
+    }
+
+    first = g_hash_table_lookup (priv->sms_contents, GUINT_TO_POINTER (mpm->parts[0]));
+    full = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+
     g_hash_table_iter_init (&iter, first);
-    while (g_hash_table_iter_next (&iter, &key, &value)) {
-        const char *keystr = key;
-        if (strncmp (keystr, "concat-", 7) == 0)
+    while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) &value)) {
+        GValue *newval;
+
+        /* Ignore hidden keys or ones we need to construct */
+        if (strncmp (key, "concat-", 7) == 0 ||
+            strcmp (key, "text") == 0 ||
+            strcmp (key, "data") == 0 ||
+            strcmp (key, "index") == 0)
             continue;
-        if (strcmp (keystr, "text") == 0 ||
-            strcmp (keystr, "index") == 0)
-            continue;
-        if (strcmp (keystr, "class") == 0) {
-            GValue *val;
-            val = g_slice_new0 (GValue);
-            g_value_init (val, G_TYPE_UINT);
-            g_value_copy (value, val);
-            g_hash_table_insert (full, key, val);
-        } else {
-            GValue *val;
-            val = g_slice_new0 (GValue);
-            g_value_init (val, G_VALUE_TYPE (value));
-            g_value_copy (value, val);
-            g_hash_table_insert (full, key, val);
-        }
+
+        /* Copy value to complete message hash */
+        newval = g_slice_new0 (GValue);
+        g_value_init (newval, G_VALUE_TYPE (value));
+        g_value_copy (value, newval);
+        g_hash_table_insert (full, (gpointer) key, newval);
     }
 
     g_hash_table_insert (full, "index", simple_uint_value (mpm->index));
-    g_hash_table_insert (full, "text", simple_string_value (fulltext));
-    g_free (fulltext);
+    g_hash_table_insert (full, "text", simple_string_value (fulltext->str));
+    g_hash_table_insert (full, "data", simple_byte_array_value (fulldata));
 
+    g_string_free (fulltext, TRUE);
+    g_byte_array_free (fulldata, TRUE);
     return full;
 }
 
@@ -6071,6 +6072,18 @@ simple_string_value (const char *str)
     val = g_slice_new0 (GValue);
     g_value_init (val, G_TYPE_STRING);
     g_value_set_string (val, str);
+
+    return val;
+}
+
+static GValue *
+simple_byte_array_value (const GByteArray *array)
+{
+    GValue *val;
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, DBUS_TYPE_G_UCHAR_ARRAY);
+    g_value_set_boxed (val, array);
 
     return val;
 }
