@@ -1551,7 +1551,7 @@ sms_cache_lookup_full (MMModem *modem,
         } else {
             GValue *val;
             val = g_slice_new0 (GValue);
-            g_value_init (val, G_TYPE_STRING);
+            g_value_init (val, G_VALUE_TYPE (value));
             g_value_copy (value, val);
             g_hash_table_insert (full, key, val);
         }
