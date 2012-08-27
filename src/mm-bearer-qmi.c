@@ -35,7 +35,8 @@ struct _MMBearerQmiPrivate {
     /* State kept while connected */
     QmiClientWds *client;
     MMPort *data;
-    guint32 packet_data_handle;
+    guint32 packet_data_handle_ipv4;
+    guint32 packet_data_handle_ipv6;
 };
 
 /*****************************************************************************/
@@ -62,7 +63,8 @@ typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_WDS_CLIENT,
-    CONNECT_STEP_START_NETWORK,
+    CONNECT_STEP_START_NETWORK_IPV4,
+    CONNECT_STEP_START_NETWORK_IPV6,
     CONNECT_STEP_LAST
 } ConnectStep;
 
@@ -74,19 +76,38 @@ typedef struct {
     MMPort *data;
     MMQmiPort *qmi;
     QmiClientWds *client;
-    guint32 packet_data_handle;
+    gchar *user;
+    gchar *password;
+    gchar *apn;
+
+    gboolean ipv4;
+    gboolean running_ipv4;
+    guint32 packet_data_handle_ipv4;
+    GError *error_ipv4;
+
+    gboolean ipv6;
+    gboolean running_ipv6;
+    guint32 packet_data_handle_ipv6;
+    GError *error_ipv6;
 } ConnectContext;
 
 static void
 connect_context_complete_and_free (ConnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_free (ctx->apn);
+    g_free (ctx->user);
+    g_free (ctx->password);
+    if (ctx->error_ipv4)
+        g_error_free (ctx->error_ipv4);
+    if (ctx->error_ipv6)
+        g_error_free (ctx->error_ipv6);
     if (ctx->client)
         g_object_unref (ctx->client);
     g_object_unref (ctx->data);
     g_object_unref (ctx->qmi);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     g_slice_free (ConnectContext, ctx);
 }
@@ -122,14 +143,12 @@ start_network_ready (QmiClientWds *client,
     GError *error = NULL;
     QmiMessageWdsStartNetworkOutput *output;
 
-    output = qmi_client_wds_start_network_finish (client, res, &error);
-    if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
-        return;
-    }
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
-    if (!qmi_message_wds_start_network_output_get_result (output, &error)) {
+    output = qmi_client_wds_start_network_finish (client, res, &error);
+    if (output &&
+        !qmi_message_wds_start_network_output_get_result (output, &error)) {
         /* No-effect errors should be ignored. The modem will keep the
          * connection active as long as there is a WDS client which requested
          * to start the network. If ModemManager crashed while a connection was
@@ -139,6 +158,7 @@ start_network_ready (QmiClientWds *client,
                              QMI_PROTOCOL_ERROR,
                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_error_free (error);
+            error = NULL;
 
             /* Fall down to a successful connection */
         } else {
@@ -165,16 +185,23 @@ start_network_ready (QmiClientWds *client,
                              verbose_cer_type,
                              verbose_cer_reason);
             }
-
-            g_simple_async_result_take_error (ctx->result, error);
-            connect_context_complete_and_free (ctx);
-            qmi_message_wds_start_network_output_unref (output);
-            return;
         }
     }
 
-    qmi_message_wds_start_network_output_get_packet_data_handle (output, &ctx->packet_data_handle, NULL);
-    qmi_message_wds_start_network_output_unref (output);
+    if (error) {
+        if (ctx->running_ipv4)
+            ctx->error_ipv4 = error;
+        else
+            ctx->error_ipv6 = error;
+    } else {
+        if (ctx->running_ipv4)
+            qmi_message_wds_start_network_output_get_packet_data_handle (output, &ctx->packet_data_handle_ipv4, NULL);
+        else
+            qmi_message_wds_start_network_output_get_packet_data_handle (output, &ctx->packet_data_handle_ipv6, NULL);
+    }
+
+    if (output)
+        qmi_message_wds_start_network_output_unref (output);
 
     /* Keep on */
     ctx->step++;
@@ -182,50 +209,28 @@ start_network_ready (QmiClientWds *client,
 }
 
 static QmiMessageWdsStartNetworkInput *
-build_start_network_input (MMBearerQmi *self)
+build_start_network_input (ConnectContext *ctx)
 {
     QmiMessageWdsStartNetworkInput *input;
-    MMBearerProperties *properties = NULL;
-    const gchar *str;
-    QmiWdsIpFamily ip_type;
 
-    g_object_get (self,
-                  MM_BEARER_CONFIG, &properties,
-                  NULL);
-
-    if (!properties)
-        return NULL;
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
     input = qmi_message_wds_start_network_input_new ();
 
-    str = mm_bearer_properties_get_apn (properties);
-    if (str)
-        qmi_message_wds_start_network_input_set_apn (input, str, NULL);
+    if (ctx->apn)
+        qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
 
-    str = mm_bearer_properties_get_user (properties);
-    if (str)
-        qmi_message_wds_start_network_input_set_username (input, str, NULL);
+    if (ctx->user)
+        qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
 
-    str = mm_bearer_properties_get_password (properties);
-    if (str)
-        qmi_message_wds_start_network_input_set_password (input, str, NULL);
+    if (ctx->password)
+        qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
 
-    switch (mm_bearer_properties_get_ip_type (properties)) {
-    case MM_BEARER_IP_FAMILY_IPV4:
-        ip_type = QMI_WDS_IP_FAMILY_IPV4;
-        break;
-    case MM_BEARER_IP_FAMILY_IPV6:
-        ip_type = QMI_WDS_IP_FAMILY_IPV6;
-        break;
-    case MM_BEARER_IP_FAMILY_IPV4V6:
-        /* dual stack, we assume unspecified */
-    case MM_BEARER_IP_FAMILY_UNKNOWN:
-    default:
-        ip_type = QMI_WDS_IP_FAMILY_UNSPECIFIED;
-        break;
-    }
-
-    qmi_message_wds_start_network_input_set_ip_family_preference (input, ip_type, NULL);
+    qmi_message_wds_start_network_input_set_ip_family_preference (
+        input,
+        (ctx->running_ipv6 ? QMI_WDS_IP_FAMILY_IPV6 : QMI_WDS_IP_FAMILY_IPV4),
+        NULL);
 
     return input;
 }
@@ -283,6 +288,9 @@ connect_context_step (ConnectContext *ctx)
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
+
+        g_assert (ctx->ipv4 || ctx->ipv6);
+
         /* Fall down */
         ctx->step++;
 
@@ -314,52 +322,102 @@ connect_context_step (ConnectContext *ctx)
         ctx->client = QMI_CLIENT_WDS (client);
     }
 
-    case CONNECT_STEP_START_NETWORK: {
-        QmiMessageWdsStartNetworkInput *input;
+    case CONNECT_STEP_START_NETWORK_IPV4:
+        if (ctx->ipv4) {
+            QmiMessageWdsStartNetworkInput *input;
 
-        input = build_start_network_input (ctx->self);
-        qmi_client_wds_start_network (ctx->client,
-                                      input,
-                                      10,
-                                      ctx->cancellable,
-                                      (GAsyncReadyCallback)start_network_ready,
-                                      ctx);
-        if (input)
-            qmi_message_wds_start_network_input_unref (input);
-        return;
-    }
+            ctx->running_ipv4 = TRUE;
+            ctx->running_ipv6 = FALSE;
+            input = build_start_network_input (ctx);
+            qmi_client_wds_start_network (ctx->client,
+                                          input,
+                                          10,
+                                          ctx->cancellable,
+                                          (GAsyncReadyCallback)start_network_ready,
+                                          ctx);
+            if (input)
+                qmi_message_wds_start_network_input_unref (input);
+            return;
+        }
 
-    case CONNECT_STEP_LAST: {
-        MMBearerIpConfig *config;
-        ConnectResult *result;
+        /* No IPv4 setup needed, fall down */
+        ctx->step++;
 
-        /* Port is connected; update the state */
-        mm_port_set_connected (MM_PORT (ctx->data), TRUE);
+    case CONNECT_STEP_START_NETWORK_IPV6:
+        if (ctx->ipv6) {
+            QmiMessageWdsStartNetworkInput *input;
 
-        /* Keep connection related data */
-        g_assert (ctx->self->priv->data == NULL);
-        ctx->self->priv->data = g_object_ref (ctx->data);
-        g_assert (ctx->self->priv->client == NULL);
-        ctx->self->priv->client = g_object_ref (ctx->client);
-        g_assert (ctx->self->priv->packet_data_handle == 0);
-        ctx->self->priv->packet_data_handle = ctx->packet_data_handle;
+            ctx->running_ipv4 = FALSE;
+            ctx->running_ipv6 = TRUE;
+            input = build_start_network_input (ctx);
+            qmi_client_wds_start_network (ctx->client,
+                                          input,
+                                          10,
+                                          ctx->cancellable,
+                                          (GAsyncReadyCallback)start_network_ready,
+                                          ctx);
+            if (input)
+                qmi_message_wds_start_network_input_unref (input);
+            return;
+        }
 
-        /* Build IP config; always DHCP based */
-        config = mm_bearer_ip_config_new ();
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+        /* No IPv6 setup needed, fall down */
+        ctx->step++;
 
-        /* Build result */
-        result = g_slice_new0 (ConnectResult);
-        result->data = g_object_ref (ctx->data);
-        result->ipv4_config = config;
-        result->ipv6_config = g_object_ref (config);
+    case CONNECT_STEP_LAST:
+        /* If one of IPv4 or IPv6 succeeds, we're connected */
+        if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
+            MMBearerIpConfig *config;
+            ConnectResult *result;
 
-        /* Set operation result */
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   result,
-                                                   (GDestroyNotify)connect_result_free);
+            /* Port is connected; update the state */
+            mm_port_set_connected (MM_PORT (ctx->data), TRUE);
+
+            /* Keep connection related data */
+            g_assert (ctx->self->priv->data == NULL);
+            ctx->self->priv->data = g_object_ref (ctx->data);
+            g_assert (ctx->self->priv->client == NULL);
+            ctx->self->priv->client = g_object_ref (ctx->client);
+            g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
+            ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+            g_assert (ctx->self->priv->packet_data_handle_ipv6 == 0);
+            ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+
+            /* Build IP config; always DHCP based */
+            config = mm_bearer_ip_config_new ();
+            mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+
+            /* Build result */
+            result = g_slice_new0 (ConnectResult);
+            result->data = g_object_ref (ctx->data);
+            if (ctx->packet_data_handle_ipv4)
+                result->ipv4_config = g_object_ref (config);
+            if (ctx->packet_data_handle_ipv6)
+                result->ipv6_config = g_object_ref (config);
+
+            g_object_unref (config);
+
+            /* Set operation result */
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       result,
+                                                       (GDestroyNotify)connect_result_free);
+        } else {
+            GError *error;
+
+            /* No connection, set error. If both set, IPv4 error preferred */
+            if (ctx->error_ipv4) {
+                error = ctx->error_ipv4;
+                ctx->error_ipv4 = NULL;
+            } else {
+                error = ctx->error_ipv6;
+                ctx->error_ipv6 = NULL;
+            }
+
+            g_simple_async_result_take_error (ctx->result, error);
+        }
+
         connect_context_complete_and_free (ctx);
-      }
+        return;
     }
 }
 
@@ -377,6 +435,7 @@ connect (MMBearer *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
+    MMBearerProperties *properties = NULL;
     ConnectContext *ctx;
     MMBaseModem *modem  = NULL;
     MMPort *data;
@@ -424,7 +483,6 @@ connect (MMBearer *self,
             mm_port_subsys_get_string (mm_port_get_subsys (data)),
             mm_port_get_device (data));
 
-    /* In this context, we only keep the stuff we'll need later */
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
     ctx->qmi = qmi;
@@ -436,6 +494,38 @@ connect (MMBearer *self,
                                              user_data,
                                              connect);
 
+    g_object_get (self,
+                  MM_BEARER_CONFIG, &properties,
+                  NULL);
+
+    if (properties) {
+        ctx->apn = g_strdup (mm_bearer_properties_get_apn (properties));
+        ctx->user = g_strdup (mm_bearer_properties_get_user (properties));
+        ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
+        switch (mm_bearer_properties_get_ip_type (properties)) {
+        case MM_BEARER_IP_FAMILY_IPV4:
+            ctx->ipv4 = TRUE;
+            ctx->ipv6 = FALSE;
+            break;
+        case MM_BEARER_IP_FAMILY_IPV6:
+            ctx->ipv4 = FALSE;
+            ctx->ipv6 = TRUE;
+            break;
+        case MM_BEARER_IP_FAMILY_IPV4V6:
+            ctx->ipv4 = TRUE;
+            ctx->ipv6 = TRUE;
+            break;
+        case MM_BEARER_IP_FAMILY_UNKNOWN:
+        default:
+            mm_dbg ("No specific IP family requested, defaulting to IPv4");
+            ctx->ipv4 = TRUE;
+            ctx->ipv6 = FALSE;
+            break;
+        }
+
+        g_object_unref (properties);
+    }
+
     /* Run! */
     connect_context_step (ctx);
     g_object_unref (modem);
@@ -444,12 +534,27 @@ connect (MMBearer *self,
 /*****************************************************************************/
 /* Disconnect */
 
+typedef enum {
+    DISCONNECT_STEP_FIRST,
+    DISCONNECT_STEP_STOP_NETWORK_IPV4,
+    DISCONNECT_STEP_STOP_NETWORK_IPV6,
+    DISCONNECT_STEP_LAST
+} DisconnectStep;
+
 typedef struct {
     MMBearerQmi *self;
+    GSimpleAsyncResult *result;
     QmiClientWds *client;
     MMPort *data;
-    guint32 packet_data_handle;
-    GSimpleAsyncResult *result;
+    DisconnectStep step;
+
+    gboolean running_ipv4;
+    guint32 packet_data_handle_ipv4;
+    GError *error_ipv4;
+
+    gboolean running_ipv6;
+    guint32 packet_data_handle_ipv6;
+    GError *error_ipv6;
 } DisconnectContext;
 
 static void
@@ -457,6 +562,10 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+    if (ctx->error_ipv4)
+        g_error_free (ctx->error_ipv4);
+    if (ctx->error_ipv6)
+        g_error_free (ctx->error_ipv6);
     g_object_unref (ctx->client);
     g_object_unref (ctx->data);
     g_object_unref (ctx->self);
@@ -472,17 +581,29 @@ disconnect_finish (MMBearer *self,
 }
 
 static void
-reset_bearer_connection (MMBearerQmi *self)
+reset_bearer_connection (MMBearerQmi *self,
+                         gboolean reset_ipv4,
+                         gboolean reset_ipv6)
 {
-    if (self->priv->data) {
-        /* Port is disconnected; update the state */
-        mm_port_set_connected (self->priv->data, FALSE);
-        g_clear_object (&self->priv->data);
-    }
+    if (reset_ipv4)
+        self->priv->packet_data_handle_ipv4 = 0;
 
-    g_clear_object (&self->priv->client);
-    self->priv->packet_data_handle = 0;
+    if (reset_ipv6)
+        self->priv->packet_data_handle_ipv6 = 0;
+
+    if (!self->priv->packet_data_handle_ipv4 &&
+        !self->priv->packet_data_handle_ipv6) {
+        if (self->priv->data) {
+            /* Port is disconnected; update the state */
+            mm_port_set_connected (self->priv->data, FALSE);
+            g_clear_object (&self->priv->data);
+        }
+
+        g_clear_object (&self->priv->client);
+    }
 }
+
+static void disconnect_context_step (DisconnectContext *ctx);
 
 static void
 stop_network_ready (QmiClientWds *client,
@@ -493,25 +614,100 @@ stop_network_ready (QmiClientWds *client,
     QmiMessageWdsStopNetworkOutput *output;
 
     output = qmi_client_wds_stop_network_finish (client, res, &error);
-    if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disconnect_context_complete_and_free (ctx);
-        return;
+    if (output)
+        qmi_message_wds_stop_network_output_get_result (output, &error);
+
+    if (error) {
+        if (ctx->running_ipv4)
+            ctx->error_ipv4 = error;
+        else
+            ctx->error_ipv6 = error;
+    } else {
+        /* Clear internal status */
+        reset_bearer_connection (ctx->self,
+                                 ctx->running_ipv4,
+                                 ctx->running_ipv6);
     }
 
-    if (!qmi_message_wds_stop_network_output_get_result (output, &error)) {
+    if (output)
         qmi_message_wds_stop_network_output_unref (output);
-        g_simple_async_result_take_error (ctx->result, error);
+
+    /* Keep on */
+    ctx->step++;
+    disconnect_context_step (ctx);
+}
+
+static void
+disconnect_context_step (DisconnectContext *ctx)
+{
+    switch (ctx->step) {
+    case DISCONNECT_STEP_FIRST:
+        /* Fall down */
+        ctx->step++;
+
+    case DISCONNECT_STEP_STOP_NETWORK_IPV4:
+        if (ctx->packet_data_handle_ipv4) {
+            QmiMessageWdsStopNetworkInput *input;
+
+            input = qmi_message_wds_stop_network_input_new ();
+            qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
+
+            ctx->running_ipv4 = TRUE;
+            ctx->running_ipv6 = FALSE;
+            qmi_client_wds_stop_network (ctx->client,
+                                         input,
+                                         10,
+                                         NULL,
+                                         (GAsyncReadyCallback)stop_network_ready,
+                                         ctx);
+            return;
+        }
+
+        /* Fall down */
+        ctx->step++;
+
+    case DISCONNECT_STEP_STOP_NETWORK_IPV6:
+        if (ctx->packet_data_handle_ipv6) {
+            QmiMessageWdsStopNetworkInput *input;
+
+            input = qmi_message_wds_stop_network_input_new ();
+            qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
+
+            ctx->running_ipv4 = FALSE;
+            ctx->running_ipv6 = TRUE;
+            qmi_client_wds_stop_network (ctx->client,
+                                         input,
+                                         10,
+                                         NULL,
+                                         (GAsyncReadyCallback)stop_network_ready,
+                                         ctx);
+            return;
+        }
+
+        /* Fall down */
+        ctx->step++;
+
+    case DISCONNECT_STEP_LAST:
+        if (!ctx->error_ipv4 && !ctx->error_ipv6)
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        else {
+            GError *error;
+
+            /* If both set, IPv4 error preferred */
+            if (ctx->error_ipv4) {
+                error = ctx->error_ipv4;
+                ctx->error_ipv4 = NULL;
+            } else {
+                error = ctx->error_ipv6;
+                ctx->error_ipv6 = NULL;
+            }
+
+            g_simple_async_result_take_error (ctx->result, error);
+        }
+
         disconnect_context_complete_and_free (ctx);
         return;
     }
-
-    /* Clear internal status */
-    reset_bearer_connection (ctx->self);
-
-    qmi_message_wds_stop_network_output_unref (output);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disconnect_context_complete_and_free (ctx);
 }
 
 static void
@@ -520,10 +716,9 @@ disconnect (MMBearer *_self,
             gpointer user_data)
 {
     MMBearerQmi *self = MM_BEARER_QMI (_self);
-    QmiMessageWdsStopNetworkInput *input;
     DisconnectContext *ctx;
 
-    if (!self->priv->packet_data_handle ||
+    if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
         !self->priv->client ||
         !self->priv->data) {
         g_simple_async_report_error_in_idle (
@@ -540,20 +735,16 @@ disconnect (MMBearer *_self,
     ctx->self = g_object_ref (self);
     ctx->data = g_object_ref (self->priv->data);
     ctx->client = g_object_ref (self->priv->client);
-    ctx->packet_data_handle = self->priv->packet_data_handle;
+    ctx->packet_data_handle_ipv4 = self->priv->packet_data_handle_ipv4;
+    ctx->packet_data_handle_ipv6 = self->priv->packet_data_handle_ipv6;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              disconnect);
+    ctx->step = DISCONNECT_STEP_FIRST;
 
-    input = qmi_message_wds_stop_network_input_new ();
-    qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle, NULL);
-    qmi_client_wds_stop_network (ctx->client,
-                                 input,
-                                 10,
-                                 NULL,
-                                 (GAsyncReadyCallback)stop_network_ready,
-                                 ctx);
+    /* Run! */
+    disconnect_context_step (ctx);
 }
 
 /*****************************************************************************/
@@ -562,7 +753,7 @@ static void
 report_disconnection (MMBearer *self)
 {
     /* Cleanup all connection related data */
-    reset_bearer_connection (MM_BEARER_QMI (self));
+    reset_bearer_connection (MM_BEARER_QMI (self), TRUE, TRUE);
 
     /* Chain up parent's report_disconection() */
     MM_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_disconnection (self);
