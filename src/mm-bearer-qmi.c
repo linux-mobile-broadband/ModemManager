@@ -33,7 +33,8 @@ G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BEARER);
 
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
-    QmiClientWds *client;
+    QmiClientWds *client_ipv4;
+    QmiClientWds *client_ipv6;
     MMPort *data;
     guint32 packet_data_handle_ipv4;
     guint32 packet_data_handle_ipv6;
@@ -62,8 +63,11 @@ connect_result_free (ConnectResult *result)
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
-    CONNECT_STEP_WDS_CLIENT,
+    CONNECT_STEP_IPV4,
+    CONNECT_STEP_WDS_CLIENT_IPV4,
     CONNECT_STEP_START_NETWORK_IPV4,
+    CONNECT_STEP_IPV6,
+    CONNECT_STEP_WDS_CLIENT_IPV6,
     CONNECT_STEP_START_NETWORK_IPV6,
     CONNECT_STEP_LAST
 } ConnectStep;
@@ -75,18 +79,19 @@ typedef struct {
     ConnectStep step;
     MMPort *data;
     MMQmiPort *qmi;
-    QmiClientWds *client;
     gchar *user;
     gchar *password;
     gchar *apn;
 
     gboolean ipv4;
     gboolean running_ipv4;
+    QmiClientWds *client_ipv4;
     guint32 packet_data_handle_ipv4;
     GError *error_ipv4;
 
     gboolean ipv6;
     gboolean running_ipv6;
+    QmiClientWds *client_ipv6;
     guint32 packet_data_handle_ipv6;
     GError *error_ipv6;
 } ConnectContext;
@@ -103,8 +108,10 @@ connect_context_complete_and_free (ConnectContext *ctx)
         g_error_free (ctx->error_ipv4);
     if (ctx->error_ipv6)
         g_error_free (ctx->error_ipv6);
-    if (ctx->client)
-        g_object_unref (ctx->client);
+    if (ctx->client_ipv4)
+        g_object_unref (ctx->client_ipv4);
+    if (ctx->client_ipv6)
+        g_object_unref (ctx->client_ipv6);
     g_object_unref (ctx->data);
     g_object_unref (ctx->qmi);
     g_object_unref (ctx->cancellable);
@@ -242,15 +249,23 @@ qmi_port_allocate_client_ready (MMQmiPort *qmi,
 {
     GError *error = NULL;
 
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
     if (!mm_qmi_port_allocate_client_finish (qmi, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
         return;
     }
 
-    ctx->client = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
-                                                          QMI_SERVICE_WDS,
-                                                          MM_QMI_PORT_FLAG_DEFAULT));
+    if (ctx->running_ipv4)
+        ctx->client_ipv4 = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
+                                                                   QMI_SERVICE_WDS,
+                                                                   MM_QMI_PORT_FLAG_WDS_IPV4));
+    else
+        ctx->client_ipv6 = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
+                                                                   QMI_SERVICE_WDS,
+                                                                   MM_QMI_PORT_FLAG_WDS_IPV6));
 
     /* Keep on */
     ctx->step++;
@@ -308,66 +323,109 @@ connect_context_step (ConnectContext *ctx)
         /* If already open, just fall down */
         ctx->step++;
 
-    case CONNECT_STEP_WDS_CLIENT: {
+    case CONNECT_STEP_IPV4:
+        /* If no IPv4 setup needed, jump to IPv6 */
+        if (!ctx->ipv4) {
+            ctx->step = CONNECT_STEP_IPV6;
+            connect_context_step (ctx);
+            return;
+        }
+
+        /* Start IPv4 setup */
+        mm_dbg ("Running IPv4 connection setup");
+        ctx->running_ipv4 = TRUE;
+        ctx->running_ipv6 = FALSE;
+        /* Just fall down */
+        ctx->step++;
+
+    case CONNECT_STEP_WDS_CLIENT_IPV4: {
         QmiClient *client;
 
         client = mm_qmi_port_get_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_DEFAULT);
+                                         MM_QMI_PORT_FLAG_WDS_IPV4);
         if (!client) {
+            mm_dbg ("Allocating IPv4-specific WDS client");
             mm_qmi_port_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_DEFAULT,
+                                         MM_QMI_PORT_FLAG_WDS_IPV4,
                                          ctx->cancellable,
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          ctx);
             return;
         }
 
-        ctx->client = QMI_CLIENT_WDS (client);
+        ctx->client_ipv4 = QMI_CLIENT_WDS (client);
+        /* Just fall down */
+        ctx->step++;
     }
 
-    case CONNECT_STEP_START_NETWORK_IPV4:
-        if (ctx->ipv4) {
-            QmiMessageWdsStartNetworkInput *input;
+    case CONNECT_STEP_START_NETWORK_IPV4: {
+        QmiMessageWdsStartNetworkInput *input;
 
-            ctx->running_ipv4 = TRUE;
-            ctx->running_ipv6 = FALSE;
-            input = build_start_network_input (ctx);
-            qmi_client_wds_start_network (ctx->client,
-                                          input,
-                                          10,
-                                          ctx->cancellable,
-                                          (GAsyncReadyCallback)start_network_ready,
-                                          ctx);
-            if (input)
-                qmi_message_wds_start_network_input_unref (input);
+        mm_dbg ("Starting IPv4 connection...");
+        input = build_start_network_input (ctx);
+        qmi_client_wds_start_network (ctx->client_ipv4,
+                                      input,
+                                      10,
+                                      ctx->cancellable,
+                                      (GAsyncReadyCallback)start_network_ready,
+                                      ctx);
+        qmi_message_wds_start_network_input_unref (input);
+        return;
+    }
+
+    case CONNECT_STEP_IPV6:
+        /* If no IPv6 setup needed, jump to last */
+        if (!ctx->ipv6) {
+            ctx->step = CONNECT_STEP_LAST;
+            connect_context_step (ctx);
             return;
         }
 
-        /* No IPv4 setup needed, fall down */
+        /* Start IPv6 setup */
+        mm_dbg ("Running IPv6 connection setup");
+        ctx->running_ipv4 = FALSE;
+        ctx->running_ipv6 = TRUE;
+        /* Just fall down */
         ctx->step++;
 
-    case CONNECT_STEP_START_NETWORK_IPV6:
-        if (ctx->ipv6) {
-            QmiMessageWdsStartNetworkInput *input;
+    case CONNECT_STEP_WDS_CLIENT_IPV6: {
+        QmiClient *client;
 
-            ctx->running_ipv4 = FALSE;
-            ctx->running_ipv6 = TRUE;
-            input = build_start_network_input (ctx);
-            qmi_client_wds_start_network (ctx->client,
-                                          input,
-                                          10,
-                                          ctx->cancellable,
-                                          (GAsyncReadyCallback)start_network_ready,
-                                          ctx);
-            if (input)
-                qmi_message_wds_start_network_input_unref (input);
+        client = mm_qmi_port_get_client (ctx->qmi,
+                                         QMI_SERVICE_WDS,
+                                         MM_QMI_PORT_FLAG_WDS_IPV6);
+        if (!client) {
+            mm_dbg ("Allocating IPv6-specific WDS client");
+            mm_qmi_port_allocate_client (ctx->qmi,
+                                         QMI_SERVICE_WDS,
+                                         MM_QMI_PORT_FLAG_WDS_IPV6,
+                                         ctx->cancellable,
+                                         (GAsyncReadyCallback)qmi_port_allocate_client_ready,
+                                         ctx);
             return;
         }
 
-        /* No IPv6 setup needed, fall down */
+        ctx->client_ipv6 = QMI_CLIENT_WDS (client);
+        /* Just fall down */
         ctx->step++;
+    }
+
+    case CONNECT_STEP_START_NETWORK_IPV6: {
+        QmiMessageWdsStartNetworkInput *input;
+
+        mm_dbg ("Starting IPv6 connection...");
+        input = build_start_network_input (ctx);
+        qmi_client_wds_start_network (ctx->client_ipv6,
+                                      input,
+                                      10,
+                                      ctx->cancellable,
+                                      (GAsyncReadyCallback)start_network_ready,
+                                      ctx);
+        qmi_message_wds_start_network_input_unref (input);
+        return;
+    }
 
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
@@ -381,10 +439,12 @@ connect_context_step (ConnectContext *ctx)
             /* Keep connection related data */
             g_assert (ctx->self->priv->data == NULL);
             ctx->self->priv->data = g_object_ref (ctx->data);
-            g_assert (ctx->self->priv->client == NULL);
-            ctx->self->priv->client = g_object_ref (ctx->client);
+            g_assert (ctx->self->priv->client_ipv4 == NULL);
+            ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
             g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
             ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+            g_assert (ctx->self->priv->client_ipv6 == NULL);
+            ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
             g_assert (ctx->self->priv->packet_data_handle_ipv6 == 0);
             ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
 
@@ -549,15 +609,16 @@ typedef enum {
 typedef struct {
     MMBearerQmi *self;
     GSimpleAsyncResult *result;
-    QmiClientWds *client;
     MMPort *data;
     DisconnectStep step;
 
     gboolean running_ipv4;
+    QmiClientWds *client_ipv4;
     guint32 packet_data_handle_ipv4;
     GError *error_ipv4;
 
     gboolean running_ipv6;
+    QmiClientWds *client_ipv6;
     guint32 packet_data_handle_ipv6;
     GError *error_ipv6;
 } DisconnectContext;
@@ -571,7 +632,10 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
         g_error_free (ctx->error_ipv4);
     if (ctx->error_ipv6)
         g_error_free (ctx->error_ipv6);
-    g_object_unref (ctx->client);
+    if (ctx->client_ipv4)
+        g_object_unref (ctx->client_ipv4);
+    if (ctx->client_ipv6)
+        g_object_unref (ctx->client_ipv6);
     g_object_unref (ctx->data);
     g_object_unref (ctx->self);
     g_slice_free (DisconnectContext, ctx);
@@ -590,11 +654,15 @@ reset_bearer_connection (MMBearerQmi *self,
                          gboolean reset_ipv4,
                          gboolean reset_ipv6)
 {
-    if (reset_ipv4)
+    if (reset_ipv4) {
         self->priv->packet_data_handle_ipv4 = 0;
+        g_clear_object (&self->priv->client_ipv4);
+    }
 
-    if (reset_ipv6)
+    if (reset_ipv6) {
         self->priv->packet_data_handle_ipv6 = 0;
+        g_clear_object (&self->priv->client_ipv6);
+    }
 
     if (!self->priv->packet_data_handle_ipv4 &&
         !self->priv->packet_data_handle_ipv6) {
@@ -603,8 +671,6 @@ reset_bearer_connection (MMBearerQmi *self,
             mm_port_set_connected (self->priv->data, FALSE);
             g_clear_object (&self->priv->data);
         }
-
-        g_clear_object (&self->priv->client);
     }
 }
 
@@ -659,7 +725,7 @@ disconnect_context_step (DisconnectContext *ctx)
 
             ctx->running_ipv4 = TRUE;
             ctx->running_ipv6 = FALSE;
-            qmi_client_wds_stop_network (ctx->client,
+            qmi_client_wds_stop_network (ctx->client_ipv4,
                                          input,
                                          10,
                                          NULL,
@@ -680,7 +746,7 @@ disconnect_context_step (DisconnectContext *ctx)
 
             ctx->running_ipv4 = FALSE;
             ctx->running_ipv6 = TRUE;
-            qmi_client_wds_stop_network (ctx->client,
+            qmi_client_wds_stop_network (ctx->client_ipv6,
                                          input,
                                          10,
                                          NULL,
@@ -724,7 +790,7 @@ disconnect (MMBearer *_self,
     DisconnectContext *ctx;
 
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
-        !self->priv->client ||
+        (!self->priv->client_ipv4 && self->priv->client_ipv6) ||
         !self->priv->data) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
@@ -739,8 +805,9 @@ disconnect (MMBearer *_self,
     ctx = g_slice_new0 (DisconnectContext);
     ctx->self = g_object_ref (self);
     ctx->data = g_object_ref (self->priv->data);
-    ctx->client = g_object_ref (self->priv->client);
+    ctx->client_ipv4 = self->priv->client_ipv4 ? g_object_ref (self->priv->client_ipv4) : NULL;
     ctx->packet_data_handle_ipv4 = self->priv->packet_data_handle_ipv4;
+    ctx->client_ipv6 = self->priv->client_ipv6 ? g_object_ref (self->priv->client_ipv6) : NULL;
     ctx->packet_data_handle_ipv6 = self->priv->packet_data_handle_ipv6;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -801,7 +868,8 @@ dispose (GObject *object)
     MMBearerQmi *self = MM_BEARER_QMI (object);
 
     g_clear_object (&self->priv->data);
-    g_clear_object (&self->priv->client);
+    g_clear_object (&self->priv->client_ipv4);
+    g_clear_object (&self->priv->client_ipv6);
 
     G_OBJECT_CLASS (mm_bearer_qmi_parent_class)->dispose (object);
 }

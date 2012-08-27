@@ -59,7 +59,9 @@ gboolean mm_qmi_port_is_open     (MMQmiPort *self);
 void     mm_qmi_port_close       (MMQmiPort *self);
 
 typedef enum {
-    MM_QMI_PORT_FLAG_DEFAULT = 0
+    MM_QMI_PORT_FLAG_DEFAULT  = 0,
+    MM_QMI_PORT_FLAG_WDS_IPV4 = 100,
+    MM_QMI_PORT_FLAG_WDS_IPV6 = 101
 } MMQmiPortFlag;
 
 void     mm_qmi_port_allocate_client        (MMQmiPort *self,
