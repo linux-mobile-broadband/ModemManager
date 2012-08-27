@@ -48,6 +48,9 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191f", ENV{ID_MM_ERICSSON_MBM}="1"
 # Ericsson C5621w
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1921", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# Ericsson H5321gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{ID_MM_ERICSSON_MBM}="1"
+
 # Ericsson C3304w
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1928", ENV{ID_MM_ERICSSON_MBM}="1"
 
