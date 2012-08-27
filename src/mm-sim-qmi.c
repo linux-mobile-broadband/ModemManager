@@ -45,7 +45,9 @@ ensure_qmi_client (MMSimQmi *self,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (modem), service);
+    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (modem),
+                                      service,
+                                      MM_QMI_PORT_FLAG_DEFAULT);
     if (!client)
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,

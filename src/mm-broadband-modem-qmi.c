@@ -90,7 +90,9 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
 {
     QmiClient *client;
 
-    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)), service);
+    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
+                                      service,
+                                      MM_QMI_PORT_FLAG_DEFAULT);
     if (!client) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
@@ -5097,6 +5099,7 @@ allocate_next_client (InitializationStartedContext *ctx)
     /* Otherwise, allocate next client */
     mm_qmi_port_allocate_client (ctx->qmi,
                                  ctx->services[ctx->service_index],
+                                 MM_QMI_PORT_FLAG_DEFAULT,
                                  NULL,
                                  (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                  ctx);

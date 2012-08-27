@@ -29,6 +29,7 @@ G_DEFINE_TYPE (MMQmiPort, mm_qmi_port, MM_TYPE_PORT)
 typedef struct {
     QmiService service;
     QmiClient *client;
+    MMQmiPortFlag flag;
 } ServiceInfo;
 
 struct _MMQmiPortPrivate {
@@ -41,14 +42,16 @@ struct _MMQmiPortPrivate {
 
 QmiClient *
 mm_qmi_port_peek_client (MMQmiPort *self,
-                         QmiService service)
+                         QmiService service,
+                         MMQmiPortFlag flag)
 {
     GList *l;
 
     for (l = self->priv->services; l; l = g_list_next (l)) {
         ServiceInfo *info = l->data;
 
-        if (info->service == service)
+        if (info->service == service &&
+            info->flag == flag)
             return info->client;
     }
 
@@ -57,11 +60,12 @@ mm_qmi_port_peek_client (MMQmiPort *self,
 
 QmiClient *
 mm_qmi_port_get_client (MMQmiPort *self,
-                        QmiService service)
+                        QmiService service,
+                        MMQmiPortFlag flag)
 {
     QmiClient *client;
 
-    client = mm_qmi_port_peek_client (self, service);
+    client = mm_qmi_port_peek_client (self, service, flag);
     return (client ? g_object_ref (client) : NULL);
 }
 
@@ -120,13 +124,14 @@ allocate_client_ready (QmiDevice *qmi_device,
 void
 mm_qmi_port_allocate_client (MMQmiPort *self,
                              QmiService service,
+                             MMQmiPortFlag flag,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
                              gpointer user_data)
 {
     AllocateClientContext *ctx;
 
-    if (!!mm_qmi_port_peek_client (self, service)) {
+    if (!!mm_qmi_port_peek_client (self, service, flag)) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -145,6 +150,7 @@ mm_qmi_port_allocate_client (MMQmiPort *self,
                                              mm_qmi_port_allocate_client);
     ctx->info = g_new0 (ServiceInfo, 1);
     ctx->info->service = service;
+    ctx->info->flag = flag;
 
     qmi_device_allocate_client (self->priv->qmi_device,
                                 service,

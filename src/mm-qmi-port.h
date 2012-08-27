@@ -58,8 +58,13 @@ gboolean mm_qmi_port_open_finish (MMQmiPort *self,
 gboolean mm_qmi_port_is_open     (MMQmiPort *self);
 void     mm_qmi_port_close       (MMQmiPort *self);
 
+typedef enum {
+    MM_QMI_PORT_FLAG_DEFAULT = 0
+} MMQmiPortFlag;
+
 void     mm_qmi_port_allocate_client        (MMQmiPort *self,
                                              QmiService service,
+                                             MMQmiPortFlag flag,
                                              GCancellable *cancellable,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data);
@@ -68,8 +73,10 @@ gboolean mm_qmi_port_allocate_client_finish (MMQmiPort *self,
                                              GError **error);
 
 QmiClient *mm_qmi_port_peek_client (MMQmiPort *self,
-                                    QmiService service);
+                                    QmiService service,
+                                    MMQmiPortFlag flag);
 QmiClient *mm_qmi_port_get_client  (MMQmiPort *self,
-                                    QmiService service);
+                                    QmiService service,
+                                    MMQmiPortFlag flag);
 
 #endif /* MM_QMI_PORT_H */

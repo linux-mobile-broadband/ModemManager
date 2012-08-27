@@ -248,7 +248,9 @@ qmi_port_allocate_client_ready (MMQmiPort *qmi,
         return;
     }
 
-    ctx->client = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi, QMI_SERVICE_WDS));
+    ctx->client = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
+                                                          QMI_SERVICE_WDS,
+                                                          MM_QMI_PORT_FLAG_DEFAULT));
 
     /* Keep on */
     ctx->step++;
@@ -309,10 +311,13 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_WDS_CLIENT: {
         QmiClient *client;
 
-        client = mm_qmi_port_get_client (ctx->qmi, QMI_SERVICE_WDS);
+        client = mm_qmi_port_get_client (ctx->qmi,
+                                         QMI_SERVICE_WDS,
+                                         MM_QMI_PORT_FLAG_DEFAULT);
         if (!client) {
             mm_qmi_port_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
+                                         MM_QMI_PORT_FLAG_DEFAULT,
                                          ctx->cancellable,
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          ctx);
