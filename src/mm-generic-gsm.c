@@ -2423,6 +2423,45 @@ get_imei (MMModemGsmCard *modem,
 }
 
 static void
+get_imsi_done (MMAtSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+    char *str;
+    guint32 i = 0;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        /* strip any prefix and quotes; the IMSI is 15 digits */
+        p = mm_strip_tag (response->str, "+CIMI:");
+        while (p && *p && !isdigit (*p))
+            p++;
+        str = g_strdup (p);
+        while (i < 15 && str && isdigit (str[i]))
+            i++;
+        if (i == 15) {
+            str[i] = '\0';
+            mm_callback_info_set_result (info, str, g_free);
+        } else {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Failed to parse IMSI response");
+        }
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
 get_imsi (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
@@ -2437,7 +2476,7 @@ get_imsi (MMModemGsmCard *modem,
         mm_callback_info_schedule (info);
     else {
         g_clear_error (&info->error);
-        mm_at_serial_port_queue_command_cached (port, "+CIMI", 3, get_string_done, info);
+        mm_at_serial_port_queue_command_cached (port, "+CIMI", 3, get_imsi_done, info);
     }
 }
 
