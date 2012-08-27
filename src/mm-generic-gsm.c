@@ -1885,6 +1885,21 @@ sms_get_format_cb (MMAtSerialPort *port,
     g_regex_unref (r);
 }
 
+static void
+sms_ind_enable_cb (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    if (g_error_matches (error, MM_MSG_ERROR, MM_MSG_ERROR_NOT_SUPPORTED)) {
+        /* If the device doesn't like the +CNMI we gave it (which could be
+         * plugin-specific) try a fallback.  Many devices based on Qualcomm
+         * chipsets don't like '1' for the <ds> parameter for some reason.
+         */
+        mm_at_serial_port_queue_command (port, "+CNMI=2,1,2,2,0", 3, NULL, NULL);
+    }
+}
+
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -1932,7 +1947,7 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     /* Enable SMS notifications */
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
-        mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
+        mm_at_serial_port_queue_command (priv->primary, cmd, 3, sms_ind_enable_cb, NULL);
     g_free (cmd);
 
     /* Check and enable the right SMS mode */
