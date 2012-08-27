@@ -533,14 +533,20 @@ connect_context_step (ConnectContext *ctx)
             /* Keep connection related data */
             g_assert (ctx->self->priv->data == NULL);
             ctx->self->priv->data = g_object_ref (ctx->data);
-            g_assert (ctx->self->priv->client_ipv4 == NULL);
-            ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
+
             g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
-            ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
-            g_assert (ctx->self->priv->client_ipv6 == NULL);
-            ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
+            g_assert (ctx->self->priv->client_ipv4 == NULL);
+            if (ctx->packet_data_handle_ipv4) {
+                ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+                ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
+            }
+
             g_assert (ctx->self->priv->packet_data_handle_ipv6 == 0);
-            ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+            g_assert (ctx->self->priv->client_ipv6 == NULL);
+            if (ctx->packet_data_handle_ipv6) {
+                ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+                ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
+            }
 
             /* Build IP config; always DHCP based */
             config = mm_bearer_ip_config_new ();
