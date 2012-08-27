@@ -65,9 +65,11 @@ typedef enum {
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
+    CONNECT_STEP_IP_FAMILY_IPV4,
     CONNECT_STEP_START_NETWORK_IPV4,
     CONNECT_STEP_IPV6,
     CONNECT_STEP_WDS_CLIENT_IPV6,
+    CONNECT_STEP_IP_FAMILY_IPV6,
     CONNECT_STEP_START_NETWORK_IPV6,
     CONNECT_STEP_LAST
 } ConnectStep;
@@ -83,6 +85,7 @@ typedef struct {
     gchar *password;
     gchar *apn;
     gboolean no_ip_family_preference;
+    gboolean default_ip_family_set;
 
     gboolean ipv4;
     gboolean running_ipv4;
@@ -237,8 +240,11 @@ build_start_network_input (ConnectContext *ctx)
 
     /* Only add the IP family preference TLV if explicitly requested a given
      * family. This TLV may be newer than the Start Network command itself, so
-     * we'll just allow the case where none is specified */
-    if (!ctx->no_ip_family_preference) {
+     * we'll just allow the case where none is specified. Also, don't add this
+     * TLV if we already set a default IP family preference with "WDS Set IP
+     * Family" */
+    if (!ctx->no_ip_family_preference &&
+        !ctx->default_ip_family_set) {
         qmi_message_wds_start_network_input_set_ip_family_preference (
             input,
             (ctx->running_ipv6 ? QMI_WDS_IP_FAMILY_IPV6 : QMI_WDS_IP_FAMILY_IPV4),
@@ -246,6 +252,38 @@ build_start_network_input (ConnectContext *ctx)
     }
 
     return input;
+}
+
+static void
+set_ip_family_ready (QmiClientWds *client,
+                     GAsyncResult *res,
+                     ConnectContext *ctx)
+{
+    GError *error = NULL;
+    QmiMessageWdsSetIpFamilyOutput *output;
+
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
+    output = qmi_client_wds_set_ip_family_finish (client, res, &error);
+    if (output) {
+        qmi_message_wds_set_ip_family_output_get_result (output, &error);
+        qmi_message_wds_set_ip_family_output_unref (output);
+    }
+
+    if (error) {
+        /* Ensure we add the IP family preference TLV */
+        mm_dbg ("Couldn't set IP family preference: '%s'", error->message);
+        g_error_free (error);
+        ctx->default_ip_family_set = FALSE;
+    } else {
+        /* No need to add IP family preference */
+        ctx->default_ip_family_set = TRUE;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (ctx);
 }
 
 static void
@@ -366,6 +404,30 @@ connect_context_step (ConnectContext *ctx)
         ctx->step++;
     }
 
+    case CONNECT_STEP_IP_FAMILY_IPV4:
+        /* If client is new enough, select IP family */
+        if (!ctx->no_ip_family_preference &&
+            qmi_client_check_version (QMI_CLIENT (ctx->client_ipv4), 1, 9)) {
+            QmiMessageWdsSetIpFamilyInput *input;
+
+            mm_dbg ("Setting default IP family to: IPv4");
+            input = qmi_message_wds_set_ip_family_input_new ();
+            qmi_message_wds_set_ip_family_input_set_preference (input, QMI_WDS_IP_FAMILY_IPV4, NULL);
+            qmi_client_wds_set_ip_family (ctx->client_ipv4,
+                                          input,
+                                          10,
+                                          ctx->cancellable,
+                                          (GAsyncReadyCallback)set_ip_family_ready,
+                                          ctx);
+            qmi_message_wds_set_ip_family_input_unref (input);
+            return;
+        }
+
+        ctx->default_ip_family_set = FALSE;
+
+        /* Just fall down */
+        ctx->step++;
+
     case CONNECT_STEP_START_NETWORK_IPV4: {
         QmiMessageWdsStartNetworkInput *input;
 
@@ -417,6 +479,32 @@ connect_context_step (ConnectContext *ctx)
         /* Just fall down */
         ctx->step++;
     }
+
+    case CONNECT_STEP_IP_FAMILY_IPV6:
+
+        g_assert (ctx->no_ip_family_preference == FALSE);
+
+        /* If client is new enough, select IP family */
+        if (qmi_client_check_version (QMI_CLIENT (ctx->client_ipv6), 1, 9)) {
+            QmiMessageWdsSetIpFamilyInput *input;
+
+            mm_dbg ("Setting default IP family to: IPv6");
+            input = qmi_message_wds_set_ip_family_input_new ();
+            qmi_message_wds_set_ip_family_input_set_preference (input, QMI_WDS_IP_FAMILY_IPV6, NULL);
+            qmi_client_wds_set_ip_family (ctx->client_ipv6,
+                                          input,
+                                          10,
+                                          ctx->cancellable,
+                                          (GAsyncReadyCallback)set_ip_family_ready,
+                                          ctx);
+            qmi_message_wds_set_ip_family_input_unref (input);
+            return;
+        }
+
+        ctx->default_ip_family_set = FALSE;
+
+        /* Just fall down */
+        ctx->step++;
 
     case CONNECT_STEP_START_NETWORK_IPV6: {
         QmiMessageWdsStartNetworkInput *input;
