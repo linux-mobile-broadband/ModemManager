@@ -183,5 +183,8 @@ ATTRS{idProduct}=="2002", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_ZTE_PORT_TYPE_AUX}=
 ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_ZTE_PORT_TYPE_MODEM}="1"
 ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_ZTE_PORT_TYPE_AUX}="1"
 
+# Icera-based devices that use DHCP, not AT%IPDPADDR
+ATTRS{product}=="K3805-z", ENV{ID_MM_ZTE_ICERA_DHCP}="1"
+
 LABEL="mm_zte_port_types_end"
 

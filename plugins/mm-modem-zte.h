@@ -40,6 +40,7 @@ MMModem *mm_modem_zte_new (const char *device,
                            const char *driver,
                            const char *plugin,
                            guint32 vendor,
-                           guint32 product);
+                           guint32 product,
+                           gboolean icera_dhcp);
 
 #endif /* MM_MODEM_ZTE_H */
