@@ -97,6 +97,42 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return FALSE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    /* A 2-second wait is necessary for SIM to become ready.
+     * Otherwise, a subsequent AT+CRSM command will likely fail. */
+    g_timeout_add_seconds (2, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
+
+/*****************************************************************************/
 /* Load supported bands (Modem interface) */
 
 /*
@@ -360,6 +396,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
