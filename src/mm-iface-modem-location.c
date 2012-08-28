@@ -218,6 +218,8 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
         g_assert (ctx->location_gps_nmea != NULL);
@@ -286,6 +288,8 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
@@ -314,6 +318,8 @@ mm_iface_modem_location_3gpp_update_lac_ci (MMIfaceModemLocation *self,
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
@@ -340,6 +346,8 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
