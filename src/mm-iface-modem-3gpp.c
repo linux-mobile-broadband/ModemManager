@@ -602,6 +602,9 @@ update_registration_state (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
                   NULL);
 
+    if (!skeleton)
+        return;
+
     /* Only set new state if different */
     if (new_state != old_state) {
         mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s)",
