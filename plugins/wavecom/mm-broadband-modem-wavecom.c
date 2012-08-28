@@ -466,7 +466,7 @@ set_allowed_modes (MMIfaceModem *self,
 {
     SetAllowedModesContext *ctx;
 
-    ctx = g_new (SetAllowedModesContext, 1);
+    ctx = g_new0 (SetAllowedModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
