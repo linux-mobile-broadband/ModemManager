@@ -95,6 +95,8 @@ typedef void (*MMModemStringFn) (MMModem *modem,
 
 typedef void (*MMModemIp4Fn) (MMModem *modem,
                               guint32 address,
+                              guint32 netmask,
+                              guint32 gateway,
                               GArray *dns,
                               GError *error,
                               gpointer user_data);

@@ -251,6 +251,8 @@ get_ip4_invoke (MMCallbackInfo *info)
 
     callback (info->modem,
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-netmask")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-gateway")),
               (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
               info->error, info->user_data);
 }
@@ -293,6 +295,8 @@ value_array_add_uint (GValueArray *array, guint32 i)
 static void
 get_ip4_done (MMModem *modem,
               guint32 address,
+              guint32 netmask,
+              guint32 gateway,
               GArray *dns,
               GError *error,
               gpointer user_data)
@@ -311,7 +315,6 @@ get_ip4_done (MMModem *modem,
 
         if (dns) {
             if (dns->len > 0)
-
                 dns1 = g_array_index (dns, guint32, 0);
             if (dns->len > 1)
                 dns2 = g_array_index (dns, guint32, 1);
