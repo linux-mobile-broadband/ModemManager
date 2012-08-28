@@ -507,7 +507,7 @@ modem_load_manufacturer_finish (MMIfaceModem *self,
     if (!result)
         return NULL;
 
-    manufacturer = g_variant_dup_string (result, NULL);
+    manufacturer = g_strstrip (g_variant_dup_string (result, NULL));
     mm_dbg ("loaded manufacturer: %s", manufacturer);
     return manufacturer;
 }
@@ -548,7 +548,7 @@ modem_load_model_finish (MMIfaceModem *self,
     if (!result)
         return NULL;
 
-    model = g_variant_dup_string (result, NULL);
+    model = g_strstrip (g_variant_dup_string (result, NULL));
     mm_dbg ("loaded model: %s", model);
     return model;
 }
@@ -589,7 +589,7 @@ modem_load_revision_finish (MMIfaceModem *self,
     if (!result)
         return NULL;
 
-    revision = g_variant_dup_string (result, NULL);
+    revision = g_strstrip (g_variant_dup_string (result, NULL));
     mm_dbg ("loaded revision: %s", revision);
     return revision;
 }
