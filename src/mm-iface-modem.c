@@ -1512,7 +1512,8 @@ validate_bands (const GArray *supported_bands_array,
             }
 
             if (supported_bands_array->len > 1 ||
-                g_array_index (supported_bands_array, MMModemBand, 0) != MM_MODEM_BAND_ANY) {
+                (g_array_index (supported_bands_array, MMModemBand, 0) != MM_MODEM_BAND_ANY &&
+                 g_array_index (supported_bands_array, MMModemBand, 0) != MM_MODEM_BAND_UNKNOWN)) {
                 gboolean found = FALSE;
                 guint j;
 
