@@ -1592,18 +1592,25 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
     if (bands_array->len == 1 &&
         g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
         guint i;
-        ctx->bands_array = g_array_sized_new (FALSE,
-                                              FALSE,
-                                              sizeof (MMModemBand),
-                                              supported_bands_array->len);
+
         for (i = 0; i < supported_bands_array->len; i++) {
             MMModemBand band = g_array_index (supported_bands_array, MMModemBand, i);
-            if (band != MM_MODEM_BAND_ANY)
+
+            if (band != MM_MODEM_BAND_ANY &&
+                band != MM_MODEM_BAND_UNKNOWN) {
+                if (!ctx->bands_array)
+                    ctx->bands_array = g_array_sized_new (FALSE,
+                                                          FALSE,
+                                                          sizeof (MMModemBand),
+                                                          supported_bands_array->len);
+
                 g_array_insert_val (ctx->bands_array, i, band);
+            }
         }
-    } else {
-        ctx->bands_array = g_array_ref (bands_array);
     }
+
+    if (!ctx->bands_array)
+        ctx->bands_array = g_array_ref (bands_array);
 
     /* Simply return if target list of bands equals to current list of bands */
     current_bands_array = (mm_common_bands_variant_to_garray (
