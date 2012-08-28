@@ -690,6 +690,8 @@ ip4_config_invoke (MMCallbackInfo *info)
 
     callback (info->modem,
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-netmask")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-gateway")),
               (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
               info->error, info->user_data);
 }
@@ -726,7 +728,11 @@ get_ip4_config_done (MMAtSerialPort *port,
     cid = _get_cid (MM_MODEM_ICERA (info->modem));
     dns_array = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 2);
 
-    /* %IPDPADDR: <cid>,<ip>,<gw>,<dns1>,<dns2>[,<nbns1>,<nbns2>] */
+    /* %IPDPADDR: <cid>,<ip>,<gw>,<dns1>,<dns2>[,<nbns1>,<nbns2>[,<??>,<netmask>,<gw>]]
+     *
+     * Sierra USB305: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0
+     * K3805-Z: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0, 255.0.0.0, 255.255.255.0, 21.93.217.10,
+     */
     items = g_strsplit (response->str + strlen (IPDPADDR_TAG), ", ", 0);
 
     for (iter = items, i = 0; *iter; iter++, i++) {
@@ -744,12 +750,23 @@ get_ip4_config_done (MMAtSerialPort *port,
         } else if (i == 1) { /* IP address */
             if (inet_pton (AF_INET, *iter, &tmp) > 0)
                 mm_callback_info_set_data (info, "ip4-address", GUINT_TO_POINTER (tmp), NULL);
+        } else if (i == 2) { /* Gateway */
+            if ((inet_pton (AF_INET, *iter, &tmp) > 0) && (tmp > 0))
+                mm_callback_info_set_data (info, "ip4-gateway", GUINT_TO_POINTER (tmp), NULL);
         } else if (i == 3) { /* DNS 1 */
             if (inet_pton (AF_INET, *iter, &tmp) > 0)
                 g_array_append_val (dns_array, tmp);
         } else if (i == 4) { /* DNS 2 */
             if (inet_pton (AF_INET, *iter, &tmp) > 0)
                 g_array_append_val (dns_array, tmp);
+        } else if (i == 8) { /* Netmask */
+            if (inet_pton (AF_INET, *iter, &tmp) > 0)
+                mm_callback_info_set_data (info, "ip4-netmask", GUINT_TO_POINTER (tmp), NULL);
+        } else if (i == 9) { /* Duplicate gateway */
+            if (mm_callback_info_get_data (info, "ip4-gateway") == NULL) {
+                if (inet_pton (AF_INET, *iter, &tmp) > 0)
+                    mm_callback_info_set_data (info, "ip4-gateway", GUINT_TO_POINTER (tmp), NULL);
+            }
         }
     }
 

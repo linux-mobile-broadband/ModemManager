@@ -495,6 +495,8 @@ ip4_config_invoke (MMCallbackInfo *info)
 
     callback (info->modem,
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-netmask")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-gateway")),
               (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
               info->error, info->user_data);
 }
