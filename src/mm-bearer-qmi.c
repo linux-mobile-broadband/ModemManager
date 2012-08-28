@@ -177,24 +177,28 @@ start_network_ready (QmiClientWds *client,
             if (g_error_matches (error,
                                  QMI_PROTOCOL_ERROR,
                                  QMI_PROTOCOL_ERROR_CALL_FAILED)) {
-                guint16 cer;
-                guint16 verbose_cer_type;
-                guint16 verbose_cer_reason;
+                QmiWdsCallEndReason cer;
+                QmiWdsVerboseCallEndReasonType verbose_cer_type;
+                gint16 verbose_cer_reason;
 
                 if (qmi_message_wds_start_network_output_get_call_end_reason (
                         output,
                         &cer,
                         NULL))
-                    mm_info ("call end reason: %u", cer);
+                    mm_info ("call end reason (%u): '%s'",
+                             cer,
+                             qmi_wds_call_end_reason_get_string (cer));
 
                 if (qmi_message_wds_start_network_output_get_verbose_call_end_reason (
                         output,
                         &verbose_cer_type,
                         &verbose_cer_reason,
                         NULL))
-                    mm_info ("verbose call end reason: %u, %u",
+                    mm_info ("verbose call end reason (%u,%d): [%s] %s",
                              verbose_cer_type,
-                             verbose_cer_reason);
+                             verbose_cer_reason,
+                             qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type),
+                             qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason));
             }
         }
     }
