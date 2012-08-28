@@ -159,6 +159,7 @@ grab_port (MMPluginBase *base,
     MMPortType ptype;
     MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
     guint16 vendor = 0, product = 0;
+    gboolean icera_dhcp = FALSE;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -177,6 +178,8 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
+    icera_dhcp = g_udev_device_get_property_as_boolean (port, "ID_MM_ZTE_ICERA_DHCP");
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
@@ -186,7 +189,8 @@ grab_port (MMPluginBase *base,
                                       mm_plugin_base_supports_task_get_driver (task),
                                       mm_plugin_get_name (MM_PLUGIN (base)),
                                       vendor,
-                                      product);
+                                      product,
+                                      icera_dhcp);
         } else if (caps & CAP_CDMA) {
             modem = mm_generic_cdma_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),

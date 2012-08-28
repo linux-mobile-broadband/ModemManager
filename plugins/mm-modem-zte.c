@@ -50,6 +50,7 @@ typedef struct {
     gboolean has_net;
     gboolean is_icera;
     MMModemIceraPrivate *icera;
+    gboolean icera_dhcp;
 } MMModemZtePrivate;
 
 MMModem *
@@ -57,7 +58,8 @@ mm_modem_zte_new (const char *device,
                   const char *driver,
                   const char *plugin,
                   guint32 vendor,
-                  guint32 product)
+                  guint32 product,
+                  gboolean icera_dhcp)
 {
     MMModem *modem;
 
@@ -72,8 +74,10 @@ mm_modem_zte_new (const char *device,
                                     MM_MODEM_HW_VID, vendor,
                                     MM_MODEM_HW_PID, product,
                                     NULL));
-    if (modem)
+    if (modem) {
         MM_MODEM_ZTE_GET_PRIVATE (modem)->icera = mm_modem_icera_init_private ();
+        MM_MODEM_ZTE_GET_PRIVATE (modem)->icera_dhcp = icera_dhcp;
+    }
 
     return modem;
 }
@@ -425,22 +429,20 @@ icera_check_cb (MMModem *modem,
                 GError *error,
                 gpointer user_data)
 {
-    if (!error) {
+    if (!error && result) {
         MMModemZte *self = MM_MODEM_ZTE (user_data);
         MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
 
-        if (result) {
-            priv->is_icera = TRUE;
+        priv->is_icera = TRUE;
 
-            /* Some devices with Icera chipsets don't have pseudo-ethernet
-             * ports and thus should use PPP.  Some devices use static IP,
-             * while others use DHCP on the net port.  What fun.
-             */
-            if (priv->has_net) {
-                g_object_set (G_OBJECT (modem),
-                              MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
-                              NULL);
-            }
+        /* Some devices with Icera chipsets don't have pseudo-ethernet
+         * ports and thus should use PPP.  Some devices use static IP,
+         * while others use DHCP on the net port.  What fun.
+         */
+        if (priv->has_net) {
+            g_object_set (G_OBJECT (modem), MM_MODEM_IP_METHOD,
+                          priv->icera_dhcp ? MM_MODEM_IP_METHOD_DHCP : MM_MODEM_IP_METHOD_STATIC,
+                          NULL);
         }
     }
 }
