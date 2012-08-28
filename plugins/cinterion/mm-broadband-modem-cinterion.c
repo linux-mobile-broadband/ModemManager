@@ -967,7 +967,7 @@ set_bands_3g (MMIfaceModem *self,
     cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u", cinterion_band);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
-                              3,
+                              15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
                               result);
@@ -1063,7 +1063,7 @@ set_bands_2g (MMIfaceModem *self,
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
-                              3,
+                              15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
                               result);
