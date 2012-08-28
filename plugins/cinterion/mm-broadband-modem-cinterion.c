@@ -660,18 +660,23 @@ load_supported_bands (MMIfaceModem *self,
     /* We do assume that we already know if the modem is 2G-only, 3G-only or
      * 2G+3G. This is checked quite before trying to load supported bands. */
 
+#define _g_array_insert_enum(array,index,type,val) do { \
+        type aux = (type)val;                           \
+        g_array_insert_val (array, index, aux);         \
+    } while (0)
+
     bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-    g_array_index (bands, MMModemBand, 0) = MM_MODEM_BAND_EGSM;
-    g_array_index (bands, MMModemBand, 1) = MM_MODEM_BAND_DCS;
-    g_array_index (bands, MMModemBand, 2) = MM_MODEM_BAND_PCS;
-    g_array_index (bands, MMModemBand, 3) = MM_MODEM_BAND_G850;
+    _g_array_insert_enum (bands, 0, MMModemBand, MM_MODEM_BAND_EGSM);
+    _g_array_insert_enum (bands, 1, MMModemBand, MM_MODEM_BAND_DCS);
+    _g_array_insert_enum (bands, 2, MMModemBand, MM_MODEM_BAND_PCS);
+    _g_array_insert_enum (bands, 3, MMModemBand, MM_MODEM_BAND_G850);
 
     /* Add 3G-specific bands */
     if (mm_iface_modem_is_3g (self)) {
         g_array_set_size (bands, 7);
-        g_array_index (bands, MMModemBand, 4) = MM_MODEM_BAND_U2100;
-        g_array_index (bands, MMModemBand, 5) = MM_MODEM_BAND_U1900;
-        g_array_index (bands, MMModemBand, 6) = MM_MODEM_BAND_U850;
+        _g_array_insert_enum (bands, 4, MMModemBand, MM_MODEM_BAND_U2100);
+        _g_array_insert_enum (bands, 5, MMModemBand, MM_MODEM_BAND_U1900);
+        _g_array_insert_enum (bands, 6, MMModemBand, MM_MODEM_BAND_U850);
     }
 
     g_simple_async_result_set_op_res_gpointer (result,
