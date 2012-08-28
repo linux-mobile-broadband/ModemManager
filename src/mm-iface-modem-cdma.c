@@ -911,6 +911,8 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                   MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED, &supported,
                   MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (supported) {
         /* The property in the interface is bound to the property
@@ -960,6 +962,8 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                   MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, &supported,
                   MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     if (supported) {
         /* The property in the interface is bound to the property
