@@ -76,10 +76,10 @@ void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *
 
 const gchar      *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *properties);
 const gchar      *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *properties);
-void              mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *properties,
+gboolean          mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *properties,
                                                                   const MMModemBand **bands,
                                                                   guint *n_bands);
-void              mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *properties,
+gboolean          mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *properties,
                                                                   MMModemMode *allowed,
                                                                   MMModemMode *preferred);
 const gchar      *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *properties);

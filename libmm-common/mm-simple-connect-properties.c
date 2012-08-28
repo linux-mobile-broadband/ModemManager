@@ -33,6 +33,7 @@ struct _MMSimpleConnectPropertiesPrivate {
     /* Operator ID */
     gchar *operator_id;
     /* Bands */
+    gboolean bands_set;
     MMModemBand *bands;
     guint n_bands;
     /* Modes */
@@ -78,6 +79,7 @@ mm_simple_connect_properties_set_bands (MMSimpleConnectProperties *self,
     memcpy (self->priv->bands,
             bands,
             sizeof (MMModemBand) * self->priv->n_bands);
+    self->priv->bands_set = TRUE;
 }
 
 void
@@ -178,30 +180,40 @@ mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
     return self->priv->operator_id;
 }
 
-void
+gboolean
 mm_simple_connect_properties_get_bands (MMSimpleConnectProperties *self,
                                         const MMModemBand **bands,
                                         guint *n_bands)
 {
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-    g_return_if_fail (bands != NULL);
-    g_return_if_fail (n_bands != NULL);
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), FALSE);
+    g_return_val_if_fail (bands != NULL, FALSE);
+    g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    *bands = self->priv->bands;
-    *n_bands = self->priv->n_bands;
+    if (self->priv->bands_set) {
+        *bands = self->priv->bands;
+        *n_bands = self->priv->n_bands;
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
-void
+gboolean
 mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode *allowed,
                                                 MMModemMode *preferred)
 {
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-    g_return_if_fail (allowed != NULL);
-    g_return_if_fail (preferred != NULL);
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), FALSE);
+    g_return_val_if_fail (allowed != NULL, FALSE);
+    g_return_val_if_fail (preferred != NULL, FALSE);
 
-    *allowed = self->priv->allowed_modes;
-    *preferred = self->priv->preferred_mode;
+    if (self->priv->allowed_modes_set) {
+        *allowed = self->priv->allowed_modes;
+        *preferred = self->priv->preferred_mode;
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 const gchar *
@@ -542,7 +554,7 @@ mm_simple_connect_properties_init (MMSimpleConnectProperties *self)
     self->priv->allowed_modes = MM_MODEM_MODE_ANY;
     self->priv->preferred_mode = MM_MODEM_MODE_NONE;
     self->priv->bands = g_new (MMModemBand, 1);
-    self->priv->bands[0] = MM_MODEM_BAND_ANY;
+    self->priv->bands[0] = MM_MODEM_BAND_UNKNOWN;
     self->priv->n_bands = 1;
 }
 

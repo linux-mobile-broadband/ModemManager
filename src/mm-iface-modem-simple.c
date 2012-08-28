@@ -522,40 +522,50 @@ connection_step (ConnectionContext *ctx)
         mm_info ("Simple connect state (%d/%d): Allowed mode",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        mm_simple_connect_properties_get_allowed_modes (ctx->properties,
-                                                        &allowed_modes,
-                                                        &preferred_mode);
-        mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
-                                          allowed_modes,
-                                          preferred_mode,
-                                          (GAsyncReadyCallback)set_allowed_modes_ready,
-                                          ctx);
-        return;
+        /* Don't set modes unless explicitly requested to do so */
+        if (mm_simple_connect_properties_get_allowed_modes (ctx->properties,
+                                                            &allowed_modes,
+                                                            &preferred_mode)) {
+            mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
+                                              allowed_modes,
+                                              preferred_mode,
+                                              (GAsyncReadyCallback)set_allowed_modes_ready,
+                                              ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
     }
 
     case CONNECTION_STEP_BANDS: {
-        GArray *array;
         const MMModemBand *bands = NULL;
         guint n_bands = 0;
-        guint i;
 
         mm_info ("Simple connect state (%d/%d): Bands",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        mm_simple_connect_properties_get_bands (ctx->properties,
-                                                &bands,
-                                                &n_bands);
+        /* Don't set bands unless explicitly requested to do so */
+        if (mm_simple_connect_properties_get_bands (ctx->properties,
+                                                    &bands,
+                                                    &n_bands)) {
+            GArray *array;
+            guint i;
 
-        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
-        for (i = 0; i < n_bands; i++)
-            g_array_insert_val (array, i, bands[i]);
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
+            for (i = 0; i < n_bands; i++)
+                g_array_insert_val (array, i, bands[i]);
 
-        mm_iface_modem_set_bands (MM_IFACE_MODEM (ctx->self),
-                                  array,
-                                  (GAsyncReadyCallback)set_bands_ready,
-                                  ctx);
-        g_array_unref (array);
-        return;
+            mm_iface_modem_set_bands (MM_IFACE_MODEM (ctx->self),
+                                      array,
+                                      (GAsyncReadyCallback)set_bands_ready,
+                                      ctx);
+            g_array_unref (array);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
     }
 
     case CONNECTION_STEP_REGISTER:
