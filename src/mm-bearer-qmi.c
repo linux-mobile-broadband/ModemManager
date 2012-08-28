@@ -891,7 +891,7 @@ disconnect (MMBearer *_self,
     DisconnectContext *ctx;
 
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
-        (!self->priv->client_ipv4 && self->priv->client_ipv6) ||
+        (!self->priv->client_ipv4 && !self->priv->client_ipv6) ||
         !self->priv->data) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
