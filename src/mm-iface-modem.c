@@ -2001,6 +2001,7 @@ struct _UnlockCheckContext {
     guint pin_check_timeout_id;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
+    MMModemLock lock;
 };
 
 static UnlockCheckContext *
@@ -2045,41 +2046,13 @@ reinitialize_ready (MMBaseModem *self,
     }
 }
 
-static void
-modem_after_sim_unlock_ready (MMIfaceModem *self,
-                              GAsyncResult *res)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
-        mm_warn ("After SIM unlock failed setup: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    /* Go on */
-    mm_base_modem_initialize (MM_BASE_MODEM (self),
-                              (GAsyncReadyCallback) reinitialize_ready,
-                              NULL);
-}
-
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    /* If we were asked to run something after having sent the PIN unlock,
-     * do it now. This may be just a timeout or some other command that gives us
-     * the real SIM state */
-    if (MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock != NULL &&
-        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish != NULL) {
-        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock(
-            self,
-            (GAsyncReadyCallback)modem_after_sim_unlock_ready,
-            NULL);
-    } else {
-        /* If no wait needed, just go on */
-        mm_base_modem_initialize (MM_BASE_MODEM (self),
-                                  (GAsyncReadyCallback) reinitialize_ready,
-                                  NULL);
-    }
+    /* If no wait needed, just go on */
+    mm_base_modem_initialize (MM_BASE_MODEM (self),
+                              (GAsyncReadyCallback) reinitialize_ready,
+                              NULL);
     return FALSE;
 }
 
@@ -2146,16 +2119,36 @@ unlock_check_again  (UnlockCheckContext *ctx)
 }
 
 static void
+modem_after_sim_unlock_ready (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              UnlockCheckContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
+        /* Complete anyway */
+        mm_warn ("After SIM unlock failed setup: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Update lock status and modem status if needed */
+    set_lock_status (self, ctx->skeleton, ctx->lock);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (ctx->lock),
+                                               NULL);
+    g_simple_async_result_complete (ctx->result);
+    unlock_check_context_free (ctx);
+}
+
+static void
 unlock_check_ready (MMIfaceModem *self,
                     GAsyncResult *res,
                     UnlockCheckContext *ctx)
 {
     GError *error = NULL;
-    MMModemLock lock;
 
-    lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self,
-                                                                             res,
-                                                                             &error);
+    ctx->lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error);
     if (error) {
         /* Treat several SIM related, serial and other core errors as critical
          * and abort the checks. These will end up moving the modem to a FAILED
@@ -2197,14 +2190,33 @@ unlock_check_ready (MMIfaceModem *self,
         }
 
         /* If reached max retries and still reporting error, set UNKNOWN */
-        lock = MM_MODEM_LOCK_UNKNOWN;
+        ctx->lock = MM_MODEM_LOCK_UNKNOWN;
+    }
+
+    /* If we get that no lock is required, run the after SIM unlock step
+     * in order to wait for the SIM to get ready */
+    if (ctx->lock == MM_MODEM_LOCK_NONE ||
+        ctx->lock == MM_MODEM_LOCK_SIM_PIN2 ||
+        ctx->lock == MM_MODEM_LOCK_SIM_PUK2) {
+        if (MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock != NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish != NULL) {
+            mm_dbg ("SIM is ready, running after SIM unlock step...");
+            MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock(
+                self,
+                (GAsyncReadyCallback)modem_after_sim_unlock_ready,
+                ctx);
+            return;
+        }
+
+        /* If no way to run after SIM unlock step, we're done */
+        mm_dbg ("SIM is ready, and no need for the after SIM unlock step...");
     }
 
     /* Update lock status and modem status if needed */
-    set_lock_status (self, ctx->skeleton, lock);
+    set_lock_status (self, ctx->skeleton, ctx->lock);
 
     g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (lock),
+                                               GUINT_TO_POINTER (ctx->lock),
                                                NULL);
     g_simple_async_result_complete (ctx->result);
     unlock_check_context_free (ctx);
