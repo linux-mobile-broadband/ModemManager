@@ -6,12 +6,22 @@ Overview of changes in ModemManager 0.5.4
 - Ignore unsupported QMI ethernet ports
 - Better support for sending SMS messages on some modems
 - Use SMS PDU mode by default
+- Fix handling of multipart data-only SMS messages
+- Fix SMS notifications for some Qualcomm devices
 - Fix QCDM registration checking
+- Send 'State' property changed signals
 - ZTE: support more devices
-- ZTE: support for PPP-based devices that use Icera chipsets
+- ZTE: support for PPP- and DHCP-based devices that use Icera chipsets
 - ZTE: fix allowed mode response handling
 - ZTE: power modems down when disabled
 - Huawei: fix intermittent issue with newer devices not being recognized
+- mbm: power modems down when disabled
+- mbm: add support for Ericsson H5321 (found in Thinkpad X230)
+- Sierra: fix detection of APP1 ports broken by 0.5.2
+- Sierra: fix signal quality checking on devices that use PPP
+- Sierra: more reliable data connections with the USB305/Lightning
+- Icera: retry configuring PDP context if it fails
+- Novatel: fix checking of CDMA Extended Roaming Indicator
 
 
 Overview of changes in ModemManager 0.5.2
