@@ -41,6 +41,9 @@ struct _MMModemIcera {
      * MMModemIceraPrivate pointer.
      */
     MMModemIceraPrivate * (*get_private) (MMModemIcera *icera);
+    char *                (*get_call_control_cmd) (MMModemIcera *icera,
+                                                   guint32 cid,
+                                                   gboolean activate);
 };
 
 GType mm_modem_icera_get_type (void);
