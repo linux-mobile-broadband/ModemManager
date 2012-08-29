@@ -16,6 +16,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <gmodule.h>
 
 #include <libmm-common.h>
@@ -97,6 +98,12 @@ gcap_ready (MMAtSerialPort *port,
          */
         if (strstr (response->str, "C885"))
             g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+
+        /* For debugging: let users figure out if their device supports it or not */
+        if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
+            mm_dbg ("Sierra: APP1 PPP OK '%s'", response->str);
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+        }
     }
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
