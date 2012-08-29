@@ -11,14 +11,17 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2012 Red Hat, Inc.
  */
 
 #include <string.h>
+#include <stdlib.h>
+
 #include <gmodule.h>
 #include "mm-plugin-sierra.h"
 #include "mm-modem-sierra-gsm.h"
 #include "mm-modem-sierra-cdma.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN_BASE)
 
@@ -74,6 +77,12 @@ handle_probe_response (MMPluginBase *self,
          */
         if (strstr (response, "C885"))
             g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+
+        /* For debugging: let users figure out if their device supports it or not */
+        if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
+            mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
+            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+        }
 
         mm_plugin_base_supports_task_complete (task, 10);
         return;
