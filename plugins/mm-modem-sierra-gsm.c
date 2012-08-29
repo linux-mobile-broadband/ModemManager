@@ -574,6 +574,13 @@ port_grabbed (MMGenericGsm *gsm,
     if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
+        if (pflags == MM_AT_PORT_FLAG_SECONDARY) {
+            /* Built-in echo removal conflicts with the APP1 port's limited AT
+             * parser, which doesn't always prefix responses with <CR><LF>.
+             */
+            g_object_set (G_OBJECT (port), MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE, NULL);
+        }
+
         regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
