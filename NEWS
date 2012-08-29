@@ -3,7 +3,7 @@ Overview of changes in ModemManager 0.6
 
 Significant changes over ModemManager 0.5 include:
 
-- More flexible and reliable port probing and modem setup
+- More flexible and reliable port probing and modem setup (especially for Huawei devices)
 - New plugin for some Cinterion modems
 - New plugin for some Iridium satellite modems
 - New API for modem firmware management
