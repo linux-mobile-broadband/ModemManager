@@ -51,7 +51,11 @@ struct _MMModemIceraPrivate {
 #define MM_MODEM_ICERA_GET_PRIVATE(m) (MM_MODEM_ICERA_GET_INTERFACE (m)->get_private(m))
 
 static void connect_pending_done (MMModemIcera *self);
-
+static void icera_call_control (MMModemIcera *self,
+                                guint32 cid,
+                                gboolean activate,
+                                MMAtSerialResponseFn callback,
+                                gpointer user_data);
 
 static void
 cleanup_configure_context (MMModemIcera *self)
@@ -315,10 +319,10 @@ mm_modem_icera_get_access_technology (MMModemIcera *self,
 /****************************************************************/
 
 static void
-disconnect_ipdpact_done (MMAtSerialPort *port,
-                         GString *response,
-                         GError *error,
-                         gpointer user_data)
+disconnect_done (MMAtSerialPort *port,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -337,8 +341,6 @@ mm_modem_icera_do_disconnect (MMGenericGsm *gsm,
                               gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
-    char *command;
 
     /* Cleanup any running connect stuff */
     cleanup_configure_context (MM_MODEM_ICERA (gsm));
@@ -346,12 +348,7 @@ mm_modem_icera_do_disconnect (MMGenericGsm *gsm,
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
-    g_assert (primary);
-
-    command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
-    mm_at_serial_port_queue_command (primary, command, 3, disconnect_ipdpact_done, info);
-    g_free (command);
+    icera_call_control (MM_MODEM_ICERA (gsm), cid, FALSE, disconnect_done, info);
 }
 
 /*****************************************************************************/
@@ -495,6 +492,7 @@ _get_cid (MMModemIcera *self)
 
 static void
 icera_call_control (MMModemIcera *self,
+                    guint32 cid,
                     gboolean activate,
                     MMAtSerialResponseFn callback,
                     gpointer user_data)
@@ -505,8 +503,13 @@ icera_call_control (MMModemIcera *self,
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
-    command = g_strdup_printf ("%%IPDPACT=%d,%d", _get_cid (self), activate ? 1 : 0);
-    mm_at_serial_port_queue_command (primary, command, 3, callback, user_data);
+    /* Firmware might have a custom call control command (ie, Sierra) */
+    if (MM_MODEM_ICERA_GET_INTERFACE (self)->get_call_control_cmd)
+        command = MM_MODEM_ICERA_GET_INTERFACE (self)->get_call_control_cmd (self, cid, activate);
+    else
+        command = g_strdup_printf ("%%IPDPACT=%d,%d", cid, activate ? 1 : 0);
+
+    mm_at_serial_port_queue_command (primary, command, 15, callback, user_data);
     g_free (command);
 }
 
@@ -534,7 +537,7 @@ icera_connect_timed_out (gpointer data)
                                            "Connection timed out");
     }
 
-    icera_call_control (self, FALSE, timeout_done, self);
+    icera_call_control (self, _get_cid (self), FALSE, timeout_done, self);
     return FALSE;
 }
 
@@ -563,6 +566,15 @@ icera_connected (MMAtSerialPort *port,
 
         priv->connect_pending_data = info;
         priv->connect_pending_id = g_timeout_add_seconds (30, icera_connect_timed_out, self);
+
+        /* If the implementor has a custom call control command, then assume
+         * that it returns OK only when the connection is ready, and thus all
+         * we have to do is complete the connection request. Otherwise, if
+         * using standard Icera commands, we wait for the connection indication
+         * via %IPDPACT unsolicited messages.
+         */
+        if (MM_MODEM_ICERA_GET_INTERFACE (self)->get_call_control_cmd)
+            connect_pending_done (self);
     }
 }
 
@@ -580,7 +592,11 @@ old_context_clear_done (MMAtSerialPort *port,
         return;
 
     /* Activate the PDP context and start the data session */
-    icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_connected, info);
+    icera_call_control (MM_MODEM_ICERA (info->modem),
+                        _get_cid (MM_MODEM_ICERA (info->modem)),
+                        TRUE,
+                        icera_connected,
+                        info);
 }
 
 static void configure_context (MMAtSerialPort *port, MMCallbackInfo *info,
@@ -628,7 +644,7 @@ auth_done (MMAtSerialPort *port,
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
     } else {
         /* Ensure the PDP context is deactivated */
-        icera_call_control (MM_MODEM_ICERA (info->modem), FALSE, old_context_clear_done, info);
+        icera_call_control (self, _get_cid (self), FALSE, old_context_clear_done, info);
     }
 }
 
