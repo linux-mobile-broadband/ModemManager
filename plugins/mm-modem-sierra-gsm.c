@@ -391,19 +391,10 @@ icera_check_cb (MMModem *modem,
                 GError *error,
                 gpointer user_data)
 {
-    if (!error) {
-        MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (user_data);
-        MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
-
-        if (result) {
-            priv->is_icera = TRUE;
-            g_object_set (G_OBJECT (modem),
-                          MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
-                          NULL);
-
-            /* Turn on unsolicited network state messages */
-            mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (modem), TRUE);
-        }
+    if (!error && result) {
+        /* Turn on unsolicited network state messages */
+        MM_MODEM_SIERRA_GSM_GET_PRIVATE (user_data)->is_icera = TRUE;
+        mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (user_data), TRUE);
     }
 }
 
@@ -867,6 +858,18 @@ get_icera_private (MMModemIcera *icera)
     return MM_MODEM_SIERRA_GSM_GET_PRIVATE (icera)->icera;
 }
 
+static char *
+get_icera_call_control_cmd (MMModemIcera *icera, guint32 cid, gboolean activate)
+{
+    /* Sierra devices with Icera chipsets (USB 305/AT&T Lightning) still
+     * support Sierra call control commands, and using these allow DHCP
+     * to be used instead of static addressing.  The USB305 sometimes has
+     * problems with addressing when using the Icera commands, but the Sierra
+     * ones work fine.
+     */
+    return g_strdup_printf ("!SCACT=%d,%d", activate ? 1 : 0, cid);
+}
+
 /*****************************************************************************/
 
 static void
@@ -882,6 +885,7 @@ static void
 modem_icera_init (MMModemIcera *icera)
 {
     icera->get_private = get_icera_private;
+    icera->get_call_control_cmd = get_icera_call_control_cmd;
 }
 
 static void
