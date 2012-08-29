@@ -643,17 +643,15 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
     MMPluginBaseSupportsTaskPrivate *priv;
     QcdmResult *result;
     int err = QCDM_SUCCESS;
-
-    /* Just the initial poke; ignore it */
-    if (!user_data)
-        return;
+    GByteArray *cmd2;
 
     task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
     priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
 
     if (error) {
-        /* Probably not a QCDM port */
-        goto done;
+        if (!g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            mm_dbg ("QCDM probe error: (%d) %s", error->code, error->message);
+        goto again;
     }
 
     /* Parse the response */
@@ -661,14 +659,24 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
     if (!result) {
         g_warning ("(%s) failed to parse QCDM version info command result: %d",
                    g_udev_device_get_name (priv->port), err);
-        goto done;
+        goto again;
     }
 
     /* yay, probably a QCDM port */
     qcdm_result_unref (result);
     priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_QCDM;
-done:
     probe_complete (task);
+    return;
+
+again:
+    cmd2 = g_object_steal_data (G_OBJECT (task), "cmd2");
+    if (cmd2) {
+        /* second try */
+        mm_qcdm_serial_port_queue_command (priv->qcdm_port, cmd2, 3, qcdm_verinfo_cb, task);
+    } else {
+        /* all done */
+        probe_complete (task);
+    }
 }
 
 static void
@@ -679,6 +687,7 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
     GError *error = NULL;
     GByteArray *verinfo = NULL, *verinfo2;
     gint len;
+    guint8 marker = 0x7E;
 
     /* Close the AT port */
     if (priv->probe_port) {
@@ -707,24 +716,29 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
         return;
     }
 
-    /* Build up the probe command */
-    verinfo = g_byte_array_sized_new (50);
-    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50);
+    /* Build up the probe command; 0x7E is the frame marker, so put one at the
+     * beginning of the buffer to ensure that the device discards any AT
+     * commands that probing might have sent earlier.  Should help devices
+     * respond more quickly and speed up QCDM probing.
+     */
+    verinfo = g_byte_array_sized_new (10);
+    g_byte_array_append (verinfo, &marker, 1);
+
+    len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
     if (len <= 0) {
         g_byte_array_free (verinfo, TRUE);
         g_warning ("(%s) failed to create QCDM version info command", name);
         probe_complete (task);
         return;
     }
-    verinfo->len = len;
+    verinfo->len = len + 1;
 
-    /* Queuing the command takes ownership over it; copy it for the second try */
+    /* Queuing the command takes ownership over it; save a copy for the second try */
     verinfo2 = g_byte_array_sized_new (verinfo->len);
     g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
+    g_object_set_data_full (G_OBJECT (task), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
 
-    /* Send the command twice; the ports often need to be woken up */
-    mm_qcdm_serial_port_queue_command (priv->qcdm_port, verinfo, 3, qcdm_verinfo_cb, NULL);
-    mm_qcdm_serial_port_queue_command (priv->qcdm_port, verinfo2, 3, qcdm_verinfo_cb, task);
+    mm_qcdm_serial_port_queue_command (priv->qcdm_port, verinfo, 3, qcdm_verinfo_cb, task);
 }
 
 static void
