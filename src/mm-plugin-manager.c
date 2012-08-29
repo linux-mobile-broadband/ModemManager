@@ -74,6 +74,7 @@ typedef struct {
 
 static void port_probe_context_step (PortProbeContext *port_probe_ctx);
 static void suggest_port_probe_result (FindDeviceSupportContext *ctx,
+                                       PortProbeContext *origin,
                                        MMPlugin *suggested_plugin);
 
 static void
@@ -157,7 +158,7 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
 
         if (cancel_remaining)
             /* Set a NULL suggested plugin, will cancel the probes */
-            suggest_port_probe_result (ctx, NULL);
+            suggest_port_probe_result (ctx, port_probe_ctx, NULL);
 
     } else {
         /* Notify the plugin to the device, if this is the first port probing
@@ -171,7 +172,7 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
             mm_device_set_plugin (ctx->device, G_OBJECT (port_probe_ctx->best_plugin));
 
             /* Suggest this plugin also to other port probes */
-            suggest_port_probe_result (ctx, port_probe_ctx->best_plugin);
+            suggest_port_probe_result (ctx, port_probe_ctx, port_probe_ctx->best_plugin);
         }
         /* Warn if the best plugin found for this port differs from the
          * best plugin found for the the first probed port. */
@@ -213,6 +214,7 @@ deferred_support_check_idle (PortProbeContext *port_probe_ctx)
 
 static void
 suggest_port_probe_result (FindDeviceSupportContext *ctx,
+                           PortProbeContext *origin,
                            MMPlugin *suggested_plugin)
 {
     GList *l;
@@ -220,7 +222,8 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
     for (l = ctx->running_probes; l; l = g_list_next (l)) {
         PortProbeContext *port_probe_ctx = l->data;
 
-        if (!port_probe_ctx->best_plugin &&
+        if (port_probe_ctx != origin &&
+            !port_probe_ctx->best_plugin &&
             !port_probe_ctx->suggested_plugin) {
             /* TODO: Cancel probing in the port if the plugin being
              * checked right now is not the one being suggested.
