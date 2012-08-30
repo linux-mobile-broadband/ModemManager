@@ -42,13 +42,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandBearer, mm_broadband_bearer, MM_TYPE_BEARER, 
                                                async_initable_iface_init));
 
 typedef enum {
-    CONNECTION_FORBIDDEN_REASON_NONE,
-    CONNECTION_FORBIDDEN_REASON_UNREGISTERED,
-    CONNECTION_FORBIDDEN_REASON_ROAMING,
-    CONNECTION_FORBIDDEN_REASON_LAST
-} ConnectionForbiddenReason;
-
-typedef enum {
     CONNECTION_TYPE_NONE,
     CONNECTION_TYPE_3GPP,
     CONNECTION_TYPE_CDMA,
@@ -62,19 +55,8 @@ struct _MMBroadbandBearerPrivate {
     ConnectionType connection_type;
 
     /*-- 3GPP specific --*/
-    /* Reason if 3GPP connection is forbidden */
-    ConnectionForbiddenReason reason_3gpp;
-    /* Handler ID for the registration state change signals */
-    guint id_3gpp_registration_change;
     /* CID of the PDP context */
     guint cid;
-
-    /*-- CDMA specific --*/
-    /* Reason if CDMA connection is forbidden */
-    ConnectionForbiddenReason reason_cdma;
-    /* Handler IDs for the registration state change signals */
-    guint id_cdma1x_registration_change;
-    guint id_evdo_registration_change;
 };
 
 /*****************************************************************************/
@@ -84,14 +66,6 @@ mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
 {
     return self->priv->cid;
 }
-
-/*****************************************************************************/
-
-static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON_LAST] = {
-    "none",
-    "Not registered in the network",
-    "Registered in roaming network, and roaming not allowed"
-};
 
 /*****************************************************************************/
 /* Detailed connect result, used in both CDMA and 3GPP sequences */
@@ -1279,50 +1253,35 @@ connect (MMBearer *self,
 
     /* If the modem has 3GPP capabilities, launch 3GPP-based connection */
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem))) {
-        /* Launch connection if allowed */
-        if (MM_BROADBAND_BEARER (self)->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE) {
-            MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp (
-                MM_BROADBAND_BEARER (self),
-                MM_BROADBAND_MODEM (modem),
-                primary,
-                mm_base_modem_peek_port_secondary (modem),
-                suggested_data,
-                cancellable,
-                (GAsyncReadyCallback) connect_3gpp_ready,
-                ctx);
-            g_object_unref (modem);
-            return;
-        }
-
-        mm_dbg ("Not allowed to connect bearer in 3GPP network: '%s'",
-                connection_forbidden_reason_str[MM_BROADBAND_BEARER (self)->priv->reason_3gpp]);
+        MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp (
+            MM_BROADBAND_BEARER (self),
+            MM_BROADBAND_MODEM (modem),
+            primary,
+            mm_base_modem_peek_port_secondary (modem),
+            suggested_data,
+            cancellable,
+            (GAsyncReadyCallback) connect_3gpp_ready,
+            ctx);
+        g_object_unref (modem);
+        return;
     }
 
     /* Otherwise, launch CDMA-specific connection */
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem))) {
-        /* Launch connection if allowed */
-        if (MM_BROADBAND_BEARER (self)->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE) {
-            MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma (
-                MM_BROADBAND_BEARER (self),
-                MM_BROADBAND_MODEM (modem),
-                primary,
-                mm_base_modem_peek_port_secondary (modem),
-                suggested_data,
-                cancellable,
-                (GAsyncReadyCallback) connect_cdma_ready,
-                ctx);
-            g_object_unref (modem);
-            return;
-        }
-        mm_dbg ("Not allowed to connect bearer in CDMA network: '%s'",
-                connection_forbidden_reason_str[MM_BROADBAND_BEARER (self)->priv->reason_cdma]);
+        MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma (
+            MM_BROADBAND_BEARER (self),
+            MM_BROADBAND_MODEM (modem),
+            primary,
+            mm_base_modem_peek_port_secondary (modem),
+            suggested_data,
+            cancellable,
+            (GAsyncReadyCallback) connect_cdma_ready,
+            ctx);
+        g_object_unref (modem);
+        return;
     }
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNAUTHORIZED,
-                                     "Not allowed to connect bearer");
-    connect_context_complete_and_free (ctx);
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -1903,83 +1862,6 @@ crm_range_ready (MMBaseModem *modem,
 }
 
 static void
-modem_3gpp_registration_state_changed (MMBroadbandModem *modem,
-                                       GParamSpec *pspec,
-                                       MMBroadbandBearer *self)
-{
-    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-
-    g_object_get (modem,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
-                  NULL);
-
-    switch (state) {
-    case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
-        mm_dbg ("Bearer not allowed to connect, not registered");
-        self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
-        break;
-    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
-        mm_dbg ("Bearer allowed to connect, registered in home network");
-        self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
-        break;
-    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
-            mm_dbg ("Bearer allowed to connect, registered in roaming network");
-            self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
-        } else {
-            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
-            self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
-        }
-        break;
-    }
-
-    /* close connection if we're connected in 3GPP */
-    if (self->priv->reason_3gpp != CONNECTION_FORBIDDEN_REASON_NONE &&
-        self->priv->connection_type == CONNECTION_TYPE_3GPP)
-        mm_bearer_disconnect_force (MM_BEARER (self));
-}
-
-static void
-modem_cdma_registration_state_changed (MMBroadbandModem *modem,
-                                       GParamSpec *pspec,
-                                       MMBroadbandBearer *self)
-{
-    MMModemCdmaRegistrationState cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-
-    g_object_get (modem,
-                  MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE, &cdma1x_state,
-                  MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE, &evdo_state,
-                  NULL);
-
-    if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
-        evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
-            mm_dbg ("Bearer allowed to connect, registered in roaming network");
-            self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
-        } else {
-            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
-            self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_ROAMING;
-        }
-    } else if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN ||
-               evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN) {
-        mm_dbg ("Bearer allowed to connect, registered in home network");
-        self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
-    } else {
-        mm_dbg ("Bearer not allowed to connect, not registered");
-        self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
-    }
-
-    /* close connection if we're connected in CDMA */
-    if (self->priv->reason_cdma != CONNECTION_FORBIDDEN_REASON_NONE &&
-        self->priv->connection_type == CONNECTION_TYPE_CDMA)
-        mm_bearer_disconnect_force (MM_BEARER (self));
-}
-
-static void
 interface_initialization_step (InitAsyncContext *ctx)
 {
     switch (ctx->step) {
@@ -2009,30 +1891,6 @@ interface_initialization_step (InitAsyncContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_LAST:
-
-        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->modem))) {
-            ctx->self->priv->id_3gpp_registration_change =
-                g_signal_connect (ctx->modem,
-                                  "notify::" MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
-                                  G_CALLBACK (modem_3gpp_registration_state_changed),
-                                  ctx->self);
-            modem_3gpp_registration_state_changed (MM_BROADBAND_MODEM (ctx->modem), NULL, ctx->self);
-        }
-
-        if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->modem))) {
-            ctx->self->priv->id_cdma1x_registration_change =
-                g_signal_connect (ctx->modem,
-                                  "notify::" MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
-                                  G_CALLBACK (modem_cdma_registration_state_changed),
-                                  ctx->self);
-            ctx->self->priv->id_evdo_registration_change =
-                g_signal_connect (ctx->modem,
-                                  "notify::" MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE,
-                                  G_CALLBACK (modem_cdma_registration_state_changed),
-                              ctx->self);
-            modem_cdma_registration_state_changed (MM_BROADBAND_MODEM (ctx->modem), NULL, ctx->self);
-        }
-
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         g_simple_async_result_complete_in_idle (ctx->result);
@@ -2116,36 +1974,14 @@ mm_broadband_bearer_init (MMBroadbandBearer *self)
 
     /* Set defaults */
     self->priv->connection_type = CONNECTION_TYPE_NONE;
-    self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
-    self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
 }
 
 static void
 dispose (GObject *object)
 {
     MMBroadbandBearer *self = MM_BROADBAND_BEARER (object);
-    MMBroadbandModem *modem = NULL;
 
-    g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
-                  NULL);
-
-    /* We will disconnect the signals before calling parent's dispose, so that
-     * we can get the 'modem' object we need to perform the disconnection */
-    if (self->priv->id_3gpp_registration_change) {
-        g_signal_handler_disconnect (modem, self->priv->id_3gpp_registration_change);
-        self->priv->id_3gpp_registration_change = 0;
-    }
-    if (self->priv->id_cdma1x_registration_change) {
-        g_signal_handler_disconnect (modem, self->priv->id_cdma1x_registration_change);
-        self->priv->id_cdma1x_registration_change = 0;
-    }
-    if (self->priv->id_evdo_registration_change) {
-        g_signal_handler_disconnect (modem, self->priv->id_evdo_registration_change);
-        self->priv->id_evdo_registration_change = 0;
-    }
-
-    g_object_unref (modem);
+    reset_bearer_connection (self);
 
     G_OBJECT_CLASS (mm_broadband_bearer_parent_class)->dispose (object);
 }

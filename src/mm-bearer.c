@@ -27,6 +27,8 @@
 
 #include "mm-daemon-enums-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-bearer.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
@@ -38,6 +40,14 @@
 #define MM_BEARER_IP_TIMEOUT_DEFAULT 20
 
 G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
+
+
+typedef enum {
+    CONNECTION_FORBIDDEN_REASON_NONE,
+    CONNECTION_FORBIDDEN_REASON_UNREGISTERED,
+    CONNECTION_FORBIDDEN_REASON_ROAMING,
+    CONNECTION_FORBIDDEN_REASON_LAST
+} ConnectionForbiddenReason;
 
 enum {
     PROP_0,
@@ -67,6 +77,27 @@ struct _MMBearerPrivate {
     GCancellable *connect_cancellable;
     /* handler id for the disconnect + cancel connect request */
     gulong disconnect_signal_handler;
+
+    /*-- 3GPP specific --*/
+    /* Reason if 3GPP connection is forbidden */
+    ConnectionForbiddenReason reason_3gpp;
+    /* Handler ID for the registration state change signals */
+    guint id_3gpp_registration_change;
+
+    /*-- CDMA specific --*/
+    /* Reason if CDMA connection is forbidden */
+    ConnectionForbiddenReason reason_cdma;
+    /* Handler IDs for the registration state change signals */
+    guint id_cdma1x_registration_change;
+    guint id_evdo_registration_change;
+};
+
+/*****************************************************************************/
+
+static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON_LAST] = {
+    "none",
+    "Not registered in the network",
+    "Registered in roaming network, and roaming not allowed"
 };
 
 /*****************************************************************************/
@@ -136,6 +167,132 @@ bearer_update_status_connected (MMBearer *self,
     /* Update the property value */
     self->priv->status = MM_BEARER_STATUS_CONNECTED;
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+}
+
+/*****************************************************************************/
+
+static void
+modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
+                                       GParamSpec *pspec,
+                                       MMBearer *self)
+{
+    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
+    g_object_get (modem,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
+                  NULL);
+
+    switch (state) {
+    case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+        mm_dbg ("Bearer not allowed to connect, not registered");
+        self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
+        break;
+    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+        mm_dbg ("Bearer allowed to connect, registered in home network");
+        self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
+        break;
+    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
+            mm_dbg ("Bearer allowed to connect, registered in roaming network");
+            self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
+        } else {
+            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
+            self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
+        }
+        break;
+    }
+
+    /* close connection if some reason found */
+    if (self->priv->reason_3gpp != CONNECTION_FORBIDDEN_REASON_NONE)
+        mm_bearer_disconnect_force (MM_BEARER (self));
+}
+
+static void
+modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
+                                       GParamSpec *pspec,
+                                       MMBearer *self)
+{
+    MMModemCdmaRegistrationState cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    g_object_get (modem,
+                  MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE, &cdma1x_state,
+                  MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE, &evdo_state,
+                  NULL);
+
+    if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+        evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
+            mm_dbg ("Bearer allowed to connect, registered in roaming network");
+            self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
+        } else {
+            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
+            self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_ROAMING;
+        }
+    } else if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN ||
+               evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN) {
+        mm_dbg ("Bearer allowed to connect, registered in home network");
+        self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
+    } else {
+        mm_dbg ("Bearer not allowed to connect, not registered");
+        self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
+    }
+
+    /* close connection if some reason found */
+    if (self->priv->reason_cdma != CONNECTION_FORBIDDEN_REASON_NONE)
+        mm_bearer_disconnect_force (MM_BEARER (self));
+}
+
+static void
+set_signal_handlers (MMBearer *self)
+{
+    g_assert (self->priv->modem != NULL);
+
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem))) {
+        self->priv->id_3gpp_registration_change =
+            g_signal_connect (self->priv->modem,
+                              "notify::" MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
+                              G_CALLBACK (modem_3gpp_registration_state_changed),
+                              self);
+        modem_3gpp_registration_state_changed (MM_IFACE_MODEM_3GPP (self->priv->modem), NULL, self);
+    }
+
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self->priv->modem))) {
+        self->priv->id_cdma1x_registration_change =
+            g_signal_connect (self->priv->modem,
+                              "notify::" MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
+                              G_CALLBACK (modem_cdma_registration_state_changed),
+                              self);
+        self->priv->id_evdo_registration_change =
+            g_signal_connect (self->priv->modem,
+                              "notify::" MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE,
+                              G_CALLBACK (modem_cdma_registration_state_changed),
+                              self);
+        modem_cdma_registration_state_changed (MM_IFACE_MODEM_CDMA (self->priv->modem), NULL, self);
+    }
+}
+
+static void
+reset_signal_handlers (MMBearer *self)
+{
+    if (!self->priv->modem)
+        return;
+
+    if (self->priv->id_3gpp_registration_change) {
+        g_signal_handler_disconnect (self->priv->modem, self->priv->id_3gpp_registration_change);
+        self->priv->id_3gpp_registration_change = 0;
+    }
+    if (self->priv->id_cdma1x_registration_change) {
+        g_signal_handler_disconnect (self->priv->modem, self->priv->id_cdma1x_registration_change);
+        self->priv->id_cdma1x_registration_change = 0;
+    }
+    if (self->priv->id_evdo_registration_change) {
+        g_signal_handler_disconnect (self->priv->modem, self->priv->id_evdo_registration_change);
+        self->priv->id_evdo_registration_change = 0;
+    }
 }
 
 /*****************************************************************************/
@@ -274,6 +431,34 @@ mm_bearer_connect (MMBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Bearer currently being disconnected");
+        return;
+    }
+
+    /* Check 3GPP roaming allowance */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)) &&
+        self->priv->reason_3gpp != CONNECTION_FORBIDDEN_REASON_NONE) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_UNAUTHORIZED,
+            "Not allowed to connect bearer in 3GPP network: '%s'",
+            connection_forbidden_reason_str[self->priv->reason_3gpp]);
+        return;
+    }
+
+    /* Check CDMA roaming allowance */
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self->priv->modem)) &&
+        self->priv->reason_cdma != CONNECTION_FORBIDDEN_REASON_NONE) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_UNAUTHORIZED,
+            "Not allowed to connect bearer in CDMA network: '%s'",
+            connection_forbidden_reason_str[self->priv->reason_cdma]);
         return;
     }
 
@@ -720,12 +905,16 @@ set_property (GObject *object,
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem)
+        if (self->priv->modem) {
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the BEARER's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
                                     self, MM_BEARER_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+            /* Listen to 3GPP/CDMA registration state changes */
+            set_signal_handlers (self);
+        }
         break;
     case PROP_STATUS:
         /* We don't allow g_object_set()-ing the status property */
@@ -787,6 +976,8 @@ mm_bearer_init (MMBearer *self)
                                               MM_TYPE_BEARER,
                                               MMBearerPrivate);
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+    self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
+    self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
 
     /* Set defaults */
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
@@ -819,6 +1010,8 @@ dispose (GObject *object)
         mm_bearer_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
+
+    reset_signal_handlers (self);
 
     g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->config);
