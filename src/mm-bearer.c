@@ -434,9 +434,9 @@ mm_bearer_connect (MMBearer *self,
         return;
     }
 
-    /* Check 3GPP roaming allowance */
+    /* Check 3GPP roaming allowance, *only* roaming related here */
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)) &&
-        self->priv->reason_3gpp != CONNECTION_FORBIDDEN_REASON_NONE) {
+        self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
@@ -448,9 +448,9 @@ mm_bearer_connect (MMBearer *self,
         return;
     }
 
-    /* Check CDMA roaming allowance */
+    /* Check CDMA roaming allowance, *only* roaming related here */
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self->priv->modem)) &&
-        self->priv->reason_cdma != CONNECTION_FORBIDDEN_REASON_NONE) {
+        self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
