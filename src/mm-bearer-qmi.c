@@ -796,8 +796,16 @@ stop_network_ready (QmiClientWds *client,
     QmiMessageWdsStopNetworkOutput *output;
 
     output = qmi_client_wds_stop_network_finish (client, res, &error);
-    if (output)
-        qmi_message_wds_stop_network_output_get_result (output, &error);
+    if (output &&
+        !qmi_message_wds_stop_network_output_get_result (output, &error)) {
+        /* No effect error, we're already disconnected */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_error_free (error);
+            error = NULL;
+        }
+    }
 
     if (error) {
         if (ctx->running_ipv4)
