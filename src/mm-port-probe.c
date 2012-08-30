@@ -711,7 +711,7 @@ static const MMPortProbeAtCommand product_probing[] = {
 };
 
 static const MMPortProbeAtCommand icera_probing[] = {
-    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_no_error },
     { NULL }
 };
 
