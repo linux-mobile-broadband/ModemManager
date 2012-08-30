@@ -25,6 +25,8 @@ libmodem_helpers_la_SOURCES = \
 	mm-error-helpers.h \
 	mm-modem-helpers.c \
 	mm-modem-helpers.h \
+	mm-modem-helpers-qmi.c \
+	mm-modem-helpers-qmi.h \
 	mm-charsets.c \
 	mm-charsets.h \
 	mm-utils.c \
