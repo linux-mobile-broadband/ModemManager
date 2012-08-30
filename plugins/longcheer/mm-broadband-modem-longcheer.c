@@ -252,7 +252,7 @@ load_unlock_retries_ready (MMBaseModem *self,
                            GSimpleAsyncResult *operation_result)
 {
     const gchar *response;
-    GError *error;
+    GError *error = NULL;
     int pin1, puk1, pin2, puk2;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
