@@ -596,14 +596,6 @@ connect_context_step (ConnectContext *ctx)
     }
 }
 
-static MMQmiPort *
-get_qmi_port_for_data_port (MMBaseModem *modem,
-                            MMPort *data)
-{
-    /* TODO: match QMI and WWAN ports */
-    return mm_base_modem_get_port_qmi (modem);
-}
-
 static void
 connect (MMBearer *self,
          GCancellable *cancellable,
@@ -615,6 +607,7 @@ connect (MMBearer *self,
     MMBaseModem *modem  = NULL;
     MMPort *data;
     MMQmiPort *qmi;
+    GError *error = NULL;
 
     g_object_get (self,
                   MM_BEARER_MODEM, &modem,
@@ -636,17 +629,13 @@ connect (MMBearer *self,
     }
 
     /* Each data port has a single QMI port associated */
-    qmi = get_qmi_port_for_data_port (modem, data);
+    qmi = mm_base_modem_get_port_qmi_for_data (modem, data, &error);
     if (!qmi) {
-        g_simple_async_report_error_in_idle (
+        g_simple_async_report_take_gerror_in_idle (
             G_OBJECT (self),
             callback,
             user_data,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_NOT_FOUND,
-            "No QMI port found associated to data port (%s/%s)",
-            mm_port_subsys_get_string (mm_port_get_subsys (data)),
-            mm_port_get_device (data));
+            error);
         g_object_unref (data);
         g_object_unref (modem);
         return;
