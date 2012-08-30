@@ -26,6 +26,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-novatel-lte.h"
 #include "mm-broadband-modem-novatel-lte.h"
+#include "mm-sim-novatel-lte.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-log.h"
@@ -94,6 +95,29 @@ modem_create_bearer (MMIfaceModem *self,
                                      NULL, /* cancellable */
                                      (GAsyncReadyCallback)broadband_bearer_new_ready,
                                      result);
+}
+
+/*****************************************************************************/
+/* Create SIM (Modem interface) */
+
+static MMSim *
+modem_create_sim_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return mm_sim_novatel_lte_new_finish (res, error);
+}
+
+static void
+modem_create_sim (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    /* New Novatel LTE SIM */
+    mm_sim_novatel_lte_new (MM_BASE_MODEM (self),
+                            NULL, /* cancellable */
+                            callback,
+                            user_data);
 }
 
 /*****************************************************************************/
@@ -396,6 +420,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->create_sim = modem_create_sim;
+    iface->create_sim_finish = modem_create_sim_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_supported_bands = load_supported_bands;
