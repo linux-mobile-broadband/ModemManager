@@ -65,7 +65,7 @@ dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (Dial3gppContext, ctx);
 }
 
 static gboolean
