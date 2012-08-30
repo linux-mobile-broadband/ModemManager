@@ -31,6 +31,8 @@
 
 G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BEARER);
 
+#define GLOBAL_PACKET_DATA_HANDLE 0xFFFFFFFF
+
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
     QmiClientWds *client_ipv4;
@@ -170,6 +172,10 @@ start_network_ready (QmiClientWds *client,
                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_error_free (error);
             error = NULL;
+            if (ctx->running_ipv4)
+                ctx->packet_data_handle_ipv4 = GLOBAL_PACKET_DATA_HANDLE;
+            else
+                ctx->packet_data_handle_ipv6 = GLOBAL_PACKET_DATA_HANDLE;
 
             /* Fall down to a successful connection */
         } else {
