@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <gudev/gudev.h>
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
@@ -527,6 +528,123 @@ mm_base_modem_peek_port_qmi (MMBaseModem *self)
 
     /* First QMI port in the list is the primary one always */
     return (self->priv->qmi ? (MMQmiPort *)self->priv->qmi->data : NULL);
+}
+
+MMQmiPort *
+mm_base_modem_get_port_qmi_for_data (MMBaseModem *self,
+                                     MMPort *data,
+                                     GError **error)
+{
+    MMQmiPort *qmi;
+
+    qmi = mm_base_modem_peek_port_qmi_for_data (self, data, error);
+    return (qmi ? (MMQmiPort *)g_object_ref (qmi) : NULL);
+}
+
+MMQmiPort *
+mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
+                                      MMPort *data,
+                                      GError **error)
+{
+    MMQmiPort *found;
+    GUdevClient *client;
+    GUdevDevice *data_device;
+    GUdevDevice *data_device_parent;
+    GList *l;
+
+    if (mm_port_get_subsys (data) != MM_PORT_SUBSYS_NET) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot look for QMI port associated to a non-net data port");
+        return NULL;
+    }
+
+    /* don't listen for uevents */
+    client = g_udev_client_new (NULL);
+
+    /* Get udev device for the data port */
+    data_device = (g_udev_client_query_by_subsystem_and_name (
+                       client,
+                       "net",
+                       mm_port_get_device (data)));
+    if (!data_device) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't find udev device for port 'net/%s'",
+                     mm_port_get_device (data));
+        g_object_unref (client);
+        return NULL;
+    }
+
+    /* Get parent of the data device */
+    data_device_parent = g_udev_device_get_parent (data_device);
+    if (!data_device_parent) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get udev device parent for port 'net/%s'",
+                     mm_port_get_device (data));
+        g_object_unref (data_device);
+        g_object_unref (client);
+        return NULL;
+    }
+
+    /* Now walk the list of QMI ports looking for a match */
+    found = NULL;
+    for (l = self->priv->qmi; l && !found; l = g_list_next (l)) {
+        GUdevDevice *qmi_device;
+        GUdevDevice *qmi_device_parent;
+
+        /* Get udev device for the QMI port */
+        qmi_device = (g_udev_client_query_by_subsystem_and_name (
+                          client,
+                          "usb",
+                          mm_port_get_device (MM_PORT (l->data))));
+        if (!qmi_device) {
+            qmi_device = (g_udev_client_query_by_subsystem_and_name (
+                              client,
+                              "usbmisc",
+                              mm_port_get_device (MM_PORT (l->data))));
+            if (!qmi_device) {
+                mm_warn ("Couldn't get udev device for QMI port '%s'",
+                         mm_port_get_device (MM_PORT (l->data)));
+                continue;
+            }
+        }
+
+        /* Get parent of the QMI device */
+        qmi_device_parent = g_udev_device_get_parent (qmi_device);
+        g_object_unref (qmi_device);
+
+        if (!data_device_parent) {
+            mm_warn ("Couldn't get udev device parent for QMI port '%s'",
+                     mm_port_get_device (MM_PORT (l->data)));
+            continue;
+        }
+
+        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
+                         g_udev_device_get_sysfs_path (qmi_device_parent)))
+            found = MM_QMI_PORT (l->data);
+
+        g_object_unref (qmi_device_parent);
+    }
+
+    g_object_unref (data_device_parent);
+    g_object_unref (data_device);
+    g_object_unref (client);
+
+    if (!found) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated QMI port for 'net/%s'",
+                     mm_port_get_device (data));
+        return NULL;
+    }
+
+    return found;
 }
 
 MMPort *

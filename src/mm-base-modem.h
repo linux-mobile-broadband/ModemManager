@@ -112,15 +112,16 @@ gboolean  mm_base_modem_has_at_port  (MMBaseModem *self);
 gboolean  mm_base_modem_organize_ports (MMBaseModem *self,
                                         GError **error);
 
-MMAtSerialPort   *mm_base_modem_peek_port_primary     (MMBaseModem *self);
-MMAtSerialPort   *mm_base_modem_peek_port_secondary   (MMBaseModem *self);
-MMQcdmSerialPort *mm_base_modem_peek_port_qcdm        (MMBaseModem *self);
-MMAtSerialPort   *mm_base_modem_peek_port_gps_control (MMBaseModem *self);
-MMGpsSerialPort  *mm_base_modem_peek_port_gps         (MMBaseModem *self);
-MMQmiPort        *mm_base_modem_peek_port_qmi         (MMBaseModem *self);
-MMAtSerialPort   *mm_base_modem_peek_best_at_port     (MMBaseModem *self, GError **error);
-MMPort           *mm_base_modem_peek_best_data_port   (MMBaseModem *self);
-GList            *mm_base_modem_peek_data_ports       (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_peek_port_primary      (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_peek_port_secondary    (MMBaseModem *self);
+MMQcdmSerialPort *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
+MMGpsSerialPort  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
+MMQmiPort        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
+MMQmiPort        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
+MMAtSerialPort   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
+MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self);
+GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
 
 MMAtSerialPort   *mm_base_modem_get_port_primary      (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_secondary    (MMBaseModem *self);
@@ -128,6 +129,7 @@ MMQcdmSerialPort *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
 MMGpsSerialPort  *mm_base_modem_get_port_gps          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
+MMQmiPort        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 MMAtSerialPort   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
