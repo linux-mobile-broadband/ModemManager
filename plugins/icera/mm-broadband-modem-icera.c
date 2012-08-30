@@ -1100,7 +1100,7 @@ load_supported_bands_get_bands_ready (MMIfaceModem *self,
 {
     SupportedBandsContext *ctx;
     const gchar *response;
-    GError *error;
+    GError *error = NULL;
     GSList *iter;
     guint32 len = 0, i;
 
@@ -1184,7 +1184,7 @@ load_current_bands_ready (MMIfaceModem *self,
 {
     GArray *bands;
     const gchar *response;
-    GError *error;
+    GError *error = NULL;
     GSList *parsed, *iter;
     guint32 len = 0;
 
