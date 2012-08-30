@@ -272,6 +272,15 @@ register_in_3gpp_or_cdma_network_ready (MMIfaceModemSimple *self,
     connection_step (ctx);
 }
 
+static gboolean
+after_set_allowed_modes_timeout_cb (ConnectionContext *ctx)
+{
+    /* Allowed modes set... almost there! */
+    ctx->step++;
+    connection_step (ctx);
+    return FALSE;
+}
+
 static void
 set_allowed_modes_ready (MMBaseModem *self,
                          GAsyncResult *res,
@@ -280,19 +289,33 @@ set_allowed_modes_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_iface_modem_set_allowed_modes_finish (MM_IFACE_MODEM (self), res, &error)) {
-        /* If setting allowed modes is unsupported, keep on */
-        if (!g_error_matches (error,
-                              MM_CORE_ERROR,
-                              MM_CORE_ERROR_UNSUPPORTED)) {
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED)) {
+            /* If setting bands is unsupported, keep on without sleep */
+            ctx->step++;
+            connection_step (ctx);
+        } else {
             g_dbus_method_invocation_take_error (ctx->invocation, error);
             connection_context_free (ctx);
-            return;
         }
+        return;
     }
 
-    /* Allowed modes set... almost there! */
+    /* Setting allowed modes will reset the current registration, so we'll need
+     * a couple of seconds to settle down. This sleep time just makes sure that
+     * the modem has enough time to report being unregistered. */
+    mm_dbg ("Will wait to settle down after updating allowed modes");
+    g_timeout_add_seconds (2, (GSourceFunc)after_set_allowed_modes_timeout_cb, ctx);
+}
+
+static gboolean
+after_set_bands_timeout_cb (ConnectionContext *ctx)
+{
+    /* Bands set... almost there! */
     ctx->step++;
     connection_step (ctx);
+    return FALSE;
 }
 
 static void
@@ -303,19 +326,24 @@ set_bands_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_iface_modem_set_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
-        /* If setting bands is unsupported, keep on */
-        if (!g_error_matches (error,
-                              MM_CORE_ERROR,
-                              MM_CORE_ERROR_UNSUPPORTED)) {
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED)) {
+            /* If setting bands is unsupported, keep on without sleep */
+            ctx->step++;
+            connection_step (ctx);
+        } else {
             g_dbus_method_invocation_take_error (ctx->invocation, error);
             connection_context_free (ctx);
-            return;
         }
+        return;
     }
 
-    /* Bands set... almost there! */
-    ctx->step++;
-    connection_step (ctx);
+    /* Setting bands will reset the current registration, so we'll need a couple
+     * of seconds to settle down. This sleep time just makes sure that the modem
+     * has enough time to report being unregistered. */
+    mm_dbg ("Will wait to settle down after updating bands");
+    g_timeout_add_seconds (2, (GSourceFunc)after_set_bands_timeout_cb, ctx);
 }
 
 static void
