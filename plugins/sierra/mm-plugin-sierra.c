@@ -34,8 +34,9 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 /* Custom init */
 
-#define TAG_SIERRA_APP1_PORT   "sierra-app1-port"
-#define TAG_SIERRA_APP_PPP_OK  "sierra-app-ppp-ok"
+#define TAG_SIERRA_APP1_PORT      "sierra-app1-port"
+#define TAG_SIERRA_APP_PPP_OK     "sierra-app-ppp-ok"
+#define TAG_SIERRA_SECONDARY_PORT "sierra-secondary-port"
 
 typedef struct {
     MMPortProbe *probe;
@@ -83,7 +84,11 @@ gcap_ready (MMAtSerialPort *port,
     /* A valid reply to +GCAP tells us this is an AT port already */
     mm_port_probe_set_result_at (ctx->probe, TRUE);
 
-    if (strstr (response->str, "APP1")) {
+    /* Some secondary ports in sierra modems like to reply just 'OK' to any
+     * command passed, like +GCAP. Detect that as soon as possible */
+    if (!g_str_has_prefix (response->str, "+GCAP")) {
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_SECONDARY_PORT, GUINT_TO_POINTER (TRUE));
+    } else if (strstr (response->str, "APP1")) {
         g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PORT, GUINT_TO_POINTER (TRUE));
 
         /* 885 can handle PPP on the APP ports, leaving the primary port open
@@ -155,6 +160,24 @@ sierra_custom_init (MMPortProbe *probe,
 
 /*****************************************************************************/
 
+static gboolean
+sierra_port_probe_list_is_icera (GList *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        /* Only assume the Icera probing check is valid IF the port is not
+         * secondary. This will skip the stupid ports which reply OK to every
+         * AT command, even the one we use to check for Icera support */
+        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)) &&
+            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_SECONDARY_PORT) &&
+            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_APP1_PORT))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
@@ -173,7 +196,7 @@ create_modem (MMPlugin *self,
                                                           product));
     }
 
-    if (mm_port_probe_list_is_icera (probes))
+    if (sierra_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
@@ -204,6 +227,8 @@ grab_port (MMPlugin *self,
             pflags = MM_AT_PORT_FLAG_PPP;
         else
             pflags = MM_AT_PORT_FLAG_SECONDARY;
+    } else if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_SECONDARY_PORT)) {
+        pflags = MM_AT_PORT_FLAG_SECONDARY;
     } else if (ptype == MM_PORT_TYPE_AT)
         pflags = MM_AT_PORT_FLAG_PRIMARY;
 
