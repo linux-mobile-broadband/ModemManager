@@ -1309,6 +1309,19 @@ mm_port_probe_is_icera (MMPortProbe *self)
             FALSE);
 }
 
+gboolean
+mm_port_probe_list_is_icera (GList *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 const gchar *
 mm_port_probe_get_port_name (MMPortProbe *self)
 {

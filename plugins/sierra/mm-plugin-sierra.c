@@ -163,15 +163,7 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    GList *l;
-    gboolean is_icera;
-
-    for (l = probes, is_icera = FALSE; l && !is_icera; l = g_list_next (l)) {
-        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)))
-            is_icera = TRUE;
-    }
-
-    if (is_icera)
+    if (mm_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),

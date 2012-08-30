@@ -126,5 +126,6 @@ gboolean      mm_port_probe_is_icera         (MMPortProbe *self);
 /* Additional helpers */
 gboolean mm_port_probe_list_has_at_port  (GList *list);
 gboolean mm_port_probe_list_has_qmi_port (GList *list);
+gboolean mm_port_probe_list_is_icera     (GList *list);
 
 #endif /* MM_PORT_PROBE_H */
