@@ -22,6 +22,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
+#include "mm-broadband-modem-qmi.h"
 #include "mm-broadband-modem-sierra.h"
 #include "mm-broadband-modem-sierra-icera.h"
 
@@ -163,6 +164,15 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_dbg ("QMI-powered Sierra modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+
     if (mm_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
                                                                    drivers,
@@ -210,7 +220,7 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const gchar *drivers[] = { "sierra", "sierra_net", NULL };
     static const MMAsyncMethod custom_init = {
         .async  = G_CALLBACK (sierra_custom_init),
