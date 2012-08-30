@@ -59,6 +59,8 @@ QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisit
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
+GArray *mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array);
+
 MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_qmi_registration_state (QmiNasAttachState attach_state,
                                                                                            QmiNasRegistrationState registration_state,
                                                                                            gboolean roaming);

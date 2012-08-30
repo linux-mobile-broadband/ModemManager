@@ -276,6 +276,150 @@ mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,
 
 /*****************************************************************************/
 
+typedef struct {
+    QmiNasActiveBand qmi_band;
+    MMModemBand mm_band;
+} ActiveBandsMap;
+
+static const ActiveBandsMap active_bands_map [] = {
+    /* CDMA bands */
+    { QMI_NAS_ACTIVE_BAND_BC_0,  MM_MODEM_BAND_CDMA_BC0_CELLULAR_800   },
+    { QMI_NAS_ACTIVE_BAND_BC_1,  MM_MODEM_BAND_CDMA_BC1_PCS_1900       },
+    { QMI_NAS_ACTIVE_BAND_BC_2,  MM_MODEM_BAND_CDMA_BC2_TACS           },
+    { QMI_NAS_ACTIVE_BAND_BC_3,  MM_MODEM_BAND_CDMA_BC3_JTACS          },
+    { QMI_NAS_ACTIVE_BAND_BC_4,  MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS     },
+    { QMI_NAS_ACTIVE_BAND_BC_5,  MM_MODEM_BAND_CDMA_BC5_NMT450         },
+    { QMI_NAS_ACTIVE_BAND_BC_6,  MM_MODEM_BAND_CDMA_BC6_IMT2000        },
+    { QMI_NAS_ACTIVE_BAND_BC_7,  MM_MODEM_BAND_CDMA_BC7_CELLULAR_700   },
+    { QMI_NAS_ACTIVE_BAND_BC_8,  MM_MODEM_BAND_CDMA_BC8_1800           },
+    { QMI_NAS_ACTIVE_BAND_BC_9,  MM_MODEM_BAND_CDMA_BC9_900            },
+    { QMI_NAS_ACTIVE_BAND_BC_10, MM_MODEM_BAND_CDMA_BC10_SECONDARY_800 },
+    { QMI_NAS_ACTIVE_BAND_BC_11, MM_MODEM_BAND_CDMA_BC11_PAMR_400      },
+    { QMI_NAS_ACTIVE_BAND_BC_12, MM_MODEM_BAND_CDMA_BC12_PAMR_800      },
+    { QMI_NAS_ACTIVE_BAND_BC_13, MM_MODEM_BAND_CDMA_BC13_IMT2000_2500  },
+    { QMI_NAS_ACTIVE_BAND_BC_14, MM_MODEM_BAND_CDMA_BC14_PCS2_1900     },
+    { QMI_NAS_ACTIVE_BAND_BC_15, MM_MODEM_BAND_CDMA_BC15_AWS           },
+    { QMI_NAS_ACTIVE_BAND_BC_16, MM_MODEM_BAND_CDMA_BC16_US_2500       },
+    { QMI_NAS_ACTIVE_BAND_BC_17, MM_MODEM_BAND_CDMA_BC17_US_FLO_2500   },
+    { QMI_NAS_ACTIVE_BAND_BC_18, MM_MODEM_BAND_CDMA_BC18_US_PS_700     },
+    { QMI_NAS_ACTIVE_BAND_BC_19, MM_MODEM_BAND_CDMA_BC19_US_LOWER_700  },
+
+    /* GSM bands */
+    { QMI_NAS_ACTIVE_BAND_GSM_850, MM_MODEM_BAND_G850          },
+    { QMI_NAS_ACTIVE_BAND_GSM_900_EXTENDED, MM_MODEM_BAND_EGSM },
+    { QMI_NAS_ACTIVE_BAND_GSM_DCS_1800, MM_MODEM_BAND_DCS      },
+    { QMI_NAS_ACTIVE_BAND_GSM_PCS_1900, MM_MODEM_BAND_PCS      },
+
+    /* WCDMA bands */
+    { QMI_NAS_ACTIVE_BAND_WCDMA_2100, MM_MODEM_BAND_U2100       },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_PCS_1900, MM_MODEM_BAND_PCS     },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_DCS_1800, MM_MODEM_BAND_DCS     },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_1700_US, MM_MODEM_BAND_U17IV    },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_850, MM_MODEM_BAND_U850         },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_800, MM_MODEM_BAND_U800         },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_2600, MM_MODEM_BAND_U2600       },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_900, MM_MODEM_BAND_U900         },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_1700_JAPAN, MM_MODEM_BAND_U17IX },
+    { QMI_NAS_ACTIVE_BAND_WCDMA_850_JAPAN, MM_MODEM_BAND_U850   },
+
+    /* LTE bands */
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_I       },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_II      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_III     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_IV      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_5,  MM_MODEM_BAND_EUTRAN_V       },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_6,  MM_MODEM_BAND_EUTRAN_VI      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_7,  MM_MODEM_BAND_EUTRAN_VII     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_8,  MM_MODEM_BAND_EUTRAN_VIII    },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_9,  MM_MODEM_BAND_EUTRAN_IX      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_10, MM_MODEM_BAND_EUTRAN_X       },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_11, MM_MODEM_BAND_EUTRAN_XI      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_XII     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_XIII    },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_14, MM_MODEM_BAND_EUTRAN_XIV     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_17, MM_MODEM_BAND_EUTRAN_XVII    },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_XVIII   },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_XIX     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_XX      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_21, MM_MODEM_BAND_EUTRAN_XXI     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_24, MM_MODEM_BAND_EUTRAN_XXIV    },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_25, MM_MODEM_BAND_EUTRAN_XXV     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_33, MM_MODEM_BAND_EUTRAN_XXXIII  },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_34, MM_MODEM_BAND_EUTRAN_XXXIV   },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_35, MM_MODEM_BAND_EUTRAN_XXXV    },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_36, MM_MODEM_BAND_EUTRAN_XXXVI   },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_37, MM_MODEM_BAND_EUTRAN_XXXVII  },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_38, MM_MODEM_BAND_EUTRAN_XXXVIII },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_39, MM_MODEM_BAND_EUTRAN_XXXIX   },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_XL      },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_41, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_42, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_NAS_ACTIVE_BAND_EUTRAN_43, MM_MODEM_BAND_EUTRAN_XLIII   }
+
+    /* NOTE. The following bands were unmatched:
+     *
+     * - QMI_NAS_ACTIVE_BAND_GSM_450
+     * - QMI_NAS_ACTIVE_BAND_GSM_480
+     * - QMI_NAS_ACTIVE_BAND_GSM_750
+     * - QMI_NAS_ACTIVE_BAND_GSM_900_PRIMARY
+     * - QMI_NAS_ACTIVE_BAND_GSM_900_RAILWAYS
+     * - QMI_NAS_ACTIVE_BAND_WCDMA_1500_JAPAN
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_A
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_B
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_C
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_D
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_E
+     * - QMI_NAS_ACTIVE_BAND_TDSCDMA_F
+     */
+};
+
+static void
+add_active_bands (GArray *mm_bands,
+                  QmiNasActiveBand qmi_bands)
+{
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    for (i = 0; i < G_N_ELEMENTS (active_bands_map); i++) {
+        if (qmi_bands == active_bands_map[i].qmi_band) {
+            guint j;
+
+            /* Avoid adding duplicate band entries */
+            for (j = 0; j < mm_bands->len; j++) {
+                if (g_array_index (mm_bands, MMModemBand, j) == active_bands_map[i].mm_band)
+                    return;
+            }
+
+            g_array_append_val (mm_bands, active_bands_map[i].mm_band);
+            return;
+        }
+    }
+}
+
+GArray *
+mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array)
+{
+    GArray *mm_bands;
+
+    mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+    if (info_array) {
+        guint i;
+
+        for (i = 0; i < info_array->len; i++) {
+            QmiMessageNasGetRfBandInformationOutputListElement *item;
+
+            item = &g_array_index (info_array, QmiMessageNasGetRfBandInformationOutputListElement, i);
+            add_active_bands (mm_bands, item->active_band_class);
+        }
+    }
+
+    return mm_bands;
+}
+
+/*****************************************************************************/
+
 MMModemAccessTechnology
 mm_modem_access_technology_from_qmi_radio_interface (QmiNasRadioInterface interface)
 {

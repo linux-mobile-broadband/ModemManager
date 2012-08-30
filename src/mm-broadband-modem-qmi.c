@@ -1013,6 +1013,91 @@ modem_load_supported_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load current bands (Modem interface) */
+
+static GArray *
+modem_load_current_bands_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+nas_get_rf_band_information_ready (QmiClientNas *client,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    QmiMessageNasGetRfBandInformationOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_rf_band_information_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_nas_get_rf_band_information_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get current band information: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        GArray *mm_bands;
+        GArray *info_array = NULL;
+
+        qmi_message_nas_get_rf_band_information_output_get_list (output, &info_array, NULL);
+
+        mm_bands = mm_modem_bands_from_qmi_rf_band_information_array (info_array);
+
+        if (mm_bands->len == 0) {
+            g_array_unref (mm_bands);
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't parse the list of current bands");
+        } else {
+            g_simple_async_result_set_op_res_gpointer (simple,
+                                                       mm_bands,
+                                                       (GDestroyNotify)g_array_unref);
+        }
+    }
+
+    if (output)
+        qmi_message_nas_get_rf_band_information_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_current_bands (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_current_bands);
+
+    mm_dbg ("loading current bands...");
+    qmi_client_nas_get_rf_band_information (QMI_CLIENT_NAS (client),
+                                            NULL,
+                                            5,
+                                            NULL,
+                                            (GAsyncReadyCallback)nas_get_rf_band_information_ready,
+                                            result);
+}
+
+/*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
 static MMModemMode
@@ -4709,6 +4794,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_supported_bands = modem_load_supported_bands;
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
+    iface->load_current_bands = modem_load_current_bands;
+    iface->load_current_bands_finish = modem_load_current_bands_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
 
