@@ -93,7 +93,7 @@ supported_modes_ws46_test_ready (MMBaseModem *self,
          strstr (response, "30") != NULL ||   /* 2G/4G */
          strstr (response, "31") != NULL)) {  /* 3G/4G */
         /* Add LTE caps */
-        ctx->caps &= MM_MODEM_CAPABILITY_LTE;
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
     }
 
     g_simple_async_result_set_op_res_gpointer (
