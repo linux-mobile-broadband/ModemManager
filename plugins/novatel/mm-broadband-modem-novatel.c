@@ -611,7 +611,7 @@ parse_modem_snapshot (DetailedRegistrationStateContext *ctx,
     guint8 eri = 0;
 
     /* Roaming? */
-    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
+    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri) == 0) {
         gchar *str;
         gboolean roaming = FALSE;
 
