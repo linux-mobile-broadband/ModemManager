@@ -261,6 +261,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_CUSTOM_INIT,        &custom_init,
                       MM_PLUGIN_ICERA_PROBE,        TRUE,
+                      MM_PLUGIN_REMOVE_ECHO,        FALSE,
                       NULL));
 }
 
