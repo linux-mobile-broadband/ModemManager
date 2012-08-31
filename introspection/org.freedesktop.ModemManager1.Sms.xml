@@ -59,6 +59,16 @@
     <property name="Text" type="s" access="readwrite" />
 
     <!--
+        Data:
+
+        Message data.
+
+        When sending, if the data is larger than the limit of the technology or
+        modem, the message will be broken into multiple parts or messages.
+    -->
+    <property name="Data" type="ay" access="readwrite" />
+
+    <!--
         SMSC:
 
         Indicates the SMS service center number.
