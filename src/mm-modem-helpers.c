@@ -22,6 +22,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 
 #include <ModemManager.h>
 #include <libmm-common.h>
@@ -131,6 +132,17 @@ mm_create_device_identifier (guint vid,
     g_string_free (devid, TRUE);
 
     return ret;
+}
+
+/*****************************************************************************/
+
+guint
+mm_netmask_to_cidr (const gchar *netmask)
+{
+    guint32 num = 0;
+
+    inet_pton (AF_INET, netmask, &num);
+    return mm_count_bits_set (num);
 }
 
 /*****************************************************************************/

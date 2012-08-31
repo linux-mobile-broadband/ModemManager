@@ -58,6 +58,8 @@ gchar *mm_create_device_identifier (guint vid,
                                     const gchar *model,
                                     const gchar *manf);
 
+guint mm_netmask_to_cidr (const gchar *netmask);
+
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/
