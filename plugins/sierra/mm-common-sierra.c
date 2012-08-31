@@ -215,6 +215,15 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
                       MM_PORT_CARRIER_DETECT, FALSE,
                       NULL);
 
+        if (i == 1) {
+            /* Built-in echo removal conflicts with the APP1 port's limited AT
+             * parser, which doesn't always prefix responses with <CR><LF>.
+             */
+            g_object_set (ports[i],
+                          MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                          NULL);
+        }
+
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
             pacsp0_regex,
