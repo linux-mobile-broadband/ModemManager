@@ -937,55 +937,84 @@ assemble_sms (MMSms *self,
               GError **error)
 {
     GList *l;
-    gchar **textparts;
     guint idx;
-    gchar *fulltext;
-    MMSmsPart *first = NULL;
+    MMSmsPart **sorted_parts;
+    GString *fulltext;
+    GByteArray *fulldata;
 
-    /* Assemble text from all parts */
-    textparts = g_malloc0 ((1 + self->priv->max_parts) * sizeof (* textparts));
+    sorted_parts = g_new0 (MMSmsPart *, self->priv->max_parts);
+
+    /* Check if we have duplicate parts */
     for (l = self->priv->parts; l; l = g_list_next (l)) {
         idx = mm_sms_part_get_concat_sequence ((MMSmsPart *)l->data);
-        if (textparts[idx]) {
+        if (sorted_parts[idx]) {
             mm_warn ("Duplicate part index (%u) found, ignoring", idx);
             continue;
         }
-        /* NOTE! we don't strdup here */
-        textparts[idx] = (gchar *)mm_sms_part_get_text ((MMSmsPart *)l->data);
 
-        /* If first in multipart, keep it for later */
-        if (idx == 0)
-            first = (MMSmsPart *)l->data;
+        /* Add the part to the proper index */
+        sorted_parts[idx] = (MMSmsPart *)l->data;
     }
 
-    /* Check if we have all parts */
+    /* Assemble text and data from all parts */
+    fulltext = g_string_new ("");
+    fulldata = g_byte_array_sized_new (160 * self->priv->max_parts);
+
     for (idx = 0; idx < self->priv->max_parts; idx++) {
-        if (!textparts[idx]) {
+        const gchar *parttext;
+        const GByteArray *partdata;
+
+        if (!sorted_parts[idx]) {
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
-                         "Cannot assemble SMS, missing part at index %u",
+                         "Cannot assemble SMS, missing part at index (%u)",
                          idx);
-            g_free (textparts);
+            g_string_free (fulltext, TRUE);
+            g_byte_array_free (fulldata, TRUE);
+            g_free (sorted_parts);
             return FALSE;
         }
+
+        parttext = mm_sms_part_get_text (sorted_parts[idx]);
+        partdata = mm_sms_part_get_data (sorted_parts[idx]);
+
+        if (!parttext || !partdata) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Cannot assemble SMS, part at index (%u) has no text or data",
+                         idx);
+            g_string_free (fulltext, TRUE);
+            g_byte_array_free (fulldata, TRUE);
+            g_free (sorted_parts);
+            return FALSE;
+        }
+
+        g_string_append (fulltext, parttext);
+        g_byte_array_append (fulldata, partdata->data, partdata->len);
     }
 
     /* If we got all parts, we also have the first one always */
-    g_assert (first != NULL);
+    g_assert (sorted_parts[0] != NULL);
 
     /* If we got everything, assemble the text! */
-    fulltext = g_strjoinv (NULL, textparts);
     g_object_set (self,
                   "text",      fulltext,
-                  "smsc",      mm_sms_part_get_smsc (first),
-                  "class",     mm_sms_part_get_class (first),
-                  "number",    mm_sms_part_get_number (first),
-                  "timestamp", mm_sms_part_get_timestamp (first),
-                  "validity",  mm_sms_part_get_validity (first),
+                  "data",      g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE,
+                                                          fulldata->data,
+                                                          fulldata->len,
+                                                          sizeof (guchar)),
+                  "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
+                  "class",     mm_sms_part_get_class (sorted_parts[0]),
+                  "number",    mm_sms_part_get_number (sorted_parts[0]),
+                  "timestamp", mm_sms_part_get_timestamp (sorted_parts[0]),
+                  "validity",  mm_sms_part_get_validity (sorted_parts[0]),
                   NULL);
-    g_free (fulltext);
-    g_free (textparts);
+
+    g_string_free (fulltext, TRUE);
+    g_byte_array_free (fulldata, TRUE);
+    g_free (sorted_parts);
 
     self->priv->is_assembled = TRUE;
 

@@ -139,6 +139,7 @@ $(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemMana
 		--c-namespace=MmGdbus \
 		--generate-docbook mm-gdbus-doc \
 		--generate-c-code mm-gdbus-sms \
+		--annotate "org.freedesktop.ModemManager1.Sms:Data" org.gtk.GDBus.C.ForceGVariant True \
 		$< \
 		$(NULL)
 
