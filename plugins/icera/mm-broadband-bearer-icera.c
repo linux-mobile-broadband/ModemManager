@@ -154,9 +154,15 @@ ip_config_ready (MMBaseModem *modem,
         return;
     }
 
-    /* %IPDPADDR: <cid>,<ip>,<gw>,<dns1>,<dns2>[,<nbns1>,<nbns2>] */
+    /* %IPDPADDR: <cid>,<ip>,<gw>,<dns1>,<dns2>[,<nbns1>,<nbns2>[,<??>,<netmask>,<gw>]]
+     *
+     * Sierra USB305: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0
+     * K3805-Z: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0, 255.0.0.0, 255.255.255.0, 21.93.217.10,
+     */
     response = mm_strip_tag (response, IPDPADDR_TAG);
     items = g_strsplit (response, ", ", 0);
+
+    ip_config = mm_bearer_ip_config_new ();
 
     for (i = 0, dns_i = 0; items[i]; i++) {
         if (i == 0) { /* CID */
@@ -175,21 +181,56 @@ ip_config_ready (MMBaseModem *modem,
         } else if (i == 1) { /* IP address */
             guint32 tmp;
 
-            if (!inet_pton (AF_INET, items[i], &tmp))
+            if (!inet_pton (AF_INET, items[i], &tmp)) {
+                mm_warn ("Couldn't parse IP address '%s'", items[i]);
+                g_clear_object (&ip_config);
                 break;
+            }
 
-            ip_config = mm_bearer_ip_config_new ();
             mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_STATIC);
             mm_bearer_ip_config_set_address (ip_config,  items[i]);
+        } else if (i == 2) { /* Gateway */
+            guint32 tmp;
+
+            if (!inet_pton (AF_INET, items[i], &tmp)) {
+                mm_warn ("Couldn't parse gateway address '%s'", items[i]);
+                g_clear_object (&ip_config);
+                break;
+            }
+
+            mm_bearer_ip_config_set_gateway (ip_config,  items[i]);
         } else if (i == 3 || i == 4) { /* DNS entries */
             guint32 tmp;
 
             if (!inet_pton (AF_INET, items[i], &tmp)) {
+                mm_warn ("Couldn't parse DNS address '%s'", items[i]);
                 g_clear_object (&ip_config);
                 break;
             }
 
             dns[dns_i++] = items[i];
+        } else if (i == 8) { /* Netmask */
+            guint32 tmp;
+
+            if (!inet_pton (AF_INET, items[i], &tmp)) {
+                mm_warn ("Couldn't parse netmask '%s'", items[i]);
+                g_clear_object (&ip_config);
+                break;
+            }
+
+            mm_bearer_ip_config_set_prefix (ip_config, mm_netmask_to_cidr (items[i]));
+        } else if (i == 9) { /* Duplicate Gateway */
+            if (!!mm_bearer_ip_config_get_gateway (ip_config)) {
+                guint32 tmp;
+
+                if (!inet_pton (AF_INET, items[i], &tmp)) {
+                    mm_warn ("Couldn't parse (duplicate) gateway address '%s'", items[i]);
+                    g_clear_object (&ip_config);
+                    break;
+                }
+
+                mm_bearer_ip_config_set_gateway (ip_config,  items[i]);
+            }
         }
     }
 
