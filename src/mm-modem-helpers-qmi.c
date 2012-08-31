@@ -14,6 +14,7 @@
  */
 
 #include "mm-modem-helpers-qmi.h"
+#include "mm-enums-types.h"
 #include "mm-log.h"
 
 /*****************************************************************************/

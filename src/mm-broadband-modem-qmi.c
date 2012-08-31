@@ -1939,9 +1939,9 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
         QmiMessageNasSetSystemSelectionPreferenceInput *input;
         QmiNasRatModePreference pref;
 
-        pref = modem_mode_to_qmi_rat_mode_preference (ctx->allowed,
-                                                      mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self)),
-                                                      mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)));
+        pref = mm_modem_mode_to_qmi_rat_mode_preference (ctx->allowed,
+                                                         mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self)),
+                                                         mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)));
         if (!pref) {
             gchar *str;
 
@@ -1962,7 +1962,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             QmiNasGsmWcdmaAcquisitionOrderPreference order;
 
-            order = modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
+            order = mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
             qmi_message_nas_set_system_selection_preference_input_set_gsm_wcdma_acquisition_order_preference (input, order, NULL);
         }
 
