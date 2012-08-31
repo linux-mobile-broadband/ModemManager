@@ -56,11 +56,6 @@ struct _MMBroadbandModemQmiPrivate {
     gchar *meid;
     gchar *esn;
 
-    /* Allowed mode related */
-#if defined WITH_NEWEST_QMI_COMMANDS
-    gboolean has_mode_preference_in_system_selection_preference;
-#endif /* WITH_NEWEST_QMI_COMMANDS */
-
     /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
     gboolean unsolicited_events_enabled;
     gboolean unsolicited_events_setup;
@@ -1589,9 +1584,7 @@ typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientNas *client;
     GSimpleAsyncResult *result;
-#if defined WITH_NEWEST_QMI_COMMANDS
     gboolean run_get_system_selection_preference;
-#endif /* WITH_NEWEST_QMI_COMMANDS */
     gboolean run_get_technology_preference;
 } LoadAllowedModesContext;
 
@@ -1686,8 +1679,6 @@ get_technology_preference_ready (QmiClientNas *client,
     load_allowed_modes_context_complete_and_free (ctx);
 }
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-
 static void
 allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
@@ -1709,9 +1700,6 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
                    output,
                    &mode_preference_mask,
                    NULL)) {
-        /* Assuming here that Get System Selection Preference reports *always* all
-         * optional fields that the current message version supports */
-        ctx->self->priv->has_mode_preference_in_system_selection_preference = FALSE;
         mm_dbg ("Mode preference not reported in system selection preference");
     } else {
         MMModemMode allowed;
@@ -1731,8 +1719,8 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
             result->allowed = allowed;
             result->preferred = MM_MODEM_MODE_NONE;
 
-            if (mode_preference_mask & QMI_NAS_RAT_MODE_PREFERENCE_GSM &&
-                mode_preference_mask & QMI_NAS_RAT_MODE_PREFERENCE_UMTS &&
+            if ((mode_preference_mask & QMI_NAS_RAT_MODE_PREFERENCE_GSM) &&
+                (mode_preference_mask & QMI_NAS_RAT_MODE_PREFERENCE_UMTS) &&
                 qmi_message_nas_get_system_selection_preference_output_get_gsm_wcdma_acquisition_order_preference (
                         output,
                         &gsm_or_wcdma,
@@ -1759,12 +1747,9 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
     load_allowed_modes_context_complete_and_free (ctx);
 }
 
-#endif /* WITH_NEWEST_QMI_COMMANDS */
-
 static void
 load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
 {
-#if defined WITH_NEWEST_QMI_COMMANDS
     if (ctx->run_get_system_selection_preference) {
         qmi_client_nas_get_system_selection_preference (
             ctx->client,
@@ -1775,7 +1760,6 @@ load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
             ctx);
         return;
     }
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     if (ctx->run_get_technology_preference) {
         qmi_client_nas_get_technology_preference (
@@ -1817,17 +1801,11 @@ load_allowed_modes (MMIfaceModem *self,
                                              user_data,
                                              load_allowed_modes);
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-    /* System selection preference introduced in NAS 1.1
-     * TODO: Not sure when the System Selection Preference got the
-     * 'Mode Preference' TLV, so we'll need to handle the fallback. */
-    ctx->run_get_system_selection_preference =
-        (qmi_client_check_version (client, 1, 1) &&
-         ctx->self->priv->has_mode_preference_in_system_selection_preference);
-#endif /* WITH_NEWEST_QMI_COMMANDS */
+    /* System selection preference introduced in NAS 1.1 */
+    ctx->run_get_system_selection_preference = qmi_client_check_version (client, 1, 1);
 
-    /* Technology preference introduced in NAS 1.7 */
-    ctx->run_get_technology_preference = qmi_client_check_version (client, 1, 7);
+    /* Technology preference introduced in NAS 1.0, so always available */
+    ctx->run_get_technology_preference = TRUE;
 
     load_allowed_modes_context_step (ctx);
 }
@@ -1841,9 +1819,7 @@ typedef struct {
     GSimpleAsyncResult *result;
     MMModemMode allowed;
     MMModemMode preferred;
-#if defined WITH_NEWEST_QMI_COMMANDS
     gboolean run_set_system_selection_preference;
-#endif /* WITH_NEWEST_QMI_COMMANDS */
     gboolean run_set_technology_preference;
 } SetAllowedModesContext;
 
@@ -1894,8 +1870,6 @@ set_technology_preference_ready (QmiClientNas *client,
     set_allowed_modes_context_step (ctx);
 }
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-
 static void
 allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
@@ -1909,10 +1883,6 @@ allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
         mm_dbg ("QMI operation failed: %s", error->message);
         g_error_free (error);
     } else if (!qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_DEVICE_UNSUPPORTED))
-            ctx->self->priv->has_mode_preference_in_system_selection_preference = FALSE;
         mm_dbg ("Couldn't set system selection preference: %s", error->message);
         g_error_free (error);
         qmi_message_nas_set_system_selection_preference_output_unref (output);
@@ -1929,12 +1899,9 @@ allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
     set_allowed_modes_context_step (ctx);
 }
 
-#endif /* WITH_NEWEST_QMI_COMMANDS */
-
 static void
 set_allowed_modes_context_step (SetAllowedModesContext *ctx)
 {
-#if defined WITH_NEWEST_QMI_COMMANDS
     if (ctx->run_set_system_selection_preference) {
         QmiMessageNasSetSystemSelectionPreferenceInput *input;
         QmiNasRatModePreference pref;
@@ -1978,7 +1945,6 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
         qmi_message_nas_set_system_selection_preference_input_unref (input);
         return;
     }
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     if (ctx->run_set_technology_preference) {
         QmiMessageNasSetTechnologyPreferenceInput *input;
@@ -2056,17 +2022,11 @@ set_allowed_modes (MMIfaceModem *self,
     ctx->allowed = allowed;
     ctx->preferred = preferred;
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-    /* System selection preference introduced in NAS 1.1
-     * TODO: Not sure when the System Selection Preference got the
-     * 'Mode Preference' TLV, so we'll need to handle the fallback. */
-    ctx->run_set_system_selection_preference =
-        (qmi_client_check_version (client, 1, 1) &&
-         ctx->self->priv->has_mode_preference_in_system_selection_preference);
-#endif /* WITH_NEWEST_QMI_COMMANDS */
+    /* System selection preference introduced in NAS 1.1 */
+    ctx->run_set_system_selection_preference = qmi_client_check_version (client, 1, 1);
 
-    /* Technology preference introduced in NAS 1.7 */
-    ctx->run_set_technology_preference = qmi_client_check_version (client, 1, 7);
+    /* Technology preference introduced in NAS 1.0, so always available */
+    ctx->run_set_technology_preference = TRUE;
 
     set_allowed_modes_context_step (ctx);
 }
@@ -4740,12 +4700,6 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_MODEM_QMI,
                                               MMBroadbandModemQmiPrivate);
-
-#if defined WITH_NEWEST_QMI_COMMANDS
-    /* Some initial defaults for when we need to gather info about
-     * supported commands/TLVs */
-    self->priv->has_mode_preference_in_system_selection_preference = TRUE;
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 }
 
 static void

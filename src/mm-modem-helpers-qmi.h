@@ -47,8 +47,6 @@ MMModemMode mm_modem_mode_from_qmi_radio_technology_preference (QmiNasRadioTechn
 QmiNasRadioTechnologyPreference mm_modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
                                                                                   gboolean is_cdma);
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-
 MMModemMode mm_modem_mode_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi);
 QmiNasRatModePreference mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
                                                                   gboolean is_cdma,
@@ -56,8 +54,6 @@ QmiNasRatModePreference mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mo
 
 MMModemMode mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi);
 QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode);
-
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 GArray *mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array);
 

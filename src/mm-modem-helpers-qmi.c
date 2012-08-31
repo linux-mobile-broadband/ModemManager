@@ -572,8 +572,6 @@ mm_modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
 
 /*****************************************************************************/
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-
 MMModemMode
 mm_modem_mode_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
 {
@@ -673,8 +671,6 @@ mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
 
     return MM_MODEM_MODE_NONE;
 }
-
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 /*****************************************************************************/
 
