@@ -1074,7 +1074,9 @@ parse_imsi (const gchar *response,
 
     g_assert (response != NULL);
 
-    for (s = response, len = 0; *s; ++s, ++len) {
+    for (s = mm_strip_tag (response, "+CIMI"), len = 0;
+         *s;
+         ++s, ++len) {
         /* IMSI is a number with 15 or less decimal digits. */
         if (!isdigit (*s) || len > 15) {
             g_set_error (error,
