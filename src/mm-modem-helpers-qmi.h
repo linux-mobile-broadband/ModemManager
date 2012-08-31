@@ -52,6 +52,10 @@ QmiNasRatModePreference mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mo
                                                                   gboolean is_cdma,
                                                                   gboolean is_3gpp);
 
+MMModemCapability mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi);
+
+MMModemCapability mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi);
+
 MMModemMode mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi);
 QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode);
 

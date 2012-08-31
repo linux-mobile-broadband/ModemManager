@@ -630,6 +630,63 @@ mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
 
 /*****************************************************************************/
 
+MMModemCapability
+mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X)
+        caps |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO)
+        caps |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_GSM)
+        caps |= MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_UMTS)
+        caps |= MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_LTE)
+        caps |= MM_MODEM_CAPABILITY_LTE;
+
+    /* FIXME: LTE Advanced? */
+
+    return caps;
+}
+
+/*****************************************************************************/
+
+MMModemCapability
+mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+
+    if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2) {
+        /* Skip AMPS */
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
+            caps |= MM_MODEM_CAPABILITY_CDMA_EVDO; /* CDMA */
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR)
+            caps |= MM_MODEM_CAPABILITY_CDMA_EVDO; /* EV-DO */
+    }
+
+    if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP) {
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM)
+            caps |= MM_MODEM_CAPABILITY_GSM_UMTS; /* GSM */
+        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
+            caps |= MM_MODEM_CAPABILITY_GSM_UMTS; /* WCDMA */
+    }
+
+    if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE)
+        caps |= MM_MODEM_CAPABILITY_LTE;
+
+    /* FIXME: LTE Advanced? */
+
+    return caps;
+}
+
+/*****************************************************************************/
+
 MMModemMode
 mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi)
 {

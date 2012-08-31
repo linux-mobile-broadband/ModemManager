@@ -146,7 +146,18 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Capabilities loading (Modem interface) */
+/* Current Capabilities loading (Modem interface) */
+
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientNas *nas_client;
+    QmiClientDms *dms_client;
+    GSimpleAsyncResult *result;
+    gboolean run_get_system_selection_preference;
+    gboolean run_get_technology_preference;
+    gboolean run_get_capabilities;
+} LoadCurrentCapabilitiesContext;
 
 static MMModemCapability
 modem_load_current_capabilities_finish (MMIfaceModem *self,
@@ -169,6 +180,289 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
 }
 
 static void
+load_current_capabilities_context_complete_and_free (LoadCurrentCapabilitiesContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->nas_client);
+    g_object_unref (ctx->dms_client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx);
+
+static void
+load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
+                                                  GAsyncResult *res,
+                                                  LoadCurrentCapabilitiesContext *ctx)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+    QmiMessageDmsGetCapabilitiesOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_capabilities_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get Capabilities: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        guint i;
+        guint mask = MM_MODEM_CAPABILITY_NONE;
+        GArray *radio_interface_list;
+
+        qmi_message_dms_get_capabilities_output_get_info (
+            output,
+            NULL, /* info_max_tx_channel_rate */
+            NULL, /* info_max_rx_channel_rate */
+            NULL, /* info_data_service_capability */
+            NULL, /* info_sim_capability */
+            &radio_interface_list,
+            NULL);
+
+        for (i = 0; i < radio_interface_list->len; i++) {
+            mask |= mm_modem_capability_from_qmi_radio_interface (g_array_index (radio_interface_list,
+                                                                                 QmiDmsRadioInterface,
+                                                                                 i));
+        }
+
+        /* Final capabilities are the intersection between the Technology
+         * Preference (ie, allowed modes) and the device's capabilities.  If
+         * the Technology Preference was "auto" or unknown we just fall back to
+         * the Get Capabilities response.
+         */
+        caps = ((MMModemCapability) GPOINTER_TO_UINT (
+                    g_simple_async_result_get_op_res_gpointer (ctx->result)));
+        if (caps == MM_MODEM_CAPABILITY_NONE)
+            caps = mask;
+        else
+            caps &= mask;
+    }
+
+    if (output)
+        qmi_message_dms_get_capabilities_output_unref (output);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
+    load_current_capabilities_context_complete_and_free (ctx);
+}
+
+static void
+load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
+                                                           GAsyncResult *res,
+                                                           LoadCurrentCapabilitiesContext *ctx)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+    QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't get technology preference: %s", error->message);
+        g_error_free (error);
+    } else {
+        QmiNasRadioTechnologyPreference preference_mask;
+
+        qmi_message_nas_get_technology_preference_output_get_active (
+            output,
+            &preference_mask,
+            NULL, /* duration */
+            NULL);
+        if (preference_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO) {
+            caps = mm_modem_capability_from_qmi_radio_technology_preference (preference_mask);
+            if (caps == MM_MODEM_CAPABILITY_NONE) {
+                gchar *str;
+
+                str = qmi_nas_radio_technology_preference_build_string_from_mask (preference_mask);
+                mm_dbg ("Unsupported modes reported: '%s'", str);
+                g_free (str);
+            }
+        }
+    }
+
+    if (output)
+        qmi_message_nas_get_technology_preference_output_unref (output);
+
+    ctx->run_get_technology_preference = FALSE;
+
+    /* Get DMS Capabilities too */
+    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
+    load_current_capabilities_context_step (ctx);
+}
+
+static void
+load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *client,
+                                                                 GAsyncResult *res,
+                                                                 LoadCurrentCapabilitiesContext *ctx)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+    QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
+    GError *error = NULL;
+    QmiNasRatModePreference mode_preference_mask = 0;
+
+    output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't get system selection preference: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
+                   output,
+                   &mode_preference_mask,
+                   NULL)) {
+        mm_dbg ("Mode preference not reported in system selection preference");
+    } else {
+        caps = mm_modem_capability_from_qmi_rat_mode_preference (mode_preference_mask);
+        if (caps == MM_MODEM_CAPABILITY_NONE) {
+            gchar *str;
+
+            str = qmi_nas_rat_mode_preference_build_string_from_mask (mode_preference_mask);
+            mm_dbg ("Unsupported capabilities reported: '%s'", str);
+            g_free (str);
+        }
+    }
+
+    if (output)
+        qmi_message_nas_get_system_selection_preference_output_unref (output);
+
+    if (caps == MM_MODEM_CAPABILITY_NONE) {
+        /* Fall back to Technology Preference */
+        ctx->run_get_system_selection_preference = FALSE;
+        load_current_capabilities_context_step (ctx);
+        return;
+    }
+
+    /* Success */
+    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
+    load_current_capabilities_context_complete_and_free (ctx);
+}
+
+static void
+load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx)
+{
+    if (ctx->run_get_system_selection_preference) {
+        qmi_client_nas_get_system_selection_preference (
+            ctx->nas_client,
+            NULL, /* no input */
+            5,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)load_current_capabilities_get_system_selection_preference_ready,
+            ctx);
+        return;
+    }
+
+    if (ctx->run_get_technology_preference) {
+        qmi_client_nas_get_technology_preference (
+            ctx->nas_client,
+            NULL, /* no input */
+            5,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)load_current_capabilities_get_technology_preference_ready,
+            ctx);
+        return;
+    }
+
+    if (ctx->run_get_capabilities) {
+        qmi_client_dms_get_capabilities (
+            ctx->dms_client,
+            NULL, /* no input */
+            5,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)load_current_capabilities_get_capabilities_ready,
+            ctx);
+        return;
+    }
+
+    g_simple_async_result_set_error (
+        ctx->result,
+        MM_CORE_ERROR,
+        MM_CORE_ERROR_UNSUPPORTED,
+        "Loading current capabilities is not supported by this device");
+    load_current_capabilities_context_complete_and_free (ctx);
+}
+
+static void
+modem_load_current_capabilities (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    LoadCurrentCapabilitiesContext *ctx;
+    QmiClient *nas_client = NULL;
+    QmiClient *dms_client = NULL;
+
+    /* Best way to get current capabilities (ie, enabled radios) is
+     * Get System Selection Preference's "mode preference" TLV, but that's
+     * only supported by NAS >= 1.1, meaning older Gobi devices don't
+     * implement it.
+     *
+     * On these devices, the DMS Get Capabilities call appears to report
+     * currently enabled radios, but this does not take the user's
+     * technology preference into account.
+     *
+     * So in the absence of System Selection Preference, we check the
+     * Technology Preference first, and if that is "AUTO" we fall back to
+     * Get Capabilities.
+     */
+
+    mm_dbg ("loading current capabilities...");
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &nas_client,
+                            callback, user_data))
+        return;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &dms_client,
+                            callback, user_data))
+        return;
+
+    ctx = g_new0 (LoadCurrentCapabilitiesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->nas_client = g_object_ref (nas_client);
+    ctx->dms_client = g_object_ref (dms_client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_current_capabilities);
+
+    /* System selection preference introduced in NAS 1.1 */
+    ctx->run_get_system_selection_preference = qmi_client_check_version (nas_client, 1, 1);
+
+    ctx->run_get_technology_preference = TRUE;
+    ctx->run_get_capabilities = TRUE;
+
+    load_current_capabilities_context_step (ctx);
+}
+
+/*****************************************************************************/
+/* Modem Capabilities loading (Modem interface) */
+
+static MMModemCapability
+modem_load_modem_capabilities_finish (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMModemCapability caps;
+    gchar *caps_str;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_CAPABILITY_NONE;
+
+    caps = ((MMModemCapability) GPOINTER_TO_UINT (
+                g_simple_async_result_get_op_res_gpointer (
+                    G_SIMPLE_ASYNC_RESULT (res))));
+    caps_str = mm_modem_capability_build_string_from_mask (caps);
+    mm_dbg ("loaded modem capabilities: %s", caps_str);
+    g_free (caps_str);
+    return caps;
+}
+
+static void
 dms_get_capabilities_ready (QmiClientDms *client,
                             GAsyncResult *res,
                             GSimpleAsyncResult *simple)
@@ -181,7 +475,7 @@ dms_get_capabilities_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't get Capabilities: ");
+        g_prefix_error (&error, "Couldn't get modem capabilities: ");
         g_simple_async_result_take_error (simple, error);
     } else {
         guint i;
@@ -216,9 +510,9 @@ dms_get_capabilities_ready (QmiClientDms *client,
 }
 
 static void
-modem_load_current_capabilities (MMIfaceModem *self,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+modem_load_modem_capabilities (MMIfaceModem *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
     GSimpleAsyncResult *result;
     QmiClient *client = NULL;
@@ -231,9 +525,9 @@ modem_load_current_capabilities (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_load_current_capabilities);
+                                        modem_load_modem_capabilities);
 
-    mm_dbg ("loading current capabilities...");
+    mm_dbg ("loading modem capabilities...");
     qmi_client_dms_get_capabilities (QMI_CLIENT_DMS (client),
                                      NULL,
                                      5,
@@ -4730,6 +5024,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Initialization steps */
     iface->load_current_capabilities = modem_load_current_capabilities;
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
+    iface->load_modem_capabilities = modem_load_modem_capabilities;
+    iface->load_modem_capabilities_finish = modem_load_modem_capabilities_finish;
     iface->load_manufacturer = modem_load_manufacturer;
     iface->load_manufacturer_finish = modem_load_manufacturer_finish;
     iface->load_model = modem_load_model;
