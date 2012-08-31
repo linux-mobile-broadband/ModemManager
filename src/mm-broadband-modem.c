@@ -4410,20 +4410,67 @@ modem_messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
                                                   GAsyncResult *res,
                                                   GError **error)
 {
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    GError *inner_error = NULL;
+
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
 }
+
+static gboolean
+cnmi_response_processor (MMBaseModem *self,
+                         gpointer none,
+                         const gchar *command,
+                         const gchar *response,
+                         gboolean last_command,
+                         const GError *error,
+                         GVariant **result,
+                         GError **result_error)
+{
+    if (error) {
+        /* If we get a not-supported error and we're not in the last command, we
+         * won't set 'result_error', so we'll keep on the sequence */
+        if (!g_error_matches (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_NOT_SUPPORTED) ||
+            last_command)
+            *result_error = g_error_copy (error);
+
+        return FALSE;
+    }
+
+    *result = NULL;
+    return TRUE;
+}
+
+/*
+ * Many devices based on Qualcomm chipsets don't support a <ds> value
+ * of '1', despite saying they do in the AT+CNMI=? response.  But they
+ * do accept '2'.  Since we're not doing much with delivery status
+ * reports yet, if we get a CME 303 (not supported) error when setting
+ * the message indication parameters via CNMI, fall back to the
+ * Qualcomm-compatible CNMI parameters.
+ */
+static const MMBaseModemAtCommand cnmi_sequence[] = {
+    { "+CNMI=2,1,2,1,0", 3, TRUE, cnmi_response_processor },
+    { "+CNMI=2,1,2,2,0", 3, TRUE, cnmi_response_processor },
+    { NULL }
+};
 
 static void
 modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CNMI=2,1,2,1,0",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        cnmi_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
