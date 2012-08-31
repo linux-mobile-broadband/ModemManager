@@ -459,6 +459,7 @@ typedef struct {
     guint cid;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
+    guint authentication_retries;
 } Dial3gppContext;
 
 static Dial3gppContext *
@@ -792,6 +793,15 @@ deactivate_ready (MMBaseModem *modem,
     g_free (command);
 }
 
+static void authenticate (Dial3gppContext *ctx);
+
+static gboolean
+retry_authentication_cb (Dial3gppContext *ctx)
+{
+    authenticate (ctx);
+    return FALSE;
+}
+
 static void
 authenticate_ready (MMBaseModem *modem,
                     GAsyncResult *res,
@@ -805,7 +815,16 @@ authenticate_ready (MMBaseModem *modem,
         return;
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        /* TODO(njw): retry up to 3 times with a 1-second delay */
+        /* Retry configuring the context. It sometimes fails with a 583
+         * error ["a profile (CID) is currently active"] if a connect
+         * is attempted too soon after a disconnect. */
+        if (++ctx->authentication_retries < 3) {
+            mm_dbg ("Authentication failed: '%s'; retrying...", error->message);
+            g_error_free (error);
+            g_timeout_add_seconds (1, (GSourceFunc)retry_authentication_cb, ctx);
+            return;
+        }
+
         /* Return an error */
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
