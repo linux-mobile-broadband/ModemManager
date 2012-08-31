@@ -398,10 +398,8 @@ serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     gboolean is_qcdm = FALSE;
-
-    /* Just the initial poke; ignore it */
-    if (!self)
-        return;
+    gboolean retry = FALSE;
+    PortProbeRunTask *task = self->priv->task;
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
@@ -417,12 +415,35 @@ serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
                      g_udev_device_get_subsystem (self->priv->port),
                      g_udev_device_get_name (self->priv->port),
                      err);
+            retry = TRUE;
         } else {
             /* yay, probably a QCDM port */
             is_qcdm = TRUE;
 
             qcdm_result_unref (result);
         }
+    } else {
+        if (!g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            mm_dbg ("QCDM probe error: (%d) %s", error->code, error->message);
+        retry = TRUE;
+    }
+
+    if (retry) {
+        GByteArray *cmd2;
+
+        cmd2 = g_object_steal_data (G_OBJECT (self), "cmd2");
+        if (cmd2) {
+            /* second try */
+            mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
+                                               cmd2,
+                                               3,
+                                               NULL,
+                                               (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
+                                               self);
+            return;
+        }
+
+        /* no more retries left */
     }
 
     /* Set probing result */
@@ -440,6 +461,7 @@ serial_probe_qcdm (MMPortProbe *self)
     GByteArray *verinfo = NULL;
     GByteArray *verinfo2;
     gint len;
+    guint8 marker = 0x7E;
 
     task->source_id = 0;
 
@@ -486,9 +508,14 @@ serial_probe_qcdm (MMPortProbe *self)
         return FALSE;
     }
 
-    /* Build up the probe command */
-    verinfo = g_byte_array_sized_new (50);
-    len = qcdm_cmd_version_info_new ((gchar *) verinfo->data, 50);
+    /* Build up the probe command; 0x7E is the frame marker, so put one at the
+     * beginning of the buffer to ensure that the device discards any AT
+     * commands that probing might have sent earlier.  Should help devices
+     * respond more quickly and speed up QCDM probing.
+     */
+    verinfo = g_byte_array_sized_new (10);
+    g_byte_array_append (verinfo, &marker, 1);
+    len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
     if (len <= 0) {
         g_byte_array_free (verinfo, TRUE);
         port_probe_run_task_complete (
@@ -501,21 +528,15 @@ serial_probe_qcdm (MMPortProbe *self)
                          g_udev_device_get_name (self->priv->port)));
         return FALSE;
     }
-    verinfo->len = len;
+    verinfo->len = len + 1;
 
-    /* Queuing the command takes ownership over it; dup it for the second try */
+    /* Queuing the command takes ownership over it; save it for the second try */
     verinfo2 = g_byte_array_sized_new (verinfo->len);
     g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
+    g_object_set_data_full (G_OBJECT (self), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
 
-    /* Send the command twice; the ports often need to be woken up */
     mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
                                        verinfo,
-                                       3,
-                                       NULL,
-                                       (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
-                                       NULL);
-    mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
-                                       verinfo2,
                                        3,
                                        NULL,
                                        (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
