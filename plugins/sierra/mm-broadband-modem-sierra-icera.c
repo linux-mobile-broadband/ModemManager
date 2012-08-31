@@ -29,11 +29,68 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 #include "mm-common-sierra.h"
+#include "mm-broadband-bearer-sierra.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierraIcera, mm_broadband_modem_sierra_icera, MM_TYPE_BROADBAND_MODEM_ICERA, 0,
                             G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+
+/*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+modem_create_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMBearer *bearer;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New Sierra bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+
+    return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_sierra_new_ready (GObject *source,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    MMBearer *bearer = NULL;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_sierra_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_create_bearer (MMIfaceModem *self,
+                     MMBearerProperties *properties,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_bearer);
+
+    mm_dbg ("Creating Sierra bearer...");
+    mm_broadband_bearer_sierra_new (MM_BROADBAND_MODEM_SIERRA (self),
+                                    properties,
+                                    NULL, /* cancellable */
+                                    (GAsyncReadyCallback)broadband_bearer_sierra_new_ready,
+                                    result);
+}
 
 /*****************************************************************************/
 /* Setup ports (Broadband modem class) */
@@ -77,6 +134,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
     iface->create_sim = mm_common_sierra_create_sim;
     iface->create_sim_finish = mm_common_sierra_create_sim_finish;
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
 }
 
 static void
