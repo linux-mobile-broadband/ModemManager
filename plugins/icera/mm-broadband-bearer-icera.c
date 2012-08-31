@@ -179,7 +179,7 @@ ip_config_ready (MMBaseModem *modem,
                 break;
             }
         } else if (i == 1) { /* IP address */
-            guint32 tmp;
+            guint32 tmp = 0;
 
             if (!inet_pton (AF_INET, items[i], &tmp)) {
                 mm_warn ("Couldn't parse IP address '%s'", items[i]);
@@ -190,7 +190,7 @@ ip_config_ready (MMBaseModem *modem,
             mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_STATIC);
             mm_bearer_ip_config_set_address (ip_config,  items[i]);
         } else if (i == 2) { /* Gateway */
-            guint32 tmp;
+            guint32 tmp = 0;
 
             if (!inet_pton (AF_INET, items[i], &tmp)) {
                 mm_warn ("Couldn't parse gateway address '%s'", items[i]);
@@ -198,9 +198,10 @@ ip_config_ready (MMBaseModem *modem,
                 break;
             }
 
-            mm_bearer_ip_config_set_gateway (ip_config,  items[i]);
+            if (tmp)
+                mm_bearer_ip_config_set_gateway (ip_config, items[i]);
         } else if (i == 3 || i == 4) { /* DNS entries */
-            guint32 tmp;
+            guint32 tmp = 0;
 
             if (!inet_pton (AF_INET, items[i], &tmp)) {
                 mm_warn ("Couldn't parse DNS address '%s'", items[i]);
@@ -208,9 +209,10 @@ ip_config_ready (MMBaseModem *modem,
                 break;
             }
 
-            dns[dns_i++] = items[i];
+            if (tmp)
+                dns[dns_i++] = items[i];
         } else if (i == 8) { /* Netmask */
-            guint32 tmp;
+            guint32 tmp = 0;
 
             if (!inet_pton (AF_INET, items[i], &tmp)) {
                 mm_warn ("Couldn't parse netmask '%s'", items[i]);
@@ -220,8 +222,8 @@ ip_config_ready (MMBaseModem *modem,
 
             mm_bearer_ip_config_set_prefix (ip_config, mm_netmask_to_cidr (items[i]));
         } else if (i == 9) { /* Duplicate Gateway */
-            if (!!mm_bearer_ip_config_get_gateway (ip_config)) {
-                guint32 tmp;
+            if (!mm_bearer_ip_config_get_gateway (ip_config)) {
+                guint32 tmp = 0;
 
                 if (!inet_pton (AF_INET, items[i], &tmp)) {
                     mm_warn ("Couldn't parse (duplicate) gateway address '%s'", items[i]);
@@ -229,7 +231,8 @@ ip_config_ready (MMBaseModem *modem,
                     break;
                 }
 
-                mm_bearer_ip_config_set_gateway (ip_config,  items[i]);
+                if (tmp)
+                    mm_bearer_ip_config_set_gateway (ip_config, items[i]);
             }
         }
     }
