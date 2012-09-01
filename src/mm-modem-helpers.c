@@ -1361,7 +1361,7 @@ mm_string_to_access_tech (const gchar *string)
 
     /* We're returning a MASK of technologies found; so we can include more
      * than one technology in the result */
-    if (strcasestr (string, "LTE"))
+    if (strcasestr (string, "LTE") || strcasestr (string, "4G"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
 
     if (strcasestr (string, "HSPA+"))
