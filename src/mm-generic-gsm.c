@@ -4575,7 +4575,7 @@ static ModeEtsi modes_table[] = {
     { MM_MODEM_GSM_ACCESS_TECH_HSDPA,       4 },
     { MM_MODEM_GSM_ACCESS_TECH_HSUPA,       5 },
     { MM_MODEM_GSM_ACCESS_TECH_HSPA,        6 },
-    { MM_MODEM_GSM_ACCESS_TECH_HSPA,        7 },  /* E-UTRAN/LTE => HSPA for now */
+    { MM_MODEM_GSM_ACCESS_TECH_LTE,         7 },
     { MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,    -1 },
 };
 
