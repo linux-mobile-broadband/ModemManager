@@ -334,6 +334,63 @@ modem_create_sim (MMIfaceModem *self,
 /* Capabilities loading (Modem interface) */
 
 typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMModemCapability caps;
+} LoadCapabilitiesContext;
+
+static void
+load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadCapabilitiesContext, ctx);
+}
+
+static MMModemCapability
+modem_load_current_capabilities_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error)
+{
+    MMModemCapability caps;
+    gchar *caps_str;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_CAPABILITY_NONE;
+
+    caps = (MMModemCapability) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    caps_str = mm_modem_capability_build_string_from_mask (caps);
+    mm_dbg ("loaded current capabilities: %s", caps_str);
+    g_free (caps_str);
+    return caps;
+}
+
+static void
+current_capabilities_ws46_test_ready (MMBaseModem *self,
+                                      GAsyncResult *res,
+                                      LoadCapabilitiesContext *ctx)
+{
+    const gchar *response;
+
+    /* Completely ignore errors in AT+WS46=? */
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (response &&
+        (strstr (response, "28") != NULL ||   /* 4G only */
+         strstr (response, "30") != NULL ||   /* 2G/4G */
+         strstr (response, "31") != NULL)) {  /* 3G/4G */
+        /* Add LTE caps */
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        GUINT_TO_POINTER (ctx->caps),
+        NULL);
+    load_capabilities_context_complete_and_free (ctx);
+}
+
+typedef struct {
     gchar *name;
     MMModemCapability bits;
 } ModemCaps;
@@ -445,26 +502,6 @@ parse_caps_cgmm (MMBaseModem *self,
     return FALSE;
 }
 
-static MMModemCapability
-modem_load_current_capabilities_finish (MMIfaceModem *self,
-                                        GAsyncResult *res,
-                                        GError **error)
-{
-    GVariant *result;
-    MMModemCapability caps;
-    gchar *caps_str;
-
-    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (!result)
-        return MM_MODEM_CAPABILITY_NONE;
-
-    caps = (MMModemCapability)g_variant_get_uint32 (result);
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("loaded current capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
-}
-
 static const MMBaseModemAtCommand capabilities[] = {
     { "+GCAP",  2, TRUE,  parse_caps_gcap },
     { "I",      1, TRUE,  parse_caps_gcap }, /* yes, really parse as +GCAP */
@@ -474,11 +511,69 @@ static const MMBaseModemAtCommand capabilities[] = {
 };
 
 static void
+capabilities_sequence_ready (MMBaseModem *self,
+                             GAsyncResult *res,
+                             LoadCapabilitiesContext *ctx)
+{
+    GError *error = NULL;
+    GVariant *result;
+
+    result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    if (!result) {
+        g_simple_async_result_take_error (ctx->result, error);
+        load_capabilities_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->caps = (MMModemCapability)g_variant_get_uint32 (result);
+
+    /* Some modems (e.g. Sierra Wireless MC7710 or ZTE MF820D) won't report LTE
+     * capabilities even if they have them. So just run AT+WS46=? as well to see
+     * if the current supported modes includes any LTE-specific mode.
+     * This is not a big deal, as the AT+WS46=? command is a test command with a
+     * cache-able result.
+     *
+     * E.g.:
+     *  AT+WS46=?
+     *   +WS46: (12,22,25,28,29)
+     *   OK
+     *
+     */
+    if (ctx->caps & MM_MODEM_CAPABILITY_GSM_UMTS &&
+        !(ctx->caps & MM_MODEM_CAPABILITY_LTE)) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (ctx->self),
+            "+WS46=?",
+            3,
+            TRUE, /* allow caching, it's a test command */
+            (GAsyncReadyCallback)current_capabilities_ws46_test_ready,
+            ctx);
+        return;
+    }
+
+    /* Otherwise, just set the already retrieved capabilities */
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        GUINT_TO_POINTER (ctx->caps),
+        NULL);
+    load_capabilities_context_complete_and_free (ctx);
+}
+
+static void
 modem_load_current_capabilities (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
+    LoadCapabilitiesContext *ctx;
+
     mm_dbg ("loading current capabilities...");
+
+    ctx = g_slice_new0 (LoadCapabilitiesContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_current_capabilities);
 
     /* Launch sequence, we will expect a "u" GVariant */
     mm_base_modem_at_sequence (
@@ -486,8 +581,8 @@ modem_load_current_capabilities (MMIfaceModem *self,
         capabilities,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        callback,
-        user_data);
+        (GAsyncReadyCallback)capabilities_sequence_ready,
+        ctx);
 }
 
 /*****************************************************************************/
