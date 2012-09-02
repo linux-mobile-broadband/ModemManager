@@ -7140,7 +7140,8 @@ initialize_context_complete_and_free (InitializeContext *ctx)
 
     g_simple_async_result_complete_in_idle (ctx->result);
 
-    if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped &&
+    if (ctx->ports_ctx &&
+        MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped &&
         !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped (ctx->self, ctx->ports_ctx, &error)) {
         mm_warn ("Error when stopping the initialization sequence: %s", error->message);
         g_error_free (error);
