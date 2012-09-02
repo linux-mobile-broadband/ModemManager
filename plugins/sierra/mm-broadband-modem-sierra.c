@@ -38,138 +38,9 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
-static MMIfaceModem *iface_modem_parent;
-
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init))
-
-/*****************************************************************************/
-/* Capabilities loading (Modem interface) */
-
-typedef struct {
-    MMBroadbandModemSierra *self;
-    GSimpleAsyncResult *result;
-    MMModemCapability caps;
-} LoadCapabilitiesContext;
-
-static void
-load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadCapabilitiesContext, ctx);
-}
-
-static MMModemCapability
-load_current_capabilities_finish (MMIfaceModem *self,
-                                  GAsyncResult *res,
-                                  GError **error)
-{
-    MMModemCapability caps;
-    gchar *caps_str;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_CAPABILITY_NONE;
-
-    caps = (MMModemCapability) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("loaded current (sierra) capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
-}
-
-static void
-supported_modes_ws46_test_ready (MMBaseModem *self,
-                                 GAsyncResult *res,
-                                 LoadCapabilitiesContext *ctx)
-{
-    const gchar *response;
-
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-    if (response &&
-        (strstr (response, "28") != NULL ||   /* 4G only */
-         strstr (response, "30") != NULL ||   /* 2G/4G */
-         strstr (response, "31") != NULL)) {  /* 3G/4G */
-        /* Add LTE caps */
-        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
-    }
-
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (ctx->caps),
-        NULL);
-    load_capabilities_context_complete_and_free (ctx);
-}
-
-static void
-parent_load_current_capabilities_ready (MMIfaceModem *self,
-                                        GAsyncResult *res,
-                                        LoadCapabilitiesContext *ctx)
-{
-    GError *error = NULL;
-
-    ctx->caps = iface_modem_parent->load_current_capabilities_finish (self, res, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_capabilities_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Some sierra modems (e.g. MC7710 won't report +LTE capabilities even
-     * if they have them. So just run AT+WS46=? as well to see if the current
-     * supported modes includes any LTE-specific mode.
-     *
-     * E.g.:
-     *  AT+WS46=?
-     *   +WS46: (12,22,25,28,29)
-     *   OK
-     *
-     */
-    if (ctx->caps & MM_MODEM_CAPABILITY_GSM_UMTS &&
-        !(ctx->caps & MM_MODEM_CAPABILITY_LTE)) {
-        mm_base_modem_at_command (
-            MM_BASE_MODEM (ctx->self),
-            "+WS46=?",
-            3,
-            TRUE, /* allow caching, it's a test command */
-            (GAsyncReadyCallback)supported_modes_ws46_test_ready,
-            ctx);
-        return;
-    }
-
-    /* Otherwise, just set the caps from the parent */
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (ctx->caps),
-        NULL);
-    load_capabilities_context_complete_and_free (ctx);
-}
-
-static void
-load_current_capabilities (MMIfaceModem *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
-{
-    LoadCapabilitiesContext *ctx;
-
-    mm_dbg ("loading current (sierra) capabilities...");
-
-    ctx = g_slice_new0 (LoadCapabilitiesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_current_capabilities);
-
-    /* Launch parent loading first */
-    /* Chain up parent's setup */
-    iface_modem_parent->load_current_capabilities (
-        self,
-        (GAsyncReadyCallback)parent_load_current_capabilities_ready,
-        ctx);
-}
 
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
@@ -994,10 +865,6 @@ mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    iface_modem_parent = g_type_interface_peek_parent (iface);
-
-    iface->load_current_capabilities = load_current_capabilities;
-    iface->load_current_capabilities_finish = load_current_capabilities_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
