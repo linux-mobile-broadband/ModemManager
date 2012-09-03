@@ -184,7 +184,7 @@ selrat_query_ready (MMBaseModem *self,
 
         if (mm_get_uint_from_match_info (match_info, 1, &mode) &&
             mode >= 0 &&
-            mode <= 4) {
+            mode <= 7) {
             switch (mode) {
             case 0:
                 result.allowed = MM_MODEM_MODE_ANY;
@@ -199,12 +199,36 @@ selrat_query_ready (MMBaseModem *self,
                 result.preferred = MM_MODEM_MODE_NONE;
                 break;
             case 3:
-                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                result.preferred = MM_MODEM_MODE_3G;
+                /* in Sierra LTE devices, mode 3 is automatic, including LTE, no preference */
+                if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
+                    result.allowed = MM_MODEM_MODE_ANY;
+                    result.preferred = MM_MODEM_MODE_NONE;
+                } else {
+                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                    result.preferred = MM_MODEM_MODE_3G;
+                }
                 break;
             case 4:
+                /* in Sierra LTE devices, mode 4 is automatic, including LTE, no preference */
+                if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
+                    result.allowed = MM_MODEM_MODE_ANY;
+                    result.preferred = MM_MODEM_MODE_NONE;
+                } else {
+                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                    result.preferred = MM_MODEM_MODE_2G;
+                }
+                break;
+            case 5:
                 result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                result.preferred = MM_MODEM_MODE_2G;
+                result.preferred = MM_MODEM_MODE_NONE;
+                break;
+            case 6:
+                result.allowed = MM_MODEM_MODE_4G;
+                result.preferred = MM_MODEM_MODE_NONE;
+                break;
+            case 7:
+                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+                result.preferred = MM_MODEM_MODE_NONE;
                 break;
             default:
                 g_assert_not_reached ();
@@ -346,13 +370,22 @@ set_allowed_modes (MMIfaceModem *self,
     else if (allowed == MM_MODEM_MODE_2G)
         idx = 2;
     else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
-        if (preferred == MM_MODEM_MODE_3G)
+        /* in Sierra LTE devices, modes 3 and 4 are automatic, including LTE, no preference */
+        if (mm_iface_modem_is_3gpp_lte (self)) {
+            if (preferred == MM_MODEM_MODE_NONE)
+                idx = 5; /* GSM and UMTS Only */
+        }
+        else if (preferred == MM_MODEM_MODE_3G)
             idx = 3;
         else if (preferred == MM_MODEM_MODE_2G)
             idx = 4;
         else if (preferred == MM_MODEM_MODE_NONE)
             idx = 0;
-    } else if (allowed == MM_MODEM_MODE_ANY)
+    } else if (allowed == MM_MODEM_MODE_4G)
+        idx = 6;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
+        idx = 7;
+    else if (allowed == MM_MODEM_MODE_ANY)
         idx = 0;
 
     if (idx < 0) {
