@@ -102,6 +102,8 @@ bearer_status_changed (MMBearer *bearer,
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
+    if (!list)
+        return;
 
     ctx.self = bearer;
     ctx.others_connected = 0;
