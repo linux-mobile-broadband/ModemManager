@@ -489,6 +489,22 @@ unlock_check_ready (MMIfaceModem *self,
     g_object_unref (sim);
 }
 
+typedef struct {
+    MMBearer *found;
+} BearerListFindContext;
+
+static void
+bearer_list_find_disconnected (MMBearer *bearer,
+                               BearerListFindContext *ctx)
+{
+    /* If already marked one to remove, do nothing */
+    if (ctx->found)
+        return;
+
+    if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_DISCONNECTED)
+        ctx->found = g_object_ref (bearer);
+}
+
 static void
 connection_step (ConnectionContext *ctx)
 {
@@ -634,10 +650,45 @@ connection_step (ConnectionContext *ctx)
         if (!ctx->bearer) {
             mm_dbg ("Creating new bearer...");
             /* If we don't have enough space to create the bearer, try to remove
-             * all existing ones first. */
-            if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list))
-                /* We'll remove all existing bearers, and then go on creating the new one */
-                mm_bearer_list_delete_all_bearers (list);
+             * a disconnected bearer first. */
+            if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list)) {
+                BearerListFindContext foreach_ctx;
+
+                foreach_ctx.found = NULL;
+                mm_bearer_list_foreach (list,
+                                        (MMBearerListForeachFunc)bearer_list_find_disconnected,
+                                        &foreach_ctx);
+
+                /* Found a disconnected bearer, remove it */
+                if (foreach_ctx.found) {
+                    GError *error = NULL;
+
+                    if (!mm_bearer_list_delete_bearer (list,
+                                                       mm_bearer_get_path (foreach_ctx.found),
+                                                       &error)) {
+                        mm_dbg ("Couldn't delete disconnected bearer at '%s': '%s'",
+                                mm_bearer_get_path (foreach_ctx.found),
+                                error->message);
+                        g_error_free (error);
+                    } else
+                        mm_dbg ("Deleted disconnected bearer at '%s'",
+                                mm_bearer_get_path (foreach_ctx.found));
+                    g_object_unref (foreach_ctx.found);
+                }
+
+                /* Re-check space, and if we still are in max, return an error */
+                if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list)) {
+                    g_dbus_method_invocation_return_error (
+                        ctx->invocation,
+                        MM_CORE_ERROR,
+                        MM_CORE_ERROR_TOO_MANY,
+                        "Cannot create new bearer: all existing bearers are connected");
+                    connection_context_free (ctx);
+                    g_object_unref (list);
+                    g_object_unref (bearer_properties);
+                    return;
+                }
+            }
 
             mm_iface_modem_create_bearer (MM_IFACE_MODEM (ctx->self),
                                           bearer_properties,
