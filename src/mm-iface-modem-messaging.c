@@ -320,6 +320,7 @@ handle_list (MmGdbusModemMessaging *skeleton,
                                             invocation,
                                             (const gchar *const *)paths);
     g_strfreev (paths);
+    g_object_unref (list);
     return TRUE;
 }
 
