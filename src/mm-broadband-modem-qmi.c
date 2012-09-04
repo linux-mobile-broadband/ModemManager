@@ -4818,6 +4818,44 @@ modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Check support (Messaging interface) */
+
+static gboolean
+messaging_check_support_finish (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    /* no error expected here */
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+messaging_check_support (MMIfaceModemMessaging *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gboolean supported;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_check_support);
+
+    /* If we have support for the WMS client, messaging is supported */
+    supported = !!mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
+                                           QMI_SERVICE_WMS,
+                                           MM_QMI_PORT_FLAG_DEFAULT);
+
+    mm_dbg ("Messaging capabilities %s by this modem",
+            supported ? "supported" : "not supported");
+
+    g_simple_async_result_set_op_res_gboolean (result, supported);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -4960,7 +4998,8 @@ initialization_started (MMBroadbandModem *self,
     /* Setup services to open */
     ctx->services[0] = QMI_SERVICE_DMS;
     ctx->services[1] = QMI_SERVICE_NAS;
-    ctx->services[2] = QMI_SERVICE_UNKNOWN;
+    ctx->services[2] = QMI_SERVICE_WMS;
+    ctx->services[3] = QMI_SERVICE_UNKNOWN;
 
     /* Now open our QMI port */
     mm_qmi_port_open (ctx->qmi,
@@ -5158,9 +5197,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 static void
 iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
-    /* Assume we don't have messaging support */
-    iface->check_support = NULL;
-    iface->check_support_finish = NULL;
+    iface->check_support = messaging_check_support;
+    iface->check_support_finish = messaging_check_support_finish;
 }
 
 static void
