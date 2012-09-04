@@ -4893,6 +4893,108 @@ messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Set preferred storages (Messaging interface) */
+
+static gboolean
+messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+wms_set_routes_ready (QmiClientWms *client,
+                      GAsyncResult *res,
+                      GSimpleAsyncResult *simple)
+{
+    QmiMessageWmsSetRoutesOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_wms_set_routes_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_wms_set_routes_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set routes: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_wms_set_routes_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+messaging_set_preferred_storages (MMIfaceModemMessaging *self,
+                                  MMSmsStorage mem1,
+                                  MMSmsStorage mem2,
+                                  MMSmsStorage mem3,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    /* In QMI, we don't need to specify neither a default 'mem1' storage (the
+     * one used for listing, reading, deleting) nor a default 'mem2' storage
+     * (the one used for writing/sending), as the QMI operations allow to
+     * pass the specific storage directly in the command, as opposed to the
+     * AT-way which is specifying the storage first and then performing an
+     * operation on the default storage.
+     *
+     * Whenever a list/read/delete/write/send operation is received, we'll just
+     * read the corresponding property to know in which storage to perform the
+     * action.
+     *
+     * But for 'mem3', we do need to specify custom 'routes' to identify to
+     * which storage the incoming messages should be transferred, so we'll use
+     * that one.
+     */
+
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    QmiMessageWmsSetRoutesInput *input;
+    GArray *routes_array;
+    QmiMessageWmsSetRoutesInputRouteListElement route;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_WMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_set_preferred_storages);
+
+    /* Build routes array and add it as input
+     * Just worry about Class 0 and Class 1 messages for now */
+    input = qmi_message_wms_set_routes_input_new ();
+    routes_array = g_array_sized_new (FALSE, FALSE, sizeof (route), 2);
+    route.message_type = QMI_WMS_MESSAGE_TYPE_POINT_TO_POINT;
+    route.message_class = QMI_WMS_MESSAGE_CLASS_0;
+    route.storage = mm_sms_storage_to_qmi_storage_type (mem3);
+    route.receipt_action = QMI_WMS_RECEIPT_ACTION_STORE_AND_NOTIFY;
+    g_array_append_val (routes_array, route);
+    route.message_class = QMI_WMS_MESSAGE_CLASS_1;
+    g_array_append_val (routes_array, route);
+    qmi_message_wms_set_routes_input_set_route_list (input, routes_array, NULL);
+
+    mm_dbg ("setting default messaging routes...");
+    qmi_client_wms_set_routes (QMI_CLIENT_WMS (client),
+                               input,
+                               5,
+                               NULL,
+                               (GAsyncReadyCallback)wms_set_routes_ready,
+                               result);
+
+    qmi_message_wms_set_routes_input_unref (input);
+    g_array_unref (routes_array);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -5240,6 +5342,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->load_supported_storages_finish = messaging_load_supported_storages_finish;
     iface->setup_sms_format = NULL;
     iface->setup_sms_format_finish = NULL;
+    iface->set_preferred_storages = messaging_set_preferred_storages;
+    iface->set_preferred_storages_finish = messaging_set_preferred_storages_finish;
 }
 
 static void

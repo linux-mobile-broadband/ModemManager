@@ -775,3 +775,18 @@ mm_modem_cdma_registration_state_from_qmi_registration_state (QmiNasRegistration
         return MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     }
 }
+
+/*****************************************************************************/
+
+QmiWmsStorageType
+mm_sms_storage_to_qmi_storage_type (MMSmsStorage storage)
+{
+    switch (storage) {
+    case MM_SMS_STORAGE_SM:
+        return QMI_WMS_STORAGE_TYPE_UIM;
+    case MM_SMS_STORAGE_ME:
+        return QMI_WMS_STORAGE_TYPE_NV;
+    default:
+        return QMI_WMS_STORAGE_TYPE_NONE;
+    }
+}
