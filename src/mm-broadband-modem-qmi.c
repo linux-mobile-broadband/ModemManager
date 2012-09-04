@@ -4856,6 +4856,43 @@ messaging_check_support (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Load supported storages (Messaging interface) */
+
+static gboolean
+messaging_load_supported_storages_finish (MMIfaceModemMessaging *self,
+                                          GAsyncResult *res,
+                                          GArray **mem1,
+                                          GArray **mem2,
+                                          GArray **mem3,
+                                          GError **error)
+{
+    MMSmsStorage supported [2] = { MM_SMS_STORAGE_SM, MM_SMS_STORAGE_ME };
+
+    *mem1 = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), 2),
+                                 supported, 2);
+    *mem2 = g_array_ref (*mem1);
+    *mem3 = g_array_ref (*mem1);
+
+    return TRUE;
+}
+
+static void
+messaging_load_supported_storages (MMIfaceModemMessaging *self,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_load_supported_storages);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -5199,6 +5236,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
     iface->check_support = messaging_check_support;
     iface->check_support_finish = messaging_check_support_finish;
+    iface->load_supported_storages = messaging_load_supported_storages;
+    iface->load_supported_storages_finish = messaging_load_supported_storages_finish;
 }
 
 static void
