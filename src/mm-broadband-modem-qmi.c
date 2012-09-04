@@ -5238,6 +5238,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->check_support_finish = messaging_check_support_finish;
     iface->load_supported_storages = messaging_load_supported_storages;
     iface->load_supported_storages_finish = messaging_load_supported_storages_finish;
+    iface->setup_sms_format = NULL;
+    iface->setup_sms_format_finish = NULL;
 }
 
 static void
