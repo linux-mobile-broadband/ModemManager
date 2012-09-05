@@ -49,6 +49,7 @@ GType mm_qmi_port_get_type (void);
 MMQmiPort *mm_qmi_port_new (const gchar *name);
 
 void     mm_qmi_port_open        (MMQmiPort *self,
+                                  gboolean set_data_format,
                                   GCancellable *cancellable,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);

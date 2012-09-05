@@ -368,6 +368,7 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_OPEN_QMI_PORT:
         if (!mm_qmi_port_is_open (ctx->qmi)) {
             mm_qmi_port_open (ctx->qmi,
+                              TRUE,
                               ctx->cancellable,
                               (GAsyncReadyCallback)qmi_port_open_ready,
                               ctx);

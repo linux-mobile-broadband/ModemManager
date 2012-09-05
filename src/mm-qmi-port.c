@@ -165,6 +165,7 @@ mm_qmi_port_allocate_client (MMQmiPort *self,
 
 typedef struct {
     MMQmiPort *self;
+    gboolean set_data_format;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
 } PortOpenContext;
@@ -213,6 +214,7 @@ qmi_device_new_ready (GObject *unused,
                       PortOpenContext *ctx)
 {
     GError *error = NULL;
+    QmiDeviceOpenFlags flags = QMI_DEVICE_OPEN_FLAGS_VERSION_INFO;
 
     ctx->self->priv->qmi_device = qmi_device_new_finish (res, &error);
     if (!ctx->self->priv->qmi_device) {
@@ -221,9 +223,12 @@ qmi_device_new_ready (GObject *unused,
         return;
     }
 
+    if (ctx->set_data_format)
+        flags |= (QMI_DEVICE_OPEN_FLAGS_NET_802_3 | QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER);
+
     /* Now open the QMI device */
     qmi_device_open (ctx->self->priv->qmi_device,
-                     QMI_DEVICE_OPEN_FLAGS_VERSION_INFO,
+                     flags,
                      10,
                      ctx->cancellable,
                      (GAsyncReadyCallback)qmi_device_open_ready,
@@ -232,6 +237,7 @@ qmi_device_new_ready (GObject *unused,
 
 void
 mm_qmi_port_open (MMQmiPort *self,
+                  gboolean set_data_format,
                   GCancellable *cancellable,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -244,6 +250,7 @@ mm_qmi_port_open (MMQmiPort *self,
 
     ctx = g_new0 (PortOpenContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->set_data_format = set_data_format;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,

@@ -398,6 +398,7 @@ wdm_probe_qmi (MMPortProbe *self)
     /* Create a port and try to open it */
     task->qmi_port = mm_qmi_port_new (g_udev_device_get_name (self->priv->port));
     mm_qmi_port_open (task->qmi_port,
+                      FALSE,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
                       self);

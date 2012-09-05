@@ -5731,6 +5731,7 @@ initialization_started (MMBroadbandModem *self,
 
     /* Now open our QMI port */
     mm_qmi_port_open (ctx->qmi,
+                      TRUE,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
                       ctx);
