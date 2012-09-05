@@ -71,8 +71,7 @@ PKG_CHECK_MODULES(MM,
                   gmodule-2.0
                   gobject-2.0
                   gio-2.0
-                  gio-unix-2.0
-                  qmi-glib)
+                  gio-unix-2.0)
 AC_SUBST(MM_CFLAGS)
 AC_SUBST(MM_LIBS)
 
@@ -170,6 +169,21 @@ case $with_tests in
         ;;
 esac
 
+dnl QMI support (enabled by default)
+AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
+AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
+case $with_qmi in
+    yes)
+        PKG_CHECK_MODULES(QMI, qmi-glib)
+        AC_DEFINE(WITH_QMI, 1, [Define if you want QMI support])
+        AC_SUBST(QMI_CFLAGS)
+        AC_SUBST(QMI_LIBS)
+        ;;
+    *)
+        with_qmi=no
+        ;;
+esac
+
 dnl
 dnl Newest QMI commands
 dnl
@@ -177,6 +191,10 @@ AC_ARG_WITH(newest_qmi_commands, AS_HELP_STRING([--with-newest-qmi-commands], [T
 AM_CONDITIONAL(WITH_NEWEST_QMI_COMMANDS, test "x$with_newest_qmi_commands" = "xyes")
 case $with_newest_qmi_commands in
     yes)
+        if test "$with_qmi" = "xno" ; then
+           AC_ERROR([Cannot enable newest QMI commands if QMI support if disabled])
+        fi
+
         AC_DEFINE(WITH_NEWEST_QMI_COMMANDS, 1, [Define if we enable new QMI commands support])
         with_newest_qmi_commands=yes
         ;;
@@ -248,5 +266,6 @@ echo "
     PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}
     Documentation:           ${with_docs}
+    QMI support:             ${with_qmi}
     Newest QMI commands:     ${with_newest_qmi_commands}
 "

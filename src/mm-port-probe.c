@@ -15,6 +15,8 @@
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +26,6 @@
 
 #include "mm-port-probe.h"
 #include "mm-log.h"
-#include "mm-qmi-port.h"
 #include "mm-at-serial-port.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
@@ -34,6 +35,10 @@
 #include "libqcdm/src/errors.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-daemon-enums-types.h"
+
+#if defined WITH_QMI
+#include "mm-qmi-port.h"
+#endif
 
 /*
  * Steps and flow of the Probing process:
@@ -94,8 +99,11 @@ typedef struct {
     void (* at_result_processor) (MMPortProbe *self,
                                   GVariant *result);
 
+#if defined WITH_QMI
     /* ---- QMI probing specific context ---- */
     MMQmiPort *qmi_port;
+#endif
+
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
@@ -279,11 +287,13 @@ port_probe_run_task_free (PortProbeRunTask *task)
         g_object_unref (task->serial);
     }
 
+#if defined WITH_QMI
     if (task->qmi_port) {
         if (mm_qmi_port_is_open (task->qmi_port))
             mm_qmi_port_close (task->qmi_port);
         g_object_unref (task->qmi_port);
     }
+#endif
 
     if (task->cancellable)
         g_object_unref (task->cancellable);
@@ -340,6 +350,8 @@ port_probe_run_is_cancelled (MMPortProbe *self)
     return FALSE;
 }
 
+#if defined WITH_QMI
+
 static void
 qmi_port_open_ready (MMQmiPort *qmi_port,
                      GAsyncResult *res,
@@ -367,6 +379,8 @@ qmi_port_open_ready (MMQmiPort *qmi_port,
     port_probe_run_task_complete (task, TRUE, NULL);
 }
 
+#endif /* WITH_QMI */
+
 static gboolean
 wdm_probe_qmi (MMPortProbe *self)
 {
@@ -376,6 +390,7 @@ wdm_probe_qmi (MMPortProbe *self)
     if (port_probe_run_is_cancelled (self))
         return FALSE;
 
+#if defined WITH_QMI
     mm_dbg ("(%s/%s) probing QMI...",
             g_udev_device_get_subsystem (self->priv->port),
             g_udev_device_get_name (self->priv->port));
@@ -386,6 +401,12 @@ wdm_probe_qmi (MMPortProbe *self)
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
                       self);
+#else
+    /* If not compiled with QMI support, just assume we won't have any QMI port */
+    mm_port_probe_set_result_qmi (self, FALSE);
+    port_probe_run_task_complete (task, TRUE, NULL);
+#endif /* WITH_QMI */
+
     return FALSE;
 }
 
@@ -1234,10 +1255,12 @@ mm_port_probe_get_port_type (MMPortProbe *self)
     if (g_str_equal (subsys, "net"))
         return MM_PORT_TYPE_NET;
 
+#if defined WITH_QMI
     if (g_str_has_prefix (subsys, "usb") &&
         g_str_has_prefix (name, "cdc-wdm") &&
         self->priv->is_qmi)
         return MM_PORT_TYPE_QMI;
+#endif
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
         self->priv->is_qcdm)

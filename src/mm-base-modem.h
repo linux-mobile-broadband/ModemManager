@@ -18,6 +18,8 @@
 #ifndef MM_BASE_MODEM_H
 #define MM_BASE_MODEM_H
 
+#include "config.h"
+
 #include <glib.h>
 #include <glib-object.h>
 
@@ -28,7 +30,10 @@
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-gps-serial-port.h"
+
+#if defined WITH_QMI
 #include "mm-qmi-port.h"
+#endif
 
 #define MM_TYPE_BASE_MODEM            (mm_base_modem_get_type ())
 #define MM_BASE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_MODEM, MMBaseModem))
@@ -117,8 +122,10 @@ MMAtSerialPort   *mm_base_modem_peek_port_secondary    (MMBaseModem *self);
 MMQcdmSerialPort *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
 MMGpsSerialPort  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
+#if defined WITH_QMI
 MMQmiPort        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
+#endif
 MMAtSerialPort   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self);
 GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
@@ -128,8 +135,10 @@ MMAtSerialPort   *mm_base_modem_get_port_secondary    (MMBaseModem *self);
 MMQcdmSerialPort *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
 MMGpsSerialPort  *mm_base_modem_get_port_gps          (MMBaseModem *self);
+#if defined WITH_QMI
 MMQmiPort        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
+#endif
 MMAtSerialPort   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);

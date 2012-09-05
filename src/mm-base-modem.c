@@ -16,6 +16,7 @@
  */
 
 #include <config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -85,8 +86,10 @@ struct _MMBaseModemPrivate {
     MMAtSerialPort *gps_control;
     MMGpsSerialPort *gps;
 
+#if defined WITH_QMI
     /* QMI ports */
     GList *qmi;
+#endif
 };
 
 static gchar *
@@ -237,8 +240,20 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* QMI ports... */
     else if (g_str_has_prefix (subsys, "usb") &&
              g_str_has_prefix (name, "cdc-wdm")) {
+#if defined WITH_QMI
         port = MM_PORT (mm_qmi_port_new (name));
-    } else
+#else
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot add port '%s/%s', QMI support not available",
+                     subsys,
+                     name);
+        g_free (key);
+        return FALSE;
+#endif
+    }
+    else
         /* We already filter out before all non-tty, non-net, non-qmi ports */
         g_assert_not_reached();
 
@@ -308,11 +323,13 @@ mm_base_modem_release_port (MMBaseModem *self,
     if (port == (MMPort *)self->priv->gps)
         g_clear_object (&self->priv->gps);
 
+#if defined WITH_QMI
     l = g_list_find (self->priv->qmi, port);
     if (l) {
         g_object_unref (l->data);
         self->priv->qmi = g_list_delete_link (self->priv->qmi, l);
     }
+#endif
 
     /* Remove it from the tracking HT */
     mm_dbg ("(%s/%s) type %s released from %s",
@@ -512,6 +529,8 @@ mm_base_modem_peek_port_gps (MMBaseModem *self)
     return self->priv->gps;
 }
 
+#if defined WITH_QMI
+
 MMQmiPort *
 mm_base_modem_get_port_qmi (MMBaseModem *self)
 {
@@ -646,6 +665,8 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 
     return found;
 }
+
+#endif /* WITH_QMI */
 
 MMPort *
 mm_base_modem_get_best_data_port (MMBaseModem *self)
@@ -793,8 +814,10 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMGpsSerialPort *gps = NULL;
     MMPort *data_primary = NULL;
     GList *data = NULL;
+#if defined WITH_QMI
     MMPort *qmi_primary = NULL;
     GList *qmi = NULL;
+#endif
     GList *l;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
@@ -867,6 +890,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                 gps = MM_GPS_SERIAL_PORT (candidate);
             break;
 
+#if defined WITH_QMI
         case MM_PORT_TYPE_QMI:
             if (!qmi_primary)
                 qmi_primary = candidate;
@@ -874,6 +898,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                 /* All non-primary QMI ports get added to the list of QMI ports */
                 qmi = g_list_append (qmi, candidate);
             break;
+#endif
 
         default:
             /* Ignore port */
@@ -929,9 +954,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     log_port (self, MM_PORT (qcdm),         "qcdm");
     log_port (self, MM_PORT (gps_control),  "gps (control)");
     log_port (self, MM_PORT (gps),          "gps (nmea)");
+#if defined WITH_QMI
     log_port (self, MM_PORT (qmi_primary),  "qmi (primary)");
     for (l = qmi; l; l = g_list_next (l))
         log_port (self, MM_PORT (l->data),  "qmi (secondary)");
+#endif
 
     /* We keep new refs to the objects here */
     self->priv->primary = g_object_ref (primary);
@@ -945,12 +972,14 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     g_list_foreach (data, (GFunc)g_object_ref, NULL);
     self->priv->data = g_list_concat (self->priv->data, data);
 
+#if defined WITH_QMI
     /* Build the final list of QMI ports, primary port first */
     if (qmi_primary) {
         self->priv->qmi = g_list_append (self->priv->qmi, g_object_ref (qmi_primary));
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
         self->priv->qmi = g_list_concat (self->priv->qmi, qmi);
     }
+#endif
 
     /* As soon as we get the ports organized, we initialize the modem */
     mm_base_modem_initialize (self,
@@ -1226,8 +1255,10 @@ dispose (GObject *object)
     g_clear_object (&self->priv->qcdm);
     g_clear_object (&self->priv->gps_control);
     g_clear_object (&self->priv->gps);
+#if defined WITH_QMI
     g_list_free_full (self->priv->qmi, g_object_unref);
     self->priv->qmi = NULL;
+#endif
 
     if (self->priv->ports) {
         g_hash_table_destroy (self->priv->ports);

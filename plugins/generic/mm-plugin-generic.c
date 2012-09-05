@@ -29,9 +29,12 @@
 
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"
-#include "mm-broadband-modem-qmi.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
+
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
+#endif
 
 G_DEFINE_TYPE (MMPluginGeneric, mm_plugin_generic, MM_TYPE_PLUGIN)
 
@@ -49,6 +52,7 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered generic modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
@@ -57,6 +61,7 @@ create_modem (MMPlugin *self,
                                                           vendor,
                                                           product));
     }
+#endif
 
     return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
                                                   drivers,

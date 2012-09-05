@@ -16,6 +16,10 @@ PLUGIN_COMMON_LINKER_FLAGS = \
 	-module \
 	-avoid-version
 
+if WITH_QMI
+PLUGIN_COMMON_COMPILER_FLAGS += $(QMI_CFLAGS)
+endif
+
 # UDev rules
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA =

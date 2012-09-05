@@ -23,9 +23,12 @@
 
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
-#include "mm-broadband-modem-qmi.h"
 #include "mm-broadband-modem-sierra.h"
 #include "mm-broadband-modem-sierra-icera.h"
+
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
+#endif
 
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN)
 
@@ -194,6 +197,7 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered Sierra modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
@@ -202,6 +206,7 @@ create_modem (MMPlugin *self,
                                                           vendor,
                                                           product));
     }
+#endif
 
     if (sierra_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,

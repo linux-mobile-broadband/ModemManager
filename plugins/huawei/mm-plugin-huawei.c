@@ -25,8 +25,11 @@
 #include "mm-serial-enums-types.h"
 #include "mm-log.h"
 #include "mm-plugin-huawei.h"
-#include "mm-broadband-modem-qmi.h"
 #include "mm-broadband-modem-huawei.h"
+
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
+#endif
 
 G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN)
 
@@ -424,6 +427,7 @@ create_modem (MMPlugin *self,
 {
     propagate_port_mode_results (probes);
 
+#if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered Huawei modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
@@ -432,6 +436,7 @@ create_modem (MMPlugin *self,
                                                           vendor,
                                                           product));
     }
+#endif
 
     return MM_BASE_MODEM (mm_broadband_modem_huawei_new (sysfs_path,
                                                          drivers,

@@ -16,6 +16,8 @@
 #ifndef MM_PORT_PROBE_H
 #define MM_PORT_PROBE_H
 
+#include "config.h"
+
 #include <glib.h>
 #include <glib-object.h>
 #include <gio/gio.h>

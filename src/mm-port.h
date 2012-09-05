@@ -16,6 +16,7 @@
 #ifndef MM_PORT_H
 #define MM_PORT_H
 
+#include <config.h>
 #include <glib.h>
 #include <glib-object.h>
 
@@ -36,7 +37,6 @@ typedef enum { /*< underscore_name=mm_port_type >*/
     MM_PORT_TYPE_QCDM,
     MM_PORT_TYPE_GPS,
     MM_PORT_TYPE_QMI,
-
     MM_PORT_TYPE_LAST = MM_PORT_TYPE_QMI /*< skip >*/
 } MMPortType;
 

@@ -21,7 +21,10 @@
 #include "mm-log.h"
 #include "mm-plugin-pantech.h"
 #include "mm-broadband-modem.h"
+
+#if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
+#endif
 
 G_DEFINE_TYPE (MMPluginPantech, mm_plugin_pantech, MM_TYPE_PLUGIN)
 
@@ -39,6 +42,7 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered Pantech modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
@@ -47,6 +51,7 @@ create_modem (MMPlugin *self,
                                                           vendor,
                                                           product));
     }
+#endif
 
     return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
                                                   drivers,
