@@ -250,8 +250,12 @@ static void
 set_signal_handlers (MMBearer *self)
 {
     g_assert (self->priv->modem != NULL);
+    g_assert (self->priv->config != NULL);
 
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem))) {
+    /* Don't set the 3GPP registration change signal handlers if they
+     * are already set. */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)) &&
+        !self->priv->id_3gpp_registration_change) {
         self->priv->id_3gpp_registration_change =
             g_signal_connect (self->priv->modem,
                               "notify::" MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
@@ -260,7 +264,11 @@ set_signal_handlers (MMBearer *self)
         modem_3gpp_registration_state_changed (MM_IFACE_MODEM_3GPP (self->priv->modem), NULL, self);
     }
 
-    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self->priv->modem))) {
+    /* Don't set the CDMA1x/EV-DO registration change signal handlers if they
+     * are already set. */
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self->priv->modem)) &&
+        !self->priv->id_cdma1x_registration_change &&
+        !self->priv->id_evdo_registration_change) {
         self->priv->id_cdma1x_registration_change =
             g_signal_connect (self->priv->modem,
                               "notify::" MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
@@ -911,9 +919,11 @@ set_property (GObject *object,
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
                                     self, MM_BEARER_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-
-            /* Listen to 3GPP/CDMA registration state changes */
-            set_signal_handlers (self);
+            if (self->priv->config) {
+                /* Listen to 3GPP/CDMA registration state changes. We need both
+                 * 'config' and 'modem' set. */
+                set_signal_handlers (self);
+            }
         }
         break;
     case PROP_STATUS:
@@ -925,6 +935,11 @@ set_property (GObject *object,
 
         g_clear_object (&self->priv->config);
         self->priv->config = g_value_dup_object (value);
+        if (self->priv->modem) {
+            /* Listen to 3GPP/CDMA registration state changes. We need both
+             * 'config' and 'modem' set. */
+            set_signal_handlers (self);
+        }
         /* Also expose the properties */
         dictionary = mm_bearer_properties_get_dictionary (self->priv->config);
         mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), dictionary);
