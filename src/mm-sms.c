@@ -863,12 +863,9 @@ delete_next_part (SmsDeletePartsContext *ctx)
                                              MM_CORE_ERROR_FAILED,
                                              "Couldn't delete %u parts from this SMS",
                                              ctx->n_failed);
-        else {
-            /* We do change the state of this SMS back to UNKNOWN, as it is no
-             * longer stored in the device */
-            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_UNKNOWN);
+        else
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        }
+
         sms_delete_parts_context_complete_and_free (ctx);
         return;
     }
@@ -911,8 +908,17 @@ mm_sms_delete_finish (MMSms *self,
                       GAsyncResult *res,
                       GError **error)
 {
-    if (MM_SMS_GET_CLASS (self)->delete_finish)
-        return MM_SMS_GET_CLASS (self)->delete_finish (self, res, error);
+    if (MM_SMS_GET_CLASS (self)->delete_finish) {
+        gboolean deleted;
+
+        deleted = MM_SMS_GET_CLASS (self)->delete_finish (self, res, error);
+        if (deleted)
+            /* We do change the state of this SMS back to UNKNOWN, as it is no
+             * longer stored in the device */
+            mm_gdbus_sms_set_state (MM_GDBUS_SMS (self), MM_SMS_STATE_UNKNOWN);
+
+        return deleted;
+    }
 
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
