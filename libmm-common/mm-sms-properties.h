@@ -51,22 +51,31 @@ MMSmsProperties *mm_sms_properties_new_from_dictionary (GVariant *dictionary,
 
 MMSmsProperties *mm_sms_properties_dup (MMSmsProperties *orig);
 
-void mm_sms_properties_set_text     (MMSmsProperties *properties,
-                                     const gchar *text);
-void mm_sms_properties_set_number   (MMSmsProperties *properties,
-                                     const gchar *number);
-void mm_sms_properties_set_smsc     (MMSmsProperties *properties,
-                                     const gchar *smsc);
-void mm_sms_properties_set_validity (MMSmsProperties *properties,
-                                     guint validity);
-void mm_sms_properties_set_class    (MMSmsProperties *properties,
-                                     guint class);
+void mm_sms_properties_set_text           (MMSmsProperties *self,
+                                           const gchar *text);
+void mm_sms_properties_set_data           (MMSmsProperties *self,
+                                           const guint8 *data,
+                                           gsize data_length);
+void mm_sms_properties_set_data_bytearray (MMSmsProperties *self,
+                                           GByteArray *data);
+void mm_sms_properties_set_number         (MMSmsProperties *self,
+                                           const gchar *number);
+void mm_sms_properties_set_smsc           (MMSmsProperties *self,
+                                           const gchar *smsc);
+void mm_sms_properties_set_validity       (MMSmsProperties *self,
+                                           guint validity);
+void mm_sms_properties_set_class          (MMSmsProperties *self,
+                                           guint class);
 
-const gchar *mm_sms_properties_get_text     (MMSmsProperties *properties);
-const gchar *mm_sms_properties_get_number   (MMSmsProperties *properties);
-const gchar *mm_sms_properties_get_smsc     (MMSmsProperties *properties);
-guint        mm_sms_properties_get_validity (MMSmsProperties *properties);
-guint        mm_sms_properties_get_class    (MMSmsProperties *properties);
+const gchar  *mm_sms_properties_get_text            (MMSmsProperties *self);
+const guint8 *mm_sms_properties_get_data            (MMSmsProperties *self,
+                                                     gsize *data_len);
+GByteArray   *mm_sms_properties_peek_data_bytearray (MMSmsProperties *self);
+GByteArray   *mm_sms_properties_get_data_bytearray  (MMSmsProperties *self);
+const gchar  *mm_sms_properties_get_number          (MMSmsProperties *self);
+const gchar  *mm_sms_properties_get_smsc            (MMSmsProperties *self);
+guint         mm_sms_properties_get_validity        (MMSmsProperties *self);
+guint         mm_sms_properties_get_class           (MMSmsProperties *self);
 
 GVariant *mm_sms_properties_get_dictionary (MMSmsProperties *self);
 

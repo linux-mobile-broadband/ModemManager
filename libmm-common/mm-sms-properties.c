@@ -24,6 +24,7 @@
 G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_TEXT      "text"
+#define PROPERTY_DATA      "data"
 #define PROPERTY_NUMBER    "number"
 #define PROPERTY_SMSC      "smsc"
 #define PROPERTY_VALIDITY  "validity"
@@ -31,6 +32,7 @@ G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 
 struct _MMSmsPropertiesPrivate {
     gchar *text;
+    GByteArray *data;
     gchar *number;
     gchar *smsc;
     gboolean validity_set;
@@ -49,6 +51,36 @@ mm_sms_properties_set_text (MMSmsProperties *self,
 
     g_free (self->priv->text);
     self->priv->text = g_strdup (text);
+}
+
+void
+mm_sms_properties_set_data (MMSmsProperties *self,
+                            const guint8 *data,
+                            gsize data_length)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    if (self->priv->data)
+        g_byte_array_unref (self->priv->data);
+
+    if (data && data_length)
+        self->priv->data = g_byte_array_append (g_byte_array_sized_new (data_length),
+                                                data,
+                                                data_length);
+    else
+        self->priv->data = NULL;
+}
+
+void
+mm_sms_properties_set_data_bytearray (MMSmsProperties *self,
+                                      GByteArray *data)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    if (self->priv->data)
+        g_byte_array_unref (self->priv->data);
+
+    self->priv->data = (data ? g_byte_array_ref (data) : NULL);
 }
 
 void
@@ -109,6 +141,34 @@ mm_sms_properties_get_number (MMSmsProperties *self)
     return self->priv->number;
 }
 
+const guint8 *
+mm_sms_properties_get_data (MMSmsProperties *self,
+                            gsize *data_len)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
+    if (self->priv->data && data_len)
+        *data_len = self->priv->data->len;
+
+    return self->priv->data->data;
+}
+
+GByteArray *
+mm_sms_properties_peek_data_bytearray (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
+    return self->priv->data;
+}
+
+GByteArray *
+mm_sms_properties_get_data_bytearray (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
+    return (self->priv->data ? g_byte_array_ref (self->priv->data) : NULL);
+}
+
 const gchar *
 mm_sms_properties_get_smsc (MMSmsProperties *self)
 {
@@ -153,6 +213,18 @@ mm_sms_properties_get_dictionary (MMSmsProperties *self)
                                "{sv}",
                                PROPERTY_TEXT,
                                g_variant_new_string (self->priv->text));
+
+    if (self->priv->data)
+        g_variant_builder_add (
+            &builder,
+            "{sv}",
+            PROPERTY_DATA,
+            g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
+                                     self->priv->data->data,
+                                     self->priv->data->len * sizeof (guint8),
+                                     TRUE,
+                                     NULL,
+                                     NULL));
 
     if (self->priv->number)
         g_variant_builder_add (&builder,
@@ -236,6 +308,13 @@ consume_string (MMSmsProperties *self,
         }
 
         mm_sms_properties_set_class (self, n);
+    } else if (g_str_equal (key, PROPERTY_DATA)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid properties string, key '%s' cannot be given in a string",
+                     key);
+        return FALSE;
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -300,7 +379,16 @@ consume_variant (MMSmsProperties *properties,
         mm_sms_properties_set_text (
             properties,
             g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_NUMBER))
+    else if (g_str_equal (key, PROPERTY_DATA)) {
+        const guint8 *data;
+        gsize data_len = 0;
+
+        data = g_variant_get_fixed_array (value, &data_len, sizeof (guint8));
+        mm_sms_properties_set_data (
+            properties,
+            data,
+            data_len);
+    } else if (g_str_equal (key, PROPERTY_NUMBER))
         mm_sms_properties_set_number (
             properties,
             g_variant_get_string (value, NULL));
@@ -417,6 +505,8 @@ finalize (GObject *object)
     g_free (self->priv->text);
     g_free (self->priv->number);
     g_free (self->priv->smsc);
+    if (self->priv->data)
+        g_byte_array_unref (self->priv->data);
 
     G_OBJECT_CLASS (mm_sms_properties_parent_class)->finalize (object);
 }
