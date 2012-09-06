@@ -73,6 +73,9 @@ struct _MMBroadbandModemQmiPrivate {
 #if defined WITH_NEWEST_QMI_COMMANDS
     guint system_info_indication_id;
 #endif /* WITH_NEWEST_QMI_COMMANDS */
+
+    /* Messaging helpers */
+    gboolean messaging_unsolicited_events_enabled;
 };
 
 /*****************************************************************************/
@@ -5225,6 +5228,134 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable unsolicited events (Messaging interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    GSimpleAsyncResult *result;
+    QmiClientWms *client;
+    gboolean enable;
+} EnableMessagingUnsolicitedEventsContext;
+
+static void
+enable_messaging_unsolicited_events_context_complete_and_free (EnableMessagingUnsolicitedEventsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+messaging_enable_disable_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+ser_messaging_indicator_ready (QmiClientWms *client,
+                               GAsyncResult *res,
+                               EnableMessagingUnsolicitedEventsContext *ctx)
+{
+    QmiMessageWmsSetEventReportOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_wms_set_event_report_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_wms_set_event_report_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't set event report: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_wms_set_event_report_output_unref (output);
+
+    /* Just ignore errors for now */
+    ctx->self->priv->messaging_unsolicited_events_enabled = ctx->enable;
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enable_messaging_unsolicited_events_context_complete_and_free (ctx);
+}
+
+static void
+common_enable_disable_messaging_unsolicited_events (MMBroadbandModemQmi *self,
+                                                    gboolean enable,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data)
+{
+    EnableMessagingUnsolicitedEventsContext *ctx;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    QmiMessageWmsSetEventReportInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_WMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_enable_disable_messaging_unsolicited_events);
+
+    if (enable == self->priv->messaging_unsolicited_events_enabled) {
+        mm_dbg ("Messaging unsolicited events already %s; skipping",
+                enable ? "enabled" : "disabled");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    ctx = g_new0 (EnableMessagingUnsolicitedEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->enable = enable;
+    ctx->result = result;
+
+    input = qmi_message_wms_set_event_report_input_new ();
+
+    qmi_message_wms_set_event_report_input_set_new_mt_message_indicator (
+        input,
+        ctx->enable,
+        NULL);
+    qmi_client_wms_set_event_report (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)ser_messaging_indicator_ready,
+        ctx);
+    qmi_message_wms_set_event_report_input_unref (input);
+}
+
+static void
+messaging_disable_unsolicited_events (MMIfaceModemMessaging *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    common_enable_disable_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                        FALSE,
+                                                        callback,
+                                                        user_data);
+}
+
+static void
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    common_enable_disable_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                        TRUE,
+                                                        callback,
+                                                        user_data);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -5576,6 +5707,10 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->set_preferred_storages_finish = messaging_set_preferred_storages_finish;
     iface->load_initial_sms_parts = load_initial_sms_parts;
     iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
+    iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = messaging_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
 }
 
 static void
