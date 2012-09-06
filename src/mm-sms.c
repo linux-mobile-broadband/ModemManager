@@ -108,6 +108,10 @@ handle_store_ready (MMSms *self,
                       "storage", storage,
                       NULL);
 
+        /* Transition from Unknown->Stored for SMS which were created by the user */
+        if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN)
+            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_STORED);
+
         mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
     }
 
