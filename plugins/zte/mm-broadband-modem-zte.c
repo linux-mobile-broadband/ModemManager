@@ -208,7 +208,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
         goto done;
 
     if (!mm_get_int_from_match_info (match_info, 1, &cm_mode) ||
-        cm_mode < 0 || cm_mode > 2 ||
+        cm_mode < 0 || (cm_mode > 2 && cm_mode != 6) ||
         !mm_get_int_from_match_info (match_info, 3, &pref_acq) ||
         pref_acq < 0 || pref_acq > 2) {
         g_set_error (error,
@@ -222,10 +222,10 @@ load_allowed_modes_finish (MMIfaceModem *self,
     /* Correctly parsed! */
     result = TRUE;
     if (cm_mode == 0) {
-        /* Both 2G and 3G allowed */
-        if (pref_acq == 0) {
+        /* Both 2G, 3G and LTE allowed. For LTE modems, no 2G/3G preference supported. */
+        if (pref_acq == 0 || mm_iface_modem_is_3gpp_lte (self)) {
             /* Any allowed */
-            *allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            *allowed = MM_MODEM_MODE_ANY;
             *preferred = MM_MODEM_MODE_NONE;
         } else if (pref_acq == 1) {
             *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
@@ -242,6 +242,10 @@ load_allowed_modes_finish (MMIfaceModem *self,
     } else if (cm_mode == 2) {
         /* WCDMA only */
         *allowed = MM_MODEM_MODE_3G;
+        *preferred = MM_MODEM_MODE_NONE;
+    } else if (cm_mode == 6) {
+        /* LTE only */
+        *allowed = MM_MODEM_MODE_4G;
         *preferred = MM_MODEM_MODE_NONE;
     } else
         g_assert_not_reached ();
@@ -327,7 +331,8 @@ set_allowed_modes (MMIfaceModem *self,
     } else if (allowed == MM_MODEM_MODE_3G) {
         cm_mode = 2;
         pref_acq = 0;
-    } else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+    } else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)
+               && !mm_iface_modem_is_3gpp_lte (self)) { /* LTE models do not support 2G|3G mode */
         cm_mode = 0;
         if (preferred == MM_MODEM_MODE_2G)
             pref_acq = 1;
@@ -335,6 +340,12 @@ set_allowed_modes (MMIfaceModem *self,
             pref_acq = 2;
         else /* none preferred, so AUTO */
             pref_acq = 0;
+    } else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G)) {
+        cm_mode = 0;
+        pref_acq = 0;
+    } else if (allowed == MM_MODEM_MODE_4G) {
+        cm_mode = 6;
+        pref_acq = 0;
     }
 
     if (cm_mode < 0 || pref_acq < 0) {
