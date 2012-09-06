@@ -395,15 +395,9 @@ mm_sms_part_new_from_pdu (guint index,
                           const gchar *hexpdu,
                           GError **error)
 {
-    MMSmsPart *sms_part;
     gsize pdu_len;
     guint8 *pdu;
-    guint smsc_addr_num_octets, variable_length_items, msg_start_offset,
-            sender_addr_num_digits, sender_addr_num_octets,
-            tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
-            user_data_len_offset, bit_offset;
-    SmsEncoding user_data_encoding;
-    GByteArray *raw;
+    MMSmsPart *part;
 
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
@@ -415,6 +409,27 @@ mm_sms_part_new_from_pdu (guint index,
         return NULL;
     }
 
+    part = mm_sms_part_new_from_binary_pdu (index, pdu, pdu_len, error);
+    if (!part)
+        g_free (pdu);
+
+    return part;
+}
+
+MMSmsPart *
+mm_sms_part_new_from_binary_pdu (guint index,
+                                 const guint8 *pdu,
+                                 gsize pdu_len,
+                                 GError **error)
+{
+    MMSmsPart *sms_part;
+    guint smsc_addr_num_octets, variable_length_items, msg_start_offset,
+            sender_addr_num_digits, sender_addr_num_octets,
+            tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
+            user_data_len_offset, bit_offset;
+    SmsEncoding user_data_encoding;
+    GByteArray *raw;
+
     /* SMSC, in address format, precedes the TPDU */
     smsc_addr_num_octets = pdu[0];
     variable_length_items = smsc_addr_num_octets;
@@ -425,7 +440,6 @@ mm_sms_part_new_from_pdu (guint index,
                      "PDU too short (1): %zd < %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
-        g_free (pdu);
         return NULL;
     }
 
@@ -446,7 +460,6 @@ mm_sms_part_new_from_pdu (guint index,
                      "PDU too short (2): %zd < %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
-        g_free (pdu);
         return NULL;
     }
 
@@ -470,7 +483,6 @@ mm_sms_part_new_from_pdu (guint index,
                      "PDU too short (3): %zd < %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
-        g_free (pdu);
         return NULL;
     }
 
@@ -481,7 +493,6 @@ mm_sms_part_new_from_pdu (guint index,
                      MM_CORE_ERROR_FAILED,
                      "Unhandled message type: 0x%02x",
                      pdu[msg_start_offset]);
-        g_free (pdu);
         return NULL;
     }
 
@@ -582,8 +593,6 @@ mm_sms_part_new_from_pdu (guint index,
     if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
         mm_sms_part_set_class (sms_part,
                                pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
-
-    g_free (pdu);
 
     return sms_part;
 }

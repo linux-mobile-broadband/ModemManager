@@ -28,6 +28,10 @@ MMSmsPart *mm_sms_part_new  (guint index);
 MMSmsPart *mm_sms_part_new_from_pdu  (guint index,
                                       const gchar *hexpdu,
                                       GError **error);
+MMSmsPart *mm_sms_part_new_from_binary_pdu  (guint index,
+                                             const guint8 *pdu,
+                                             gsize pdu_len,
+                                             GError **error);
 void       mm_sms_part_free (MMSmsPart *part);
 
 guint8    *mm_sms_part_get_submit_pdu (MMSmsPart *part,
