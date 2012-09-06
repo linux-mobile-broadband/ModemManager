@@ -1126,7 +1126,10 @@ mm_sms_singlepart_new (MMBaseModem *modem,
 {
     MMSms *self;
 
-    self = mm_sms_new (modem);
+    g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
+
+    /* Create an SMS object as defined by the interface */
+    self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
                   "state", state,
                   "storage", storage,
@@ -1155,12 +1158,15 @@ mm_sms_multipart_new (MMBaseModem *modem,
 {
     MMSms *self;
 
+    g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
+
     /* If this is the first part of a RECEIVED SMS, we overwrite the state
      * as RECEIVING, to indicate that it is not completed yet. */
     if (state == MM_SMS_STATE_RECEIVED)
         state = MM_SMS_STATE_RECEIVING;
 
-    self = mm_sms_new (modem);
+    /* Create an SMS object as defined by the interface */
+    self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
                   MM_SMS_IS_MULTIPART,        TRUE,
                   MM_SMS_MAX_PARTS,           max_parts,

@@ -125,7 +125,7 @@ struct _MMIfaceModemMessaging {
                                                GError **error);
 
     /* Create SMS objects */
-    MMSms * (* create_sms) (MMBaseModem *self);
+    MMSms * (* create_sms) (MMIfaceModemMessaging *self);
 };
 
 GType mm_iface_modem_messaging_get_type (void);
@@ -179,5 +179,8 @@ void mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *sel
 gboolean mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
                                                                  GAsyncResult *res,
                                                                  GError **error);
+
+/* SMS creation */
+MMSms *mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self);
 
 #endif /* MM_IFACE_MODEM_MESSAGING_H */

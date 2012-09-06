@@ -4859,6 +4859,15 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Create SMS (Messaging interface) */
+
+static MMSms *
+modem_messaging_create_sms (MMIfaceModemMessaging *self)
+{
+    return mm_sms_new (MM_BASE_MODEM (self));
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -8046,7 +8055,7 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->enable_unsolicited_events_finish = modem_messaging_enable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
-    iface->create_sms = mm_sms_new;
+    iface->create_sms = modem_messaging_create_sms;
 }
 
 static void
