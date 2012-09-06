@@ -365,7 +365,7 @@ mm_sms_part_set_data (MMSmsPart *self,
 {
     if (self->data)
         g_byte_array_unref (self->data);
-    self->data = g_byte_array_ref (value);
+    self->data = (value ? g_byte_array_ref (value) : NULL);
 }
 
 void
