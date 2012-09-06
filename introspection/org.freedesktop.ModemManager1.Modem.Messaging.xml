@@ -55,7 +55,8 @@
 
         The '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.Number">Number</link>'
         and
-        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.Text">Text</link>'
+        either '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.Text">Text</link>' or
+        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.Data">Data</link>'
         properties are mandatory, others are optional.
 
         If the SMSC is not specified and one is required, the default SMSC is

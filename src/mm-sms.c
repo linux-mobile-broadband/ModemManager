@@ -982,14 +982,17 @@ assemble_sms (MMSms *self,
             return FALSE;
         }
 
+        /* When the user creates the SMS, it will have either 'text' or 'data',
+         * not both */
+
         parttext = mm_sms_part_get_text (sorted_parts[idx]);
         partdata = mm_sms_part_get_data (sorted_parts[idx]);
 
-        if (!parttext || !partdata) {
+        if (!parttext && !partdata) {
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
-                         "Cannot assemble SMS, part at index (%u) has no text or data",
+                         "Cannot assemble SMS, part at index (%u) has neither text nor data",
                          idx);
             g_string_free (fulltext, TRUE);
             g_byte_array_free (fulldata, TRUE);
@@ -997,8 +1000,10 @@ assemble_sms (MMSms *self,
             return FALSE;
         }
 
-        g_string_append (fulltext, parttext);
-        g_byte_array_append (fulldata, partdata->data, partdata->len);
+        if (parttext)
+            g_string_append (fulltext, parttext);
+        if (partdata)
+            g_byte_array_append (fulldata, partdata->data, partdata->len);
     }
 
     /* If we got all parts, we also have the first one always */
@@ -1207,6 +1212,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
 
     part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
     mm_sms_part_set_text (part, mm_sms_properties_get_text (properties));
+    mm_sms_part_take_data (part, mm_sms_properties_get_data_bytearray (properties));
     mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
     mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
     mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));
