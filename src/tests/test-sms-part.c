@@ -20,6 +20,7 @@
 
 #include "mm-sms-part.h"
 #include "mm-utils.h"
+#include "mm-log.h"
 
 /* If defined will print debugging traces */
 #ifdef TEST_SMS_PART_ENABLE_TRACE
@@ -666,6 +667,16 @@ test_create_pdu_gsm_no_validity (void)
                             expected,
                             sizeof (expected),
                             1); /* expected_msgstart */
+}
+
+void
+_mm_log (const char *loc,
+         const char *func,
+         guint32 level,
+         const char *fmt,
+         ...)
+{
+    /* Dummy log function */
 }
 
 int main (int argc, char **argv)

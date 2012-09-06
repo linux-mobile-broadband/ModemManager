@@ -248,12 +248,16 @@ sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offs
     guint32 unpacked_len;
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
+        mm_dbg ("Converting SMS part text from GSM7 to UTF8...");
         unpacked = gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
+        mm_dbg ("   Got UTF-8 text: '%s'", utf8);
         g_free (unpacked);
-    } else if (encoding == MM_SMS_ENCODING_UCS2)
+    } else if (encoding == MM_SMS_ENCODING_UCS2) {
+        mm_dbg ("Converting SMS part text from UCS-2BE to UTF8...");
         utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
-    else {
+        mm_dbg ("   Got UTF-8 text: '%s'", utf8);
+    } else {
         g_warn_if_reached ();
         utf8 = g_strdup ("");
     }
@@ -575,6 +579,7 @@ mm_sms_part_new_from_binary_pdu (guint index,
         /* 8-bit encoding is usually binary data, and we have no idea what
          * actual encoding the data is in so we can't convert it.
          */
+        mm_dbg ("Skipping SMS part text: 8-bit or Unknown encoding");
         mm_sms_part_set_text (sms_part, "");
     } else {
         /* Otherwise if it's 7-bit or UCS2 we can decode it */
