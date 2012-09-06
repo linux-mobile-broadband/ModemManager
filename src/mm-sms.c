@@ -213,8 +213,14 @@ handle_send_ready (MMSms *self,
 
     if (!MM_SMS_GET_CLASS (self)->send_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        /* Transition from Unknown->Sent or Stored->Sent */
+        if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN ||
+            mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED)
+            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
+
         mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+    }
 
     handle_send_context_free (ctx);
 }
