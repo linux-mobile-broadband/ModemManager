@@ -402,6 +402,12 @@ mm_sms_has_part_index (MMSms *self,
                                  (GCompareFunc)cmp_sms_part_index);
 }
 
+GList *
+mm_sms_get_parts (MMSms *self)
+{
+    return self->priv->parts;
+}
+
 /*****************************************************************************/
 
 static gboolean

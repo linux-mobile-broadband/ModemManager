@@ -110,6 +110,7 @@ MMSmsStorage  mm_sms_get_storage (MMSms *self);
 
 gboolean     mm_sms_has_part_index (MMSms *self,
                                     guint index);
+GList       *mm_sms_get_parts      (MMSms *self);
 
 gboolean     mm_sms_is_multipart            (MMSms *self);
 guint        mm_sms_get_multipart_reference (MMSms *self);
