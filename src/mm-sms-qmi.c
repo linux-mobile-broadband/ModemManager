@@ -219,6 +219,256 @@ sms_store (MMSms *self,
 }
 
 /*****************************************************************************/
+/* Send the SMS */
+
+typedef struct {
+    MMSms *self;
+    MMBaseModem *modem;
+    QmiClientWms *client;
+    GSimpleAsyncResult *result;
+} SmsSendContext;
+
+static void
+sms_send_context_complete_and_free (SmsSendContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_slice_free (SmsSendContext, ctx);
+}
+
+static gboolean
+sms_send_finish (MMSms *self,
+                 GAsyncResult *res,
+                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+send_generic_ready (QmiClientWms *client,
+                    GAsyncResult *res,
+                    SmsSendContext *ctx)
+{
+    QmiMessageWmsRawSendOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_wms_raw_send_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else if (!qmi_message_wms_raw_send_output_get_result (output, &error)) {
+        QmiWmsGsmUmtsRpCause rp_cause;
+        QmiWmsGsmUmtsTpCause tp_cause;
+
+        if (qmi_message_wms_raw_send_output_get_gsm_wcdma_cause_info (
+                output,
+                &rp_cause,
+                &tp_cause,
+                NULL)) {
+            mm_info ("Couldn't send SMS; RP cause (%u): '%s'; TP cause (%u): '%s'",
+                     rp_cause,
+                     qmi_wms_gsm_umts_rp_cause_get_string (rp_cause),
+                     tp_cause,
+                     qmi_wms_gsm_umts_tp_cause_get_string (tp_cause));
+        }
+
+
+        g_prefix_error (&error, "Couldn't write SMS part: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else
+        /* Done */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+
+    if (output)
+        qmi_message_wms_raw_send_output_unref (output);
+
+    sms_send_context_complete_and_free (ctx);
+}
+
+static void
+sms_send_generic (SmsSendContext *ctx)
+{
+    QmiMessageWmsRawSendInput *input;
+    guint8 *pdu;
+    guint pdulen = 0;
+    guint msgstart = 0;
+    GArray *array;
+    GError *error = NULL;
+
+    /* Get PDU */
+    pdu = mm_sms_part_get_submit_pdu ((MMSmsPart *)mm_sms_get_parts (ctx->self)->data, &pdulen, &msgstart, &error);
+    if (!pdu) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Convert to GArray */
+    array = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (guint8), pdulen),
+                                 pdu,
+                                 pdulen);
+    g_free (pdu);
+
+    input = qmi_message_wms_raw_send_input_new ();
+
+    qmi_message_wms_raw_send_input_set_raw_message_data (
+        input,
+        QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT,
+        array,
+        NULL);
+
+    qmi_client_wms_raw_send (ctx->client,
+                             input,
+                             5,
+                             NULL,
+                             (GAsyncReadyCallback)send_generic_ready,
+                             ctx);
+    qmi_message_wms_raw_send_input_unref (input);
+    g_array_unref (array);
+}
+
+static void
+send_from_storage_ready (QmiClientWms *client,
+                         GAsyncResult *res,
+                         SmsSendContext *ctx)
+{
+    QmiMessageWmsSendFromMemoryStorageOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_wms_send_from_memory_storage_finish (client, res, &error);
+    if (!output) {
+        if (!g_error_matches (error,
+                              QMI_CORE_ERROR,
+                              QMI_CORE_ERROR_UNSUPPORTED)) {
+            g_prefix_error (&error, "QMI operation failed: ");
+            g_simple_async_result_take_error (ctx->result, error);
+            sms_send_context_complete_and_free (ctx);
+            return;
+        }
+
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* Fall down to try with the Generic method */
+    } else if (!qmi_message_wms_send_from_memory_storage_output_get_result (output, &error)) {
+        if (!g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            QmiWmsGsmUmtsRpCause rp_cause;
+            QmiWmsGsmUmtsTpCause tp_cause;
+
+            if (qmi_message_wms_send_from_memory_storage_output_get_gsm_wcdma_cause_info (
+                    output,
+                    &rp_cause,
+                    &tp_cause,
+                    NULL)) {
+                mm_info ("Couldn't send SMS; RP cause (%u): '%s'; TP cause (%u): '%s'",
+                         rp_cause,
+                         qmi_wms_gsm_umts_rp_cause_get_string (rp_cause),
+                         tp_cause,
+                         qmi_wms_gsm_umts_tp_cause_get_string (tp_cause));
+            }
+
+            qmi_message_wms_send_from_memory_storage_output_unref (output);
+            g_prefix_error (&error, "Couldn't write SMS part: ");
+            g_simple_async_result_take_error (ctx->result, error);
+            sms_send_context_complete_and_free (ctx);
+            return;
+        }
+
+        qmi_message_wms_send_from_memory_storage_output_unref (output);
+        mm_dbg ("Couldn't write SMS part from storage: '%s'", error->message);
+        g_error_free (error);
+
+        /* Fall down to try with the Generic method */
+    } else {
+        /* Done */
+        qmi_message_wms_send_from_memory_storage_output_unref (output);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We can try with the generic method */
+    sms_send_generic (ctx);
+}
+
+static void
+sms_send_from_storage (SmsSendContext *ctx)
+{
+    QmiMessageWmsSendFromMemoryStorageInput *input;
+
+    input = qmi_message_wms_send_from_memory_storage_input_new ();
+
+    qmi_message_wms_send_from_memory_storage_input_set_information (
+        input,
+        mm_sms_storage_to_qmi_storage_type (mm_sms_get_storage (ctx->self)),
+        mm_sms_part_get_index ((MMSmsPart *)(mm_sms_get_parts (ctx->self)->data)),
+        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        NULL);
+
+    qmi_client_wms_send_from_memory_storage (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)send_from_storage_ready,
+        ctx);
+    qmi_message_wms_send_from_memory_storage_input_unref (input);
+}
+
+static void
+sms_send (MMSms *self,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    SmsSendContext *ctx;
+    GList *parts;
+    QmiClient *client = NULL;
+
+    parts = mm_sms_get_parts (self);
+
+    /* We currently support sending *only* single part SMS */
+    if (g_list_length (parts) != 1) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot send SMS with %u parts",
+                                             g_list_length (parts));
+        return;
+    }
+
+    /* Ensure WMS client */
+    if (!ensure_qmi_client (MM_SMS_QMI (self),
+                            QMI_SERVICE_WMS, &client,
+                            callback, user_data))
+        return;
+
+    /* Setup the context */
+    ctx = g_slice_new0 (SmsSendContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             sms_send);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    g_object_get (self,
+                  MM_SMS_MODEM, &ctx->modem,
+                  NULL);
+
+    /* If the part is STORED, try to send from storage */
+    if (mm_sms_part_get_index ((MMSmsPart *)parts->data) != SMS_PART_INVALID_INDEX)
+        sms_send_from_storage (ctx);
+    else
+        sms_send_generic (ctx);
+}
+
+/*****************************************************************************/
 
 MMSms *
 mm_sms_qmi_new (MMBaseModem *modem)
@@ -240,4 +490,6 @@ mm_sms_qmi_class_init (MMSmsQmiClass *klass)
 
     sms_class->store = sms_store;
     sms_class->store_finish = sms_store_finish;
+    sms_class->send = sms_send;
+    sms_class->send_finish = sms_send_finish;
 }
