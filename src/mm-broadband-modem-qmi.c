@@ -35,6 +35,7 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-sim-qmi.h"
 #include "mm-bearer-qmi.h"
+#include "mm-sms-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -5554,6 +5555,15 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Create SMS (Messaging interface) */
+
+static MMSms *
+messaging_create_sms (MMIfaceModemMessaging *self)
+{
+    return mm_sms_qmi_new (MM_BASE_MODEM (self));
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -5913,6 +5923,7 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->enable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = messaging_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
+    iface->create_sms = messaging_create_sms;
 }
 
 static void

@@ -222,6 +222,8 @@ endif
 # Additional QMI support in ModemManager
 if WITH_QMI
 ModemManager_SOURCES += \
+	mm-sms-qmi.h \
+	mm-sms-qmi.c \
 	mm-sim-qmi.h \
 	mm-sim-qmi.c \
 	mm-bearer-qmi.h \
