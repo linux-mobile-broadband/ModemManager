@@ -470,6 +470,144 @@ sms_send (MMSms *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMSms *self;
+    MMBaseModem *modem;
+    QmiClientWms *client;
+    GSimpleAsyncResult *result;
+    GList *current;
+    guint n_failed;
+} SmsDeletePartsContext;
+
+static void
+sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_slice_free (SmsDeletePartsContext, ctx);
+}
+
+static gboolean
+sms_delete_finish (MMSms *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void delete_next_part (SmsDeletePartsContext *ctx);
+
+static void
+delete_part_ready (QmiClientWms *client,
+                   GAsyncResult *res,
+                   SmsDeletePartsContext *ctx)
+{
+    QmiMessageWmsDeleteOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_wms_delete_finish (client, res, &error);
+    if (!output) {
+        ctx->n_failed++;
+        mm_dbg ("QMI operation failed: Couldn't delete SMS part with index %u: '%s'",
+                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
+                error->message);
+        g_error_free (error);
+    } else if (!qmi_message_wms_delete_output_get_result (output, &error)) {
+        ctx->n_failed++;
+        mm_dbg ("Couldn't delete SMS part with index %u: '%s'",
+                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
+                error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_wms_delete_output_unref (output);
+
+    /* We reset the index, as there is no longer that part */
+    mm_sms_part_set_index ((MMSmsPart *)ctx->current->data, SMS_PART_INVALID_INDEX);
+
+    ctx->current = g_list_next (ctx->current);
+    delete_next_part (ctx);
+}
+
+static void
+delete_next_part (SmsDeletePartsContext *ctx)
+{
+    QmiMessageWmsDeleteInput *input;
+
+    /* Skip non-stored parts */
+    while (ctx->current &&
+           mm_sms_part_get_index ((MMSmsPart *)ctx->current->data) == SMS_PART_INVALID_INDEX)
+        ctx->current = g_list_next (ctx->current);
+
+    /* If all removed, we're done */
+    if (!ctx->current) {
+        if (ctx->n_failed > 0)
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't delete %u parts from this SMS",
+                                             ctx->n_failed);
+        else
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+
+        sms_delete_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    input = qmi_message_wms_delete_input_new ();
+    qmi_message_wms_delete_input_set_memory_storage (
+        input,
+        mm_sms_storage_to_qmi_storage_type (mm_sms_get_storage (ctx->self)),
+        NULL);
+    qmi_message_wms_delete_input_set_memory_index (
+        input,
+        (guint32)mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
+        NULL);
+    qmi_client_wms_delete (ctx->client,
+                           input,
+                           5,
+                           NULL,
+                           (GAsyncReadyCallback)delete_part_ready,
+                           ctx);
+    qmi_message_wms_delete_input_unref (input);
+}
+
+static void
+sms_delete (MMSms *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    SmsDeletePartsContext *ctx;
+    QmiClient *client = NULL;
+
+    /* Ensure WMS client */
+    if (!ensure_qmi_client (MM_SMS_QMI (self),
+                            QMI_SERVICE_WMS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (SmsDeletePartsContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             sms_delete);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    g_object_get (self,
+                  MM_SMS_MODEM, &ctx->modem,
+                  NULL);
+
+    /* Go on deleting parts */
+    ctx->current = mm_sms_get_parts (self);
+    delete_next_part (ctx);
+}
+
+/*****************************************************************************/
+
 MMSms *
 mm_sms_qmi_new (MMBaseModem *modem)
 {
@@ -492,4 +630,6 @@ mm_sms_qmi_class_init (MMSmsQmiClass *klass)
     sms_class->store_finish = sms_store_finish;
     sms_class->send = sms_send;
     sms_class->send_finish = sms_send_finish;
+    sms_class->delete = sms_delete;
+    sms_class->delete_finish = sms_delete_finish;
 }
