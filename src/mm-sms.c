@@ -104,9 +104,7 @@ handle_store_ready (MMSms *self,
         g_object_get (self->priv->modem,
                       MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &storage,
                       NULL);
-        g_object_set (self,
-                      "storage", storage,
-                      NULL);
+        mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), storage);
 
         /* Transition from Unknown->Stored for SMS which were created by the user */
         if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN)
@@ -354,12 +352,7 @@ mm_sms_get_path (MMSms *self)
 MMSmsStorage
 mm_sms_get_storage (MMSms *self)
 {
-    MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
-
-    g_object_get (self,
-                  "storage", &storage,
-                  NULL);
-    return storage;
+    return mm_gdbus_sms_get_storage (MM_GDBUS_SMS (self));
 }
 
 gboolean
@@ -867,10 +860,7 @@ delete_next_part (SmsDeletePartsContext *ctx)
         else {
             /* We do change the state of this SMS back to UNKNOWN, as it is no
              * longer stored in the device */
-            g_object_set (ctx->self,
-                          "state", MM_SMS_STATE_UNKNOWN,
-                          NULL);
-
+            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_UNKNOWN);
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         }
         sms_delete_parts_context_complete_and_free (ctx);
@@ -1106,18 +1096,10 @@ mm_sms_multipart_take_part (MMSms *self,
                      inner_error->message);
             g_error_free (inner_error);
         } else {
-            /* Completed AND assembled */
-            MMSmsState state = MM_SMS_STATE_UNKNOWN;
-
-            /* Change state RECEIVING->RECEIVED, and signal completeness */
-            g_object_get (self,
-                          "state", &state,
-                          NULL);
-            if (state == MM_SMS_STATE_RECEIVING) {
-                g_object_set (self,
-                              "state", MM_SMS_STATE_RECEIVED,
-                              NULL);
-            }
+            /* Completed AND assembled
+             * Change state RECEIVING->RECEIVED, and signal completeness */
+            if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (self)) == MM_SMS_STATE_RECEIVING)
+                mm_gdbus_sms_set_state (MM_GDBUS_SMS (self), MM_SMS_STATE_RECEIVED);
         }
     }
 
@@ -1146,7 +1128,7 @@ mm_sms_singlepart_new (MMBaseModem *modem,
     /* Create an SMS object as defined by the interface */
     self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
-                  "state", state,
+                  "state",   state,
                   "storage", storage,
                   NULL);
 
@@ -1186,8 +1168,8 @@ mm_sms_multipart_new (MMBaseModem *modem,
                   MM_SMS_IS_MULTIPART,        TRUE,
                   MM_SMS_MAX_PARTS,           max_parts,
                   MM_SMS_MULTIPART_REFERENCE, reference,
-                  "state", state,
-                  "storage", storage,
+                  "state",                    state,
+                  "storage",                  storage,
                   NULL);
 
     if (!mm_sms_multipart_take_part (self, first_part, error))
