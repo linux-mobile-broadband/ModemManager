@@ -4523,7 +4523,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-common_enable_disable_unsolicited_events_signal_strength (ctx);
+    common_enable_disable_unsolicited_events_signal_strength (ctx);
 }
 
 /*****************************************************************************/
