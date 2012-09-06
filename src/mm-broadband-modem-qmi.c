@@ -4995,6 +4995,236 @@ messaging_set_preferred_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Load initial SMS parts */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    GSimpleAsyncResult *result;
+    QmiClientWms *client;
+    MMSmsStorage storage;
+    GArray *message_array;
+    guint i;
+} LoadInitialSmsPartsContext;
+
+static void
+load_initial_sms_parts_context_complete_and_free (LoadInitialSmsPartsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+
+    if (ctx->message_array)
+        g_array_unref (ctx->message_array);
+
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadInitialSmsPartsContext, ctx);
+}
+
+static gboolean
+load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void read_next_sms_part (LoadInitialSmsPartsContext *ctx);
+
+static void
+wms_raw_read_ready (QmiClientWms *client,
+                    GAsyncResult *res,
+                    LoadInitialSmsPartsContext *ctx)
+{
+    QmiMessageWmsRawReadOutput *output = NULL;
+    GError *error = NULL;
+
+    /* Ignore errors, just keep on with the next messages */
+
+    output = qmi_client_wms_raw_read_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_wms_raw_read_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't list messages: %s", error->message);
+        g_error_free (error);
+    } else {
+        QmiWmsMessageTagType tag;
+        QmiWmsMessageFormat format;
+        GArray *data;
+
+        qmi_message_wms_raw_read_output_get_raw_message_data (
+            output,
+            &tag,
+            &format,
+            &data,
+            NULL);
+
+        switch (format) {
+        case QMI_WMS_MESSAGE_FORMAT_CDMA:
+            mm_dbg ("Skipping CDMA messages for now...");
+            break;
+        case QMI_WMS_MESSAGE_FORMAT_MWI:
+            mm_dbg ("Don't know how to process 'message waiting indicator' messages");
+            break;
+        case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
+        case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST: {
+            QmiMessageWmsListMessagesOutputMessageListElement *message;
+            MMSmsPart *part;
+
+            message = &g_array_index (ctx->message_array,
+                                      QmiMessageWmsListMessagesOutputMessageListElement,
+                                      ctx->i);
+
+            part = mm_sms_part_new_from_binary_pdu (message->memory_index,
+                                                    (guint8 *)data->data,
+                                                    data->len,
+                                                    &error);
+            if (part) {
+                mm_dbg ("Correctly parsed PDU (%d)",
+                        message->memory_index);
+                mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                                    part,
+                                                    mm_sms_state_from_qmi_message_tag (tag),
+                                                    ctx->storage);
+            } else {
+                /* Don't treat the error as critical */
+                mm_dbg ("Error parsing PDU (%d): %s",
+                        message->memory_index,
+                        error->message);
+                g_error_free (error);
+            }
+
+            break;
+        }
+        default:
+            mm_dbg ("Unhandled message format '%u'", format);
+            break;
+        }
+    }
+
+    if (output)
+        qmi_message_wms_raw_read_output_unref (output);
+
+    /* Keep on reading parts */
+    ctx->i++;
+    read_next_sms_part (ctx);
+}
+
+static void
+read_next_sms_part (LoadInitialSmsPartsContext *ctx)
+{
+    QmiMessageWmsListMessagesOutputMessageListElement *message;
+    QmiMessageWmsRawReadInput *input;
+
+    if (ctx->i >= ctx->message_array->len ||
+        !ctx->message_array) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        load_initial_sms_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    message = &g_array_index (ctx->message_array,
+                              QmiMessageWmsListMessagesOutputMessageListElement,
+                              ctx->i);
+
+    input = qmi_message_wms_raw_read_input_new ();
+    qmi_message_wms_raw_read_input_set_message_memory_storage_id (
+        input,
+        mm_sms_storage_to_qmi_storage_type (ctx->storage),
+        message->memory_index,
+        NULL);
+    qmi_client_wms_raw_read (QMI_CLIENT_WMS (ctx->client),
+                             input,
+                             3,
+                             NULL,
+                             (GAsyncReadyCallback)wms_raw_read_ready,
+                             ctx);
+    qmi_message_wms_raw_read_input_unref (input);
+}
+
+static void
+wms_list_messages_ready (QmiClientWms *client,
+                         GAsyncResult *res,
+                         LoadInitialSmsPartsContext *ctx)
+{
+    QmiMessageWmsListMessagesOutput *output = NULL;
+    GError *error = NULL;
+    GArray *message_array;
+
+    output = qmi_client_wms_list_messages_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        load_initial_sms_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_wms_list_messages_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't list messages: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        load_initial_sms_parts_context_complete_and_free (ctx);
+        qmi_message_wms_list_messages_output_unref (output);
+        return;
+    }
+
+    qmi_message_wms_list_messages_output_get_message_list (
+        output,
+        &message_array,
+        NULL);
+
+    /* Keep a reference to the array ourselves */
+    ctx->message_array = g_array_ref (message_array);
+
+    qmi_message_wms_list_messages_output_unref (output);
+
+    /* Start reading parts */
+    ctx->i = 0;
+    read_next_sms_part (ctx);
+}
+
+static void
+load_initial_sms_parts (MMIfaceModemMessaging *self,
+                        MMSmsStorage storage,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    LoadInitialSmsPartsContext *ctx;
+    QmiClient *client = NULL;
+    QmiMessageWmsListMessagesInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_WMS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (LoadInitialSmsPartsContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->storage = storage;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_initial_sms_parts);
+
+    mm_dbg ("loading messages from storage '%s'...",
+            mm_sms_storage_get_string (storage));
+
+    /* Request to list messages in a given storage */
+    input = qmi_message_wms_list_messages_input_new ();
+    qmi_message_wms_list_messages_input_set_storage_type (
+        input,
+        mm_sms_storage_to_qmi_storage_type (storage),
+        NULL);
+    qmi_client_wms_list_messages (QMI_CLIENT_WMS (ctx->client),
+                                  input,
+                                  5,
+                                  NULL,
+                                  (GAsyncReadyCallback)wms_list_messages_ready,
+                                  ctx);
+    qmi_message_wms_list_messages_input_unref (input);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -5344,6 +5574,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_sms_format_finish = NULL;
     iface->set_preferred_storages = messaging_set_preferred_storages;
     iface->set_preferred_storages_finish = messaging_set_preferred_storages_finish;
+    iface->load_initial_sms_parts = load_initial_sms_parts;
+    iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
 }
 
 static void

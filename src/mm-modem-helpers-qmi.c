@@ -790,3 +790,21 @@ mm_sms_storage_to_qmi_storage_type (MMSmsStorage storage)
         return QMI_WMS_STORAGE_TYPE_NONE;
     }
 }
+
+/*****************************************************************************/
+
+MMSmsState
+mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag)
+{
+    switch (tag) {
+    case QMI_WMS_MESSAGE_TAG_TYPE_MT_READ:
+    case QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ:
+        return MM_SMS_STATE_RECEIVED;
+    case QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT:
+        return MM_SMS_STATE_SENT;
+    case QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT:
+        return MM_SMS_STATE_STORED;
+    default:
+        return MM_SMS_STATE_UNKNOWN;
+    }
+}
