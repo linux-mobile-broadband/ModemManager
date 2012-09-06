@@ -791,6 +791,19 @@ mm_sms_storage_to_qmi_storage_type (MMSmsStorage storage)
     }
 }
 
+MMSmsStorage
+mm_sms_storage_from_qmi_storage_type (QmiWmsStorageType qmi_storage)
+{
+    switch (qmi_storage) {
+    case QMI_WMS_STORAGE_TYPE_UIM:
+        return MM_SMS_STORAGE_SM;
+    case QMI_WMS_STORAGE_TYPE_NV:
+        return MM_SMS_STORAGE_ME;
+    default:
+        return MM_SMS_STORAGE_UNKNOWN;
+    }
+}
+
 /*****************************************************************************/
 
 MMSmsState

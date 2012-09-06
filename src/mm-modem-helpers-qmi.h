@@ -71,6 +71,7 @@ MMModemCdmaRegistrationState mm_modem_cdma_registration_state_from_qmi_registrat
 /* QMI/WMS to MM translations */
 
 QmiWmsStorageType mm_sms_storage_to_qmi_storage_type (MMSmsStorage storage);
+MMSmsStorage mm_sms_storage_from_qmi_storage_type (QmiWmsStorageType qmi_storage);
 
 MMSmsState mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag);
 
