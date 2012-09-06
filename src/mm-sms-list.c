@@ -319,10 +319,17 @@ mm_sms_list_take_part (MMSmsList *self,
     }
 
     /* Did we just get a part of a multi-part SMS? */
-    if (mm_sms_part_should_concat (part))
+    if (mm_sms_part_should_concat (part)) {
+        mm_dbg ("SMS part at '%s/%u' is from a multipart SMS",
+                mm_sms_storage_get_string (storage),
+                mm_sms_part_get_index (part));
         return take_multipart (self, part, state, storage, error);
+    }
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
+    mm_dbg ("SMS part at '%s/%u' is from a singlepart SMS",
+            mm_sms_storage_get_string (storage),
+            mm_sms_part_get_index (part));
     return take_singlepart (self, part, state, storage, error);
 }
 
