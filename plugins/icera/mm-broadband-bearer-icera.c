@@ -1074,7 +1074,7 @@ mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 
     properties[PROP_DEFAULT_IP_METHOD] =
-        g_param_spec_enum (MM_BASE_MODEM_DEVICE,
+        g_param_spec_enum (MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD,
                            "Default IP method",
                            "Default IP Method (static or DHCP) to use.",
                            MM_TYPE_BEARER_IP_METHOD,
