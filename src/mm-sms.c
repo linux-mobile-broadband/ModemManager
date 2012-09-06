@@ -1000,7 +1000,7 @@ assemble_sms (MMSms *self,
 
     /* If we got everything, assemble the text! */
     g_object_set (self,
-                  "text",      fulltext,
+                  "text",      fulltext->str,
                   "data",      g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
                                                         fulldata->data,
                                                         fulldata->len * sizeof (guint8),
