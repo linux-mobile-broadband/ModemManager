@@ -201,7 +201,8 @@ grab_port (MMPluginBase *base,
                                              mm_plugin_base_supports_task_get_driver (task),
                                              mm_plugin_get_name (MM_PLUGIN (base)),
                                              vendor,
-                                             product);
+                                             product,
+                                             (caps & MM_PLUGIN_BASE_PORT_CAP_LTE));
         } else if (caps & CAP_CDMA) {
             modem = mm_modem_sierra_cdma_new (sysfs_path,
                                               mm_plugin_base_supports_task_get_driver (task),

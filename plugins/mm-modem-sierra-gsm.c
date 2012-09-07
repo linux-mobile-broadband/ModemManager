@@ -44,6 +44,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemSierraGsm, mm_modem_sierra_gsm, MM_TYPE_GENERIC_G
 typedef struct {
     guint enable_wait_id;
     gboolean has_net;
+    gboolean has_lte;
     char *username;
     char *password;
     gboolean is_icera;
@@ -55,7 +56,8 @@ mm_modem_sierra_gsm_new (const char *device,
                          const char *driver,
                          const char *plugin,
                          guint32 vendor,
-                         guint32 product)
+                         guint32 product,
+                         gboolean has_lte)
 {
     MMModem *modem;
 
@@ -70,8 +72,10 @@ mm_modem_sierra_gsm_new (const char *device,
                                       MM_MODEM_HW_VID, vendor,
                                       MM_MODEM_HW_PID, product,
                                       NULL);
-    if (modem)
+    if (modem) {
         MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->icera = mm_modem_icera_init_private ();
+        MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->has_lte = has_lte;
+    }
 
     return modem;
 }
@@ -85,6 +89,7 @@ get_allowed_mode_done (MMAtSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSierraGsmPrivate *priv;
     GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
 
@@ -107,6 +112,7 @@ get_allowed_mode_done (MMAtSerialPort *port,
         goto done;
     }
 
+    priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (info->modem);
     if (g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
         MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
         char *str;
@@ -123,10 +129,28 @@ get_allowed_mode_done (MMAtSerialPort *port,
             mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
             break;
         case 3:
-            mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
+            /* in Sierra LTE devices, mode 3 is automatic, including LTE, no preference */
+            if (priv->has_lte)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+            else
+                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
             break;
         case 4:
-            mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
+            /* in Sierra LTE devices, mode 4 is automatic, including LTE, no preference */
+            if (priv->has_lte)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+            else
+                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
+            break;
+        case 5:
+            /* 2G and 3G only; but we can't represent that */
+            mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
+            break;
+        case 6:
+            mode = MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY;
+            break;
+        case 7:
+            mode = MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED;
             break;
         default:
             info->error = g_error_new (MM_MODEM_ERROR,
@@ -223,6 +247,15 @@ set_allowed_mode (MMGenericGsm *gsm,
         return;
     }
 
+    if (   MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->has_lte == FALSE
+        && (   mode == MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY
+            || mode == MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED)) {
+        g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                             "4G allowed modes requested, but modem does not support 4G");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     switch (mode) {
     case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
         idx = 2;
@@ -230,11 +263,17 @@ set_allowed_mode (MMGenericGsm *gsm,
     case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
         idx = 1;
         break;
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY:
+        idx = 6;
+        break;
     case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
         idx = 4;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
         idx = 3;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED:
+        idx = 7;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_ANY:
     default:
@@ -460,6 +499,31 @@ icera_check_cb (MMModem *modem,
        MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_enable_power_up_done (MM_GENERIC_GSM (info->modem), NULL, NULL, info);
 }
 
+static void
+ws46_done_cb (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    /* Ignore errors */
+    if (!error && response) {
+        if (strstr (response->str, "28") ||   /* 4G only */
+            strstr (response->str, "30") ||   /* 2G/4G */
+            strstr (response->str, "31")) {  /* 3G/4G */
+            MM_MODEM_SIERRA_GSM_GET_PRIVATE (info->modem)->has_lte = TRUE;
+        }
+    }
+
+    mm_modem_icera_is_icera (MM_MODEM_ICERA (info->modem), icera_check_cb, info);
+}
+
 static gboolean
 sierra_enabled (gpointer user_data)
 {
@@ -467,13 +531,37 @@ sierra_enabled (gpointer user_data)
     MMGenericGsm *modem;
     MMModemSierraGsmPrivate *priv;
 
-    /* Make sure we don't use an invalid modem that may have been removed */
-    if (info->modem) {
-        modem = MM_GENERIC_GSM (info->modem);
-        priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem);
-        priv->enable_wait_id = 0;
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return FALSE;
+
+    modem = MM_GENERIC_GSM (info->modem);
+    priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem);
+    priv->enable_wait_id = 0;
+
+    if (priv->has_lte)
         mm_modem_icera_is_icera (MM_MODEM_ICERA (modem), icera_check_cb, info);
+    else {
+        MMAtSerialPort *primary;
+
+        /* Some modems (e.g. Sierra Wireless MC7710 or ZTE MF820D) won't report LTE
+         * capabilities even if they have them. So just run AT+WS46=? as well to see
+         * if the current supported modes includes any LTE-specific mode.
+         * This is not a big deal, as the AT+WS46=? command is a test command with a
+         * cache-able result.
+         *
+         * E.g.:
+         *  AT+WS46=?
+         *   +WS46: (12,22,25,28,29)
+         *   OK
+         *
+         */
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_AT_PORT_FLAG_PRIMARY);
+        g_assert (primary);
+        mm_at_serial_port_queue_command (primary, "+WS46=?", 3, ws46_done_cb, info);
     }
+
     return FALSE;
 }
 

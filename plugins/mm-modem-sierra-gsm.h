@@ -40,6 +40,7 @@ MMModem *mm_modem_sierra_gsm_new (const char *device,
                                   const char *driver,
                                   const char *plugin_name,
                                   guint32 vendor,
-                                  guint32 product);
+                                  guint32 product,
+                                  gboolean has_lte);
 
 #endif /* MM_MODEM_SIERRA_GSM_H */
