@@ -1228,6 +1228,9 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                             GError **error)
 {
     MMSmsPart *part;
+    gchar **split_text;
+    guint n_parts;
+    MMSmsEncoding encoding;
 
     /* Don't create SMS from properties if either text or number is missing */
     if (!mm_sms_properties_get_number (properties) ||
@@ -1241,9 +1244,65 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                       "number" : "text' or 'data"));
     }
 
+    split_text = mm_sms_part_util_split_text (mm_sms_properties_get_text (properties),
+                                              &encoding);
+    n_parts = (split_text ? g_strv_length (split_text) : 0);
+
+    if (n_parts > 1) {
+        MMSms *sms = NULL;
+        guint i = 0;
+         /* wtf... is this really the way to go? */
+        guint reference = g_random_int_range (1,255);
+
+        /* Loop text chunks */
+        while (split_text[i]) {
+            mm_dbg ("  Processing chunk '%u' of text with '%u' bytes",
+                    i, (guint)strlen (split_text[i]));
+
+            /* Create new part */
+            part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
+            mm_sms_part_set_text (part, split_text[i]);
+            mm_sms_part_set_encoding (part, encoding);
+            mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
+            mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
+            mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));
+            mm_sms_part_set_class (part, mm_sms_properties_get_class (properties));
+            mm_sms_part_set_concat_reference (part, reference);
+            mm_sms_part_set_concat_sequence (part, i + 1);
+            mm_sms_part_set_concat_max (part, n_parts);
+
+            if (!sms) {
+                mm_dbg ("Building user-created multipart SMS...");
+                sms = mm_sms_multipart_new (
+                    modem,
+                    MM_SMS_STATE_UNKNOWN,
+                    MM_SMS_STORAGE_UNKNOWN, /* not stored anywhere yet */
+                    reference,
+                    g_strv_length (split_text),
+                    part,
+                    error);
+                if (!sms)
+                    break;
+            } else if (!mm_sms_multipart_take_part (sms, part, error)) {
+                g_clear_object (&sms);
+                break;
+            }
+
+            mm_dbg ("  Added part '%u' to multipart SMS...", i + 1);
+            i++;
+        }
+
+        return sms;
+    }
+
+    /* Single part it will be */
     part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
-    mm_sms_part_set_text (part, mm_sms_properties_get_text (properties));
-    mm_sms_part_take_data (part, mm_sms_properties_get_data_bytearray (properties));
+    if (n_parts == 1) {
+        mm_sms_part_set_text (part, mm_sms_properties_get_text (properties));
+        mm_sms_part_set_encoding (part, encoding);
+    } else {
+        mm_sms_part_take_data (part, mm_sms_properties_get_data_bytearray (properties));
+    }
     mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
     mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
     mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));
