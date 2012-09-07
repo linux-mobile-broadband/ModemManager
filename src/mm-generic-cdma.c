@@ -32,6 +32,7 @@
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/errors.h"
 #include "mm-log.h"
+#include "mm-utils.h"
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
 
@@ -2355,25 +2356,6 @@ simple_connect (MMModemSimple *simple,
     g_clear_error (&error);
 }
 
-static void
-simple_free_gvalue (gpointer data)
-{
-    g_value_unset ((GValue *) data);
-    g_slice_free (GValue, data);
-}
-
-static GValue *
-simple_uint_value (guint32 i)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_UINT);
-    g_value_set_uint (val, i);
-
-    return val;
-}
-
 #define SS_HASH_TAG "simple-get-status"
 
 static void
@@ -2389,8 +2371,8 @@ simple_status_got_signal_quality (MMModem *modem,
         info->error = g_error_copy (error);
         g_warning ("Error getting signal quality: %s", error->message);
     } else {
-        properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
-        g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
+        properties = mm_callback_info_get_data (info, SS_HASH_TAG);
+        value_hash_add_uint (properties, "signal_quality", result);
     }
 
     mm_callback_info_schedule (info);
@@ -2419,7 +2401,7 @@ simple_get_status (MMModemSimple *simple,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    properties = value_hash_new ();
     mm_callback_info_set_data (info, SS_HASH_TAG, properties, (GDestroyNotify) g_hash_table_unref);
     mm_modem_cdma_get_signal_quality (MM_MODEM_CDMA (simple), simple_status_got_signal_quality, info);
 }

@@ -194,10 +194,6 @@ static void clck_cb (MMAtSerialPort *port,
                      gpointer user_data);
 
 #define GS_HASH_TAG "get-sms"
-static GValue *simple_string_value (const char *str);
-static GValue *simple_uint_value (guint32 i);
-static GValue *simple_byte_array_value (const GByteArray *array);
-static void simple_free_gvalue (gpointer data);
 
 MMModem *
 mm_generic_gsm_new (const char *device,
@@ -1536,12 +1532,10 @@ sms_cache_lookup_full (MMModem *modem,
     }
 
     first = g_hash_table_lookup (priv->sms_contents, GUINT_TO_POINTER (mpm->parts[0]));
-    full = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    full = value_hash_new ();
 
     g_hash_table_iter_init (&iter, first);
     while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) &value)) {
-        GValue *newval;
-
         /* Ignore hidden keys or ones we need to construct */
         if (strncmp (key, "concat-", 7) == 0 ||
             strcmp (key, "text") == 0 ||
@@ -1550,15 +1544,12 @@ sms_cache_lookup_full (MMModem *modem,
             continue;
 
         /* Copy value to complete message hash */
-        newval = g_slice_new0 (GValue);
-        g_value_init (newval, G_VALUE_TYPE (value));
-        g_value_copy (value, newval);
-        g_hash_table_insert (full, (gpointer) key, newval);
+        value_hash_add_value (full, key, value);
     }
 
-    g_hash_table_insert (full, "index", simple_uint_value (mpm->index));
-    g_hash_table_insert (full, "text", simple_string_value (fulltext->str));
-    g_hash_table_insert (full, "data", simple_byte_array_value (fulldata));
+    value_hash_add_uint (full, "index", mpm->index);
+    value_hash_add_string (full, "text", fulltext->str);
+    value_hash_add_byte_array (full, "data", fulldata);
 
     g_string_free (fulltext, TRUE);
     g_byte_array_free (fulldata, TRUE);
@@ -5155,7 +5146,7 @@ sms_get_done (MMAtSerialPort *port,
         goto out;
     }
 
-    g_hash_table_insert (properties, "index", simple_uint_value (idx));
+    value_hash_add_uint (properties, "index", idx);
     sms_cache_insert (info->modem, properties, idx);
 
     look_for_complete = GPOINTER_TO_UINT (mm_callback_info_get_data(info,
@@ -5421,7 +5412,7 @@ pdu_parse_cmgl (MMGenericGsm *self, const char *response, GError **error)
 
         properties = sms_parse_pdu (pdu, NULL);
         if (properties) {
-            g_hash_table_insert (properties, "index", simple_uint_value (idx));
+            value_hash_add_uint (properties, "index", idx);
             sms_cache_insert (MM_MODEM (self), properties, idx);
             /* The cache holds a reference, so we don't need it anymore */
             g_hash_table_unref (properties);
@@ -5553,7 +5544,7 @@ text_parse_cmgl (MMGenericGsm *self, const char *response, GError **error)
         g_free (text);
         g_byte_array_free (data, TRUE);
 
-        g_hash_table_insert (properties, "index", simple_uint_value (idx));
+        value_hash_add_uint (properties, "index", idx);
         sms_cache_insert (MM_MODEM (self), properties, idx);
         /* The cache holds a reference, so we don't need it anymore */
         g_hash_table_unref (properties);
@@ -6328,49 +6319,6 @@ simple_connect (MMModemSimple *simple,
     simple_state_machine (MM_MODEM (simple), NULL, info);
 }
 
-static void
-simple_free_gvalue (gpointer data)
-{
-    g_value_unset ((GValue *) data);
-    g_slice_free (GValue, data);
-}
-
-static GValue *
-simple_uint_value (guint32 i)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_UINT);
-    g_value_set_uint (val, i);
-
-    return val;
-}
-
-static GValue *
-simple_string_value (const char *str)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_STRING);
-    g_value_set_string (val, str);
-
-    return val;
-}
-
-static GValue *
-simple_byte_array_value (const GByteArray *array)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, DBUS_TYPE_G_UCHAR_ARRAY);
-    g_value_set_boxed (val, array);
-
-    return val;
-}
-
 #define SS_HASH_TAG "simple-get-status"
 
 static void
@@ -6391,7 +6339,7 @@ simple_status_got_signal_quality (MMModem *modem,
 
     if (!error || error_no_network) {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
-        g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
+        value_hash_add_uint (properties, "signal_quality", result);
     } else {
         g_clear_error (&info->error);
         info->error = g_error_copy (error);
@@ -6410,7 +6358,7 @@ simple_status_got_band (MMModem *modem,
 
     if (!error) {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
-        g_hash_table_insert (properties, "band", simple_uint_value (result));
+        value_hash_add_uint (properties, "band", result);
     } else {
         g_clear_error (&info->error);
         info->error = g_error_copy (error);
@@ -6439,9 +6387,9 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
     } else {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
 
-        g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
-        g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
-        g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
+        value_hash_add_uint (properties, "registration_status", status);
+        value_hash_add_string (properties, "operator_code", oper_code);
+        value_hash_add_string (properties, "operator_name", oper_name);
     }
     mm_callback_info_chain_complete_one (info);
 }
@@ -6472,7 +6420,7 @@ simple_get_status (MMModemSimple *simple,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    properties = value_hash_new ();
     mm_callback_info_set_data (info, SS_HASH_TAG, properties, (GDestroyNotify) g_hash_table_unref);
 
     mm_callback_info_chain_start (info, 3);
@@ -6483,10 +6431,10 @@ simple_get_status (MMModemSimple *simple,
     if (priv->act > -1) {
         /* Deprecated key */
         old_mode = mm_modem_gsm_network_act_to_old_mode (priv->act);
-        g_hash_table_insert (properties, "network_mode", simple_uint_value (old_mode));
+        value_hash_add_uint (properties, "network_mode", old_mode);
 
         /* New key */
-        g_hash_table_insert (properties, "access_technology", simple_uint_value (priv->act));
+        value_hash_add_uint (properties, "access_technology", priv->act);
     }
 }
 

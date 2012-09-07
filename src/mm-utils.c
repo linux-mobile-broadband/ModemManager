@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <dbus/dbus-glib.h>
 
 #include "mm-utils.h"
 
@@ -107,3 +108,61 @@ utils_check_for_single_value (guint32 value)
 
     return TRUE;
 }
+
+/***************************************************************/
+
+static void
+vh_free_gvalue (gpointer data)
+{
+    g_value_unset ((GValue *) data);
+    g_slice_free (GValue, data);
+}
+
+GHashTable *
+value_hash_new (void)
+{
+    return g_hash_table_new_full (g_str_hash, g_str_equal, NULL, (GDestroyNotify) vh_free_gvalue);
+}
+
+void
+value_hash_add_uint (GHashTable *hash, const char *key, guint32 val)
+{
+    GValue *v = g_slice_new0 (GValue);
+
+    g_value_init (v, G_TYPE_UINT);
+    g_value_set_uint (v, val);
+    g_hash_table_insert (hash, (gpointer) key, v);
+}
+
+void
+value_hash_add_string (GHashTable *hash, const char *key, const char *val)
+{
+    GValue *v = g_slice_new0 (GValue);
+
+    g_value_init (v, G_TYPE_STRING);
+    g_value_set_string (v, val);
+    g_hash_table_insert (hash, (gpointer) key, v);
+}
+
+void
+value_hash_add_byte_array (GHashTable *hash, const char *key, const GByteArray *val)
+{
+    GValue *v = g_slice_new0 (GValue);
+
+    g_value_init (v, DBUS_TYPE_G_UCHAR_ARRAY);
+    g_value_set_boxed (v, val);
+    g_hash_table_insert (hash, (gpointer) key, v);
+}
+
+void
+value_hash_add_value (GHashTable *hash, const char *key, const GValue *val)
+{
+    GValue *v = g_slice_new0 (GValue);
+
+    g_value_init (v, G_VALUE_TYPE (val));
+    g_value_copy (val, v);
+    g_hash_table_insert (hash, (gpointer) key, v);
+}
+
+/***************************************************************/
+

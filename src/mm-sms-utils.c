@@ -300,51 +300,6 @@ sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offs
     return utf8;
 }
 
-static void
-simple_free_gvalue (gpointer data)
-{
-    g_value_unset ((GValue *) data);
-    g_slice_free (GValue, data);
-}
-
-
-
-static GValue *
-simple_uint_value (guint32 i)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_UINT);
-    g_value_set_uint (val, i);
-
-    return val;
-}
-
-static GValue *
-simple_string_value (const char *str)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_STRING);
-    g_value_set_string (val, str);
-
-    return val;
-}
-
-static GValue *
-byte_array_value (const GByteArray *array)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, DBUS_TYPE_G_UCHAR_ARRAY);
-    g_value_set_boxed (val, array);
-
-    return val;
-}
-
 GHashTable *
 sms_properties_hash_new (const char *smsc,
                          const char *number,
@@ -360,20 +315,20 @@ sms_properties_hash_new (const char *smsc,
     g_return_val_if_fail (text != NULL, NULL);
     g_return_val_if_fail (data != NULL, NULL);
 
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
-    g_hash_table_insert (properties, "number", simple_string_value (number));
-    g_hash_table_insert (properties, "data", byte_array_value (data));
-    g_hash_table_insert (properties, "data-coding-scheme", simple_uint_value (data_coding_scheme));
-    g_hash_table_insert (properties, "text", simple_string_value (text));
+    properties = value_hash_new ();
+    value_hash_add_string (properties, "number", number);
+    value_hash_add_byte_array (properties, "data", data);
+    value_hash_add_uint (properties, "data-coding-scheme", data_coding_scheme);
+    value_hash_add_string (properties, "text", text);
 
     if (smsc)
-        g_hash_table_insert (properties, "smsc", simple_string_value (smsc));
+        value_hash_add_string (properties, "smsc", smsc);
 
     if (timestamp)
-        g_hash_table_insert (properties, "timestamp", simple_string_value (timestamp));
+        value_hash_add_string (properties, "timestamp", timestamp);
 
     if (class)
-        g_hash_table_insert (properties, "class", simple_uint_value (*class));
+        value_hash_add_uint (properties, "class", *class);
 
     return properties;
 }
@@ -556,9 +511,9 @@ sms_parse_pdu (const char *hexpdu, GError **error)
                                           class_valid ? &msg_class : NULL);
     g_assert (properties);
     if (multipart) {
-        g_hash_table_insert (properties, "concat-reference", simple_uint_value (concat_ref));
-        g_hash_table_insert (properties, "concat-max", simple_uint_value (concat_max));
-        g_hash_table_insert (properties, "concat-sequence", simple_uint_value (concat_seq));
+        value_hash_add_uint (properties, "concat-reference", concat_ref);
+        value_hash_add_uint (properties, "concat-max", concat_max);
+        value_hash_add_uint (properties, "concat-sequence", concat_seq);
     }
 
     g_free (smsc_addr);
