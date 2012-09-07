@@ -855,3 +855,110 @@ error:
     g_free (pdu);
     return NULL;
 }
+
+gchar **
+mm_sms_part_util_split_text (const gchar *text,
+                             MMSmsEncoding *encoding)
+{
+    guint gsm_unsupported = 0;
+    gchar **out;
+    guint n_chunks;
+    guint i;
+    guint j;
+    gsize in_len;
+
+    if (!text)
+        return NULL;
+
+    in_len = strlen (text);
+
+    /* Some info about the rules for splitting.
+     *
+     * The User Data can be up to 140 bytes in the SMS part:
+     *  0) If we only need one chunk, it can be of up to 140 bytes.
+     *     If we need more than one chunk, these have to be of 140 - 6 = 134
+     *     bytes each, as we need place for the UDH header.
+     *  1) If we're using GSM7 encoding, this gives us up to 160 characters,
+     *     as we can pack 160 characters of 7bits each into 140 bytes.
+     *      160 * 7 = 140 * 8 = 1120.
+     *     If we only have 134 bytes allowed, that would mean that we can pack
+     *     up to 153 input characters:
+     *      134 * 8 = 1072; 1072/7=153.14
+     *  2) If we're using UCS2 encoding, we can pack up to 70 characters in
+     *     140 bytes (each with 2 bytes), or up to 67 characters in 134 bytes.
+     *
+     * This method does the split of the input string into N strings, so that
+     * each of the strings can be placed in a SMS part.
+     */
+
+    /* Check if we can do GSM encoding */
+    mm_charset_get_encoded_len (text,
+                                MM_MODEM_CHARSET_GSM,
+                                &gsm_unsupported);
+    if (gsm_unsupported > 0) {
+        /* If cannot do it in GSM encoding, do it in UCS-2 */
+        GByteArray *array;
+
+        *encoding = MM_SMS_ENCODING_UCS2;
+
+        /* Guess more or less the size of the output array to avoid multiple
+         * allocations */
+        array = g_byte_array_sized_new (in_len * 2);
+        if (!mm_modem_charset_byte_array_append (array,
+                                                 text,
+                                                 FALSE,
+                                                 MM_MODEM_CHARSET_UCS2)) {
+            g_byte_array_unref (array);
+            return NULL;
+        }
+
+        /* Our bytearray has it in UCS-2 now.
+         * UCS-2 is a fixed-size encoding, which means that the text has exactly
+         * 2 bytes for each unicode point. We can now split this array into
+         * chunks of 67 UCS-2 characters (134 bytes).
+         *
+         * Note that UCS-2 covers unicode points between U+0000 and U+FFFF, which
+         * means that there is no direct relationship between the size of the
+         * input text in UTF-8 and the size of the text in UCS-2. A 3-byte UTF-8
+         * encoded character will still be represented with 2 bytes in UCS-2.
+         */
+        if (array->len <= 140) {
+            out = g_new (gchar *, 2);
+            out[0] = g_strdup (text);
+            out[1] = NULL;
+        } else {
+            n_chunks = array->len / 134;
+            if (array->len % 134 != 0)
+                n_chunks++;
+
+            out = g_new0 (gchar *, n_chunks + 1);
+            for (i = 0, j = 0; i < n_chunks; i++, j += 134) {
+                out[i] = sms_decode_text (&array->data[j],
+                                          MIN (array->len - j, 134),
+                                          MM_SMS_ENCODING_UCS2,
+                                          0);
+            }
+        }
+        g_byte_array_unref (array);
+    } else {
+        /* Do it with GSM encoding */
+        *encoding = MM_SMS_ENCODING_GSM7;
+
+        if (in_len <= 160) {
+            out = g_new (gchar *, 2);
+            out[0] = g_strdup (text);
+            out[1] = NULL;
+        } else {
+            n_chunks = in_len / 153;
+            if (in_len % 153 != 0)
+                n_chunks++;
+
+            out = g_new0 (gchar *, n_chunks + 1);
+            for (i = 0, j = 0; i < n_chunks; i++, j += 153) {
+                out[i] = g_strndup (&text[j], 153);
+            }
+        }
+    }
+
+    return out;
+}

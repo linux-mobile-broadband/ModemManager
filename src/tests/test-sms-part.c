@@ -669,6 +669,136 @@ test_create_pdu_gsm_no_validity (void)
                             1); /* expected_msgstart */
 }
 
+/********************* TEXT SPLIT TESTS *********************/
+
+static void
+common_test_text_split (const gchar *text,
+                        const gchar **expected,
+                        MMSmsEncoding expected_encoding)
+{
+    gchar **out;
+    MMSmsEncoding out_encoding = MM_SMS_ENCODING_UNKNOWN;
+    guint i;
+
+    out = mm_sms_part_util_split_text (text, &out_encoding);
+
+    g_assert (out != NULL);
+    g_assert (out_encoding != MM_SMS_ENCODING_UNKNOWN);
+
+    g_assert_cmpuint (g_strv_length (out), ==, g_strv_length ((gchar **)expected));
+
+    for (i = 0; out[i]; i++) {
+        g_assert_cmpstr (out[i], ==, expected[i]);
+    }
+}
+
+static void
+test_text_split_short (void)
+{
+    const gchar *text = "Hello";
+    const gchar *expected [] = {
+        "Hello",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_GSM7);
+}
+
+static void
+test_text_split_short_ucs2 (void)
+{
+    const gchar *text = "你好";
+    const gchar *expected [] = {
+        "你好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_UCS2);
+}
+
+static void
+test_text_split_max_single_pdu (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789";
+    const gchar *expected [] = {
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_GSM7);
+}
+
+static void
+test_text_split_max_single_pdu_ucs2 (void)
+{
+    /* NOTE: This chinese string contains 210 bytes when encoded in
+     * UTF-8! But still, it can be placed into 140 bytes when in UCS-2
+     */
+    const gchar *text =
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好";
+    const gchar *expected [] = {
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_UCS2);
+}
+
+static void
+test_text_split_two_pdu (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901234567890";
+    const gchar *expected [] = {
+        /* First chunk */
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "012345678901234567890123456789012",
+        /* Second chunk */
+        "34567890",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_GSM7);
+}
+
+static void
+test_text_split_two_pdu_ucs2 (void)
+{
+    const gchar *text =
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好好";
+    const gchar *expected [] = {
+        /* First chunk */
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你",
+        /* Second chunk */
+        "好你好好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_SMS_ENCODING_UCS2);
+}
+
+/************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -708,6 +838,13 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/PDU-Creator/GSM-no-smsc", test_create_pdu_gsm_no_smsc);
     g_test_add_func ("/MM/SMS/PDU-Creator/GSM-3", test_create_pdu_gsm_3);
     g_test_add_func ("/MM/SMS/PDU-Creator/GSM-no-validity", test_create_pdu_gsm_no_validity);
+
+    g_test_add_func ("/MM/SMS/Text-Split/short", test_text_split_short);
+    g_test_add_func ("/MM/SMS/Text-Split/short-UCS2", test_text_split_short_ucs2);
+    g_test_add_func ("/MM/SMS/Text-Split/max-single-pdu", test_text_split_max_single_pdu);
+    g_test_add_func ("/MM/SMS/Text-Split/max-single-pdu-UCS2", test_text_split_max_single_pdu_ucs2);
+    g_test_add_func ("/MM/SMS/Text-Split/two-pdu", test_text_split_two_pdu);
+    g_test_add_func ("/MM/SMS/Text-Split/two-pdu-UCS2", test_text_split_two_pdu_ucs2);
 
     return g_test_run ();
 }

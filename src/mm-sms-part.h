@@ -115,4 +115,7 @@ guint mm_sms_part_encode_address (const gchar *address,
                                   gsize buflen,
                                   gboolean is_smsc);
 
+gchar **mm_sms_part_util_split_text (const gchar *text,
+                                     MMSmsEncoding *encoding);
+
 #endif /* MM_SMS_PART_H */
