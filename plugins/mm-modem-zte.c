@@ -138,7 +138,10 @@ get_allowed_mode_done (MMAtSerialPort *port,
         pref_acq = atoi (str);
         g_free (str);
 
-        if (cm_mode < 0 || cm_mode > 2 || pref_acq < 0 || pref_acq > 2) {
+        if (   cm_mode < 0
+            || (cm_mode > 2 && cm_mode != 6)
+            || pref_acq < 0
+            || (pref_acq > 2 && pref_acq != 6)) {
             info->error = g_error_new (MM_MODEM_ERROR,
                                        MM_MODEM_ERROR_GENERAL,
                                        "Failed to parse the allowed mode response: '%s'",
@@ -146,17 +149,22 @@ get_allowed_mode_done (MMAtSerialPort *port,
             goto done;
         }
 
-        if (cm_mode == 0) {  /* Both 2G and 3G allowed */
+        if (cm_mode == 0) {
+            /* 2G, 3G and LTE allowed. For LTE modems, no 2G/3G preference supported. */
             if (pref_acq == 0)
                 mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
             else if (pref_acq == 1)
                 mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
             else if (pref_acq == 2)
                 mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
+            else if (pref_acq == 6)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED;
         } else if (cm_mode == 1) /* GSM only */
             mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
         else if (cm_mode == 2) /* WCDMA only */
             mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
+        else if (cm_mode == 6) /* LTE only */
+            mode = MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY;
 
         mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
     }
@@ -247,6 +255,10 @@ set_allowed_mode (MMGenericGsm *gsm,
         cm_mode = 2;
         pref_acq = 0;
         break;
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY:
+        cm_mode = 6;
+        pref_acq = 0;
+        break;
     case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
         cm_mode = 0;
         pref_acq = 1;
@@ -254,6 +266,10 @@ set_allowed_mode (MMGenericGsm *gsm,
     case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
         cm_mode = 0;
         pref_acq = 2;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED:
+        cm_mode = 0;
+        pref_acq = 6;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_ANY:
     default:
