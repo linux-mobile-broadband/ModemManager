@@ -810,7 +810,12 @@ modem_power_down (MMIfaceModem *self,
      * keeps access to the SIM */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN=4",
-                              3,
+                              /* The modem usually completes +CFUN=4 within 1-2 seconds,
+                               * but sometimes takes a ridiculously long time (~30-35 seconds).
+                               * It's better to have a long timeout here than to have the
+                               * modem not responding to subsequent AT commands until +CFUN=4
+                               * completes. */
+                              40,
                               FALSE,
                               callback,
                               user_data);
