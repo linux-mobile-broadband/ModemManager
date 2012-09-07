@@ -517,7 +517,7 @@ impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
                                  MMModemGsmAllowedMode mode,
                                  DBusGMethodInvocation *context)
 {
-    if (mode > MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY) {
+    if (mode > MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY) {
         GError *error;
 
         error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
@@ -568,7 +568,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Allowed Mode",
                             "Allowed network access mode",
                             MM_MODEM_GSM_ALLOWED_MODE_ANY,
-                            MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY,
+                            MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY,
                             MM_MODEM_GSM_ALLOWED_MODE_ANY,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 

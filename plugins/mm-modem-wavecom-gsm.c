@@ -788,6 +788,12 @@ set_allowed_mode (MMGenericGsm *gsm,
         case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
             net = 1;
             break;
+        default:
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "Cannot set desired allowed mode %d", mode);
+            mm_callback_info_schedule (info);
+            break;
         }
 
         cmd = g_string_new ("+WWSM=");

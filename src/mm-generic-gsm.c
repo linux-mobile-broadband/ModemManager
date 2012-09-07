@@ -4681,8 +4681,10 @@ set_allowed_mode (MMModemGsmNetwork *net,
     case MM_MODEM_GSM_ALLOWED_MODE_ANY:
     case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
     case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED:
     case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
     case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY:
         if (!MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode) {
             info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
                                                "Operation not supported");
@@ -6152,7 +6154,7 @@ simple_get_allowed_mode (MMCallbackInfo *info,
 
     /* check for new allowed mode first */
     if (simple_get_uint_property (info, "allowed_mode", &allowed_mode, &tmp_error)) {
-        if (allowed_mode > MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY) {
+        if (allowed_mode > MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY) {
             g_set_error (&tmp_error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                          "Invalid allowed mode %d", old_mode);
         } else {

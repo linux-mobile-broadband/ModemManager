@@ -154,6 +154,12 @@
       <tp:enumvalue suffix="3G_ONLY" value="4">
         <tp:docstring>Use only 3G (UMTS or HSxPA)</tp:docstring>
       </tp:enumvalue>
+      <tp:enumvalue suffix="4G_PREFERRED" value="5">
+        <tp:docstring>Prefer 4G (LTE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="4G_ONLY" value="6">
+        <tp:docstring>Use only 4G (LTE)</tp:docstring>
+      </tp:enumvalue>
     </tp:enum>
 
     <tp:enum name="MM_MODEM_GSM_ACCESS_TECH" type="u">
