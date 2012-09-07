@@ -222,7 +222,8 @@ print_modem_info (void)
 {
     gchar *drivers_string;
     gchar *prefixed_revision;
-    gchar *capabilities_string;
+    gchar *modem_capabilities_string;
+    gchar *current_capabilities_string;
     gchar *access_technologies_string;
     gchar *supported_modes_string;
     gchar *allowed_modes_string;
@@ -243,8 +244,10 @@ print_modem_info (void)
 #define VALIDATE_PATH(str) ((str && !g_str_equal (str, "/")) ? str : "none")
 
     /* Strings in heap */
-    capabilities_string = mm_modem_capability_build_string_from_mask (
+    modem_capabilities_string = mm_modem_capability_build_string_from_mask (
         mm_modem_get_modem_capabilities (ctx->modem));
+    current_capabilities_string = mm_modem_capability_build_string_from_mask (
+        mm_modem_get_current_capabilities (ctx->modem));
     access_technologies_string = mm_modem_access_technology_build_string_from_mask (
         mm_modem_get_access_technologies (ctx->modem));
     mm_modem_get_bands (ctx->modem, &bands, &n_bands);
@@ -298,11 +301,13 @@ print_modem_info (void)
              "           |          model: '%s'\n"
              "           |       revision: '%s'\n"
              "           |   capabilities: '%s'\n"
+             "           |        current: '%s'\n"
              "           |   equipment id: '%s'\n",
              VALIDATE_UNKNOWN (mm_modem_get_manufacturer (ctx->modem)),
              VALIDATE_UNKNOWN (mm_modem_get_model (ctx->modem)),
              VALIDATE_UNKNOWN (prefixed_revision),
-             VALIDATE_UNKNOWN (capabilities_string),
+             VALIDATE_UNKNOWN (modem_capabilities_string),
+             VALIDATE_UNKNOWN (current_capabilities_string),
              VALIDATE_UNKNOWN (mm_modem_get_equipment_identifier (ctx->modem)));
 
     /* System related stuff */
@@ -413,7 +418,8 @@ print_modem_info (void)
     g_free (bands_string);
     g_free (supported_bands_string);
     g_free (access_technologies_string);
-    g_free (capabilities_string);
+    g_free (modem_capabilities_string);
+    g_free (current_capabilities_string);
     g_free (prefixed_revision);
     g_free (allowed_modes_string);
     g_free (preferred_mode_string);
