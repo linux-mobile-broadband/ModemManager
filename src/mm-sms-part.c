@@ -715,40 +715,19 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
 {
     guint8 *pdu;
     guint len, offset = 0;
-    MMModemCharset best_cs = MM_MODEM_CHARSET_GSM;
-    guint ucs2len = 0, gsm_unsupported = 0;
-    guint textlen = 0;
+    guint shift = 0;
+    guint8 *udl_ptr;
 
     g_return_val_if_fail (part->number != NULL, NULL);
     g_return_val_if_fail (part->text != NULL, NULL);
 
-    /* FIXME: support multiple fragments. */
-
-    textlen = mm_charset_get_encoded_len (part->text, MM_MODEM_CHARSET_GSM, &gsm_unsupported);
-    if (textlen > 160) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_UNSUPPORTED,
-                             "Cannot encode message to fit into an SMS.");
-        return NULL;
-    }
-
-    /* If there are characters that are unsupported in the GSM charset, try
-     * UCS2.  If the UCS2 encoded string is too long to fit in an SMS, then
-     * just use GSM and suck up the unconverted chars.
-     */
-    if (gsm_unsupported > 0) {
-        ucs2len = mm_charset_get_encoded_len (part->text, MM_MODEM_CHARSET_UCS2, NULL);
-        if (ucs2len <= 140) {
-            best_cs = MM_MODEM_CHARSET_UCS2;
-            textlen = ucs2len;
-        }
-    }
+    mm_dbg ("Creating PDU for part...");
 
     /* Build up the PDU */
     pdu = g_malloc0 (PDU_SIZE);
 
     if (part->smsc) {
+        mm_dbg ("  adding SMSC to PDU...");
         len = mm_sms_part_encode_address (part->smsc, pdu, PDU_SIZE, TRUE);
         if (len == 0) {
             g_set_error (error,
@@ -766,13 +745,28 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     if (out_msgstart)
         *out_msgstart = offset;
 
-    if (part->validity > 0)
+    /* ----------- First BYTE ----------- */
+
+    if (part->validity > 0) {
+        mm_dbg ("  adding validity to PDU...");
         pdu[offset] = 1 << 4; /* TP-VP present; format RELATIVE */
-    else
+    } else
         pdu[offset] = 0;      /* TP-VP not present */
+
+    /* Concatenation sequence only found in multipart SMS */
+    if (part->concat_sequence) {
+        mm_dbg ("  adding UDHI to PDU...");
+        pdu[offset] |= 0x40; /* UDHI */
+    }
+
+    /* TODO: Request status only in last part */
     pdu[offset++] |= 0x01;    /* TP-MTI = SMS-SUBMIT */
 
+    /* ----------- TP-MR (1 byte) ----------- */
+
     pdu[offset++] = 0x00;     /* TP-Message-Reference: filled by device */
+
+    /* ----------- Destination address ----------- */
 
     len = mm_sms_part_encode_address (part->number, &pdu[offset], PDU_SIZE - offset, FALSE);
     if (len == 0) {
@@ -784,23 +778,56 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     }
     offset += len;
 
-    /* TP-PID */
+    /* ----------- TP-PID (1 byte) ----------- */
+
     pdu[offset++] = 0x00;
 
-    /* TP-DCS */
-    if (best_cs == MM_MODEM_CHARSET_UCS2)
-        pdu[offset++] = 0x08;
-    else
-        pdu[offset++] = 0x00;  /* GSM */
+    /* ----------- TP-DCS (1 byte) ----------- */
 
-    /* TP-Validity-Period: 4 days */
+    if (part->encoding == MM_SMS_ENCODING_UCS2) {
+        mm_dbg ("  using UCS2 encoding...");
+        pdu[offset++] = 0x08;
+    } else {
+        mm_dbg ("  using GSM7 encoding...");
+        pdu[offset++] = 0x00;  /* GSM */
+    }
+
+    /* ----------- TP-Validity-Period (1 byte): 4 days ----------- */
+    /* Only if TP-VPF was set in first byte */
+
     if (part->validity > 0)
         pdu[offset++] = validity_to_relative (part->validity);
 
-    /* TP-User-Data-Length */
-    pdu[offset++] = textlen;
+    /* ----------- TP-User-Data-Length ----------- */
+    /* Set to zero initially, and keep a ptr for easy access later */
+    udl_ptr = &pdu[offset];
+    pdu[offset++] = 0;
 
-    if (best_cs == MM_MODEM_CHARSET_GSM) {
+    /* Build UDH */
+    if (part->concat_sequence) {
+        mm_dbg ("  adding UDH header in PDU... (reference: %u, max: %u, sequence: %u)",
+                part->concat_reference,
+                part->concat_max,
+                part->concat_sequence);
+        pdu[offset++] = 0x05; /* udh len */
+        pdu[offset++] = 0x00; /* mid */
+        pdu[offset++] = 0x03; /* data len */
+        pdu[offset++] = (guint8)part->concat_reference;
+        pdu[offset++] = (guint8)part->concat_max;
+        pdu[offset++] = (guint8)part->concat_sequence;
+
+        /* if a UDH is present and the data encoding is the default 7-bit
+         * alphabet, the user data must be 7-bit word aligned after the
+         * UDH. This means up to 6 bits of zeros need to be inserted at the
+         * start of the message.
+         *
+         * In our case the UDH is 6 bytes long, 48bits. The next multiple of
+         * 7 is therefore 49, so we only need to include one bit of padding.
+         */
+        shift = 1;
+    }
+
+    if (part->encoding == MM_SMS_ENCODING_GSM7) {
         guint8 *unpacked, *packed;
         guint32 unlen = 0, packlen = 0;
 
@@ -814,7 +841,15 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
             goto error;
         }
 
-        packed = gsm_pack (unpacked, unlen, 0, &packlen);
+        /* Set real data length, in septets
+         * If we had UDH, add 7 septets
+         */
+        *udl_ptr = part->concat_sequence ? (7 + unlen) : unlen;
+        mm_dbg ("  user data length is '%u' septets (%s UDH)",
+                *udl_ptr,
+                part->concat_sequence ? "with" : "without");
+
+        packed = gsm_pack (unpacked, unlen, shift, &packlen);
         g_free (unpacked);
         if (!packed || packlen == 0) {
             g_free (packed);
@@ -828,11 +863,12 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
         memcpy (&pdu[offset], packed, packlen);
         g_free (packed);
         offset += packlen;
-    } else if (best_cs == MM_MODEM_CHARSET_UCS2) {
+    } else if (part->encoding == MM_SMS_ENCODING_UCS2) {
         GByteArray *array;
 
-        array = g_byte_array_sized_new (textlen / 2);
-        if (!mm_modem_charset_byte_array_append (array, part->text, FALSE, best_cs)) {
+        /* Try to guess a good value for the array */
+        array = g_byte_array_sized_new (strlen (part->text) * 2);
+        if (!mm_modem_charset_byte_array_append (array, part->text, FALSE, MM_MODEM_CHARSET_UCS2)) {
             g_byte_array_free (array, TRUE);
             g_set_error_literal (error,
                                  MM_MESSAGE_ERROR,
@@ -840,6 +876,14 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
                                  "Failed to convert message text to UCS2");
             goto error;
         }
+
+        /* Set real data length, in octets
+         * If we had UDH, add 6 octets
+         */
+        *udl_ptr = part->concat_sequence ? (6 + array->len) : array->len;
+        mm_dbg ("  user data length is '%u' octets (%s UDH)",
+                *udl_ptr,
+                part->concat_sequence ? "with" : "without");
 
         memcpy (&pdu[offset], array->data, array->len);
         offset += array->len;
