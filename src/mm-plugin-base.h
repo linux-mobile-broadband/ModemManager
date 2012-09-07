@@ -39,6 +39,7 @@
 #define MM_PLUGIN_BASE_PORT_CAP_QCDM        0x0400 /* QCDM-capable port */
 #define MM_PLUGIN_BASE_PORT_CAP_AT          0x0800 /* Responds to AT commands */
 #define MM_PLUGIN_BASE_PORT_CAP_IRIDIUM     0x1000 /* Iridium */
+#define MM_PLUGIN_BASE_PORT_CAP_LTE         0x2000 /* LTE */
 
 #define MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK            (mm_plugin_base_supports_task_get_type ())
 #define MM_PLUGIN_BASE_SUPPORTS_TASK(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK, MMPluginBaseSupportsTask))

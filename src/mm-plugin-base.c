@@ -450,6 +450,9 @@ static struct modem_caps modem_caps[] = {
     {"+IS-856",   MM_PLUGIN_BASE_PORT_CAP_IS856},   /* Cmotech */
     {"CIS-856-A", MM_PLUGIN_BASE_PORT_CAP_IS856_A},
     {"CIS-856A",  MM_PLUGIN_BASE_PORT_CAP_IS856_A}, /* Kyocera KPC680 */
+    {"+CLTE2",    MM_PLUGIN_BASE_PORT_CAP_LTE}, /* Novatel */
+    {"+CLTE1",    MM_PLUGIN_BASE_PORT_CAP_LTE}, /* Novatel */
+    {"+CLTE",     MM_PLUGIN_BASE_PORT_CAP_LTE},
     {"+DS",       MM_PLUGIN_BASE_PORT_CAP_DS},
     {"+ES",       MM_PLUGIN_BASE_PORT_CAP_ES},
     {"+MS",       MM_PLUGIN_BASE_PORT_CAP_MS},
