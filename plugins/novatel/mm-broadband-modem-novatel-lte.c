@@ -29,6 +29,7 @@
 #include "mm-sim-novatel-lte.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
@@ -407,6 +408,9 @@ mm_broadband_modem_novatel_lte_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, MM_SMS_STORAGE_SM,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, MM_SMS_STORAGE_SM,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, MM_SMS_STORAGE_SM,
                          NULL);
 }
 
