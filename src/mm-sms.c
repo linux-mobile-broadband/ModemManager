@@ -956,22 +956,47 @@ assemble_sms (MMSms *self,
 
     sorted_parts = g_new0 (MMSmsPart *, self->priv->max_parts);
 
-    /* Check if we have duplicate parts */
-    for (l = self->priv->parts; l; l = g_list_next (l)) {
-        idx = mm_sms_part_get_concat_sequence ((MMSmsPart *)l->data);
-        if (sorted_parts[idx]) {
-            mm_warn ("Duplicate part index (%u) found, ignoring", idx);
-            continue;
+    /* Note that sequence in multipart messages start with '1', while singlepart
+     * messages have '0' as sequence. */
+
+    if (self->priv->max_parts == 1) {
+        if (g_list_length (self->priv->parts) != 1) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Single part message with multiple parts (%u) found",
+                         g_list_length (self->priv->parts));
+            g_free (sorted_parts);
+            return FALSE;
         }
 
-        /* Add the part to the proper index */
-        sorted_parts[idx] = (MMSmsPart *)l->data;
+        sorted_parts[0] = (MMSmsPart *)self->priv->parts->data;
+    } else {
+        /* Check if we have duplicate parts */
+        for (l = self->priv->parts; l; l = g_list_next (l)) {
+            idx = mm_sms_part_get_concat_sequence ((MMSmsPart *)l->data);
+
+            if (idx < 1 || idx > self->priv->max_parts) {
+                mm_warn ("Invalid part index (%u) found, ignoring", idx);
+                continue;
+            }
+
+            if (sorted_parts[idx - 1]) {
+                mm_warn ("Duplicate part index (%u) found, ignoring", idx);
+                continue;
+            }
+
+            /* Add the part to the proper index */
+            sorted_parts[idx - 1] = (MMSmsPart *)l->data;
+        }
     }
 
-    /* Assemble text and data from all parts */
     fulltext = g_string_new ("");
     fulldata = g_byte_array_sized_new (160 * self->priv->max_parts);
 
+    /* Assemble text and data from all parts. Now 'idx' is the index of the
+     * array, so for multipart messages the real index of the part is 'idx + 1'
+     */
     for (idx = 0; idx < self->priv->max_parts; idx++) {
         const gchar *parttext;
         const GByteArray *partdata;
@@ -981,7 +1006,7 @@ assemble_sms (MMSms *self,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
                          "Cannot assemble SMS, missing part at index (%u)",
-                         idx);
+                         self->priv->max_parts == 1 ? idx : idx + 1);
             g_string_free (fulltext, TRUE);
             g_byte_array_free (fulldata, TRUE);
             g_free (sorted_parts);
@@ -990,7 +1015,6 @@ assemble_sms (MMSms *self,
 
         /* When the user creates the SMS, it will have either 'text' or 'data',
          * not both */
-
         parttext = mm_sms_part_get_text (sorted_parts[idx]);
         partdata = mm_sms_part_get_data (sorted_parts[idx]);
 
@@ -999,7 +1023,7 @@ assemble_sms (MMSms *self,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
                          "Cannot assemble SMS, part at index (%u) has neither text nor data",
-                         idx);
+                         self->priv->max_parts == 1 ? idx : idx + 1);
             g_string_free (fulltext, TRUE);
             g_byte_array_free (fulldata, TRUE);
             g_free (sorted_parts);
