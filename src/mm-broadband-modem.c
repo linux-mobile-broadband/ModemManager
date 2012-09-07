@@ -4789,7 +4789,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
         } else {
             /* Don't treat the error as critical */
             mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
-            g_error_free (error);
+            g_clear_error (&error);
         }
     }
 
