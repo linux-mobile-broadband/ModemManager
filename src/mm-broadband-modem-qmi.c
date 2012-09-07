@@ -316,7 +316,33 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
                    output,
                    &mode_preference_mask,
                    NULL)) {
+        QmiNasBandPreference band_preference_mask;
+
         mm_dbg ("Mode preference not reported in system selection preference");
+
+        if (qmi_message_nas_get_system_selection_preference_output_get_band_preference (
+                output,
+                &band_preference_mask,
+                NULL)) {
+            gchar *str;
+
+            str = qmi_nas_band_preference_build_string_from_mask (band_preference_mask);
+            ctx->capabilities = mm_modem_capability_from_qmi_band_preference (band_preference_mask);
+            mm_dbg ("%s bands reported in system selection preference: '%s'",
+                    ctx->capabilities == MM_MODEM_CAPABILITY_NONE ? "Unsupported" : "Valid",
+                    str);
+            g_free (str);
+
+            /* Just the presence of the LTE band preference tells us it's LTE */
+            if (qmi_message_nas_get_system_selection_preference_output_get_lte_band_preference (
+                    output,
+                    NULL,
+                    NULL)) {
+                mm_dbg ("LTE band preference found");
+                ctx->capabilities |= MM_MODEM_CAPABILITY_LTE;
+            }
+        } else
+            mm_dbg ("Band preference not reported in system selection preference");
     } else {
         gchar *str;
 

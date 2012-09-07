@@ -687,6 +687,64 @@ mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyP
 
 /*****************************************************************************/
 
+#define ALL_3GPP2_BANDS                         \
+    (QMI_NAS_BAND_PREFERENCE_BC_0_A_SYSTEM   |  \
+     QMI_NAS_BAND_PREFERENCE_BC_0_B_SYSTEM   |  \
+     QMI_NAS_BAND_PREFERENCE_BC_1_ALL_BLOCKS |  \
+     QMI_NAS_BAND_PREFERENCE_BC_2            |  \
+     QMI_NAS_BAND_PREFERENCE_BC_3_A_SYSTEM   |  \
+     QMI_NAS_BAND_PREFERENCE_BC_4_ALL_BLOCKS |  \
+     QMI_NAS_BAND_PREFERENCE_BC_5_ALL_BLOCKS |  \
+     QMI_NAS_BAND_PREFERENCE_BC_6            |  \
+     QMI_NAS_BAND_PREFERENCE_BC_7            |  \
+     QMI_NAS_BAND_PREFERENCE_BC_8            |  \
+     QMI_NAS_BAND_PREFERENCE_BC_9            |  \
+     QMI_NAS_BAND_PREFERENCE_BC_10           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_11           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_12           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_14           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_15           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_16           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_17           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_18           |  \
+     QMI_NAS_BAND_PREFERENCE_BC_19)
+
+#define ALL_3GPP_BANDS                          \
+    (QMI_NAS_BAND_PREFERENCE_GSM_DCS_1800     | \
+     QMI_NAS_BAND_PREFERENCE_GSM_900_EXTENDED | \
+     QMI_NAS_BAND_PREFERENCE_GSM_900_PRIMARY  | \
+     QMI_NAS_BAND_PREFERENCE_GSM_450          | \
+     QMI_NAS_BAND_PREFERENCE_GSM_480          | \
+     QMI_NAS_BAND_PREFERENCE_GSM_750          | \
+     QMI_NAS_BAND_PREFERENCE_GSM_850          | \
+     QMI_NAS_BAND_PREFERENCE_GSM_900_RAILWAYS | \
+     QMI_NAS_BAND_PREFERENCE_GSM_PCS_1900     | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_2100       | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_PCS_1900   | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_DCS_1800   | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_1700_US    | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_850_US     | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_800        | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_2600       | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_900        | \
+     QMI_NAS_BAND_PREFERENCE_WCDMA_1700_JAPAN)
+
+MMModemCapability
+mm_modem_capability_from_qmi_band_preference (QmiNasBandPreference qmi)
+{
+    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
+
+    if (qmi & ALL_3GPP_BANDS)
+        caps |= MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    if (qmi & ALL_3GPP2_BANDS)
+        caps |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    return caps;
+}
+
+/*****************************************************************************/
+
 MMModemMode
 mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi)
 {
