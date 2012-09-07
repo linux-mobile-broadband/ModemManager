@@ -154,7 +154,6 @@ modem_create_bearer (MMIfaceModem *self,
 /*****************************************************************************/
 /* Current Capabilities loading (Modem interface) */
 
-
 typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientNas *nas_client;
@@ -163,6 +162,7 @@ typedef struct {
     gboolean run_get_system_selection_preference;
     gboolean run_get_technology_preference;
     gboolean run_get_capabilities;
+    MMModemCapability capabilities;
 } LoadCurrentCapabilitiesContext;
 
 static MMModemCapability
@@ -203,7 +203,6 @@ load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
                                                   GAsyncResult *res,
                                                   LoadCurrentCapabilitiesContext *ctx)
 {
-    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
     QmiMessageDmsGetCapabilitiesOutput *output = NULL;
     GError *error = NULL;
 
@@ -235,22 +234,20 @@ load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
         }
 
         /* Final capabilities are the intersection between the Technology
-         * Preference (ie, allowed modes) and the device's capabilities.  If
-         * the Technology Preference was "auto" or unknown we just fall back to
-         * the Get Capabilities response.
+         * Preference (ie, allowed modes) or SSP and the device's capabilities.
+         * If the Technology Preference was "auto" or unknown we just fall back
+         * to the Get Capabilities response.
          */
-        caps = ((MMModemCapability) GPOINTER_TO_UINT (
-                    g_simple_async_result_get_op_res_gpointer (ctx->result)));
-        if (caps == MM_MODEM_CAPABILITY_NONE)
-            caps = mask;
+        if (ctx->capabilities == MM_MODEM_CAPABILITY_NONE)
+            ctx->capabilities = mask;
         else
-            caps &= mask;
+            ctx->capabilities &= mask;
     }
 
     if (output)
         qmi_message_dms_get_capabilities_output_unref (output);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (ctx->capabilities), NULL);
     load_current_capabilities_context_complete_and_free (ctx);
 }
 
@@ -259,7 +256,6 @@ load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
                                                            GAsyncResult *res,
                                                            LoadCurrentCapabilitiesContext *ctx)
 {
-    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
 
@@ -279,24 +275,24 @@ load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
             NULL, /* duration */
             NULL);
         if (preference_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO) {
-            caps = mm_modem_capability_from_qmi_radio_technology_preference (preference_mask);
-            if (caps == MM_MODEM_CAPABILITY_NONE) {
-                gchar *str;
+            gchar *str;
 
-                str = qmi_nas_radio_technology_preference_build_string_from_mask (preference_mask);
-                mm_dbg ("Unsupported modes reported: '%s'", str);
-                g_free (str);
-            }
+            str = qmi_nas_radio_technology_preference_build_string_from_mask (preference_mask);
+            ctx->capabilities = mm_modem_capability_from_qmi_radio_technology_preference (preference_mask);
+            mm_dbg ("%s modes reported in technology preference: '%s'",
+                    ctx->capabilities == MM_MODEM_CAPABILITY_NONE ? "Unsupported" : "Valid",
+                    str);
+            g_free (str);
         }
     }
 
     if (output)
         qmi_message_nas_get_technology_preference_output_unref (output);
 
+    /* Mark as TP already run */
     ctx->run_get_technology_preference = FALSE;
 
     /* Get DMS Capabilities too */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
     load_current_capabilities_context_step (ctx);
 }
 
@@ -305,7 +301,6 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
                                                                  GAsyncResult *res,
                                                                  LoadCurrentCapabilitiesContext *ctx)
 {
-    MMModemCapability caps = MM_MODEM_CAPABILITY_NONE;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
     QmiNasRatModePreference mode_preference_mask = 0;
@@ -323,29 +318,27 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
                    NULL)) {
         mm_dbg ("Mode preference not reported in system selection preference");
     } else {
-        caps = mm_modem_capability_from_qmi_rat_mode_preference (mode_preference_mask);
-        if (caps == MM_MODEM_CAPABILITY_NONE) {
-            gchar *str;
+        gchar *str;
 
-            str = qmi_nas_rat_mode_preference_build_string_from_mask (mode_preference_mask);
-            mm_dbg ("Unsupported capabilities reported: '%s'", str);
-            g_free (str);
-        }
+        str = qmi_nas_rat_mode_preference_build_string_from_mask (mode_preference_mask);
+        ctx->capabilities = mm_modem_capability_from_qmi_rat_mode_preference (mode_preference_mask);
+        mm_dbg ("%s capabilities reported in system selection preference: '%s'",
+                ctx->capabilities == MM_MODEM_CAPABILITY_NONE ? "Unsupported" : "Valid",
+                str);
+        g_free (str);
     }
 
     if (output)
         qmi_message_nas_get_system_selection_preference_output_unref (output);
 
-    if (caps == MM_MODEM_CAPABILITY_NONE) {
-        /* Fall back to Technology Preference */
-        ctx->run_get_system_selection_preference = FALSE;
-        load_current_capabilities_context_step (ctx);
-        return;
-    }
+    /* Mark as SSP already run */
+    ctx->run_get_system_selection_preference = FALSE;
 
-    /* Success */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (caps), NULL);
-    load_current_capabilities_context_complete_and_free (ctx);
+    /* If we got some value, cache it and go on to DMS Get Capabilities */
+    if (ctx->capabilities != MM_MODEM_CAPABILITY_NONE)
+        ctx->run_get_technology_preference = FALSE;
+
+    load_current_capabilities_context_step (ctx);
 }
 
 static void
@@ -435,6 +428,7 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                              callback,
                                              user_data,
                                              modem_load_current_capabilities);
+    ctx->capabilities = MM_MODEM_CAPABILITY_NONE;
 
     /* System selection preference introduced in NAS 1.1 */
     ctx->run_get_system_selection_preference = qmi_client_check_version (nas_client, 1, 1);
