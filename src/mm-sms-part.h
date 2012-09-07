@@ -19,6 +19,13 @@
 
 #include <glib.h>
 
+typedef enum {
+    MM_SMS_ENCODING_UNKNOWN = 0x0,
+    MM_SMS_ENCODING_GSM7,
+    MM_SMS_ENCODING_8BIT,
+    MM_SMS_ENCODING_UCS2
+} MMSmsEncoding;
+
 typedef struct _MMSmsPart MMSmsPart;
 
 #define SMS_MAX_PDU_LEN 344
@@ -76,6 +83,10 @@ void              mm_sms_part_take_data              (MMSmsPart *part,
 guint             mm_sms_part_get_data_coding_scheme (MMSmsPart *part);
 void              mm_sms_part_set_data_coding_scheme (MMSmsPart *part,
                                                       guint data_coding_scheme);
+
+MMSmsEncoding     mm_sms_part_get_encoding           (MMSmsPart *part);
+void              mm_sms_part_set_encoding           (MMSmsPart *part,
+                                                      MMSmsEncoding encoding);
 
 guint             mm_sms_part_get_class              (MMSmsPart *part);
 void              mm_sms_part_set_class              (MMSmsPart *part,

@@ -58,13 +58,6 @@
 #define SMS_TIMESTAMP_LEN 7
 #define SMS_MIN_PDU_LEN (7 + SMS_TIMESTAMP_LEN)
 
-typedef enum {
-    MM_SMS_ENCODING_UNKNOWN = 0x0,
-    MM_SMS_ENCODING_GSM7,
-    MM_SMS_ENCODING_8BIT,
-    MM_SMS_ENCODING_UCS2
-} SmsEncoding;
-
 static char sms_bcd_chars[] = "0123456789*#abc\0\0";
 
 static void
@@ -183,10 +176,10 @@ sms_decode_timestamp (const guint8 *timestamp)
     return timestr;
 }
 
-static SmsEncoding
+static MMSmsEncoding
 sms_encoding_type (int dcs)
 {
-    SmsEncoding scheme = MM_SMS_ENCODING_UNKNOWN;
+    MMSmsEncoding scheme = MM_SMS_ENCODING_UNKNOWN;
 
     switch ((dcs >> 4) & 0xf) {
         /* General data coding group */
@@ -241,7 +234,7 @@ sms_encoding_type (int dcs)
 }
 
 static char *
-sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offset)
+sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_offset)
 {
     char *utf8;
     guint8 *unpacked;
@@ -271,6 +264,7 @@ struct _MMSmsPart {
     gchar *timestamp;
     gchar *number;
     gchar *text;
+    MMSmsEncoding encoding;
     GByteArray *data;
     guint data_coding_scheme;
     guint class;
@@ -301,10 +295,10 @@ mm_sms_part_free (MMSmsPart *self)
         return self->name;                    \
     }
 
-#define PART_SET_UINT_FUNC(name)              \
+#define PART_SET_FUNC(type, name)             \
     void                                      \
     mm_sms_part_set_##name (MMSmsPart *self,  \
-                            guint value)      \
+                            type value)       \
     {                                         \
         self->name = value;                   \
     }
@@ -327,7 +321,7 @@ mm_sms_part_free (MMSmsPart *self)
     }
 
 PART_GET_FUNC (guint, index)
-PART_SET_UINT_FUNC (index)
+PART_SET_FUNC (guint, index)
 PART_GET_FUNC (const gchar *, smsc)
 PART_SET_TAKE_STR_FUNC (smsc)
 PART_GET_FUNC (const gchar *, number)
@@ -335,17 +329,19 @@ PART_SET_TAKE_STR_FUNC (number)
 PART_GET_FUNC (const gchar *, timestamp)
 PART_SET_TAKE_STR_FUNC (timestamp)
 PART_GET_FUNC (guint, concat_max)
-PART_SET_UINT_FUNC (concat_max)
+PART_SET_FUNC (guint, concat_max)
 PART_GET_FUNC (guint, concat_sequence)
-PART_SET_UINT_FUNC (concat_sequence)
+PART_SET_FUNC (guint, concat_sequence)
 PART_GET_FUNC (const gchar *, text)
 PART_SET_TAKE_STR_FUNC (text)
 PART_GET_FUNC (guint, data_coding_scheme)
-PART_SET_UINT_FUNC (data_coding_scheme)
+PART_SET_FUNC (guint, data_coding_scheme)
+PART_GET_FUNC (MMSmsEncoding, encoding)
+PART_SET_FUNC (MMSmsEncoding, encoding)
 PART_GET_FUNC (guint, class)
-PART_SET_UINT_FUNC (class)
+PART_SET_FUNC (guint, class)
 PART_GET_FUNC (guint, validity)
-PART_SET_UINT_FUNC (validity)
+PART_SET_FUNC (guint, validity)
 
 PART_GET_FUNC (guint, concat_reference)
 
@@ -431,7 +427,7 @@ mm_sms_part_new_from_binary_pdu (guint index,
             sender_addr_num_digits, sender_addr_num_octets,
             tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
             user_data_len_offset, bit_offset;
-    SmsEncoding user_data_encoding;
+    MMSmsEncoding user_data_encoding;
     GByteArray *raw;
 
     /* SMSC, in address format, precedes the TPDU */
@@ -573,6 +569,9 @@ mm_sms_part_new_from_binary_pdu (guint index,
         } else
             user_data_len -= udhl;
     }
+
+    /* Keep user data encoding */
+    mm_sms_part_set_encoding (sms_part, user_data_encoding);
 
     if (   user_data_encoding == MM_SMS_ENCODING_8BIT
         || user_data_encoding == MM_SMS_ENCODING_UNKNOWN) {
