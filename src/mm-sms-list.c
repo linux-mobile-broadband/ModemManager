@@ -278,13 +278,6 @@ take_multipart (MMSmsList *self,
     if (!sms)
         return FALSE;
 
-    /* We do export uncomplete multipart messages, in order to be able to
-     *  request removal of all parts of those multipart SMS that will never
-     *  get completed.
-     * Only the STATE of the SMS object will be valid in the exported DBus
-     *  interface.*/
-    mm_sms_export (sms);
-
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_sms_get_path (sms),
