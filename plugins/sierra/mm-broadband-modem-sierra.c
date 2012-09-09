@@ -490,12 +490,12 @@ modem_power_down_finish (MMIfaceModem *self,
 }
 
 static void
-pcstate_disable_ready (MMBaseModem *self,
+modem_power_down_ready (MMBaseModem *self,
                        GAsyncResult *res,
                        GSimpleAsyncResult *simple)
 {
     /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
-     * at!pcstate.
+     * at!pcstate or 3GPP devices support +CFUN=4.
      */
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
 
@@ -522,16 +522,18 @@ modem_power_down (MMIfaceModem *self,
                                   "!pcstate=0",
                                   5,
                                   FALSE,
-                                  (GAsyncReadyCallback)pcstate_disable_ready,
+                                  (GAsyncReadyCallback)modem_power_down_ready,
                                   result);
         return;
     }
 
-    /* For 3GPP modems we should call parent's power down, but there is no
-     * such power down command in MMBroadbandModem, so just finish here. */
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    /* For GSM modems, run AT+CFUN=4 (power save) */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=4",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)modem_power_down_ready,
+                              result);
 }
 
 /*****************************************************************************/
