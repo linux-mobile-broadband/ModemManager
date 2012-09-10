@@ -88,9 +88,7 @@ enum {
     PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
     PROP_MODEM_MESSAGING_SMS_LIST,
     PROP_MODEM_MESSAGING_SMS_PDU_MODE,
-    PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE,
-    PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE,
-    PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE,
+    PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -164,9 +162,7 @@ struct _MMBroadbandModemPrivate {
     GObject *modem_messaging_dbus_skeleton;
     MMBearerList *modem_messaging_sms_list;
     gboolean modem_messaging_sms_pdu_mode;
-    MMSmsStorage modem_messaging_sms_mem1_storage;
-    MMSmsStorage modem_messaging_sms_mem2_storage;
-    MMSmsStorage modem_messaging_sms_mem3_storage;
+    MMSmsStorage modem_messaging_sms_default_storage;
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
@@ -4315,12 +4311,12 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
-/* Set preferred SMS storage (Messaging interface) */
+/* Set default SMS storage (Messaging interface) */
 
 static gboolean
-modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
-                                               GAsyncResult *res,
-                                               GError **error)
+modem_messaging_set_default_storage_finish (MMIfaceModemMessaging *self,
+                                            GAsyncResult *res,
+                                            GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -4342,42 +4338,33 @@ cpms_set_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_messaging_set_preferred_storages (MMIfaceModemMessaging *_self,
-                                        MMSmsStorage mem1,
-                                        MMSmsStorage mem2,
-                                        MMSmsStorage mem3,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data)
+modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
+                                     MMSmsStorage storage,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     gchar *cmd;
     GSimpleAsyncResult *result;
-    gchar *mem1_str;
-    gchar *mem2_str;
-    gchar *mem3_str;
+    gchar *mem_str;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_messaging_set_preferred_storages);
+                                        modem_messaging_set_default_storage);
 
     /* Set defaults as current */
-    self->priv->current_sms_mem1_storage = mem1;
-    self->priv->current_sms_mem2_storage = mem2;
+    self->priv->current_sms_mem2_storage = storage;
 
-    mem1_str = g_ascii_strup (mm_sms_storage_get_string (mem1), -1);
-    mem2_str = g_ascii_strup (mm_sms_storage_get_string (mem2), -1);
-    mem3_str = g_ascii_strup (mm_sms_storage_get_string (mem3), -1);
-    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"", mem1_str, mem2_str, mem3_str);
+    mem_str = g_ascii_strup (mm_sms_storage_get_string (storage), -1);
+    cmd = g_strdup_printf ("+CPMS=\"\",\"%s\",\"%s\"", mem_str, mem_str);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cpms_set_ready,
                               result);
-    g_free (mem1_str);
-    g_free (mem2_str);
-    g_free (mem3_str);
+    g_free (mem_str);
     g_free (cmd);
 }
 
@@ -4562,8 +4549,7 @@ sms_part_ready (MMBroadbandModem *self,
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
                                             MM_SMS_STATE_RECEIVED,
-                                            /* use default reception (mem3) storage */
-                                            self->priv->modem_messaging_sms_mem3_storage);
+                                            self->priv->modem_messaging_sms_default_storage);
     } else {
         /* Don't treat the error as critical */
         mm_dbg ("Error parsing PDU (%d): %s", ctx->idx, error->message);
@@ -7863,14 +7849,8 @@ set_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         self->priv->modem_messaging_sms_pdu_mode = g_value_get_boolean (value);
         break;
-    case PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE:
-        self->priv->modem_messaging_sms_mem1_storage = g_value_get_enum (value);
-        break;
-    case PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE:
-        self->priv->modem_messaging_sms_mem2_storage = g_value_get_enum (value);
-        break;
-    case PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE:
-        self->priv->modem_messaging_sms_mem3_storage = g_value_get_enum (value);
+    case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
+        self->priv->modem_messaging_sms_default_storage = g_value_get_enum (value);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
@@ -7951,14 +7931,8 @@ get_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         g_value_set_boolean (value, self->priv->modem_messaging_sms_pdu_mode);
         break;
-    case PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE:
-        g_value_set_enum (value, self->priv->modem_messaging_sms_mem1_storage);
-        break;
-    case PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE:
-        g_value_set_enum (value, self->priv->modem_messaging_sms_mem2_storage);
-        break;
-    case PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE:
-        g_value_set_enum (value, self->priv->modem_messaging_sms_mem3_storage);
+    case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
+        g_value_set_enum (value, self->priv->modem_messaging_sms_default_storage);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
@@ -7986,9 +7960,9 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_network_supported = TRUE;
     self->priv->modem_cdma_evdo_network_supported = TRUE;
-    self->priv->modem_messaging_sms_mem1_storage = MM_SMS_STORAGE_ME;
-    self->priv->modem_messaging_sms_mem2_storage = MM_SMS_STORAGE_ME;
-    self->priv->modem_messaging_sms_mem3_storage = MM_SMS_STORAGE_ME;
+    self->priv->modem_messaging_sms_default_storage = MM_SMS_STORAGE_ME;
+    self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
+    self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
 }
 
 static void
@@ -8224,8 +8198,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->check_support_finish = modem_messaging_check_support_finish;
     iface->load_supported_storages = modem_messaging_load_supported_storages;
     iface->load_supported_storages_finish = modem_messaging_load_supported_storages_finish;
-    iface->set_preferred_storages = modem_messaging_set_preferred_storages;
-    iface->set_preferred_storages_finish = modem_messaging_set_preferred_storages_finish;
+    iface->set_default_storage = modem_messaging_set_default_storage;
+    iface->set_default_storage_finish = modem_messaging_set_default_storage_finish;
     iface->setup_sms_format = modem_messaging_setup_sms_format;
     iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
     iface->load_initial_sms_parts = modem_messaging_load_initial_sms_parts;
@@ -8354,16 +8328,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
                                       MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE);
 
     g_object_class_override_property (object_class,
-                                      PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE,
-                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE);
-
-    g_object_class_override_property (object_class,
-                                      PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE,
-                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE);
-
-    g_object_class_override_property (object_class,
-                                      PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE,
-                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE);
+                                      PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,

@@ -28,12 +28,10 @@
 #define MM_IS_IFACE_MODEM_MESSAGING(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING))
 #define MM_IFACE_MODEM_MESSAGING_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
 
-#define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON    "iface-modem-messaging-dbus-skeleton"
-#define MM_IFACE_MODEM_MESSAGING_SMS_LIST         "iface-modem-messaging-sms-list"
-#define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE     "iface-modem-messaging-sms-pdu-mode"
-#define MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE "iface-modem-messaging-sms-mem1-storage"
-#define MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE "iface-modem-messaging-sms-mem2-storage"
-#define MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE "iface-modem-messaging-sms-mem3-storage"
+#define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON       "iface-modem-messaging-dbus-skeleton"
+#define MM_IFACE_MODEM_MESSAGING_SMS_LIST            "iface-modem-messaging-sms-list"
+#define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE        "iface-modem-messaging-sms-pdu-mode"
+#define MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE "iface-modem-messaging-sms-default-storage"
 
 typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
 
@@ -63,16 +61,14 @@ struct _MMIfaceModemMessaging {
                                                 GArray **mem3,
                                                 GError **error);
 
-    /* Set preferred storages (async) */
-    void (* set_preferred_storages) (MMIfaceModemMessaging *self,
-                                     MMSmsStorage mem1,
-                                     MMSmsStorage mem2,
-                                     MMSmsStorage mem3,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data);
-    gboolean (*set_preferred_storages_finish) (MMIfaceModemMessaging *self,
-                                               GAsyncResult *res,
-                                               GError **error);
+    /* Set default storage (async) */
+    void (* set_default_storage) (MMIfaceModemMessaging *self,
+                                  MMSmsStorage storage,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gboolean (*set_default_storage_finish) (MMIfaceModemMessaging *self,
+                                            GAsyncResult *res,
+                                            GError **error);
 
     /* Setup SMS format (async) */
     void (* setup_sms_format) (MMIfaceModemMessaging *self,

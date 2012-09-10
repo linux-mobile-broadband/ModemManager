@@ -187,7 +187,7 @@ handle_store (MMSms *self,
     if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
         /* We'll set now the proper storage, taken from the default mem2 one */
         g_object_get (self->priv->modem,
-                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &ctx->storage,
+                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &ctx->storage,
                       NULL);
         g_assert (ctx->storage != MM_SMS_STORAGE_UNKNOWN);
     }

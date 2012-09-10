@@ -4919,12 +4919,12 @@ messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
-/* Set preferred storages (Messaging interface) */
+/* Set default storage (Messaging interface) */
 
 static gboolean
-messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
-                                         GAsyncResult *res,
-                                         GError **error)
+messaging_set_default_storage_finish (MMIfaceModemMessaging *self,
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -4956,29 +4956,11 @@ wms_set_routes_ready (QmiClientWms *client,
 }
 
 static void
-messaging_set_preferred_storages (MMIfaceModemMessaging *self,
-                                  MMSmsStorage mem1,
-                                  MMSmsStorage mem2,
-                                  MMSmsStorage mem3,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
+messaging_set_default_storage (MMIfaceModemMessaging *self,
+                               MMSmsStorage storage,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
-    /* In QMI, we don't need to specify neither a default 'mem1' storage (the
-     * one used for listing, reading, deleting) nor a default 'mem2' storage
-     * (the one used for writing/sending), as the QMI operations allow to
-     * pass the specific storage directly in the command, as opposed to the
-     * AT-way which is specifying the storage first and then performing an
-     * operation on the default storage.
-     *
-     * Whenever a list/read/delete/write/send operation is received, we'll just
-     * read the corresponding property to know in which storage to perform the
-     * action.
-     *
-     * But for 'mem3', we do need to specify custom 'routes' to identify to
-     * which storage the incoming messages should be transferred, so we'll use
-     * that one.
-     */
-
     GSimpleAsyncResult *result;
     QmiClient *client = NULL;
     QmiMessageWmsSetRoutesInput *input;
@@ -4993,7 +4975,7 @@ messaging_set_preferred_storages (MMIfaceModemMessaging *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        messaging_set_preferred_storages);
+                                        messaging_set_default_storage);
 
     /* Build routes array and add it as input
      * Just worry about Class 0 and Class 1 messages for now */
@@ -5001,7 +4983,7 @@ messaging_set_preferred_storages (MMIfaceModemMessaging *self,
     routes_array = g_array_sized_new (FALSE, FALSE, sizeof (route), 2);
     route.message_type = QMI_WMS_MESSAGE_TYPE_POINT_TO_POINT;
     route.message_class = QMI_WMS_MESSAGE_CLASS_0;
-    route.storage = mm_sms_storage_to_qmi_storage_type (mem3);
+    route.storage = mm_sms_storage_to_qmi_storage_type (storage);
     route.receipt_action = QMI_WMS_RECEIPT_ACTION_STORE_AND_NOTIFY;
     g_array_append_val (routes_array, route);
     route.message_class = QMI_WMS_MESSAGE_CLASS_1;
@@ -5932,8 +5914,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->load_supported_storages_finish = messaging_load_supported_storages_finish;
     iface->setup_sms_format = NULL;
     iface->setup_sms_format_finish = NULL;
-    iface->set_preferred_storages = messaging_set_preferred_storages;
-    iface->set_preferred_storages_finish = messaging_set_preferred_storages_finish;
+    iface->set_default_storage = messaging_set_default_storage;
+    iface->set_default_storage_finish = messaging_set_default_storage_finish;
     iface->load_initial_sms_parts = load_initial_sms_parts;
     iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
     iface->setup_unsolicited_events = messaging_setup_unsolicited_events;
