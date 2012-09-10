@@ -100,7 +100,7 @@ gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                                                     const gchar *ati1);
 
 /* Locking/unlocking SMS storages */
-void     mm_broadband_modem_lock_storages            (MMBroadbandModem *self,
+void     mm_broadband_modem_lock_sms_storages        (MMBroadbandModem *self,
                                                       MMSmsStorage mem1, /* reading/listing/deleting */
                                                       MMSmsStorage mem2, /* storing/sending */
                                                       GAsyncReadyCallback callback,

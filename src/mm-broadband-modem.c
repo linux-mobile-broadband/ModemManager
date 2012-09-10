@@ -4219,11 +4219,11 @@ lock_storages_cpms_set_ready (MMBaseModem *self,
 }
 
 void
-mm_broadband_modem_lock_storages (MMBroadbandModem *self,
-                                  MMSmsStorage mem1, /* reading/listing/deleting */
-                                  MMSmsStorage mem2, /* storing/sending */
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
+mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
+                                      MMSmsStorage mem1, /* reading/listing/deleting */
+                                      MMSmsStorage mem2, /* storing/sending */
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     LockSmsStoragesContext *ctx;
     gchar *cmd;
@@ -4255,6 +4255,9 @@ mm_broadband_modem_lock_storages (MMBroadbandModem *self,
                                              callback,
                                              user_data,
                                              mm_broadband_modem_lock_sms_storages);
+
+    ctx->previous_mem1 = self->priv->current_sms_mem1_storage;
+    ctx->previous_mem2 = self->priv->current_sms_mem2_storage;
 
     if (mem1 != MM_SMS_STORAGE_UNKNOWN)
         self->priv->current_sms_mem1_storage = mem1;
@@ -4891,6 +4894,9 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
     const gchar *response;
     GError *error = NULL;
 
+    /* Always always always unlock. Warned you've been. */
+    mm_broadband_modem_unlock_sms_storages (self);
+
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
@@ -4944,22 +4950,21 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
 }
 
 static void
-list_parts_storage_ready (MMBroadbandModem *self,
-                          GAsyncResult *res,
-                          ListPartsContext *ctx)
+list_parts_lock_storages_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                ListPartsContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_messaging_set_preferred_storages_finish (
-            MM_IFACE_MODEM_MESSAGING (self),
-            res,
-            &error)) {
+    if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
+        /* TODO: we should either make this lock() never fail, by automatically
+         * retrying after some time, or otherwise retry here. */
         g_simple_async_result_take_error (ctx->result, error);
         list_parts_context_complete_and_free (ctx);
         return;
     }
 
-    /* Storage now set */
+    /* Storage now set and locked */
 
     /* Get SMS parts from ALL types.
      * Different command to be used if we are on Text or PDU mode */
@@ -4995,12 +5000,11 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
             mm_sms_storage_get_string (storage));
 
     /* First, request to set the proper storage to read from */
-    mm_iface_modem_messaging_set_preferred_storages (self,
-                                                     storage,
-                                                     MM_SMS_STORAGE_UNKNOWN,
-                                                     MM_SMS_STORAGE_UNKNOWN,
-                                                     (GAsyncReadyCallback)list_parts_storage_ready,
-                                                     ctx);
+    mm_broadband_modem_lock_sms_storages (ctx->self,
+                                          storage,
+                                          MM_SMS_STORAGE_UNKNOWN,
+                                          (GAsyncReadyCallback)list_parts_lock_storages_ready,
+                                          ctx);
 }
 
 /*****************************************************************************/
