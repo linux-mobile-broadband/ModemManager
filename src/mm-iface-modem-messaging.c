@@ -675,8 +675,8 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_SMS_FORMAT,
-    ENABLING_STEP_LOAD_INITIAL_SMS_PARTS,
     ENABLING_STEP_STORAGE_DEFAULTS,
+    ENABLING_STEP_LOAD_INITIAL_SMS_PARTS,
     ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_LAST
@@ -794,6 +794,23 @@ load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
 }
 
 static void
+set_default_storages_ready (MMIfaceModemMessaging *self,
+                            GAsyncResult *res,
+                            EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_messaging_set_preferred_storages_finish (self, res, &error)) {
+        mm_dbg ("Couldn't set preferred storages: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on with next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 load_initial_sms_parts_from_storages (EnablingContext *ctx)
 {
     gboolean all_loaded = FALSE;
@@ -827,23 +844,6 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
         (GAsyncReadyCallback)load_initial_sms_parts_ready,
         ctx);
     return;
-}
-
-static void
-set_default_storages_ready (MMIfaceModemMessaging *self,
-                            GAsyncResult *res,
-                            EnablingContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_iface_modem_messaging_set_preferred_storages_finish (self, res, &error)) {
-        mm_dbg ("Couldn't set preferred storages: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    /* Go on with next step */
-    ctx->step++;
-    interface_enabling_step (ctx);
 }
 
 VOID_REPLY_READY_FN (setup_unsolicited_events)
@@ -911,16 +911,6 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
-        /* Allow loading the initial list of SMS parts */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts_finish) {
-            load_initial_sms_parts_from_storages (ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
     case ENABLING_STEP_STORAGE_DEFAULTS:
         /* Set storage defaults */
         mm_dbg ("Setting default preferred storages...");
@@ -931,6 +921,16 @@ interface_enabling_step (EnablingContext *ctx)
                                                          (GAsyncReadyCallback)set_default_storages_ready,
                                                          ctx);
         return;
+
+    case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
+        /* Allow loading the initial list of SMS parts */
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts_finish) {
+            load_initial_sms_parts_from_storages (ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
