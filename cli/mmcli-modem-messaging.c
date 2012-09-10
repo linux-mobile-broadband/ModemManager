@@ -167,9 +167,13 @@ print_messaging_status (void)
     g_print ("\n"
              "%s\n"
              "  ----------------------------\n"
-             "  Messaging | supported storages: '%s'\n",
+             "  Messaging | supported storages: '%s'\n"
+             "            |    default storage: '%s'\n",
              mm_modem_messaging_get_path (ctx->modem_messaging),
-             VALIDATE_UNKNOWN (supported_str));
+             VALIDATE_UNKNOWN (supported_str),
+             VALIDATE_UNKNOWN (mm_sms_storage_get_string (
+                                   mm_modem_messaging_get_default_storage (
+                                       ctx->modem_messaging))));
     g_free (supported_str);
 }
 
