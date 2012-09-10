@@ -268,8 +268,9 @@ set_allowed_mode (MMGenericGsm *gsm,
         pref_acq = 2;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED:
+        /* ZTE modems seen until now do not support LTE preference, so use any mode instead */
         cm_mode = 0;
-        pref_acq = 6;
+        pref_acq = 0;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_ANY:
     default:
