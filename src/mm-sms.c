@@ -862,6 +862,7 @@ typedef struct {
     MMSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
+    gboolean need_unlock;
     GList *current;
     guint n_failed;
 } SmsDeletePartsContext;
@@ -869,8 +870,11 @@ typedef struct {
 static void
 sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
+    g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
+    /* Unlock storages if we had the lock */
+    if (ctx->need_unlock)
+        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem));
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
@@ -946,6 +950,28 @@ delete_next_part (SmsDeletePartsContext *ctx)
 }
 
 static void
+delete_lock_sms_storages_ready (MMBroadbandModem *modem,
+                                GAsyncResult *res,
+                                SmsDeletePartsContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_delete_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We are now locked. Whatever result we have here, we need to make sure
+     * we unlock the storages before finishing. */
+    ctx->need_unlock = TRUE;
+
+    /* Go on deleting parts */
+    ctx->current = ctx->self->priv->parts;
+    delete_next_part (ctx);
+}
+
+static void
 sms_delete (MMSms *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
@@ -960,9 +986,13 @@ sms_delete (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    /* Go on deleting parts */
-    ctx->current = ctx->self->priv->parts;
-    delete_next_part (ctx);
+    /* Select specific storage to delete from */
+    mm_broadband_modem_lock_sms_storages (
+        MM_BROADBAND_MODEM (self->priv->modem),
+        mm_sms_get_storage (self),
+        MM_SMS_STORAGE_UNKNOWN, /* none required for mem2 */
+        (GAsyncReadyCallback)delete_lock_sms_storages_ready,
+        ctx);
 }
 
 /*****************************************************************************/
