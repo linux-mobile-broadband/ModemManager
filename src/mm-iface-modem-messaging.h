@@ -180,6 +180,14 @@ gboolean mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMes
                                                                  GAsyncResult *res,
                                                                  GError **error);
 
+/* Check storage support */
+gboolean mm_iface_modem_messaging_is_storage_supported_for_storing   (MMIfaceModemMessaging *self,
+                                                                      MMSmsStorage storage,
+                                                                      GError **error);
+gboolean mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessaging *self,
+                                                                      MMSmsStorage storage,
+                                                                      GError **error);
+
 /* SMS creation */
 MMSms *mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self);
 

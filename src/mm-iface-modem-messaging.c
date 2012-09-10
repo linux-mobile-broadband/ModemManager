@@ -365,21 +365,10 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
-gboolean
-mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
-                                                        GAsyncResult *res,
-                                                        GError **error)
-{
-    if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish)
-        return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish (self, res, error);
-
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
 static gboolean
 is_storage_supported (GArray *supported,
                       MMSmsStorage preferred,
-                      const gchar *name,
+                      const gchar *action,
                       GError **error)
 {
     guint i;
@@ -398,10 +387,47 @@ is_storage_supported (GArray *supported,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_UNSUPPORTED,
-                 "Storage '%s' is not supported in '%s'",
+                 "Storage '%s' is not supported for %s",
                  mm_sms_storage_get_string (preferred),
-                 name);
+                 action);
     return FALSE;
+}
+
+gboolean
+mm_iface_modem_messaging_is_storage_supported_for_storing (MMIfaceModemMessaging *self,
+                                                           MMSmsStorage storage,
+                                                           GError **error)
+{
+    /* mem2 is for storing */
+    return is_storage_supported ((get_storage_context (self))->supported_mem2,
+                                 storage,
+                                 "storing",
+                                 error);
+}
+
+gboolean
+mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessaging *self,
+                                                             MMSmsStorage storage,
+                                                             GError **error)
+{
+    /* mem3 is for receiving */
+    return is_storage_supported ((get_storage_context (self))->supported_mem3,
+                                 storage,
+                                 "receiving",
+                                 error);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
+                                                        GAsyncResult *res,
+                                                        GError **error)
+{
+    if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish)
+        return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish (self, res, error);
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 void
@@ -431,9 +457,9 @@ mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
 
     /* Check if the requested storages are really supported */
     ctx = get_storage_context (self);
-    if (!is_storage_supported (ctx->supported_mem1, mem1, "mem1", &error) ||
-        !is_storage_supported (ctx->supported_mem2, mem2, "mem2", &error) ||
-        !is_storage_supported (ctx->supported_mem3, mem3, "mem3", &error)) {
+    if (!is_storage_supported (ctx->supported_mem1, mem1, "reading/listing/deleting", &error) ||
+        !is_storage_supported (ctx->supported_mem2, mem2, "storing", &error) ||
+        !is_storage_supported (ctx->supported_mem3, mem3, "receiving", &error)) {
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
                                                    callback,
                                                    user_data,
