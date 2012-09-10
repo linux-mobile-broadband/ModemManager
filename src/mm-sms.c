@@ -25,6 +25,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms.h"
@@ -77,6 +78,7 @@ typedef struct {
     MMSms *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
+    MMSmsStorage storage;
 } HandleStoreContext;
 
 static void
@@ -98,13 +100,7 @@ handle_store_ready (MMSms *self,
     if (!MM_SMS_GET_CLASS (self)->store_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
-        MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
-
-        /* We'll set now the proper storage, taken from the default mem2 one */
-        g_object_get (self->priv->modem,
-                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &storage,
-                      NULL);
-        mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), storage);
+        mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), ctx->storage);
 
         /* Transition from Unknown->Stored for SMS which were created by the user */
         if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN)
@@ -114,19 +110,6 @@ handle_store_ready (MMSms *self,
     }
 
     handle_store_context_free (ctx);
-}
-
-static gboolean
-sms_is_stored (MMSms *self)
-{
-    GList *l;
-
-    for (l = self->priv->parts; l; l = g_list_next (l)) {
-        if (mm_sms_part_get_index ((MMSmsPart *)l->data) == SMS_PART_INVALID_INDEX)
-            return FALSE;
-    }
-
-    return TRUE;
 }
 
 static void
@@ -143,8 +126,28 @@ handle_store_auth_ready (MMBaseModem *modem,
     }
 
     /* First of all, check if we already have the SMS stored. */
-    if (sms_is_stored (ctx->self)) {
-        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+    if (mm_sms_get_storage (ctx->self) != MM_SMS_STORAGE_UNKNOWN) {
+        /* Check if SMS stored in some other storage */
+        if (mm_sms_get_storage (ctx->self) == ctx->storage)
+            /* Good, same storage */
+            mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+        else
+            g_dbus_method_invocation_return_error (
+                ctx->invocation,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_FAILED,
+                "SMS is already stored in storage '%s', cannot store it in storage '%s'",
+                mm_sms_storage_get_string (mm_sms_get_storage (ctx->self)),
+                mm_sms_storage_get_string (ctx->storage));
+        handle_store_context_free (ctx);
+        return;
+    }
+
+    /* Check if the requested storage is allowed for storing */
+    if (!mm_iface_modem_messaging_is_storage_supported_for_storing (MM_IFACE_MODEM_MESSAGING (ctx->modem),
+                                                                    ctx->storage,
+                                                                    &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
@@ -161,13 +164,15 @@ handle_store_auth_ready (MMBaseModem *modem,
     }
 
     MM_SMS_GET_CLASS (ctx->self)->store (ctx->self,
+                                         ctx->storage,
                                          (GAsyncReadyCallback)handle_store_ready,
                                          ctx);
 }
 
 static gboolean
 handle_store (MMSms *self,
-              GDBusMethodInvocation *invocation)
+              GDBusMethodInvocation *invocation,
+              guint32 storage)
 {
     HandleStoreContext *ctx;
 
@@ -177,6 +182,15 @@ handle_store (MMSms *self,
     g_object_get (self,
                   MM_SMS_MODEM, &ctx->modem,
                   NULL);
+    ctx->storage = (MMSmsStorage)storage;
+
+    if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
+        /* We'll set now the proper storage, taken from the default mem2 one */
+        g_object_get (self->priv->modem,
+                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &ctx->storage,
+                      NULL);
+        g_assert (ctx->storage != MM_SMS_STORAGE_UNKNOWN);
+    }
 
     mm_base_modem_authorize (ctx->modem,
                              invocation,
@@ -473,6 +487,8 @@ typedef struct {
     MMSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
+    MMSmsStorage storage;
+    gboolean need_unlock;
     gboolean use_pdu_mode;
     GList *current;
     gchar *msg_data;
@@ -481,8 +497,11 @@ typedef struct {
 static void
 sms_store_context_complete_and_free (SmsStoreContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
+    g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
+    /* Unlock storages if we had the lock */
+    if (ctx->need_unlock)
+        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem));
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->msg_data);
@@ -602,7 +621,30 @@ sms_store_next_part (SmsStoreContext *ctx)
 }
 
 static void
+store_lock_sms_storages_ready (MMBroadbandModem *modem,
+                               GAsyncResult *res,
+                               SmsStoreContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We are now locked. Whatever result we have here, we need to make sure
+     * we unlock the storages before finishing. */
+    ctx->need_unlock = TRUE;
+
+    /* Go on to store the parts */
+    ctx->current = ctx->self->priv->parts;
+    sms_store_next_part (ctx);
+}
+
+static void
 sms_store (MMSms *self,
+           MMSmsStorage storage,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
@@ -616,14 +658,21 @@ sms_store (MMSms *self,
                                              sms_store);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
+    ctx->storage = storage;
 
     /* Different ways to do it if on PDU or text mode */
     g_object_get (self->priv->modem,
                   MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &ctx->use_pdu_mode,
                   NULL);
 
-    ctx->current = self->priv->parts;
-    sms_store_next_part (ctx);
+    /* First, lock storage to use */
+    g_assert (MM_IS_BROADBAND_MODEM (self->priv->modem));
+    mm_broadband_modem_lock_sms_storages (
+        MM_BROADBAND_MODEM (self->priv->modem),
+        MM_SMS_STORAGE_UNKNOWN, /* none required for mem1 */
+        ctx->storage,
+        (GAsyncReadyCallback)store_lock_sms_storages_ready,
+        ctx);
 }
 
 /*****************************************************************************/

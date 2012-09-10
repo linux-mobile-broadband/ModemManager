@@ -192,6 +192,7 @@ sms_store_next_part (SmsStoreContext *ctx)
 
 static void
 sms_store (MMSms *self,
+           MMSmsStorage storage,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
@@ -212,11 +213,9 @@ sms_store (MMSms *self,
                                              sms_store);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
+    ctx->storage = storage;
     g_object_get (self,
                   MM_SMS_MODEM, &ctx->modem,
-                  NULL);
-    g_object_get (ctx->modem,
-                  MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &ctx->storage,
                   NULL);
 
     ctx->current = mm_sms_get_parts (self);

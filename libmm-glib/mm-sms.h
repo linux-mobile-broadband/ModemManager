@@ -61,6 +61,7 @@ gboolean mm_sms_send_sync   (MMSms *self,
                              GError **error);
 
 void     mm_sms_store        (MMSms *self,
+                              MMSmsStorage storage,
                               GCancellable *cancellable,
                               GAsyncReadyCallback callback,
                               gpointer user_data);
@@ -68,6 +69,7 @@ gboolean mm_sms_store_finish (MMSms *self,
                               GAsyncResult *res,
                               GError **error);
 gboolean mm_sms_store_sync   (MMSms *self,
+                              MMSmsStorage storage,
                               GCancellable *cancellable,
                               GError **error);
 

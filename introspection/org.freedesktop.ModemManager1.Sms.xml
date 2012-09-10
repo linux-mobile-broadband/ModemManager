@@ -30,8 +30,15 @@
         Store:
 
         Store the message in the device if not already done.
+
+        This method requires a <link linkend="MMSmsStorage">MMSmsStorage</link>
+        value, describing the storage where this message is to be kept; or
+        <link linkend="MM-SMS-STORAGE-UNKNOWN:CAPS"><constant>MM_SMS_STORAGE_UNKNOWN</constant></link>
+        if the default storage should be used.
     -->
-    <method name="Store" />
+    <method name="Store">
+      <arg name="storage" type="u" direction="in" />
+    </method>
 
     <!--
         State:

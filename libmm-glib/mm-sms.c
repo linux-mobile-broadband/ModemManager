@@ -347,6 +347,7 @@ mm_sms_send_sync (MMSms *self,
 /**
  * mm_sms_store:
  * @self: A #MMSms.
+ * @storage: A #MMSmsStorage specifying where to store the SMS, or #MM_SMS_STORAGE_UNKNOWN to use the default.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -360,6 +361,7 @@ mm_sms_send_sync (MMSms *self,
  */
 void
 mm_sms_store (MMSms *self,
+              MMSmsStorage storage,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -367,6 +369,7 @@ mm_sms_store (MMSms *self,
     g_return_if_fail (MM_GDBUS_IS_SMS (self));
 
     mm_gdbus_sms_call_store (self,
+                             storage,
                              cancellable,
                              callback,
                              user_data);
@@ -395,6 +398,7 @@ mm_sms_store_finish (MMSms *self,
 /**
  * mm_sms_store_sync:
  * @self: A #MMSms.
+ * @storage: A #MMSmsStorage specifying where to store the SMS, or #MM_SMS_STORAGE_UNKNOWN to use the default.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -407,12 +411,14 @@ mm_sms_store_finish (MMSms *self,
  */
 gboolean
 mm_sms_store_sync (MMSms *self,
+                   MMSmsStorage storage,
                    GCancellable *cancellable,
                    GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
 
     return mm_gdbus_sms_call_store_sync (self,
+                                         storage,
                                          cancellable,
                                          error);
 }

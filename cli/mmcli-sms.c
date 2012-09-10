@@ -238,6 +238,7 @@ get_sms_ready (GObject      *source,
     /* Requesting to store the SMS? */
     if (store_flag) {
         mm_sms_store (ctx->sms,
+                      MM_SMS_STORAGE_UNKNOWN,
                       ctx->cancellable,
                       (GAsyncReadyCallback)store_ready,
                       NULL);
@@ -302,6 +303,7 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
         gboolean operation_result;
 
         operation_result = mm_sms_store_sync (ctx->sms,
+                                              MM_SMS_STORAGE_UNKNOWN,
                                               NULL,
                                               &error);
         store_process_reply (operation_result, error);

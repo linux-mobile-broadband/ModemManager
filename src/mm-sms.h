@@ -54,6 +54,7 @@ struct _MMSmsClass {
 
     /* Store the SMS */
     void (* store) (MMSms *self,
+                    MMSmsStorage storage,
                     GAsyncReadyCallback callback,
                     gpointer user_data);
     gboolean (* store_finish) (MMSms *self,
