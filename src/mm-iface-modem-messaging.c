@@ -373,10 +373,6 @@ is_storage_supported (GArray *supported,
 {
     guint i;
 
-    /* We do allow setting UNKNOWN here, so that we set the *default* storage */
-    if (preferred == MM_SMS_STORAGE_UNKNOWN)
-        return TRUE;
-
     if (supported) {
         for (i = 0; i < supported->len; i++) {
             if (preferred == g_array_index (supported, MMSmsStorage, i))
@@ -415,77 +411,6 @@ mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessagi
                                  storage,
                                  "receiving",
                                  error);
-}
-
-/*****************************************************************************/
-
-gboolean
-mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
-                                                        GAsyncResult *res,
-                                                        GError **error)
-{
-    if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish)
-        return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish (self, res, error);
-
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-void
-mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
-                                                 MMSmsStorage mem1,
-                                                 MMSmsStorage mem2,
-                                                 MMSmsStorage mem3,
-                                                 GAsyncReadyCallback callback,
-                                                 gpointer user_data)
-{
-    GError *error = NULL;
-    StorageContext *ctx;
-    MMSmsStorage default_mem1;
-    MMSmsStorage default_mem2;
-    MMSmsStorage default_mem3;
-
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages ||
-        !MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Setting preferred storage is not supported");
-        return;
-    }
-
-    /* Check if the requested storages are really supported */
-    ctx = get_storage_context (self);
-    if (!is_storage_supported (ctx->supported_mem1, mem1, "reading/listing/deleting", &error) ||
-        !is_storage_supported (ctx->supported_mem2, mem2, "storing", &error) ||
-        !is_storage_supported (ctx->supported_mem3, mem3, "receiving", &error)) {
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
-        return;
-    }
-
-    default_mem1 = MM_SMS_STORAGE_UNKNOWN;
-    default_mem2 = MM_SMS_STORAGE_UNKNOWN;
-    default_mem3 = MM_SMS_STORAGE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, &default_mem1,
-                  MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &default_mem2,
-                  MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, &default_mem3,
-                  NULL);
-
-    /* If unknown given, set defaults */
-    if (mem1 == MM_SMS_STORAGE_UNKNOWN)
-        mem1 = default_mem1;
-    if (mem2 == MM_SMS_STORAGE_UNKNOWN)
-        mem2 = default_mem2;
-    if (mem3 == MM_SMS_STORAGE_UNKNOWN)
-        mem3 = default_mem3;
-
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages (
-        self, mem1, mem2, mem3, callback, user_data);
 }
 
 /*****************************************************************************/
@@ -794,13 +719,13 @@ load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
 }
 
 static void
-set_default_storages_ready (MMIfaceModemMessaging *self,
-                            GAsyncResult *res,
-                            EnablingContext *ctx)
+set_preferred_storages_ready (MMIfaceModemMessaging *self,
+                              GAsyncResult *res,
+                              EnablingContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_messaging_set_preferred_storages_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish (self, res, &error)) {
         mm_dbg ("Couldn't set preferred storages: '%s'", error->message);
         g_error_free (error);
     }
@@ -913,14 +838,44 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_STORAGE_DEFAULTS:
         /* Set storage defaults */
-        mm_dbg ("Setting default preferred storages...");
-        mm_iface_modem_messaging_set_preferred_storages (ctx->self,
-                                                         MM_SMS_STORAGE_UNKNOWN,
-                                                         MM_SMS_STORAGE_UNKNOWN,
-                                                         MM_SMS_STORAGE_UNKNOWN,
-                                                         (GAsyncReadyCallback)set_default_storages_ready,
-                                                         ctx);
-        return;
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_preferred_storages &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_preferred_storages_finish) {
+            StorageContext *storage_ctx;
+            MMSmsStorage default_mem1 = MM_SMS_STORAGE_UNKNOWN;
+            MMSmsStorage default_mem2 = MM_SMS_STORAGE_UNKNOWN;
+            MMSmsStorage default_mem3 = MM_SMS_STORAGE_UNKNOWN;
+            GError *error = NULL;
+
+            mm_dbg ("Setting default preferred storages...");
+
+            g_object_get (ctx->self,
+                          MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, &default_mem1,
+                          MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &default_mem2,
+                          MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, &default_mem3,
+                          NULL);
+            g_assert (default_mem1 != MM_SMS_STORAGE_UNKNOWN);
+            g_assert (default_mem2 != MM_SMS_STORAGE_UNKNOWN);
+            g_assert (default_mem3 != MM_SMS_STORAGE_UNKNOWN);
+
+            /* Check if the requested storages are really supported */
+            storage_ctx = get_storage_context (ctx->self);
+            if (!is_storage_supported (storage_ctx->supported_mem1, default_mem1, "reading/listing/deleting", &error) ||
+                !is_storage_supported (storage_ctx->supported_mem2, default_mem2, "storing", &error) ||
+                !is_storage_supported (storage_ctx->supported_mem3, default_mem3, "receiving", &error)) {
+                g_simple_async_result_take_error (ctx->result, error);
+                enabling_context_complete_and_free (ctx);
+                return;
+            }
+
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_preferred_storages (
+                ctx->self,
+                default_mem1, default_mem2, default_mem3,
+                (GAsyncReadyCallback)set_preferred_storages_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
         /* Allow loading the initial list of SMS parts */

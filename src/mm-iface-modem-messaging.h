@@ -169,17 +169,6 @@ gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                              MMSmsState state,
                                              MMSmsStorage storage);
 
-/* Set preferred storages */
-void mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
-                                                      MMSmsStorage mem1,
-                                                      MMSmsStorage mem2,
-                                                      MMSmsStorage mem3,
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-gboolean mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
-                                                                 GAsyncResult *res,
-                                                                 GError **error);
-
 /* Check storage support */
 gboolean mm_iface_modem_messaging_is_storage_supported_for_storing   (MMIfaceModemMessaging *self,
                                                                       MMSmsStorage storage,
