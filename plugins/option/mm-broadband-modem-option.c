@@ -624,6 +624,48 @@ modem_after_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* IMSI loading (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    gchar *imei;
+    gchar *comma;
+
+    imei = g_strdup (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error));
+    if (!imei)
+        return NULL;
+
+    /* IMEI reported by Option modems contain the IMEI plus something else:
+     *
+     * (ttyHS4): --> 'AT+CGSN<CR>'
+     * (ttyHS4): <-- '<CR><LF>357516032005989,TR19A8P11R<CR><LF><CR><LF>OK<CR><LF>'
+     */
+    comma = strchr (imei, ',');
+    if (comma)
+        *comma = '\0';
+
+    mm_dbg ("loaded IMEI: %s", imei);
+    return imei;
+}
+
+static void
+modem_3gpp_load_imei (MMIfaceModem3gpp *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    mm_dbg ("loading (Option) IMEI...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CGSN",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -1099,6 +1141,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 
+    iface->load_imei = modem_3gpp_load_imei;
+    iface->load_imei_finish = modem_3gpp_load_imei_finish;
     iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
