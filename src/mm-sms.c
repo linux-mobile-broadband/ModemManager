@@ -499,9 +499,9 @@ sms_store_context_complete_and_free (SmsStoreContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    /* Unlock storages if we had the lock */
+    /* Unlock mem2 storage if we had the lock */
     if (ctx->need_unlock)
-        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem));
+        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->msg_data);
@@ -872,9 +872,9 @@ sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    /* Unlock storages if we had the lock */
+    /* Unlock mem1 storage if we had the lock */
     if (ctx->need_unlock)
-        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem));
+        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), TRUE, FALSE);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);

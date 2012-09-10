@@ -170,8 +170,9 @@ struct _MMBroadbandModemPrivate {
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
-    gboolean storages_locked;
+    gboolean mem1_storage_locked;
     MMSmsStorage current_sms_mem1_storage;
+    gboolean mem2_storage_locked;
     MMSmsStorage current_sms_mem2_storage;
 
 
@@ -4167,10 +4168,19 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
  */
 
 void
-mm_broadband_modem_unlock_sms_storages (MMBroadbandModem *self)
+mm_broadband_modem_unlock_sms_storages (MMBroadbandModem *self,
+                                        gboolean mem1,
+                                        gboolean mem2)
 {
-    g_assert (self->priv->storages_locked);
-    self->priv->storages_locked = FALSE;
+    if (mem1) {
+        g_assert (self->priv->mem1_storage_locked);
+        self->priv->mem1_storage_locked = FALSE;
+    }
+
+    if (mem2) {
+        g_assert (self->priv->mem2_storage_locked);
+        self->priv->mem2_storage_locked = FALSE;
+    }
 }
 
 gboolean
@@ -4185,7 +4195,9 @@ typedef struct {
     GSimpleAsyncResult *result;
     MMBroadbandModem *self;
     MMSmsStorage previous_mem1;
+    gboolean mem1_locked;
     MMSmsStorage previous_mem2;
+    gboolean mem2_locked;
 } LockSmsStoragesContext;
 
 static void
@@ -4208,9 +4220,14 @@ lock_storages_cpms_set_ready (MMBaseModem *self,
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         /* Reset previous storages and set unlocked */
-        ctx->self->priv->current_sms_mem1_storage = ctx->previous_mem1;
-        ctx->self->priv->current_sms_mem2_storage = ctx->previous_mem2;
-        ctx->self->priv->storages_locked = FALSE;
+        if (ctx->mem1_locked) {
+            ctx->self->priv->current_sms_mem1_storage = ctx->previous_mem1;
+            ctx->self->priv->mem1_storage_locked = FALSE;
+        }
+        if (ctx->mem2_locked) {
+            ctx->self->priv->current_sms_mem2_storage = ctx->previous_mem2;
+            ctx->self->priv->mem2_storage_locked = FALSE;
+        }
     }
     else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -4227,51 +4244,65 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
 {
     LockSmsStoragesContext *ctx;
     gchar *cmd;
-    gchar *mem1_str;
-    gchar *mem2_str;
+    gchar *mem1_str = NULL;
+    gchar *mem2_str = NULL;
 
     /* If storages are currently locked by someone else, just return an
      * error */
-    if (self->priv->storages_locked) {
+    if ((mem1 != MM_SMS_STORAGE_UNKNOWN && self->priv->mem1_storage_locked) ||
+        (mem2 != MM_SMS_STORAGE_UNKNOWN && self->priv->mem2_storage_locked)) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
             user_data,
             MM_CORE_ERROR,
             MM_CORE_ERROR_RETRY,
-            "SMS storages currently locked, try again later");
+            "SMS storage currently locked, try again later");
         return;
     }
 
-    /* Acquire lock */
-    self->priv->storages_locked = TRUE;
-
+    /* We allow locking either just one or both */
     g_assert (mem1 != MM_SMS_STORAGE_UNKNOWN ||
               mem2 != MM_SMS_STORAGE_UNKNOWN);
 
-    ctx = g_slice_new (LockSmsStoragesContext);
+    ctx = g_slice_new0 (LockSmsStoragesContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              mm_broadband_modem_lock_sms_storages);
 
-    ctx->previous_mem1 = self->priv->current_sms_mem1_storage;
-    ctx->previous_mem2 = self->priv->current_sms_mem2_storage;
-
-    if (mem1 != MM_SMS_STORAGE_UNKNOWN)
+    if (mem1 != MM_SMS_STORAGE_UNKNOWN) {
+        ctx->mem1_locked = TRUE;
+        ctx->previous_mem1 = self->priv->current_sms_mem1_storage;
+        self->priv->mem1_storage_locked = TRUE;
         self->priv->current_sms_mem1_storage = mem1;
-    if (mem2 != MM_SMS_STORAGE_UNKNOWN)
+        mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+    }
+
+    if (mem2 != MM_SMS_STORAGE_UNKNOWN) {
+        ctx->mem2_locked = TRUE;
+        ctx->previous_mem2 = self->priv->current_sms_mem2_storage;
+        self->priv->mem2_storage_locked = TRUE;
         self->priv->current_sms_mem2_storage = mem2;
+        mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
+    }
 
     /* We don't touch 'mem3' here */
-    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
-    mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
 
     mm_dbg ("Locking SMS storages to: mem1 (%s), mem2 (%s)...",
-            mem1_str, mem2_str);
+            mem1_str ? mem1_str : "none",
+            mem2_str ? mem2_str : "none");
 
-    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\"", mem1_str, mem2_str);
+    if (mem2_str)
+        cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\"",
+                               mem1_str ? mem1_str : "",
+                               mem2_str);
+    else if (mem1_str)
+        cmd = g_strdup_printf ("+CPMS=\"%s\"", mem1_str);
+    else
+        g_assert_not_reached ();
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
@@ -4894,8 +4925,8 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
     const gchar *response;
     GError *error = NULL;
 
-    /* Always always always unlock. Warned you've been. */
-    mm_broadband_modem_unlock_sms_storages (self);
+    /* Always always always unlock mem1 storage. Warned you've been. */
+    mm_broadband_modem_unlock_sms_storages (self, TRUE, FALSE);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {

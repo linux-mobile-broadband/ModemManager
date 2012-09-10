@@ -108,6 +108,8 @@ void     mm_broadband_modem_lock_sms_storages        (MMBroadbandModem *self,
 gboolean mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
                                                       GAsyncResult *res,
                                                       GError **error);
-void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self);
+void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self,
+                                                      gboolean mem1,
+                                                      gboolean mem2);
 
 #endif /* MM_BROADBAND_MODEM_H */
