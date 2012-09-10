@@ -46,6 +46,7 @@ static Context *ctx;
 static gboolean info_flag; /* set when no action found */
 static gboolean send_flag;
 static gboolean store_flag;
+static gchar *store_in_storage_str;
 
 static GOptionEntry entries[] = {
     { "send", 0, 0, G_OPTION_ARG_NONE, &send_flag,
@@ -53,7 +54,11 @@ static GOptionEntry entries[] = {
       NULL,
     },
     { "store", 0, 0, G_OPTION_ARG_NONE, &store_flag,
-      "Store the SMS in the device.",
+      "Store the SMS in the device, at the default storage",
+      NULL,
+    },
+    { "store-in-storage", 0, 0, G_OPTION_ARG_STRING, &store_in_storage_str,
+      "Store the SMS in the device, at the specified storage",
       NULL,
     },
     { NULL }
@@ -85,7 +90,8 @@ mmcli_sms_options_enabled (void)
         return !!n_actions;
 
     n_actions = (send_flag +
-                 store_flag);
+                 store_flag +
+                 !!store_in_storage_str);
 
     if (n_actions == 0 && mmcli_get_common_sms_string ()) {
         /* default to info */
@@ -245,6 +251,26 @@ get_sms_ready (GObject      *source,
         return;
     }
 
+    /* Requesting to store the SMS in a specific storage? */
+    if (store_in_storage_str) {
+        MMSmsStorage storage;
+        GError *error = NULL;
+
+        storage = mm_common_get_sms_storage_from_string (store_in_storage_str, &error);
+        if (error) {
+            g_printerr ("error: couldn't store the SMS: '%s'\n",
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        mm_sms_store (ctx->sms,
+                      storage,
+                      ctx->cancellable,
+                      (GAsyncReadyCallback)store_ready,
+                      NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -304,6 +330,27 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
 
         operation_result = mm_sms_store_sync (ctx->sms,
                                               MM_SMS_STORAGE_UNKNOWN,
+                                              NULL,
+                                              &error);
+        store_process_reply (operation_result, error);
+        return;
+    }
+
+    /* Requesting to store the SMS in a specific storage? */
+    if (store_in_storage_str) {
+        gboolean operation_result;
+        MMSmsStorage storage;
+        GError *error = NULL;
+
+        storage = mm_common_get_sms_storage_from_string (store_in_storage_str, &error);
+        if (error) {
+            g_printerr ("error: couldn't store the SMS: '%s'\n",
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        operation_result = mm_sms_store_sync (ctx->sms,
+                                              storage,
                                               NULL,
                                               &error);
         store_process_reply (operation_result, error);

@@ -320,7 +320,6 @@ mm_common_get_rm_protocol_from_string (const gchar *str,
 
     enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
 
-
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
             return enum_class->values[i].value;
@@ -354,6 +353,28 @@ mm_common_get_ip_type_from_string (const gchar *str,
                  "Couldn't match '%s' with a valid MMBearerIpFamily value",
                  str);
     return MM_BEARER_IP_FAMILY_UNKNOWN;
+}
+
+MMSmsStorage
+mm_common_get_sms_storage_from_string (const gchar *str,
+                                       GError **error)
+{
+	GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_STORAGE));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMSmsStorage value",
+                 str);
+    return MM_SMS_STORAGE_UNKNOWN;
 }
 
 GVariant *
