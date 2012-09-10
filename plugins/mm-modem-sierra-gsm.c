@@ -230,8 +230,11 @@ set_allowed_mode (MMGenericGsm *gsm,
     MMAtSerialPort *primary;
     char *command;
     int idx = 0;
+    MMModemSierraGsmPrivate *priv;
 
-    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->is_icera) {
+    priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
+
+    if (priv->is_icera) {
         mm_modem_icera_set_allowed_mode (MM_MODEM_ICERA (self), mode, callback, user_data);
         return;
     }
@@ -247,7 +250,7 @@ set_allowed_mode (MMGenericGsm *gsm,
         return;
     }
 
-    if (   MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->has_lte == FALSE
+    if (   priv->has_lte == FALSE
         && (   mode == MM_MODEM_GSM_ALLOWED_MODE_4G_ONLY
             || mode == MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED)) {
         g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
@@ -267,10 +270,16 @@ set_allowed_mode (MMGenericGsm *gsm,
         idx = 6;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
-        idx = 4;
+        if (priv->has_lte)
+            idx = 2; /* 2G preferred not supported, use 2G mode instead */
+        else
+            idx = 4;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
-        idx = 3;
+        if (priv->has_lte)
+            idx = 5; /* 3G preferred not supported, use 2G/3G mode instead */
+        else
+            idx = 3;
         break;
     case MM_MODEM_GSM_ALLOWED_MODE_4G_PREFERRED:
         idx = 7;
