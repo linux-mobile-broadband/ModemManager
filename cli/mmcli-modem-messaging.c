@@ -43,11 +43,16 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
+static gboolean status_flag;
 static gboolean list_flag;
 static gchar *create_str;
 static gchar *delete_str;
 
 static GOptionEntry entries[] = {
+    { "messaging-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show status of messaging support.",
+      NULL
+    },
     { "list-sms", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List SMS messages available in a given modem",
       NULL
@@ -87,7 +92,8 @@ mmcli_modem_messaging_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (list_flag +
+    n_actions = (status_flag +
+                 list_flag +
                  !!create_str +
                  !!delete_str);
 
@@ -95,6 +101,9 @@ mmcli_modem_messaging_options_enabled (void)
         g_printerr ("error: too many Messaging actions requested\n");
         exit (EXIT_FAILURE);
     }
+
+    if (status_flag)
+        mmcli_force_sync_operation ();
 
     checked = TRUE;
     return !!n_actions;
@@ -137,6 +146,31 @@ void
 mmcli_modem_messaging_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+print_messaging_status (void)
+{
+    MMSmsStorage *supported = NULL;
+    guint supported_len = 0;
+    gchar *supported_str = NULL;
+
+    mm_modem_messaging_get_supported_storages (ctx->modem_messaging,
+                                               &supported,
+                                               &supported_len);
+    if (supported)
+        supported_str = mm_common_build_sms_storages_string (supported, supported_len);
+
+#undef VALIDATE_UNKNOWN
+#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+
+    g_print ("\n"
+             "%s\n"
+             "  ----------------------------\n"
+             "  Messaging | supported storages: '%s'\n",
+             mm_modem_messaging_get_path (ctx->modem_messaging),
+             VALIDATE_UNKNOWN (supported_str));
+    g_free (supported_str);
 }
 
 static void
@@ -258,6 +292,9 @@ get_modem_ready (GObject      *source,
 
     ensure_modem_messaging ();
 
+    if (status_flag)
+        g_assert_not_reached ();
+
     /* Request to list SMS? */
     if (list_flag) {
         g_debug ("Asynchronously listing SMS in modem...");
@@ -336,6 +373,13 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
         mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_messaging));
 
     ensure_modem_messaging ();
+
+    /* Request to get location status? */
+    if (status_flag) {
+        g_debug ("Printing messaging status...");
+        print_messaging_status ();
+        return;
+    }
 
     /* Request to list the SMS? */
     if (list_flag) {
