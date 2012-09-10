@@ -46,6 +46,10 @@ gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
 
 const char *mm_strip_tag (const char *str, const char *cmd);
 
+gboolean mm_uint_from_match_item (GMatchInfo *info, guint32 num, guint32 *val);
+
+gboolean mm_int_from_match_item (GMatchInfo *info, guint32 num, gint32 *val);
+
 gboolean mm_cdma_parse_spservice_response (const char *reply,
                                            MMModemCdmaRegistrationState *out_cdma_1x_state,
                                            MMModemCdmaRegistrationState *out_evdo_state);

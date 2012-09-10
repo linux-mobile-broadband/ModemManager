@@ -28,6 +28,7 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 G_DEFINE_TYPE (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA)
 
@@ -133,26 +134,6 @@ strip_response (const char *resp, const char *cmd)
     return p;
 }
 
-static gboolean
-uint_from_match_item (GMatchInfo *match_info, guint32 num, guint32 *val)
-{
-    long int tmp;
-    char *str;
-    gboolean success = FALSE;
-
-    str = g_match_info_fetch (match_info, num);
-    g_return_val_if_fail (str != NULL, FALSE);
-
-    errno = 0;
-    tmp = strtol (str, NULL, 10);
-    if (errno == 0 && tmp >= 0 && tmp <= G_MAXUINT) {
-        *val = (guint32) tmp;
-        success = TRUE;
-    }
-    g_free (str);
-    return success;
-}
-
 static void
 sysinfo_done (MMAtSerialPort *port,
               GString *response,
@@ -192,11 +173,11 @@ sysinfo_done (MMAtSerialPort *port,
         /* At this point the generic code already knows we've been registered */
         reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
 
-        if (uint_from_match_item (match_info, 1, &val)) {
+        if (mm_uint_from_match_item (match_info, 1, &val)) {
             if (val == 2) {
                 /* Service available, check roaming state */
                 val = 0;
-                if (uint_from_match_item (match_info, 3, &val)) {
+                if (mm_uint_from_match_item (match_info, 3, &val)) {
                     if (val == 0)
                         reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
                     else if (val == 1)
@@ -207,7 +188,7 @@ sysinfo_done (MMAtSerialPort *port,
 
         /* Check service type */
         val = 0;
-        if (uint_from_match_item (match_info, 4, &val)) {
+        if (mm_uint_from_match_item (match_info, 4, &val)) {
             if (val == 2)
                 mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
             else if (val == 4)

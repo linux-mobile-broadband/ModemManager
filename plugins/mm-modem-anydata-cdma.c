@@ -29,6 +29,7 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -76,46 +77,6 @@ strip_response (const char *resp, const char *cmd)
     return p;
 }
 
-static gboolean
-uint_from_match_item (GMatchInfo *match_info, guint32 num, guint32 *val)
-{
-    long int tmp;
-    char *str;
-    gboolean success = FALSE;
-
-    str = g_match_info_fetch (match_info, num);
-    g_return_val_if_fail (str != NULL, FALSE);
-
-    errno = 0;
-    tmp = strtol (str, NULL, 10);
-    if (errno == 0 && tmp >= 0 && tmp <= G_MAXUINT) {
-        *val = (guint32) tmp;
-        success = TRUE;
-    }
-    g_free (str);
-    return success;
-}
-
-static gboolean
-int_from_match_item (GMatchInfo *match_info, guint32 num, gint *val)
-{
-    long int tmp;
-    char *str;
-    gboolean success = FALSE;
-
-    str = g_match_info_fetch (match_info, num);
-    g_return_val_if_fail (str != NULL, FALSE);
-
-    errno = 0;
-    tmp = strtol (str, NULL, 10);
-    if (errno == 0 && tmp >= G_MININT && tmp <= G_MAXINT) {
-        *val = (gint) tmp;
-        success = TRUE;
-    }
-    g_free (str);
-    return success;
-}
-
 static void
 evdo_state_done (MMAtSerialPort *port,
                  GString *response,
@@ -156,10 +117,10 @@ evdo_state_done (MMAtSerialPort *port,
         gint dbm = 0;
 
         /* dBm is between -106 (worst) and -20.7 (best) */
-        int_from_match_item (match_info, 6, &dbm);
+        mm_int_from_match_item (match_info, 6, &dbm);
 
         /* Parse the EVDO radio state */
-        if (uint_from_match_item (match_info, 1, &val)) {
+        if (mm_uint_from_match_item (match_info, 1, &val)) {
             switch (val) {
             case 3:  /* IDLE */
                 /* If IDLE and the EVDO dBm is -105 or lower, assume no service.
@@ -231,10 +192,10 @@ state_done (MMAtSerialPort *port,
         gint dbm = 0;
 
         /* dBm is between -106 (worst) and -20.7 (best) */
-        int_from_match_item (match_info, 6, &dbm);
+        mm_int_from_match_item (match_info, 6, &dbm);
 
         /* Parse the 1x radio state */
-        if (uint_from_match_item (match_info, 5, &val)) {
+        if (mm_uint_from_match_item (match_info, 5, &val)) {
             switch (val) {
             case 1:  /* IDLE */
                 /* If IDLE and the 1X dBm is -105 or lower, assume no service.
