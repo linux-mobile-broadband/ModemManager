@@ -63,20 +63,6 @@ mm_modem_anydata_cdma_new (const char *device,
 
 /*****************************************************************************/
 
-static const char *
-strip_response (const char *resp, const char *cmd)
-{
-    const char *p = resp;
-
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-        while (*p == ' ')
-            p++;
-    }
-    return p;
-}
-
 static void
 evdo_state_done (MMAtSerialPort *port,
                  GString *response,
@@ -100,7 +86,7 @@ evdo_state_done (MMAtSerialPort *port,
         return;
     }
 
-    reply = strip_response (response->str, "*HSTATE:");
+    reply = mm_strip_tag (response->str, "*HSTATE:");
 
     /* Format is "<at state>,<session state>,<channel>,<pn>,<EcIo>,<rssi>,..." */
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([^,\\)]*)\\s*,\\s*([^,\\)]*)\\s*,.*",
@@ -175,7 +161,7 @@ state_done (MMAtSerialPort *port,
         return;
     }
 
-    reply = strip_response (response->str, "*STATE:");
+    reply = mm_strip_tag (response->str, "*STATE:");
 
     /* Format is "<channel>,<pn>,<sid>,<nid>,<state>,<rssi>,..." */
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([^,\\)]*)\\s*,.*",

@@ -120,20 +120,6 @@ handle_evdo_quality_change (MMAtSerialPort *port,
 
 /*****************************************************************************/
 
-static const char *
-strip_response (const char *resp, const char *cmd)
-{
-    const char *p = resp;
-
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-        while (*p == ' ')
-            p++;
-    }
-    return p;
-}
-
 static void
 sysinfo_done (MMAtSerialPort *port,
               GString *response,
@@ -155,7 +141,7 @@ sysinfo_done (MMAtSerialPort *port,
         goto done;
     }
 
-    reply = strip_response (response->str, "^SYSINFO:");
+    reply = mm_strip_tag (response->str, "^SYSINFO:");
 
     /* Format is "<srv_status>,<srv_domain>,<roam_status>,<sys_mode>,<sim_state>" */
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)",
