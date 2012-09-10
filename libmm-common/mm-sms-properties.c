@@ -23,12 +23,13 @@
 
 G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 
-#define PROPERTY_TEXT      "text"
-#define PROPERTY_DATA      "data"
-#define PROPERTY_NUMBER    "number"
-#define PROPERTY_SMSC      "smsc"
-#define PROPERTY_VALIDITY  "validity"
-#define PROPERTY_CLASS     "class"
+#define PROPERTY_TEXT                    "text"
+#define PROPERTY_DATA                    "data"
+#define PROPERTY_NUMBER                  "number"
+#define PROPERTY_SMSC                    "smsc"
+#define PROPERTY_VALIDITY                "validity"
+#define PROPERTY_CLASS                   "class"
+#define PROPERTY_DELIVERY_REPORT_REQUEST "delivery-report-request"
 
 struct _MMSmsPropertiesPrivate {
     gchar *text;
@@ -39,6 +40,8 @@ struct _MMSmsPropertiesPrivate {
     guint validity;
     gboolean class_set;
     guint class;
+    gboolean delivery_report_request_set;
+    gboolean delivery_report_request;
 };
 
 /*****************************************************************************/
@@ -123,6 +126,16 @@ mm_sms_properties_set_class (MMSmsProperties *self,
     self->priv->class = class;
 }
 
+void
+mm_sms_properties_set_delivery_report_request (MMSmsProperties *self,
+                                               gboolean request)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->delivery_report_request_set = TRUE;
+    self->priv->delivery_report_request = request;
+}
+
 /*****************************************************************************/
 
 const gchar *
@@ -193,6 +206,14 @@ mm_sms_properties_get_class (MMSmsProperties *self)
     return self->priv->class;
 }
 
+gboolean
+mm_sms_properties_get_delivery_report_request (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), FALSE);
+
+    return self->priv->delivery_report_request;
+}
+
 /*****************************************************************************/
 
 GVariant *
@@ -250,6 +271,12 @@ mm_sms_properties_get_dictionary (MMSmsProperties *self)
                                PROPERTY_CLASS,
                                g_variant_new_uint32 (self->priv->class));
 
+    if (self->priv->delivery_report_request_set)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_DELIVERY_REPORT_REQUEST,
+                               g_variant_new_boolean (self->priv->delivery_report_request));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -272,6 +299,28 @@ parse_uint (const gchar *str,
                  "Invalid properties string, cannot parse '%s' as uint",
                  str);
     return 0;
+}
+
+static gboolean
+parse_boolean (const gchar *str,
+               GError **error)
+{
+    if (g_ascii_strcasecmp (str, "yes") == 0 ||
+        g_ascii_strcasecmp (str, "true") == 0 ||
+        g_str_equal (str, "1"))
+        return TRUE;
+
+    if (g_ascii_strcasecmp (str, "no") == 0 ||
+        g_ascii_strcasecmp (str, "false") == 0 ||
+        g_str_equal (str, "0"))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Invalid properties string, cannot parse '%s' as boolean",
+                 str);
+    return FALSE;
 }
 
 static gboolean
@@ -308,7 +357,18 @@ consume_string (MMSmsProperties *self,
         }
 
         mm_sms_properties_set_class (self, n);
-    } else if (g_str_equal (key, PROPERTY_DATA)) {
+    } else if (g_str_equal (key, PROPERTY_DELIVERY_REPORT_REQUEST)) {
+        GError *inner_error = NULL;
+        gboolean request;
+
+        request = parse_boolean (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+
+        mm_sms_properties_set_delivery_report_request (self, request);
+    }  else if (g_str_equal (key, PROPERTY_DATA)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
@@ -404,6 +464,10 @@ consume_variant (MMSmsProperties *properties,
         mm_sms_properties_set_class (
             properties,
             g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_DELIVERY_REPORT_REQUEST))
+        mm_sms_properties_set_delivery_report_request (
+            properties,
+            g_variant_get_boolean (value));
     else {
         /* Set error */
         g_set_error (error,

@@ -96,6 +96,10 @@ guint             mm_sms_part_get_validity           (MMSmsPart *part);
 void              mm_sms_part_set_validity           (MMSmsPart *part,
                                                       guint validity);
 
+gboolean          mm_sms_part_get_delivery_report_request (MMSmsPart *part);
+void              mm_sms_part_set_delivery_report_request (MMSmsPart *part,
+                                                           gboolean delivery_report_request);
+
 guint             mm_sms_part_get_concat_reference   (MMSmsPart *part);
 void              mm_sms_part_set_concat_reference   (MMSmsPart *part,
                                                       guint concat_reference);

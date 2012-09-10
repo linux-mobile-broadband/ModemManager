@@ -1183,6 +1183,8 @@ assemble_sms (MMSms *self,
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
                   "timestamp", mm_sms_part_get_timestamp (sorted_parts[0]),
                   "validity",  mm_sms_part_get_validity (sorted_parts[0]),
+                  /* delivery report request usually set in the last part only */
+                  "delivery-report-request", mm_sms_part_get_delivery_report_request (sorted_parts[self->priv->max_parts - 1]),
                   NULL);
 
     g_string_free (fulltext, TRUE);
@@ -1397,6 +1399,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
             mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
             mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));
             mm_sms_part_set_class (part, mm_sms_properties_get_class (properties));
+            mm_sms_part_set_delivery_report_request (part, mm_sms_properties_get_delivery_report_request (properties));
             mm_sms_part_set_concat_reference (part, reference);
             mm_sms_part_set_concat_sequence (part, i + 1);
             mm_sms_part_set_concat_max (part, n_parts);
@@ -1437,6 +1440,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
     mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
     mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));
     mm_sms_part_set_class (part, mm_sms_properties_get_class (properties));
+    mm_sms_part_set_delivery_report_request (part, mm_sms_properties_get_delivery_report_request (properties));
 
     return mm_sms_singlepart_new (modem,
                                   MM_SMS_STATE_UNKNOWN,

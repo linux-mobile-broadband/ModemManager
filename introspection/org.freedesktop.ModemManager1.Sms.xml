@@ -103,6 +103,13 @@
     <property name="Class" type="u" access="readwrite" />
 
     <!--
+        DeliveryReportRequest:
+
+        #TRUE if delivery report request is required, #FALSE otherwise.
+    -->
+    <property name="DeliveryReportRequest" type="b" access="readwrite" />
+
+    <!--
         Timestamp:
 
         Time message was received or was sent, in

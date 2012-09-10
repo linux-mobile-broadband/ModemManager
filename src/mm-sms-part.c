@@ -269,6 +269,7 @@ struct _MMSmsPart {
     guint data_coding_scheme;
     guint class;
     guint validity;
+    gboolean delivery_report_request;
 
     gboolean should_concat;
     guint concat_reference;
@@ -342,6 +343,8 @@ PART_GET_FUNC (guint, class)
 PART_SET_FUNC (guint, class)
 PART_GET_FUNC (guint, validity)
 PART_SET_FUNC (guint, validity)
+PART_GET_FUNC (gboolean, delivery_report_request)
+PART_SET_FUNC (gboolean, delivery_report_request)
 
 PART_GET_FUNC (guint, concat_reference)
 
@@ -759,8 +762,18 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
         pdu[offset] |= 0x40; /* UDHI */
     }
 
-    /* TODO: Request status only in last part */
-    pdu[offset++] |= 0x01;    /* TP-MTI = SMS-SUBMIT */
+    /* Delivery report requested in singlepart messages or in the last PDU of
+     * multipart messages */
+    if (part->delivery_report_request &&
+        (!part->concat_sequence ||
+         part->concat_max == part->concat_sequence)) {
+        mm_dbg ("  requesting delivery report...");
+        pdu[offset] |= 0x20;
+    }
+
+    /* TP-MTI = SMS-SUBMIT */
+    pdu[offset++] |= 0x01;
+
 
     /* ----------- TP-MR (1 byte) ----------- */
 
