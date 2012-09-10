@@ -120,7 +120,8 @@ get_rssi_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemCdma *parent_iface;
-    int qual;
+    int cdma_qual = 0, evdo_qual = 0;
+    int composite_qual = 0;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -134,19 +135,27 @@ get_rssi_done (MMAtSerialPort *port,
         return;
     }
 
-    /* Parse the signal quality */
-    qual = get_one_qual (response->str, "RX0=");
-    if (qual < 0)
-        qual = get_one_qual (response->str, "1x RSSI=");
-    if (qual < 0)
-        qual = get_one_qual (response->str, "RX1=");
+    /* When the modem is using CDMA 1x, the RSSI will be prefixed with
+     * "1x RSSI".  When using EVDO, the RSSI will be prefixed with "RX0".
+     */
 
-    if (qual >= 0) {
-        mm_callback_info_set_result (info, GUINT_TO_POINTER ((guint32) qual), NULL);
-        mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (info->modem), (guint32) qual);
+    evdo_qual = get_one_qual (response->str, "RX0=");
+    if (evdo_qual >= 0) {
+        mm_generic_cdma_update_evdo_quality (MM_GENERIC_CDMA (info->modem), (guint32) evdo_qual);
+        composite_qual = evdo_qual;
     } else {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                    "%s", "Could not parse signal quality results");
+        cdma_qual = get_one_qual (response->str, "1x RSSI=");
+        if (cdma_qual >= 0) {
+            mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (info->modem), (guint32) cdma_qual);
+            composite_qual = cdma_qual;
+        }
+    }
+
+    if (composite_qual >= 0)
+        mm_callback_info_set_result (info, GUINT_TO_POINTER ((guint32) composite_qual), NULL);
+    else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse signal quality results");
     }
 
     mm_callback_info_schedule (info);
