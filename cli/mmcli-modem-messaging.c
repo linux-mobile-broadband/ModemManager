@@ -53,15 +53,15 @@ static GOptionEntry entries[] = {
       "Show status of messaging support.",
       NULL
     },
-    { "list-sms", 0, 0, G_OPTION_ARG_NONE, &list_flag,
+    { "messaging-list-sms", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List SMS messages available in a given modem",
       NULL
     },
-    { "create-sms", 0, 0, G_OPTION_ARG_STRING, &create_str,
+    { "messaging-create-sms", 0, 0, G_OPTION_ARG_STRING, &create_str,
       "Create a new SMS in a given modem",
       "[\"key=value,...\"]"
     },
-    { "delete-sms", 0, 0, G_OPTION_ARG_STRING, &delete_str,
+    { "messaging-delete-sms", 0, 0, G_OPTION_ARG_STRING, &delete_str,
       "Delete a SMS from a given modem",
       "[PATH]"
     },
