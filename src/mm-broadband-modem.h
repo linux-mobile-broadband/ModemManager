@@ -22,6 +22,7 @@
 #include <glib-object.h>
 
 #include "mm-base-modem.h"
+#include "ModemManager-enums.h"
 
 #define MM_TYPE_BROADBAND_MODEM            (mm_broadband_modem_get_type ())
 #define MM_BROADBAND_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BROADBAND_MODEM, MMBroadbandModem))
@@ -97,5 +98,16 @@ gchar *mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem 
 gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                                                     const gchar *ati,
                                                     const gchar *ati1);
+
+/* Locking/unlocking SMS storages */
+void     mm_broadband_modem_lock_storages            (MMBroadbandModem *self,
+                                                      MMSmsStorage mem1, /* reading/listing/deleting */
+                                                      MMSmsStorage mem2, /* storing/sending */
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+gboolean mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
+                                                      GAsyncResult *res,
+                                                      GError **error);
+void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self);
 
 #endif /* MM_BROADBAND_MODEM_H */

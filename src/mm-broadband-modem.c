@@ -170,6 +170,10 @@ struct _MMBroadbandModemPrivate {
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
+    gboolean storages_locked;
+    MMSmsStorage current_sms_mem1_storage;
+    MMSmsStorage current_sms_mem2_storage;
+
 
     /*<--- Modem Time interface --->*/
     /* Properties */
@@ -4141,6 +4145,142 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Lock/unlock SMS storage (Messaging interface implementation helper)
+ *
+ * The basic commands to work with SMS storages play with AT+CPMS and three
+ * different storages: mem1, mem2 and mem3.
+ *   'mem1' is the storage for reading, listing and deleting.
+ *   'mem2' is the storage for writing and sending from storage.
+ *   'mem3' is the storage for receiving.
+ *
+ * When a command is to be issued for a specific storage, we need a way to
+ * lock the access so that other actions are forbidden until the current one
+ * finishes. Just think of two sequential actions to store two different
+ * SMS into 2 different storages. If the second action is run while the first
+ * one is still running, we should issue a RETRY error.
+ *
+ * Note that mem3 cannot be locked; we just set the default mem3 and that's it.
+ *
+ * When we unlock the storage, we don't go back to the default storage
+ * automatically, we just keep track of which is the current one and only go to
+ * the default one if needed.
+ */
+
+void
+mm_broadband_modem_unlock_sms_storages (MMBroadbandModem *self)
+{
+    g_assert (self->priv->storages_locked);
+    self->priv->storages_locked = FALSE;
+}
+
+gboolean
+mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModem *self;
+    MMSmsStorage previous_mem1;
+    MMSmsStorage previous_mem2;
+} LockSmsStoragesContext;
+
+static void
+lock_sms_storages_context_complete_and_free (LockSmsStoragesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LockSmsStoragesContext, ctx);
+}
+
+static void
+lock_storages_cpms_set_ready (MMBaseModem *self,
+                              GAsyncResult *res,
+                              LockSmsStoragesContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        /* Reset previous storages and set unlocked */
+        ctx->self->priv->current_sms_mem1_storage = ctx->previous_mem1;
+        ctx->self->priv->current_sms_mem2_storage = ctx->previous_mem2;
+        ctx->self->priv->storages_locked = FALSE;
+    }
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+
+    lock_sms_storages_context_complete_and_free (ctx);
+}
+
+void
+mm_broadband_modem_lock_storages (MMBroadbandModem *self,
+                                  MMSmsStorage mem1, /* reading/listing/deleting */
+                                  MMSmsStorage mem2, /* storing/sending */
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    LockSmsStoragesContext *ctx;
+    gchar *cmd;
+    gchar *mem1_str;
+    gchar *mem2_str;
+
+    /* If storages are currently locked by someone else, just return an
+     * error */
+    if (self->priv->storages_locked) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_RETRY,
+            "SMS storages currently locked, try again later");
+        return;
+    }
+
+    /* Acquire lock */
+    self->priv->storages_locked = TRUE;
+
+    g_assert (mem1 != MM_SMS_STORAGE_UNKNOWN ||
+              mem2 != MM_SMS_STORAGE_UNKNOWN);
+
+    ctx = g_slice_new (LockSmsStoragesContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_broadband_modem_lock_sms_storages);
+
+    if (mem1 != MM_SMS_STORAGE_UNKNOWN)
+        self->priv->current_sms_mem1_storage = mem1;
+    if (mem2 != MM_SMS_STORAGE_UNKNOWN)
+        self->priv->current_sms_mem2_storage = mem2;
+
+    /* We don't touch 'mem3' here */
+    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+    mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
+
+    mm_dbg ("Locking SMS storages to: mem1 (%s), mem2 (%s)...",
+            mem1_str, mem2_str);
+
+    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\"", mem1_str, mem2_str);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)lock_storages_cpms_set_ready,
+                              ctx);
+    g_free (mem1_str);
+    g_free (mem2_str);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Set preferred SMS storage (Messaging interface) */
 
 static gboolean
@@ -4168,13 +4308,14 @@ cpms_set_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
+modem_messaging_set_preferred_storages (MMIfaceModemMessaging *_self,
                                         MMSmsStorage mem1,
                                         MMSmsStorage mem2,
                                         MMSmsStorage mem3,
                                         GAsyncReadyCallback callback,
                                         gpointer user_data)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     gchar *cmd;
     GSimpleAsyncResult *result;
     gchar *mem1_str;
@@ -4185,6 +4326,10 @@ modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
                                         callback,
                                         user_data,
                                         modem_messaging_set_preferred_storages);
+
+    /* Set defaults as current */
+    self->priv->current_sms_mem1_storage = mem1;
+    self->priv->current_sms_mem2_storage = mem2;
 
     mem1_str = g_ascii_strup (mm_sms_storage_get_string (mem1), -1);
     mem2_str = g_ascii_strup (mm_sms_storage_get_string (mem2), -1);
