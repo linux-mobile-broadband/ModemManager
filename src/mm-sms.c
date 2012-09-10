@@ -682,6 +682,7 @@ typedef struct {
     MMSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
+    gboolean need_unlock;
     gboolean from_storage;
     gboolean use_pdu_mode;
     GList *current;
@@ -693,6 +694,9 @@ sms_send_context_complete_and_free (SmsSendContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+    /* Unlock mem2 storage if we had the lock */
+    if (ctx->need_unlock)
+        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->msg_data);
@@ -829,6 +833,28 @@ sms_send_next_part (SmsSendContext *ctx)
 }
 
 static void
+send_lock_sms_storages_ready (MMBroadbandModem *modem,
+                              GAsyncResult *res,
+                              SmsSendContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We are now locked. Whatever result we have here, we need to make sure
+     * we unlock the storages before finishing. */
+    ctx->need_unlock = TRUE;
+
+    /* Go on to send the parts */
+    ctx->current = ctx->self->priv->parts;
+    sms_send_next_part (ctx);
+}
+
+static void
 sms_send (MMSms *self,
           GAsyncReadyCallback callback,
           gpointer user_data)
@@ -846,12 +872,22 @@ sms_send (MMSms *self,
 
     /* If the SMS is STORED, try to send from storage */
     ctx->from_storage = (mm_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
-    if (!ctx->from_storage)
-        /* Different ways to do it if on PDU or text mode */
-        g_object_get (self->priv->modem,
-                      MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &ctx->use_pdu_mode,
-                      NULL);
+    if (ctx->from_storage) {
+        /* When sending from storage, first lock storage to use */
+        g_assert (MM_IS_BROADBAND_MODEM (self->priv->modem));
+        mm_broadband_modem_lock_sms_storages (
+            MM_BROADBAND_MODEM (self->priv->modem),
+            MM_SMS_STORAGE_UNKNOWN, /* none required for mem1 */
+            mm_sms_get_storage (self),
+            (GAsyncReadyCallback)send_lock_sms_storages_ready,
+            ctx);
+        return;
+    }
 
+    /* Different ways to do it if on PDU or text mode */
+    g_object_get (self->priv->modem,
+                  MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &ctx->use_pdu_mode,
+                  NULL);
     ctx->current = self->priv->parts;
     sms_send_next_part (ctx);
 }
