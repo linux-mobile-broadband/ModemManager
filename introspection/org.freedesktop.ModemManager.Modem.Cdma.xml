@@ -60,7 +60,9 @@
 
     <method name="GetSignalQuality">
       <tp:docstring>
-        Get the current signal quality.
+        Get the current signal quality. EVDO signal quality is returned if
+        the device is registered with an EVDO network, otherwise CDMA1x quality
+        is returned.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_signal_quality"/>
@@ -103,7 +105,9 @@
       </tp:docstring>
       <arg name="quality" type="u">
         <tp:docstring>
-          The new quality in percent, 0..100.
+          The new quality in percent, 0..100.  The quality is EVDO signal quality
+          if the device is registered with an EVDO network, otherwise it is
+          CDMA1x quality.
         </tp:docstring>
       </arg>
     </signal>

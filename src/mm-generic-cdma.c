@@ -57,6 +57,8 @@ static void update_enabled_state (MMGenericCdma *self,
                                   gboolean stay_connected,
                                   MMModemStateReason reason);
 
+static guint32 get_composite_quality (MMGenericCdma *self);
+
 static void modem_init (MMModem *modem_class);
 static void modem_cdma_init (MMModemCdma *cdma_class);
 static void modem_simple_init (MMModemSimple *class);
@@ -394,6 +396,9 @@ mm_generic_cdma_set_1x_registration_state (MMGenericCdma *self,
                                                        priv->cdma_1x_reg_state,
                                                        priv->evdo_reg_state);
     }
+
+    /* Update signal quality too since that depends on registration state */
+    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), get_composite_quality (self));
 }
 
 void
@@ -421,6 +426,9 @@ mm_generic_cdma_set_evdo_registration_state (MMGenericCdma *self,
                                                        priv->cdma_1x_reg_state,
                                                        priv->evdo_reg_state);
     }
+
+    /* Update signal quality too since that depends on registration state */
+    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), get_composite_quality (self));
 }
 
 MMModemCdmaRegistrationState
@@ -973,6 +981,19 @@ get_card_info (MMModem *modem,
 
 /*****************************************************************************/
 
+static guint32
+get_composite_quality (MMGenericCdma *self)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    /* EVDO signal quality preferred if EVDO is registered */
+    if (   (priv->evdo_rev0 || priv->evdo_revA)
+        && (priv->evdo_reg_state > MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        && priv->evdo_quality)
+        return priv->evdo_quality;
+    return priv->cdma1x_quality;
+}
+
 void
 mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality)
 {
@@ -984,7 +1005,8 @@ mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality)
     priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     if (priv->cdma1x_quality != quality) {
         priv->cdma1x_quality = quality;
-        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), quality);
+        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self),
+                                                   get_composite_quality (self));
     }
 }
 
@@ -999,7 +1021,8 @@ mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality)
     priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     if (priv->evdo_quality != quality) {
         priv->evdo_quality = quality;
-        // FIXME: emit a signal
+        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self),
+                                                   get_composite_quality (self));
     }
 }
 
@@ -1050,15 +1073,15 @@ get_signal_quality_done (MMAtSerialPort *port,
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
 
                 priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+                mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (info->modem), quality);
+
+                /* Return composite quality, not just CDMA1x quality */
+                quality = get_composite_quality (MM_GENERIC_CDMA (info->modem));
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-                if (priv->cdma1x_quality != quality) {
-                    priv->cdma1x_quality = quality;
-                    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
-                }
             }
         } else
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not parse signal quality results");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse signal quality results");
     }
 
     mm_callback_info_schedule (info);
@@ -1118,13 +1141,11 @@ qcdm_pilot_sets_cb (MMQcdmSerialPort *port,
         best_db = CLAMP (ABS (best_db), BEST_ECIO, WORST_ECIO) - BEST_ECIO;
         quality = (guint32) (100 - (best_db * 100 / (WORST_ECIO - BEST_ECIO)));
     }
+    mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (info->modem), quality);
 
+    /* Return composite quality, not just CDMA1x quality */
+    quality = get_composite_quality (MM_GENERIC_CDMA (info->modem));
     mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-
-    if (priv->cdma1x_quality != quality) {
-        priv->cdma1x_quality = quality;
-        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
-    }
 
 done:
     mm_callback_info_schedule (info);
