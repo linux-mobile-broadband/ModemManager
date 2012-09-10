@@ -41,6 +41,13 @@ MMBearerIpFamily      mm_common_get_ip_type_from_string     (const gchar *str,
 MMSmsStorage          mm_common_get_sms_storage_from_string (const gchar *str,
                                                              GError **error);
 
+GArray       *mm_common_sms_storages_variant_to_garray (GVariant *variant);
+MMSmsStorage *mm_common_sms_storages_variant_to_array  (GVariant *variant,
+                                                        guint *n_storages);
+GVariant     *mm_common_sms_storages_array_to_variant  (const MMSmsStorage *storages,
+                                                        guint n_storages);
+GVariant     *mm_common_sms_storages_garray_to_variant (GArray *array);
+
 GArray      *mm_common_bands_variant_to_garray (GVariant *variant);
 MMModemBand *mm_common_bands_variant_to_array  (GVariant *variant,
                                                 guint *n_bands);

@@ -72,6 +72,67 @@ mm_common_build_sms_storages_string (const MMSmsStorage *storages,
     return g_string_free (str, FALSE);
 }
 
+GArray *
+mm_common_sms_storages_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            guint32 storage;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), n);
+            while (g_variant_iter_loop (&iter, "u", &storage))
+                g_array_append_val (array, storage);
+        }
+    }
+
+    return array;
+}
+
+MMSmsStorage *
+mm_common_sms_storages_variant_to_array (GVariant *variant,
+                                         guint *n_storages)
+{
+    GArray *array;
+
+    array = mm_common_sms_storages_variant_to_garray (variant);
+    if (n_storages)
+        *n_storages = array->len;
+    return (MMSmsStorage *) g_array_free (array, FALSE);
+}
+
+GVariant *
+mm_common_sms_storages_array_to_variant (const MMSmsStorage *storages,
+                                         guint n_storages)
+{
+    GVariantBuilder builder;
+    guint i;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+
+    for (i = 0; i < n_storages; i++)
+        g_variant_builder_add_value (&builder,
+                                     g_variant_new_uint32 ((guint32)storages[i]));
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_sms_storages_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_sms_storages_array_to_variant ((const MMSmsStorage *)array->data,
+                                                        array->len);
+
+    return mm_common_sms_storages_array_to_variant (NULL, 0);
+}
+
 MMModemMode
 mm_common_get_modes_from_string (const gchar *str,
                                  GError **error)
