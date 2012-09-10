@@ -4866,8 +4866,15 @@ messaging_check_support (MMIfaceModemMessaging *self,
                                            QMI_SERVICE_WMS,
                                            MM_QMI_PORT_FLAG_DEFAULT);
 
-    mm_dbg ("Messaging capabilities %s by this modem",
-            supported ? "supported" : "not supported");
+    /* We only handle 3GPP messaging (PDU based) currently, so just ignore
+     * CDMA-only QMI modems */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self)) && supported) {
+        mm_info ("Messaging capabilities supported by this modem, "
+                 "but 3GPP2 messaging not supported yet by ModemManager");
+        supported = FALSE;
+    } else
+        mm_dbg ("Messaging capabilities %s by this modem",
+                supported ? "supported" : "not supported");
 
     g_simple_async_result_set_op_res_gboolean (result, supported);
     g_simple_async_result_complete_in_idle (result);
