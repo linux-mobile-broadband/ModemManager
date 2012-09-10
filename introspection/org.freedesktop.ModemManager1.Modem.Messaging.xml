@@ -98,5 +98,14 @@
       <arg name="path" type="o" />
     </signal>
 
+    <!--
+        SupportedStorages:
+
+        A list of <link linkend="MMSmsStorage">MMSmsStorage</link> values,
+        specifying the storages supported by this modem for storing and
+        receiving SMS.
+    -->
+    <property name="SupportedStorages" type="au" access="read" />
+
   </interface>
 </node>

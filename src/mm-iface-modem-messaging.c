@@ -1026,6 +1026,8 @@ load_supported_storages_ready (MMIfaceModemMessaging *self,
         gchar *mem1;
         gchar *mem2;
         gchar *mem3;
+        GArray *supported_storages;
+        guint i;
 
         mem1 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem1->data,
                                                     storage_ctx->supported_mem1->len);
@@ -1041,6 +1043,32 @@ load_supported_storages_ready (MMIfaceModemMessaging *self,
         g_free (mem1);
         g_free (mem2);
         g_free (mem3);
+
+        /* We set in the interface the list of storages which are allowed for
+         * both write/send and receive */
+        supported_storages = g_array_sized_new (FALSE, FALSE, sizeof (guint32), storage_ctx->supported_mem2->len);
+        for (i = 0; i < storage_ctx->supported_mem2->len; i++) {
+            gboolean found = FALSE;
+            guint j;
+
+            for (j = 0; j < storage_ctx->supported_mem3->len && !found; j++) {
+                if (g_array_index (storage_ctx->supported_mem3, MMSmsStorage, j) ==
+                    g_array_index (storage_ctx->supported_mem2, MMSmsStorage, i))
+                    found = TRUE;
+            }
+
+            if (found) {
+                guint32 val;
+
+                val = g_array_index (storage_ctx->supported_mem2, MMSmsStorage, i);
+                g_array_append_val (supported_storages, val);
+            }
+        }
+
+        mm_gdbus_modem_messaging_set_supported_storages (
+            ctx->skeleton,
+            mm_common_sms_storages_garray_to_variant (supported_storages));
+        g_array_unref (supported_storages);
     }
 
     /* Go on to next step */
