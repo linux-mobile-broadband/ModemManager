@@ -41,7 +41,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-samsung.la \
 	libmm-plugin-wavecom.la \
 	libmm-plugin-cinterion.la \
-	libmm-plugin-iridium.la
+	libmm-plugin-iridium.la \
+	libmm-plugin-via.la
 
 # Generic
 
@@ -458,6 +459,27 @@ libmm_plugin_iridium_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
+
+# Via CBP7 (ChinaTelecom CBP7.1, Fusion Wireless 2770p)
+
+libmm_plugin_via_la_SOURCES = \
+	mm-plugin-via.c \
+	mm-plugin-via.h \
+	mm-modem-via.c \
+	mm-modem-via.h
+
+libmm_plugin_via_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
+
+libmm_plugin_via_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
