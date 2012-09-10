@@ -432,8 +432,6 @@ mm_broadband_modem_novatel_lte_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
-                         /* 'ME' storage not supported */
-                         MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, MM_SMS_STORAGE_SM,
                          NULL);
 }
 

@@ -410,8 +410,6 @@ mm_broadband_modem_iridium_new (const gchar *device,
                          MM_BASE_MODEM_MAX_TIMEOUTS, 3,
                          /* Only CS network is supported by the Iridium modem */
                          MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, FALSE,
-                         /* 'ME' storage not supported */
-                         MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, MM_SMS_STORAGE_SM,
                          NULL);
 }
 

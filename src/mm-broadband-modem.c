@@ -7960,7 +7960,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_network_supported = TRUE;
     self->priv->modem_cdma_evdo_network_supported = TRUE;
-    self->priv->modem_messaging_sms_default_storage = MM_SMS_STORAGE_ME;
+    self->priv->modem_messaging_sms_default_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
 }

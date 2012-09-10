@@ -791,6 +791,31 @@ enable_unsolicited_events_ready (MMIfaceModemMessaging *self,
     interface_enabling_step (ctx);
 }
 
+static MMSmsStorage
+get_best_initial_default_sms_storage (MMIfaceModemMessaging *self)
+{
+    StorageContext *storage_ctx;
+    guint i;
+    MMSmsStorage default_storages_preference[] = {
+        MM_SMS_STORAGE_MT, /* MT=ME+SM */
+        MM_SMS_STORAGE_ME,
+        MM_SMS_STORAGE_SM,
+        MM_SMS_STORAGE_UNKNOWN
+    };
+
+    storage_ctx = get_storage_context (self);
+
+    for (i = 0; default_storages_preference[i] != MM_SMS_STORAGE_UNKNOWN; i++) {
+        /* Check if the requested storage is really supported in both mem2 and mem3 */
+        if (is_storage_supported (storage_ctx->supported_mem2, default_storages_preference[i], "storing", NULL) &&
+            is_storage_supported (storage_ctx->supported_mem3, default_storages_preference[i], "receiving", NULL)) {
+            break;
+        }
+    }
+
+    return default_storages_preference[i];
+}
+
 static void
 interface_enabling_step (EnablingContext *ctx)
 {
@@ -840,34 +865,25 @@ interface_enabling_step (EnablingContext *ctx)
         /* Set storage defaults */
         if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage &&
             MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage_finish) {
-            StorageContext *storage_ctx;
-            MMSmsStorage default_storage = MM_SMS_STORAGE_UNKNOWN;
-            GError *error = NULL;
+            MMSmsStorage default_storage;
 
-            mm_dbg ("Setting default storage...");
+            default_storage = get_best_initial_default_sms_storage (ctx->self);
 
-            g_object_get (ctx->self,
-                          MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &default_storage,
+            /* Already bound to the 'default-storage' property in the skeleton */
+            g_object_set (ctx->self,
+                          MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
                           NULL);
-            g_assert (default_storage != MM_SMS_STORAGE_UNKNOWN);
 
-            /* Check if the requested storages are really supported */
-            storage_ctx = get_storage_context (ctx->self);
-            if (!is_storage_supported (storage_ctx->supported_mem2, default_storage, "storing", &error) ||
-                !is_storage_supported (storage_ctx->supported_mem3, default_storage, "receiving", &error)) {
-                g_simple_async_result_take_error (ctx->result, error);
-                enabling_context_complete_and_free (ctx);
+            if (default_storage != MM_SMS_STORAGE_UNKNOWN) {
+                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage (
+                    ctx->self,
+                    default_storage,
+                    (GAsyncReadyCallback)set_default_storage_ready,
+                    ctx);
                 return;
             }
 
-            mm_gdbus_modem_messaging_set_default_storage (ctx->skeleton, default_storage);
-
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage (
-                ctx->self,
-                default_storage,
-                (GAsyncReadyCallback)set_default_storage_ready,
-                ctx);
-            return;
+            mm_info ("Cannot set default storage, none of the suggested ones supported");
         }
         /* Fall down to next step */
         ctx->step++;
@@ -1227,6 +1243,11 @@ mm_iface_modem_messaging_initialize (MMIfaceModemMessaging *self,
     if (!skeleton) {
         skeleton = mm_gdbus_modem_messaging_skeleton_new ();
         mm_gdbus_modem_messaging_set_supported_storages (skeleton, NULL);
+
+        /* Bind our Default messaging property */
+        g_object_bind_property (self, MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
+                                skeleton, "default-storage",
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
         g_object_set (self,
                       MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, skeleton,
