@@ -218,7 +218,7 @@ mm_sms_dup_timestamp (MMSms *self)
 guint
 mm_sms_get_validity (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
 
     return mm_gdbus_sms_get_validity (self);
 }
@@ -234,7 +234,7 @@ mm_sms_get_validity (MMSms *self)
 guint
 mm_sms_get_class (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
 
     return mm_gdbus_sms_get_class (self);
 }
@@ -250,7 +250,7 @@ mm_sms_get_class (MMSms *self)
 MMSmsState
 mm_sms_get_state (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_STATE_UNKNOWN);
 
     return mm_gdbus_sms_get_state (self);
 }
@@ -266,7 +266,7 @@ mm_sms_get_state (MMSms *self)
 MMSmsStorage
 mm_sms_get_storage (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_STORAGE_UNKNOWN);
 
     return mm_gdbus_sms_get_storage (self);
 }
