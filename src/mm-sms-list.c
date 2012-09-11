@@ -300,7 +300,8 @@ mm_sms_list_take_part (MMSmsList *self,
     ctx.storage = storage;
 
     /* Ensure we don't have already taken a part with the same index */
-    if (g_list_find_custom (self->priv->list,
+    if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX &&
+        g_list_find_custom (self->priv->list,
                             &ctx,
                             (GCompareFunc)cmp_sms_by_part_index_and_storage)) {
         g_set_error (error,
@@ -313,18 +314,27 @@ mm_sms_list_take_part (MMSmsList *self,
 
     /* Did we just get a part of a multi-part SMS? */
     if (mm_sms_part_should_concat (part)) {
-        mm_dbg ("SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u')",
-                mm_sms_storage_get_string (storage),
-                mm_sms_part_get_index (part),
-                mm_sms_part_get_concat_reference (part),
-                mm_sms_part_get_concat_sequence (part));
+        if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX)
+            mm_dbg ("SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u')",
+                    mm_sms_storage_get_string (storage),
+                    mm_sms_part_get_index (part),
+                    mm_sms_part_get_concat_reference (part),
+                    mm_sms_part_get_concat_sequence (part));
+        else
+            mm_dbg ("SMS part (not stored) is from a multipart SMS (reference: '%u', sequence: '%u')",
+                    mm_sms_part_get_concat_reference (part),
+                    mm_sms_part_get_concat_sequence (part));
+
         return take_multipart (self, part, state, storage, error);
     }
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
-    mm_dbg ("SMS part at '%s/%u' is from a singlepart SMS",
-            mm_sms_storage_get_string (storage),
-            mm_sms_part_get_index (part));
+    if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX)
+        mm_dbg ("SMS part at '%s/%u' is from a singlepart SMS",
+                mm_sms_storage_get_string (storage),
+                mm_sms_part_get_index (part));
+    else
+        mm_dbg ("SMS part (not stored) is from a singlepart SMS");
     return take_singlepart (self, part, state, storage, error);
 }
 
