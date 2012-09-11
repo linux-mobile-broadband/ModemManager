@@ -144,16 +144,17 @@ print_sms_info (MMSms *sms)
 
     g_print ("SMS '%s'\n",
              mm_sms_get_path (sms));
-    g_print ("  -------------------------\n"
-             "  Content    |      text: '%s'\n"
-             "             |    number: '%s'\n"
-             "  -------------------------\n"
-             "  Properties |     state: '%s'\n"
-             "             |      smsc: '%s'\n"
-             "             | timestamp: '%s'\n"
-             "             |  validity: '%u'\n"
-             "             |     class: '%u'\n"
-             "             |   storage: '%s'\n",
+    g_print ("  -------------------------------\n"
+             "  Content    |            text: '%s'\n"
+             "             |          number: '%s'\n"
+             "  -------------------------------\n"
+             "  Properties |           state: '%s'\n"
+             "             |            smsc: '%s'\n"
+             "             |       timestamp: '%s'\n"
+             "             |        validity: '%u'\n"
+             "             |           class: '%u'\n"
+             "             | delivery report: '%s'\n"
+             "             |         storage: '%s'\n",
              VALIDATE (mm_sms_get_text (sms)),
              VALIDATE (mm_sms_get_number (sms)),
              mm_sms_state_get_string (mm_sms_get_state (sms)),
@@ -161,6 +162,7 @@ print_sms_info (MMSms *sms)
              VALIDATE (mm_sms_get_timestamp (sms)),
              mm_sms_get_validity (sms),
              mm_sms_get_class (sms),
+             mm_sms_get_delivery_report_request (sms) ? "requested" : "not requested",
              mm_sms_storage_get_string (mm_sms_get_storage (sms)));
 }
 
