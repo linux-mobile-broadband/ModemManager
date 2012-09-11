@@ -326,6 +326,41 @@ test_pack_gsm7_7_chars_offset (void *f, gpointer d)
     g_free (packed);
 }
 
+static void
+test_take_convert_ucs2_hex_utf8 (void *f, gpointer d)
+{
+    gchar *src, *converted;
+
+    /* Ensure hex-encoded UCS-2 works */
+    src = g_strdup ("0054002d004d006f00620069006c0065");
+    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
+    g_assert_cmpstr (converted, ==, "T-Mobile");
+    g_free (converted);
+}
+
+static void
+test_take_convert_ucs2_bad_ascii (void *f, gpointer d)
+{
+    gchar *src, *converted;
+
+    /* Test that something mostly ASCII returns most of the original string */
+    src = g_strdup ("Orange\241");
+    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
+    g_assert_cmpstr (converted, ==, "Orange");
+    g_free (converted);
+}
+
+static void
+test_take_convert_ucs2_bad_ascii2 (void *f, gpointer d)
+{
+    gchar *src, *converted;
+
+    /* Ensure something completely screwed up doesn't crash */
+    src = g_strdup ("\241\255\254\250\244\234");
+    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
+    g_assert (converted == NULL);
+}
+
 
 #if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;
@@ -359,6 +394,10 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_pack_gsm7_last_septet_alone, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_pack_gsm7_7_chars_offset, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_hex_utf8, NULL));
+    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_bad_ascii, NULL));
+    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_bad_ascii2, NULL));
 
     result = g_test_run ();
 
