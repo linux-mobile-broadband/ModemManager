@@ -394,6 +394,30 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+reset_finish (MMIfaceModem *self,
+              GAsyncResult *res,
+              GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+reset (MMIfaceModem *self,
+       GAsyncReadyCallback callback,
+       gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=6",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemNovatelLte *
 mm_broadband_modem_novatel_lte_new (const gchar *device,
@@ -435,6 +459,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* No support for setting bands, as it destabilizes the modem. */
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->reset = reset;
+    iface->reset_finish = reset_finish;
 }
 
 static void
