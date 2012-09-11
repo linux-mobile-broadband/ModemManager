@@ -61,7 +61,7 @@
 
         Number to which the message is addressed.
     -->
-    <property name="Number" type="s" access="readwrite" />
+    <property name="Number" type="s" access="read" />
 
     <!--
         Text:
@@ -71,7 +71,7 @@
         When sending, if the text is larger than the limit of the technology or
         modem, the message will be broken into multiple parts or messages.
     -->
-    <property name="Text" type="s" access="readwrite" />
+    <property name="Text" type="s" access="read" />
 
     <!--
         Data:
@@ -81,7 +81,7 @@
         When sending, if the data is larger than the limit of the technology or
         modem, the message will be broken into multiple parts or messages.
     -->
-    <property name="Data" type="ay" access="readwrite" />
+    <property name="Data" type="ay" access="read" />
 
     <!--
         SMSC:
@@ -90,7 +90,7 @@
 
         Always empty for 3GPP2/CDMA.
     -->
-    <property name="SMSC" type="s" access="readwrite" />
+    <property name="SMSC" type="s" access="read" />
 
     <!--
         Validity:
@@ -99,7 +99,7 @@
 
         Always 0 for 3GPP2/CDMA.
     -->
-    <property name="Validity" type="u" access="readwrite" />
+    <property name="Validity" type="u" access="read" />
 
     <!--
         Class:
@@ -108,14 +108,14 @@
 
         Always 0 for 3GPP2/CDMA.
     -->
-    <property name="Class" type="u" access="readwrite" />
+    <property name="Class" type="u" access="read" />
 
     <!--
         DeliveryReportRequest:
 
         #TRUE if delivery report request is required, #FALSE otherwise.
     -->
-    <property name="DeliveryReportRequest" type="b" access="readwrite" />
+    <property name="DeliveryReportRequest" type="b" access="read" />
 
     <!--
         MessageReference:
