@@ -70,6 +70,7 @@ void       mm_3gpp_creg_regex_destroy (GPtrArray *array);
 GRegex    *mm_3gpp_ciev_regex_get (void);
 GRegex    *mm_3gpp_cusd_regex_get (void);
 GRegex    *mm_3gpp_cmti_regex_get (void);
+GRegex    *mm_3gpp_cds_regex_get (void);
 
 
 /* AT+COPS=? (network scan) response parser */

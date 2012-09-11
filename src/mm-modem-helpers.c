@@ -285,6 +285,18 @@ mm_3gpp_cmti_regex_get (void)
                         NULL);
 }
 
+GRegex *
+mm_3gpp_cds_regex_get (void)
+{
+    /* Example:
+     * <CR><LF>+CDS: 24<CR><LF>07914356060013F10659098136395339F6219011707193802190117071938030<CR><LF>
+     */
+    return g_regex_new ("\\r\\n\\+CDS:\\s*(\\d+)\\r\\n(.*)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
 /*************************************************************************/
 
 static void

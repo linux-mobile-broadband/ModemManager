@@ -4602,6 +4602,39 @@ cmti_received (MMAtSerialPort *port,
 }
 
 static void
+cds_received (MMAtSerialPort *port,
+              GMatchInfo *info,
+              MMBroadbandModem *self)
+{
+    GError *error = NULL;
+    MMSmsPart *part;
+    guint length;
+    gchar *pdu;
+
+    mm_dbg ("Got new non-stored message indication");
+
+    if (!mm_get_uint_from_match_info (info, 1, &length))
+        return;
+
+    pdu = g_match_info_fetch (info, 2);
+    if (!pdu)
+        return;
+
+    part = mm_sms_part_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, &error);
+    if (part) {
+        mm_dbg ("Correctly parsed non-stored PDU");
+        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                            part,
+                                            MM_SMS_STATE_RECEIVED,
+                                            MM_SMS_STORAGE_UNKNOWN);
+    } else {
+        /* Don't treat the error as critical */
+        mm_dbg ("Error parsing non-stored PDU: %s", error->message);
+        g_error_free (error);
+    }
+}
+
+static void
 set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                            gboolean enable,
                                            GAsyncReadyCallback callback,
@@ -4610,6 +4643,7 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
     GSimpleAsyncResult *result;
     MMAtSerialPort *ports[2];
     GRegex *cmti_regex;
+    GRegex *cds_regex;
     guint i;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -4618,6 +4652,7 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                         set_messaging_unsolicited_events_handlers);
 
     cmti_regex = mm_3gpp_cmti_regex_get ();
+    cds_regex = mm_3gpp_cds_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
@@ -4636,9 +4671,16 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
             enable ? (MMAtSerialUnsolicitedMsgFn) cmti_received : NULL,
             enable ? self : NULL,
             NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            cds_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn) cds_received : NULL,
+            enable ? self : NULL,
+            NULL);
     }
 
     g_regex_unref (cmti_regex);
+    g_regex_unref (cds_regex);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
