@@ -945,12 +945,13 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
         *out_msgstart = offset;
 
     /* ----------- First BYTE ----------- */
+    pdu[offset] = 0;
 
+    /* TP-VP present; format RELATIVE */
     if (part->validity > 0) {
         mm_dbg ("  adding validity to PDU...");
-        pdu[offset] = 1 << 4; /* TP-VP present; format RELATIVE */
-    } else
-        pdu[offset] = 0;      /* TP-VP not present */
+        pdu[offset] |= 0x10;
+    }
 
     /* Concatenation sequence only found in multipart SMS */
     if (part->concat_sequence) {
