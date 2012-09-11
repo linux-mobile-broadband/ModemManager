@@ -993,14 +993,19 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     pdu[offset++] = 0x00;
 
     /* ----------- TP-DCS (1 byte) ----------- */
+    pdu[offset] = 0x00;
 
     if (part->encoding == MM_SMS_ENCODING_UCS2) {
         mm_dbg ("  using UCS2 encoding...");
-        pdu[offset++] = 0x08;
-    } else {
+        pdu[offset] |= SMS_DCS_CODING_UCS2;
+    } else if (part->encoding == MM_SMS_ENCODING_GSM7) {
         mm_dbg ("  using GSM7 encoding...");
-        pdu[offset++] = 0x00;  /* GSM */
+        pdu[offset] |= SMS_DCS_CODING_DEFAULT;  /* GSM */
+    } else {
+        mm_dbg ("  using 8bit encoding...");
+        pdu[offset] |= SMS_DCS_CODING_8BIT;
     }
+    offset++;
 
     /* ----------- TP-Validity-Period (1 byte): 4 days ----------- */
     /* Only if TP-VPF was set in first byte */
