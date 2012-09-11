@@ -137,33 +137,57 @@ mmcli_sms_shutdown (void)
 static void
 print_sms_info (MMSms *sms)
 {
+    MMSmsPduType pdu_type;
+
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
 #undef VALIDATE
 #define VALIDATE(str) (str ? str : "unknown")
 
+    pdu_type = mm_sms_get_pdu_type (sms);
+
     g_print ("SMS '%s'\n",
              mm_sms_get_path (sms));
-    g_print ("  -------------------------------\n"
-             "  Content    |            text: '%s'\n"
-             "             |          number: '%s'\n"
-             "  -------------------------------\n"
-             "  Properties |           state: '%s'\n"
-             "             |            smsc: '%s'\n"
-             "             |       timestamp: '%s'\n"
-             "             |        validity: '%u'\n"
-             "             |           class: '%u'\n"
-             "             | delivery report: '%s'\n"
-             "             |         storage: '%s'\n",
+    g_print ("  -----------------------------------\n"
+             "  Content    |                text: '%s'\n"
+             "             |              number: '%s'\n"
+             "  -----------------------------------\n"
+             "  Properties |            PDU type: '%s'\n"
+             "             |               state: '%s'\n"
+             "             |                smsc: '%s'\n"
+             "             |            validity: '%u'\n"
+             "             |               class: '%u'\n"
+             "             |             storage: '%s'\n",
              VALIDATE (mm_sms_get_text (sms)),
              VALIDATE (mm_sms_get_number (sms)),
+             mm_sms_pdu_type_get_string (pdu_type),
              mm_sms_state_get_string (mm_sms_get_state (sms)),
              VALIDATE (mm_sms_get_smsc (sms)),
-             VALIDATE (mm_sms_get_timestamp (sms)),
              mm_sms_get_validity (sms),
              mm_sms_get_class (sms),
-             mm_sms_get_delivery_report_request (sms) ? "requested" : "not requested",
              mm_sms_storage_get_string (mm_sms_get_storage (sms)));
+
+    if (pdu_type == MM_SMS_PDU_TYPE_SUBMIT)
+        g_print ("             |     delivery report: '%s'\n",
+                 mm_sms_get_delivery_report_request (sms) ? "requested" : "not requested");
+
+    if (pdu_type == MM_SMS_PDU_TYPE_STATUS_REPORT ||
+        pdu_type == MM_SMS_PDU_TYPE_SUBMIT)
+        g_print ("             |   message reference: '%u'\n",
+                 mm_sms_get_message_reference (sms));
+
+    if (pdu_type == MM_SMS_PDU_TYPE_STATUS_REPORT ||
+        pdu_type == MM_SMS_PDU_TYPE_DELIVER)
+        g_print ("             |           timestamp: '%s'\n",
+                 VALIDATE (mm_sms_get_timestamp (sms)));
+
+    if (pdu_type == MM_SMS_PDU_TYPE_STATUS_REPORT) {
+        g_print ("             |      delivery state: '%s' (0x%X)\n",
+                 VALIDATE (mm_sms_delivery_state_get_string_extended (mm_sms_get_delivery_state (sms))),
+                 mm_sms_get_delivery_state (sms));
+        g_print ("             | discharge timestamp: '%s'\n",
+                 VALIDATE (mm_sms_get_discharge_timestamp (sms)));
+    }
 }
 
 static void
