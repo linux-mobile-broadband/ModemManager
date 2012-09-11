@@ -17,6 +17,8 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <string.h>
+#include <stdio.h>
+#include <locale.h>
 
 #include "mm-sms-part.h"
 #include "mm-utils.h"
@@ -840,10 +842,20 @@ _mm_log (const char *loc,
          ...)
 {
     /* Dummy log function */
+    va_list args;
+    gchar *msg;
+
+    va_start (args, fmt);
+    msg = g_strdup_vprintf (fmt, args);
+    va_end (args);
+    g_print ("%s\n", msg);
+    g_free (msg);
 }
 
 int main (int argc, char **argv)
 {
+    setlocale (LC_ALL, "");
+
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
