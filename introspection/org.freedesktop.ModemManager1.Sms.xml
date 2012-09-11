@@ -120,11 +120,27 @@
     <!--
         Timestamp:
 
-        Time message was received or was sent, in
+        Time when the first PDU of the SMS message arrived the SMSC, in
         <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
         format.
+        This field is only applicable if the PDU type is
+        <link linkend="MM-SMS-PDU-TYPE-DELIVER:CAPS"><constant>MM_SMS_PDU_TYPE_DELIVER</constant></link>.
+        or
+        <link linkend="MM-SMS-PDU-TYPE-STATUS-REPORT:CAPS"><constant>MM_SMS_PDU_TYPE_STATUS_REPORT</constant></link>.
     -->
     <property name="Timestamp" type="s" access="read" />
+
+    <!--
+        DischargeTimestamp:
+
+        Time when the first PDU of the SMS message left the SMSC, in
+        <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
+        format.
+
+        This field is only applicable if the PDU type is
+        <link linkend="MM-SMS-PDU-TYPE-STATUS-REPORT:CAPS"><constant>MM_SMS_PDU_TYPE_STATUS_REPORT</constant></link>.
+    -->
+    <property name="DischargeTimestamp" type="s" access="read" />
 
     <!--
         Storage:

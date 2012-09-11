@@ -321,6 +321,7 @@ struct _MMSmsPart {
     MMSmsPduType pdu_type;
     gchar *smsc;
     gchar *timestamp;
+    gchar *discharge_timestamp;
     gchar *number;
     gchar *text;
     MMSmsEncoding encoding;
@@ -339,6 +340,7 @@ struct _MMSmsPart {
 void
 mm_sms_part_free (MMSmsPart *self)
 {
+    g_free (self->discharge_timestamp);
     g_free (self->timestamp);
     g_free (self->smsc);
     g_free (self->number);
@@ -390,6 +392,8 @@ PART_GET_FUNC (const gchar *, number)
 PART_SET_TAKE_STR_FUNC (number)
 PART_GET_FUNC (const gchar *, timestamp)
 PART_SET_TAKE_STR_FUNC (timestamp)
+PART_GET_FUNC (const gchar *, discharge_timestamp)
+PART_SET_TAKE_STR_FUNC (discharge_timestamp)
 PART_GET_FUNC (guint, concat_max)
 PART_SET_FUNC (guint, concat_max)
 PART_GET_FUNC (guint, concat_sequence)
@@ -680,8 +684,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
         offset += 7;
 
         /* ------ Discharge Timestamp (7 bytes) ------ */
-        mm_sms_part_take_timestamp (sms_part,
-                                    sms_decode_timestamp (&pdu[offset]));
+        mm_sms_part_take_discharge_timestamp (sms_part,
+                                              sms_decode_timestamp (&pdu[offset]));
         offset += 7;
 
         /* ----- TP-STATUS (1 byte) ------ */

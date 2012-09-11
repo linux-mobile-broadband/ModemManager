@@ -74,6 +74,12 @@ void              mm_sms_part_set_timestamp          (MMSmsPart *part,
 void              mm_sms_part_take_timestamp         (MMSmsPart *part,
                                                       gchar *timestamp);
 
+const gchar      *mm_sms_part_get_discharge_timestamp  (MMSmsPart *part);
+void              mm_sms_part_set_discharge_timestamp  (MMSmsPart *part,
+                                                        const gchar *timestamp);
+void              mm_sms_part_take_discharge_timestamp (MMSmsPart *part,
+                                                        gchar *timestamp);
+
 const gchar      *mm_sms_part_get_text               (MMSmsPart *part);
 void              mm_sms_part_set_text               (MMSmsPart *part,
                                                       const gchar *text);

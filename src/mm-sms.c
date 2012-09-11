@@ -1182,8 +1182,9 @@ assemble_sms (MMSms *self,
                   "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
                   "class",     mm_sms_part_get_class (sorted_parts[0]),
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
-                  "timestamp", mm_sms_part_get_timestamp (sorted_parts[0]),
                   "validity",  mm_sms_part_get_validity (sorted_parts[0]),
+                  "timestamp",               mm_sms_part_get_timestamp (sorted_parts[0]),
+                  "discharge-timestamp",     mm_sms_part_get_discharge_timestamp (sorted_parts[0]),
                   /* delivery report request usually set in the last part only */
                   "delivery-report-request", mm_sms_part_get_delivery_report_request (sorted_parts[self->priv->max_parts - 1]),
                   NULL);
