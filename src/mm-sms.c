@@ -1210,11 +1210,12 @@ assemble_sms (MMSms *self,
         }
 
         /* When the user creates the SMS, it will have either 'text' or 'data',
-         * not both */
+         * not both. Also status report PDUs may not have neither text nor data. */
         parttext = mm_sms_part_get_text (sorted_parts[idx]);
         partdata = mm_sms_part_get_data (sorted_parts[idx]);
 
-        if (!parttext && !partdata) {
+        if (!parttext && !partdata &&
+            mm_sms_part_get_pdu_type (sorted_parts[idx]) != MM_SMS_PDU_TYPE_STATUS_REPORT) {
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
