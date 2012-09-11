@@ -208,6 +208,42 @@ mm_sms_dup_timestamp (MMSms *self)
 }
 
 /**
+ * mm_sms_get_discharge_timestamp:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_timestamp() if on another thread.</warning>
+ *
+ * Returns: (transfer none): The name of the timestamp, or %NULL if it couldn't be retrieved.
+ */
+const gchar *
+mm_sms_get_discharge_timestamp (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sms_get_discharge_timestamp (self));
+}
+
+/**
+ * mm_sms_dup_discharge_timestamp:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * Returns: (transfer full): The name of the timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ */
+gchar *
+mm_sms_dup_discharge_timestamp (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sms_dup_discharge_timestamp (self));
+}
+
+/**
  * mm_sms_get_validity:
  * @self: A #MMSms.
  *
@@ -239,12 +275,44 @@ mm_sms_get_class (MMSms *self)
     return mm_gdbus_sms_get_class (self);
 }
 
+/**
+ * mm_sms_get_message_reference:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * Returns: TODO
+ */
+guint
+mm_sms_get_message_reference (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
+
+    return mm_gdbus_sms_get_message_reference (self);
+}
+
 gboolean
 mm_sms_get_delivery_report_request (MMSms *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
 
     return mm_gdbus_sms_get_delivery_report_request (self);
+}
+
+/**
+ * mm_sms_get_delivery_state:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * Returns: TODO
+ */
+guint
+mm_sms_get_delivery_state (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_DELIVERY_STATE_UNKNOWN);
+
+    return mm_gdbus_sms_get_delivery_state (self);
 }
 
 /**
@@ -277,6 +345,22 @@ mm_sms_get_storage (MMSms *self)
     g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_STORAGE_UNKNOWN);
 
     return mm_gdbus_sms_get_storage (self);
+}
+
+/**
+ * mm_sms_get_pdu_type:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * Returns: TODO
+ */
+MMSmsPduType
+mm_sms_get_pdu_type (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_PDU_TYPE_UNKNOWN);
+
+    return (MMSmsPduType)mm_gdbus_sms_get_pdu_type (self);
 }
 
 /**
