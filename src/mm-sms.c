@@ -1046,8 +1046,8 @@ assemble_sms (MMSms *self,
                                                         fulldata->data,
                                                         fulldata->len * sizeof (guint8),
                                                         TRUE,
-                                                        NULL,
-                                                        NULL),
+                                                        (GDestroyNotify) g_byte_array_unref,
+                                                        g_byte_array_ref (fulldata)),
                   "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
                   "class",     mm_sms_part_get_class (sorted_parts[0]),
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
@@ -1056,7 +1056,7 @@ assemble_sms (MMSms *self,
                   NULL);
 
     g_string_free (fulltext, TRUE);
-    g_byte_array_free (fulldata, TRUE);
+    g_byte_array_unref (fulldata);
     g_free (sorted_parts);
 
     self->priv->is_assembled = TRUE;
