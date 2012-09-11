@@ -423,6 +423,22 @@ test_pdu_multipart (void)
         NULL, 0, 0);
 }
 
+static void
+test_pdu_not_stored (void)
+{
+    static const gchar *hexpdu1 =
+        "07914356060013F1065A098136397339F7219011700463802190117004638030";
+
+    common_test_part_from_hexpdu (
+        hexpdu1,
+        "+34656000311", /* smsc */
+        "639337937", /* number */
+        "120911074036+02", /* timestamp */
+        FALSE, /* multipart! */
+        NULL, /* text */
+        NULL, 0, 0);
+}
+
 /********************* SMS ADDRESS ENCODER TESTS *********************/
 
 static void
@@ -826,6 +842,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-udhi", test_pdu_udhi);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-multipart", test_pdu_multipart);
+    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-not-stored", test_pdu_not_stored);
 
     g_test_add_func ("/MM/SMS/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
     g_test_add_func ("/MM/SMS/Address-Encoder/smsc-unknown", test_address_encode_smsc_unknown);
