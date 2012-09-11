@@ -4816,6 +4816,19 @@ sms_state_from_str (const gchar *str)
     return MM_SMS_STATE_UNKNOWN;
 }
 
+static MMSmsPduType
+sms_pdu_type_from_str (const gchar *str)
+{
+    /* We merge unread and read messages in the same state */
+    if (strstr (str, "REC"))
+        return MM_SMS_PDU_TYPE_DELIVER;
+
+    if (strstr (str, "STO"))
+        return MM_SMS_PDU_TYPE_SUBMIT;
+
+    return MM_SMS_PDU_TYPE_UNKNOWN;
+}
+
 static void
 sms_text_part_list_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
@@ -4866,23 +4879,23 @@ sms_text_part_list_ready (MMBroadbandModem *self,
             goto next;
         }
 
+        /* Get part state */
+        stat = mm_get_string_unquoted_from_match_info (match_info, 2);
+        if (!stat) {
+            mm_dbg ("Failed to get part status");
+            goto next;
+        }
+
         /* Get and parse number */
         number = mm_get_string_unquoted_from_match_info (match_info, 3);
         if (!number) {
             mm_dbg ("Failed to get message sender number");
+            g_free (stat);
             goto next;
         }
 
         number = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
                                                               number);
-
-        /* Get part state */
-        stat = mm_get_string_unquoted_from_match_info (match_info, 2);
-        if (!stat) {
-            mm_dbg ("Failed to get part status");
-            g_free (number);
-            goto next;
-        }
 
         /* Get and parse timestamp (always expected in ASCII) */
         timestamp = mm_get_string_unquoted_from_match_info (match_info, 5);
@@ -4901,7 +4914,8 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         g_free (ucs2_text);
 
         /* all take() methods pass ownership of the value as well */
-        part = mm_sms_part_new (idx);
+        part = mm_sms_part_new (idx,
+                                sms_pdu_type_from_str (stat));
         mm_sms_part_take_number (part, number);
         mm_sms_part_take_timestamp (part, timestamp);
         mm_sms_part_take_text (part, text);

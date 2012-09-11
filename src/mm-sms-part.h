@@ -18,6 +18,7 @@
 #define MM_SMS_PART_H
 
 #include <glib.h>
+#include <ModemManager-enums.h>
 
 typedef enum {
     MM_SMS_ENCODING_UNKNOWN = 0x0,
@@ -31,7 +32,8 @@ typedef struct _MMSmsPart MMSmsPart;
 #define SMS_MAX_PDU_LEN 344
 #define SMS_PART_INVALID_INDEX G_MAXUINT
 
-MMSmsPart *mm_sms_part_new  (guint index);
+MMSmsPart *mm_sms_part_new  (guint index,
+                             MMSmsPduType type);
 MMSmsPart *mm_sms_part_new_from_pdu  (guint index,
                                       const gchar *hexpdu,
                                       GError **error);
@@ -49,6 +51,10 @@ guint8    *mm_sms_part_get_submit_pdu (MMSmsPart *part,
 guint             mm_sms_part_get_index              (MMSmsPart *part);
 void              mm_sms_part_set_index              (MMSmsPart *part,
                                                       guint index);
+
+MMSmsPduType      mm_sms_part_get_pdu_type           (MMSmsPart *part);
+void              mm_sms_part_set_pdu_type           (MMSmsPart *part,
+                                                      MMSmsPduType type);
 
 const gchar      *mm_sms_part_get_smsc               (MMSmsPart *part);
 void              mm_sms_part_set_smsc               (MMSmsPart *part,

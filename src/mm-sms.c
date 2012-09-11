@@ -1171,6 +1171,7 @@ assemble_sms (MMSms *self,
 
     /* If we got everything, assemble the text! */
     g_object_set (self,
+                  "pdu-type",  mm_sms_part_get_pdu_type (sorted_parts[0]),
                   "text",      fulltext->str,
                   "data",      g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
                                                         fulldata->data,
@@ -1392,7 +1393,8 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                     i, (guint)strlen (split_text[i]));
 
             /* Create new part */
-            part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
+            part = mm_sms_part_new (SMS_PART_INVALID_INDEX,
+                                    MM_SMS_PDU_TYPE_SUBMIT);
             mm_sms_part_set_text (part, split_text[i]);
             mm_sms_part_set_encoding (part, encoding);
             mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
@@ -1429,7 +1431,8 @@ mm_sms_new_from_properties (MMBaseModem *modem,
     }
 
     /* Single part it will be */
-    part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
+    part = mm_sms_part_new (SMS_PART_INVALID_INDEX,
+                            MM_SMS_PDU_TYPE_SUBMIT);
     if (n_parts == 1) {
         mm_sms_part_set_text (part, mm_sms_properties_get_text (properties));
         mm_sms_part_set_encoding (part, encoding);

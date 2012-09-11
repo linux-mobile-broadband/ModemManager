@@ -355,6 +355,22 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
 } MMModemBand;
 
 /**
+ * MMSmsPduType:
+ * @MM_SMS_PDU_TYPE_UNKNOWN: Unknown type.
+ * @MM_SMS_PDU_TYPE_DELIVER: SMS has been received from the SMSC.
+ * @MM_SMS_PDU_TYPE_SUBMIT: SMS is sent, or to be sent to the SMSC.
+ * @MM_SMS_PDU_TYPE_STATUS_REPORT: SMS is a status report received from the SMSC.
+ *
+ * Type of PDUs used in the SMS.
+ */
+typedef enum { /*< underscore_name=mm_sms_pdu_type >*/
+    MM_SMS_PDU_TYPE_UNKNOWN       = 0,
+    MM_SMS_PDU_TYPE_DELIVER       = 1,
+    MM_SMS_PDU_TYPE_SUBMIT        = 2,
+    MM_SMS_PDU_TYPE_STATUS_REPORT = 3
+} MMSmsPduType;
+
+/**
  * MMSmsState:
  * @MM_SMS_STATE_UNKNOWN: State unknown or not reportable.
  * @MM_SMS_STATE_STORED: The message has been neither received nor yet sent.

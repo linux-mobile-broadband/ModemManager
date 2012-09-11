@@ -49,6 +49,14 @@
     <property name="State" type="u" access="read" />
 
     <!--
+        PduType:
+
+        A <link linkend="MMSmsPduType">MMSmsPduType</link> value,
+        describing the type of PDUs used in the SMS message.
+    -->
+    <property name="PduType" type="u" access="read" />
+
+    <!--
         Number:
 
         Number to which the message is addressed.

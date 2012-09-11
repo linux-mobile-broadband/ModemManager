@@ -21,6 +21,7 @@
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-sms-part.h"
 #include "mm-charsets.h"
@@ -260,6 +261,7 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
 
 struct _MMSmsPart {
     guint index;
+    MMSmsPduType pdu_type;
     gchar *smsc;
     gchar *timestamp;
     gchar *number;
@@ -323,6 +325,8 @@ mm_sms_part_free (MMSmsPart *self)
 
 PART_GET_FUNC (guint, index)
 PART_SET_FUNC (guint, index)
+PART_GET_FUNC (MMSmsPduType, pdu_type)
+PART_SET_FUNC (MMSmsPduType, pdu_type)
 PART_GET_FUNC (const gchar *, smsc)
 PART_SET_TAKE_STR_FUNC (smsc)
 PART_GET_FUNC (const gchar *, number)
@@ -383,12 +387,14 @@ mm_sms_part_should_concat (MMSmsPart *self)
 }
 
 MMSmsPart *
-mm_sms_part_new (guint index)
+mm_sms_part_new (guint index,
+                 MMSmsPduType pdu_type)
 {
     MMSmsPart *sms_part;
 
     sms_part = g_slice_new0 (MMSmsPart);
     sms_part->index = index;
+    sms_part->pdu_type = pdu_type;
 
     return sms_part;
 }
@@ -500,7 +506,7 @@ mm_sms_part_new_from_binary_pdu (guint index,
     }
 
     /* Create the new MMSmsPart */
-    sms_part = mm_sms_part_new (index);
+    sms_part = mm_sms_part_new (index, MM_SMS_PDU_TYPE_SUBMIT);
     mm_sms_part_take_smsc (sms_part,
                            sms_decode_address (&pdu[1], 2 * (pdu[0] - 1)));
     mm_sms_part_take_number (sms_part,

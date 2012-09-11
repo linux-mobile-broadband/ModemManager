@@ -19,6 +19,7 @@ MMModemLock
 MMModemMode
 MMModemState
 MMModemStateChangeReason
+MMSmsPduType
 MMSmsState
 MMSmsStorage
 </SECTION>

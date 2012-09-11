@@ -527,7 +527,7 @@ common_test_create_pdu (const gchar *smsc,
     guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    part = mm_sms_part_new (0);
+    part = mm_sms_part_new (0, MM_SMS_PDU_TYPE_SUBMIT);
     if (smsc)
         mm_sms_part_set_smsc (part, smsc);
     if (number)
