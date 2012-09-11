@@ -118,6 +118,17 @@
     <property name="DeliveryReportRequest" type="b" access="readwrite" />
 
     <!--
+        MessageReference:
+
+        Message Reference of the last PDU sent/received within this SMS.
+
+        If the PDU type is
+        <link linkend="MM-SMS-PDU-TYPE-STATUS-REPORT:CAPS"><constant>MM_SMS_PDU_TYPE_STATUS_REPORT</constant></link>,
+        this field identifies the Message Reference of the PDU associated to the status report.
+    -->
+    <property name="MessageReference" type="u" access="read" />
+
+    <!--
         Timestamp:
 
         Time when the first PDU of the SMS message arrived the SMSC, in

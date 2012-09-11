@@ -230,9 +230,16 @@ handle_send_ready (MMSms *self,
     else {
         /* Transition from Unknown->Sent or Stored->Sent */
         if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN ||
-            mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED)
-            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
+            mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED) {
+            GList *l;
 
+            /* Update state */
+            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
+            /* Grab last message reference */
+            l = g_list_last (mm_sms_get_parts (ctx->self));
+            mm_gdbus_sms_set_message_reference (MM_GDBUS_SMS (ctx->self),
+                                                mm_sms_part_get_message_reference ((MMSmsPart *)l->data));
+        }
         mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
     }
 
@@ -261,6 +268,16 @@ handle_send_auth_ready (MMBaseModem *modem,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_FAILED,
                                                "This SMS was received, cannot send it");
+        handle_send_context_free (ctx);
+        return;
+    }
+
+    /* Don't allow sending the same SMS multiple times, we would lose the message reference */
+    if (state == MM_SMS_STATE_SENT) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "This SMS was already sent, cannot send it again");
         handle_send_context_free (ctx);
         return;
     }
@@ -713,19 +730,56 @@ sms_send_finish (MMSms *self,
 
 static void sms_send_next_part (SmsSendContext *ctx);
 
+static gint
+read_message_reference_from_reply (const gchar *response,
+                                   GError **error)
+{
+    gint rv = 0;
+    gint idx = -1;
+
+    if (strstr (response, "+CMGS"))
+        rv = sscanf (strstr (response, "+CMGS"), "+CMGS: %d", &idx);
+    else if (strstr (response, "+CMSS"))
+        rv = sscanf (strstr (response, "+CMSS"), "+CMSS: %d", &idx);
+
+    if (rv != 1 || idx < 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't read message reference: "
+                     "%d fields parsed from response '%s'",
+                     rv, response);
+        return -1;
+    }
+
+    return idx;
+}
+
 static void
 send_generic_msg_data_ready (MMBaseModem *modem,
                              GAsyncResult *res,
                              SmsSendContext *ctx)
 {
     GError *error = NULL;
+    const gchar *response;
+    gint message_reference;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_send_context_complete_and_free (ctx);
         return;
     }
+
+    message_reference = read_message_reference_from_reply (response, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_sms_part_set_message_reference ((MMSmsPart *)ctx->current->data,
+                                       (guint)message_reference);
 
     ctx->current = g_list_next (ctx->current);
     sms_send_next_part (ctx);
@@ -760,8 +814,10 @@ send_from_storage_ready (MMBaseModem *modem,
                          SmsSendContext *ctx)
 {
     GError *error = NULL;
+    const gchar *response;
+    gint message_reference;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
     if (error) {
         mm_dbg ("Couldn't send SMS from storage: '%s'; trying generic send...",
                 error->message);
@@ -771,6 +827,16 @@ send_from_storage_ready (MMBaseModem *modem,
         sms_send_next_part (ctx);
         return;
     }
+
+    message_reference = read_message_reference_from_reply (response, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_sms_part_set_message_reference ((MMSmsPart *)ctx->current->data,
+                                       (guint)message_reference);
 
     ctx->current = g_list_next (ctx->current);
     sms_send_next_part (ctx);
@@ -1185,7 +1251,8 @@ assemble_sms (MMSms *self,
                   "validity",  mm_sms_part_get_validity (sorted_parts[0]),
                   "timestamp",               mm_sms_part_get_timestamp (sorted_parts[0]),
                   "discharge-timestamp",     mm_sms_part_get_discharge_timestamp (sorted_parts[0]),
-                  /* delivery report request usually set in the last part only */
+                  /* delivery report request and message reference taken always from the last part */
+                  "message-reference",       mm_sms_part_get_message_reference (sorted_parts[self->priv->max_parts - 1]),
                   "delivery-report-request", mm_sms_part_get_delivery_report_request (sorted_parts[self->priv->max_parts - 1]),
                   NULL);
 

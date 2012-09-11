@@ -330,6 +330,7 @@ struct _MMSmsPart {
     guint class;
     guint validity;
     gboolean delivery_report_request;
+    guint message_reference;
 
     gboolean should_concat;
     guint concat_reference;
@@ -410,6 +411,8 @@ PART_GET_FUNC (guint, validity)
 PART_SET_FUNC (guint, validity)
 PART_GET_FUNC (gboolean, delivery_report_request)
 PART_SET_FUNC (gboolean, delivery_report_request)
+PART_GET_FUNC (guint, message_reference)
+PART_SET_FUNC (guint, message_reference)
 
 PART_GET_FUNC (guint, concat_reference)
 
@@ -596,6 +599,7 @@ mm_sms_part_new_from_binary_pdu (guint index,
         PDU_SIZE_CHECK (offset + 1, "cannot read message reference");
 
         mm_dbg ("  message reference: %u", (guint)pdu[offset]);
+        mm_sms_part_set_message_reference (sms_part, pdu[offset]);
         offset++;
     }
 

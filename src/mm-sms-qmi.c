@@ -262,6 +262,7 @@ send_generic_ready (QmiClientWms *client,
 {
     QmiMessageWmsRawSendOutput *output = NULL;
     GError *error = NULL;
+    guint16 message_id;
 
     output = qmi_client_wms_raw_send_finish (client, res, &error);
     if (!output) {
@@ -293,6 +294,10 @@ send_generic_ready (QmiClientWms *client,
         sms_send_context_complete_and_free (ctx);
         return;
     }
+
+    if (qmi_message_wms_raw_send_output_get_message_id (output, &message_id, NULL))
+        mm_sms_part_set_message_reference ((MMSmsPart *)ctx->current->data,
+                                           message_id);
 
     qmi_message_wms_raw_send_output_unref (output);
 
@@ -350,6 +355,7 @@ send_from_storage_ready (QmiClientWms *client,
 {
     QmiMessageWmsSendFromMemoryStorageOutput *output = NULL;
     GError *error = NULL;
+    guint16 message_id;
 
     output = qmi_client_wms_send_from_memory_storage_finish (client, res, &error);
     if (!output) {
@@ -404,6 +410,10 @@ send_from_storage_ready (QmiClientWms *client,
         qmi_message_wms_send_from_memory_storage_output_unref (output);
         return;
     }
+
+    if (qmi_message_wms_send_from_memory_storage_output_get_message_id (output, &message_id, NULL))
+        mm_sms_part_set_message_reference ((MMSmsPart *)ctx->current->data,
+                                           message_id);
 
     qmi_message_wms_send_from_memory_storage_output_unref (output);
 

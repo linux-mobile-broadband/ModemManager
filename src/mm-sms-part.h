@@ -108,6 +108,10 @@ guint             mm_sms_part_get_validity           (MMSmsPart *part);
 void              mm_sms_part_set_validity           (MMSmsPart *part,
                                                       guint validity);
 
+guint             mm_sms_part_get_message_reference  (MMSmsPart *part);
+void              mm_sms_part_set_message_reference  (MMSmsPart *part,
+                                                      guint message_reference);
+
 gboolean          mm_sms_part_get_delivery_report_request (MMSmsPart *part);
 void              mm_sms_part_set_delivery_report_request (MMSmsPart *part,
                                                            gboolean delivery_report_request);
