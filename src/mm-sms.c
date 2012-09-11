@@ -1372,9 +1372,12 @@ mm_sms_singlepart_new (MMBaseModem *modem,
     /* Keep the single part in the list */
     self->priv->parts = g_list_prepend (self->priv->parts, part);
 
-    if (!assemble_sms (self, error))
+    if (!assemble_sms (self, error)) {
+        /* Note: we need to remove the part from the list, as we really didn't
+         * take it, and therefore the caller is responsible for freeing it. */
+        self->priv->parts = g_list_remove (self->priv->parts, part);
         g_clear_object (&self);
-    else
+    } else
         /* Only export once properly created */
         mm_sms_export (self);
 
