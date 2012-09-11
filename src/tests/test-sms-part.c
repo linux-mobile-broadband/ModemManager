@@ -532,8 +532,14 @@ common_test_create_pdu (const gchar *smsc,
         mm_sms_part_set_smsc (part, smsc);
     if (number)
         mm_sms_part_set_number (part, number);
-    if (text)
+    if (text) {
+        MMSmsEncoding encoding = MM_SMS_ENCODING_UNKNOWN;
+
+        /* Detect best encoding */
+        mm_sms_part_util_split_text (text, &encoding);
         mm_sms_part_set_text (part, text);
+        mm_sms_part_set_encoding (part, encoding);
+    }
     if (validity > 0)
         mm_sms_part_set_validity (part, validity);
     if (class > 0)
