@@ -239,6 +239,14 @@ mm_sms_get_class (MMSms *self)
     return mm_gdbus_sms_get_class (self);
 }
 
+gboolean
+mm_sms_get_delivery_report_request (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_get_delivery_report_request (self);
+}
+
 /**
  * mm_sms_get_state:
  * @self: A #MMSms.
