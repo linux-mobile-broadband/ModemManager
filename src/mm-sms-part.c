@@ -32,7 +32,7 @@
 
 #define SMS_TP_MTI_MASK               0x03
 #define  SMS_TP_MTI_SMS_DELIVER       0x00
-#define  SMS_TP_MTI_SMS_SUBMIT_REPORT 0x01
+#define  SMS_TP_MTI_SMS_SUBMIT        0x01
 #define  SMS_TP_MTI_SMS_STATUS_REPORT 0x02
 
 #define SMS_NUMBER_TYPE_MASK          0x70
@@ -259,6 +259,63 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
     return utf8;
 }
 
+static guint
+relative_to_validity (guint8 relative)
+{
+    if (relative <= 143)
+        return (relative + 1) * 5;
+
+    if (relative <= 167)
+        return 720 + (relative - 143) * 30;
+
+    return (relative - 166) * 1440;
+}
+
+static guint8
+validity_to_relative (guint validity)
+{
+    if (validity == 0)
+        return 167; /* 24 hours */
+
+    if (validity <= 720) {
+        /* 5 minute units up to 12 hours */
+        if (validity % 5)
+            validity += 5;
+        return (validity / 5) - 1;
+    }
+
+    if (validity > 720 && validity <= 1440) {
+        /* 12 hours + 30 minute units up to 1 day */
+        if (validity % 30)
+            validity += 30;  /* round up to next 30 minutes */
+        validity = MIN (validity, 1440);
+        return 143 + ((validity - 720) / 30);
+    }
+
+    if (validity > 1440 && validity <= 43200) {
+        /* 2 days up to 1 month */
+        if (validity % 1440)
+            validity += 1440;  /* round up to next day */
+        validity = MIN (validity, 43200);
+        return 167 + ((validity - 1440) / 1440);
+    }
+
+    /* 43200 = 30 days in minutes
+     * 10080 = 7 days in minutes
+     * 635040 = 63 weeks in minutes
+     * 40320 = 4 weeks in minutes
+     */
+    if (validity > 43200 && validity <= 635040) {
+        /* 5 weeks up to 63 weeks */
+        if (validity % 10080)
+            validity += 10080;  /* round up to next week */
+        validity = MIN (validity, 635040);
+        return 196 + ((validity - 40320) / 10080);
+    }
+
+    return 255; /* 63 weeks */
+}
+
 struct _MMSmsPart {
     guint index;
     MMSmsPduType pdu_type;
@@ -432,102 +489,283 @@ mm_sms_part_new_from_binary_pdu (guint index,
                                  GError **error)
 {
     MMSmsPart *sms_part;
-    guint smsc_addr_num_octets, variable_length_items, msg_start_offset,
-            sender_addr_num_digits, sender_addr_num_octets,
-            tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
-            user_data_len_offset, bit_offset;
-    MMSmsEncoding user_data_encoding;
     GByteArray *raw;
+    guint8 pdu_type;
+    guint offset;
+    guint smsc_addr_size_bytes;
+    guint tp_addr_size_digits;
+    guint tp_addr_size_bytes;
+    guint8 validity_format = 0;
+    gboolean has_udh = FALSE;
+    /* The following offsets are OPTIONAL, as STATUS REPORTs may not have
+     * them; we use '0' to indicate their absence */
+    guint tp_pid_offset = 0;
+    guint tp_dcs_offset = 0;
+    guint tp_user_data_len_offset = 0;
+    MMSmsEncoding user_data_encoding = MM_SMS_ENCODING_UNKNOWN;
 
-    /* SMSC, in address format, precedes the TPDU */
-    smsc_addr_num_octets = pdu[0];
-    variable_length_items = smsc_addr_num_octets;
-    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "PDU too short (1): %zd < %d",
-                     pdu_len,
-                     variable_length_items + SMS_MIN_PDU_LEN);
-        return NULL;
-    }
+    /* Create the new MMSmsPart */
+    sms_part = mm_sms_part_new (index, MM_SMS_PDU_TYPE_UNKNOWN);
 
-    /* where in the PDU the actual SMS protocol message begins */
-    msg_start_offset = 1 + smsc_addr_num_octets;
-    sender_addr_num_digits = pdu[msg_start_offset + 1];
-
-    /*
-     * round the sender address length up to an even number of
-     * semi-octets, and thus an integral number of octets
-     */
-    sender_addr_num_octets = (sender_addr_num_digits + 1) >> 1;
-    variable_length_items += sender_addr_num_octets;
-    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "PDU too short (2): %zd < %d",
-                     pdu_len,
-                     variable_length_items + SMS_MIN_PDU_LEN);
-        return NULL;
-    }
-
-    tp_pid_offset = msg_start_offset + 3 + sender_addr_num_octets;
-    tp_dcs_offset = tp_pid_offset + 1;
-
-    user_data_len_offset = tp_dcs_offset + 1 + SMS_TIMESTAMP_LEN;
-    user_data_offset = user_data_len_offset + 1;
-    user_data_len = pdu[user_data_len_offset];
-    user_data_encoding = sms_encoding_type(pdu[tp_dcs_offset]);
-
-    if (user_data_encoding == MM_SMS_ENCODING_GSM7)
-        variable_length_items += (7 * (user_data_len + 1 )) / 8;
+    if (index != SMS_PART_INVALID_INDEX)
+        mm_dbg ("Parsing PDU (%u)...", index);
     else
-        variable_length_items += user_data_len;
+        mm_dbg ("Parsing PDU...");
 
-    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "PDU too short (3): %zd < %d",
-                     pdu_len,
-                     variable_length_items + SMS_MIN_PDU_LEN);
-        return NULL;
+#define PDU_SIZE_CHECK(required_size, check_descr_str) \
+    if (pdu_len < required_size) {                     \
+        g_set_error (error,                            \
+                     MM_CORE_ERROR,                    \
+                     MM_CORE_ERROR_FAILED,             \
+                     "PDU too short, %s: %zd < %u",    \
+                     check_descr_str,                  \
+                     pdu_len,                          \
+                     required_size);                   \
+        mm_sms_part_free (sms_part);                   \
+        return NULL;                                   \
     }
 
-    /* Only handle SMS-DELIVER */
-    if ((pdu[msg_start_offset] & SMS_TP_MTI_MASK) != SMS_TP_MTI_SMS_DELIVER) {
+    offset = 0;
+
+    /* ---------------------------------------------------------------------- */
+    /* SMSC, in address format, precedes the TPDU
+     * First byte represents the number of BYTES for the address value */
+    PDU_SIZE_CHECK (1, "cannot read SMSC address length");
+    smsc_addr_size_bytes = pdu[offset++];
+    if (smsc_addr_size_bytes > 0) {
+        PDU_SIZE_CHECK (offset + smsc_addr_size_bytes, "cannot read SMSC address");
+        /* SMSC may not be given in DELIVER PDUs */
+        mm_sms_part_take_smsc (sms_part,
+                               sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1)));
+        mm_dbg ("  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
+        offset += smsc_addr_size_bytes;
+    } else
+        mm_dbg ("  No SMSC address given");
+
+
+    /* ---------------------------------------------------------------------- */
+    /* TP-MTI (1 byte) */
+    PDU_SIZE_CHECK (offset + 1, "cannot read TP-MTI");
+
+    pdu_type = (pdu[offset] & SMS_TP_MTI_MASK);
+    switch (pdu_type) {
+    case SMS_TP_MTI_SMS_DELIVER:
+        mm_dbg ("  Deliver type PDU detected");
+        mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_DELIVER);
+        break;
+    case SMS_TP_MTI_SMS_SUBMIT:
+        mm_dbg ("  Submit type PDU detected");
+        mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_SUBMIT);
+        break;
+    case SMS_TP_MTI_SMS_STATUS_REPORT:
+        mm_dbg ("  Status report type PDU detected");
+        mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_STATUS_REPORT);
+        break;
+    default:
+        mm_sms_part_free (sms_part);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unhandled message type: 0x%02x",
-                     pdu[msg_start_offset]);
+                     pdu_type);
         return NULL;
     }
 
-    /* Create the new MMSmsPart */
-    sms_part = mm_sms_part_new (index, MM_SMS_PDU_TYPE_SUBMIT);
-    mm_sms_part_take_smsc (sms_part,
-                           sms_decode_address (&pdu[1], 2 * (pdu[0] - 1)));
+    /* Delivery report was requested? */
+    if (pdu[offset] & 0x20)
+        mm_sms_part_set_delivery_report_request (sms_part, TRUE);
+
+    /* PDU with validity? (only in SUBMIT PDUs) */
+    if (pdu_type == SMS_TP_MTI_SMS_SUBMIT)
+        validity_format = pdu[offset] & 0x18;
+
+    /* PDU with user data header? */
+    if (pdu[offset] & 0x40)
+        has_udh = TRUE;
+
+    offset++;
+
+    /* ---------------------------------------------------------------------- */
+    /* TP-MR (1 byte, in STATUS_REPORT and SUBMIT PDUs */
+    if (pdu_type == SMS_TP_MTI_SMS_STATUS_REPORT ||
+        pdu_type == SMS_TP_MTI_SMS_SUBMIT) {
+        PDU_SIZE_CHECK (offset + 1, "cannot read message reference");
+
+        mm_dbg ("  message reference: %u", (guint)pdu[offset]);
+        offset++;
+    }
+
+
+    /* ---------------------------------------------------------------------- */
+    /* TP-DA or TP-OA or TP-RA
+     * First byte represents the number of DIGITS in the number.
+     * Round the sender address length up to an even number of
+     * semi-octets, and thus an integral number of octets.
+     */
+    PDU_SIZE_CHECK (offset + 1, "cannot read number of digits in number");
+    tp_addr_size_digits = pdu[offset++];
+    tp_addr_size_bytes = (tp_addr_size_digits + 1) >> 1;
+
+    PDU_SIZE_CHECK (offset + tp_addr_size_bytes, "cannot read number");
     mm_sms_part_take_number (sms_part,
-                             sms_decode_address (&pdu[msg_start_offset + 2],
-                                                 pdu[msg_start_offset + 1]));
-    mm_sms_part_take_timestamp (sms_part,
-                                sms_decode_timestamp (&pdu[tp_dcs_offset + 1]));
+                             sms_decode_address (&pdu[offset],
+                                                 tp_addr_size_digits));
+    mm_dbg ("  Number parsed: '%s'", mm_sms_part_get_number (sms_part));
+    offset += (1 + tp_addr_size_bytes); /* +1 due to the Type of Address byte */
 
-    bit_offset = 0;
-    if (pdu[msg_start_offset] & SMS_TP_UDHI) {
-        int udhl, end, offset;
-        udhl = pdu[user_data_offset] + 1;
-        end = user_data_offset + udhl;
+    /* ---------------------------------------------------------------------- */
+    /* Get timestamps and indexes for TP-PID, TP-DCS and TP-UDL/TP-UD */
 
-        for (offset = user_data_offset + 1; offset < end;) {
-            guint8 ie_id, ie_len;
+    if (pdu_type == SMS_TP_MTI_SMS_DELIVER) {
+        PDU_SIZE_CHECK (offset + 9,
+                        "cannot read PID/DCS/Timestamp"); /* 1+1+7=9 */
 
-            ie_id = pdu[offset++];
-            ie_len = pdu[offset++];
+        /* ------ TP-PID (1 byte) ------ */
+        tp_pid_offset = offset++;
 
-            switch (ie_id) {
+        /* ------ TP-DCS (1 byte) ------ */
+        tp_dcs_offset = offset++;
+
+        /* ------ Timestamp (7 bytes) ------ */
+        mm_sms_part_take_timestamp (sms_part,
+                                    sms_decode_timestamp (&pdu[offset]));
+        offset += 7;
+
+        tp_user_data_len_offset = offset;
+    } else if (pdu_type == SMS_TP_MTI_SMS_SUBMIT) {
+        PDU_SIZE_CHECK (offset + 2 + !!validity_format,
+                        "cannot read PID/DCS/Validity"); /* 1+1=2 */
+
+        /* ------ TP-PID (1 byte) ------ */
+        tp_pid_offset = offset++;
+
+        /* ------ TP-DCS (1 byte) ------ */
+        tp_dcs_offset = offset++;
+
+        /* ----------- TP-Validity-Period (1 byte) ----------- */
+        if (validity_format) {
+            switch (validity_format) {
+            case 0x10:
+                mm_dbg ("  validity available, format relative");
+                mm_sms_part_set_validity (sms_part,
+                                          relative_to_validity (pdu[offset]));
+                break;
+            case 0x08:
+                /* TODO: support enhanced format; GSM 03.40 */
+                mm_dbg ("  validity available, format enhanced (not implemented)");
+                break;
+            case 0x18:
+                /* TODO: support absolute format; GSM 03.40 */
+                mm_dbg ("  validity available, format absolute (not implemented)");
+                break;
+            default:
+                /* Cannot happen as we AND with the 0x18 mask */
+                g_assert_not_reached();
+            }
+            offset++;
+        }
+
+        tp_user_data_len_offset = offset;
+    }
+    else if (pdu_type == SMS_TP_MTI_SMS_STATUS_REPORT) {
+        /* We have 2 timestamps in status report PDUs:
+         *  first, the timestamp for when the PDU was received in the SMSC
+         *  second, the timestamp for when the PDU was forwarded by the SMSC
+         */
+        PDU_SIZE_CHECK (offset + 15, "cannot read Timestamps/TP-STATUS"); /* 7+7+1=15 */
+
+        /* ------ Timestamp (7 bytes) ------ */
+        mm_sms_part_take_timestamp (sms_part,
+                                    sms_decode_timestamp (&pdu[offset]));
+        offset += 7;
+
+        /* ------ Discharge Timestamp (7 bytes) ------ */
+        mm_sms_part_take_timestamp (sms_part,
+                                    sms_decode_timestamp (&pdu[offset]));
+        offset += 7;
+
+        /* ----- TP-STATUS (1 byte) ------ */
+        mm_dbg ("  status: %u", (guint)pdu[offset]);
+        offset++;
+
+        /* ------ TP-PI (1 byte) OPTIONAL ------ */
+        if (offset < pdu_len) {
+            guint next_optional_field_offset = offset + 1;
+
+            /* TP-PID? */
+            if (pdu[offset] & 0x01)
+                tp_pid_offset = next_optional_field_offset++;
+
+            /* TP-DCS? */
+            if (pdu[offset] & 0x02)
+                tp_dcs_offset = next_optional_field_offset++;
+
+            /* TP-UserData? */
+            if (pdu[offset] & 0x04)
+                tp_user_data_len_offset = next_optional_field_offset;
+        }
+    } else
+        g_assert_not_reached ();
+
+    if (tp_pid_offset > 0) {
+        PDU_SIZE_CHECK (tp_pid_offset + 1, "cannot read TP-PID");
+        mm_dbg ("  PID: %u", (guint)pdu[tp_pid_offset]);
+    }
+
+    /* Grab user data encoding */
+    if (tp_dcs_offset > 0) {
+        PDU_SIZE_CHECK (tp_dcs_offset + 1, "cannot read TP-DCS");
+        user_data_encoding = sms_encoding_type(pdu[tp_dcs_offset]);
+        switch (user_data_encoding) {
+        case MM_SMS_ENCODING_GSM7:
+            mm_dbg ("  user data encoding is GSM7");
+            break;
+        case MM_SMS_ENCODING_UCS2:
+            mm_dbg ("  user data encoding is UCS2");
+            break;
+        case MM_SMS_ENCODING_8BIT:
+            mm_dbg ("  user data encoding is 8bit");
+            break;
+        default:
+            mm_dbg ("  user data encoding is unknown");
+            break;
+        }
+        mm_sms_part_set_encoding (sms_part, user_data_encoding);
+    }
+
+    if (tp_user_data_len_offset > 0) {
+        guint tp_user_data_size_elements;
+        guint tp_user_data_size_bytes;
+        guint tp_user_data_offset;
+        guint bit_offset;
+
+        PDU_SIZE_CHECK (tp_user_data_len_offset + 1, "cannot read TP-UDL");
+        tp_user_data_size_elements = pdu[tp_user_data_len_offset];
+        mm_dbg ("  user data length: %u elements", tp_user_data_size_elements);
+
+        if (user_data_encoding == MM_SMS_ENCODING_GSM7)
+            tp_user_data_size_bytes = (7 * (tp_user_data_size_elements + 1 )) / 8;
+        else
+            tp_user_data_size_bytes = tp_user_data_size_elements;
+        mm_dbg ("  user data length: %u bytes", tp_user_data_size_bytes);
+
+        tp_user_data_offset = tp_user_data_len_offset + 1;
+        PDU_SIZE_CHECK (tp_user_data_offset + tp_user_data_size_bytes, "cannot read TP-UD");
+
+        bit_offset = 0;
+        if (has_udh) {
+            guint udhl, end;
+
+            udhl = pdu[tp_user_data_offset] + 1;
+            end = tp_user_data_offset + udhl;
+
+            for (offset = tp_user_data_offset + 1; offset < end;) {
+                guint8 ie_id, ie_len;
+
+                ie_id = pdu[offset++];
+                ie_len = pdu[offset++];
+
+                switch (ie_id) {
                 case 0x00:
                     /*
                      * Ignore the IE if one of the following is true:
@@ -538,12 +776,9 @@ mm_sms_part_new_from_binary_pdu (guint index,
                         pdu[offset + 2] > pdu[offset + 1])
                         break;
 
-                    mm_sms_part_set_concat_reference (sms_part,
-                                                      pdu[offset]);
-                    mm_sms_part_set_concat_max (sms_part,
-                                                pdu[offset + 1]);
-                    mm_sms_part_set_concat_sequence (sms_part,
-                                                     pdu[offset + 2]);
+                    mm_sms_part_set_concat_reference (sms_part, pdu[offset]);
+                    mm_sms_part_set_concat_max (sms_part, pdu[offset + 1]);
+                    mm_sms_part_set_concat_sequence (sms_part, pdu[offset + 2]);
                     break;
                 case 0x08:
                     /* Concatenated short message, 16-bit reference */
@@ -551,61 +786,61 @@ mm_sms_part_new_from_binary_pdu (guint index,
                         pdu[offset + 3] > pdu[offset + 2])
                         break;
 
-                    mm_sms_part_set_concat_reference (sms_part,
-                                                      (pdu[offset] << 8) | pdu[offset + 1]);
-                    mm_sms_part_set_concat_max (sms_part,
-                                                pdu[offset + 2]);
-                    mm_sms_part_set_concat_sequence (sms_part,
-                                                     pdu[offset + 3]);
+                    mm_sms_part_set_concat_reference (sms_part, (pdu[offset] << 8) | pdu[offset + 1]);
+                    mm_sms_part_set_concat_max (sms_part,pdu[offset + 2]);
+                    mm_sms_part_set_concat_sequence (sms_part, pdu[offset + 3]);
                     break;
+                }
+
+                offset += ie_len;
             }
 
-            offset += ie_len;
+            /*
+             * Move past the user data headers to prevent it from being
+             * decoded into garbage text.
+             */
+            tp_user_data_offset += udhl;
+            tp_user_data_size_bytes -= udhl;
+            if (user_data_encoding == MM_SMS_ENCODING_GSM7) {
+                /*
+                 * Find the number of bits we need to add to the length of the
+                 * user data to get a multiple of 7 (the padding).
+                 */
+                bit_offset = (7 - udhl % 7) % 7;
+                tp_user_data_size_elements -= (udhl * 8 + bit_offset) / 7;
+            } else
+                tp_user_data_size_elements -= udhl;
         }
 
-        /*
-         * Move past the user data headers to prevent it from being
-         * decoded into garbage text.
-         */
-        user_data_offset += udhl;
-        if (user_data_encoding == MM_SMS_ENCODING_GSM7) {
-            /*
-             * Find the number of bits we need to add to the length of the
-             * user data to get a multiple of 7 (the padding).
+        if (   user_data_encoding == MM_SMS_ENCODING_8BIT
+            || user_data_encoding == MM_SMS_ENCODING_UNKNOWN) {
+            /* 8-bit encoding is usually binary data, and we have no idea what
+             * actual encoding the data is in so we can't convert it.
              */
-            bit_offset = (7 - udhl % 7) % 7;
-            user_data_len -= (udhl * 8 + bit_offset) / 7;
-        } else
-            user_data_len -= udhl;
+            mm_dbg ("Skipping SMS part text: 8-bit or Unknown encoding");
+            mm_sms_part_set_text (sms_part, "");
+        } else {
+            /* Otherwise if it's 7-bit or UCS2 we can decode it */
+            mm_dbg ("Decoding text with '%u' elements", tp_user_data_size_elements);
+            mm_sms_part_take_text (sms_part,
+                                   sms_decode_text (&pdu[tp_user_data_offset],
+                                                    tp_user_data_size_elements,
+                                                    user_data_encoding,
+                                                    bit_offset));
+            g_warn_if_fail (sms_part->text != NULL);
+        }
+
+        /* Add the raw PDU data */
+        raw = g_byte_array_sized_new (tp_user_data_size_bytes);
+        g_byte_array_append (raw, &pdu[tp_user_data_offset], tp_user_data_size_bytes);
+        mm_sms_part_take_data (sms_part, raw);
+        mm_sms_part_set_data_coding_scheme (sms_part,
+                                            pdu[tp_dcs_offset] & 0xFF);
+
+        if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
+            mm_sms_part_set_class (sms_part,
+                                   pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
     }
-
-    /* Keep user data encoding */
-    mm_sms_part_set_encoding (sms_part, user_data_encoding);
-
-    if (   user_data_encoding == MM_SMS_ENCODING_8BIT
-        || user_data_encoding == MM_SMS_ENCODING_UNKNOWN) {
-        /* 8-bit encoding is usually binary data, and we have no idea what
-         * actual encoding the data is in so we can't convert it.
-         */
-        mm_dbg ("Skipping SMS part text: 8-bit or Unknown encoding");
-        mm_sms_part_set_text (sms_part, "");
-    } else {
-        /* Otherwise if it's 7-bit or UCS2 we can decode it */
-        mm_sms_part_take_text (sms_part,
-                               sms_decode_text (&pdu[user_data_offset], user_data_len,
-                                                user_data_encoding, bit_offset));
-        g_warn_if_fail (sms_part->text != NULL);
-    }
-
-    /* Add the raw PDU data */
-    raw = g_byte_array_sized_new (user_data_len);
-    g_byte_array_append (raw, &pdu[user_data_offset], user_data_len);
-    mm_sms_part_take_data (sms_part, raw);
-    mm_sms_part_set_data_coding_scheme (sms_part, pdu[tp_dcs_offset] & 0xFF);
-
-    if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
-        mm_sms_part_set_class (sms_part,
-                               pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
 
     return sms_part;
 }
@@ -649,51 +884,6 @@ mm_sms_part_encode_address (const gchar *address,
         buf[0] = strlen (address);  /* number of digits in address */
 
     return len ? len + 2 : 0;  /* addr length + size byte + number type/plan */
-}
-
-static guint8
-validity_to_relative (guint validity)
-{
-    if (validity == 0)
-        return 167; /* 24 hours */
-
-    if (validity <= 720) {
-        /* 5 minute units up to 12 hours */
-        if (validity % 5)
-            validity += 5;
-        return (validity / 5) - 1;
-    }
-
-    if (validity > 720 && validity <= 1440) {
-        /* 12 hours + 30 minute units up to 1 day */
-        if (validity % 30)
-            validity += 30;  /* round up to next 30 minutes */
-        validity = MIN (validity, 1440);
-        return 143 + ((validity - 720) / 30);
-    }
-
-    if (validity > 1440 && validity <= 43200) {
-        /* 2 days up to 1 month */
-        if (validity % 1440)
-            validity += 1440;  /* round up to next day */
-        validity = MIN (validity, 43200);
-        return 167 + ((validity - 1440) / 1440);
-    }
-
-    /* 43200 = 30 days in minutes
-     * 10080 = 7 days in minutes
-     * 635040 = 63 weeks in minutes
-     * 40320 = 4 weeks in minutes
-     */
-    if (validity > 43200 && validity <= 635040) {
-        /* 5 weeks up to 63 weeks */
-        if (validity % 10080)
-            validity += 10080;  /* round up to next week */
-        validity = MIN (validity, 635040);
-        return 196 + ((validity - 40320) / 10080);
-    }
-
-    return 255; /* 63 weeks */
 }
 
 /**
