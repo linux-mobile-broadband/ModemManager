@@ -16,6 +16,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
@@ -1478,6 +1479,48 @@ test_parse_operator_id (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test +CDS unsolicited message parsing */
+
+static void
+common_parse_cds (const gchar *str,
+                  guint expected_pdu_len,
+                  const gchar *expected_pdu)
+{
+    GMatchInfo *match_info;
+    GRegex *regex;
+    gchar *pdu_len_str;
+    gchar *pdu;
+
+    regex = mm_3gpp_cds_regex_get ();
+    g_regex_match (regex, str, 0, &match_info);
+    g_assert (g_match_info_matches (match_info));
+
+    pdu_len_str = g_match_info_fetch (match_info, 1);
+    g_assert (pdu_len_str != NULL);
+    g_assert_cmpuint ((guint) atoi (pdu_len_str), == , expected_pdu_len);
+
+    pdu = g_match_info_fetch (match_info, 2);
+    g_assert (pdu != NULL);
+
+    g_assert_cmpstr (pdu, ==, expected_pdu);
+
+    g_free (pdu);
+    g_free (pdu_len_str);
+
+    g_match_info_free (match_info);
+    g_regex_unref (regex);
+}
+
+static void
+test_parse_cds (void *f, gpointer d)
+{
+    /* <CR><LF>+CDS: 24<CR><LF>07914356060013F1065A098136395339F6219011700463802190117004638030<CR><LF> */
+    common_parse_cds ("\r\n+CDS: 24\r\n07914356060013F1065A098136395339F6219011700463802190117004638030\r\n",
+                      24,
+                      "07914356060013F1065A098136395339F6219011700463802190117004638030");
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1585,6 +1628,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_multiple_numbers, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_operator_id, NULL));
+
+
+    g_test_suite_add (suite, TESTCASE (test_parse_cds, NULL));
 
     result = g_test_run ();
 
