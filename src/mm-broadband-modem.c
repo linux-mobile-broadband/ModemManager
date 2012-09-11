@@ -4567,13 +4567,11 @@ cmti_received (MMAtSerialPort *port,
                MMBroadbandModem *self)
 {
     guint idx = 0;
-    gchar *str, *command;
+    gchar *command;
     SmsPartContext *ctx;
 
-    str = g_match_info_fetch (info, 2);
-    if (str)
-        idx = atoi (str);
-    g_free (str);
+    if (!mm_get_uint_from_match_info (info, 2, &idx))
+        return;
 
     if (G_UNLIKELY (!self->priv->known_sms_parts))
         self->priv->known_sms_parts = g_hash_table_new (g_direct_hash, g_direct_equal);
