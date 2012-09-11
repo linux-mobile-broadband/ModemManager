@@ -767,7 +767,7 @@ mm_sms_part_new_from_binary_pdu (guint index,
             udhl = pdu[tp_user_data_offset] + 1;
             end = tp_user_data_offset + udhl;
 
-            for (offset = tp_user_data_offset + 1; offset < end;) {
+            for (offset = tp_user_data_offset + 1; (offset + 1) < end;) {
                 guint8 ie_id, ie_len;
 
                 ie_id = pdu[offset++];
@@ -775,6 +775,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
 
                 switch (ie_id) {
                 case 0x00:
+                    if (offset + 2 >= end)
+                        break;
                     /*
                      * Ignore the IE if one of the following is true:
                      *  - it claims to be part 0 of M
@@ -789,6 +791,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
                     mm_sms_part_set_concat_sequence (sms_part, pdu[offset + 2]);
                     break;
                 case 0x08:
+                    if (offset + 3 >= end)
+                        break;
                     /* Concatenated short message, 16-bit reference */
                     if (pdu[offset + 3] == 0 ||
                         pdu[offset + 3] > pdu[offset + 2])
