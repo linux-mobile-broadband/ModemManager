@@ -424,6 +424,23 @@ test_pdu_multipart (void)
 }
 
 static void
+test_pdu_stored_by_us (void)
+{
+    /* This is a SUBMIT PDU! */
+    static const gchar *hexpdu1 =
+        "002100098136397339F70008224F60597D4F60597D4F60597D4F60597D4F60597D4F60597D4F60597D4F60597D4F60";
+
+    common_test_part_from_hexpdu (
+        hexpdu1,
+        NULL, /* smsc */
+        "639337937", /* number */
+        NULL, /* timestamp */
+        FALSE, /* multipart! */
+        "你好你好你好你好你好你好你好你好你", /* text */
+        NULL, 0, 0);
+}
+
+static void
 test_pdu_not_stored (void)
 {
     static const gchar *hexpdu1 =
@@ -842,6 +859,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-udhi", test_pdu_udhi);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-multipart", test_pdu_multipart);
+    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-stored-by-us", test_pdu_stored_by_us);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-not-stored", test_pdu_not_stored);
 
     g_test_add_func ("/MM/SMS/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
