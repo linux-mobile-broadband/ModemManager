@@ -20,6 +20,8 @@
  * Copyright (C) 2012 Google, Inc.
  */
 
+#include "string.h"
+
 #include "mm-helpers.h"
 #include "mm-sms.h"
 #include "mm-modem.h"
@@ -97,6 +99,71 @@ mm_sms_dup_text (MMSms *self)
 
     RETURN_NON_EMPTY_STRING (
         mm_gdbus_sms_dup_text (self));
+}
+
+/**
+ * mm_sms_get_data:
+ * @self: A #MMSms.
+ * @data_len: (out) Size of the output data, if any given.
+ *
+ * TODO
+ *
+ * Returns: (transfer none): The data, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ */
+const guint8 *
+mm_sms_get_data (MMSms *self,
+                 gsize *data_len)
+{
+    GVariant *data;
+
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+
+    data = mm_gdbus_sms_get_data (MM_GDBUS_SMS (self));
+    return (data ?
+            g_variant_get_fixed_array (
+                mm_gdbus_sms_get_data (MM_GDBUS_SMS (self)),
+                data_len,
+                sizeof (guchar)):
+            NULL);
+}
+
+/**
+ * mm_sms_dup_data:
+ * @self: A #MMSms.
+ * @data_len: (out) Size of the output data, if any given.
+ *
+ * TODO
+ *
+ * Returns: (transfer full): The data, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ */
+guint8 *
+mm_sms_dup_data (MMSms *self,
+                 gsize *data_len)
+{
+    guint8 *out;
+    GVariant *data_variant;
+    const guint8 *orig_data;
+    gsize orig_data_len = 0;
+
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+
+    /* Get a ref to ensure the variant is valid as long as we use it */
+    data_variant = mm_gdbus_sms_dup_data (MM_GDBUS_SMS (self));
+    if (!data_variant)
+        return NULL;
+
+    orig_data = (g_variant_get_fixed_array (
+                     mm_gdbus_sms_get_data (MM_GDBUS_SMS (self)),
+                     &orig_data_len,
+                     sizeof (guchar)));
+
+    out = g_new (guint8, orig_data_len);
+    memcpy (out, orig_data, orig_data_len);
+    g_variant_unref (data_variant);
+
+    if (data_len)
+        *data_len = orig_data_len;
+    return out;
 }
 
 /**
