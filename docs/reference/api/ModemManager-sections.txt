@@ -21,6 +21,7 @@ MMModemState
 MMModemStateChangeReason
 MMSmsPduType
 MMSmsState
+MMSmsDeliveryState
 MMSmsStorage
 </SECTION>
 

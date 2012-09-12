@@ -154,6 +154,17 @@
     <property name="DischargeTimestamp" type="s" access="read" />
 
     <!--
+        DeliveryState:
+
+        A <link linkend="MMSmsDeliveryState">MMSmsDeliveryState</link> value,
+        describing the state of the delivery reported in the Status Report message.
+
+        This field is only applicable if the PDU type is
+        <link linkend="MM-SMS-PDU-TYPE-STATUS-REPORT:CAPS"><constant>MM_SMS_PDU_TYPE_STATUS_REPORT</constant></link>.
+    -->
+    <property name="DeliveryState" type="u" access="read" />
+
+    <!--
         Storage:
 
         A <link linkend="MMSmsStorage">MMSmsStorage</link> value,

@@ -1252,6 +1252,7 @@ assemble_sms (MMSms *self,
                   "validity",  mm_sms_part_get_validity (sorted_parts[0]),
                   "timestamp",               mm_sms_part_get_timestamp (sorted_parts[0]),
                   "discharge-timestamp",     mm_sms_part_get_discharge_timestamp (sorted_parts[0]),
+                  "delivery-state",          mm_sms_part_get_delivery_state (sorted_parts[0]),
                   /* delivery report request and message reference taken always from the last part */
                   "message-reference",       mm_sms_part_get_message_reference (sorted_parts[self->priv->max_parts - 1]),
                   "delivery-report-request", mm_sms_part_get_delivery_report_request (sorted_parts[self->priv->max_parts - 1]),

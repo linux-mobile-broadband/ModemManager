@@ -761,3 +761,47 @@ mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
 
     return str;
 }
+
+/*****************************************************************************/
+
+const gchar *
+mm_sms_delivery_state_get_string_extended (guint delivery_state)
+{
+    if (delivery_state > 0x02 && delivery_state < 0x20) {
+        if (delivery_state < 0x10)
+            return "completed-reason-reserved";
+        else
+            return "completed-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x25 && delivery_state < 0x40) {
+        if (delivery_state < 0x30)
+            return "temporary-error-reason-reserved";
+        else
+            return "temporary-error-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x49 && delivery_state < 0x60) {
+        if (delivery_state < 0x50)
+            return "error-reason-reserved";
+        else
+            return "error-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x65 && delivery_state < 0x80) {
+        if (delivery_state < 0x70)
+            return "temporary-fatal-error-reason-reserved";
+        else
+            return "temporary-fatal-error-sc-specific-reason";
+    }
+
+    if (delivery_state >= 0x80 && delivery_state < 0x100)
+        return "unknown-reason-reserved";
+
+    if (delivery_state >= 0x100)
+        return "unknown";
+
+    /* Otherwise, use the MMSmsDeliveryState enum as we can match the known
+     * value */
+    return mm_sms_delivery_state_get_string ((MMSmsDeliveryState)delivery_state);
+}

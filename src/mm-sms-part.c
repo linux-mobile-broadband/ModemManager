@@ -331,6 +331,8 @@ struct _MMSmsPart {
     guint validity;
     gboolean delivery_report_request;
     guint message_reference;
+    /* NOT a MMSmsDeliveryState, which just includes the known values */
+    guint delivery_state;
 
     gboolean should_concat;
     guint concat_reference;
@@ -413,6 +415,8 @@ PART_GET_FUNC (gboolean, delivery_report_request)
 PART_SET_FUNC (gboolean, delivery_report_request)
 PART_GET_FUNC (guint, message_reference)
 PART_SET_FUNC (guint, message_reference)
+PART_GET_FUNC (guint, delivery_state)
+PART_SET_FUNC (guint, delivery_state)
 
 PART_GET_FUNC (guint, concat_reference)
 
@@ -459,6 +463,8 @@ mm_sms_part_new (guint index,
     sms_part = g_slice_new0 (MMSmsPart);
     sms_part->index = index;
     sms_part->pdu_type = pdu_type;
+    sms_part->encoding = MM_SMS_ENCODING_UNKNOWN;
+    sms_part->delivery_state = MM_SMS_DELIVERY_STATE_UNKNOWN;
 
     return sms_part;
 }
@@ -693,7 +699,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
         offset += 7;
 
         /* ----- TP-STATUS (1 byte) ------ */
-        mm_dbg ("  status: %u", (guint)pdu[offset]);
+        mm_dbg ("  delivery state: %u", (guint)pdu[offset]);
+        mm_sms_part_set_delivery_state (sms_part, pdu[offset]);
         offset++;
 
         /* ------ TP-PI (1 byte) OPTIONAL ------ */

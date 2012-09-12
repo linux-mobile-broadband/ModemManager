@@ -87,4 +87,6 @@ gboolean  mm_get_double_from_match_info          (GMatchInfo *match_info,
 gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
                                                   guint32 match_index);
 
+const gchar *mm_sms_delivery_state_get_string_extended (guint delivery_state);
+
 #endif /* MM_COMMON_HELPERS_H */
