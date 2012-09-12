@@ -727,9 +727,11 @@ mm_sms_part_new_from_binary_pdu (guint index,
         mm_dbg ("  PID: %u", (guint)pdu[tp_pid_offset]);
     }
 
-    /* Grab user data encoding */
+    /* Grab user data encoding and message class */
     if (tp_dcs_offset > 0) {
         PDU_SIZE_CHECK (tp_dcs_offset + 1, "cannot read TP-DCS");
+
+        /* Encoding given in the 'alphabet' bits */
         user_data_encoding = sms_encoding_type(pdu[tp_dcs_offset]);
         switch (user_data_encoding) {
         case MM_SMS_ENCODING_GSM7:
@@ -746,6 +748,11 @@ mm_sms_part_new_from_binary_pdu (guint index,
             break;
         }
         mm_sms_part_set_encoding (sms_part, user_data_encoding);
+
+        /* Class */
+        if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
+            mm_sms_part_set_class (sms_part,
+                                   pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
     }
 
     if (tp_user_data_len_offset > 0) {
@@ -856,9 +863,6 @@ mm_sms_part_new_from_binary_pdu (guint index,
         mm_sms_part_set_data_coding_scheme (sms_part,
                                             pdu[tp_dcs_offset] & 0xFF);
 
-        if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
-            mm_sms_part_set_class (sms_part,
-                                   pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
     }
 
     return sms_part;
