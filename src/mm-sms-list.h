@@ -61,6 +61,10 @@ MMSmsList *mm_sms_list_new (MMBaseModem *modem);
 GStrv mm_sms_list_get_paths (MMSmsList *self);
 guint mm_sms_list_get_count (MMSmsList *self);
 
+gboolean mm_sms_list_has_part (MMSmsList *self,
+                               MMSmsStorage storage,
+                               guint index);
+
 gboolean mm_sms_list_take_part (MMSmsList *self,
                                 MMSmsPart *part,
                                 MMSmsState state,

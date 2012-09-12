@@ -288,6 +288,25 @@ take_multipart (MMSmsList *self,
 }
 
 gboolean
+mm_sms_list_has_part (MMSmsList *self,
+                      MMSmsStorage storage,
+                      guint index)
+{
+    PartIndexAndStorage ctx;
+
+    if (storage == MM_SMS_STORAGE_UNKNOWN ||
+        index == SMS_PART_INVALID_INDEX)
+        return FALSE;
+
+    ctx.part_index = index;
+    ctx.storage = storage;
+
+    return !!g_list_find_custom (self->priv->list,
+                                 &ctx,
+                                 (GCompareFunc)cmp_sms_by_part_index_and_storage);
+}
+
+gboolean
 mm_sms_list_take_part (MMSmsList *self,
                        MMSmsPart *part,
                        MMSmsState state,
@@ -300,10 +319,9 @@ mm_sms_list_take_part (MMSmsList *self,
     ctx.storage = storage;
 
     /* Ensure we don't have already taken a part with the same index */
-    if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX &&
-        g_list_find_custom (self->priv->list,
-                            &ctx,
-                            (GCompareFunc)cmp_sms_by_part_index_and_storage)) {
+    if (mm_sms_list_has_part (self,
+                              storage,
+                              mm_sms_part_get_index (part))) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,

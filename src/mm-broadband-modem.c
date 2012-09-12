@@ -165,7 +165,6 @@ struct _MMBroadbandModemPrivate {
     MMSmsStorage modem_messaging_sms_default_storage;
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
-    GHashTable *known_sms_parts;
     gboolean mem1_storage_locked;
     MMSmsStorage current_sms_mem1_storage;
     gboolean mem2_storage_locked;
@@ -4598,6 +4597,7 @@ cmti_received (MMAtSerialPort *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
+    SmsPartContext *ctx;
     guint idx = 0;
     MMSmsStorage storage;
     gchar *str;
@@ -4605,41 +4605,35 @@ cmti_received (MMAtSerialPort *port,
     if (!mm_get_uint_from_match_info (info, 2, &idx))
         return;
 
-    if (G_UNLIKELY (!self->priv->known_sms_parts))
-        self->priv->known_sms_parts = g_hash_table_new (g_direct_hash, g_direct_equal);
-    else if (g_hash_table_lookup_extended (self->priv->known_sms_parts,
-                                           GUINT_TO_POINTER (idx),
-                                           NULL,
-                                           NULL))
-        /* Don't signal multiple times if there are multiple CMTI notifications for a message */
-        return;
-
-    /* Nothing is currently stored in the hash table - presence is all that matters. */
-    g_hash_table_insert (self->priv->known_sms_parts, GUINT_TO_POINTER (idx), NULL);
-
     /* The match info gives us in which storage the index applies */
     str = mm_get_string_unquoted_from_match_info (info, 1);
     storage = mm_common_get_sms_storage_from_string (str, NULL);
-
-    if (storage == MM_SMS_STORAGE_UNKNOWN)
+    if (storage == MM_SMS_STORAGE_UNKNOWN) {
         mm_dbg ("Skipping CMTI indication, unknown storage '%s' reported", str);
-    else {
-        SmsPartContext *ctx;
+        g_free (str);
+        return;
+    }
+    g_free (str);
 
-        ctx = g_new0 (SmsPartContext, 1);
-        ctx->self = g_object_ref (self);
-        ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
-        ctx->idx = idx;
-
-        /* First, request to set the proper storage to read from */
-        mm_broadband_modem_lock_sms_storages (ctx->self,
-                                              storage,
-                                              MM_SMS_STORAGE_UNKNOWN,
-                                              (GAsyncReadyCallback)indication_lock_storages_ready,
-                                              ctx);
+    /* Don't signal multiple times if there are multiple CMTI notifications for a message */
+    if (mm_sms_list_has_part (self->priv->modem_messaging_sms_list,
+                              storage,
+                              idx)) {
+        mm_dbg ("Skipping CMTI indication, part already processed");
+        return;
     }
 
-    g_free (str);
+    ctx = g_new0 (SmsPartContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
+    ctx->idx = idx;
+
+    /* First, request to set the proper storage to read from */
+    mm_broadband_modem_lock_sms_storages (ctx->self,
+                                          storage,
+                                          MM_SMS_STORAGE_UNKNOWN,
+                                          (GAsyncReadyCallback)indication_lock_storages_ready,
+                                          ctx);
 }
 
 static void
@@ -8070,9 +8064,6 @@ finalize (GObject *object)
 
     if (self->priv->modem_3gpp_registration_regex)
         mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
-
-    if (self->priv->known_sms_parts)
-        g_hash_table_unref (self->priv->known_sms_parts);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->finalize (object);
 }
