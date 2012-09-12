@@ -66,10 +66,12 @@
     <!--
         Text:
 
-        Message text.
+        Message text, in UTF-8.
 
         When sending, if the text is larger than the limit of the technology or
         modem, the message will be broken into multiple parts or messages.
+
+        Note that Text and Data are never given at the same time.
     -->
     <property name="Text" type="s" access="read" />
 
@@ -80,6 +82,8 @@
 
         When sending, if the data is larger than the limit of the technology or
         modem, the message will be broken into multiple parts or messages.
+
+        Note that Text and Data are never given at the same time.
     -->
     <property name="Data" type="ay" access="read" />
 

@@ -1434,14 +1434,19 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                             GError **error)
 {
     MMSmsPart *part;
-    gchar **split_text;
     guint n_parts;
+    const gchar *text;
     MMSmsEncoding encoding;
+    gchar **split_text = NULL;
+    GByteArray *data;
+    GByteArray **split_data = NULL;
+
+    text = mm_sms_properties_get_text (properties);
+    data = mm_sms_properties_peek_data_bytearray (properties);
 
     /* Don't create SMS from properties if either (text|data) or number is missing */
     if (!mm_sms_properties_get_number (properties) ||
-        (!mm_sms_properties_get_text (properties) &&
-         !mm_sms_properties_get_data (properties, NULL))) {
+        (!text && !data)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
@@ -1451,9 +1456,33 @@ mm_sms_new_from_properties (MMBaseModem *modem,
         return NULL;
     }
 
-    split_text = mm_sms_part_util_split_text (mm_sms_properties_get_text (properties),
-                                              &encoding);
-    n_parts = (split_text ? g_strv_length (split_text) : 0);
+    /* Don't create SMS from properties if both text and data are given */
+    if (text && data) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create SMS: both 'text' and 'data' given");
+        return NULL;
+    }
+
+    if (text) {
+        split_text = mm_sms_part_util_split_text (text, &encoding);
+        if (!split_text) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_INVALID_ARGS,
+                         "Cannot create SMS: cannot process input text");
+            return NULL;
+        }
+        n_parts = g_strv_length (split_text);
+    } else if (data) {
+        encoding = MM_SMS_ENCODING_8BIT;
+        split_data = mm_sms_part_util_split_data (data);
+        g_assert (split_data != NULL);
+        /* noop within the for */
+        for (n_parts = 0; split_data[n_parts]; n_parts++);
+    } else
+        g_assert_not_reached ();
 
     if (n_parts > 1) {
         MMSms *sms = NULL;
@@ -1461,15 +1490,37 @@ mm_sms_new_from_properties (MMBaseModem *modem,
          /* wtf... is this really the way to go? */
         guint reference = g_random_int_range (1,255);
 
-        /* Loop text chunks */
-        while (split_text[i]) {
-            mm_dbg ("  Processing chunk '%u' of text with '%u' bytes",
-                    i, (guint)strlen (split_text[i]));
+        g_assert (split_text != NULL || split_data != NULL);
+        g_assert (!(split_text != NULL && split_data != NULL));
+
+        /* Loop text/data chunks */
+        while (1) {
+            gchar *part_text = NULL;
+            GByteArray *part_data = NULL;
+
+            if (split_text) {
+                if (!split_text[i])
+                    break;
+                part_text = split_text[i];
+                split_text[i] = NULL;
+                mm_dbg ("  Processing chunk '%u' of text with '%u' bytes",
+                        i, (guint) strlen (part_text));
+            } else if (split_data) {
+                if (!split_data[i])
+                    break;
+                part_data = split_data[i];
+                split_data[i] = NULL;
+                mm_dbg ("  Processing chunk '%u' of data with '%u' bytes",
+                        i, part_data->len);
+
+            } else
+                g_assert_not_reached ();
 
             /* Create new part */
             part = mm_sms_part_new (SMS_PART_INVALID_INDEX,
                                     MM_SMS_PDU_TYPE_SUBMIT);
-            mm_sms_part_set_text (part, split_text[i]);
+            mm_sms_part_take_text (part, part_text);
+            mm_sms_part_take_data (part, part_data);
             mm_sms_part_set_encoding (part, encoding);
             mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
             mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
@@ -1481,13 +1532,13 @@ mm_sms_new_from_properties (MMBaseModem *modem,
             mm_sms_part_set_concat_max (part, n_parts);
 
             if (!sms) {
-                mm_dbg ("Building user-created multipart SMS...");
+                mm_dbg ("Building user-created multipart SMS... (%u parts expected)", n_parts);
                 sms = mm_sms_multipart_new (
                     modem,
                     MM_SMS_STATE_UNKNOWN,
                     MM_SMS_STORAGE_UNKNOWN, /* not stored anywhere yet */
                     reference,
-                    g_strv_length (split_text),
+                    n_parts,
                     part,
                     error);
                 if (!sms)
@@ -1501,18 +1552,40 @@ mm_sms_new_from_properties (MMBaseModem *modem,
             i++;
         }
 
+        /* Rewalk the arrays and remove any remaining text/data not set after an error */
+        if (split_text) {
+            for (i = 0; i < n_parts; i++) {
+                if (split_text[i])
+                    g_free (split_text[i]);
+            }
+
+            g_free (split_text);
+        }
+        else if (split_data) {
+            for (i = 0; i < n_parts; i++) {
+                if (split_data[i])
+                    g_byte_array_unref (split_data[i]);
+            }
+            g_free (split_data);
+        }
+
         return sms;
     }
 
     /* Single part it will be */
     part = mm_sms_part_new (SMS_PART_INVALID_INDEX,
                             MM_SMS_PDU_TYPE_SUBMIT);
-    if (n_parts == 1) {
-        mm_sms_part_set_text (part, mm_sms_properties_get_text (properties));
-        mm_sms_part_set_encoding (part, encoding);
-    } else {
-        mm_sms_part_take_data (part, mm_sms_properties_get_data_bytearray (properties));
-    }
+
+    if (split_text) {
+        mm_sms_part_take_text (part, split_text[0]);
+        g_free (split_text);
+    } else if (split_data) {
+        mm_sms_part_take_data (part, split_data[0]);
+        g_free (split_data);
+    } else
+        g_assert_not_reached ();
+
+    mm_sms_part_set_encoding (part, encoding);
     mm_sms_part_set_number (part, mm_sms_properties_get_number (properties));
     mm_sms_part_set_smsc (part, mm_sms_properties_get_smsc (properties));
     mm_sms_part_set_validity (part, mm_sms_properties_get_validity (properties));

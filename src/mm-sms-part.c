@@ -499,7 +499,6 @@ mm_sms_part_new_from_binary_pdu (guint index,
                                  GError **error)
 {
     MMSmsPart *sms_part;
-    GByteArray *raw;
     guint8 pdu_type;
     guint offset;
     guint smsc_addr_size_bytes;
@@ -835,28 +834,34 @@ mm_sms_part_new_from_binary_pdu (guint index,
                 tp_user_data_size_elements -= udhl;
         }
 
-        if (   user_data_encoding == MM_SMS_ENCODING_8BIT
-            || user_data_encoding == MM_SMS_ENCODING_UNKNOWN) {
-            /* 8-bit encoding is usually binary data, and we have no idea what
-             * actual encoding the data is in so we can't convert it.
-             */
-            mm_dbg ("Skipping SMS part text: 8-bit or Unknown encoding");
-            mm_sms_part_set_text (sms_part, "");
-        } else {
+        switch (user_data_encoding) {
+        case MM_SMS_ENCODING_GSM7:
+        case MM_SMS_ENCODING_UCS2:
             /* Otherwise if it's 7-bit or UCS2 we can decode it */
-            mm_dbg ("Decoding text with '%u' elements", tp_user_data_size_elements);
+            mm_dbg ("Decoding SMS text with '%u' elements", tp_user_data_size_elements);
             mm_sms_part_take_text (sms_part,
                                    sms_decode_text (&pdu[tp_user_data_offset],
                                                     tp_user_data_size_elements,
                                                     user_data_encoding,
                                                     bit_offset));
             g_warn_if_fail (sms_part->text != NULL);
-        }
+            break;
 
-        /* Add the raw PDU data */
-        raw = g_byte_array_sized_new (tp_user_data_size_bytes);
-        g_byte_array_append (raw, &pdu[tp_user_data_offset], tp_user_data_size_bytes);
-        mm_sms_part_take_data (sms_part, raw);
+        default:
+            {
+                GByteArray *raw;
+
+                mm_dbg ("Skipping SMS text: Unknown encoding");
+
+                /* 8-bit encoding is usually binary data, and we have no idea what
+                 * actual encoding the data is in so we can't convert it.
+                 */
+                raw = g_byte_array_sized_new (tp_user_data_size_bytes);
+                g_byte_array_append (raw, &pdu[tp_user_data_offset], tp_user_data_size_bytes);
+                mm_sms_part_take_data (sms_part, raw);
+                break;
+            }
+        }
     }
 
     return sms_part;
@@ -1233,6 +1238,44 @@ mm_sms_part_util_split_text (const gchar *text,
             for (i = 0, j = 0; i < n_chunks; i++, j += 153) {
                 out[i] = g_strndup (&text[j], 153);
             }
+        }
+    }
+
+    return out;
+}
+
+GByteArray **
+mm_sms_part_util_split_data (const GByteArray *data)
+{
+    GByteArray **out;
+
+    /* Some info about the rules for splitting.
+     *
+     * The User Data can be up to 140 bytes in the SMS part:
+     *  0) If we only need one chunk, it can be of up to 140 bytes.
+     *     If we need more than one chunk, these have to be of 140 - 6 = 134
+     *     bytes each, as we need place for the UDH header.
+     */
+
+    if (data->len <= 140) {
+        out = g_new0 (GByteArray *, 2);
+        out[0] = g_byte_array_append (g_byte_array_sized_new (data->len),
+                                      data->data,
+                                      data->len);
+    } else {
+        guint n_chunks;
+        guint i;
+        guint j;
+
+        n_chunks = data->len / 134;
+        if (data->len % 134 != 0)
+            n_chunks ++;
+
+        out = g_new0 (GByteArray *, n_chunks + 1);
+        for (i = 0, j = 0; i < n_chunks; i++, j+= 134) {
+            out[i] = g_byte_array_append (g_byte_array_sized_new (134),
+                                          &data->data[j],
+                                          MIN (data->len - j, 134));
         }
     }
 
