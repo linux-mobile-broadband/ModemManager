@@ -3066,13 +3066,14 @@ parse_operator (const char *reply, MMModemCharset cur_charset)
          * string of the bytes of the operator name as encoded by the current
          * character set.
          */
-        if (cur_charset == MM_MODEM_CHARSET_UCS2)
+        if (cur_charset == MM_MODEM_CHARSET_UCS2) {
+            /* In this case we're already checking UTF-8 validity */
             operator = mm_charset_take_and_convert_to_utf8 (operator, MM_MODEM_CHARSET_UCS2);
-
+        }
         /* Ensure the operator name is valid UTF-8 so that we can send it
          * through D-Bus and such.
          */
-        if (!g_utf8_validate (operator, -1, NULL)) {
+        else if (!g_utf8_validate (operator, -1, NULL)) {
             g_free (operator);
             operator = NULL;
         }
