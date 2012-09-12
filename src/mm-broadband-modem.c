@@ -4520,6 +4520,9 @@ sms_part_ready (MMBroadbandModem *self,
     const gchar *response;
     GError *error = NULL;
 
+    /* Always always always unlock mem1 storage. Warned you've been. */
+    mm_broadband_modem_unlock_sms_storages (self, TRUE, FALSE);
+
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         /* We're really ignoring this error afterwards, as we don't have a callback
@@ -4562,13 +4565,42 @@ sms_part_ready (MMBroadbandModem *self,
 }
 
 static void
+indication_lock_storages_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                SmsPartContext *ctx)
+{
+    gchar *command;
+    GError *error = NULL;
+
+    if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
+        /* TODO: we should either make this lock() never fail, by automatically
+         * retrying after some time, or otherwise retry here. */
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_part_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Storage now set and locked */
+
+    /* Retrieve the message */
+    command = g_strdup_printf ("+CMGR=%d", ctx->idx);
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                              command,
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback)sms_part_ready,
+                              ctx);
+    g_free (command);
+}
+
+static void
 cmti_received (MMAtSerialPort *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
     guint idx = 0;
-    gchar *command;
-    SmsPartContext *ctx;
+    MMSmsStorage storage;
+    gchar *str;
 
     if (!mm_get_uint_from_match_info (info, 2, &idx))
         return;
@@ -4585,20 +4617,29 @@ cmti_received (MMAtSerialPort *port,
     /* Nothing is currently stored in the hash table - presence is all that matters. */
     g_hash_table_insert (self->priv->known_sms_parts, GUINT_TO_POINTER (idx), NULL);
 
-    ctx = g_new0 (SmsPartContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
-    ctx->idx = idx;
+    /* The match info gives us in which storage the index applies */
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+    storage = mm_common_get_sms_storage_from_string (str, NULL);
 
-    /* Retrieve the message */
-    command = g_strdup_printf ("+CMGR=%d", idx);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              command,
-                              10,
-                              FALSE,
-                              (GAsyncReadyCallback)sms_part_ready,
-                              ctx);
-    g_free (command);
+    if (storage == MM_SMS_STORAGE_UNKNOWN)
+        mm_dbg ("Skipping CMTI indication, unknown storage '%s' reported", str);
+    else {
+        SmsPartContext *ctx;
+
+        ctx = g_new0 (SmsPartContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
+        ctx->idx = idx;
+
+        /* First, request to set the proper storage to read from */
+        mm_broadband_modem_lock_sms_storages (ctx->self,
+                                              storage,
+                                              MM_SMS_STORAGE_UNKNOWN,
+                                              (GAsyncReadyCallback)indication_lock_storages_ready,
+                                              ctx);
+    }
+
+    g_free (str);
 }
 
 static void
