@@ -27,7 +27,6 @@
 #include "mm-marshal.h"
 #include "mm-sms-list.h"
 #include "mm-sms.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMSmsList, mm_sms_list, G_TYPE_OBJECT);

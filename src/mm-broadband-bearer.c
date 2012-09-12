@@ -30,7 +30,6 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-modem-at.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-serial-enums-types.h"

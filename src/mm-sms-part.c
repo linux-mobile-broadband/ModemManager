@@ -25,7 +25,6 @@
 
 #include "mm-sms-part.h"
 #include "mm-charsets.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 #define PDU_SIZE 200
@@ -476,7 +475,7 @@ mm_sms_part_new_from_pdu (guint index,
     MMSmsPart *part;
 
     /* Convert PDU from hex to binary */
-    pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
+    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, &pdu_len);
     if (!pdu) {
         g_set_error_literal (error,
                              MM_CORE_ERROR,

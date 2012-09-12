@@ -40,7 +40,6 @@
 #include "mm-sms-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
-#include "mm-utils.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 #include "mm-qcdm-serial-port.h"
@@ -3581,7 +3580,7 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
                                             broadband->priv->modem_current_charset)) {
         *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
         /* convert to hex representation */
-        hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
+        hex = mm_utils_bin2hexstr (ussd_command->data, ussd_command->len);
     }
 
     g_byte_array_free (ussd_command, TRUE);

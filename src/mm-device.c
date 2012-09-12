@@ -20,11 +20,10 @@
 #include <string.h>
 
 #include <ModemManager.h>
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-device.h"
 #include "mm-plugin.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMDevice, mm_device, G_TYPE_OBJECT);
@@ -166,8 +165,8 @@ get_device_ids (GUdevDevice *device,
         goto out;
 
     if (vendor) {
-        *vendor = (guint16) (utils_hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint16) ((utils_hex2byte (vid) & 0xFF) << 8);
+        *vendor = (guint16) (mm_utils_hex2byte (vid + 2) & 0xFF);
+        *vendor |= (guint16) ((mm_utils_hex2byte (vid) & 0xFF) << 8);
     }
 
     if (!pid)
@@ -185,8 +184,8 @@ get_device_ids (GUdevDevice *device,
     }
 
     if (product) {
-        *product = (guint16) (utils_hex2byte (pid + 2) & 0xFF);
-        *product |= (guint16) ((utils_hex2byte (pid) & 0xFF) << 8);
+        *product = (guint16) (mm_utils_hex2byte (pid + 2) & 0xFF);
+        *product |= (guint16) ((mm_utils_hex2byte (pid) & 0xFF) << 8);
     }
 
     success = TRUE;

@@ -20,8 +20,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <libmm-common.h>
+
 #include "mm-charsets.h"
-#include "mm-utils.h"
 
 typedef struct {
     const char *gsm_name;
@@ -160,7 +161,7 @@ mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
     iconv_from = charset_iconv_from (charset);
     g_return_val_if_fail (iconv_from != NULL, FALSE);
 
-    unconverted = utils_hexstr2bin (src, &unconverted_len);
+    unconverted = mm_utils_hexstr2bin (src, &unconverted_len);
     if (!unconverted)
         return NULL;
 
@@ -208,7 +209,7 @@ mm_modem_charset_utf8_to_hex (const char *src, MMModemCharset charset)
     }
 
     /* Get hex representation of the string */
-    hex = utils_bin2hexstr ((guint8 *)converted, converted_len);
+    hex = mm_utils_bin2hexstr ((guint8 *)converted, converted_len);
     g_free (converted);
     return hex;
 }
@@ -607,7 +608,7 @@ mm_charset_get_encoded_len (const char *utf8,
     for (e = &subset_table[0];
          e->cs != charset && e->cs != MM_MODEM_CHARSET_UNKNOWN;
          e++);
-    g_return_val_if_fail (e->cs != MM_MODEM_CHARSET_UNKNOWN, 0);        
+    g_return_val_if_fail (e->cs != MM_MODEM_CHARSET_UNKNOWN, 0);
 
     while (*p) {
         gunichar c;
@@ -622,7 +623,7 @@ mm_charset_get_encoded_len (const char *utf8,
             end = p;
             while (*end++);
         }
-        
+
         if (!e->func (c, p, (end - p), &clen))
             unsupported++;
         len += clen;
@@ -888,7 +889,7 @@ mm_utf8_take_and_convert_to_charset (gchar *str,
         }
 
         /* Get hex representation of the string */
-        hex = utils_bin2hexstr ((guint8 *)encoded, encoded_len);
+        hex = mm_utils_bin2hexstr ((guint8 *)encoded, encoded_len);
         g_free (encoded);
         encoded = hex;
         g_free (str);

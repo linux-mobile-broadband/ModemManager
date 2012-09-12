@@ -30,7 +30,6 @@
 #include "mm-broadband-bearer-novatel-lte.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
-#include "mm-utils.h"
 
 #define CONNECTION_CHECK_TIMEOUT_SEC 5
 

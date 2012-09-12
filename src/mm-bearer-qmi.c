@@ -25,7 +25,6 @@
 #include <libqmi-glib.h>
 
 #include "mm-bearer-qmi.h"
-#include "mm-utils.h"
 #include "mm-serial-enums-types.h"
 #include "mm-log.h"
 

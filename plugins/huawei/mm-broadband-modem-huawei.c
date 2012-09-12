@@ -26,7 +26,6 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
-#include "mm-utils.h"
 #include "mm-common-helpers.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
@@ -1096,7 +1095,7 @@ encode (MMIfaceModem3gppUssd *self,
     }
 
     packed = gsm_pack (gsm, len, 0, &packed_len);
-    hex = utils_bin2hexstr (packed, packed_len);
+    hex = mm_utils_bin2hexstr (packed, packed_len);
     g_free (packed);
     g_free (gsm);
 
@@ -1113,7 +1112,7 @@ decode (MMIfaceModem3gppUssd *self,
     gsize bin_len;
     guint32 unpacked_len;
 
-    bin = utils_hexstr2bin (reply, &bin_len);
+    bin = mm_utils_hexstr2bin (reply, &bin_len);
     unpacked = gsm_unpack ((guint8*) bin, (bin_len * 8) / 7, 0, &unpacked_len);
     /* if the last character in a 7-byte block is padding, then drop it */
     if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))

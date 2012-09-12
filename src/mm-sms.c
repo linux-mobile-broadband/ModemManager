@@ -31,7 +31,6 @@
 #include "mm-sms.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
@@ -475,7 +474,7 @@ sms_get_store_or_send_command (MMSmsPart *part,
             return FALSE;
 
         /* Convert PDU to hex */
-        hex = utils_bin2hexstr (pdu, pdulen);
+        hex = mm_utils_bin2hexstr (pdu, pdulen);
         g_free (pdu);
 
         if (!hex) {

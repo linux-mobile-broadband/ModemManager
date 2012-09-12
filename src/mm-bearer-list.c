@@ -26,7 +26,6 @@
 #include <libmm-common.h>
 
 #include "mm-bearer-list.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMBearerList, mm_bearer_list, G_TYPE_OBJECT);

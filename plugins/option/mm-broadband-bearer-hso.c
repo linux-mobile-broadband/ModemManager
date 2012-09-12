@@ -31,7 +31,6 @@
 #include "mm-broadband-bearer-hso.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
-#include "mm-utils.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerHso, mm_broadband_bearer_hso, MM_TYPE_BROADBAND_BEARER);
 

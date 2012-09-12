@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2010 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google, Inc.
  * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
@@ -88,5 +89,11 @@ gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
                                                   guint32 match_index);
 
 const gchar *mm_sms_delivery_state_get_string_extended (guint delivery_state);
+
+gint      mm_utils_hex2byte   (const gchar *hex);
+gchar    *mm_utils_hexstr2bin (const gchar *hex, gsize *out_len);
+gchar    *mm_utils_bin2hexstr (const guint8 *bin, gsize len);
+
+gboolean  mm_utils_check_for_single_value (guint32 value);
 
 #endif /* MM_COMMON_HELPERS_H */

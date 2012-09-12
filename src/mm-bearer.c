@@ -32,7 +32,6 @@
 #include "mm-bearer.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 

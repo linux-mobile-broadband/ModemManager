@@ -27,8 +27,6 @@ libmodem_helpers_la_SOURCES = \
 	mm-modem-helpers.h \
 	mm-charsets.c \
 	mm-charsets.h \
-	mm-utils.c \
-	mm-utils.h \
 	mm-sms-part.h \
 	mm-sms-part.c
 

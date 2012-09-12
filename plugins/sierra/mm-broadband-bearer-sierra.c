@@ -30,7 +30,6 @@
 #include "mm-broadband-bearer-sierra.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
-#include "mm-utils.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerSierra, mm_broadband_bearer_sierra, MM_TYPE_BROADBAND_BEARER);
 

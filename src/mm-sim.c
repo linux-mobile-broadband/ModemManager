@@ -29,7 +29,6 @@
 #include "mm-sim.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-marshal.h"
@@ -1178,7 +1177,7 @@ parse_mnc_length (const gchar *response,
         }
 
         /* Convert hex string to binary */
-        bin = utils_hexstr2bin (hex, &buflen);
+        bin = mm_utils_hexstr2bin (hex, &buflen);
         if (!bin || buflen < 4) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -1315,7 +1314,7 @@ parse_spn (const gchar *response,
         }
 
         /* Convert hex string to binary */
-        bin = utils_hexstr2bin (hex, &buflen);
+        bin = mm_utils_hexstr2bin (hex, &buflen);
         if (!bin) {
             g_set_error (error,
                          MM_CORE_ERROR,

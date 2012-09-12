@@ -25,7 +25,6 @@
 
 #include "mm-bearer-iridium.h"
 #include "mm-base-modem-at.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 /* Allow up to 200s to get a proper IP connection */

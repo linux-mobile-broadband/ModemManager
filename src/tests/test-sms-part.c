@@ -20,8 +20,9 @@
 #include <stdio.h>
 #include <locale.h>
 
+#include <libmm-common.h>
+
 #include "mm-sms-part.h"
-#include "mm-utils.h"
 #include "mm-log.h"
 
 /* If defined will print debugging traces */
@@ -96,7 +97,7 @@ common_test_part_from_pdu (const guint8 *pdu,
 {
     gchar *hexpdu;
 
-    hexpdu = utils_bin2hexstr (pdu, pdu_size);
+    hexpdu = mm_utils_bin2hexstr (pdu, pdu_size);
     common_test_part_from_hexpdu (hexpdu,
                                   expected_smsc,
                                   expected_number,
@@ -353,7 +354,7 @@ test_pdu_insufficient_data (void)
         0x97, 0xd9, 0xec, 0x37
     };
 
-    hexpdu = utils_bin2hexstr (pdu, sizeof (pdu));
+    hexpdu = mm_utils_bin2hexstr (pdu, sizeof (pdu));
     part = mm_sms_part_new_from_pdu (0, hexpdu, &error);
     g_assert (part == NULL);
     /* We don't care for the specific error type */

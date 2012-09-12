@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2010 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
@@ -804,4 +805,97 @@ mm_sms_delivery_state_get_string_extended (guint delivery_state)
     /* Otherwise, use the MMSmsDeliveryState enum as we can match the known
      * value */
     return mm_sms_delivery_state_get_string ((MMSmsDeliveryState)delivery_state);
+}
+
+/*****************************************************************************/
+
+/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
+
+static gint
+hex2num (gchar c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+gint
+mm_utils_hex2byte (const gchar *hex)
+{
+	gint a, b;
+
+	a = hex2num (*hex++);
+	if (a < 0)
+		return -1;
+	b = hex2num (*hex++);
+	if (b < 0)
+		return -1;
+	return (a << 4) | b;
+}
+
+gchar *
+mm_utils_hexstr2bin (const gchar *hex, gsize *out_len)
+{
+	const gchar *ipos = hex;
+	gchar *buf = NULL;
+	gsize i;
+	gint a;
+	gchar *opos;
+    gsize len;
+
+    len = strlen (hex);
+
+	/* Length must be a multiple of 2 */
+    g_return_val_if_fail ((len % 2) == 0, NULL);
+
+	opos = buf = g_malloc0 ((len / 2) + 1);
+	for (i = 0; i < len; i += 2) {
+		a = mm_utils_hex2byte (ipos);
+		if (a < 0) {
+			g_free (buf);
+			return NULL;
+		}
+		*opos++ = a;
+		ipos += 2;
+	}
+    *out_len = len / 2;
+	return buf;
+}
+
+/* End from hostap */
+
+gchar *
+mm_utils_bin2hexstr (const guint8 *bin, gsize len)
+{
+    GString *ret;
+    gsize i;
+
+    g_return_val_if_fail (bin != NULL, NULL);
+
+    ret = g_string_sized_new (len * 2 + 1);
+    for (i = 0; i < len; i++)
+        g_string_append_printf (ret, "%.2X", bin[i]);
+    return g_string_free (ret, FALSE);
+}
+
+gboolean
+mm_utils_check_for_single_value (guint32 value)
+{
+    gboolean found = FALSE;
+    guint32 i;
+
+    for (i = 1; i <= 32; i++) {
+        if (value & 0x1) {
+            if (found)
+                return FALSE;  /* More than one bit set */
+            found = TRUE;
+        }
+        value >>= 1;
+    }
+
+    return TRUE;
 }
