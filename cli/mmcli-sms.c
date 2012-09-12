@@ -47,6 +47,7 @@ static gboolean info_flag; /* set when no action found */
 static gboolean send_flag;
 static gboolean store_flag;
 static gchar *store_in_storage_str;
+static gchar *create_file_with_data_str;
 
 static GOptionEntry entries[] = {
     { "send", 0, 0, G_OPTION_ARG_NONE, &send_flag,
@@ -60,6 +61,10 @@ static GOptionEntry entries[] = {
     { "store-in-storage", 0, 0, G_OPTION_ARG_STRING, &store_in_storage_str,
       "Store the SMS in the device, at the specified storage",
       NULL,
+    },
+    { "create-file-with-data", 0, 0, G_OPTION_ARG_STRING, &create_file_with_data_str,
+      "Create a file with the data contents of the SMS.",
+      "[File path",
     },
     { NULL }
 };
@@ -91,7 +96,8 @@ mmcli_sms_options_enabled (void)
 
     n_actions = (send_flag +
                  store_flag +
-                 !!store_in_storage_str);
+                 !!store_in_storage_str +
+                 !!create_file_with_data_str);
 
     if (n_actions == 0 && mmcli_get_common_sms_string ()) {
         /* default to info */
@@ -105,6 +111,9 @@ mmcli_sms_options_enabled (void)
     }
 
     if (info_flag)
+        mmcli_force_sync_operation ();
+
+    if (create_file_with_data_str)
         mmcli_force_sync_operation ();
 
     checked = TRUE;
@@ -138,6 +147,8 @@ static void
 print_sms_info (MMSms *sms)
 {
     MMSmsPduType pdu_type;
+    const guint8 *data;
+    gsize data_size;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
@@ -149,17 +160,32 @@ print_sms_info (MMSms *sms)
     g_print ("SMS '%s'\n",
              mm_sms_get_path (sms));
     g_print ("  -----------------------------------\n"
-             "  Content    |                text: '%s'\n"
-             "             |              number: '%s'\n"
-             "  -----------------------------------\n"
+             "  Content    |              number: '%s'\n",
+             VALIDATE (mm_sms_get_number (sms)));
+
+    if (mm_sms_get_text (sms))
+        g_print ("             |               text : '%s'\n",
+                 VALIDATE (mm_sms_get_text (sms)));
+
+    data = mm_sms_get_data (sms, &data_size);
+    if (data) {
+        gchar *data_hex;
+
+        data_hex = mm_utils_bin2hexstr (data, data_size);
+        g_print ("             |               data : '%s'\n",
+                 VALIDATE (data_hex));
+        g_free (data_hex);
+    }
+
+    g_print ("  -----------------------------------\n"
              "  Properties |            PDU type: '%s'\n"
              "             |               state: '%s'\n"
              "             |                smsc: '%s'\n"
              "             |            validity: '%u'\n"
              "             |               class: '%u'\n"
              "             |             storage: '%s'\n",
-             VALIDATE (mm_sms_get_text (sms)),
-             VALIDATE (mm_sms_get_number (sms)),
+
+
              mm_sms_pdu_type_get_string (pdu_type),
              mm_sms_state_get_string (mm_sms_get_state (sms)),
              VALIDATE (mm_sms_get_smsc (sms)),
@@ -188,6 +214,38 @@ print_sms_info (MMSms *sms)
         g_print ("             | discharge timestamp: '%s'\n",
                  VALIDATE (mm_sms_get_discharge_timestamp (sms)));
     }
+}
+
+static void
+create_file_with_data (MMSms *sms,
+                       const gchar *input_path_str)
+{
+    GError *error = NULL;
+    gchar *path;
+    GFile *file;
+    const guint8 *data;
+    gsize data_size;
+
+    file = g_file_new_for_commandline_arg (input_path_str);
+    path = g_file_get_path (file);
+
+    data = mm_sms_get_data (sms, &data_size);
+    if (!data) {
+        g_printerr ("error: couldn't create file: SMS has no data\n");
+        exit (EXIT_FAILURE);
+    }
+
+    if (!g_file_set_contents (path,
+                              (const gchar *)data,
+                              data_size,
+                              &error)) {
+        g_printerr ("error: cannot write to file '%s': '%s'\n",
+                    input_path_str, error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_free (path);
+    g_object_unref (file);
 }
 
 static void
@@ -256,6 +314,9 @@ get_sms_ready (GObject      *source,
     mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->sms));
 
     if (info_flag)
+        g_assert_not_reached ();
+
+    if (create_file_with_data_str)
         g_assert_not_reached ();
 
     /* Requesting to send the SMS? */
@@ -336,6 +397,13 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
     if (info_flag) {
         g_debug ("Printing SMS info...");
         print_sms_info (ctx->sms);
+        return;
+    }
+
+    /* Request to create a new file with the data from the SMS? */
+    if (create_file_with_data_str) {
+        g_debug ("Creating file with SMS data...");
+        create_file_with_data (ctx->sms, create_file_with_data_str);
         return;
     }
 
