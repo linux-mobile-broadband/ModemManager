@@ -326,7 +326,6 @@ struct _MMSmsPart {
     gchar *text;
     MMSmsEncoding encoding;
     GByteArray *data;
-    guint data_coding_scheme;
     guint class;
     guint validity;
     gboolean delivery_report_request;
@@ -403,8 +402,6 @@ PART_GET_FUNC (guint, concat_sequence)
 PART_SET_FUNC (guint, concat_sequence)
 PART_GET_FUNC (const gchar *, text)
 PART_SET_TAKE_STR_FUNC (text)
-PART_GET_FUNC (guint, data_coding_scheme)
-PART_SET_FUNC (guint, data_coding_scheme)
 PART_GET_FUNC (MMSmsEncoding, encoding)
 PART_SET_FUNC (MMSmsEncoding, encoding)
 PART_GET_FUNC (guint, class)
@@ -860,9 +857,6 @@ mm_sms_part_new_from_binary_pdu (guint index,
         raw = g_byte_array_sized_new (tp_user_data_size_bytes);
         g_byte_array_append (raw, &pdu[tp_user_data_offset], tp_user_data_size_bytes);
         mm_sms_part_take_data (sms_part, raw);
-        mm_sms_part_set_data_coding_scheme (sms_part,
-                                            pdu[tp_dcs_offset] & 0xFF);
-
     }
 
     return sms_part;

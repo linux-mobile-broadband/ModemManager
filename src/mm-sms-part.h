@@ -92,10 +92,6 @@ void              mm_sms_part_set_data               (MMSmsPart *part,
 void              mm_sms_part_take_data              (MMSmsPart *part,
                                                       GByteArray *data);
 
-guint             mm_sms_part_get_data_coding_scheme (MMSmsPart *part);
-void              mm_sms_part_set_data_coding_scheme (MMSmsPart *part,
-                                                      guint data_coding_scheme);
-
 MMSmsEncoding     mm_sms_part_get_encoding           (MMSmsPart *part);
 void              mm_sms_part_set_encoding           (MMSmsPart *part,
                                                       MMSmsEncoding encoding);

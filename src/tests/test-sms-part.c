@@ -51,8 +51,7 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
                               gboolean expected_multipart,
                               const gchar *expected_text,
                               const guint8 *expected_data,
-                              gsize expected_data_size,
-                              guint expected_data_coding_scheme)
+                              gsize expected_data_size)
 {
     MMSmsPart *part;
     GError *error = NULL;
@@ -76,12 +75,10 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
         const GByteArray *data;
 
         data = mm_sms_part_get_data (part);
-        g_assert_cmpuint (expected_data_coding_scheme, ==, mm_sms_part_get_data_coding_scheme (part));
         g_assert_cmpuint ((guint)expected_data_size, ==, data->len);
         for (i = 0; i < data->len; i++)
             g_assert_cmpuint ((guint)data->data[i], ==, expected_data[i]);
     }
-
 
     mm_sms_part_free (part);
 }
@@ -95,8 +92,7 @@ common_test_part_from_pdu (const guint8 *pdu,
                            gboolean expected_multipart,
                            const gchar *expected_text,
                            const guint8 *expected_data,
-                           gsize expected_data_size,
-                           guint expected_data_coding_scheme)
+                           gsize expected_data_size)
 {
     gchar *hexpdu;
 
@@ -108,8 +104,7 @@ common_test_part_from_pdu (const guint8 *pdu,
                                   expected_multipart,
                                   expected_text,
                                   expected_data,
-                                  expected_data_size,
-                                  expected_data_coding_scheme);
+                                  expected_data_size);
     g_free (hexpdu);
 }
 
@@ -143,7 +138,7 @@ test_pdu1 (void)
         FALSE,
         "Here's a longer message [{with some extended characters}] "
         "thrown in, such as £ and ΩΠΨ and §¿ as well.", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -163,7 +158,7 @@ test_pdu2 (void)
         "110329192004+04", /* timestamp */
         FALSE,
         "тест", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -183,7 +178,7 @@ test_pdu3 (void)
         "110101123456+00", /* timestamp */
         FALSE,
         "hellohello", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -204,7 +199,7 @@ test_pdu3_nzpid (void)
         "110101123456+00", /* timestamp */
         FALSE,
         "hellohello", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -225,7 +220,7 @@ test_pdu3_mms (void)
         "110101123456+00", /* timestamp */
         FALSE,
         "hellohello", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -246,7 +241,7 @@ test_pdu3_natl (void)
         "110101123456+00", /* timestamp */
         FALSE,
         "hellohello", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -269,8 +264,7 @@ test_pdu3_8bit (void)
         FALSE,
         "", /* text */
         expected_data, /* data */
-        sizeof (expected_data), /* data size */
-        0x04); /* data coding scheme */
+        sizeof (expected_data)); /* data size */
 }
 
 static void
@@ -319,7 +313,7 @@ test_pdu_dcsf1 (void)
         "Info SFR - Confidentiel, à ne jamais transmettre -\r\n"
         "Voici votre nouveau mot de passe : sw2ced pour gérer "
         "votre compte SFR sur www.sfr.fr ou par téléphone au 963", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -342,8 +336,7 @@ test_pdu_dcsf_8bit (void)
         FALSE,
         "", /* text */
         expected_data, /* data */
-        sizeof (expected_data), /* data size */
-        0xF4); /* data coding scheme */
+        sizeof (expected_data)); /* data size */
 }
 
 static void
@@ -389,7 +382,7 @@ test_pdu_udhi (void)
         "Welkom, bel om uw Voicemail te beluisteren naar +31612001233"
         " (PrePay: *100*1233#). Voicemail ontvangen is altijd gratis."
         " Voor gebruik van mobiel interne", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -413,7 +406,7 @@ test_pdu_multipart (void)
         TRUE, /* multipart! */
         "This is a very long test designed to exercise multi part capability. It should "
         "show up as one message, not as two, as the underlying encoding represents ", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 
     common_test_part_from_hexpdu (
         hexpdu2,
@@ -422,7 +415,7 @@ test_pdu_multipart (void)
         "120425195651-04", /* timestamp */
         TRUE, /* multipart! */
         "that the parts are related to one another. ", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -439,7 +432,7 @@ test_pdu_stored_by_us (void)
         NULL, /* timestamp */
         FALSE, /* multipart! */
         "你好你好你好你好你好你好你好你好你", /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 static void
@@ -455,7 +448,7 @@ test_pdu_not_stored (void)
         "120911074036+02", /* timestamp */
         FALSE, /* multipart! */
         NULL, /* text */
-        NULL, 0, 0);
+        NULL, 0);
 }
 
 /********************* SMS ADDRESS ENCODER TESTS *********************/
