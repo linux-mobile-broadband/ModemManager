@@ -89,20 +89,6 @@
     </signal>
 
     <!--
-        Completed:
-        @path: Object path of the new SMS.
-
-        Emitted when the complete-ness status of an SMS message changes.
-
-        An SMS may not necessarily be complete when the first part is received;
-        this signal will be emitted when all parts have been received, even for
-        single-part messages.
-    -->
-    <signal name="Completed">
-      <arg name="path" type="o" />
-    </signal>
-
-    <!--
         Deleted:
         @path: Object path of the now deleted SMS.
 
