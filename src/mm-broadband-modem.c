@@ -160,7 +160,7 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Messaging interface --->*/
     /* Properties */
     GObject *modem_messaging_dbus_skeleton;
-    MMBearerList *modem_messaging_sms_list;
+    MMSmsList *modem_messaging_sms_list;
     gboolean modem_messaging_sms_pdu_mode;
     MMSmsStorage modem_messaging_sms_default_storage;
     /* Implementation helpers */
