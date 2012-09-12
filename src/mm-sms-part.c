@@ -939,7 +939,7 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     guint8 *udl_ptr;
 
     g_return_val_if_fail (part->number != NULL, NULL);
-    g_return_val_if_fail (part->text != NULL, NULL);
+    g_return_val_if_fail (part->text != NULL || part->data != NULL, NULL);
 
     mm_dbg ("Creating PDU for part...");
 
@@ -1124,6 +1124,17 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
         memcpy (&pdu[offset], array->data, array->len);
         offset += array->len;
         g_byte_array_free (array, TRUE);
+    } else if (part->encoding == MM_SMS_ENCODING_8BIT) {
+        /* Set real data length, in octets
+         * If we had UDH, add 6 octets
+         */
+        *udl_ptr = part->concat_sequence ? (6 + part->data->len) : part->data->len;
+        mm_dbg ("  binary user data length is '%u' octets (%s UDH)",
+                *udl_ptr,
+                part->concat_sequence ? "with" : "without");
+
+        memcpy (&pdu[offset], part->data->data, part->data->len);
+        offset += part->data->len;
     } else
         g_assert_not_reached ();
 
