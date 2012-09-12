@@ -1438,7 +1438,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
     guint n_parts;
     MMSmsEncoding encoding;
 
-    /* Don't create SMS from properties if either text or number is missing */
+    /* Don't create SMS from properties if either (text|data) or number is missing */
     if (!mm_sms_properties_get_number (properties) ||
         (!mm_sms_properties_get_text (properties) &&
          !mm_sms_properties_get_data (properties, NULL))) {
@@ -1448,6 +1448,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                      "Cannot create SMS: mandatory parameter '%s' is missing",
                      (!mm_sms_properties_get_number (properties)?
                       "number" : "text' or 'data"));
+        return NULL;
     }
 
     split_text = mm_sms_part_util_split_text (mm_sms_properties_get_text (properties),
