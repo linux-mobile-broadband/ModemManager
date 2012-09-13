@@ -1566,13 +1566,16 @@ get_signal_info_ready (QmiClientNas *client,
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-static gint8
-signal_strength_get_quality (MMBroadbandModemQmi *self,
-                             QmiMessageNasGetSignalStrengthOutput *output)
+static void
+signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
+                                             QmiMessageNasGetSignalStrengthOutput *output,
+                                             guint8 *o_quality,
+                                             MMModemAccessTechnology *o_act)
 {
     GArray *array = NULL;
     gint8 signal_max;
     QmiNasRadioInterface main_interface;
+    MMModemAccessTechnology act;
     guint8 quality;
 
     /* We do not report per-technology signal quality, so just get the highest
@@ -1583,6 +1586,8 @@ signal_strength_get_quality (MMBroadbandModemQmi *self,
     mm_dbg ("Signal strength (%s): %d dBm",
             qmi_nas_radio_interface_get_string (main_interface),
             signal_max);
+
+    act = mm_modem_access_technology_from_qmi_radio_interface (main_interface);
 
     /* On multimode devices we may get more */
     if (qmi_message_nas_get_signal_strength_output_get_strength_list (output, &array, NULL)) {
@@ -1598,6 +1603,8 @@ signal_strength_get_quality (MMBroadbandModemQmi *self,
                     element->strength);
 
             signal_max = MAX (element->strength, signal_max);
+
+            act |= mm_modem_access_technology_from_qmi_radio_interface (element->radio_interface);
         }
     }
 
@@ -1605,7 +1612,9 @@ signal_strength_get_quality (MMBroadbandModemQmi *self,
     quality = STRENGTH_TO_QUALITY (signal_max);
 
     mm_dbg ("Signal strength: %d dBm --> %u%%", signal_max, quality);
-    return quality;
+
+    *o_quality = quality;
+    *o_act = act;
 }
 
 static void
@@ -1615,7 +1624,8 @@ get_signal_strength_ready (QmiClientNas *client,
 {
     QmiMessageNasGetSignalStrengthOutput *output;
     GError *error = NULL;
-    guint quality;
+    guint8 quality = 0;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     output = qmi_client_nas_get_signal_strength_finish (client, res, &error);
     if (!output) {
@@ -1631,7 +1641,14 @@ get_signal_strength_ready (QmiClientNas *client,
         return;
     }
 
-    quality = signal_strength_get_quality (ctx->self, output);
+    signal_strength_get_quality_and_access_tech (ctx->self, output, &quality, &act);
+
+    /* We update the access technologies directly here when loading signal
+     * quality. It goes a bit out of context, but we can do it nicely */
+    mm_iface_modem_update_access_technologies (
+        MM_IFACE_MODEM (ctx->self),
+        act,
+        (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
@@ -4661,6 +4678,10 @@ event_report_indication_cb (QmiClientNas *client,
                 quality);
 
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+        mm_iface_modem_update_access_technologies (
+            MM_IFACE_MODEM (self),
+            mm_modem_access_technology_from_qmi_radio_interface (signal_strength_radio_interface),
+            (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
     }
 }
 
