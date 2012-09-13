@@ -860,7 +860,7 @@ sms_send_next_part (SmsSendContext *ctx)
                                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data));
         mm_base_modem_at_command (ctx->modem,
                                   cmd,
-                                  10,
+                                  30,
                                   FALSE,
                                   (GAsyncReadyCallback)send_from_storage_ready,
                                   ctx);
@@ -890,7 +890,7 @@ sms_send_next_part (SmsSendContext *ctx)
     g_assert (ctx->msg_data != NULL);
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              10,
+                              30,
                               FALSE,
                               (GAsyncReadyCallback)send_generic_ready,
                               ctx);

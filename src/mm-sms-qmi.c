@@ -340,7 +340,7 @@ sms_send_generic (SmsSendContext *ctx)
 
     qmi_client_wms_raw_send (ctx->client,
                              input,
-                             5,
+                             30,
                              NULL,
                              (GAsyncReadyCallback)send_generic_ready,
                              ctx);
@@ -439,7 +439,7 @@ sms_send_from_storage (SmsSendContext *ctx)
     qmi_client_wms_send_from_memory_storage (
         ctx->client,
         input,
-        5,
+        30,
         NULL,
         (GAsyncReadyCallback)send_from_storage_ready,
         ctx);
