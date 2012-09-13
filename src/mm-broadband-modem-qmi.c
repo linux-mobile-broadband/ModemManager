@@ -3121,8 +3121,10 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     /* Report new registration states */
     mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state);
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
-    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), mm_access_technologies);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
+
+    /* Note: don't update access technologies with the ones retrieved here; they
+     * are not really the 'current' access technologies */
 }
 
 static void
@@ -3242,7 +3244,6 @@ process_common_info (QmiNasServiceStatus service_status,
 static gboolean
 process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                   QmiIndicationNasSystemInfoOutput *indication_output,
-                  MMModemAccessTechnology *mm_access_technologies,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
                   guint16 *mm_lac,
@@ -3263,8 +3264,6 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
     gboolean network_id_valid;
     const gchar *mcc;
     const gchar *mnc;
-    gboolean egprs_support_valid;
-    gboolean egprs_support;
 
     g_assert ((response_output != NULL && indication_output == NULL) ||
               (response_output == NULL && indication_output != NULL));
@@ -3342,17 +3341,12 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
         return FALSE;
     }
 
-    *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
-    if (egprs_support_valid && egprs_support)
-        *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-
     return TRUE;
 }
 
 static gboolean
 process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
                     QmiIndicationNasSystemInfoOutput *indication_output,
-                    MMModemAccessTechnology *mm_access_technologies,
                     MMModem3gppRegistrationState *mm_cs_registration_state,
                     MMModem3gppRegistrationState *mm_ps_registration_state,
                     guint16 *mm_lac,
@@ -3454,36 +3448,12 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
         return FALSE;
     }
 
-    *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    if (hs_service_valid) {
-        switch (hs_service) {
-        case QMI_NAS_WCDMA_HS_SERVICE_HSDPA_HSUPA_UNSUPPORTED:
-            break;
-        case QMI_NAS_WCDMA_HS_SERVICE_HSDPA_SUPPORTED:
-            *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
-            break;
-        case QMI_NAS_WCDMA_HS_SERVICE_HSUPA_SUPPORTED:
-            *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
-            break;
-        case QMI_NAS_WCDMA_HS_SERVICE_HSDPA_HSUPA_SUPPORTED:
-            *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-            break;
-        case QMI_NAS_WCDMA_HS_SERVICE_HSDPA_PLUS_SUPPORTED:
-        case QMI_NAS_WCDMA_HS_SERVICE_HSDPA_PLUS_HSUPA_SUPPORTED:
-        case QMI_NAS_WCDMA_HS_SERVICE_DC_HSDPA_PLUS_SUPPORTED:
-        case QMI_NAS_WCDMA_HS_SERVICE_DC_HSDPA_PLUS_HSUPA_SUPPORTED:
-            *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
-            break;
-        }
-    }
-
     return TRUE;
 }
 
 static gboolean
 process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
                   QmiIndicationNasSystemInfoOutput *indication_output,
-                  MMModemAccessTechnology *mm_access_technologies,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
                   guint16 *mm_lac,
@@ -3579,7 +3549,6 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
         return FALSE;
     }
 
-    *mm_access_technologies |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     return TRUE;
 }
 
@@ -3588,14 +3557,12 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                                  QmiMessageNasGetSystemInfoOutput *response_output,
                                  QmiIndicationNasSystemInfoOutput *indication_output)
 {
-    MMModemAccessTechnology access_technologies;
     MMModem3gppRegistrationState cs_registration_state;
     MMModem3gppRegistrationState ps_registration_state;
     guint16 lac;
     guint32 cid;
     gchar *operator_id;
 
-    access_technologies = 0;
     ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     lac = 0;
@@ -3607,21 +3574,18 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
      * The first one giving results will be the one reported.
      */
     if (!process_lte_info (response_output, indication_output,
-                           &access_technologies,
                            &cs_registration_state,
                            &ps_registration_state,
                            &lac,
                            &cid,
                            &operator_id) &&
         !process_wcdma_info (response_output, indication_output,
-                             &access_technologies,
                              &cs_registration_state,
                              &ps_registration_state,
                              &lac,
                              &cid,
                              &operator_id) &&
         !process_gsm_info (response_output, indication_output,
-                           &access_technologies,
                            &cs_registration_state,
                            &ps_registration_state,
                            &lac,
@@ -3639,7 +3603,6 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     /* Report new registration states */
     mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), cs_registration_state);
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
-    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), access_technologies);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
 }
 
@@ -4034,8 +3997,9 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
                                                           nid);
     mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
                                                         mm_evdo_registration_state);
-    mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
-                                                    mm_access_technologies);
+
+    /* Note: don't update access technologies with the ones retrieved here; they
+     * are not really the 'current' access technologies */
 }
 
 static void
