@@ -234,7 +234,13 @@ gboolean mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *s
                                                              GError **error);
 
 /* Request to reload current operator */
-void mm_iface_modem_3gpp_reload_current_operator (MMIfaceModem3gpp *self);
+void     mm_iface_modem_3gpp_reload_current_operator        (MMIfaceModem3gpp *self,
+                                                             GAsyncReadyCallback callback,
+                                                             gpointer user_data);
+gboolean mm_iface_modem_3gpp_reload_current_operator_finish (MMIfaceModem3gpp *self,
+                                                             GAsyncResult *res,
+                                                             GError **error);
+void     mm_iface_modem_3gpp_clear_current_operator         (MMIfaceModem3gpp *self);
 
 /* Allow registering in the network */
 gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
