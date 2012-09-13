@@ -1,0 +1,169 @@
+#!/bin/bash
+
+print_usage () {
+    echo "usage: $0 [MODEM INDEX] [all|ucs2|gsm7|data] [NUMBER]"
+    echo "   if no [NUMBER] is given, a dummy one will be used and no SMS will be sent"
+}
+
+test () {
+    TITLE=$1
+    TEXT=$2
+    DATAFILE=$3
+
+    echo
+    echo
+    echo "============================================================="
+    echo "$TITLE"
+    echo "============================================================="
+    echo
+
+    # Build SMS properties
+    PROPERTIES="number='$NUMBER'"
+    if [ "x$TEXT" != "x" ]; then
+        PROPERTIES=$PROPERTIES",text='$TEXT'"
+    fi
+
+    # Create the SMS first, get DBus path returned
+    echo "Creating SMS..."
+    CMD="mmcli -m $MODEM_INDEX --messaging-create-sms=\"$PROPERTIES\""
+    if [ "x$DATAFILE" != "x" ]; then
+        CMD=$CMD" --messaging-create-sms-with-data=$DATAFILE"
+    fi
+
+    echo "$> $CMD"
+    OUT=`eval $CMD`
+    SMS_PATH=`echo "$OUT" | grep "/org/freedesktop/ModemManager1/SMS" | awk 'BEGIN { FS = " " } ; { print $1 }'`
+    if [ "x$SMS_PATH" = "x" ]; then
+        echo "error: couldn't create SMS" 1>&2
+        exit 2
+    else
+        echo "SMS created:"
+        mmcli -s $SMS_PATH
+        echo
+    fi
+
+    echo "Storing SMS..."
+    CMD="mmcli -s $SMS_PATH --store"
+    echo "$> $CMD"
+    OUT=`eval $CMD`
+    STORED=`echo "$OUT" | grep "success"`
+    if [ "x$STORED" = "x" ]; then
+        echo "error: couldn't store the SMS" 1>&2
+        exit 2
+    else
+        echo "SMS stored:"
+        mmcli -s $SMS_PATH
+        echo
+    fi
+
+    if [ "x$DONOTSEND" = "x" ]; then
+        echo "Sending SMS..."
+        CMD="mmcli -s $SMS_PATH --send"
+        echo "$> $CMD"
+        OUT=`eval $CMD`
+        SENT=`echo "$OUT" | grep "success"`
+        if [ "x$SENT" = "x" ]; then
+            echo "error: couldn't send the SMS" 1>&2
+            exit 2
+        else
+            echo "SMS sent:"
+            mmcli -s $SMS_PATH
+            echo
+        fi
+    fi
+
+    # Delete the SMS now
+    echo "Deleting SMS..."
+    CMD="mmcli -m $MODEM_INDEX --messaging-delete-sms=$SMS_PATH"
+    echo "$> $CMD"
+    OUT=`eval $CMD`
+    DELETED=`echo "$OUT" | grep "success"`
+    if [ "x$DELETED" = "x" ]; then
+        echo "error: couldn't delete the SMS" 1>&2
+        exit 2
+    else
+        echo "SMS deleted"
+    fi
+}
+
+if [ $# -ge 2 ]; then
+    MODEM_INDEX=$1
+    COMMAND=$2
+fi
+
+if [ $# -eq 2 ]; then
+    DONOTSEND=1
+    NUMBER=123456
+elif [ $# -eq 3 ]; then
+    NUMBER=$3
+else
+    echo "error: missing arguments" 1>&2
+    print_usage
+    exit 255
+fi
+
+# Process commands
+case $COMMAND in
+    "all")
+        RUN_UCS2=1
+        RUN_GSM7=1
+        RUN_DATA=1
+        ;;
+    "ucs2")
+        RUN_UCS2=1
+        ;;
+    "gsm7")
+        RUN_GSM7=1
+        ;;
+    "data")
+        RUN_DATA=1
+        ;;
+    *)
+        echo "error: unexpected command '$COMMAND'" 1>&2
+        print_usage
+        exit 255
+        ;;
+esac
+
+
+
+#
+# UCS2 tests
+#
+if [ "x$RUN_UCS2" != "x" ]; then
+    test "Testing singlepart SMS with UCS2 text..." "你好你好你好你" ""
+    test "Testing multipart SMS with UCS2 text..." "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好好" ""
+fi
+
+#
+# GSM7 tests
+#
+if [ "x$RUN_GSM7" != "x" ]; then
+    test "Testing singlepart SMS with GSM7 text..." "Hello world" ""
+    test "Testing multipart SMS with GSM7 text..." "01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" ""
+fi
+
+#
+# Data tests
+#
+if [ "x$RUN_DATA" != "x" ]; then
+    TESTFILE_SHORT=/tmp/`basename $0`-140
+    TESTFILE_LONG=/tmp/`basename $0`-200
+
+    echo
+    if [ -f $TESTFILE_SHORT ]; then
+        echo "Re-using previously created 140-byte testfile at $TESTFILE_SHORT"
+    else
+        echo "Creating testfile at $TESTFILE_SHORT"
+        dd if=/dev/random of=$TESTFILE_SHORT bs=1 count=140
+    fi
+    if [ -f $TESTFILE_LONG ]; then
+        echo "Re-using previously created 200-byte testfile at $TESTFILE_LONG"
+    else
+        echo "Creating testfile at $TESTFILE_LONG"
+        dd if=/dev/random of=$TESTFILE_LONG bs=1 count=200
+    fi
+
+    test "Testing singlepart SMS with data..." "" "$TESTFILE_SHORT"
+    test "Testing multipart SMS with data..." "" "$TESTFILE_LONG"
+fi
