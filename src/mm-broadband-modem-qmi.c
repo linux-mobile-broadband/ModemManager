@@ -2993,13 +2993,21 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
          (mm_access_technologies & MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK))) {
         mm_dbg ("Processing 3GPP info...");
     } else {
+        MMModem3gppRegistrationState reg_state_3gpp;
+
         mm_dbg ("No 3GPP info given...");
         g_free (self->priv->current_operator_id);
         self->priv->current_operator_id = NULL;
         g_free (self->priv->current_operator_description);
         self->priv->current_operator_description = NULL;
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+
+        if (registration_state == QMI_NAS_REGISTRATION_STATE_NOT_REGISTERED_SEARCHING)
+            reg_state_3gpp = MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
+        else
+            reg_state_3gpp = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0);
         return;
