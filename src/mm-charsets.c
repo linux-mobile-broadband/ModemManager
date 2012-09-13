@@ -797,6 +797,7 @@ mm_charset_take_and_convert_to_utf8 (gchar *str, MMModemCharset charset)
         utf8 = g_convert (str, strlen (str),
                           "UTF-8//TRANSLIT", "UTF-8//TRANSLIT",
                           NULL, NULL, NULL);
+        g_free (str);
         break;
     }
 
