@@ -971,7 +971,7 @@ typedef struct {
 static void
 sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     /* Unlock mem1 storage if we had the lock */
     if (ctx->need_unlock)
@@ -1086,6 +1086,13 @@ sms_delete (MMSms *self,
                                              sms_delete);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
+
+    if (mm_sms_get_storage (self) == MM_SMS_STORAGE_UNKNOWN) {
+        mm_dbg ("Not removing parts from non-stored SMS");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        sms_delete_parts_context_complete_and_free (ctx);
+        return;
+    }
 
     /* Select specific storage to delete from */
     mm_broadband_modem_lock_sms_storages (
