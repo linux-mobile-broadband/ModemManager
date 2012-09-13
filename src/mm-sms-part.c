@@ -1255,7 +1255,8 @@ mm_sms_part_util_split_text (const gchar *text,
 }
 
 GByteArray **
-mm_sms_part_util_split_data (const GByteArray *data)
+mm_sms_part_util_split_data (const guint8 *data,
+                             gsize data_len)
 {
     GByteArray **out;
 
@@ -1267,25 +1268,25 @@ mm_sms_part_util_split_data (const GByteArray *data)
      *     bytes each, as we need place for the UDH header.
      */
 
-    if (data->len <= 140) {
+    if (data_len <= 140) {
         out = g_new0 (GByteArray *, 2);
-        out[0] = g_byte_array_append (g_byte_array_sized_new (data->len),
-                                      data->data,
-                                      data->len);
+        out[0] = g_byte_array_append (g_byte_array_sized_new (data_len),
+                                      data,
+                                      data_len);
     } else {
         guint n_chunks;
         guint i;
         guint j;
 
-        n_chunks = data->len / 134;
-        if (data->len % 134 != 0)
+        n_chunks = data_len / 134;
+        if (data_len % 134 != 0)
             n_chunks ++;
 
         out = g_new0 (GByteArray *, n_chunks + 1);
         for (i = 0, j = 0; i < n_chunks; i++, j+= 134) {
             out[i] = g_byte_array_append (g_byte_array_sized_new (134),
-                                          &data->data[j],
-                                          MIN (data->len - j, 134));
+                                          &data[j],
+                                          MIN (data_len - j, 134));
         }
     }
 

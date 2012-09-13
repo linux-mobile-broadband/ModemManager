@@ -54,6 +54,35 @@ struct _MMSmsListPrivate {
 
 /*****************************************************************************/
 
+gboolean
+mm_sms_list_has_local_multipart_reference (MMSmsList *self,
+                                           const gchar *number,
+                                           guint8 reference)
+{
+    GList *l;
+
+    /* No one should look for multipart reference 0, which isn't valid */
+    g_assert (reference != 0);
+
+    for (l = self->priv->list; l; l = g_list_next (l)) {
+        MMSms *sms = MM_SMS (l->data);
+
+        if (mm_sms_is_multipart (sms) &&
+            mm_gdbus_sms_get_pdu_type (MM_GDBUS_SMS (sms)) == MM_SMS_PDU_TYPE_SUBMIT &&
+            mm_sms_get_storage (sms) != MM_SMS_STORAGE_UNKNOWN &&
+            mm_sms_get_multipart_reference (sms) == reference &&
+            g_str_equal (mm_gdbus_sms_get_number (MM_GDBUS_SMS (sms)), number)) {
+            /* Yes, the SMS list has an SMS with the same destination number
+             * and multipart reference */
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*****************************************************************************/
+
 guint
 mm_sms_list_get_count (MMSmsList *self)
 {

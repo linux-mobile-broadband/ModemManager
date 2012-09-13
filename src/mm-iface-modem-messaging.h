@@ -176,4 +176,9 @@ gboolean mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceMod
 /* SMS creation */
 MMSms *mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self);
 
+/* Look for a new valid multipart reference */
+guint8 mm_iface_modem_messaging_get_local_multipart_reference (MMIfaceModemMessaging *self,
+                                                               const gchar *number,
+                                                               GError **error);
+
 #endif /* MM_IFACE_MODEM_MESSAGING_H */

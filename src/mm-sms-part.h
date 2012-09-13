@@ -138,6 +138,7 @@ guint mm_sms_part_encode_address (const gchar *address,
 gchar **mm_sms_part_util_split_text (const gchar *text,
                                      MMSmsEncoding *encoding);
 
-GByteArray **mm_sms_part_util_split_data (const GByteArray *data);
+GByteArray **mm_sms_part_util_split_data (const guint8 *data,
+                                          gsize data_len);
 
 #endif /* MM_SMS_PART_H */

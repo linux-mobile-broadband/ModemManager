@@ -82,4 +82,8 @@ gboolean mm_sms_list_delete_sms_finish (MMSmsList *self,
                                         GAsyncResult *res,
                                         GError **error);
 
+gboolean mm_sms_list_has_local_multipart_reference (MMSmsList *self,
+                                                    const gchar *number,
+                                                    guint8 reference);
+
 #endif /* MM_SMS_LIST_H */
