@@ -107,7 +107,7 @@ generate_submit_pdus (MMSms *self,
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_INVALID_ARGS,
-                         "Cannot create SMS: cannot process input text");
+                         "Cannot generate PDUs: Error processing input text");
             return FALSE;
         }
         n_parts = g_strv_length (split_text);
