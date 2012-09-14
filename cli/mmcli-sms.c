@@ -64,7 +64,7 @@ static GOptionEntry entries[] = {
     },
     { "create-file-with-data", 0, 0, G_OPTION_ARG_STRING, &create_file_with_data_str,
       "Create a file with the data contents of the SMS.",
-      "[File path",
+      "[File path]",
     },
     { NULL }
 };
@@ -164,7 +164,7 @@ print_sms_info (MMSms *sms)
              VALIDATE (mm_sms_get_number (sms)));
 
     if (mm_sms_get_text (sms))
-        g_print ("             |               text : '%s'\n",
+        g_print ("             |                text: '%s'\n",
                  VALIDATE (mm_sms_get_text (sms)));
 
     data = mm_sms_get_data (sms, &data_size);
@@ -172,7 +172,7 @@ print_sms_info (MMSms *sms)
         gchar *data_hex;
 
         data_hex = mm_utils_bin2hexstr (data, data_size);
-        g_print ("             |               data : '%s'\n",
+        g_print ("             |                data: '%s'\n",
                  VALIDATE (data_hex));
         g_free (data_hex);
     }
