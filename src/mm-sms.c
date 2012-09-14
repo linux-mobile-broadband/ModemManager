@@ -123,6 +123,24 @@ generate_submit_pdus (MMSms *self,
     g_assert (split_text != NULL || split_data != NULL);
     g_assert (!(split_text != NULL && split_data != NULL));
 
+    if (n_parts > 255) {
+        if (split_text)
+            g_strfreev (split_text);
+        else if (split_data) {
+            guint i = 0;
+
+            while (split_data[i])
+                g_byte_array_unref (split_data[i++]);
+            g_free (split_data);
+        }
+
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_TOO_MANY,
+                     "Cannot generate PDUs: Text or Data too long");
+        return FALSE;
+    }
+
     /* Loop text/data chunks */
     i = 0;
     while (1) {
