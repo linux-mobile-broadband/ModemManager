@@ -973,15 +973,14 @@ mm_gsm_parse_clck_response (const char *reply, gboolean *enabled)
 {
     GRegex *r;
     GMatchInfo *match_info;
-    char *p, *str;
+    const gchar *p;
+    gchar *str;
     gboolean success = FALSE;
 
     g_return_val_if_fail (reply != NULL, FALSE);
     g_return_val_if_fail (enabled != NULL, FALSE);
 
-    p = strchr (reply, ':');
-    if (p)
-        p++;
+    p = mm_strip_tag (reply, "+CLCK:");
 
     r = g_regex_new ("\\s*([01])\\s*", 0, 0, NULL);
     if (!r)
