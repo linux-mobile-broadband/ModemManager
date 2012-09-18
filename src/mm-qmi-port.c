@@ -351,7 +351,19 @@ static void
 dispose (GObject *object)
 {
     MMQmiPort *self = MM_QMI_PORT (object);
+    GList *l;
 
+    /* Deallocate all clients */
+    for (l = self->priv->services; l; l = g_list_next (l)) {
+        ServiceInfo *info = l->data;
+
+        if (info->client)
+            g_object_unref (info->client);
+    }
+    g_list_free_full (self->priv->services, (GDestroyNotify)g_free);
+    self->priv->services = NULL;
+
+    /* Clear device object */
     g_clear_object (&self->priv->qmi_device);
 
     G_OBJECT_CLASS (mm_qmi_port_parent_class)->dispose (object);
