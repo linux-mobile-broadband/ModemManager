@@ -5834,10 +5834,49 @@ enable_location_gathering_finish (MMIfaceModemLocation *self,
 }
 
 static void
+ser_location_ready (QmiClientPds *client,
+                    GAsyncResult *res,
+                    EnableLocationGatheringContext *ctx)
+{
+    QmiMessagePdsSetEventReportOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_pds_set_event_report_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_set_event_report_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set event report: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        qmi_message_pds_set_event_report_output_unref (output);
+        return;
+    }
+
+    qmi_message_pds_set_event_report_output_unref (output);
+
+    mm_dbg ("Adding location event report indication handling");
+    g_assert (ctx->self->priv->location_event_report_indication_id == 0);
+    ctx->self->priv->location_event_report_indication_id =
+        g_signal_connect (client,
+                          "event-report",
+                          G_CALLBACK (location_event_report_indication_cb),
+                          ctx->self);
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enable_location_gathering_context_complete_and_free (ctx);
+}
+
+static void
 auto_tracking_state_start_ready (QmiClientPds *client,
                                  GAsyncResult *res,
                                  EnableLocationGatheringContext *ctx)
 {
+    QmiMessagePdsSetEventReportInput *input;
     QmiMessagePdsSetAutoTrackingStateOutput *output = NULL;
     GError *error = NULL;
 
@@ -5864,16 +5903,17 @@ auto_tracking_state_start_ready (QmiClientPds *client,
 
     qmi_message_pds_set_auto_tracking_state_output_unref (output);
 
-    mm_dbg ("Adding location event report indication handling");
-    g_assert (ctx->self->priv->location_event_report_indication_id == 0);
-    ctx->self->priv->location_event_report_indication_id =
-        g_signal_connect (client,
-                          "event-report",
-                          G_CALLBACK (location_event_report_indication_cb),
-                          ctx->self);
-
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_location_gathering_context_complete_and_free (ctx);
+    /* Only gather standard NMEA traces */
+    input = qmi_message_pds_set_event_report_input_new ();
+    qmi_message_pds_set_event_report_input_set_nmea_position_reporting (input, TRUE, NULL);
+    qmi_client_pds_set_event_report (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)ser_location_ready,
+        ctx);
+    qmi_message_pds_set_event_report_input_unref (input);
 }
 
 static void
