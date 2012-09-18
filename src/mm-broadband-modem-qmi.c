@@ -87,6 +87,7 @@ struct _MMBroadbandModemQmiPrivate {
 
     /* Location helpers */
     MMModemLocationSource enabled_sources;
+    guint location_event_report_indication_id;
 };
 
 /*****************************************************************************/
@@ -5658,6 +5659,23 @@ location_load_capabilities (MMIfaceModemLocation *self,
 /*****************************************************************************/
 /* Disable location gathering (Location interface) */
 
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientPds *client;
+    GSimpleAsyncResult *result;
+} DisableLocationGatheringContext;
+
+static void
+disable_location_gathering_context_complete_and_free (DisableLocationGatheringContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    if (ctx->client)
+        g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (DisableLocationGatheringContext, ctx);
+}
+
 static gboolean
 disable_location_gathering_finish (MMIfaceModemLocation *self,
                                    GAsyncResult *res,
@@ -5669,7 +5687,7 @@ disable_location_gathering_finish (MMIfaceModemLocation *self,
 static void
 gps_service_state_stop_ready (QmiClientPds *client,
                               GAsyncResult *res,
-                              GSimpleAsyncResult *simple)
+                              DisableLocationGatheringContext *ctx)
 {
     QmiMessagePdsSetGpsServiceStateOutput *output = NULL;
     GError *error = NULL;
@@ -5677,55 +5695,66 @@ gps_service_state_stop_ready (QmiClientPds *client,
     output = qmi_client_pds_set_gps_service_state_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
-    } else if (!qmi_message_pds_set_gps_service_state_output_get_result (output, &error)) {
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            g_error_free (error);
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        } else {
+        g_simple_async_result_take_error (ctx->result, error);
+        disable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_set_gps_service_state_output_get_result (output, &error)) {
+        if (!g_error_matches (error,
+                              QMI_PROTOCOL_ERROR,
+                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set GPS service state: ");
-            g_simple_async_result_take_error (simple, error);
+            g_simple_async_result_take_error (ctx->result, error);
+            disable_location_gathering_context_complete_and_free (ctx);
+            qmi_message_pds_set_gps_service_state_output_unref (output);
+            return;
         }
-    } else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
 
-    if (output)
-        qmi_message_pds_set_gps_service_state_output_unref (output);
+        g_error_free (error);
+    }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    qmi_message_pds_set_gps_service_state_output_unref (output);
+
+    mm_dbg ("Removing location event report indication handling");
+    g_assert (ctx->self->priv->location_event_report_indication_id != 0);
+    g_signal_handler_disconnect (client, ctx->self->priv->location_event_report_indication_id);
+    ctx->self->priv->location_event_report_indication_id = 0;
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disable_location_gathering_context_complete_and_free (ctx);
 }
 
 static void
-disable_location_gathering (MMIfaceModemLocation *_self,
+disable_location_gathering (MMIfaceModemLocation *self,
                             MMModemLocationSource source,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
-    gboolean stop_gps = FALSE;
+    DisableLocationGatheringContext *ctx;
     QmiClient *client = NULL;
+    gboolean stop_gps = FALSE;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        disable_location_gathering);
+    ctx = g_slice_new0 (DisableLocationGatheringContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disable_location_gathering);
 
     /* Only stop GPS engine if no GPS-related sources enabled */
     if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                   MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        self->priv->enabled_sources &= ~source;
+        ctx->self->priv->enabled_sources &= ~source;
 
-        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
+        if (!(ctx->self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
             stop_gps = TRUE;
     }
 
@@ -5735,24 +5764,48 @@ disable_location_gathering (MMIfaceModemLocation *_self,
         input = qmi_message_pds_set_gps_service_state_input_new ();
         qmi_message_pds_set_gps_service_state_input_set_state (input, FALSE, NULL);
         qmi_client_pds_set_gps_service_state (
-            QMI_CLIENT_PDS (client),
+            ctx->client,
             input,
             10,
             NULL, /* cancellable */
             (GAsyncReadyCallback)gps_service_state_stop_ready,
-            result);
+            ctx);
         qmi_message_pds_set_gps_service_state_input_unref (input);
         return;
     }
 
     /* For any other location (e.g. 3GPP), or if still some GPS needed, just return */
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disable_location_gathering_context_complete_and_free (ctx);
 }
 
 /*****************************************************************************/
 /* Enable location gathering (Location interface) */
+
+static void
+location_event_report_indication_cb (QmiClientPds *client,
+                                     QmiIndicationPdsEventReportOutput *output,
+                                     MMBroadbandModemQmi *self)
+{
+    QmiPdsPositionSessionStatus session_status;
+    const gchar *nmea;
+
+    if (qmi_indication_pds_event_report_output_get_position_session_status (
+            output,
+            &session_status,
+            NULL)) {
+        mm_dbg ("[GPS] session status changed: '%s'",
+                qmi_pds_position_session_status_get_string (session_status));
+    }
+
+    if (qmi_indication_pds_event_report_output_get_nmea_position (
+            output,
+            &nmea,
+            NULL)) {
+        mm_dbg ("[NMEA] %s", nmea);
+        mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), nmea);
+    }
+}
 
 typedef struct {
     MMBroadbandModemQmi *self;
@@ -5792,22 +5845,34 @@ auto_tracking_state_start_ready (QmiClientPds *client,
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (ctx->result, error);
-    } else if (!qmi_message_pds_set_auto_tracking_state_output_get_result (output, &error)) {
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            g_error_free (error);
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        } else {
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_set_auto_tracking_state_output_get_result (output, &error)) {
+        if (!g_error_matches (error,
+                              QMI_PROTOCOL_ERROR,
+                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set auto-tracking state: ");
             g_simple_async_result_take_error (ctx->result, error);
+            enable_location_gathering_context_complete_and_free (ctx);
+            qmi_message_pds_set_auto_tracking_state_output_unref (output);
+            return;
         }
-    } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_error_free (error);
+    }
 
-    if (output)
-        qmi_message_pds_set_auto_tracking_state_output_unref (output);
+    qmi_message_pds_set_auto_tracking_state_output_unref (output);
 
+    mm_dbg ("Adding location event report indication handling");
+    g_assert (ctx->self->priv->location_event_report_indication_id == 0);
+    ctx->self->priv->location_event_report_indication_id =
+        g_signal_connect (client,
+                          "event-report",
+                          G_CALLBACK (location_event_report_indication_cb),
+                          ctx->self);
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     enable_location_gathering_context_complete_and_free (ctx);
 }
 
@@ -5829,18 +5894,16 @@ gps_service_state_start_ready (QmiClientPds *client,
     }
 
     if (!qmi_message_pds_set_gps_service_state_output_get_result (output, &error)) {
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            g_error_free (error);
-            /* Fall down */
-        } else {
+        if (!g_error_matches (error,
+                              QMI_PROTOCOL_ERROR,
+                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set GPS service state: ");
             g_simple_async_result_take_error (ctx->result, error);
             enable_location_gathering_context_complete_and_free (ctx);
             qmi_message_pds_set_gps_service_state_output_unref (output);
             return;
         }
+        g_error_free (error);
     }
 
     qmi_message_pds_set_gps_service_state_output_unref (output);
