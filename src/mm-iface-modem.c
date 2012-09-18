@@ -2941,6 +2941,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,
+    INITIALIZATION_STEP_POWER_DOWN,
     INITIALIZATION_STEP_BEARERS,
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
@@ -3073,6 +3074,26 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
 
 UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities", TRUE)
 UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities", FALSE)
+
+static void
+initialization_modem_power_down_ready (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->modem_init_power_down_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't power down the modem during initialization: '%s'", error->message);
+        g_error_free (error);
+    } else
+        mm_dbg ("Modem initially powered down...");
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
@@ -3320,6 +3341,20 @@ interface_initialization_step (InitializationContext *ctx)
         mm_gdbus_modem_set_modem_capabilities (
             ctx->skeleton,
             mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_POWER_DOWN:
+        /* We run the power down command during initialization, to ensure we
+         * start with radio off, when possible */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init_power_down &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init_power_down_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init_power_down (
+                ctx->self,
+                (GAsyncReadyCallback)initialization_modem_power_down_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
