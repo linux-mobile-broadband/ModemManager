@@ -88,6 +88,26 @@ struct _MMBroadbandModemQmiPrivate {
 
 /*****************************************************************************/
 
+static QmiClient *
+peek_qmi_client (MMBroadbandModemQmi *self,
+                 QmiService service,
+                 GError **error)
+{
+    QmiClient *client;
+
+    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
+                                      service,
+                                      MM_QMI_PORT_FLAG_DEFAULT);
+    if (!client)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't peek client for service '%s'",
+                     qmi_service_get_string (service));
+
+    return client;
+}
+
 static gboolean
 ensure_qmi_client (MMBroadbandModemQmi *self,
                    QmiService service,
@@ -95,19 +115,16 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
+    GError *error = NULL;
     QmiClient *client;
 
-    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
-                                      service,
-                                      MM_QMI_PORT_FLAG_DEFAULT);
+    client = peek_qmi_client (self, service, &error);
     if (!client) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek client for service '%s'",
-                                             qmi_service_get_string (service));
+        g_simple_async_report_take_gerror_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            error);
         return FALSE;
     }
 
