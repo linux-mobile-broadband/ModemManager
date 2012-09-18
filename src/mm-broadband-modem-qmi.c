@@ -1814,6 +1814,7 @@ common_power_up_down (MMIfaceModem *self,
                                        NULL,
                                        (GAsyncReadyCallback)dms_set_operating_mode_ready,
                                        result);
+    qmi_message_dms_set_operating_mode_input_unref (input);
 }
 
 static void
