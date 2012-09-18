@@ -82,6 +82,10 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
         if (previous) {
             gchar *sequence;
 
+            /* Skip the trace if we already have it there */
+            if (strstr (previous, trace))
+                return TRUE;
+
             sequence = g_strdup_printf ("%s%s%s",
                                         previous,
                                         g_str_has_suffix (previous, "\r\n") ? "" : "\r\n",
