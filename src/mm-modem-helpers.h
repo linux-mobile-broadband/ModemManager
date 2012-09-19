@@ -44,8 +44,9 @@
     (MM_MODEM_CAPABILITY_GSM_UMTS |     \
      MM_MODEM_CAPABILITY_3GPP_LTE)
 
-const gchar *mm_strip_tag (const gchar *str,
-                           const gchar *cmd);
+gchar       *mm_strip_quotes (gchar *str);
+const gchar *mm_strip_tag    (const gchar *str,
+                              const gchar *cmd);
 
 guint mm_count_bits_set (gulong number);
 

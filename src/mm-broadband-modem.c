@@ -634,13 +634,23 @@ modem_load_model_finish (MMIfaceModem *self,
                          GError **error)
 {
     GVariant *result;
+    const gchar *p;
     gchar *model;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return NULL;
 
-    model = g_strstrip (g_variant_dup_string (result, NULL));
+    p = g_variant_get_string (result, NULL);
+
+    /* Some devices (e.g. ZTE MF820D) seem to include the command prefix */
+    p = mm_strip_tag (p, "+CGMM:");
+    p = mm_strip_tag (p, "+GMM:");
+    model = g_strdup (p);
+
+    /* Stripping quotes modifies string in place */
+    model = mm_strip_quotes (model);
+
     mm_dbg ("loaded model: %s", model);
     return model;
 }

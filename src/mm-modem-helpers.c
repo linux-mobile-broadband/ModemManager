@@ -32,6 +32,23 @@
 
 /*****************************************************************************/
 
+gchar *
+mm_strip_quotes (gchar *str)
+{
+    gsize len;
+
+    if (!str)
+        return NULL;
+
+    len = strlen (str);
+    if ((len >= 2) && (str[0] == '"') && (str[len - 1] == '"')) {
+        str[0] = ' ';
+        str[len - 1] = ' ';
+    }
+
+    return g_strstrip (str);
+}
+
 const gchar *
 mm_strip_tag (const gchar *str, const gchar *cmd)
 {
