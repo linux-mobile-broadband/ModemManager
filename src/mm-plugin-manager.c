@@ -161,29 +161,40 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
             suggest_port_probe_result (ctx, port_probe_ctx, NULL);
 
     } else {
+        MMPlugin *device_plugin;
+
+        device_plugin = (MMPlugin *)mm_device_peek_plugin (ctx->device);
+
         /* Notify the plugin to the device, if this is the first port probing
-         * result we got. */
-        if (!mm_device_peek_plugin (ctx->device)) {
-            mm_dbg ("(%s/%s): found best plugin (%s) for device (%s)",
-                    g_udev_device_get_subsystem (port_probe_ctx->port),
-                    g_udev_device_get_name (port_probe_ctx->port),
-                    mm_plugin_get_name (port_probe_ctx->best_plugin),
-                    mm_device_get_path (ctx->device));
+         * result we got.
+         * Also, if the previously suggested plugin was the GENERIC one and now
+         * we're reporting a more specific one, use the new one.
+         */
+        if (!device_plugin ||
+            (g_str_equal (mm_plugin_get_name (device_plugin), MM_PLUGIN_GENERIC_NAME) &&
+             device_plugin != port_probe_ctx->best_plugin)) {
+            /* Only log best plugin if it's not the generic one */
+            if (!g_str_equal (mm_plugin_get_name (port_probe_ctx->best_plugin), MM_PLUGIN_GENERIC_NAME))
+                mm_dbg ("(%s/%s): found best plugin (%s) for device (%s)",
+                        g_udev_device_get_subsystem (port_probe_ctx->port),
+                        g_udev_device_get_name (port_probe_ctx->port),
+                        mm_plugin_get_name (port_probe_ctx->best_plugin),
+                        mm_device_get_path (ctx->device));
+
             mm_device_set_plugin (ctx->device, G_OBJECT (port_probe_ctx->best_plugin));
 
             /* Suggest this plugin also to other port probes */
             suggest_port_probe_result (ctx, port_probe_ctx, port_probe_ctx->best_plugin);
         }
         /* Warn if the best plugin found for this port differs from the
-         * best plugin found for the the first probed port. */
-        else if (!g_str_equal (mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
-                               mm_plugin_get_name (port_probe_ctx->best_plugin))) {
+         * best plugin found for the the first probed port */
+        else if (!g_str_equal (mm_plugin_get_name (device_plugin),
+                               mm_plugin_get_name (port_probe_ctx->best_plugin)))
             mm_warn ("(%s/%s): plugin mismatch error (expected: '%s', got: '%s')",
                      g_udev_device_get_subsystem (port_probe_ctx->port),
                      g_udev_device_get_name (port_probe_ctx->port),
                      mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
                      mm_plugin_get_name (port_probe_ctx->best_plugin));
-        }
     }
 
     /* Remove us from the list of running probes */
@@ -222,29 +233,28 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
     for (l = ctx->running_probes; l; l = g_list_next (l)) {
         PortProbeContext *port_probe_ctx = l->data;
 
+        /* Plugin suggestions serve two different purposes here:
+         *  1) Finish all the probes which were deferred until suggested.
+         *  2) Suggest to other probes which plugin to test next.
+         *
+         * The exception here is when we suggest the GENERIC plugin.
+         * In this case, only purpose (1) is applied, this is, only
+         * the deferred until suggested probes get finished.
+         */
+
         if (port_probe_ctx != origin &&
             !port_probe_ctx->best_plugin &&
             !port_probe_ctx->suggested_plugin) {
-            /* TODO: Cancel probing in the port if the plugin being
-             * checked right now is not the one being suggested.
-             */
-            if (suggested_plugin) {
-                mm_dbg ("(%s): (%s/%s) suggested plugin for port",
-                        mm_plugin_get_name (suggested_plugin),
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
-                        g_udev_device_get_name (port_probe_ctx->port));
-                port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
-            }
-
             /* If we got a task deferred until a suggestion comes,
              * complete it */
             if (port_probe_ctx->defer_until_suggested) {
                 if (suggested_plugin) {
-                    mm_dbg ("(%s): (%s/%s) deferred task completed, got suggested plugin",
-                            mm_plugin_get_name (suggested_plugin),
+                    mm_dbg ("(%s/%s) deferred task completed, got suggested plugin (%s)",
                             g_udev_device_get_subsystem (port_probe_ctx->port),
-                            g_udev_device_get_name (port_probe_ctx->port));
+                            g_udev_device_get_name (port_probe_ctx->port),
+                            mm_plugin_get_name (suggested_plugin));
                     /* Advance to the suggested plugin and re-check support there */
+                    port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
                     port_probe_ctx->current = g_list_find (port_probe_ctx->current,
                                                            port_probe_ctx->suggested_plugin);
                 } else {
@@ -259,6 +269,19 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
                 g_assert (port_probe_ctx->defer_id == 0);
                 port_probe_ctx->defer_id = g_idle_add ((GSourceFunc)deferred_support_check_idle,
                                                        port_probe_ctx);
+            }
+            /* TODO: Cancel probing in the port if the plugin being
+             * checked right now is not the one being suggested.
+             */
+            else if (suggested_plugin &&
+                     /* The GENERIC plugin is NEVER suggested to others */
+                     !g_str_equal (mm_plugin_get_name (suggested_plugin),
+                                   MM_PLUGIN_GENERIC_NAME)) {
+                mm_dbg ("(%s): (%s/%s) suggested plugin for port",
+                        mm_plugin_get_name (suggested_plugin),
+                        g_udev_device_get_subsystem (port_probe_ctx->port),
+                        g_udev_device_get_name (port_probe_ctx->port));
+                port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
             }
         }
     }
