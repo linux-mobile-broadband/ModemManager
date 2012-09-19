@@ -153,6 +153,9 @@ getportmode_ready (MMAtSerialPort *port,
         cache_port_mode (device, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
         cache_port_mode (device, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
         g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
+
+        /* Mark port as being AT already */
+        mm_port_probe_set_result_at (ctx->probe, TRUE);
     }
 
     ctx->getportmode_done = TRUE;
