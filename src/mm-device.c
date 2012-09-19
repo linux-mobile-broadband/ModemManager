@@ -267,8 +267,10 @@ mm_device_grab_port (MMDevice    *self,
     if (mm_device_owns_port (self, udev_port))
         return;
 
-    /* Get the vendor/product IDs out of the first port grabbed */
-    if (!self->priv->port_probes) {
+    /* Get the vendor/product IDs out of the first one that gives us
+     * some valid value (it seems we may get NULL reported for VID in QMI
+     * ports, e.g. Huawei E367) */
+    if (!self->priv->vendor && !self->priv->product) {
         if (!get_device_ids (udev_port,
                              &self->priv->vendor,
                              &self->priv->product)) {
