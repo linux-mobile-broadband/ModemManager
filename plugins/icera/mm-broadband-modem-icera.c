@@ -1646,6 +1646,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_current_bands = modem_load_current_bands;
     iface->load_current_bands_finish = modem_load_current_bands_finish;
+    /* Note: don't implement modem_init_power_down, as CFUN=4 here may take
+     * looong to reply */
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->reset = modem_reset;
