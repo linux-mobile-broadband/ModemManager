@@ -1468,7 +1468,15 @@ mm_3gpp_parse_operator (const gchar *reply,
          */
         if (!g_utf8_validate (operator, -1, NULL)) {
             g_free (operator);
-            operator = NULL;
+            return NULL;
+        }
+
+        /* Some modems (Novatel LTE) return the operator name as "Unknown" when
+         * it fails to obtain the operator name. Return NULL in such case.
+         */
+        if (g_ascii_strcasecmp (operator, "unknown") == 0) {
+            g_free (operator);
+            return NULL;
         }
     }
 
