@@ -35,6 +35,7 @@
 #define MM_GENERIC_CDMA_EVDO_REVA            "evdo-revA"
 
 #define MM_GENERIC_CDMA_REGISTRATION_TRY_CSS "registration-try-css"
+#define MM_GENERIC_CDMA_REGISTRATION_TRY_CAD "registration-try-cad"
 
 typedef struct {
     MMModemBase parent;

@@ -77,6 +77,7 @@ typedef struct {
     gboolean evdo_rev0;
     gboolean evdo_revA;
     gboolean reg_try_css;
+    gboolean reg_try_cad;
     gboolean has_spservice;
     gboolean has_speri;
 
@@ -108,6 +109,7 @@ enum {
     PROP_EVDO_REV0,
     PROP_EVDO_REVA,
     PROP_REG_TRY_CSS,
+    PROP_REG_TRY_CAD,
     LAST_PROP
 };
 
@@ -1875,6 +1877,35 @@ error:
 }
 
 static void
+reg_state_query_at (MMGenericCdma *self, MMCallbackInfo *info)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    MMAtSerialPort *port;
+
+    if (priv->reg_try_cad) {
+        port = mm_generic_cdma_get_best_at_port (self, &info->error);
+        if (!port) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
+    } else {
+        /* Just call subclass' registration function if it has one; note that
+         * MMGenericCdma's query_registration_state() will assume that we're
+         * registered on the 1X network, but the generic handler should never
+         * get called because the generic class won't set REG_TRY_CAD = FALSE.
+         */
+        g_assert (MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state != real_query_registration_state);
+        MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state (MM_GENERIC_CDMA (info->modem),
+                                                                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                                           subclass_reg_query_done,
+                                                                           info);
+    }
+}
+
+static void
 reg_hdrstate_cb (MMQcdmSerialPort *port,
                  GByteArray *response,
                  GError *error,
@@ -1885,18 +1916,26 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
     guint32 sysmode;
     MMModemCdmaRegistrationState cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    MMAtSerialPort *at_port;
     gboolean evdo_registered = FALSE;
+    int err = QCDM_SUCCESS;
 
-    if (error)
-        goto error;
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
-    sysmode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "sysmode"));
+    /* Parse the response */
+    if (!error)
+        result = qcdm_cmd_hdr_subsys_state_info_result ((const char *) response->data, response->len, &err);
 
-    /* Get HDR subsystem state to determine EVDO registration when in 1X mode */
-    result = qcdm_cmd_hdr_subsys_state_info_result ((const char *) response->data,
-                                                    response->len,
-                                                    NULL);
+    if (!result) {
+        /* Fall back to AT-based registration queries */
+        mm_dbg ("Failed to parse HDR subsys state info command result: %d", err);
+        reg_state_query_at (MM_GENERIC_CDMA (info->modem), info);
+        return;
+    }
+
+    /* Determine EVDO registration */
     if (result) {
         guint8 session_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED;
         guint8 almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
@@ -1920,6 +1959,7 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
         qcdm_result_unref (result);
     }
 
+    sysmode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "sysmode"));
     switch (sysmode) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
         cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
@@ -1954,15 +1994,6 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
     set_callback_1x_state_helper (info, cdma_state);
     set_callback_evdo_state_helper (info, evdo_state);
     mm_callback_info_schedule (info);
-    return;
-
-error:
-    /* If there was some error, fall back to use +CAD like we did before QCDM */
-    at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (info->modem), &info->error);
-    if (at_port)
-        mm_at_serial_port_queue_command (at_port, "+CAD?", 3, get_analog_digital_done, info);
-    else
-        mm_callback_info_schedule (info);
 }
 
 static void
@@ -1972,28 +2003,23 @@ reg_cmstate_cb (MMQcdmSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMAtSerialPort *at_port = NULL;
     QcdmResult *result = NULL;
     guint32 opmode = 0, sysmode = 0;
     int err = QCDM_SUCCESS;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     /* Parse the response */
     if (!error)
         result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &err);
 
     if (!result) {
-        /* If there was some error, fall back to use +CAD like we did before QCDM */
-        if (info->modem)
-            at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (info->modem), &info->error);
-        else {
-            g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                         "Failed to parse CM subsys state info command result: %d", err);
-        }
-
-        if (at_port)
-            mm_at_serial_port_queue_command (at_port, "+CAD?", 3, get_analog_digital_done, info);
-        else
-            mm_callback_info_schedule (info);
+        /* Fall back to AT-based registration queries */
+        mm_dbg ("Failed to parse CM subsys state info command result: %d", err);
+        reg_state_query_at (MM_GENERIC_CDMA (info->modem), info);
         return;
     }
 
@@ -2057,7 +2083,7 @@ get_registration_state (MMModemCdma *modem,
         g_assert (cmstate->len);
         mm_qcdm_serial_port_queue_command (priv->qcdm, cmstate, 3, reg_cmstate_cb, info);
     } else
-        mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
+        reg_state_query_at (MM_GENERIC_CDMA (modem), info);
 }
 
 /*****************************************************************************/
@@ -2522,6 +2548,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_REG_TRY_CSS:
         priv->reg_try_css = g_value_get_boolean (value);
         break;
+    case PROP_REG_TRY_CAD:
+        priv->reg_try_cad = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -2555,6 +2584,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_REG_TRY_CSS:
         g_value_set_boolean (value, priv->reg_try_css);
+        break;
+    case PROP_REG_TRY_CAD:
+        g_value_set_boolean (value, priv->reg_try_cad);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2623,6 +2655,14 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *generic_class)
             g_param_spec_boolean (MM_GENERIC_CDMA_REGISTRATION_TRY_CSS,
                                   "RegistrationTryCss",
                                   "Use Serving System response when checking modem"
+                                  " registration state.",
+                                  TRUE,
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property (object_class, PROP_REG_TRY_CAD,
+            g_param_spec_boolean (MM_GENERIC_CDMA_REGISTRATION_TRY_CAD,
+                                  "RegistrationTryCad",
+                                  "Use Query Analog/Digital response when checking modem"
                                   " registration state.",
                                   TRUE,
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
