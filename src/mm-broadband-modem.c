@@ -2295,7 +2295,7 @@ static const MMBaseModemAtCommand modem_init_sequence[] = {
      *   after the Z command because such commands may be ignored.
      * So run ATZ alone.
      */
-    { "Z", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { "Z", 6, FALSE, mm_base_modem_response_processor_no_result_continue },
 
     /* Ensure echo is off after the init command */
     { "E0 V1",      3, FALSE, NULL },
