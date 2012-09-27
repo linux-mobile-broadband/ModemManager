@@ -366,6 +366,35 @@ qcdm_cmd_esn_result (const char *buf, size_t len, int *out_error)
 /**********************************************************************/
 
 size_t
+qcdm_cmd_control_new (char *buf, size_t len, u_int8_t mode)
+{
+    char cmdbuf[5];
+    DMCmdControl *cmd = (DMCmdControl *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_CONTROL;
+    cmd->mode = htole16 ((u_int16_t) mode);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_control_result (const char *buf, size_t len, int *out_error)
+{
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_CONTROL, sizeof (DMCmdControl), out_error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
+size_t
 qcdm_cmd_cdma_status_new (char *buf, size_t len)
 {
     char cmdbuf[3];

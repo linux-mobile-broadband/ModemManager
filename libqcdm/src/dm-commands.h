@@ -246,6 +246,19 @@ struct DMCmdSubsysHeader {
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysHeader DMCmdSubsysHeader;
 
+typedef enum {
+    DM_CONTROL_MODE_OFFLINE = 1,
+    DM_CONTROL_MODE_RESET = 2,
+} DMControlMode;
+
+/* DIAG_CMD_CONTROL */
+struct DMCmdControl {
+    u_int8_t code;
+    /* DMControlMode */
+    u_int16_t mode;
+} __attribute__ ((packed));
+typedef struct DMCmdControl DMCmdControl;
+
 /* DIAG_CMD_NV_READ / DIAG_CMD_NV_WRITE */
 struct DMCmdNVReadWrite {
     u_int8_t code;

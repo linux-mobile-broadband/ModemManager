@@ -92,6 +92,19 @@ QcdmResult *qcdm_cmd_esn_result (const char *buf,
 
 /**********************************************************************/
 
+enum {
+    QCDM_CMD_CONTROL_MODE_OFFLINE = 1,
+    QCDM_CMD_CONTROL_MODE_RESET = 2,
+};
+
+size_t      qcdm_cmd_control_new    (char *buf, size_t len, u_int8_t mode);
+
+QcdmResult *qcdm_cmd_control_result (const char *buf,
+                                     size_t len,
+                                     int *out_error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_CDMA_STATUS_ITEM_RF_MODE */
 enum {
     QCDM_CMD_CDMA_STATUS_RF_MODE_ANALOG = 0,
