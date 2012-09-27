@@ -382,6 +382,57 @@ error:
 	return -1;
 }
 
+static int
+qcdm_set_mode (const char *port, u_int8_t mode)
+{
+	int fd, err;
+	char buf[512];
+	size_t len;
+	QcdmResult *result;
+	size_t reply_len;
+
+	fd = com_setup (port);
+	if (fd < 0)
+		return -1;
+
+	err = qcdm_port_setup (fd);
+	if (err != QCDM_SUCCESS) {
+		fprintf (stderr, "E: failed to set up DM port %s: %d\n", port, err);
+		goto error;
+	}
+
+	len = qcdm_cmd_control_new (buf, sizeof (buf), mode);
+	assert (len);
+
+	/* Send the command */
+	if (!qcdm_send (fd, buf, len)) {
+		fprintf (stderr, "E: failed to send QCDM HDR pref command\n");
+		goto error;
+	}
+
+	reply_len = qcdm_wait_reply (fd, buf, sizeof (buf));
+	if (!reply_len) {
+		fprintf (stderr, "E: failed to receive HDR pref command reply\n");
+		goto error;
+	}
+
+	/* Parse the response into a result structure */
+	err = QCDM_SUCCESS;
+	result = qcdm_cmd_control_result (buf, reply_len, &err);
+	if (!result) {
+		fprintf (stderr, "E: failed to parse HDR pref command reply: %d\n", err);
+		goto error;
+	}
+
+	qcdm_result_unref (result);
+	close (fd);
+	return 0;
+
+error:
+	close (fd);
+	return -1;
+}
+
 /******************************************************************/
 
 static void
@@ -447,7 +498,13 @@ main (int argc, char *argv[])
 		return 1;
 	if (set_evdo && qcdm_set_hdr_pref (dmport, hdrpref))
 		return 1;
-	
+
+	/* Send DM reset command */
+	qcdm_set_mode (dmport, QCDM_CMD_CONTROL_MODE_OFFLINE);
+	sleep (2);
+	qcdm_set_mode (dmport, QCDM_CMD_CONTROL_MODE_RESET);
+	sleep (2);
+
 	fprintf (stdout, "Success setting mode to '%s': replug your device.\n", smode);
 	return 0;
 }
