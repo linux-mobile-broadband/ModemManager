@@ -406,13 +406,13 @@ qcdm_set_mode (const char *port, u_int8_t mode)
 
 	/* Send the command */
 	if (!qcdm_send (fd, buf, len)) {
-		fprintf (stderr, "E: failed to send QCDM HDR pref command\n");
+		fprintf (stderr, "E: failed to send QCDM Control command\n");
 		goto error;
 	}
 
 	reply_len = qcdm_wait_reply (fd, buf, sizeof (buf));
 	if (!reply_len) {
-		fprintf (stderr, "E: failed to receive HDR pref command reply\n");
+		fprintf (stderr, "E: failed to receive Control command reply\n");
 		goto error;
 	}
 
@@ -420,7 +420,7 @@ qcdm_set_mode (const char *port, u_int8_t mode)
 	err = QCDM_SUCCESS;
 	result = qcdm_cmd_control_result (buf, reply_len, &err);
 	if (!result) {
-		fprintf (stderr, "E: failed to parse HDR pref command reply: %d\n", err);
+		fprintf (stderr, "E: failed to parse Control command reply: %d\n", err);
 		goto error;
 	}
 
