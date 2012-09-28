@@ -3179,7 +3179,10 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
     /*  We just run the sequence in the primary port */
     command = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (!command) {
-        g_assert (error != NULL);
+        if (!error)
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "AT sequence failed");
         mm_dbg ("%s unsolicited registration events in primary port failed: '%s'",
                 ctx->enable ? "Enabling" : "Disabling",
                 error->message);
