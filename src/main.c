@@ -66,13 +66,13 @@ setup_signals (void)
 }
 
 static void
-name_acquired_cb (GDBusConnection *connection,
-                  const gchar *name,
-                  gpointer user_data)
+bus_acquired_cb (GDBusConnection *connection,
+                 const gchar *name,
+                 gpointer user_data)
 {
     GError *error = NULL;
 
-    mm_dbg ("Service name '%s' was acquired", name);
+    mm_dbg ("Bus acquired, creating manager...");
 
     /* Create Manager object */
     g_assert (!manager);
@@ -83,8 +83,17 @@ name_acquired_cb (GDBusConnection *connection,
         g_main_loop_quit (loop);
         return;
     }
+}
+
+static void
+name_acquired_cb (GDBusConnection *connection,
+                  const gchar *name,
+                  gpointer user_data)
+{
+    mm_dbg ("Service name '%s' was acquired", name);
 
     /* Launch scan for devices */
+    g_assert (manager);
     mm_manager_start (manager);
 }
 
@@ -95,14 +104,18 @@ name_lost_cb (GDBusConnection *connection,
 {
     /* Note that we're not allowing replacement, so once the name acquired, the
      * process won't lose it. */
-    mm_warn ("Could not acquire the '%s' service name", name);
+    if (!name)
+        mm_warn ("Could not get the system bus. Make sure "
+                 "the message bus daemon is running!");
+    else
+        mm_warn ("Could not acquire the '%s' service name", name);
+
     g_main_loop_quit (loop);
 }
 
 int
 main (int argc, char *argv[])
 {
-    GDBusConnection *bus;
     GError *err = NULL;
     guint name_id;
 
@@ -126,24 +139,15 @@ main (int argc, char *argv[])
 
     mm_info ("ModemManager (version " MM_DIST_VERSION ") starting...");
 
-    /* Get system bus */
-    bus = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &err);
-    if (!bus) {
-        g_warning ("Could not get the system bus. Make sure "
-                   "the message bus daemon is running! Message: %s",
-                   err->message);
-        g_error_free (err);
-        return -1;
-    }
-
     /* Acquire name, don't allow replacement */
-    name_id = g_bus_own_name_on_connection (bus,
-                                            MM_DBUS_SERVICE,
-                                            G_BUS_NAME_OWNER_FLAGS_NONE,
-                                            name_acquired_cb,
-                                            name_lost_cb,
-                                            NULL,
-                                            NULL);
+    name_id = g_bus_own_name (G_BUS_TYPE_SYSTEM,
+                              MM_DBUS_SERVICE,
+                              G_BUS_NAME_OWNER_FLAGS_NONE,
+                              bus_acquired_cb,
+                              name_acquired_cb,
+                              name_lost_cb,
+                              NULL,
+                              NULL);
 
     /* Go into the main loop */
     loop = g_main_loop_new (NULL, FALSE);
@@ -164,7 +168,6 @@ main (int argc, char *argv[])
     }
 
     g_bus_unown_name (name_id);
-    g_object_unref (bus);
 
     mm_log_shutdown ();
 
