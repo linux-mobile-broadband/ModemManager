@@ -1001,11 +1001,16 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                       NULL);
 
         /* Signal status change */
-        if (skeleton)
+        if (skeleton) {
+            /* Flush current change before signaling the state change,
+             * so that clients get the proper state already in the
+             * state-changed callback */
+            g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
             mm_gdbus_modem_emit_state_changed (skeleton,
                                                old_state,
                                                new_state,
                                                reason);
+        }
 
         /* If we go to registered state (from unregistered), setup signal
          * quality and access technologies periodic retrieval */
