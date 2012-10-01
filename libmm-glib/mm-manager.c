@@ -41,6 +41,43 @@ struct _MMManagerPrivate {
   MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy;
 };
 
+/*****************************************************************************/
+
+static GType
+get_proxy_type (GDBusObjectManagerClient *manager,
+                const gchar *object_path,
+                const gchar *interface_name,
+                gpointer user_data)
+{
+  static gsize once_init_value = 0;
+  static GHashTable *lookup_hash;
+  GType ret;
+
+  if (interface_name == NULL)
+    return MM_GDBUS_TYPE_OBJECT_PROXY;
+  if (g_once_init_enter (&once_init_value))
+    {
+      lookup_hash = g_hash_table_new (g_str_hash, g_str_equal);
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Messaging", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_MESSAGING_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Location", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_LOCATION_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Time", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_TIME_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Firmware", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_FIRMWARE_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Contacts", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_CONTACTS_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.ModemCdma", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_CDMA_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM3GPP_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM3GPP_USSD_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Simple", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_SIMPLE_PROXY));
+      g_once_init_leave (&once_init_value, 1);
+    }
+  ret = (GType) GPOINTER_TO_SIZE (g_hash_table_lookup (lookup_hash, interface_name));
+  if (ret == (GType) 0)
+    ret = G_TYPE_DBUS_PROXY;
+  return ret;
+}
+
+/*****************************************************************************/
+
 /**
  * mm_manager_new:
  * @connection: A #GDBusConnection.
@@ -75,7 +112,7 @@ mm_manager_new (GDBusConnection               *connection,
                                 "object-path", MM_DBUS_PATH,
                                 "flags", flags,
                                 "connection", connection,
-                                "get-proxy-type-func", mm_gdbus_object_manager_client_get_proxy_type,
+                                "get-proxy-type-func", get_proxy_type,
                                 NULL);
 }
 
@@ -125,7 +162,7 @@ mm_manager_new_sync (GDBusConnection                *connection,
                           "object-path", MM_DBUS_PATH,
                           "flags", flags,
                           "connection", connection,
-                          "get-proxy-type-func", mm_gdbus_object_manager_client_get_proxy_type,
+                          "get-proxy-type-func", get_proxy_type,
                           NULL);
 
     return (ret ? MM_MANAGER (ret) : NULL);
