@@ -247,6 +247,8 @@ docs/man/ModemManager.8
 docs/reference/Makefile
 docs/reference/api/Makefile
 docs/reference/api/version.xml
+docs/reference/libmm-glib/Makefile
+docs/reference/libmm-glib/version.xml
 libmm-glib/Makefile
 cli/Makefile
 ])
