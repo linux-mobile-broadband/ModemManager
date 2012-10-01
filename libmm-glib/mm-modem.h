@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef _MM_MODEM_H_
@@ -31,51 +32,106 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusModem     MMModem;
-#define MM_TYPE_MODEM(o) MM_GDBUS_TYPE_MODEM (o)
-#define MM_MODEM(o)      MM_GDBUS_MODEM(o)
-#define MM_IS_MODEM(o)   MM_GDBUS_IS_MODEM(o)
+#define MM_TYPE_MODEM            (mm_modem_get_type ())
+#define MM_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM, MMModem))
+#define MM_MODEM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_MODEM, MMModemClass))
+#define MM_IS_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))
+#define MM_IS_MODEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MODEM))
+#define MM_MODEM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MODEM, MMModemClass))
+
+typedef struct _MMModem MMModem;
+typedef struct _MMModemClass MMModemClass;
+typedef struct _MMModemPrivate MMModemPrivate;
+
+/**
+ * MMModem:
+ *
+ * The #MMModem structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMModem {
+    /*< private >*/
+    MmGdbusModemProxy parent;
+    MMModemPrivate *priv;
+};
+
+struct _MMModemClass {
+    /*< private >*/
+    MmGdbusModemProxyClass parent;
+};
+
+GType mm_modem_get_type (void);
 
 const gchar *mm_modem_get_path (MMModem *self);
 gchar       *mm_modem_dup_path (MMModem *self);
 
 const gchar       *mm_modem_get_sim_path             (MMModem *self);
 gchar             *mm_modem_dup_sim_path             (MMModem *self);
+
 MMModemCapability  mm_modem_get_modem_capabilities   (MMModem *self);
+
 MMModemCapability  mm_modem_get_current_capabilities (MMModem *self);
+
 guint              mm_modem_get_max_bearers          (MMModem *self);
+
 guint              mm_modem_get_max_active_bearers   (MMModem *self);
+
 const gchar       *mm_modem_get_manufacturer         (MMModem *self);
 gchar             *mm_modem_dup_manufacturer         (MMModem *self);
+
 const gchar       *mm_modem_get_model                (MMModem *self);
 gchar             *mm_modem_dup_model                (MMModem *self);
+
 const gchar       *mm_modem_get_revision             (MMModem *self);
 gchar             *mm_modem_dup_revision             (MMModem *self);
+
 const gchar       *mm_modem_get_device_identifier    (MMModem *self);
 gchar             *mm_modem_dup_device_identifier    (MMModem *self);
+
 const gchar       *mm_modem_get_device               (MMModem *self);
 gchar             *mm_modem_dup_device               (MMModem *self);
-const gchar * const *mm_modem_get_drivers            (MMModem *self);
-gchar            **mm_modem_dup_drivers              (MMModem *self);
+
+const gchar * const  *mm_modem_get_drivers           (MMModem *self);
+gchar               **mm_modem_dup_drivers           (MMModem *self);
+
 const gchar       *mm_modem_get_plugin               (MMModem *self);
 gchar             *mm_modem_dup_plugin               (MMModem *self);
+
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
 gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
-const gchar *const *mm_modem_get_own_numbers          (MMModem *self);
-gchar            **mm_modem_dup_own_numbers          (MMModem *self);
+
+const gchar *const  *mm_modem_get_own_numbers        (MMModem *self);
+gchar              **mm_modem_dup_own_numbers        (MMModem *self);
+
 MMModemLock        mm_modem_get_unlock_required      (MMModem *self);
+
 MMUnlockRetries   *mm_modem_get_unlock_retries       (MMModem *self);
+MMUnlockRetries   *mm_modem_peek_unlock_retries      (MMModem *self);
+
 MMModemState       mm_modem_get_state                (MMModem *self);
+
 MMModemAccessTechnology mm_modem_get_access_technologies (MMModem *self);
+
 guint              mm_modem_get_signal_quality       (MMModem *self,
                                                       gboolean *recent);
+
 MMModemMode        mm_modem_get_supported_modes      (MMModem *self);
+
 MMModemMode        mm_modem_get_allowed_modes        (MMModem *self);
+
 MMModemMode        mm_modem_get_preferred_mode       (MMModem *self);
-void               mm_modem_get_supported_bands      (MMModem *self,
+
+gboolean           mm_modem_peek_supported_bands     (MMModem *self,
+                                                      const MMModemBand **bands,
+                                                      guint *n_bands);
+gboolean           mm_modem_get_supported_bands      (MMModem *self,
                                                       MMModemBand **bands,
                                                       guint *n_bands);
-void               mm_modem_get_bands                (MMModem *self,
+
+gboolean           mm_modem_peek_bands               (MMModem *self,
+                                                      const MMModemBand **bands,
+                                                      guint *n_bands);
+gboolean           mm_modem_get_bands                (MMModem *self,
                                                       MMModemBand **bands,
                                                       guint *n_bands);
 
@@ -158,24 +214,24 @@ gboolean mm_modem_factory_reset_finish (MMModem *self,
                                         GAsyncResult *res,
                                         GError **error);
 gboolean mm_modem_factory_reset_sync   (MMModem *self,
-                                        const gchar *arg_code,
+                                        const gchar *code,
                                         GCancellable *cancellable,
                                         GError **error);
 
-void     mm_modem_command      (MMModem *self,
-                                const gchar *cmd,
-                                guint timeout,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data);
-gchar *mm_modem_command_finish (MMModem *self,
-                                GAsyncResult *res,
-                                GError **error);
-gchar *mm_modem_command_sync   (MMModem *self,
-                                const gchar *arg_cmd,
-                                guint timeout,
-                                GCancellable *cancellable,
-                                GError **error);
+void      mm_modem_command        (MMModem *self,
+                                   const gchar *cmd,
+                                   guint timeout,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+gchar    *mm_modem_command_finish (MMModem *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+gchar    *mm_modem_command_sync   (MMModem *self,
+                                   const gchar *cmd,
+                                   guint timeout,
+                                   GCancellable *cancellable,
+                                   GError **error);
 
 void     mm_modem_set_allowed_modes        (MMModem *self,
                                             MMModemMode modes,
