@@ -17,13 +17,30 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #include <gio/gio.h>
 
 #include "mm-helpers.h"
 #include "mm-modem-3gpp.h"
+
+/**
+ * SECTION: mm-modem-3gpp
+ * @title: MMModem3gpp
+ * @short_description: The 3GPP interface
+ *
+ * The #MMModem3gpp is an object providing access to the methods, signals and
+ * properties of the 3GPP interface.
+ *
+ * The 3GPP interface is exposed whenever a modem has any of the 3GPP
+ * capabilities (%MM_MODEM_CAPABILITY_GSM_UMTS, %MM_MODEM_CAPABILITY_LTE or %MM_MODEM_CAPABILITY_LTE_ADVANCED).
+ */
+
+G_DEFINE_TYPE (MMModem3gpp, mm_modem_3gpp, MM_GDBUS_TYPE_MODEM3GPP_PROXY)
+
+/*****************************************************************************/
 
 /**
  * mm_modem_3gpp_get_path:
@@ -36,7 +53,7 @@
 const gchar *
 mm_modem_3gpp_get_path (MMModem3gpp *self)
 {
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
         g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
@@ -55,7 +72,7 @@ mm_modem_3gpp_dup_path (MMModem3gpp *self)
 {
     gchar *value;
 
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     g_object_get (G_OBJECT (self),
                   "g-object-path", &value,
@@ -63,24 +80,29 @@ mm_modem_3gpp_dup_path (MMModem3gpp *self)
     RETURN_NON_EMPTY_STRING (value);
 }
 
+/*****************************************************************************/
+
 /**
  * mm_modem_3gpp_get_imei:
  * @self: A #MMModem3gpp.
  *
  * Gets the <ulink url="http://en.wikipedia.org/wiki/Imei">IMEI</ulink>,
- * as reported by this #MMModem.
+ * as reported by this #MMModem3gpp.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_modem_3gpp_dup_imei() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_dup_imei() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The IMEI, or %NULL if none available.
  */
 const gchar *
 mm_modem_3gpp_get_imei (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_modem3gpp_get_imei (self));
+        mm_gdbus_modem3gpp_get_imei (MM_GDBUS_MODEM3GPP (self)));
 }
 
 /**
@@ -88,18 +110,20 @@ mm_modem_3gpp_get_imei (MMModem3gpp *self)
  * @self: A #MMModem3gpp.
  *
  * Gets a copy of the <ulink url="http://en.wikipedia.org/wiki/Imei">IMEI</ulink>,
- * as reported by this #MMModem.
+ * as reported by this #MMModem3gpp.
  *
  * Returns: (transfer full): The IMEI, or %NULL if none available. The returned value should be freed with g_free().
  */
 gchar *
 mm_modem_3gpp_dup_imei (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_modem3gpp_dup_imei (self));
+        mm_gdbus_modem3gpp_dup_imei (MM_GDBUS_MODEM3GPP (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_modem_3gpp_get_operator_code:
@@ -117,17 +141,20 @@ mm_modem_3gpp_dup_imei (MMModem3gpp *self)
  * or the mobile is not registered to a mobile network, this property will
  * be a zero-length (blank) string.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_modem_3gpp_dup_operator_code() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_dup_operator_code() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The operator code, or %NULL if none available.
  */
 const gchar *
 mm_modem_3gpp_get_operator_code (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_modem3gpp_get_operator_code (self));
+        mm_gdbus_modem3gpp_get_operator_code (MM_GDBUS_MODEM3GPP (self)));
 }
 
 /**
@@ -147,11 +174,13 @@ mm_modem_3gpp_get_operator_code (MMModem3gpp *self)
 gchar *
 mm_modem_3gpp_dup_operator_code (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_modem3gpp_dup_operator_code (self));
+        mm_gdbus_modem3gpp_dup_operator_code (MM_GDBUS_MODEM3GPP (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_modem_3gpp_get_operator_name:
@@ -160,17 +189,20 @@ mm_modem_3gpp_dup_operator_code (MMModem3gpp *self)
  * Gets the name of the operator to which the mobile is
  * currently registered.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_modem_3gpp_dup_operator_name() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_dup_operator_name() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The operator name, or %NULL if none available.
  */
 const gchar *
 mm_modem_3gpp_get_operator_name (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_modem3gpp_get_operator_name (self));
+        mm_gdbus_modem3gpp_get_operator_name (MM_GDBUS_MODEM3GPP (self)));
 }
 
 /**
@@ -185,11 +217,13 @@ mm_modem_3gpp_get_operator_name (MMModem3gpp *self)
 gchar *
 mm_modem_3gpp_dup_operator_name (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_modem3gpp_dup_operator_name (self));
+        mm_gdbus_modem3gpp_dup_operator_name (MM_GDBUS_MODEM3GPP (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_modem_3gpp_get_registration_state:
@@ -203,10 +237,12 @@ mm_modem_3gpp_dup_operator_name (MMModem3gpp *self)
 MMModem3gppRegistrationState
 mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
 
-    return mm_gdbus_modem3gpp_get_registration_state (self);
+    return mm_gdbus_modem3gpp_get_registration_state (MM_GDBUS_MODEM3GPP (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_modem_3gpp_get_enabled_facility_locks:
@@ -219,11 +255,48 @@ mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
 MMModem3gppFacility
 mm_modem_3gpp_get_enabled_facility_locks (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), MM_MODEM_3GPP_FACILITY_NONE);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_FACILITY_NONE);
 
-    return mm_gdbus_modem3gpp_get_enabled_facility_locks (self);
+    return mm_gdbus_modem3gpp_get_enabled_facility_locks (MM_GDBUS_MODEM3GPP (self));
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_register_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_register().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_register().
+ *
+ * Returns: %TRUE if the modem was registered, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_3gpp_register_finish (MMModem3gpp *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_register_finish (MM_GDBUS_MODEM3GPP (self), res, error);
+}
+
+/**
+ * mm_modem_3gpp_register:
+ * @self: A #MMModem3gpp.
+ * @network_id: The operator ID to register. An empty string can be used to register to the home network.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests registration with a given mobile network.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_3gpp_register_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_register_sync() for the synchronous, blocking version of this method.
+ */
 void
 mm_modem_3gpp_register (MMModem3gpp *self,
                         const gchar *network_id,
@@ -231,40 +304,37 @@ mm_modem_3gpp_register (MMModem3gpp *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_MODEM3GPP (self));
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
 
-    mm_gdbus_modem3gpp_call_register (self,
-                                      network_id,
-                                      cancellable,
-                                      callback,
-                                      user_data);
+    mm_gdbus_modem3gpp_call_register (MM_GDBUS_MODEM3GPP (self), network_id, cancellable, callback, user_data);
 }
 
-gboolean
-mm_modem_3gpp_register_finish (MMModem3gpp *self,
-                               GAsyncResult *res,
-                               GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
-
-    return mm_gdbus_modem3gpp_call_register_finish (self,
-                                                    res,
-                                                    error);
-}
-
+/**
+ * mm_modem_3gpp_register_sync:
+ * @self: A #MMModem3gpp.
+ * @network_id: The operator ID to register. An empty string can be used to register to the home network.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests registration with a given mobile network.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_3gpp_register()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the modem was registered, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_3gpp_register_sync (MMModem3gpp *self,
                              const gchar *network_id,
                              GCancellable *cancellable,
                              GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
 
-    return mm_gdbus_modem3gpp_call_register_sync (self,
-                                                  network_id,
-                                                  cancellable,
-                                                  error);
+    return mm_gdbus_modem3gpp_call_register_sync (MM_GDBUS_MODEM3GPP (self), network_id, cancellable, error);
 }
+
+/*****************************************************************************/
 
 struct _MMModem3gppNetwork {
     MMModem3gppNetworkAvailability availability;
@@ -274,6 +344,12 @@ struct _MMModem3gppNetwork {
     MMModemAccessTechnology access_technology;
 };
 
+/**
+ * mm_modem_3gpp_network_free:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Frees a #MMModem3gppNetwork.
+ */
 void
 mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
 {
@@ -286,6 +362,14 @@ mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
     g_slice_free (MMModem3gppNetwork, network);
 }
 
+/**
+ * mm_modem_3gpp_network_get_availability:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Get availability of the 3GPP network.
+ *
+ * Returns: A #MMModem3gppNetworkAvailability.
+ */
 MMModem3gppNetworkAvailability
 mm_modem_3gpp_network_get_availability (const MMModem3gppNetwork *network)
 {
@@ -294,6 +378,14 @@ mm_modem_3gpp_network_get_availability (const MMModem3gppNetwork *network)
     return network->availability;
 }
 
+/**
+ * mm_modem_3gpp_network_get_operator_long:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Get the long operator name of the 3GPP network.
+ *
+ * Returns: (transfer none): The long operator name, or %NULL if none available.
+ */
 const gchar *
 mm_modem_3gpp_network_get_operator_long (const MMModem3gppNetwork *network)
 {
@@ -302,6 +394,14 @@ mm_modem_3gpp_network_get_operator_long (const MMModem3gppNetwork *network)
     return network->operator_long;
 }
 
+/**
+ * mm_modem_3gpp_network_get_operator_short:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Get the short operator name of the 3GPP network.
+ *
+ * Returns: (transfer none): The long operator name, or %NULL if none available.
+ */
 const gchar *
 mm_modem_3gpp_network_get_operator_short (const MMModem3gppNetwork *network)
 {
@@ -310,6 +410,14 @@ mm_modem_3gpp_network_get_operator_short (const MMModem3gppNetwork *network)
     return network->operator_short;
 }
 
+/**
+ * mm_modem_3gpp_network_get_operator_code:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Get the operator code (MCCMNC) of the 3GPP network.
+ *
+ * Returns: (transfer none): The operator code, or %NULL if none available.
+ */
 const gchar *
 mm_modem_3gpp_network_get_operator_code (const MMModem3gppNetwork *network)
 {
@@ -318,6 +426,14 @@ mm_modem_3gpp_network_get_operator_code (const MMModem3gppNetwork *network)
     return network->operator_code;
 }
 
+/**
+ * mm_modem_3gpp_network_get_access_technology:
+ * @network: A #MMModem3gppNetwork.
+ *
+ * Get the technology used to access the 3GPP network.
+ *
+ * Returns: A #MMModemAccessTechnology.
+ */
 MMModemAccessTechnology
 mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
 {
@@ -325,6 +441,8 @@ mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
 
     return network->access_technology;
 }
+
+/*****************************************************************************/
 
 static GList *
 create_networks_list (GVariant *variant)
@@ -372,20 +490,16 @@ create_networks_list (GVariant *variant)
     return list;
 }
 
-void
-mm_modem_3gpp_scan (MMModem3gpp *self,
-                    GCancellable *cancellable,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
-{
-    g_return_if_fail (MM_GDBUS_IS_MODEM3GPP (self));
-
-    mm_gdbus_modem3gpp_call_scan (self,
-                                  cancellable,
-                                  callback,
-                                  user_data);
-}
-
+/**
+ * mm_modem_3gpp_scan_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_scan().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_scan().
+ *
+ * Returns: a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ */
 GList *
 mm_modem_3gpp_scan_finish (MMModem3gpp *self,
                            GAsyncResult *res,
@@ -393,17 +507,52 @@ mm_modem_3gpp_scan_finish (MMModem3gpp *self,
 {
     GVariant *result = NULL;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
 
-    if (!mm_gdbus_modem3gpp_call_scan_finish (self,
-                                              &result,
-                                              res,
-                                              error))
+    if (!mm_gdbus_modem3gpp_call_scan_finish (MM_GDBUS_MODEM3GPP (self), &result, res, error))
         return NULL;
 
     return create_networks_list (result);
 }
 
+/**
+ * mm_modem_3gpp_scan:
+ * @self: A #MMModem3gpp.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to scan available 3GPP networks.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_3gpp_scan_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_scan_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_3gpp_scan (MMModem3gpp *self,
+                    GCancellable *cancellable,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+
+    mm_gdbus_modem3gpp_call_scan (MM_GDBUS_MODEM3GPP (self), cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_3gpp_scan_sync:
+ * @self: A #MMModem3gpp.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to scan available 3GPP networks.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_3gpp_scan()
+ * for the asynchronous version of this method.
+ *
+ * Returns: a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ */
 GList *
 mm_modem_3gpp_scan_sync (MMModem3gpp *self,
                          GCancellable *cancellable,
@@ -411,13 +560,22 @@ mm_modem_3gpp_scan_sync (MMModem3gpp *self,
 {
     GVariant *result = NULL;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
 
-    if (!mm_gdbus_modem3gpp_call_scan_sync (self,
-                                            &result,
-                                            cancellable,
-                                            error))
+    if (!mm_gdbus_modem3gpp_call_scan_sync (MM_GDBUS_MODEM3GPP (self), &result,cancellable, error))
         return NULL;
 
     return create_networks_list (result);
+}
+
+/*****************************************************************************/
+
+static void
+mm_modem_3gpp_init (MMModem3gpp *self)
+{
+}
+
+static void
+mm_modem_3gpp_class_init (MMModem3gppClass *modem_class)
+{
 }
