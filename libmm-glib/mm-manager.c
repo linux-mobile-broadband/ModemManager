@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Google, Inc.
  *
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
@@ -25,6 +26,18 @@
 #include "ModemManager.h"
 #include <mm-gdbus-manager.h>
 #include "mm-manager.h"
+
+/**
+ * SECTION: mm-manager
+ * @title: MMManager
+ * @short_description: The Manager object
+ *
+ * The #MMManager is the object allowing access to the Manager interface.
+ *
+ * This object is also a #GDBusObjectManagerClient, and therefore it allows to
+ * use the standard ObjectManager interface to list and handle the managed
+ * modem objects.
+ */
 
 static void initable_iface_init       (GInitableIface      *iface);
 static void async_initable_iface_init (GAsyncInitableIface *iface);
@@ -34,7 +47,7 @@ static GAsyncInitableIface *async_initable_parent_iface;
 
 G_DEFINE_TYPE_EXTENDED (MMManager, mm_manager, MM_GDBUS_TYPE_OBJECT_MANAGER_CLIENT, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init)
-                        G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE, async_initable_iface_init));
+                        G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE, async_initable_iface_init))
 
 struct _MMManagerPrivate {
   /* The proxy for the Manager interface */
@@ -79,6 +92,22 @@ get_proxy_type (GDBusObjectManagerClient *manager,
 /*****************************************************************************/
 
 /**
+ * mm_manager_new_finish:
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_new().
+ * @error: Return location for error or %NULL
+ *
+ * Finishes an operation started with mm_manager_new().
+ *
+ * Returns: (transfer full) (type MMManager): The constructed object manager client or %NULL if @error is set.
+ */
+MMManager *
+mm_manager_new_finish (GAsyncResult  *res,
+                       GError       **error)
+{
+    return MM_MANAGER (mm_gdbus_object_manager_client_new_finish (res, error));
+}
+
+/**
  * mm_manager_new:
  * @connection: A #GDBusConnection.
  * @flags: Flags from the #GDBusObjectManagerClientFlags enumeration.
@@ -117,22 +146,6 @@ mm_manager_new (GDBusConnection               *connection,
 }
 
 /**
- * mm_manager_new_finish:
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_new().
- * @error: Return location for error or %NULL
- *
- * Finishes an operation started with mm_manager_new().
- *
- * Returns: (transfer full) (type MMManager): The constructed object manager client or %NULL if @error is set.
- */
-MMManager *
-mm_manager_new_finish (GAsyncResult  *res,
-                       GError       **error)
-{
-    return MM_MANAGER (mm_gdbus_object_manager_client_new_finish (res, error));
-}
-
-/**
  * mm_manager_new_sync:
  * @connection: A #GDBusConnection.
  * @flags: Flags from the #GDBusObjectManagerClientFlags enumeration.
@@ -168,13 +181,15 @@ mm_manager_new_sync (GDBusConnection                *connection,
     return (ret ? MM_MANAGER (ret) : NULL);
 }
 
+/*****************************************************************************/
+
 /**
  * mm_manager_peek_proxy:
  * @manager: A #MMManager.
  *
- * Gets the #GDBusProxy interface of the %manager.
+ * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer none): The #GDBusProxy interface of %manager. Do not free the returned object, it is owned by @manager.
+ * Returns: (transfer none): The #GDBusProxy interface of @manager. Do not free the returned object, it is owned by @manager.
  */
 GDBusProxy *
 mm_manager_peek_proxy (MMManager *manager)
@@ -186,14 +201,34 @@ mm_manager_peek_proxy (MMManager *manager)
  * mm_manager_get_proxy:
  * @manager: A #MMManager.
  *
- * Gets the #GDBusProxy interface of the %manager.
+ * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer full): The #GDBusProxy interface of %manager, which must be freed with g_object_unref().
+ * Returns: (transfer full): The #GDBusProxy interface of @manager, which must be freed with g_object_unref().
  */
 GDBusProxy *
 mm_manager_get_proxy (MMManager *manager)
 {
     return G_DBUS_PROXY (g_object_ref (manager->priv->manager_iface_proxy));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_manager_set_logging_finish:
+ * @manager: A #MMManager.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_set_logging().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_manager_set_logging().
+ *
+ * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_set_logging_finish (MMManager     *manager,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
@@ -215,6 +250,23 @@ set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
     g_object_unref (simple);
 }
 
+/**
+ * mm_manager_set_logging:
+ * @manager: A #MMManager.
+ * @level: the login level to set.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to set the specified logging level in the daemon.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_manager_set_logging_finish() to get the result of the operation.
+ *
+ * See mm_manager_set_logging_sync() for the synchronous, blocking version of this method.
+ */
 void
 mm_manager_set_logging (MMManager           *manager,
                         const gchar         *level,
@@ -237,18 +289,21 @@ mm_manager_set_logging (MMManager           *manager,
         result);
 }
 
-gboolean
-mm_manager_set_logging_finish (MMManager     *manager,
-                               GAsyncResult  *res,
-                               GError       **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
-                                               error))
-        return FALSE;
-
-    return TRUE;
-}
-
+/**
+ * mm_manager_set_logging_sync:
+ * @manager: A #MMManager.
+ * @level: the login level to set.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to set the specified logging level in the daemon..
+ *
+ * The calling thread is blocked until a reply is received.
+ *
+ * See mm_manager_set_logging() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ */
 gboolean
 mm_manager_set_logging_sync (MMManager     *manager,
                              const gchar   *level,
@@ -260,6 +315,30 @@ mm_manager_set_logging_sync (MMManager     *manager,
                 level,
                 cancellable,
                 error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_manager_scan_devices_finish:
+ * @manager: A #MMManager.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_scan_devices().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_manager_scan_devices().
+ *
+ * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_scan_devices_finish (MMManager     *manager,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
+                                               error))
+        return FALSE;
+
+    return TRUE;
 }
 
 static void
@@ -288,11 +367,10 @@ scan_devices_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Requests to scan looking for devices.
+ * Asynchronously requests to scan looking for devices.
  *
- * Asynchronously invokes the <link linkend="gdbus-method-org-freedesktop-ModemManager1.ScanDevices">ScanDevices()</link>
- * D-Bus method on @manager. When the operation is finished, @callback will be
- * invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
  * of the thread you are calling this method from. You can then call
  * mm_manager_scan_devices_finish() to get the result of the operation.
  *
@@ -319,41 +397,18 @@ mm_manager_scan_devices (MMManager           *manager,
 }
 
 /**
- * mm_manager_scan_devices_finish:
- * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_scan_devices().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_manager_scan_devices().
- *
- * Returns: (skip): %TRUE if the call succeded, %FALSE if @error is set.
- */
-gboolean
-mm_manager_scan_devices_finish (MMManager     *manager,
-                                GAsyncResult  *res,
-                                GError       **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
-                                               error))
-        return FALSE;
-
-    return TRUE;
-}
-
-/**
  * mm_manager_scan_devices_sync:
  * @manager: A #MMManager.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Requests to scan looking for devices.
+ * Synchronously requests to scan looking for devices.
  *
- * Synchronously invokes the <link linkend="gdbus-method-org-freedesktop-ModemManager1.ScanDevices">ScanDevices()</link>
- * D-Bus method on @manager. The calling thread is blocked until a reply is received.
+ * The calling thread is blocked until a reply is received.
  *
- * See mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices() for the asynchronous version of this method.
+ * See mm_manager_scan_devices() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the call succeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_scan_devices_sync (MMManager     *manager,
@@ -365,6 +420,8 @@ mm_manager_scan_devices_sync (MMManager     *manager,
                 cancellable,
                 error));
 }
+
+/*****************************************************************************/
 
 static gboolean
 initable_init_sync (GInitable     *initable,
@@ -410,6 +467,8 @@ initable_init_sync (GInitable     *initable,
     /* All good */
 	return TRUE;
 }
+
+/*****************************************************************************/
 
 typedef struct {
     GSimpleAsyncResult *result;
@@ -529,6 +588,8 @@ initable_init_async (GAsyncInitable      *initable,
                                              ctx);
 }
 
+/*****************************************************************************/
+
 static void
 mm_manager_init (MMManager *manager)
 {
@@ -539,14 +600,13 @@ mm_manager_init (MMManager *manager)
 }
 
 static void
-finalize (GObject *object)
+dispose (GObject *object)
 {
-    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+    MMManager *self = MM_MANAGER (object);
 
-    if (priv->manager_iface_proxy)
-        g_object_unref (priv->manager_iface_proxy);
+    g_clear_object (&self->priv->manager_iface_proxy);
 
-    G_OBJECT_CLASS (mm_manager_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_manager_parent_class)->dispose (object);
 }
 
 static void
@@ -572,5 +632,5 @@ mm_manager_class_init (MMManagerClass *manager_class)
     g_type_class_add_private (object_class, sizeof (MMManagerPrivate));
 
     /* Virtual methods */
-    object_class->finalize = finalize;
+    object_class->dispose = dispose;
 }
