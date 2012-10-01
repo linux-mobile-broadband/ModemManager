@@ -81,7 +81,7 @@ get_proxy_type (GDBusObjectManagerClient *manager,
       g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.ModemCdma", GSIZE_TO_POINTER (MM_TYPE_MODEM_CDMA));
       g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp", GSIZE_TO_POINTER (MM_TYPE_MODEM_3GPP));
       g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd", GSIZE_TO_POINTER (MM_TYPE_MODEM_3GPP_USSD));
-      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Simple", GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_SIMPLE_PROXY));
+      g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Simple", GSIZE_TO_POINTER (MM_TYPE_MODEM_SIMPLE));
       g_once_init_leave (&once_init_value, 1);
     }
   ret = (GType) GPOINTER_TO_SIZE (g_hash_table_lookup (lookup_hash, interface_name));

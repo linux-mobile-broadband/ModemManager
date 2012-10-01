@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef _MM_MODEM_SIMPLE_H_
@@ -30,10 +31,34 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusModemSimple      MMModemSimple;
-#define MM_TYPE_MODEM_SIMPLE(o) MM_GDBUS_TYPE_MODEM_SIMPLE (o)
-#define MM_MODEM_SIMPLE(o)      MM_GDBUS_MODEM_SIMPLE(o)
-#define MM_IS_MODEM_SIMPLE(o)   MM_GDBUS_IS_MODEM_SIMPLE(o)
+#define MM_TYPE_MODEM_SIMPLE            (mm_modem_simple_get_type ())
+#define MM_MODEM_SIMPLE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_SIMPLE, MMModemSimple))
+#define MM_MODEM_SIMPLE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_MODEM_SIMPLE, MMModemSimpleClass))
+#define MM_IS_MODEM_SIMPLE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_SIMPLE))
+#define MM_IS_MODEM_SIMPLE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MODEM_SIMPLE))
+#define MM_MODEM_SIMPLE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MODEM_SIMPLE, MMModemSimpleClass))
+
+typedef struct _MMModemSimple MMModemSimple;
+typedef struct _MMModemSimpleClass MMModemSimpleClass;
+
+/**
+ * MMModemSimple:
+ *
+ * The #MMModemSimple structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMModemSimple {
+    /*< private >*/
+    MmGdbusModemSimpleProxy parent;
+    gpointer unused;
+};
+
+struct _MMModemSimpleClass {
+    /*< private >*/
+    MmGdbusModemSimpleProxyClass parent;
+};
+
+GType mm_modem_simple_get_type (void);
 
 const gchar *mm_modem_simple_get_path (MMModemSimple *self);
 gchar       *mm_modem_simple_dup_path (MMModemSimple *self);
@@ -52,7 +77,7 @@ MMBearer *mm_modem_simple_connect_sync   (MMModemSimple *self,
                                           GError **error);
 
 void     mm_modem_simple_disconnect        (MMModemSimple *self,
-                                            const gchar *bearer_path,
+                                            const gchar *bearer,
                                             GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data);
@@ -60,7 +85,7 @@ gboolean mm_modem_simple_disconnect_finish (MMModemSimple *self,
                                             GAsyncResult *res,
                                             GError **error);
 gboolean mm_modem_simple_disconnect_sync   (MMModemSimple *self,
-                                            const gchar *bearer_path,
+                                            const gchar *bearer,
                                             GCancellable *cancellable,
                                             GError **error);
 
