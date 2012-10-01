@@ -29,16 +29,42 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusModemLocation      MMModemLocation;
-#define MM_TYPE_MODEM_LOCATION(o) MM_GDBUS_TYPE_MODEM_LOCATION (o)
-#define MM_MODEM_LOCATION(o)      MM_GDBUS_MODEM_LOCATION(o)
-#define MM_IS_MODEM_LOCATION(o)   MM_GDBUS_IS_MODEM_LOCATION(o)
+#define MM_TYPE_MODEM_LOCATION            (mm_modem_location_get_type ())
+#define MM_MODEM_LOCATION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_LOCATION, MMModemLocation))
+#define MM_MODEM_LOCATION_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_MODEM_LOCATION, MMModemLocationClass))
+#define MM_IS_MODEM_LOCATION(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_LOCATION))
+#define MM_IS_MODEM_LOCATION_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MODEM_LOCATION))
+#define MM_MODEM_LOCATION_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MODEM_LOCATION, MMModemLocationClass))
+
+typedef struct _MMModemLocation MMModemLocation;
+typedef struct _MMModemLocationClass MMModemLocationClass;
+
+/**
+ * MMModemLocation:
+ *
+ * The #MMModemLocation structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMModemLocation {
+    /*< private >*/
+    MmGdbusModemLocationProxy parent;
+    gpointer unused;
+};
+
+struct _MMModemLocationClass {
+    /*< private >*/
+    MmGdbusModemLocationProxyClass parent;
+};
+
+GType mm_modem_location_get_type (void);
 
 const gchar *mm_modem_location_get_path (MMModemLocation *self);
 gchar       *mm_modem_location_dup_path (MMModemLocation *self);
 
 MMModemLocationSource mm_modem_location_get_capabilities (MMModemLocation *self);
+
 MMModemLocationSource mm_modem_location_get_enabled      (MMModemLocation *self);
+
 gboolean              mm_modem_location_signals_location (MMModemLocation *self);
 
 void     mm_modem_location_setup        (MMModemLocation *self,
