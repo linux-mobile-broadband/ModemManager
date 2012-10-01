@@ -38,31 +38,55 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusObject     MMObject;
-#define MM_TYPE_OBJECT(o) MM_GDBUS_TYPE_OBJECT (o)
-#define MM_OBJECT(o)      MM_GDBUS_OBJECT(o)
-#define MM_IS_OBJECT(o)   MM_GDBUS_IS_OBJECT(o)
+#define MM_TYPE_OBJECT            (mm_object_get_type ())
+#define MM_OBJECT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_OBJECT, MMObject))
+#define MM_OBJECT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_OBJECT, MMObjectClass))
+#define MM_IS_OBJECT(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_OBJECT))
+#define MM_IS_OBJECT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_OBJECT))
+#define MM_OBJECT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_OBJECT, MMObjectClass))
+
+typedef struct _MMObject MMObject;
+typedef struct _MMObjectClass MMObjectClass;
+
+/**
+ * MMObject:
+ *
+ * The #MMObject structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMObject {
+    /*< private >*/
+    MmGdbusObjectProxy parent;
+    gpointer unused;
+};
+
+struct _MMObjectClass {
+    /*< private >*/
+    MmGdbusObjectProxyClass parent;
+};
+
+GType mm_object_get_type (void);
 
 const gchar *mm_object_get_path (MMObject *self);
 gchar       *mm_object_dup_path (MMObject *self);
 
-MMModem          *mm_object_get_modem            (MMObject *object);
-MMModem3gpp      *mm_object_get_modem_3gpp       (MMObject *object);
-MMModem3gppUssd  *mm_object_get_modem_3gpp_ussd  (MMObject *object);
-MMModemCdma      *mm_object_get_modem_cdma       (MMObject *object);
-MMModemSimple    *mm_object_get_modem_simple     (MMObject *object);
-MMModemLocation  *mm_object_get_modem_location   (MMObject *object);
-MMModemMessaging *mm_object_get_modem_messaging  (MMObject *object);
-MMModemTime      *mm_object_get_modem_time       (MMObject *object);
+MMModem          *mm_object_get_modem            (MMObject *self);
+MMModem3gpp      *mm_object_get_modem_3gpp       (MMObject *self);
+MMModem3gppUssd  *mm_object_get_modem_3gpp_ussd  (MMObject *self);
+MMModemCdma      *mm_object_get_modem_cdma       (MMObject *self);
+MMModemSimple    *mm_object_get_modem_simple     (MMObject *self);
+MMModemLocation  *mm_object_get_modem_location   (MMObject *self);
+MMModemMessaging *mm_object_get_modem_messaging  (MMObject *self);
+MMModemTime      *mm_object_get_modem_time       (MMObject *self);
 
-MMModem          *mm_object_peek_modem           (MMObject *object);
-MMModem3gpp      *mm_object_peek_modem_3gpp      (MMObject *object);
-MMModem3gppUssd  *mm_object_peek_modem_3gpp_ussd (MMObject *object);
-MMModemCdma      *mm_object_peek_modem_cdma      (MMObject *object);
-MMModemSimple    *mm_object_peek_modem_simple    (MMObject *object);
-MMModemLocation  *mm_object_peek_modem_location  (MMObject *object);
-MMModemMessaging *mm_object_peek_modem_messaging (MMObject *object);
-MMModemTime      *mm_object_peek_modem_time      (MMObject *object);
+MMModem          *mm_object_peek_modem           (MMObject *self);
+MMModem3gpp      *mm_object_peek_modem_3gpp      (MMObject *self);
+MMModem3gppUssd  *mm_object_peek_modem_3gpp_ussd (MMObject *self);
+MMModemCdma      *mm_object_peek_modem_cdma      (MMObject *self);
+MMModemSimple    *mm_object_peek_modem_simple    (MMObject *self);
+MMModemLocation  *mm_object_peek_modem_location  (MMObject *self);
+MMModemMessaging *mm_object_peek_modem_messaging (MMObject *self);
+MMModemTime      *mm_object_peek_modem_time      (MMObject *self);
 
 G_END_DECLS
 

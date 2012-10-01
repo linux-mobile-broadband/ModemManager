@@ -26,6 +26,7 @@
 #include "ModemManager.h"
 #include <mm-gdbus-manager.h>
 #include "mm-manager.h"
+#include "mm-object.h"
 
 /**
  * SECTION: mm-manager
@@ -67,7 +68,7 @@ get_proxy_type (GDBusObjectManagerClient *manager,
   GType ret;
 
   if (interface_name == NULL)
-    return MM_GDBUS_TYPE_OBJECT_PROXY;
+    return MM_TYPE_OBJECT;
   if (g_once_init_enter (&once_init_value))
     {
       lookup_hash = g_hash_table_new (g_str_hash, g_str_equal);
