@@ -17,6 +17,7 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  * Copyright (C) 2012 Google, Inc.
  */
 
@@ -31,17 +32,46 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusModemMessaging      MMModemMessaging;
-#define MM_TYPE_MODEM_MESSAGING(o) MM_GDBUS_TYPE_MODEMMESSAGING (o)
-#define MM_MODEM_MESSAGING(o)      MM_GDBUS_MODEMMESSAGING(o)
-#define MM_IS_MODEM_MESSAGING(o)   MM_GDBUS_IS_MODEMMESSAGING(o)
+#define MM_TYPE_MODEM_MESSAGING            (mm_modem_messaging_get_type ())
+#define MM_MODEM_MESSAGING(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_MESSAGING, MMModemMessaging))
+#define MM_MODEM_MESSAGING_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_MODEM_MESSAGING, MMModemMessagingClass))
+#define MM_IS_MODEM_MESSAGING(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_MESSAGING))
+#define MM_IS_MODEM_MESSAGING_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MODEM_MESSAGING))
+#define MM_MODEM_MESSAGING_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MODEM_MESSAGING, MMModemMessagingClass))
+
+typedef struct _MMModemMessaging MMModemMessaging;
+typedef struct _MMModemMessagingClass MMModemMessagingClass;
+typedef struct _MMModemMessagingPrivate MMModemMessagingPrivate;
+
+/**
+ * MMModemMessaging:
+ *
+ * The #MMModemMessaging structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMModemMessaging {
+    /*< private >*/
+    MmGdbusModemMessagingProxy parent;
+    MMModemMessagingPrivate *priv;
+};
+
+struct _MMModemMessagingClass {
+    /*< private >*/
+    MmGdbusModemMessagingProxyClass parent;
+};
+
+GType mm_modem_messaging_get_type (void);
 
 const gchar *mm_modem_messaging_get_path (MMModemMessaging *self);
 gchar       *mm_modem_messaging_dup_path (MMModemMessaging *self);
 
-void         mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
-                                                        MMSmsStorage **storages,
-                                                        guint *n_storages);
+gboolean     mm_modem_messaging_get_supported_storages  (MMModemMessaging *self,
+                                                         MMSmsStorage **storages,
+                                                         guint *n_storages);
+gboolean     mm_modem_messaging_peek_supported_storages (MMModemMessaging *self,
+                                                         const MMSmsStorage **storages,
+                                                         guint *n_storages);
+
 MMSmsStorage mm_modem_messaging_get_default_storage    (MMModemMessaging *self);
 
 void   mm_modem_messaging_create        (MMModemMessaging *self,
@@ -69,7 +99,7 @@ GList *mm_modem_messaging_list_sync   (MMModemMessaging *self,
                                        GError **error);
 
 void     mm_modem_messaging_delete        (MMModemMessaging *self,
-                                           const gchar *path,
+                                           const gchar *sms,
                                            GCancellable *cancellable,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data);
@@ -77,7 +107,7 @@ gboolean mm_modem_messaging_delete_finish (MMModemMessaging *self,
                                            GAsyncResult *res,
                                            GError **error);
 gboolean mm_modem_messaging_delete_sync   (MMModemMessaging *self,
-                                           const gchar *path,
+                                           const gchar *sms,
                                            GCancellable *cancellable,
                                            GError **error);
 
