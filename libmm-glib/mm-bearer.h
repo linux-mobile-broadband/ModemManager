@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef _MM_BEARER_H_
@@ -28,17 +29,46 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusBearer     MMBearer;
-#define MM_TYPE_BEARER(o) MM_GDBUS_TYPE_BEARER (o)
-#define MM_BEARER(o)      MM_GDBUS_BEARER(o)
-#define MM_IS_BEARER(o)   MM_GDBUS_IS_BEARER(o)
+#define MM_TYPE_BEARER            (mm_bearer_get_type ())
+#define MM_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER, MMBearer))
+#define MM_BEARER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_BEARER, MMBearerClass))
+#define MM_IS_BEARER(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_BEARER))
+#define MM_IS_BEARER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_BEARER))
+#define MM_BEARER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_BEARER, MMBearerClass))
+
+typedef struct _MMBearer MMBearer;
+typedef struct _MMBearerClass MMBearerClass;
+typedef struct _MMBearerPrivate MMBearerPrivate;
+
+/**
+ * MMBearer:
+ *
+ * The #MMBearer structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMBearer {
+    /*< private >*/
+    MmGdbusBearerProxy parent;
+    MMBearerPrivate *priv;
+};
+
+struct _MMBearerClass {
+    /*< private >*/
+    MmGdbusBearerProxyClass parent;
+};
+
+GType mm_bearer_get_type (void);
 
 const gchar *mm_bearer_get_path       (MMBearer *self);
 gchar       *mm_bearer_dup_path       (MMBearer *self);
+
 const gchar *mm_bearer_get_interface  (MMBearer *self);
 gchar       *mm_bearer_dup_interface  (MMBearer *self);
+
 gboolean     mm_bearer_get_connected  (MMBearer *self);
+
 gboolean     mm_bearer_get_suspended  (MMBearer *self);
+
 guint        mm_bearer_get_ip_timeout (MMBearer *self);
 
 void     mm_bearer_connect        (MMBearer *self,
@@ -63,9 +93,14 @@ gboolean mm_bearer_disconnect_sync   (MMBearer *self,
                                       GCancellable *cancellable,
                                       GError **error);
 
-MMBearerProperties *mm_bearer_get_properties  (MMBearer *self);
-MMBearerIpConfig   *mm_bearer_get_ipv4_config (MMBearer *self);
-MMBearerIpConfig   *mm_bearer_get_ipv6_config (MMBearer *self);
+MMBearerProperties *mm_bearer_get_properties   (MMBearer *self);
+MMBearerProperties *mm_bearer_peek_properties  (MMBearer *self);
+
+MMBearerIpConfig   *mm_bearer_get_ipv4_config  (MMBearer *self);
+MMBearerIpConfig   *mm_bearer_peek_ipv4_config (MMBearer *self);
+
+MMBearerIpConfig   *mm_bearer_get_ipv6_config  (MMBearer *self);
+MMBearerIpConfig   *mm_bearer_peek_ipv6_config (MMBearer *self);
 
 G_END_DECLS
 

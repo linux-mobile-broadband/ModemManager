@@ -1327,15 +1327,21 @@ mm_modem_list_bearers_finish (MMModem *self,
     return g_list_copy (list);
 }
 
+static void create_next_bearer (ListBearersContext *ctx);
+
 static void
 modem_list_bearers_build_object_ready (GDBusConnection *connection,
                                        GAsyncResult *res,
                                        ListBearersContext *ctx)
 {
-    MMBearer *bearer;
+    GObject *bearer;
     GError *error = NULL;
+    GObject *source_object;
 
-    bearer = mm_gdbus_bearer_proxy_new_finish (res, &error);
+    source_object = g_async_result_get_source_object (res);
+    bearer = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         list_bearers_context_complete_and_free (ctx);
@@ -1356,15 +1362,23 @@ modem_list_bearers_build_object_ready (GDBusConnection *connection,
     }
 
     /* Keep on creating next object */
-    mm_gdbus_bearer_proxy_new (
-        g_dbus_proxy_get_connection (
-            G_DBUS_PROXY (ctx->self)),
-        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-        MM_DBUS_SERVICE,
-        ctx->bearer_paths[ctx->i],
-        ctx->cancellable,
-        (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
-        ctx);
+    create_next_bearer (ctx);
+}
+
+static void
+create_next_bearer (ListBearersContext *ctx)
+{
+    g_async_initable_new_async (MM_TYPE_BEARER,
+                                G_PRIORITY_DEFAULT,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
+                                ctx,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (ctx->self)),
+                                "g-object-path",    ctx->bearer_paths[ctx->i],
+                                "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                                NULL);
 }
 
 static void
@@ -1390,15 +1404,7 @@ modem_list_bearers_ready (MMModem *self,
 
     /* Got list of paths. If at least one found, start creating objects for each */
     ctx->i = 0;
-    mm_gdbus_bearer_proxy_new (
-        g_dbus_proxy_get_connection (
-            G_DBUS_PROXY (self)),
-        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-        MM_DBUS_SERVICE,
-        ctx->bearer_paths[ctx->i],
-        ctx->cancellable,
-        (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
-        ctx);
+    create_next_bearer (ctx);
 }
 
 /**
@@ -1475,17 +1481,17 @@ mm_modem_list_bearers_sync (MMModem *self,
         return NULL;
 
     for (i = 0; bearer_paths[i]; i++) {
-        MMBearer *bearer;
+        GObject *bearer;
 
-        bearer = mm_gdbus_bearer_proxy_new_sync (
-            g_dbus_proxy_get_connection (
-                G_DBUS_PROXY (self)),
-            G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-            MM_DBUS_SERVICE,
-            bearer_paths[i],
-            cancellable,
-            error);
-
+        bearer = g_initable_new (MM_TYPE_BEARER,
+                                 cancellable,
+                                 error,
+                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                 "g-name",           MM_DBUS_SERVICE,
+                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                 "g-object-path",    bearer_paths[i],
+                                 "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                                 NULL);
         if (!bearer) {
             bearer_object_list_free (bearer_objects);
             g_strfreev (bearer_paths);
@@ -1546,9 +1552,13 @@ modem_new_bearer_ready (GDBusConnection *connection,
                         CreateBearerContext *ctx)
 {
     GError *error = NULL;
-    MMBearer *bearer;
+    GObject *bearer;
+    GObject *source_object;
 
-    bearer = mm_gdbus_bearer_proxy_new_finish (res, &error);
+    source_object = g_async_result_get_source_object (res);
+    bearer = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
     if (error)
         g_simple_async_result_take_error (ctx->result, error);
     else
@@ -1577,15 +1587,17 @@ modem_create_bearer_ready (MMModem *self,
         return;
     }
 
-    mm_gdbus_bearer_proxy_new (
-        g_dbus_proxy_get_connection (
-            G_DBUS_PROXY (self)),
-        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-        MM_DBUS_SERVICE,
-        bearer_path,
-        ctx->cancellable,
-        (GAsyncReadyCallback)modem_new_bearer_ready,
-        ctx);
+    g_async_initable_new_async (MM_TYPE_BEARER,
+                                G_PRIORITY_DEFAULT,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)modem_new_bearer_ready,
+                                ctx,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                "g-object-path",    bearer_path,
+                                "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                                NULL);
     g_free (bearer_path);
 }
 
@@ -1630,6 +1642,7 @@ mm_modem_create_bearer (MMModem *self,
         ctx->cancellable = g_object_ref (cancellable);
 
     dictionary = mm_bearer_properties_get_dictionary (properties);
+
     mm_gdbus_modem_call_create_bearer (
         MM_GDBUS_MODEM (self),
         dictionary,
@@ -1665,7 +1678,7 @@ mm_modem_create_bearer_sync (MMModem *self,
                              GCancellable *cancellable,
                              GError **error)
 {
-    MMBearer *bearer = NULL;
+    GObject *bearer = NULL;
     gchar *bearer_path = NULL;
     GVariant *dictionary;
 
@@ -1678,20 +1691,21 @@ mm_modem_create_bearer_sync (MMModem *self,
                                             cancellable,
                                             error);
     if (bearer_path) {
-        bearer = mm_gdbus_bearer_proxy_new_sync (
-            g_dbus_proxy_get_connection (
-                G_DBUS_PROXY (self)),
-            G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-            MM_DBUS_SERVICE,
-            bearer_path,
-            cancellable,
-            error);
+        bearer = g_initable_new (MM_TYPE_BEARER,
+                                 cancellable,
+                                 error,
+                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                 "g-name",           MM_DBUS_SERVICE,
+                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                 "g-object-path",    bearer_path,
+                                 "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                                 NULL);
         g_free (bearer_path);
     }
 
     g_variant_unref (dictionary);
 
-    return bearer;
+    return (bearer ? MM_BEARER (bearer) : NULL);
 }
 
 /*****************************************************************************/

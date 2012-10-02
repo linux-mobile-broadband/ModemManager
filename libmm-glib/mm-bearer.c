@@ -17,12 +17,45 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #include "mm-helpers.h"
 #include "mm-bearer.h"
-#include "mm-modem.h"
+
+/**
+ * SECTION: mm-bearer
+ * @title: MMBearer
+ * @short_description: The Bearer interface
+ *
+ * The #MMBearer is an object providing access to the methods, signals and
+ * properties of the Bearer interface.
+ *
+ * When the bearer is exposed and available in the bus, it is ensured that at
+ * least this interface is also available.
+ */
+
+G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_PROXY)
+
+struct _MMBearerPrivate {
+    /* IPv4 config */
+    GMutex ipv4_config_mutex;
+    guint ipv4_config_id;
+    MMBearerIpConfig *ipv4_config;
+
+    /* IPv6 config */
+    GMutex ipv6_config_mutex;
+    guint ipv6_config_id;
+    MMBearerIpConfig *ipv6_config;
+
+    /* Properties */
+    GMutex properties_mutex;
+    guint properties_id;
+    MMBearerProperties *properties;
+};
+
+/*****************************************************************************/
 
 /**
  * mm_bearer_get_path:
@@ -35,7 +68,7 @@
 const gchar *
 mm_bearer_get_path (MMBearer *self)
 {
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
         g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
@@ -54,7 +87,7 @@ mm_bearer_dup_path (MMBearer *self)
 {
     gchar *value;
 
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     g_object_get (G_OBJECT (self),
                   "g-object-path", &value,
@@ -62,6 +95,8 @@ mm_bearer_dup_path (MMBearer *self)
 
     RETURN_NON_EMPTY_STRING (value);
 }
+
+/*****************************************************************************/
 
 /**
  * mm_bearer_get_interface:
@@ -71,17 +106,20 @@ mm_bearer_dup_path (MMBearer *self)
  * packet data using this #MMBearer. This will only be available once the #MMBearer
  * is in connected state.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_bearer_dup_interface() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_dup_interface() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The name of the interface, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_bearer_get_interface (MMBearer *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), NULL);
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_bearer_get_interface (self));
+        mm_gdbus_bearer_get_interface (MM_GDBUS_BEARER (self)));
 }
 
 /**
@@ -97,11 +135,13 @@ mm_bearer_get_interface (MMBearer *self)
 gchar *
 mm_bearer_dup_interface (MMBearer *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), NULL);
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_bearer_dup_interface (self));
+        mm_gdbus_bearer_dup_interface (MM_GDBUS_BEARER (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_bearer_get_connected:
@@ -115,10 +155,12 @@ mm_bearer_dup_interface (MMBearer *self)
 gboolean
 mm_bearer_get_connected (MMBearer *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
 
-    return mm_gdbus_bearer_get_connected (self);
+    return mm_gdbus_bearer_get_connected (MM_GDBUS_BEARER (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_bearer_get_suspended:
@@ -132,76 +174,385 @@ mm_bearer_get_connected (MMBearer *self)
 gboolean
 mm_bearer_get_suspended (MMBearer *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
 
-    return mm_gdbus_bearer_get_suspended (self);
+    return mm_gdbus_bearer_get_suspended (MM_GDBUS_BEARER (self));
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_bearer_get_ip_timeout:
+ * @self: A #MMBearer.
+ *
+ * Gets the maximum time to wait for the bearer to retrieve a valid IP address.
+ *
+ * Returns: The IP timeout, or 0 if no specific one given.
+ */
 guint
 mm_bearer_get_ip_timeout (MMBearer *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), 0);
+    g_return_val_if_fail (MM_IS_BEARER (self), 0);
 
-    return mm_gdbus_bearer_get_ip_timeout (self);
+    return mm_gdbus_bearer_get_ip_timeout (MM_GDBUS_BEARER (self));
 }
 
+/*****************************************************************************/
+
+static void
+ipv4_config_updated (MMBearer *self,
+                     GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->ipv4_config_mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->ipv4_config);
+
+        /* TODO: update existing object instead of re-creating? */
+        dictionary = mm_gdbus_bearer_get_ip4_config (MM_GDBUS_BEARER (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->ipv4_config = mm_bearer_ip_config_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid IPv4 configuration update received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->ipv4_config_mutex);
+}
+
+static void
+ensure_internal_ipv4_config (MMBearer *self,
+                             MMBearerIpConfig **dup)
+{
+    g_mutex_lock (&self->priv->ipv4_config_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->ipv4_config_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_bearer_dup_ip4_config (MM_GDBUS_BEARER (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->ipv4_config = mm_bearer_ip_config_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid initial IPv4 configuration: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->ipv4_config_id =
+                g_signal_connect (self,
+                                  "notify::ip4-config",
+                                  G_CALLBACK (ipv4_config_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->ipv4_config)
+            *dup = g_object_ref (self->priv->ipv4_config);
+    }
+    g_mutex_unlock (&self->priv->ipv4_config_mutex);
+}
+
+/**
+ * mm_bearer_get_ipv4_config:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerIpConfig object specifying the IPv4 configuration to use in
+ * the bearer.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_bearer_get_ipv4_config() again to get a new #MMBearerIpConfig with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ */
 MMBearerIpConfig *
 mm_bearer_get_ipv4_config (MMBearer *self)
 {
-    MMBearerIpConfig *config;
-    GVariant *variant;
-    GError *error = NULL;
+    MMBearerIpConfig *config = NULL;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
-    variant = mm_gdbus_bearer_dup_ip4_config (MM_GDBUS_BEARER (self));
-    config = mm_bearer_ip_config_new_from_dictionary (variant, &error);
-    if (!config) {
-        g_warning ("Couldn't create IP config: '%s'", error->message);
-        g_error_free (error);
-    }
-    g_variant_unref (variant);
-
+    ensure_internal_ipv4_config (self, &config);
     return config;
 }
 
+/**
+ * mm_bearer_peek_ipv4_config:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerIpConfig object specifying the IPv4 configuration to use in
+ * the bearer.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_get_ipv4_config() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ */
+MMBearerIpConfig *
+mm_bearer_peek_ipv4_config (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_ipv4_config (self, NULL);
+    return self->priv->ipv4_config;
+}
+
+/*****************************************************************************/
+
+static void
+ipv6_config_updated (MMBearer *self,
+                     GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->ipv6_config_mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->ipv6_config);
+
+        /* TODO: update existing object instead of re-creating? */
+        dictionary = mm_gdbus_bearer_get_ip6_config (MM_GDBUS_BEARER (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->ipv6_config = mm_bearer_ip_config_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid IPv6 configuration update received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->ipv6_config_mutex);
+}
+
+static void
+ensure_internal_ipv6_config (MMBearer *self,
+                             MMBearerIpConfig **dup)
+{
+    g_mutex_lock (&self->priv->ipv6_config_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->ipv6_config_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_bearer_dup_ip6_config (MM_GDBUS_BEARER (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->ipv6_config = mm_bearer_ip_config_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid initial IPv6 configuration: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->ipv6_config_id =
+                g_signal_connect (self,
+                                  "notify::ip6-config",
+                                  G_CALLBACK (ipv6_config_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->ipv6_config)
+            *dup = g_object_ref (self->priv->ipv6_config);
+    }
+    g_mutex_unlock (&self->priv->ipv6_config_mutex);
+}
+
+/**
+ * mm_bearer_get_ipv6_config:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerIpConfig object specifying the IPv6 configuration to use in
+ * the bearer.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_bearer_get_ipv6_config() again to get a new #MMBearerIpConfig with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ */
 MMBearerIpConfig *
 mm_bearer_get_ipv6_config (MMBearer *self)
 {
-    MMBearerIpConfig *config;
-    GVariant *variant;
-    GError *error = NULL;
+    MMBearerIpConfig *config = NULL;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
-    variant = mm_gdbus_bearer_dup_ip6_config (MM_GDBUS_BEARER (self));
-    config = mm_bearer_ip_config_new_from_dictionary (variant, &error);
-    if (!config) {
-        g_warning ("Couldn't create IP config: '%s'", error->message);
-        g_error_free (error);
-    }
-    g_variant_unref (variant);
-
+    ensure_internal_ipv6_config (self, &config);
     return config;
 }
 
+/**
+ * mm_bearer_peek_ipv6_config:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerIpConfig object specifying the IPv6 configuration to use in
+ * the bearer.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_get_ipv6_config() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ */
+MMBearerIpConfig *
+mm_bearer_peek_ipv6_config (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_ipv6_config (self, NULL);
+    return self->priv->ipv6_config;
+}
+
+/*****************************************************************************/
+
+static void
+properties_updated (MMBearer *self,
+                    GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->properties_mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->properties);
+
+        /* TODO: update existing object instead of re-creating? */
+        dictionary = mm_gdbus_bearer_get_properties (MM_GDBUS_BEARER (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->properties = mm_bearer_properties_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid bearer properties received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->properties_mutex);
+}
+
+static void
+ensure_internal_properties (MMBearer *self,
+                            MMBearerProperties **dup)
+{
+    g_mutex_lock (&self->priv->properties_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->properties_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_bearer_dup_properties (MM_GDBUS_BEARER (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->properties = mm_bearer_properties_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid initial bearer properties: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->properties_id =
+                g_signal_connect (self,
+                                  "notify::properties",
+                                  G_CALLBACK (properties_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->properties)
+            *dup = g_object_ref (self->priv->properties);
+    }
+    g_mutex_unlock (&self->priv->properties_mutex);
+}
+
+/**
+ * mm_bearer_get_properties:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerProperties object specifying the properties which were used
+ * to create the bearer.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_bearer_get_properties() again to get a new #MMBearerProperties with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
+ */
 MMBearerProperties *
 mm_bearer_get_properties (MMBearer *self)
 {
-    GError *error = NULL;
-    MMBearerProperties *properties;
+    MMBearerProperties *props = NULL;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
-    properties = (mm_bearer_properties_new_from_dictionary (
-                      mm_gdbus_bearer_get_properties (MM_GDBUS_BEARER (self)),
-                      &error));
-    if (!properties) {
-        g_warning ("Couldn't create properties: '%s'", error->message);
-        g_error_free (error);
-    }
+    ensure_internal_properties (self, &props);
+    return props;
+}
 
-    return properties;
+/**
+ * mm_bearer_peek_properties:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerProperties object specifying the properties which were used
+ * to create the bearer.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_get_properties() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMBearerProperties. Do not free the returned value, it belongs to @self.
+ */
+MMBearerProperties *
+mm_bearer_peek_properties (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_properties (self, NULL);
+    return self->priv->properties;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_connect_finish:
+ * @self: A #MMBearer.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_bearer_connect().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_bearer_connect().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_bearer_connect_finish (MMBearer *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
+
+    return mm_gdbus_bearer_call_connect_finish (MM_GDBUS_BEARER (self), res, error);
 }
 
 /**
@@ -225,32 +576,9 @@ mm_bearer_connect (MMBearer *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_BEARER (self));
+    g_return_if_fail (MM_IS_BEARER (self));
 
-    mm_gdbus_bearer_call_connect (self,
-                                  cancellable,
-                                  callback,
-                                  user_data);
-}
-
-/**
- * mm_bearer_connect_finish:
- * @self: A #MMBearer.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_bearer_connect().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_bearer_connect().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_bearer_connect_finish (MMBearer *self,
-                          GAsyncResult *res,
-                          GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
-
-    return mm_gdbus_bearer_call_connect_finish (self, res, error);
+    mm_gdbus_bearer_call_connect (MM_GDBUS_BEARER (self), cancellable, callback, user_data);
 }
 
 /**
@@ -265,19 +593,19 @@ mm_bearer_connect_finish (MMBearer *self,
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_connect() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_connect_sync (MMBearer *self,
                         GCancellable *cancellable,
                         GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
 
-    return mm_gdbus_bearer_call_connect_sync (self,
-                                              cancellable,
-                                              error);
+    return mm_gdbus_bearer_call_connect_sync (MM_GDBUS_BEARER (self), cancellable, error);
 }
+
+/*****************************************************************************/
 
 /**
  * mm_bearer_disconnect:
@@ -299,12 +627,9 @@ mm_bearer_disconnect (MMBearer *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_BEARER (self));
+    g_return_if_fail (MM_IS_BEARER (self));
 
-    mm_gdbus_bearer_call_disconnect (self,
-                                     cancellable,
-                                     callback,
-                                     user_data);
+    mm_gdbus_bearer_call_disconnect (MM_GDBUS_BEARER (self), cancellable, callback, user_data);
 }
 
 /**
@@ -315,16 +640,16 @@ mm_bearer_disconnect (MMBearer *self,
  *
  * Finishes an operation started with mm_bearer_disconnect().
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_disconnect_finish (MMBearer *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
 
-    return mm_gdbus_bearer_call_disconnect_finish (self, res, error);
+    return mm_gdbus_bearer_call_disconnect_finish (MM_GDBUS_BEARER (self), res, error);
 }
 
 /**
@@ -338,16 +663,64 @@ mm_bearer_disconnect_finish (MMBearer *self,
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_disconnect() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_disconnect_sync (MMBearer *self,
                            GCancellable *cancellable,
                            GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
 
-    return mm_gdbus_bearer_call_disconnect_sync (self,
-                                                 cancellable,
-                                                 error);
+    return mm_gdbus_bearer_call_disconnect_sync (MM_GDBUS_BEARER (self), cancellable, error);
+}
+
+/*****************************************************************************/
+
+static void
+mm_bearer_init (MMBearer *self)
+{
+    /* Setup private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_BEARER,
+                                              MMBearerPrivate);
+    g_mutex_init (&self->priv->ipv4_config_mutex);
+    g_mutex_init (&self->priv->ipv6_config_mutex);
+    g_mutex_init (&self->priv->properties_mutex);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBearer *self = MM_BEARER (object);
+
+    g_mutex_clear (&self->priv->ipv4_config_mutex);
+    g_mutex_clear (&self->priv->ipv6_config_mutex);
+    g_mutex_clear (&self->priv->properties_mutex);
+
+    G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMBearer *self = MM_BEARER (object);
+
+    g_clear_object (&self->priv->ipv4_config);
+    g_clear_object (&self->priv->ipv6_config);
+    g_clear_object (&self->priv->properties);
+
+    G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
+}
+
+static void
+mm_bearer_class_init (MMBearerClass *bearer_class)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (bearer_class);
+
+    g_type_class_add_private (object_class, sizeof (MMBearerPrivate));
+
+    /* Virtual methods */
+    object_class->dispose = dispose;
+    object_class->finalize = finalize;
 }
