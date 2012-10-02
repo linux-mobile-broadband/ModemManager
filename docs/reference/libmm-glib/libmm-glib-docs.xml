@@ -63,6 +63,7 @@
     <xi:include href="xml/mm-modem-location.xml"/>
     <xi:include href="xml/mm-modem-messaging.xml"/>
     <xi:include href="xml/mm-modem-time.xml"/>
+    <xi:include href="xml/mm-modem-firmware.xml"/>
     <xi:include href="xml/mm-modem-simple.xml"/>
   </chapter>
 

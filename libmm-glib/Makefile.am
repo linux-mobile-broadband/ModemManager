@@ -30,6 +30,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem-location.c \
 	mm-modem-time.h \
 	mm-modem-time.c \
+	mm-modem-firmware.h \
+	mm-modem-firmware.c \
 	mm-sim.h \
 	mm-sim.c \
 	mm-sms.h \
@@ -55,6 +57,7 @@ include_HEADERS = \
 	mm-modem-messaging.h \
 	mm-modem-location.h \
 	mm-modem-time.h \
+	mm-modem-firmware.h \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \

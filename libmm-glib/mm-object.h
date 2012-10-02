@@ -35,6 +35,7 @@
 #include "mm-modem-location.h"
 #include "mm-modem-messaging.h"
 #include "mm-modem-time.h"
+#include "mm-modem-firmware.h"
 
 G_BEGIN_DECLS
 
@@ -78,6 +79,7 @@ MMModemSimple    *mm_object_get_modem_simple     (MMObject *self);
 MMModemLocation  *mm_object_get_modem_location   (MMObject *self);
 MMModemMessaging *mm_object_get_modem_messaging  (MMObject *self);
 MMModemTime      *mm_object_get_modem_time       (MMObject *self);
+MMModemFirmware  *mm_object_get_modem_firmware   (MMObject *self);
 
 MMModem          *mm_object_peek_modem           (MMObject *self);
 MMModem3gpp      *mm_object_peek_modem_3gpp      (MMObject *self);
@@ -87,6 +89,7 @@ MMModemSimple    *mm_object_peek_modem_simple    (MMObject *self);
 MMModemLocation  *mm_object_peek_modem_location  (MMObject *self);
 MMModemMessaging *mm_object_peek_modem_messaging (MMObject *self);
 MMModemTime      *mm_object_peek_modem_time      (MMObject *self);
+MMModemFirmware  *mm_object_peek_modem_firmware  (MMObject *self);
 
 G_END_DECLS
 
