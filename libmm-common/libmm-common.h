@@ -36,6 +36,7 @@
 #include "mm-location-gps-nmea.h"
 #include "mm-unlock-retries.h"
 #include "mm-network-timezone.h"
+#include "mm-firmware-properties.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"
 #include "mm-gdbus-bearer.h"

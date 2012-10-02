@@ -169,6 +169,7 @@ mm-location-gps-raw.c: mm-errors-types.h
 mm-location-gps-nmea.c: mm-errors-types.h
 mm-unlock-retries.c: mm-enums-types.h
 mm-network-timezone.c: mm-errors-types.h
+mm-firmware-properties.c: mm-errors-types.h
 
 includedir = @includedir@/libmm-common
 include_HEADERS = \
@@ -185,6 +186,7 @@ include_HEADERS = \
 	mm-location-gps-raw.h \
 	mm-unlock-retries.h \
 	mm-network-timezone.h \
+	mm-firmware-properties.h \
 	mm-gdbus-manager.h \
 	mm-gdbus-modem.h \
 	mm-gdbus-bearer.h \
@@ -219,6 +221,8 @@ libmm_common_la_SOURCES = \
 	mm-unlock-retries.c \
 	mm-network-timezone.h \
 	mm-network-timezone.c \
+	mm-firmware-properties.h \
+	mm-firmware-properties.c \
 	libmm-common.h
 
 libmm_common_la_CPPFLAGS = \
