@@ -17,11 +17,28 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #include "mm-helpers.h"
 #include "mm-sim.h"
+
+/**
+ * SECTION: mm-sim
+ * @title: MMSim
+ * @short_description: The SIM interface
+ *
+ * The #MMSim is an object providing access to the methods, signals and
+ * properties of the SIM interface.
+ *
+ * When the SIM is exposed and available in the bus, it is ensured that at
+ * least this interface is also available.
+ */
+
+G_DEFINE_TYPE (MMSim, mm_sim, MM_GDBUS_TYPE_SIM_PROXY)
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_path:
@@ -34,7 +51,7 @@
 const gchar *
 mm_sim_get_path (MMSim *self)
 {
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
         g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
@@ -53,7 +70,7 @@ mm_sim_dup_path (MMSim *self)
 {
     gchar *value;
 
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     g_object_get (G_OBJECT (self),
                   "g-object-path", &value,
@@ -62,23 +79,28 @@ mm_sim_dup_path (MMSim *self)
     RETURN_NON_EMPTY_STRING (value);
 }
 
+/*****************************************************************************/
+
 /**
  * mm_sim_get_identifier:
  * @self: A #MMSim.
  *
  * Gets the unique SIM identifier of the #MMSim object.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sim_dup_identifier() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sim_dup_identifier() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The unique identifier of the #MMSim object, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sim_get_identifier (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sim_get_sim_identifier (self));
+        mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (self)));
 }
 
 /**
@@ -92,11 +114,13 @@ mm_sim_get_identifier (MMSim *self)
 gchar *
 mm_sim_dup_identifier (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sim_dup_sim_identifier (self));
+        mm_gdbus_sim_dup_sim_identifier (MM_GDBUS_SIM (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_imsi:
@@ -104,17 +128,20 @@ mm_sim_dup_identifier (MMSim *self)
  *
  * Gets the International Mobile Subscriber Identity (IMSI) of the #MMSim object.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sim_dup_imsi() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sim_dup_imsi() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The IMSI of the #MMSim object, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sim_get_imsi (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sim_get_imsi (self));
+        mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self)));
 }
 
 /**
@@ -128,11 +155,13 @@ mm_sim_get_imsi (MMSim *self)
 gchar *
 mm_sim_dup_imsi (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sim_dup_imsi (self));
+        mm_gdbus_sim_dup_imsi (MM_GDBUS_SIM (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_operator_identifier:
@@ -140,17 +169,20 @@ mm_sim_dup_imsi (MMSim *self)
  *
  * Gets the Operator Identifier of the #MMSim object.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sim_dup_operator_identifier() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sim_dup_operator_identifier() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The Operator Identifier of the #MMSim object, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sim_get_operator_identifier (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sim_get_operator_identifier (self));
+        mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (self)));
 }
 
 /**
@@ -164,11 +196,13 @@ mm_sim_get_operator_identifier (MMSim *self)
 gchar *
 mm_sim_dup_operator_identifier (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sim_dup_operator_identifier (self));
+        mm_gdbus_sim_dup_operator_identifier (MM_GDBUS_SIM (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_operator_name:
@@ -176,17 +210,20 @@ mm_sim_dup_operator_identifier (MMSim *self)
  *
  * Gets the Operator Name of the #MMSim object.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sim_dup_operator_name() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sim_dup_operator_name() if on another
+ * thread.</warning>
  *
  * Returns: (transfer none): The Operator Name of the #MMSim object, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sim_get_operator_name (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sim_get_operator_name (self));
+        mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (self)));
 }
 
 /**
@@ -200,10 +237,32 @@ mm_sim_get_operator_name (MMSim *self)
 gchar *
 mm_sim_dup_operator_name (MMSim *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sim_dup_operator_name (self));
+        mm_gdbus_sim_dup_operator_name (MM_GDBUS_SIM (self)));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_send_pin_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_send_pin().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_send_pin().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sim_send_pin_finish (MMSim *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_send_pin_finish (MM_GDBUS_SIM (self), res, error);
 }
 
 /**
@@ -228,33 +287,13 @@ mm_sim_send_pin (MMSim *self,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SIM (self));
+    g_return_if_fail (MM_IS_SIM (self));
 
-    mm_gdbus_sim_call_send_pin (self,
+    mm_gdbus_sim_call_send_pin (MM_GDBUS_SIM (self),
                                 pin,
                                 cancellable,
                                 callback,
                                 user_data);
-}
-
-/**
- * mm_sim_send_pin_finish:
- * @self: A #MMSim.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_send_pin().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sim_send_pin().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sim_send_pin_finish (MMSim *self,
-                        GAsyncResult *res,
-                        GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
-
-    return mm_gdbus_sim_call_send_pin_finish (self, res, error);
 }
 
 /**
@@ -269,7 +308,7 @@ mm_sim_send_pin_finish (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_send_pin() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_pin_sync (MMSim *self,
@@ -277,12 +316,34 @@ mm_sim_send_pin_sync (MMSim *self,
                       GCancellable *cancellable,
                       GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
-    return (mm_gdbus_sim_call_send_pin_sync (self,
+    return (mm_gdbus_sim_call_send_pin_sync (MM_GDBUS_SIM (self),
                                              pin,
                                              cancellable,
                                              error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_send_puk_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_send_puk().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_send_puk().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sim_send_puk_finish (MMSim *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_send_puk_finish (MM_GDBUS_SIM (self), res, error);
 }
 
 /**
@@ -309,34 +370,14 @@ mm_sim_send_puk (MMSim *self,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SIM (self));
+    g_return_if_fail (MM_IS_SIM (self));
 
-    mm_gdbus_sim_call_send_puk (self,
+    mm_gdbus_sim_call_send_puk (MM_GDBUS_SIM (self),
                                 puk,
                                 pin,
                                 cancellable,
                                 callback,
                                 user_data);
-}
-
-/**
- * mm_sim_send_puk_finish:
- * @self: A #MMSim.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_send_puk().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sim_send_puk().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sim_send_puk_finish (MMSim *self,
-                        GAsyncResult *res,
-                        GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
-
-    return mm_gdbus_sim_call_send_puk_finish (self, res, error);
 }
 
 /**
@@ -352,7 +393,7 @@ mm_sim_send_puk_finish (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_send_puk() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_puk_sync (MMSim *self,
@@ -361,13 +402,35 @@ mm_sim_send_puk_sync (MMSim *self,
                       GCancellable *cancellable,
                       GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
-    return (mm_gdbus_sim_call_send_puk_sync (self,
+    return (mm_gdbus_sim_call_send_puk_sync (MM_GDBUS_SIM (self),
                                              puk,
                                              pin,
                                              cancellable,
                                              error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_enable_pin_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_enable_pin().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_enable_pin().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sim_enable_pin_finish (MMSim *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_enable_pin_finish (MM_GDBUS_SIM (self), res, error);
 }
 
 /**
@@ -392,34 +455,14 @@ mm_sim_enable_pin (MMSim *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SIM (self));
+    g_return_if_fail (MM_IS_SIM (self));
 
-    mm_gdbus_sim_call_enable_pin (self,
+    mm_gdbus_sim_call_enable_pin (MM_GDBUS_SIM (self),
                                   pin,
                                   TRUE,
                                   cancellable,
                                   callback,
                                   user_data);
-}
-
-/**
- * mm_sim_enable_pin_finish:
- * @self: A #MMSim.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_enable_pin().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sim_enable_pin().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sim_enable_pin_finish (MMSim *self,
-                          GAsyncResult *res,
-                          GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
-
-    return mm_gdbus_sim_call_enable_pin_finish (self, res, error);
 }
 
 /**
@@ -434,7 +477,7 @@ mm_sim_enable_pin_finish (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_enable_pin() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_enable_pin_sync (MMSim *self,
@@ -442,13 +485,35 @@ mm_sim_enable_pin_sync (MMSim *self,
                         GCancellable *cancellable,
                         GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
-    return (mm_gdbus_sim_call_enable_pin_sync (self,
+    return (mm_gdbus_sim_call_enable_pin_sync (MM_GDBUS_SIM (self),
                                                pin,
                                                TRUE,
                                                cancellable,
                                                error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_disable_pin_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_disable_pin().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_disable_pin().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sim_disable_pin_finish (MMSim *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_enable_pin_finish (MM_GDBUS_SIM (self), res, error);
 }
 
 /**
@@ -473,34 +538,14 @@ mm_sim_disable_pin (MMSim *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SIM (self));
+    g_return_if_fail (MM_IS_SIM (self));
 
-    mm_gdbus_sim_call_enable_pin (self,
+    mm_gdbus_sim_call_enable_pin (MM_GDBUS_SIM (self),
                                   pin,
                                   FALSE,
                                   cancellable,
                                   callback,
                                   user_data);
-}
-
-/**
- * mm_sim_disable_pin_finish:
- * @self: A #MMSim.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_disable_pin().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sim_disable_pin().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sim_disable_pin_finish (MMSim *self,
-                           GAsyncResult *res,
-                           GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
-
-    return mm_gdbus_sim_call_enable_pin_finish (self, res, error);
 }
 
 /**
@@ -515,7 +560,7 @@ mm_sim_disable_pin_finish (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_disable_pin() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_disable_pin_sync (MMSim *self,
@@ -523,13 +568,35 @@ mm_sim_disable_pin_sync (MMSim *self,
                          GCancellable *cancellable,
                          GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
-    return (mm_gdbus_sim_call_enable_pin_sync (self,
+    return (mm_gdbus_sim_call_enable_pin_sync (MM_GDBUS_SIM (self),
                                                pin,
                                                FALSE,
                                                cancellable,
                                                error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_change_pin_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_change_pin().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_change_pin().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sim_change_pin_finish (MMSim *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_change_pin_finish (MM_GDBUS_SIM (self), res, error);
 }
 
 /**
@@ -556,34 +623,14 @@ mm_sim_change_pin (MMSim *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SIM (self));
+    g_return_if_fail (MM_IS_SIM (self));
 
-    mm_gdbus_sim_call_change_pin (self,
+    mm_gdbus_sim_call_change_pin (MM_GDBUS_SIM (self),
                                   old_pin,
                                   new_pin,
                                   cancellable,
                                   callback,
                                   user_data);
-}
-
-/**
- * mm_sim_change_pin_finish:
- * @self: A #MMSim.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_change_pin().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sim_change_pin().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sim_change_pin_finish (MMSim *self,
-                          GAsyncResult *res,
-                          GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
-
-    return mm_gdbus_sim_call_change_pin_finish (self, res, error);
 }
 
 /**
@@ -599,7 +646,7 @@ mm_sim_change_pin_finish (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_change_pin() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_change_pin_sync (MMSim *self,
@@ -608,11 +655,23 @@ mm_sim_change_pin_sync (MMSim *self,
                         GCancellable *cancellable,
                         GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SIM (self), FALSE);
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
-    return (mm_gdbus_sim_call_change_pin_sync (self,
+    return (mm_gdbus_sim_call_change_pin_sync (MM_GDBUS_SIM (self),
                                                old_pin,
                                                new_pin,
                                                cancellable,
                                                error));
+}
+
+/*****************************************************************************/
+
+static void
+mm_sim_init (MMSim *self)
+{
+}
+
+static void
+mm_sim_class_init (MMSimClass *sim_class)
+{
 }

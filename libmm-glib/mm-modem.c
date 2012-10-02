@@ -2226,9 +2226,13 @@ modem_get_sim_ready (GDBusConnection *connection,
                      GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
-    MMSim *sim;
+    GObject *sim;
+    GObject *source_object;
 
-    sim = mm_gdbus_sim_proxy_new_finish (res, &error);
+    source_object = g_async_result_get_source_object (res);
+    sim = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
     if (error)
         g_simple_async_result_take_error (simple, error);
     else
@@ -2278,15 +2282,17 @@ mm_modem_get_sim (MMModem *self,
         return;
     }
 
-    mm_gdbus_sim_proxy_new (
-        g_dbus_proxy_get_connection (
-            G_DBUS_PROXY (self)),
-        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-        MM_DBUS_SERVICE,
-        sim_path,
-        cancellable,
-        (GAsyncReadyCallback)modem_get_sim_ready,
-        result);
+    g_async_initable_new_async (MM_TYPE_SIM,
+                                G_PRIORITY_DEFAULT,
+                                cancellable,
+                                (GAsyncReadyCallback)modem_get_sim_ready,
+                                result,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                "g-object-path",    sim_path,
+                                "g-interface-name", "org.freedesktop.ModemManager1.Sim",
+                                NULL);
 }
 
 /**
@@ -2307,6 +2313,7 @@ mm_modem_get_sim_sync (MMModem *self,
                        GCancellable *cancellable,
                        GError **error)
 {
+    GObject *sim;
     const gchar *sim_path;
 
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
@@ -2315,14 +2322,17 @@ mm_modem_get_sim_sync (MMModem *self,
     if (!sim_path)
         return NULL;
 
-    return (MMSim *)(mm_gdbus_sim_proxy_new_sync (
-                         g_dbus_proxy_get_connection (
-                             G_DBUS_PROXY (self)),
-                         G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-                         MM_DBUS_SERVICE,
-                         sim_path,
-                         cancellable,
-                         error));
+    sim = g_initable_new (MM_TYPE_SIM,
+                          cancellable,
+                          error,
+                          "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                          "g-name",           MM_DBUS_SERVICE,
+                          "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                          "g-object-path",    sim_path,
+                          "g-interface-name", "org.freedesktop.ModemManager1.Sim",
+                          NULL);
+
+    return (sim ? MM_SIM (sim) : NULL);
 }
 
 /*****************************************************************************/
