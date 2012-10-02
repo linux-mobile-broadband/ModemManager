@@ -93,6 +93,14 @@ void          mmcli_modem_time_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_modem_time_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_time_shutdown           (void);
 
+/* Firmware group */
+GOptionGroup *mmcli_modem_firmware_get_option_group   (void);
+gboolean      mmcli_modem_firmware_options_enabled    (void);
+void          mmcli_modem_firmware_run_asynchronous   (GDBusConnection *connection,
+                                                       GCancellable    *cancellable);
+void          mmcli_modem_firmware_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_firmware_shutdown           (void);
+
 /* Bearer group */
 GOptionGroup *mmcli_bearer_get_option_group   (void);
 gboolean      mmcli_bearer_options_enabled    (void);

@@ -22,6 +22,7 @@ mmcli_SOURCES = \
 	mmcli-modem-location.c \
 	mmcli-modem-messaging.c \
 	mmcli-modem-time.c \
+	mmcli-modem-firmware.c \
 	mmcli-bearer.c \
 	mmcli-sim.c \
 	mmcli-sms.c
