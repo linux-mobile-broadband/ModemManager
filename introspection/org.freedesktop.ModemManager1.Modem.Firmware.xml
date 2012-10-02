@@ -25,6 +25,15 @@
       Certain properties are pre-defined, and some are required:
 
       <variablelist>
+        <varlistentry><term><literal>"image-type"</literal></term>
+          <listitem>
+            (Required) Type of the firmware image, given as a
+            <link linkend="MMFirmwareImageType">MMFirmwareImageType</link> value
+            (signature <literal>"u"</literal>). Firmware images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GENERIC:CAPS">MM_FIRMWARE_IMAGE_TYPE_GENERIC</link>
+            will only expose only the mandatory properties.
+          </listitem>
+        </varlistentry>
         <varlistentry><term><literal>"name"</literal></term>
           <listitem>
             (Required) A user-readable name for the firmware image, given as a
@@ -33,7 +42,7 @@
         </varlistentry>
         <varlistentry><term><literal>"version"</literal></term>
           <listitem>
-            (Optional) The version of the firmware, given as a string value
+            (Required) The version of the firmware, given as a string value
             (signature <literal>"s"</literal>). The format is
             unspecified; tools attempting to upgrade firmware automatically must
             understand the versioning scheme used by the modem driver they are
