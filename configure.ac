@@ -58,14 +58,6 @@ GETTEXT_PACKAGE=ModemManager
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
 
-PKG_CHECK_MODULES(LIBMM_COMMON,
-                  glib-2.0 >= 2.30.2
-                  gobject-2.0
-                  gio-2.0
-                  gio-unix-2.0)
-AC_SUBST(LIBMM_COMMON_CFLAGS)
-AC_SUBST(LIBMM_COMMON_LIBS)
-
 PKG_CHECK_MODULES(MM,
                   glib-2.0 >= 2.30.2
                   gmodule-2.0
@@ -78,7 +70,8 @@ AC_SUBST(MM_LIBS)
 PKG_CHECK_MODULES(LIBMM_GLIB,
                   glib-2.0 >= 2.30.2
                   gobject-2.0
-                  gio-2.0)
+                  gio-2.0
+                  gio-unix-2.0)
 AC_SUBST(LIBMM_GLIB_CFLAGS)
 AC_SUBST(LIBMM_GLIB_LIBS)
 
@@ -222,12 +215,9 @@ AC_CONFIG_FILES([
 Makefile
 data/Makefile
 data/ModemManager.pc
-data/mm-common.pc
 data/mm-glib.pc
 include/Makefile
 build-aux/Makefile
-libmm-common/Makefile
-libmm-common/tests/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile
 libqcdm/tests/Makefile
@@ -250,6 +240,8 @@ docs/reference/api/version.xml
 docs/reference/libmm-glib/Makefile
 docs/reference/libmm-glib/version.xml
 libmm-glib/Makefile
+libmm-glib/generated/Makefile
+libmm-glib/tests/Makefile
 cli/Makefile
 ])
 AC_OUTPUT

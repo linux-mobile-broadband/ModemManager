@@ -64,20 +64,20 @@ content_files = \
 expand_content_files = \
 	ModemManager-overview.xml \
 	ModemManager-dbus-reference.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
 	$(NULL)
 
 extra_files = \

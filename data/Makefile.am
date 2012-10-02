@@ -45,7 +45,6 @@ endif
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = \
 	ModemManager.pc \
-	mm-common.pc \
 	mm-glib.pc
 
 

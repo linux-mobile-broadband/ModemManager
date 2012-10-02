@@ -9,7 +9,11 @@ DOC_MAIN_SGML_FILE = $(DOC_MODULE)-docs.xml
 SCAN_OPTIONS =
 
 # The directory containing the source code.
-DOC_SOURCE_DIR = $(top_srcdir)/libmm-glib
+DOC_SOURCE_DIR = \
+	$(top_srcdir)/libmm-glib \
+	$(top_srcdir)/libmm-glib/generated \
+	$(top_builddir)/libmm-glib/generated \
+	$(NULL)
 
 HFILE_GLOB =
 CFILE_GLOB =

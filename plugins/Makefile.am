@@ -8,8 +8,9 @@ PLUGIN_COMMON_COMPILER_FLAGS = \
 	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
-	-I$(top_srcdir)/libmm-common \
-	-I$(top_builddir)/libmm-common
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_srcdir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated
 
 PLUGIN_COMMON_LINKER_FLAGS = \
 	$(GUDEV_LDFLAGS) \

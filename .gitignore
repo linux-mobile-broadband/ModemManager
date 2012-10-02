@@ -30,6 +30,13 @@ org.freedesktop.ModemManager.conf
 callouts/mm-modem-probe
 test/lsudev
 
+libmm-glib/generated/mm-gdbus-*.[ch]
+libmm-glib/generated/mm-enums-types.[ch]
+libmm-glib/generated/mm-errors-types.[ch]
+libmm-glib/generated/mm-errors-quarks.c
+libmm-glib/generated/*.xml
+libmm-glib/tests/test-common-helpers
+
 src/ModemManager
 src/mm-daemon-enums-types.c
 src/mm-daemon-enums-types.h
@@ -55,13 +62,6 @@ data/mm-common.pc
 data/mm-glib.pc
 
 include/ModemManager-names.h
-
-libmm-common/mm-gdbus-*.[ch]
-libmm-common/mm-enums-types.[ch]
-libmm-common/mm-errors-types.[ch]
-libmm-common/mm-errors-quarks.c
-libmm-common/*.xml
-libmm-common/tests/test-common-helpers
 
 po/Makefile.in.in
 po/POTFILES

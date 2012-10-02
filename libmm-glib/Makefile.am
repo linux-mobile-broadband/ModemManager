@@ -1,13 +1,6 @@
+SUBDIRS = generated . tests
 
 lib_LTLIBRARIES = libmm-glib.la
-
-libmm_glib_la_CPPFLAGS = \
-	$(LIBMM_GLIB_CFLAGS) \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/include \
-	-I$(top_builddir)/include \
-	-I${top_srcdir}/libmm-common \
-	-I${top_builddir}/libmm-common
 
 libmm_glib_la_SOURCES = \
 	libmm-glib.h \
@@ -39,10 +32,46 @@ libmm_glib_la_SOURCES = \
 	mm-modem-messaging.h \
 	mm-modem-messaging.c \
 	mm-bearer.h \
-	mm-bearer.c
+	mm-bearer.c \
+	mm-common-helpers.h \
+	mm-common-helpers.c \
+	mm-simple-status.h \
+	mm-simple-status.c \
+	mm-simple-connect-properties.h \
+	mm-simple-connect-properties.c \
+	mm-bearer-properties.h \
+	mm-bearer-properties.c \
+	mm-sms-properties.h \
+	mm-sms-properties.c \
+	mm-bearer-ip-config.h \
+	mm-bearer-ip-config.c \
+	mm-location-3gpp.h \
+	mm-location-3gpp.c \
+	mm-location-gps-raw.h \
+	mm-location-gps-raw.c \
+	mm-location-gps-nmea.h \
+	mm-location-gps-nmea.c \
+	mm-unlock-retries.h \
+	mm-unlock-retries.c \
+	mm-network-timezone.h \
+	mm-network-timezone.c \
+	mm-firmware-properties.h \
+	mm-firmware-properties.c
+
+nodist_libmm_glib_la_SOURCES = \
+	$(GENERATED_H) \
+	$(GENERATED_C)
+
+libmm_glib_la_CPPFLAGS = \
+	$(LIBMM_GLIB_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I${top_srcdir}/libmm-glib/generated \
+	-I${top_builddir}/libmm-glib/generated
 
 libmm_glib_la_LIBADD = \
-	$(top_builddir)/libmm-common/libmm-common.la \
+	${top_builddir}/libmm-glib/generated/libmm-generated.la \
 	$(LIBMM_GLIB_LIBS)
 
 includedir = @includedir@/libmm-glib
@@ -61,4 +90,16 @@ include_HEADERS = \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \
-	mm-bearer.h
+	mm-bearer.h \
+	mm-common-helpers.h \
+	mm-simple-status.h \
+	mm-simple-connect-properties.h \
+	mm-bearer-properties.h \
+	mm-sms-properties.h \
+	mm-bearer-ip-config.h \
+	mm-location-3gpp.h \
+	mm-location-gps-nmea.h \
+	mm-location-gps-raw.h \
+	mm-unlock-retries.h \
+	mm-network-timezone.h \
+	mm-firmware-properties.h

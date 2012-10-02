@@ -332,4 +332,6 @@ mm_location_gps_raw_class_init (MMLocationGpsRawClass *klass)
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMLocationGpsRawPrivate));
+
+    object_class->finalize = finalize;
 }

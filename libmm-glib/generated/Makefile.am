@@ -1,6 +1,5 @@
-SUBDIRS = . tests
 
-lib_LTLIBRARIES = libmm-common.la
+noinst_LTLIBRARIES = libmm-generated.la
 
 GENERATED_H = \
 	mm-enums-types.h \
@@ -36,6 +35,8 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
+
+BUILT_SOURCES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)
 
 # Enum types
 mm-enums-types.h: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.h
@@ -85,25 +86,20 @@ $(mm_gdbus_manager_generated): $(top_srcdir)/introspection/org.freedesktop.Modem
 		$< \
 		$(NULL)
 
-# SIM interface
-mm_gdbus_sim_generated = \
-	mm-gdbus-sim.h \
-	mm-gdbus-sim.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml
-$(mm_gdbus_sim_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sim.xml
-	$(AM_V_GEN) gdbus-codegen \
-		--interface-prefix org.freedesktop.ModemManager1. \
-		--c-namespace=MmGdbus \
-		--generate-docbook mm-gdbus-doc \
-		--generate-c-code mm-gdbus-sim \
-		$< \
-		$(NULL)
-
 # Modem interfaces
 mm_gdbus_modem_generated = \
 	mm-gdbus-modem.h \
 	mm-gdbus-modem.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
 mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
@@ -128,18 +124,17 @@ $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 		$^ \
 		$(NULL)
 
-# SMS interface
-mm_gdbus_sms_generated = \
-	mm-gdbus-sms.h \
-	mm-gdbus-sms.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml
-$(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sms.xml
+# SIM interface
+mm_gdbus_sim_generated = \
+	mm-gdbus-sim.h \
+	mm-gdbus-sim.c \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml
+$(mm_gdbus_sim_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sim.xml
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
 		--generate-docbook mm-gdbus-doc \
-		--generate-c-code mm-gdbus-sms \
-		--annotate "org.freedesktop.ModemManager1.Sms:Data" org.gtk.GDBus.C.ForceGVariant True \
+		--generate-c-code mm-gdbus-sim \
 		$< \
 		$(NULL)
 
@@ -157,82 +152,38 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemM
 		$< \
 		$(NULL)
 
-# Additional dependency rules
-mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
-mm-simple-status.c: mm-errors-types.h mm-enums-types.h
-mm-simple-connect-properties.c: mm-errors-types.h
-mm-bearer-properties.c: mm-errors-types.h
-mm-sms-properties.c: mm-errors-types.h
-mm-bearer-ip-config.c: mm-errors-types.h
-mm-location-3gpp.c: mm-errors-types.h
-mm-location-gps-raw.c: mm-errors-types.h
-mm-location-gps-nmea.c: mm-errors-types.h
-mm-unlock-retries.c: mm-enums-types.h
-mm-network-timezone.c: mm-errors-types.h
-mm-firmware-properties.c: mm-errors-types.h
-
-includedir = @includedir@/libmm-common
-include_HEADERS = \
-	mm-errors-types.h \
-	mm-enums-types.h \
-	mm-common-helpers.h \
-	mm-simple-status.h \
-	mm-simple-connect-properties.h \
-	mm-bearer-properties.h \
-	mm-sms-properties.h \
-	mm-bearer-ip-config.h \
-	mm-location-3gpp.h \
-	mm-location-gps-nmea.h \
-	mm-location-gps-raw.h \
-	mm-unlock-retries.h \
-	mm-network-timezone.h \
-	mm-firmware-properties.h \
-	mm-gdbus-manager.h \
-	mm-gdbus-modem.h \
-	mm-gdbus-bearer.h \
-	mm-gdbus-sim.h \
+# SMS interface
+mm_gdbus_sms_generated = \
 	mm-gdbus-sms.h \
-	libmm-common.h
+	mm-gdbus-sms.c \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml
+$(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sms.xml
+	$(AM_V_GEN) gdbus-codegen \
+		--interface-prefix org.freedesktop.ModemManager1. \
+		--c-namespace=MmGdbus \
+		--generate-docbook mm-gdbus-doc \
+		--generate-c-code mm-gdbus-sms \
+		--annotate "org.freedesktop.ModemManager1.Sms:Data" org.gtk.GDBus.C.ForceGVariant True \
+		$< \
+		$(NULL)
 
-nodist_libmm_common_la_SOURCES = \
+nodist_libmm_generated_la_SOURCES = \
 	$(GENERATED_H) \
 	$(GENERATED_C)
 
-libmm_common_la_SOURCES = \
-	mm-common-helpers.h \
-	mm-common-helpers.c \
-	mm-simple-status.h \
-	mm-simple-status.c \
-	mm-simple-connect-properties.h \
-	mm-simple-connect-properties.c \
-	mm-bearer-properties.h \
-	mm-bearer-properties.c \
-	mm-sms-properties.h \
-	mm-sms-properties.c \
-	mm-bearer-ip-config.h \
-	mm-bearer-ip-config.c \
-	mm-location-3gpp.h \
-	mm-location-3gpp.c \
-	mm-location-gps-raw.h \
-	mm-location-gps-raw.c \
-	mm-location-gps-nmea.h \
-	mm-location-gps-nmea.c \
-	mm-unlock-retries.h \
-	mm-unlock-retries.c \
-	mm-network-timezone.h \
-	mm-network-timezone.c \
-	mm-firmware-properties.h \
-	mm-firmware-properties.c \
-	libmm-common.h
-
-libmm_common_la_CPPFLAGS = \
-	$(LIBMM_COMMON_CFLAGS) \
+libmm_generated_la_CPPFLAGS = \
+	$(LIBMM_GLIB_CFLAGS) \
+	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
 	-Wno-unused-function \
 	-Wno-float-equal \
 	-Wno-shadow
 
-libmm_common_la_LIBADD = \
-	$(LIBMM_COMMON_LIBS)
+libmm_generated_la_LIBADD = \
+	$(LIBMM_GLIB_LIBS)
+
+includedir = @includedir@/libmm-glib
+include_HEADERS = $(GENERATED_H)
 
 CLEANFILES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)

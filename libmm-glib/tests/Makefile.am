@@ -10,11 +10,13 @@ test_common_helpers_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
-	-I$(top_srcdir)/libmm-common \
-	-I$(top_builddir)/libmm-common
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_builddir)/libmm-glib \
+	-I${top_srcdir}/libmm-glib/generated \
+	-I${top_builddir}/libmm-glib/generated
 
 test_common_helpers_LDADD = \
-	$(top_builddir)/libmm-common/libmm-common.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(MM_LIBS)
 
 if WITH_TESTS

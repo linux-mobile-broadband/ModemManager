@@ -96,7 +96,7 @@
       This object also controls any process-wide operation, such as the log
       level being used by the daemon.
     </para>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.xml"/>
   </chapter>
 
   <chapter id="ref-dbus-object-modem">
@@ -133,16 +133,16 @@
       or the
       <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.ModemCdma">CDMA interface</link>.
     </para>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
   </chapter>
 
   <chapter id="ref-dbus-object-bearer">
@@ -153,7 +153,7 @@
       may expose one or more Bearer objects, which can then be used to get the
       modem into connected state.
     </para>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml"/>
   </chapter>
 
   <chapter id="ref-dbus-object-sim">
@@ -164,7 +164,7 @@
       expose up to one SIM object, which allows SIM-specific actions such as PIN
       unlocking.
     </para>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml"/>
   </chapter>
 
   <chapter id="ref-dbus-object-sms">
@@ -174,7 +174,7 @@
       <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Messaging">Messaging interface</link>
       will export one SMS object for each SMS stored in the device.
     </para>
-    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml"/>
   </chapter>
 
 </part>

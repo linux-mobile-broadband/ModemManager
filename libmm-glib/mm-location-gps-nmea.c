@@ -243,4 +243,6 @@ mm_location_gps_nmea_class_init (MMLocationGpsNmeaClass *klass)
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMLocationGpsNmeaPrivate));
+
+    object_class->finalize = finalize;
 }

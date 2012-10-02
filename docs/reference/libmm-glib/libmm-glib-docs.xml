@@ -48,43 +48,65 @@
     </legalnotice>
   </bookinfo>
 
-  <chapter>
-    <title>The Manager object</title>
-    <xi:include href="xml/mm-manager.xml"/>
-  </chapter>
+  <part>
+    <title>Helper types</title>
+    <xi:include href="xml/mm-firmware-properties.xml"/>
+    <xi:include href="xml/mm-bearer-properties.xml"/>
+    <xi:include href="xml/mm-bearer-ip-config.xml"/>
+  </part>
 
-  <chapter>
-    <title>The Modem object</title>
-    <xi:include href="xml/mm-object.xml"/>
-    <xi:include href="xml/mm-modem.xml"/>
-    <xi:include href="xml/mm-modem-3gpp.xml"/>
-    <xi:include href="xml/mm-modem-3gpp-ussd.xml"/>
-    <xi:include href="xml/mm-modem-cdma.xml"/>
-    <xi:include href="xml/mm-modem-location.xml"/>
-    <xi:include href="xml/mm-modem-messaging.xml"/>
-    <xi:include href="xml/mm-modem-time.xml"/>
-    <xi:include href="xml/mm-modem-firmware.xml"/>
-    <xi:include href="xml/mm-modem-simple.xml"/>
-  </chapter>
+  <part>
+    <title>High level API</title>
 
-  <chapter>
-    <title>The Bearer object</title>
-    <xi:include href="xml/mm-bearer.xml"/>
-  </chapter>
+    <chapter>
+      <title>The Manager object</title>
+      <xi:include href="xml/mm-manager.xml"/>
+    </chapter>
 
-  <chapter>
-    <title>The SIM object</title>
-    <xi:include href="xml/mm-sim.xml"/>
-  </chapter>
+    <chapter>
+      <title>The Modem object</title>
+      <xi:include href="xml/mm-object.xml"/>
+      <xi:include href="xml/mm-modem.xml"/>
+      <xi:include href="xml/mm-modem-3gpp.xml"/>
+      <xi:include href="xml/mm-modem-3gpp-ussd.xml"/>
+      <xi:include href="xml/mm-modem-cdma.xml"/>
+      <xi:include href="xml/mm-modem-location.xml"/>
+      <xi:include href="xml/mm-modem-messaging.xml"/>
+      <xi:include href="xml/mm-modem-time.xml"/>
+      <xi:include href="xml/mm-modem-firmware.xml"/>
+      <xi:include href="xml/mm-modem-simple.xml"/>
+    </chapter>
 
-  <chapter>
-    <title>The SMS object</title>
-    <xi:include href="xml/mm-sms.xml"/>
-  </chapter>
+    <chapter>
+      <title>The Bearer object</title>
+      <xi:include href="xml/mm-bearer.xml"/>
+    </chapter>
+
+    <chapter>
+      <title>The SIM object</title>
+      <xi:include href="xml/mm-sim.xml"/>
+    </chapter>
+
+    <chapter>
+      <title>The SMS object</title>
+      <xi:include href="xml/mm-sms.xml"/>
+    </chapter>
+
+  </part>
+
+  <part>
+    <title>Low level API</title>
+
+    <xi:include href="xml/mm-gdbus-manager.xml"/>
+    <xi:include href="xml/mm-gdbus-modem.xml"/>
+    <xi:include href="xml/mm-gdbus-bearer.xml"/>
+    <xi:include href="xml/mm-gdbus-sim.xml"/>
+    <xi:include href="xml/mm-gdbus-sms.xml"/>
+  </part>
 
   <chapter id="object-tree">
     <title>Object Hierarchy</title>
-     <xi:include href="xml/tree_index.sgml"/>
+    <xi:include href="xml/tree_index.sgml"/>
   </chapter>
 
   <index id="api-index-full">
