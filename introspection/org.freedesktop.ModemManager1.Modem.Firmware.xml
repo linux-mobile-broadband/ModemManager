@@ -55,39 +55,35 @@
 
     <!--
         List:
-        @selected: The identifier of the selected firmware slot, or the empty string if no slot is selected (such as if all slots are empty, or no slots exist).
-        @installed: A dictionary of slots into which firmware is and/or can be installed. The key of each entry is the identifier of the slot, and the value is either an empty dictionary if the slot is empty, or a dictionary of properties of the firmware image installed in that slot. The slot identifiers and the mapping between slots and firmware images are guaranteed to remain stable only as long as the modem remains present.
-        @available: A dictionary of available firmware images. The key of each entry is the identifier of the image, and the value is a dictionary of properties of the image. The image identifiers are guaranteed to remain stable only as long as the modem remains present.
+        @selected: The unique name of the selected firmware image, or the empty string if no image is selected.
+        @installed: An array of dictionaries containing the properties of the installed firmware images.
 
-        List installed and available firmware images.
+        List installed firmware images.
 
         Depending on the type of modem, installed images may be stored on the
-        host or the modem.  The distinction between @installed and
-        @available is not one of where the firmware is stored, but that
-        installed images can be selected non-destructively, while available
-        images must be installed into a slot, possibly overwriting another
-        installed image.
+        host or the modem.
+
+        Installed images can be selected non-destructively.
     -->
     <method name="List">
-      <arg name="selected"  type="s"         direction="out" />
-      <arg name="installed" type="a{sa{sv}}" direction="out" />
-      <arg name="available" type="a{sa{sv}}" direction="out" />
+      <arg name="selected"  type="s"        direction="out" />
+      <arg name="installed" type="a{a{sv}}" direction="out" />
     </method>
 
     <!--
         Select:
-        @slot: The identifier of the firmware slot to select.
+        @name: The unique name of the firmware image to select.
 
         Selects a different firmware image to use, and immediately resets the
         modem so that it begins using the new firmware image.
 
-        The method will fail if the identifier does not match any of the slot
-        identifiers returned by
+        The method will fail if the identifier does not match any of the names
+        returned by
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Firmware.List">List()</link>,
-        or if the slot could not be selected for some reason.
+        or if the image could not be selected for some reason.
     -->
     <method name="Select">
-      <arg name="slot" type="s" direction="in" />
+      <arg name="name" type="s" direction="in" />
     </method>
 
     <!--
@@ -104,11 +100,11 @@
 
         The method will fail if either of the identifiers is invalid, or if the
         image could not be installed into the slot for some reason.
-    -->
+
     <method name="Install">
       <arg name="image" type="s" direction="in" />
       <arg name="slot"  type="s" direction="in" />
-    </method>
+    </method-->
 
   </interface>
 </node>
