@@ -275,15 +275,21 @@ mm_modem_messaging_list_finish (MMModemMessaging *self,
     return g_list_copy (list);
 }
 
+static void create_next_sms (ListSmsContext *ctx);
+
 static void
 list_build_object_ready (GDBusConnection *connection,
                          GAsyncResult *res,
                          ListSmsContext *ctx)
 {
-    MMSms *sms;
     GError *error = NULL;
+    GObject *sms;
+    GObject *source_object;
 
-    sms = mm_sms_new_finish (res, &error);
+    source_object = g_async_result_get_source_object (res);
+    sms = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         list_sms_context_complete_and_free (ctx);
@@ -304,12 +310,23 @@ list_build_object_ready (GDBusConnection *connection,
     }
 
     /* Keep on creating next object */
-    mm_sms_new (g_dbus_proxy_get_connection (
-                    G_DBUS_PROXY (ctx->self)),
-                ctx->sms_paths[ctx->i],
-                ctx->cancellable,
-                (GAsyncReadyCallback)list_build_object_ready,
-                ctx);
+    create_next_sms (ctx);
+}
+
+static void
+create_next_sms (ListSmsContext *ctx)
+{
+    g_async_initable_new_async (MM_TYPE_SMS,
+                                G_PRIORITY_DEFAULT,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)list_build_object_ready,
+                                ctx,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (ctx->self)),
+                                "g-object-path",    ctx->sms_paths[ctx->i],
+                                "g-interface-name", "org.freedesktop.ModemManager1.Sms",
+                                NULL);
 }
 
 static void
@@ -335,12 +352,7 @@ list_ready (MMModemMessaging *self,
 
     /* Got list of paths. If at least one found, start creating objects for each */
     ctx->i = 0;
-    mm_sms_new (g_dbus_proxy_get_connection (
-                    G_DBUS_PROXY (self)),
-                ctx->sms_paths[ctx->i],
-                ctx->cancellable,
-                (GAsyncReadyCallback)list_build_object_ready,
-                ctx);
+    create_next_sms (ctx);
 }
 
 /**
@@ -417,14 +429,17 @@ mm_modem_messaging_list_sync (MMModemMessaging *self,
         return NULL;
 
     for (i = 0; sms_paths[i]; i++) {
-        MMSms *sms;
+        GObject *sms;
 
-        sms = mm_sms_new_sync (g_dbus_proxy_get_connection (
-                                   G_DBUS_PROXY (self)),
-                               sms_paths[i],
-                               cancellable,
-                               error);
-
+        sms = g_initable_new (MM_TYPE_SMS,
+                                 cancellable,
+                                 error,
+                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                 "g-name",           MM_DBUS_SERVICE,
+                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                 "g-object-path",    sms_paths[i],
+                                 "g-interface-name", "org.freedesktop.ModemManager1.Sms",
+                              NULL);
         if (!sms) {
             sms_object_list_free (sms_objects);
             g_strfreev (sms_paths);
@@ -485,9 +500,13 @@ new_sms_object_ready (GDBusConnection *connection,
                       CreateSmsContext *ctx)
 {
     GError *error = NULL;
-    MMSms *sms;
+    GObject *sms;
+    GObject *source_object;
 
-    sms = mm_sms_new_finish (res, &error);
+    source_object = g_async_result_get_source_object (res);
+    sms = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
     if (error)
         g_simple_async_result_take_error (ctx->result, error);
     else
@@ -516,12 +535,17 @@ create_sms_ready (MMModemMessaging *self,
         return;
     }
 
-    mm_sms_new (g_dbus_proxy_get_connection (
-                    G_DBUS_PROXY (self)),
-                sms_path,
-                ctx->cancellable,
-                (GAsyncReadyCallback)new_sms_object_ready,
-                ctx);
+    g_async_initable_new_async (MM_TYPE_SMS,
+                                G_PRIORITY_DEFAULT,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)new_sms_object_ready,
+                                ctx,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                "g-object-path",    sms_path,
+                                "g-interface-name", "org.freedesktop.ModemManager1.Sms",
+                                NULL);
     g_free (sms_path);
 }
 
@@ -604,17 +628,21 @@ mm_modem_messaging_create_sync (MMModemMessaging *self,
                                                cancellable,
                                                error);
     if (sms_path) {
-        sms = mm_sms_new_sync (g_dbus_proxy_get_connection (
-                                   G_DBUS_PROXY (self)),
-                               sms_path,
-                               cancellable,
-                               error);
+        sms = g_initable_new (MM_TYPE_SMS,
+                              cancellable,
+                              error,
+                              "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                              "g-name",           MM_DBUS_SERVICE,
+                              "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                              "g-object-path",    sms_path,
+                              "g-interface-name", "org.freedesktop.ModemManager1.Sms",
+                              NULL);
         g_free (sms_path);
     }
 
     g_variant_unref (dictionary);
 
-    return sms;
+    return (sms ? MM_SMS (sms) : NULL);
 }
 
 /*****************************************************************************/

@@ -27,6 +27,22 @@
 #include "mm-modem.h"
 
 /**
+ * SECTION: mm-sms
+ * @title: MMSms
+ * @short_description: The SMS interface
+ *
+ * The #MMSms is an object providing access to the methods, signals and
+ * properties of the SMS interface.
+ *
+ * When the SMS is exposed and available in the bus, it is ensured that at
+ * least this interface is also available.
+ */
+
+G_DEFINE_TYPE (MMSms, mm_sms, MM_GDBUS_TYPE_SMS_PROXY)
+
+/*****************************************************************************/
+
+/**
  * mm_sms_get_path:
  * @self: A #MMSms.
  *
@@ -37,7 +53,7 @@
 const gchar *
 mm_sms_get_path (MMSms *self)
 {
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
         g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
@@ -56,7 +72,7 @@ mm_sms_dup_path (MMSms *self)
 {
     gchar *value;
 
-    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     g_object_get (G_OBJECT (self),
                   "g-object-path", &value,
@@ -65,50 +81,57 @@ mm_sms_dup_path (MMSms *self)
     RETURN_NON_EMPTY_STRING (value);
 }
 
+/*****************************************************************************/
+
 /**
  * mm_sms_get_text:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the message text, in UTF-8.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_text() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sms_dup_text() if on another
+ * thread.</warning>
  *
- * Returns: (transfer none): The name of the text, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The message text, or %NULL if it doesn't contain any (e.g. contains data instead).
  */
 const gchar *
 mm_sms_get_text (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sms_get_text (self));
+        mm_gdbus_sms_get_text (MM_GDBUS_SMS (self)));
 }
 
 /**
  * mm_sms_dup_text:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the message text, in UTF-8.
  *
- * Returns: (transfer full): The name of the text, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The message text, or %NULL if it doesn't contain any (e.g. contains data instead). The returned value should be freed with g_free().
  */
 gchar *
 mm_sms_dup_text (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sms_dup_text (self));
+        mm_gdbus_sms_dup_text (MM_GDBUS_SMS (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_data:
  * @self: A #MMSms.
- * @data_len: (out) Size of the output data, if any given.
+ * @data_len: (out): Size of the output data, if any given.
  *
- * TODO
+ * Gets the message data.
  *
- * Returns: (transfer none): The data, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer none): The message data, or %NULL if it doesn't contain any (e.g. contains text instead).
  */
 const guint8 *
 mm_sms_get_data (MMSms *self,
@@ -116,7 +139,8 @@ mm_sms_get_data (MMSms *self,
 {
     GVariant *data;
 
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
 
     data = mm_gdbus_sms_get_data (MM_GDBUS_SMS (self));
     return (data ?
@@ -132,9 +156,9 @@ mm_sms_get_data (MMSms *self,
  * @self: A #MMSms.
  * @data_len: (out) Size of the output data, if any given.
  *
- * TODO
+ * Gets the message data.
  *
- * Returns: (transfer full): The data, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_free().
  */
 guint8 *
 mm_sms_dup_data (MMSms *self,
@@ -145,7 +169,7 @@ mm_sms_dup_data (MMSms *self,
     const guint8 *orig_data;
     gsize orig_data_len = 0;
 
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     /* Get a ref to ensure the variant is valid as long as we use it */
     data_variant = mm_gdbus_sms_dup_data (MM_GDBUS_SMS (self));
@@ -166,268 +190,357 @@ mm_sms_dup_data (MMSms *self,
     return out;
 }
 
+/*****************************************************************************/
+
 /**
  * mm_sms_get_number:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the number to which the message is addressed.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_number() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sms_dup_number() if on another
+ * thread.</warning>
  *
- * Returns: (transfer none): The name of the number, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The number, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sms_get_number (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sms_get_number (self));
+        mm_gdbus_sms_get_number (MM_GDBUS_SMS (self)));
 }
 
 /**
  * mm_sms_dup_number:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the number to which the message is addressed.
  *
- * Returns: (transfer full): The name of the number, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The number, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
  */
 gchar *
 mm_sms_dup_number (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sms_dup_number (self));
+        mm_gdbus_sms_dup_number (MM_GDBUS_SMS (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_smsc:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the SMS service center number.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_smsc() if on another thread.</warning>
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sms_dup_smsc() if on another
+ * thread.</warning>
  *
- * Returns: (transfer none): The name of the smsc, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The number of the SMSC, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sms_get_smsc (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sms_get_smsc (self));
+        mm_gdbus_sms_get_smsc (MM_GDBUS_SMS (self)));
 }
 
 /**
  * mm_sms_dup_smsc:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the SMS service center number.
  *
- * Returns: (transfer full): The name of the smsc, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The number of the SMSC, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
  */
 gchar *
 mm_sms_dup_smsc (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sms_dup_smsc (self));
+        mm_gdbus_sms_dup_smsc (MM_GDBUS_SMS (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_timestamp:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the time when the first PDU of the SMS message arrived the SMSC, in
+ * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
+ * format.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_timestamp() if on another thread.</warning>
+ * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_DELIVER or
+ * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * Returns: (transfer none): The name of the timestamp, or %NULL if it couldn't be retrieved.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sms_dup_timestamp() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The timestamp, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sms_get_timestamp (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sms_get_timestamp (self));
+        mm_gdbus_sms_get_timestamp (MM_GDBUS_SMS (self)));
 }
 
 /**
  * mm_sms_dup_timestamp:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the time when the first PDU of the SMS message arrived the SMSC, in
+ * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
+ * format.
  *
- * Returns: (transfer full): The name of the timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_DELIVER or
+ * %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ *
+ * Returns: (transfer full): The timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
  */
 gchar *
 mm_sms_dup_timestamp (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sms_dup_timestamp (self));
+        mm_gdbus_sms_dup_timestamp (MM_GDBUS_SMS (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_discharge_timestamp:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the time when the first PDU of the SMS message left the SMSC, in
+ * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
+ * format.
  *
- * <warning>It is only safe to use this function on the thread where @self was constructed. Use mm_sms_dup_timestamp() if on another thread.</warning>
+ * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * Returns: (transfer none): The name of the timestamp, or %NULL if it couldn't be retrieved.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sms_dup_discharge_timestamp() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The timestamp, or %NULL if it couldn't be retrieved.
  */
 const gchar *
 mm_sms_get_discharge_timestamp (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_CONSTANT_STRING (
-        mm_gdbus_sms_get_discharge_timestamp (self));
+        mm_gdbus_sms_get_discharge_timestamp (MM_GDBUS_SMS (self)));
 }
 
 /**
  * mm_sms_dup_discharge_timestamp:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the time when the first PDU of the SMS message left the SMSC, in
+ * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
+ * format.
  *
- * Returns: (transfer full): The name of the timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ *
+ * Returns: (transfer full): The timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
  */
 gchar *
 mm_sms_dup_discharge_timestamp (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), NULL);
+    g_return_val_if_fail (MM_IS_SMS (self), NULL);
 
     RETURN_NON_EMPTY_STRING (
-        mm_gdbus_sms_dup_discharge_timestamp (self));
+        mm_gdbus_sms_dup_discharge_timestamp (MM_GDBUS_SMS (self)));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_validity:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the validity time of the SMS.
  *
- * Returns: TODO
+ * Returns: the validity time or 0 if unknown.
  */
 guint
 mm_sms_get_validity (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
+    g_return_val_if_fail (MM_IS_SMS (self), 0);
 
-    return mm_gdbus_sms_get_validity (self);
+    return mm_gdbus_sms_get_validity (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_class:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the 3GPP message class of the SMS.
  *
- * Returns: TODO
+ * Returns: the message class.
  */
 guint
 mm_sms_get_class (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
+    g_return_val_if_fail (MM_IS_SMS (self), 0);
 
-    return mm_gdbus_sms_get_class (self);
+    return mm_gdbus_sms_get_class (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_message_reference:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the message reference of the last PDU sent/received within this SMS.
  *
- * Returns: TODO
+ * If the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT, this field identifies the
+ * message reference of the PDU associated to the status report.
+ *
+ * Returns: The message reference.
  */
 guint
 mm_sms_get_message_reference (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), 0);
+    g_return_val_if_fail (MM_IS_SMS (self), 0);
 
-    return mm_gdbus_sms_get_message_reference (self);
+    return mm_gdbus_sms_get_message_reference (MM_GDBUS_SMS (self));
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_sms_get_delivery_report_request:
+ * @self: A #MMSms.
+ *
+ * Checks whether delivery report is requested for this SMS.
+ *
+ * Returns: %TRUE if delivery report is requested, %FALSE otherwise.
+ */
 gboolean
 mm_sms_get_delivery_report_request (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_IS_SMS (self), FALSE);
 
-    return mm_gdbus_sms_get_delivery_report_request (self);
+    return mm_gdbus_sms_get_delivery_report_request (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_delivery_state:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the delivery state of this SMS.
  *
- * Returns: TODO
+ * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ *
+ * Returns: A #MMSmsDeliveryState specifying the delivery state.
  */
 guint
 mm_sms_get_delivery_state (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_DELIVERY_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_DELIVERY_STATE_UNKNOWN);
 
-    return mm_gdbus_sms_get_delivery_state (self);
+    return mm_gdbus_sms_get_delivery_state (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_state:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the state of this SMS.
  *
- * Returns: TODO
+ * Returns: A #MMSmsState specifying the state.
  */
 MMSmsState
 mm_sms_get_state (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_STATE_UNKNOWN);
 
-    return mm_gdbus_sms_get_state (self);
+    return (MMSmsState)mm_gdbus_sms_get_state (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_storage:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the storage in which this SMS is kept.
  *
- * Returns: TODO
+ * Returns: A #MMSmsStorage specifying the storage.
  */
 MMSmsStorage
 mm_sms_get_storage (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_STORAGE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_STORAGE_UNKNOWN);
 
-    return mm_gdbus_sms_get_storage (self);
+    return (MMSmsStorage)mm_gdbus_sms_get_storage (MM_GDBUS_SMS (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sms_get_pdu_type:
  * @self: A #MMSms.
  *
- * TODO
+ * Gets the PDU type on which this SMS is based.
  *
- * Returns: TODO
+ * Returns: A #MMSmsPduType specifying the PDU type.
  */
 MMSmsPduType
 mm_sms_get_pdu_type (MMSms *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), MM_SMS_PDU_TYPE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_PDU_TYPE_UNKNOWN);
 
-    return (MMSmsPduType)mm_gdbus_sms_get_pdu_type (self);
+    return (MMSmsPduType)mm_gdbus_sms_get_pdu_type (MM_GDBUS_SMS (self));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sms_send_finish:
+ * @self: A #MMSms.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_send().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sms_send().
+ *
+ * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sms_send_finish (MMSms *self,
+                    GAsyncResult *res,
+                    GError **error)
+{
+    g_return_val_if_fail (MM_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_call_send_finish (MM_GDBUS_SMS (self), res, error);
 }
 
 /**
@@ -437,7 +550,9 @@ mm_sms_get_pdu_type (MMSms *self)
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
- * TODO
+ * Asynchronously requests to queue the message for delivery.
+ *
+ * SMS objects can only be sent once.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
  * You can then call mm_sms_send_finish() to get the result of the operation.
@@ -450,32 +565,12 @@ mm_sms_send (MMSms *self,
              GAsyncReadyCallback callback,
              gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SMS (self));
+    g_return_if_fail (MM_IS_SMS (self));
 
-    mm_gdbus_sms_call_send (self,
+    mm_gdbus_sms_call_send (MM_GDBUS_SMS (self),
                             cancellable,
                             callback,
                             user_data);
-}
-
-/**
- * mm_sms_send_finish:
- * @self: A #MMSms.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_send().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sms_send().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sms_send_finish (MMSms *self,
-                    GAsyncResult *res,
-                    GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
-
-    return mm_gdbus_sms_call_send_finish (self, res, error);
 }
 
 /**
@@ -484,23 +579,47 @@ mm_sms_send_finish (MMSms *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * TODO
+ * Synchronously requests to queue the message for delivery.
+ *
+ * SMS objects can only be sent once.
  *
  * The calling thread is blocked until a reply is received.
  * See mm_sms_send() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_send_sync (MMSms *self,
                   GCancellable *cancellable,
                   GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_IS_SMS (self), FALSE);
 
-    return mm_gdbus_sms_call_send_sync (self,
+    return mm_gdbus_sms_call_send_sync (MM_GDBUS_SMS (self),
                                         cancellable,
                                         error);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sms_store_finish:
+ * @self: A #MMSms.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_store().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sms_store().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sms_store_finish (MMSms *self,
+                     GAsyncResult *res,
+                     GError **error)
+{
+    g_return_val_if_fail (MM_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_call_store_finish (MM_GDBUS_SMS (self), res, error);
 }
 
 /**
@@ -511,7 +630,9 @@ mm_sms_send_sync (MMSms *self,
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
- * TODO
+ * Asynchronoulsy requests to store the message in the device if not already done.
+ *
+ * SMS objects can only be stored once.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
  * You can then call mm_sms_store_finish() to get the result of the operation.
@@ -525,33 +646,13 @@ mm_sms_store (MMSms *self,
               GAsyncReadyCallback callback,
               gpointer user_data)
 {
-    g_return_if_fail (MM_GDBUS_IS_SMS (self));
+    g_return_if_fail (MM_IS_SMS (self));
 
-    mm_gdbus_sms_call_store (self,
+    mm_gdbus_sms_call_store (MM_GDBUS_SMS (self),
                              storage,
                              cancellable,
                              callback,
                              user_data);
-}
-
-/**
- * mm_sms_store_finish:
- * @self: A #MMSms.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_store().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_sms_store().
- *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
- */
-gboolean
-mm_sms_store_finish (MMSms *self,
-                     GAsyncResult *res,
-                     GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
-
-    return mm_gdbus_sms_call_store_finish (self, res, error);
 }
 
 /**
@@ -561,12 +662,14 @@ mm_sms_store_finish (MMSms *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * TODO
+ * Synchronoulsy requests to store the message in the device if not already done.
+ *
+ * SMS objects can only be stored once.
  *
  * The calling thread is blocked until a reply is received.
  * See mm_sms_store() for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_store_sync (MMSms *self,
@@ -574,47 +677,22 @@ mm_sms_store_sync (MMSms *self,
                    GCancellable *cancellable,
                    GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+    g_return_val_if_fail (MM_IS_SMS (self), FALSE);
 
-    return mm_gdbus_sms_call_store_sync (self,
+    return mm_gdbus_sms_call_store_sync (MM_GDBUS_SMS (self),
                                          storage,
                                          cancellable,
                                          error);
 }
 
-void
-mm_sms_new (GDBusConnection *connection,
-            const gchar *path,
-            GCancellable *cancellable,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+/*****************************************************************************/
+
+static void
+mm_sms_init (MMSms *self)
 {
-    return mm_gdbus_sms_proxy_new (connection,
-                                   G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-                                   MM_DBUS_SERVICE,
-                                   path,
-                                   cancellable,
-                                   callback,
-                                   user_data);
 }
 
-MMSms *
-mm_sms_new_finish (GAsyncResult *res,
-                   GError **error)
+static void
+mm_sms_class_init (MMSmsClass *sms_class)
 {
-    return mm_gdbus_sms_proxy_new_finish (res, error);
-}
-
-MMSms *
-mm_sms_new_sync (GDBusConnection *connection,
-                 const gchar *path,
-                 GCancellable *cancellable,
-                 GError **error)
-{
-    return mm_gdbus_sms_proxy_new_sync (connection,
-                                        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-                                        MM_DBUS_SERVICE,
-                                        path,
-                                        cancellable,
-                                        error);
 }

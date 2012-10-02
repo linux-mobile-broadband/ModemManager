@@ -28,26 +28,73 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusSms     MMSms;
-#define MM_TYPE_SMS(o) MM_GDBUS_TYPE_SMS (o)
-#define MM_SMS(o)      MM_GDBUS_SMS(o)
-#define MM_IS_SMS(o)   MM_GDBUS_IS_SMS(o)
+#define MM_TYPE_SMS            (mm_sms_get_type ())
+#define MM_SMS(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SMS, MMSms))
+#define MM_SMS_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_SMS, MMSmsClass))
+#define MM_IS_SMS(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SMS))
+#define MM_IS_SMS_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_SMS))
+#define MM_SMS_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_SMS, MMSmsClass))
 
-const gchar *mm_sms_get_path (MMSms *self);
-gchar       *mm_sms_dup_path (MMSms *self);
+typedef struct _MMSms MMSms;
+typedef struct _MMSmsClass MMSmsClass;
 
-void mm_sms_new (GDBusConnection     *connection,
-                 const gchar         *object_path,
-                 GCancellable        *cancellable,
-                 GAsyncReadyCallback  callback,
-                 gpointer             user_data);
-MMSms *mm_sms_new_finish (GAsyncResult  *res,
-                          GError       **error);
+/**
+ * MMSms:
+ *
+ * The #MMSms structure contains private data and should only be accessed
+ * using the provided API.
+ */
+struct _MMSms {
+    /*< private >*/
+    MmGdbusSmsProxy parent;
+    gpointer unused;
+};
 
-MMSms *mm_sms_new_sync (GDBusConnection     *connection,
-                        const gchar         *object_path,
-                        GCancellable        *cancellable,
-                        GError             **error);
+struct _MMSmsClass {
+    /*< private >*/
+    MmGdbusSmsProxyClass parent;
+};
+
+GType mm_sms_get_type (void);
+
+const gchar *mm_sms_get_path                     (MMSms *self);
+gchar       *mm_sms_dup_path                     (MMSms *self);
+
+const gchar  *mm_sms_get_text                    (MMSms *self);
+gchar        *mm_sms_dup_text                    (MMSms *self);
+
+const guint8 *mm_sms_get_data                    (MMSms *self,
+                                                  gsize *data_len);
+guint8       *mm_sms_dup_data                    (MMSms *self,
+                                                  gsize *data_len);
+
+const gchar  *mm_sms_get_number                  (MMSms *self);
+gchar        *mm_sms_dup_number                  (MMSms *self);
+
+const gchar  *mm_sms_get_smsc                    (MMSms *self);
+gchar        *mm_sms_dup_smsc                    (MMSms *self);
+
+const gchar  *mm_sms_get_timestamp               (MMSms *self);
+gchar        *mm_sms_dup_timestamp               (MMSms *self);
+
+const gchar  *mm_sms_get_discharge_timestamp     (MMSms *self);
+gchar        *mm_sms_dup_discharge_timestamp     (MMSms *self);
+
+guint         mm_sms_get_validity                (MMSms *self);
+
+guint         mm_sms_get_class                   (MMSms *self);
+
+guint         mm_sms_get_message_reference       (MMSms *self);
+
+gboolean      mm_sms_get_delivery_report_request (MMSms *self);
+
+guint         mm_sms_get_delivery_state          (MMSms *self);
+
+MMSmsState    mm_sms_get_state                   (MMSms *self);
+
+MMSmsStorage  mm_sms_get_storage                 (MMSms *self);
+
+MMSmsPduType  mm_sms_get_pdu_type                (MMSms *self);
 
 void     mm_sms_send        (MMSms *self,
                              GCancellable *cancellable,
@@ -72,29 +119,6 @@ gboolean mm_sms_store_sync   (MMSms *self,
                               MMSmsStorage storage,
                               GCancellable *cancellable,
                               GError **error);
-
-const gchar  *mm_sms_get_text                    (MMSms *self);
-gchar        *mm_sms_dup_text                    (MMSms *self);
-const guint8 *mm_sms_get_data                    (MMSms *self,
-                                                  gsize *data_len);
-guint8       *mm_sms_dup_data                    (MMSms *self,
-                                                  gsize *data_len);
-const gchar  *mm_sms_get_number                  (MMSms *self);
-gchar        *mm_sms_dup_number                  (MMSms *self);
-const gchar  *mm_sms_get_smsc                    (MMSms *self);
-gchar        *mm_sms_dup_smsc                    (MMSms *self);
-const gchar  *mm_sms_get_timestamp               (MMSms *self);
-gchar        *mm_sms_dup_timestamp               (MMSms *self);
-const gchar  *mm_sms_get_discharge_timestamp     (MMSms *self);
-gchar        *mm_sms_dup_discharge_timestamp     (MMSms *self);
-guint         mm_sms_get_validity                (MMSms *self);
-guint         mm_sms_get_class                   (MMSms *self);
-guint         mm_sms_get_message_reference       (MMSms *self);
-gboolean      mm_sms_get_delivery_report_request (MMSms *self);
-guint         mm_sms_get_delivery_state          (MMSms *self);
-MMSmsState    mm_sms_get_state                   (MMSms *self);
-MMSmsStorage  mm_sms_get_storage                 (MMSms *self);
-MMSmsPduType  mm_sms_get_pdu_type                (MMSms *self);
 
 G_END_DECLS
 
