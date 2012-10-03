@@ -118,12 +118,67 @@
 
   <part>
     <title>Low level API</title>
+    <xi:include href="xml/MmGdbusOrgFreedesktopModemManager1.xml"/>
+    <xi:include href="xml/MmGdbusOrgFreedesktopModemManager1Proxy.xml"/>
+    <xi:include href="xml/MmGdbusOrgFreedesktopModemManager1Skeleton.xml"/>
+    <xi:include href="xml/MmGdbusObjectManagerClient.xml"/>
 
-    <xi:include href="xml/mm-gdbus-manager.xml"/>
-    <xi:include href="xml/mm-gdbus-modem.xml"/>
-    <xi:include href="xml/mm-gdbus-bearer.xml"/>
-    <xi:include href="xml/mm-gdbus-sim.xml"/>
-    <xi:include href="xml/mm-gdbus-sms.xml"/>
+    <xi:include href="xml/MmGdbusObject.xml"/>
+    <xi:include href="xml/MmGdbusObjectProxy.xml"/>
+    <xi:include href="xml/MmGdbusObjectSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModem.xml"/>
+    <xi:include href="xml/MmGdbusModemProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModem3gpp.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppProxy.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModem3gppUssd.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppUssdProxy.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppUssdSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemCdma.xml"/>
+    <xi:include href="xml/MmGdbusModemCdmaProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemCdmaSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemLocation.xml"/>
+    <xi:include href="xml/MmGdbusModemLocationProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemLocationSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemMessaging.xml"/>
+    <xi:include href="xml/MmGdbusModemMessagingProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemMessagingSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemTime.xml"/>
+    <xi:include href="xml/MmGdbusModemTimeProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemTimeSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemFirmware.xml"/>
+    <xi:include href="xml/MmGdbusModemFirmwareProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemFirmwareSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemContacts.xml"/>
+    <xi:include href="xml/MmGdbusModemContactsProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemContactsSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemSimple.xml"/>
+    <xi:include href="xml/MmGdbusModemSimpleProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemSimpleSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusBearer.xml"/>
+    <xi:include href="xml/MmGdbusBearerProxy.xml"/>
+    <xi:include href="xml/MmGdbusBearerSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusSim.xml"/>
+    <xi:include href="xml/MmGdbusSimProxy.xml"/>
+    <xi:include href="xml/MmGdbusSimSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusSms.xml"/>
+    <xi:include href="xml/MmGdbusSmsProxy.xml"/>
+    <xi:include href="xml/MmGdbusSmsSkeleton.xml"/>
+
   </part>
 
   <chapter id="object-tree">
