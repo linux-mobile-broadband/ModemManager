@@ -38,64 +38,82 @@ typedef struct _MMSimpleConnectProperties MMSimpleConnectProperties;
 typedef struct _MMSimpleConnectPropertiesClass MMSimpleConnectPropertiesClass;
 typedef struct _MMSimpleConnectPropertiesPrivate MMSimpleConnectPropertiesPrivate;
 
+/**
+ * MMSimpleConnectProperties:
+ *
+ * The #MMSimpleConnectProperties structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMSimpleConnectProperties {
+    /*< private >*/
     GObject parent;
     MMSimpleConnectPropertiesPrivate *priv;
 };
 
 struct _MMSimpleConnectPropertiesClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_simple_connect_properties_get_type (void);
 
 MMSimpleConnectProperties *mm_simple_connect_properties_new (void);
+
+void mm_simple_connect_properties_set_pin           (MMSimpleConnectProperties *self,
+                                                     const gchar *pin);
+void mm_simple_connect_properties_set_operator_id   (MMSimpleConnectProperties *self,
+                                                     const gchar *operator_id);
+void mm_simple_connect_properties_set_bands         (MMSimpleConnectProperties *self,
+                                                     const MMModemBand *bands,
+                                                     guint n_bands);
+void mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
+                                                     MMModemMode allowed,
+                                                     MMModemMode preferred);
+void mm_simple_connect_properties_set_apn           (MMSimpleConnectProperties *self,
+                                                     const gchar *apn);
+void mm_simple_connect_properties_set_user          (MMSimpleConnectProperties *self,
+                                                     const gchar *user);
+void mm_simple_connect_properties_set_password      (MMSimpleConnectProperties *self,
+                                                     const gchar *password);
+void mm_simple_connect_properties_set_ip_type       (MMSimpleConnectProperties *self,
+                                                     MMBearerIpFamily ip_type);
+void mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
+                                                     gboolean allow_roaming);
+void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *self,
+                                                     const gchar *number);
+
+const gchar      *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *self);
+const gchar      *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *self);
+gboolean          mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *self,
+                                                                  const MMModemBand **bands,
+                                                                  guint *n_bands);
+gboolean          mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
+                                                                  MMModemMode *allowed,
+                                                                  MMModemMode *preferred);
+const gchar      *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *self);
+const gchar      *mm_simple_connect_properties_get_user          (MMSimpleConnectProperties *self);
+const gchar      *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *self);
+MMBearerIpFamily  mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *self);
+gboolean          mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self);
+const gchar      *mm_simple_connect_properties_get_number        (MMSimpleConnectProperties *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
 MMSimpleConnectProperties *mm_simple_connect_properties_new_from_string (const gchar *str,
                                                                          GError **error);
 MMSimpleConnectProperties *mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                                                                              GError **error);
 
-void mm_simple_connect_properties_set_pin           (MMSimpleConnectProperties *properties,
-                                                     const gchar *pin);
-void mm_simple_connect_properties_set_operator_id   (MMSimpleConnectProperties *properties,
-                                                     const gchar *operator_id);
-void mm_simple_connect_properties_set_bands         (MMSimpleConnectProperties *properties,
-                                                     const MMModemBand *bands,
-                                                     guint n_bands);
-void mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *properties,
-                                                     MMModemMode allowed,
-                                                     MMModemMode preferred);
-void mm_simple_connect_properties_set_apn           (MMSimpleConnectProperties *properties,
-                                                     const gchar *apn);
-void mm_simple_connect_properties_set_user          (MMSimpleConnectProperties *properties,
-                                                     const gchar *user);
-void mm_simple_connect_properties_set_password      (MMSimpleConnectProperties *properties,
-                                                     const gchar *password);
-void mm_simple_connect_properties_set_ip_type       (MMSimpleConnectProperties *properties,
-                                                     MMBearerIpFamily ip_type);
-void mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *properties,
-                                                     gboolean allow_roaming);
-void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *properties,
-                                                     const gchar *number);
-
-const gchar      *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *properties);
-const gchar      *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *properties);
-gboolean          mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *properties,
-                                                                  const MMModemBand **bands,
-                                                                  guint *n_bands);
-gboolean          mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *properties,
-                                                                  MMModemMode *allowed,
-                                                                  MMModemMode *preferred);
-const gchar      *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *properties);
-const gchar      *mm_simple_connect_properties_get_user          (MMSimpleConnectProperties *properties);
-const gchar      *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *properties);
-MMBearerIpFamily  mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *properties);
-gboolean          mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *properties);
-const gchar      *mm_simple_connect_properties_get_number        (MMSimpleConnectProperties *properties);
-
 MMBearerProperties *mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *properties);
 
 GVariant *mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self);
+#endif
+
 
 G_END_DECLS
 

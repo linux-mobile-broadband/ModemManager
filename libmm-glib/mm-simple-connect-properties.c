@@ -19,6 +19,18 @@
 #include "mm-common-helpers.h"
 #include "mm-simple-connect-properties.h"
 
+/**
+ * SECTION: mm-simple-connect-properties
+ * @title: MMSimpleConnectProperties
+ * @short_description: Helper object to handle connection properties.
+ *
+ * The #MMSimpleConnectProperties is an object handling the properties requested
+ * to ModemManager when launching a connection with the Simple interface.
+ *
+ * This object is created by the user and passed to ModemManager with either
+ * mm_modem_simple_connect() or mm_modem_simple_connect_sync().
+ */
+
 G_DEFINE_TYPE (MMSimpleConnectProperties, mm_simple_connect_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_PIN             "pin"
@@ -46,6 +58,13 @@ struct _MMSimpleConnectPropertiesPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_set_pin:
+ * @self: a #MMSimpleConnectProperties.
+ * @pin: PIN code.
+ *
+ * Sets the PIN code to use when unlocking the modem.
+ */
 void
 mm_simple_connect_properties_set_pin (MMSimpleConnectProperties *self,
                                       const gchar *pin)
@@ -56,6 +75,31 @@ mm_simple_connect_properties_set_pin (MMSimpleConnectProperties *self,
     self->priv->pin = g_strdup (pin);
 }
 
+/**
+ * mm_simple_connect_properties_get_pin:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the PIN code to use when unlocking the modem.
+ *
+ * Returns: (transfer none): the PIN, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_simple_connect_properties_get_pin (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
+    return self->priv->pin;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_operator_id:
+ * @self: a #MMSimpleConnectProperties.
+ * @operator_id: operator ID, given as MCC/MNC.
+ *
+ * Sets the ID of the network to which register before connecting.
+ */
 void
 mm_simple_connect_properties_set_operator_id (MMSimpleConnectProperties *self,
                                               const gchar *operator_id)
@@ -66,6 +110,32 @@ mm_simple_connect_properties_set_operator_id (MMSimpleConnectProperties *self,
     self->priv->operator_id = g_strdup (operator_id);
 }
 
+/**
+ * mm_simple_connect_properties_get_operator_id:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the ID of the network to which register before connecting.
+ *
+ * Returns: (transfer none): the operator ID, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
+    return self->priv->operator_id;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_bands:
+ * @self: a #MMSimpleConnectProperties.
+ * @bands: array of #MMModemBand values.
+ * @n_bands: number of elements in @bands.
+ *
+ * Sets the frequency bands to use.
+ */
 void
 mm_simple_connect_properties_set_bands (MMSimpleConnectProperties *self,
                                         const MMModemBand *bands,
@@ -82,104 +152,16 @@ mm_simple_connect_properties_set_bands (MMSimpleConnectProperties *self,
     self->priv->bands_set = TRUE;
 }
 
-void
-mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
-                                                MMModemMode allowed,
-                                                MMModemMode preferred)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    self->priv->allowed_modes = allowed;
-    self->priv->preferred_mode = preferred;
-    self->priv->allowed_modes_set = TRUE;
-}
-
-void
-mm_simple_connect_properties_set_apn (MMSimpleConnectProperties *self,
-                                      const gchar *apn)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_apn (self->priv->bearer_properties,
-                                  apn);
-}
-
-void
-mm_simple_connect_properties_set_user (MMSimpleConnectProperties *self,
-                                       const gchar *user)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_user (self->priv->bearer_properties,
-                                   user);
-}
-
-void
-mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
-                                           const gchar *password)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_password (self->priv->bearer_properties,
-                                       password);
-}
-
-void
-mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
-                                          MMBearerIpFamily ip_type)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_ip_type (self->priv->bearer_properties,
-                                      ip_type);
-}
-
-void
-mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
-                                                gboolean allow_roaming)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
-                                            allow_roaming);
-}
-
-void
-mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
-                                         const gchar *number)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    mm_bearer_properties_set_number (self->priv->bearer_properties,
-                                     number);
-}
-
-/*****************************************************************************/
-
-MMBearerProperties *
-mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
-
-    return g_object_ref (self->priv->bearer_properties);
-}
-
-const gchar *
-mm_simple_connect_properties_get_pin (MMSimpleConnectProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
-
-    return self->priv->pin;
-}
-
-const gchar *
-mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
-
-    return self->priv->operator_id;
-}
-
+/**
+ * mm_simple_connect_properties_get_bands:
+ * @self: a #MMSimpleConnectProperties.
+ * @bands: (out): location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
+ * @n_bands: (out) number of elements in @bands.
+ *
+ * Gets the frequency bands to use.
+ *
+ * Returns: %TRUE if @bands is set, %FALSE otherwise.
+ */
 gboolean
 mm_simple_connect_properties_get_bands (MMSimpleConnectProperties *self,
                                         const MMModemBand **bands,
@@ -198,6 +180,38 @@ mm_simple_connect_properties_get_bands (MMSimpleConnectProperties *self,
     return FALSE;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_allowed_modes:
+ * @self: a #MMSimpleConnectProperties.
+ * @allowed: bitmask of #MMModemMode values specifying which are allowed.
+ * @preferred: a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
+ *
+ * Sets the modes allowed to use, and which of them is preferred.
+ */
+void
+mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
+                                                MMModemMode allowed,
+                                                MMModemMode preferred)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    self->priv->allowed_modes = allowed;
+    self->priv->preferred_mode = preferred;
+    self->priv->allowed_modes_set = TRUE;
+}
+
+/**
+ * mm_simple_connect_properties_get_allowed_modes:
+ * @self: a #MMSimpleConnectProperties.
+ * @allowed: (out): location for the bitmask of #MMModemMode values specifying which are allowed.
+ * @preferred: (out): loction for a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
+ *
+ * Gets the modes allowed to use, and which of them is preferred.
+ *
+ * Returns: %TRUE if @allowed and @preferred are set, %FALSE otherwise.
+ */
 gboolean
 mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode *allowed,
@@ -216,6 +230,33 @@ mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
     return FALSE;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_apn:
+ * @self: a #MMSimpleConnectProperties.
+ * @apn: Name of the access point.
+ *
+ * Sets the name of the access point to use when connecting.
+ */
+void
+mm_simple_connect_properties_set_apn (MMSimpleConnectProperties *self,
+                                      const gchar *apn)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_apn (self->priv->bearer_properties,
+                                  apn);
+}
+
+/**
+ * mm_simple_connect_properties_get_apn:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the name of the access point to use when connecting.
+ *
+ * Returns: (transfer none): the access point, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
 {
@@ -224,6 +265,33 @@ mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_apn (self->priv->bearer_properties);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_user:
+ * @self: a #MMSimpleConnectProperties.
+ * @user: the username
+ *
+ * Sets the username used to authenticate with the access point.
+ */
+void
+mm_simple_connect_properties_set_user (MMSimpleConnectProperties *self,
+                                       const gchar *user)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_user (self->priv->bearer_properties,
+                                   user);
+}
+
+/**
+ * mm_simple_connect_properties_get_user:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the username used to authenticate with the access point.
+ *
+ * Returns: (transfer none): the username, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_connect_properties_get_user (MMSimpleConnectProperties *self)
 {
@@ -232,6 +300,33 @@ mm_simple_connect_properties_get_user (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_user (self->priv->bearer_properties);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_password:
+ * @self: a #MMSimpleConnectProperties.
+ * @password: the password
+ *
+ * Sets the password used to authenticate with the access point.
+ */
+void
+mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
+                                           const gchar *password)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_password (self->priv->bearer_properties,
+                                       password);
+}
+
+/**
+ * mm_simple_connect_properties_get_password:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the password used to authenticate with the access point.
+ *
+ * Returns: (transfer none): the password, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
 {
@@ -240,6 +335,33 @@ mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_password (self->priv->bearer_properties);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_ip_type:
+ * @self: a #MMSimpleConnectProperties.
+ * @ip_type: a #MMBearerIpFamily.
+ *
+ * Sets the IP type to use.
+ */
+void
+mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
+                                          MMBearerIpFamily ip_type)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_ip_type (self->priv->bearer_properties,
+                                      ip_type);
+}
+
+/**
+ * mm_simple_connect_properties_get_ip_type:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Sets the IP type to use.
+ *
+ * Returns: a #MMBearerIpFamily.
+ */
 MMBearerIpFamily
 mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
 {
@@ -248,6 +370,34 @@ mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_allow_roaming:
+ * @self: a #MMSimpleConnectProperties.
+ * @allow_roaming: boolean value.
+ *
+ * Sets the flag to indicate whether roaming is allowed or not in the
+ * connection.
+ */
+void
+mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
+                                                gboolean allow_roaming)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
+                                            allow_roaming);
+}
+
+/**
+ * mm_simple_connect_properties_get_allow_roaming:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Checks whether roaming is allowed in the connection.
+ *
+ * Returns: %TRUE if roaming is allowed, %FALSE otherwise..
+ */
 gboolean
 mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
 {
@@ -256,12 +406,50 @@ mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
 }
 
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_number:
+ * @self: a #MMSimpleConnectProperties.
+ * @number: the number.
+ *
+ * Sets the number to use when performing the connection.
+ */
+void
+mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
+                                         const gchar *number)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_number (self->priv->bearer_properties,
+                                     number);
+}
+
+/**
+ * mm_simple_connect_properties_get_number:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the number to use when performing the connection.
+ *
+ * Returns: (transfer none): the number, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 {
     g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
 
     return mm_bearer_properties_get_number (self->priv->bearer_properties);
+}
+
+/*****************************************************************************/
+
+MMBearerProperties *
+mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
+    return g_object_ref (self->priv->bearer_properties);
 }
 
 /*****************************************************************************/
@@ -332,7 +520,7 @@ mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self)
 /*****************************************************************************/
 
 typedef struct {
-    MMSimpleConnectProperties *properties;
+    MMSimpleConnectProperties *self;
     GError *error;
     gchar *allowed_modes_str;
     gchar *preferred_mode_str;
@@ -344,22 +532,22 @@ key_value_foreach (const gchar *key,
                    ParseKeyValueContext *ctx)
 {
     /* First, check if we can consume this as bearer properties */
-    if (mm_bearer_properties_consume_string (ctx->properties->priv->bearer_properties,
+    if (mm_bearer_properties_consume_string (ctx->self->priv->bearer_properties,
                                              key, value,
                                              NULL))
         return TRUE;
 
     if (g_str_equal (key, PROPERTY_PIN))
-        mm_simple_connect_properties_set_pin (ctx->properties, value);
+        mm_simple_connect_properties_set_pin (ctx->self, value);
     else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-        mm_simple_connect_properties_set_operator_id (ctx->properties, value);
+        mm_simple_connect_properties_set_operator_id (ctx->self, value);
     else if (g_str_equal (key, PROPERTY_BANDS)) {
         MMModemBand *bands = NULL;
         guint n_bands = 0;
 
         mm_common_get_bands_from_string (value, &bands, &n_bands, &ctx->error);
         if (!ctx->error) {
-            mm_simple_connect_properties_set_bands (ctx->properties, bands, n_bands);
+            mm_simple_connect_properties_set_bands (ctx->self, bands, n_bands);
             g_free (bands);
         }
     } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
@@ -385,7 +573,7 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
     ctx.error = NULL;
     ctx.allowed_modes_str = NULL;
     ctx.preferred_mode_str = NULL;
-    ctx.properties = mm_simple_connect_properties_new ();
+    ctx.self = mm_simple_connect_properties_new ();
 
     mm_common_parse_key_value_string (str,
                                       &ctx.error,
@@ -395,8 +583,8 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
     /* If error, destroy the object */
     if (ctx.error) {
         g_propagate_error (error, ctx.error);
-        g_object_unref (ctx.properties);
-        ctx.properties = NULL;
+        g_object_unref (ctx.self);
+        ctx.self = NULL;
     }
     else if (ctx.allowed_modes_str || ctx.preferred_mode_str) {
         MMModemMode allowed_modes;
@@ -415,11 +603,11 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
 
         if (ctx.error) {
             g_propagate_error (error, ctx.error);
-            g_object_unref (ctx.properties);
-            ctx.properties = NULL;
+            g_object_unref (ctx.self);
+            ctx.self = NULL;
         } else {
             mm_simple_connect_properties_set_allowed_modes (
-                ctx.properties,
+                ctx.self,
                 allowed_modes,
                 preferred_mode);
         }
@@ -428,7 +616,7 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
     g_free (ctx.allowed_modes_str);
     g_free (ctx.preferred_mode_str);
 
-    return ctx.properties;
+    return ctx.self;
 }
 
 /*****************************************************************************/
@@ -441,13 +629,13 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMSimpleConnectProperties *properties;
+    MMSimpleConnectProperties *self;
     GVariant *allowed_modes_variant = NULL;
     GVariant *preferred_mode_variant = NULL;
 
-    properties = mm_simple_connect_properties_new ();
+    self = mm_simple_connect_properties_new ();
     if (!dictionary)
-        return properties;
+        return self;
 
     if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
         g_set_error (error,
@@ -455,7 +643,7 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                      MM_CORE_ERROR_INVALID_ARGS,
                      "Cannot create Simple Connect properties from dictionary: "
                      "invalid variant type received");
-        g_object_unref (properties);
+        g_object_unref (self);
         return NULL;
     }
 
@@ -464,23 +652,23 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
 
         /* First, check if we can consume this as bearer properties */
-        if (!mm_bearer_properties_consume_variant (properties->priv->bearer_properties,
+        if (!mm_bearer_properties_consume_variant (self->priv->bearer_properties,
                                                    key, value,
                                                    NULL)) {
             if (g_str_equal (key, PROPERTY_PIN))
                 mm_simple_connect_properties_set_pin (
-                    properties,
+                    self,
                     g_variant_get_string (value, NULL));
             else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
                 mm_simple_connect_properties_set_operator_id (
-                    properties,
+                    self,
                     g_variant_get_string (value, NULL));
             else if (g_str_equal (key, PROPERTY_BANDS)) {
                 GArray *array;
 
                 array = mm_common_bands_variant_to_garray (value);
                 mm_simple_connect_properties_set_bands (
-                    properties,
+                    self,
                     (MMModemBand *)array->data,
                     array->len);
                 g_array_unref (array);
@@ -504,13 +692,13 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     /* If error, destroy the object */
     if (inner_error) {
         g_propagate_error (error, inner_error);
-        g_object_unref (properties);
-        properties = NULL;
+        g_object_unref (self);
+        self = NULL;
     }
     /* If we got allowed modes variant, check if we got preferred mode */
     else if (allowed_modes_variant) {
         mm_simple_connect_properties_set_allowed_modes (
-            properties,
+            self,
             g_variant_get_uint32 (allowed_modes_variant),
             (preferred_mode_variant ?
              g_variant_get_uint32 (preferred_mode_variant) :
@@ -519,7 +707,7 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     /* If we only got preferred mode, assume allowed is ANY */
     else if (preferred_mode_variant) {
         mm_simple_connect_properties_set_allowed_modes (
-            properties,
+            self,
             MM_MODEM_MODE_ANY,
             g_variant_get_uint32 (preferred_mode_variant));
     }
@@ -530,11 +718,18 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     if (preferred_mode_variant)
         g_variant_unref (preferred_mode_variant);
 
-    return properties;
+    return self;
 }
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_new:
+ *
+ * Creates a new empty #MMSimpleConnectProperties.
+ *
+ * Returns: (transfer full): a #MMSimpleConnectProperties. The returned value should be freed with g_object_unref().
+ */
 MMSimpleConnectProperties *
 mm_simple_connect_properties_new (void)
 {
