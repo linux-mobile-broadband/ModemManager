@@ -21,6 +21,7 @@
  * Copyright (C) 2012 Google, Inc.
  */
 
+#include "mm-errors-types.h"
 #include "mm-object.h"
 
 /**

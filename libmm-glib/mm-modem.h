@@ -25,8 +25,9 @@
 #define _MM_MODEM_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
 
+#include "mm-gdbus-modem.h"
+#include "mm-unlock-retries.h"
 #include "mm-sim.h"
 #include "mm-bearer.h"
 

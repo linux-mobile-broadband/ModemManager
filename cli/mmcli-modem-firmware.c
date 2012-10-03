@@ -28,6 +28,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+#define _LIBMM_INSIDE_MMCLI
 #include <libmm-glib.h>
 
 #include "mmcli.h"

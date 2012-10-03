@@ -25,8 +25,10 @@
 #define _MM_MODEM_SIMPLE_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
 
+#include "mm-gdbus-modem.h"
+#include "mm-simple-connect-properties.h"
+#include "mm-simple-status.h"
 #include "mm-bearer.h"
 
 G_BEGIN_DECLS

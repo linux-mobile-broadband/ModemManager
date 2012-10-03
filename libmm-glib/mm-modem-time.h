@@ -25,7 +25,9 @@
 #define _MM_MODEM_TIME_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+
+#include "mm-gdbus-modem.h"
+#include "mm-network-timezone.h"
 
 G_BEGIN_DECLS
 

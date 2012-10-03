@@ -23,7 +23,8 @@
 #include <ctype.h>
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-bearer-list.h"
 #include "mm-log.h"

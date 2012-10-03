@@ -49,13 +49,6 @@
   </bookinfo>
 
   <part>
-    <title>Helper types</title>
-    <xi:include href="xml/mm-firmware-properties.xml"/>
-    <xi:include href="xml/mm-bearer-properties.xml"/>
-    <xi:include href="xml/mm-bearer-ip-config.xml"/>
-  </part>
-
-  <part>
     <title>High level API</title>
 
     <chapter>
@@ -66,20 +59,48 @@
     <chapter>
       <title>The Modem object</title>
       <xi:include href="xml/mm-object.xml"/>
-      <xi:include href="xml/mm-modem.xml"/>
-      <xi:include href="xml/mm-modem-3gpp.xml"/>
-      <xi:include href="xml/mm-modem-3gpp-ussd.xml"/>
-      <xi:include href="xml/mm-modem-cdma.xml"/>
-      <xi:include href="xml/mm-modem-location.xml"/>
-      <xi:include href="xml/mm-modem-messaging.xml"/>
-      <xi:include href="xml/mm-modem-time.xml"/>
-      <xi:include href="xml/mm-modem-firmware.xml"/>
-      <xi:include href="xml/mm-modem-simple.xml"/>
+      <section>
+        <title>Generic interfaces</title>
+        <xi:include href="xml/mm-modem.xml"/>
+        <xi:include href="xml/mm-modem-3gpp.xml"/>
+        <xi:include href="xml/mm-modem-3gpp-ussd.xml"/>
+        <xi:include href="xml/mm-modem-cdma.xml"/>
+        <xi:include href="xml/mm-unlock-retries.xml"/>
+      </section>
+      <section>
+        <title>Simple interface support</title>
+        <xi:include href="xml/mm-modem-simple.xml"/>
+        <xi:include href="xml/mm-simple-connect-properties.xml"/>
+        <xi:include href="xml/mm-simple-status.xml"/>
+      </section>
+      <section>
+        <title>Location support</title>
+        <xi:include href="xml/mm-modem-location.xml"/>
+        <xi:include href="xml/mm-location-3gpp.xml"/>
+        <xi:include href="xml/mm-location-gps-nmea.xml"/>
+        <xi:include href="xml/mm-location-gps-raw.xml"/>
+      </section>
+      <section>
+        <title>Messaging support</title>
+        <xi:include href="xml/mm-modem-messaging.xml"/>
+      </section>
+      <section>
+        <title>Time support</title>
+        <xi:include href="xml/mm-modem-time.xml"/>
+        <xi:include href="xml/mm-network-timezone.xml"/>
+      </section>
+      <section>
+        <title>Firmware support</title>
+        <xi:include href="xml/mm-modem-firmware.xml"/>
+        <xi:include href="xml/mm-firmware-properties.xml"/>
+      </section>
     </chapter>
 
     <chapter>
       <title>The Bearer object</title>
       <xi:include href="xml/mm-bearer.xml"/>
+      <xi:include href="xml/mm-bearer-properties.xml"/>
+      <xi:include href="xml/mm-bearer-ip-config.xml"/>
     </chapter>
 
     <chapter>
@@ -90,6 +111,7 @@
     <chapter>
       <title>The SMS object</title>
       <xi:include href="xml/mm-sms.xml"/>
+      <xi:include href="xml/mm-sms-properties.xml"/>
     </chapter>
 
   </part>

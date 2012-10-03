@@ -25,8 +25,8 @@
 #define _MM_OBJECT_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
 
+#include "mm-gdbus-modem.h"
 #include "mm-modem.h"
 #include "mm-modem-3gpp.h"
 #include "mm-modem-3gpp-ussd.h"

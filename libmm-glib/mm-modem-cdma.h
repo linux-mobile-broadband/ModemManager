@@ -25,7 +25,8 @@
 #define _MM_MODEM_CDMA_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
+
+#include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
 

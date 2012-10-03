@@ -23,8 +23,10 @@
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
-#include "ModemManager.h"
-#include <mm-gdbus-manager.h>
+#include <ModemManager.h>
+
+#include "mm-errors-types.h"
+#include "mm-gdbus-manager.h"
 #include "mm-manager.h"
 #include "mm-object.h"
 

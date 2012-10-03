@@ -25,7 +25,10 @@
 #define _MM_BEARER_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+
+#include "mm-gdbus-bearer.h"
+#include "mm-bearer-properties.h"
+#include "mm-bearer-ip-config.h"
 
 G_BEGIN_DECLS
 

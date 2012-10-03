@@ -21,8 +21,8 @@
 #include <ctype.h>
 
 #include <ModemManager.h>
-#include <libmm-common.h>
-#include <libqmi-glib.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-bearer-qmi.h"
 #include "mm-serial-enums-types.h"

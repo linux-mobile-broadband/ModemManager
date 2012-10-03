@@ -20,7 +20,8 @@
 #include <stdio.h>
 #include <locale.h>
 
-#include <libmm-common.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-sms-part.h"
 #include "mm-log.h"

@@ -24,7 +24,9 @@
 #define _MM_MODEM_FIRMWARE_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+
+#include "mm-gdbus-modem.h"
+#include "mm-firmware-properties.h"
 
 G_BEGIN_DECLS
 

@@ -25,8 +25,8 @@
 #define _MM_MODEM_MESSAGING_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
 
+#include "mm-gdbus-modem.h"
 #include "mm-sms.h"
 #include "mm-sms-properties.h"
 

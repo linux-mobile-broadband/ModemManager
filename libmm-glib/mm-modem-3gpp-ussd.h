@@ -25,7 +25,8 @@
 #define _MM_MODEM_3GPP_USSD_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
+
+#include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
 

@@ -13,9 +13,9 @@
  * Copyright (C) 2012 Google, Inc.
  */
 
-#include <glib.h>
+#include <glib-object.h>
 
-#include <libmm-common.h>
+#include <libmm-glib.h>
 
 /********************* KEY VALUE PARSER TESTS *********************/
 

@@ -24,7 +24,9 @@
 #define _MM_SMS_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+
+#include "mm-gdbus-sms.h"
+#include "mm-sms-properties.h"
 
 G_BEGIN_DECLS
 

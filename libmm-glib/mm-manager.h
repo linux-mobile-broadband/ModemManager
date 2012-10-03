@@ -27,7 +27,8 @@
 #define _MM_MANAGER_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
+
+#include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
 

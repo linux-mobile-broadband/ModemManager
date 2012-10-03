@@ -25,7 +25,8 @@
 #define _MM_SIM_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-sim.h>
+
+#include "mm-gdbus-sim.h"
 
 G_BEGIN_DECLS
 

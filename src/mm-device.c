@@ -20,7 +20,8 @@
 #include <string.h>
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-device.h"
 #include "mm-plugin.h"

@@ -25,7 +25,8 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include <libmm-common.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-plugin-wavecom.h"
 #include "mm-broadband-modem-wavecom.h"

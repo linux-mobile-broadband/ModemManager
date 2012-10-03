@@ -25,7 +25,11 @@
 #define _MM_MODEM_LOCATION_H_
 
 #include <ModemManager.h>
-#include <libmm-common.h>
+
+#include "mm-gdbus-modem.h"
+#include "mm-location-3gpp.h"
+#include "mm-location-gps-nmea.h"
+#include "mm-location-gps-raw.h"
 
 G_BEGIN_DECLS
 

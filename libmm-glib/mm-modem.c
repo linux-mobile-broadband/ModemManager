@@ -23,8 +23,8 @@
 
 #include <gio/gio.h>
 
-#include <mm-common-helpers.h>
-
+#include "mm-common-helpers.h"
+#include "mm-errors-types.h"
 #include "mm-helpers.h"
 #include "mm-modem.h"
 

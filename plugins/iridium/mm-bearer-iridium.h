@@ -21,7 +21,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include <libmm-common.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-broadband-bearer.h"
 #include "mm-broadband-modem-iridium.h"
