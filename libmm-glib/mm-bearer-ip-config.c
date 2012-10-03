@@ -18,6 +18,19 @@
 #include "mm-errors-types.h"
 #include "mm-bearer-ip-config.h"
 
+/**
+ * SECTION: mm-bearer-ip-config
+ * @title: MMBearerIpConfig
+ * @short_description: Helper object to handle IP configuration.
+ *
+ * The #MMBearerIpConfig is an object handling the IP configuration required by
+ * the bearer to finish the connection.
+ *
+ * This object is retrieved with either mm_bearer_get_ipv4_config(),
+ * mm_bearer_peek_ipv4_config(), mm_bearer_get_ipv6_config() or
+ * mm_bearer_peek_ipv6_config().
+ */
+
 G_DEFINE_TYPE (MMBearerIpConfig, mm_bearer_ip_config, G_TYPE_OBJECT);
 
 #define PROPERTY_METHOD  "method"
@@ -38,6 +51,22 @@ struct _MMBearerIpConfigPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_get_method:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the IP method to be used with this bearer.
+ *
+ * Returns: a #MMBearerIpMethod.
+ */
+MMBearerIpMethod
+mm_bearer_ip_config_get_method (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), MM_BEARER_IP_METHOD_UNKNOWN);
+
+    return self->priv->method;
+}
+
 void
 mm_bearer_ip_config_set_method (MMBearerIpConfig *self,
                                 MMBearerIpMethod method)
@@ -45,6 +74,24 @@ mm_bearer_ip_config_set_method (MMBearerIpConfig *self,
     g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
 
     self->priv->method = method;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_ip_config_get_address:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the IP address to be used with this bearer.
+ *
+ * Returns: a string with the IP address, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_ip_config_get_address (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
+    return self->priv->address;
 }
 
 void
@@ -57,6 +104,24 @@ mm_bearer_ip_config_set_address (MMBearerIpConfig *self,
     self->priv->address = g_strdup (address);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_bearer_ip_config_get_prefix:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the network prefix to be used with this bearer.
+ *
+ * Returns: the network prefix.
+ */
+guint
+mm_bearer_ip_config_get_prefix (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), 0);
+
+    return self->priv->prefix;
+}
+
 void
 mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
                                 guint prefix)
@@ -64,6 +129,24 @@ mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
     g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
 
     self->priv->prefix = prefix;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_ip_config_get_dns:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the list of IP addresses of DNS servers to be used with this bearer.
+ *
+ * Returns: a NULL-terminated array of strings. Do not free the returned value, it is owned by @self.
+ */
+const gchar **
+mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
+    return (const gchar **)self->priv->dns;
 }
 
 void
@@ -76,6 +159,24 @@ mm_bearer_ip_config_set_dns (MMBearerIpConfig *self,
     self->priv->dns = g_strdupv ((gchar **)dns);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_bearer_ip_config_get_gateway:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the IP address of the gateway to be used with this bearer.
+ *
+ * Returns: a string with the IP address, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
+    return self->priv->gateway;
+}
+
 void
 mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
                                  const gchar *gateway)
@@ -84,48 +185,6 @@ mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
 
     g_free (self->priv->gateway);
     self->priv->gateway = g_strdup (gateway);
-}
-
-/*****************************************************************************/
-
-MMBearerIpMethod
-mm_bearer_ip_config_get_method (MMBearerIpConfig *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), MM_BEARER_IP_METHOD_UNKNOWN);
-
-    return self->priv->method;
-}
-
-const gchar *
-mm_bearer_ip_config_get_address (MMBearerIpConfig *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
-
-    return self->priv->address;
-}
-
-guint
-mm_bearer_ip_config_get_prefix (MMBearerIpConfig *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), 0);
-
-    return self->priv->prefix;
-}
-
-const gchar **
-mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
-
-    return (const gchar **)self->priv->dns;
-}
-
-const gchar *
-mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
-
-    return self->priv->gateway;
 }
 
 /*****************************************************************************/

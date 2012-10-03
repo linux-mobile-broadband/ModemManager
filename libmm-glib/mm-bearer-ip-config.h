@@ -36,28 +36,43 @@ typedef struct _MMBearerIpConfig MMBearerIpConfig;
 typedef struct _MMBearerIpConfigClass MMBearerIpConfigClass;
 typedef struct _MMBearerIpConfigPrivate MMBearerIpConfigPrivate;
 
+/**
+ * MMBearerIpConfig:
+ *
+ * The #MMBearerIpConfig structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMBearerIpConfig {
+    /*< private >*/
     GObject parent;
     MMBearerIpConfigPrivate *priv;
 };
 
 struct _MMBearerIpConfigClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_bearer_ip_config_get_type (void);
-
-MMBearerIpConfig *mm_bearer_ip_config_new (void);
-MMBearerIpConfig *mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
-                                                           GError **error);
-
-MMBearerIpConfig *mm_bearer_ip_config_dup (MMBearerIpConfig *orig);
 
 MMBearerIpMethod   mm_bearer_ip_config_get_method  (MMBearerIpConfig *self);
 const gchar       *mm_bearer_ip_config_get_address (MMBearerIpConfig *self);
 guint              mm_bearer_ip_config_get_prefix  (MMBearerIpConfig *self);
 const gchar      **mm_bearer_ip_config_get_dns     (MMBearerIpConfig *self);
 const gchar       *mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
+MMBearerIpConfig *mm_bearer_ip_config_new (void);
+MMBearerIpConfig *mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
+                                                           GError **error);
+
+MMBearerIpConfig *mm_bearer_ip_config_dup (MMBearerIpConfig *orig);
 
 void mm_bearer_ip_config_set_method  (MMBearerIpConfig *self,
                                       MMBearerIpMethod ip_method);
@@ -71,6 +86,8 @@ void mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
                                       const gchar *gateway);
 
 GVariant *mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self);
+
+#endif
 
 G_END_DECLS
 

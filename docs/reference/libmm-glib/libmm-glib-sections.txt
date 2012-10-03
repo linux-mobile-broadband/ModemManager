@@ -706,14 +706,14 @@ mm_bearer_get_type
 <FILE>mm-bearer-ip-config</FILE>
 <TITLE>MMBearerIpConfig</TITLE>
 MMBearerIpConfig
-MMBearerIpConfigClass
-mm_bearer_ip_config_dup
+<SUBSECTION Getters>
+mm_bearer_ip_config_get_method
 mm_bearer_ip_config_get_address
-mm_bearer_ip_config_get_dictionary
+mm_bearer_ip_config_get_prefix
 mm_bearer_ip_config_get_dns
 mm_bearer_ip_config_get_gateway
-mm_bearer_ip_config_get_method
-mm_bearer_ip_config_get_prefix
+<SUBSECTION Private>
+mm_bearer_ip_config_get_dictionary
 mm_bearer_ip_config_new
 mm_bearer_ip_config_new_from_dictionary
 mm_bearer_ip_config_set_address
@@ -721,7 +721,9 @@ mm_bearer_ip_config_set_dns
 mm_bearer_ip_config_set_gateway
 mm_bearer_ip_config_set_method
 mm_bearer_ip_config_set_prefix
+mm_bearer_ip_config_dup
 <SUBSECTION Standard>
+MMBearerIpConfigClass
 MMBearerIpConfigPrivate
 MM_BEARER_IP_CONFIG
 MM_BEARER_IP_CONFIG_CLASS
