@@ -13,7 +13,8 @@ test_common_helpers_CPPFLAGS = \
 	-I$(top_srcdir)/libmm-glib \
 	-I$(top_builddir)/libmm-glib \
 	-I${top_srcdir}/libmm-glib/generated \
-	-I${top_builddir}/libmm-glib/generated
+	-I${top_builddir}/libmm-glib/generated \
+	-DLIBMM_GLIB_COMPILATION
 
 test_common_helpers_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \

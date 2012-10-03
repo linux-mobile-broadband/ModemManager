@@ -92,7 +92,6 @@ include_HEADERS = \
 	mm-sim.h \
 	mm-sms.h \
 	mm-bearer.h \
-	mm-common-helpers.h \
 	mm-simple-status.h \
 	mm-simple-connect-properties.h \
 	mm-bearer-properties.h \

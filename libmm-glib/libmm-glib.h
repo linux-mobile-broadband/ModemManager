@@ -45,7 +45,13 @@
 # include <mm-modem-firmware.h>
 #endif
 
-#include <mm-common-helpers.h>
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+/* This one is not even installed */
+# include <mm-common-helpers.h>
+#endif
+
 #include <mm-simple-status.h>
 #include <mm-simple-connect-properties.h>
 #include <mm-sms-properties.h>

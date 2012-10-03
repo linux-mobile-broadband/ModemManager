@@ -21,6 +21,7 @@ CFILE_GLOB =
 # Headers to ignore
 IGNORE_HFILES = \
 	mm-helpers.h \
+	mm-common-helpers.h \
 	$(NULL)
 
 # CFLAGS and LDFLAGS for compiling scan program. Only needed
