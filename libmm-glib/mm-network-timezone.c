@@ -18,6 +18,18 @@
 #include "mm-errors-types.h"
 #include "mm-network-timezone.h"
 
+/**
+ * SECTION: mm-network-timezone
+ * @title: MMNetworkTimezone
+ * @short_description: Helper object to handle network timezone information.
+ *
+ * The #MMNetworkTimezone is an object handling the timezone information
+ * reported by the network.
+ *
+ * This object is retrieved with either mm_modem_time_peek_network_timezone()
+ * or mm_modem_time_get_network_timezone().
+ */
+
 G_DEFINE_TYPE (MMNetworkTimezone, mm_network_timezone, G_TYPE_OBJECT);
 
 struct _MMNetworkTimezonePrivate {
@@ -28,6 +40,14 @@ struct _MMNetworkTimezonePrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_network_timezone_get_offset:
+ * @self: a #MMNetworkTimezone.
+ *
+ * Gets the timezone offset (in minutes) reported by the network.
+ *
+ * Returns: the offset, or %MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN if unknown.
+ */
 gint
 mm_network_timezone_get_offset (MMNetworkTimezone *self)
 {
@@ -36,26 +56,6 @@ mm_network_timezone_get_offset (MMNetworkTimezone *self)
 
     return self->priv->offset;
 }
-
-gint
-mm_network_timezone_get_dst_offset (MMNetworkTimezone *self)
-{
-    g_return_val_if_fail (MM_IS_NETWORK_TIMEZONE (self),
-                          MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN);
-
-    return self->priv->dst_offset;
-}
-
-gint
-mm_network_timezone_get_leap_seconds (MMNetworkTimezone *self)
-{
-    g_return_val_if_fail (MM_IS_NETWORK_TIMEZONE (self),
-                          MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN);
-
-    return self->priv->leap_seconds;
-}
-
-/*****************************************************************************/
 
 void
 mm_network_timezone_set_offset (MMNetworkTimezone *self,
@@ -66,6 +66,26 @@ mm_network_timezone_set_offset (MMNetworkTimezone *self,
     self->priv->offset = offset;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_network_timezone_get_dst_offset:
+ * @self: a #MMNetworkTimezone.
+ *
+ * Gets the timezone offset due to daylight saving time (in minutes) reported by
+ * the network.
+ *
+ * Returns: the offset, or %MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN if unknown.
+ */
+gint
+mm_network_timezone_get_dst_offset (MMNetworkTimezone *self)
+{
+    g_return_val_if_fail (MM_IS_NETWORK_TIMEZONE (self),
+                          MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN);
+
+    return self->priv->dst_offset;
+}
+
 void
 mm_network_timezone_set_dst_offset (MMNetworkTimezone *self,
                                     gint dst_offset)
@@ -73,6 +93,25 @@ mm_network_timezone_set_dst_offset (MMNetworkTimezone *self,
     g_return_if_fail (MM_IS_NETWORK_TIMEZONE (self));
 
     self->priv->dst_offset = dst_offset;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_network_timezone_get_leap_seconds:
+ * @self: a #MMNetworkTimezone.
+ *
+ * Gets the number of leap seconds (TAI-UTC), as reported by the network.
+ *
+ * Returns: the number of leap seconds, or %MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN if unknown.
+ */
+gint
+mm_network_timezone_get_leap_seconds (MMNetworkTimezone *self)
+{
+    g_return_val_if_fail (MM_IS_NETWORK_TIMEZONE (self),
+                          MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN);
+
+    return self->priv->leap_seconds;
 }
 
 void

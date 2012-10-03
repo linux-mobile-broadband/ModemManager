@@ -476,19 +476,21 @@ mm_modem_time_get_type
 <FILE>mm-network-timezone</FILE>
 <TITLE>MMNetworkTimezone</TITLE>
 MMNetworkTimezone
-MMNetworkTimezoneClass
-MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN
 MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN
-mm_network_timezone_get_dictionary
+MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN
+<SUBSECTION Getters>
+mm_network_timezone_get_offset
 mm_network_timezone_get_dst_offset
 mm_network_timezone_get_leap_seconds
-mm_network_timezone_get_offset
+<SUBSECTION Private>
 mm_network_timezone_new
 mm_network_timezone_new_from_dictionary
 mm_network_timezone_set_dst_offset
 mm_network_timezone_set_leap_seconds
+mm_network_timezone_get_dictionary
 mm_network_timezone_set_offset
 <SUBSECTION Standard>
+MMNetworkTimezoneClass
 MMNetworkTimezonePrivate
 MM_IS_NETWORK_TIMEZONE
 MM_IS_NETWORK_TIMEZONE_CLASS

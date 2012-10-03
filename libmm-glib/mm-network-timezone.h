@@ -32,31 +32,57 @@ G_BEGIN_DECLS
 #define MM_IS_NETWORK_TIMEZONE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_NETWORK_TIMEZONE))
 #define MM_NETWORK_TIMEZONE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_NETWORK_TIMEZONE, MMNetworkTimezoneClass))
 
+/**
+ * MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN:
+ *
+ * Identifier for an unknown timezone offset.
+ */
 #define MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN       G_MAXINT32
+
+/**
+ * MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN:
+ *
+ * Identifier for an unknown leap seconds value.
+ */
 #define MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN G_MAXINT32
 
 typedef struct _MMNetworkTimezone MMNetworkTimezone;
 typedef struct _MMNetworkTimezoneClass MMNetworkTimezoneClass;
 typedef struct _MMNetworkTimezonePrivate MMNetworkTimezonePrivate;
 
+/**
+ * MMNetworkTimezone:
+ *
+ * The #MMNetworkTimezone structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMNetworkTimezone {
+    /*< private >*/
     GObject parent;
     MMNetworkTimezonePrivate *priv;
 };
 
 struct _MMNetworkTimezoneClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_network_timezone_get_type (void);
 
-MMNetworkTimezone *mm_network_timezone_new (void);
-MMNetworkTimezone *mm_network_timezone_new_from_dictionary (GVariant *dictionary,
-                                                            GError **error);
-
 gint32 mm_network_timezone_get_offset       (MMNetworkTimezone *self);
 gint32 mm_network_timezone_get_dst_offset   (MMNetworkTimezone *self);
 gint32 mm_network_timezone_get_leap_seconds (MMNetworkTimezone *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
+MMNetworkTimezone *mm_network_timezone_new (void);
+MMNetworkTimezone *mm_network_timezone_new_from_dictionary (GVariant *dictionary,
+                                                            GError **error);
 
 void mm_network_timezone_set_offset       (MMNetworkTimezone *self,
                                            gint offset);
@@ -66,6 +92,8 @@ void mm_network_timezone_set_leap_seconds (MMNetworkTimezone *self,
                                            gint leap_seconds);
 
 GVariant *mm_network_timezone_get_dictionary (MMNetworkTimezone *self);
+
+#endif
 
 G_END_DECLS
 
