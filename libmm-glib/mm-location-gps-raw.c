@@ -21,6 +21,19 @@
 #include "mm-errors-types.h"
 #include "mm-location-gps-raw.h"
 
+/**
+ * SECTION: mm-location-gps-raw
+ * @title: MMLocationGpsRaw
+ * @short_description: Helper object to handle generic GPS location information.
+ *
+ * The #MMLocationGpsRaw is an object handling the location information of the
+ * modem when this is reported by GPS.
+ *
+ * This object is retrieved with either mm_modem_location_get_gps_raw(),
+ * mm_modem_location_get_gps_raw_sync(), mm_modem_location_get_full() or
+ * mm_modem_location_get_full_sync().
+ */
+
 G_DEFINE_TYPE (MMLocationGpsRaw, mm_location_gps_raw, G_TYPE_OBJECT);
 
 #define PROPERTY_UTC_TIME  "utc-time"
@@ -39,6 +52,14 @@ struct _MMLocationGpsRawPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_raw_get_utc_time:
+ * @self: a #MMLocationGpsRaw.
+ *
+ * Gets the UTC time of the location being reported.
+ *
+ * Returns: a string with the UTC time, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_location_gps_raw_get_utc_time (MMLocationGpsRaw *self)
 {
@@ -47,6 +68,16 @@ mm_location_gps_raw_get_utc_time (MMLocationGpsRaw *self)
     return self->priv->utc_time;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_location_gps_raw_get_longitude:
+ * @self: a #MMLocationGpsRaw.
+ *
+ * Gets the longitude, in the [-180,180] range.
+ *
+ * Returns: the longitude, or %MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN if unknown.
+ */
 gdouble
 mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
 {
@@ -56,6 +87,16 @@ mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
     return self->priv->longitude;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_location_gps_raw_get_latitude:
+ * @self: a #MMLocationGpsRaw.
+ *
+ * Gets the latitude, in the [-90,90] range.
+ *
+ * Returns: the latitude, or %MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN if unknown.
+ */
 gdouble
 mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
 {
@@ -65,6 +106,16 @@ mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
     return self->priv->latitude;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_location_gps_raw_get_altitude:
+ * @self: a #MMLocationGpsRaw.
+ *
+ * Gets the altitude, in the [-90,90] range.
+ *
+ * Returns: the altitude, or %MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN if unknown.
+ */
 gdouble
 mm_location_gps_raw_get_altitude (MMLocationGpsRaw *self)
 {

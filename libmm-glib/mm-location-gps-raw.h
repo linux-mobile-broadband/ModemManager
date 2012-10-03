@@ -32,42 +32,76 @@ G_BEGIN_DECLS
 #define MM_IS_LOCATION_GPS_RAW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_LOCATION_GPS_RAW))
 #define MM_LOCATION_GPS_RAW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_LOCATION_GPS_RAW, MMLocationGpsRawClass))
 
-
-/* Proper longitude values will fall in the [-180,180] range
- * Proper latitude values will fall in the [-90,90] range
+/**
+ * MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN:
+ *
+ * Identifier for an unknown longitude value.
+ *
+ * Proper longitude values fall in the [-180,180] range.
  */
 #define MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN G_MINDOUBLE
+
+/**
+ * MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN:
+ *
+ * Identifier for an unknown latitude value.
+ *
+ * Proper latitude values fall in the [-90,90] range.
+ */
 #define MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN  G_MINDOUBLE
+
+/**
+ * MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN:
+ *
+ * Identifier for an unknown altitude value.
+ */
 #define MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN  G_MINDOUBLE
 
 typedef struct _MMLocationGpsRaw MMLocationGpsRaw;
 typedef struct _MMLocationGpsRawClass MMLocationGpsRawClass;
 typedef struct _MMLocationGpsRawPrivate MMLocationGpsRawPrivate;
 
+/**
+ * MMLocationGpsRaw:
+ *
+ * The #MMLocationGpsRaw structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMLocationGpsRaw {
+    /*< private >*/
     GObject parent;
     MMLocationGpsRawPrivate *priv;
 };
 
 struct _MMLocationGpsRawClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_location_gps_raw_get_type (void);
-
-MMLocationGpsRaw *mm_location_gps_raw_new (void);
-MMLocationGpsRaw *mm_location_gps_raw_new_from_dictionary (GVariant *string,
-                                                           GError **error);
 
 const gchar *mm_location_gps_raw_get_utc_time  (MMLocationGpsRaw *self);
 gdouble      mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self);
 gdouble      mm_location_gps_raw_get_latitude  (MMLocationGpsRaw *self);
 gdouble      mm_location_gps_raw_get_altitude  (MMLocationGpsRaw *self);
 
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
+MMLocationGpsRaw *mm_location_gps_raw_new (void);
+MMLocationGpsRaw *mm_location_gps_raw_new_from_dictionary (GVariant *string,
+                                                           GError **error);
+
 gboolean mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
                                         const gchar *trace);
 
 GVariant *mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self);
+
+#endif
 
 G_END_DECLS
 

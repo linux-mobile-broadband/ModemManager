@@ -75,6 +75,8 @@ gboolean mm_location_gps_nmea_add_trace (MMLocationGpsNmea *self,
 
 GVariant *mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self);
 
+#endif
+
 G_END_DECLS
 
 #endif /* MM_LOCATION_GPS_NMEA_H */
