@@ -20,6 +20,18 @@
 #include "mm-enums-types.h"
 #include "mm-unlock-retries.h"
 
+/**
+ * SECTION: mm-unlock-retries
+ * @title: MMUnlockRetries
+ * @short_description: Helper object to report unlock retries.
+ *
+ * The #MMUnlockRetries is an object exposing the unlock retry counts for
+ * different #MMModemLock values.
+ *
+ * This object is retrieved from the #MMModem object with either
+ * mm_modem_get_unlock_retries() or mm_modem_peek_unlock_retries().
+ */
+
 G_DEFINE_TYPE (MMUnlockRetries, mm_unlock_retries, G_TYPE_OBJECT);
 
 struct _MMUnlockRetriesPrivate {
@@ -46,6 +58,17 @@ mm_unlock_retries_unset (MMUnlockRetries *self,
                          GUINT_TO_POINTER (lock));
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_unlock_retries_get:
+ * @self: a #MMUnlockRetries.
+ * @lock: a #MMModemLock.
+ *
+ * Gets the unlock retries for the given @lock.
+ *
+ * Returns: the unlock retries or %MM_UNLOCK_RETRIES_UNKNOWN if unknown.
+ */
 guint
 mm_unlock_retries_get (MMUnlockRetries *self,
                        MMModemLock lock)
@@ -86,6 +109,14 @@ mm_unlock_retries_cmp (MMUnlockRetries *a,
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_foreach:
+ * @self: a @MMUnlockRetries.
+ * @callback: callback to call for each available lock.
+ * @user_data: data to pass to @callback.
+ *
+ * Executes @callback for each lock information found in @self.
+ */
 void
 mm_unlock_retries_foreach (MMUnlockRetries *self,
                            MMUnlockRetriesForeachCb callback,

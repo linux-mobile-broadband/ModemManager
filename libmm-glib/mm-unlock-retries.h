@@ -32,22 +32,61 @@ G_BEGIN_DECLS
 #define MM_IS_UNLOCK_RETRIES_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_UNLOCK_RETRIES))
 #define MM_UNLOCK_RETRIES_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_UNLOCK_RETRIES, MMUnlockRetriesClass))
 
+/**
+ * MM_UNLOCK_RETRIES_UNKNOWN:
+ *
+ * Identifier for reporting unknown unlock retries.
+ */
 #define MM_UNLOCK_RETRIES_UNKNOWN 999
 
 typedef struct _MMUnlockRetries MMUnlockRetries;
 typedef struct _MMUnlockRetriesClass MMUnlockRetriesClass;
 typedef struct _MMUnlockRetriesPrivate MMUnlockRetriesPrivate;
 
+/**
+ * MMUnlockRetries:
+ *
+ * The #MMUnlockRetries structure contains private data and should only be accessed
+ * using the provided API.
+ */
 struct _MMUnlockRetries {
+    /*< private >*/
     GObject parent;
     MMUnlockRetriesPrivate *priv;
 };
 
 struct _MMUnlockRetriesClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_unlock_retries_get_type (void);
+
+guint mm_unlock_retries_get (MMUnlockRetries *self,
+                             MMModemLock lock);
+
+/**
+ * MMUnlockRetriesForeachCb:
+ * @lock: a #MMModemLock.
+ * @count: the number of retries left for @lock.
+ * @user_data: data passed to the function.
+ *
+ * Specifies the type of function passed to mm_unlock_retries_foreach().
+ */
+typedef void (* MMUnlockRetriesForeachCb) (MMModemLock lock,
+                                           guint count,
+                                           gpointer user_data);
+
+void mm_unlock_retries_foreach (MMUnlockRetries *self,
+                                MMUnlockRetriesForeachCb callback,
+                                gpointer user_data);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
 
 MMUnlockRetries *mm_unlock_retries_new (void);
 MMUnlockRetries *mm_unlock_retries_new_from_dictionary (GVariant *dictionary);
@@ -59,23 +98,14 @@ void  mm_unlock_retries_set (MMUnlockRetries *self,
 void  mm_unlock_retries_unset (MMUnlockRetries *self,
                                MMModemLock lock);
 
-guint mm_unlock_retries_get (MMUnlockRetries *self,
-                             MMModemLock lock);
-
-typedef void (* MMUnlockRetriesForeachCb) (MMModemLock lock,
-                                           guint count,
-                                           gpointer user_data);
-
-void mm_unlock_retries_foreach (MMUnlockRetries *self,
-                                MMUnlockRetriesForeachCb callback,
-                                gpointer user_data);
-
 gboolean mm_unlock_retries_cmp (MMUnlockRetries *a,
                                 MMUnlockRetries *b);
 
 GVariant *mm_unlock_retries_get_dictionary (MMUnlockRetries *self);
 
 gchar *mm_unlock_retries_build_string (MMUnlockRetries *self);
+
+#endif
 
 G_END_DECLS
 

@@ -165,19 +165,21 @@ mm_modem_get_type
 <FILE>mm-unlock-retries</FILE>
 <TITLE>MMUnlockRetries</TITLE>
 MMUnlockRetries
-MMUnlockRetriesClass
-MMUnlockRetriesForeachCb
 MM_UNLOCK_RETRIES_UNKNOWN
+<SUBSECTION Getters>
+mm_unlock_retries_get
+MMUnlockRetriesForeachCb
+mm_unlock_retries_foreach
+<SUBSECTION Private>
 mm_unlock_retries_build_string
 mm_unlock_retries_cmp
-mm_unlock_retries_foreach
-mm_unlock_retries_get
-mm_unlock_retries_get_dictionary
 mm_unlock_retries_new
 mm_unlock_retries_new_from_dictionary
+mm_unlock_retries_get_dictionary
 mm_unlock_retries_set
 mm_unlock_retries_unset
 <SUBSECTION Standard>
+MMUnlockRetriesClass
 MMUnlockRetriesPrivate
 MM_IS_UNLOCK_RETRIES
 MM_IS_UNLOCK_RETRIES_CLASS
