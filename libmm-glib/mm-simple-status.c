@@ -19,9 +19,19 @@
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 #include "mm-simple-status.h"
+#include "mm-modem-cdma.h"
 
-#define SID_UNKNOWN 99999
-#define NID_UNKNOWN 99999
+/**
+ * SECTION: mm-simple-status
+ * @title: MMSimpleStatus
+ * @short_description: Helper object to handle overall modem status.
+ *
+ * The #MMSimpleStatus is an object handling the general modem status properties,
+ * available in the Simple interface.
+ *
+ * This object is retrieved with either mm_modem_simple_get_status() or
+ * mm_modem_simple_get_status_sync().
+ */
 
 G_DEFINE_TYPE (MMSimpleStatus, mm_simple_status, G_TYPE_OBJECT);
 
@@ -76,6 +86,14 @@ struct _MMSimpleStatusPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_status_get_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the state of the modem.
+ *
+ * Returns: a #MMModemState.
+ */
 MMModemState
 mm_simple_status_get_state (MMSimpleStatus *self)
 {
@@ -84,6 +102,17 @@ mm_simple_status_get_state (MMSimpleStatus *self)
     return self->priv->state;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_signal_quality:
+ * @self: a #MMSimpleStatus.
+ * @recent: (out) (allow-none): indication of whether the given signal quality is considered recent.
+ *
+ * Gets the signal quality.
+ *
+ * Returns: the signal quality.
+ */
 guint32
 mm_simple_status_get_signal_quality (MMSimpleStatus *self,
                                      gboolean *recent)
@@ -105,6 +134,16 @@ mm_simple_status_get_signal_quality (MMSimpleStatus *self,
     return signal_quality;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_bands:
+ * @self: a #MMSimpleStatus.
+ * @bands: (out): location for an array of #MMModemBand values. Do not free the returned value, it is owned by @self.
+ * @n_bands: (out): number of elements in @bands.
+ *
+ * Gets the currently used frequency bands.
+ */
 void
 mm_simple_status_get_bands (MMSimpleStatus *self,
                             const MMModemBand **bands,
@@ -119,6 +158,16 @@ mm_simple_status_get_bands (MMSimpleStatus *self,
     *bands = (const MMModemBand *)self->priv->bands_array->data;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_access_technologies:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the currently used access technologies.
+ *
+ * Returns: a bitmask of #MMModemAccessTechnology values.
+ */
 MMModemAccessTechnology
 mm_simple_status_get_access_technologies (MMSimpleStatus *self)
 {
@@ -127,6 +176,16 @@ mm_simple_status_get_access_technologies (MMSimpleStatus *self)
     return self->priv->access_technologies;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_3gpp_registration_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the current state of the registration in the 3GPP network.
+ *
+ * Returns: a #MMModem3gppRegistrationState.
+ */
 MMModem3gppRegistrationState
 mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self)
 {
@@ -135,6 +194,16 @@ mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self)
     return self->priv->modem_3gpp_registration_state;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_3gpp_operator_code:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the MCC/MNC of the operator of the 3GPP network where the modem is registered.
+ *
+ * Returns: the operator code, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_status_get_3gpp_operator_code (MMSimpleStatus *self)
 {
@@ -143,6 +212,16 @@ mm_simple_status_get_3gpp_operator_code (MMSimpleStatus *self)
     return self->priv->modem_3gpp_operator_code;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_3gpp_operator_name:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the name of the operator of the 3GPP network where the modem is registered.
+ *
+ * Returns: the operator name, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_simple_status_get_3gpp_operator_name (MMSimpleStatus *self)
 {
@@ -151,6 +230,16 @@ mm_simple_status_get_3gpp_operator_name (MMSimpleStatus *self)
     return self->priv->modem_3gpp_operator_name;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_cdma_cdma1x_registration_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the current state of the registration in the CDMA-1x network.
+ *
+ * Returns: a #MMModemCdmaRegistrationState.
+ */
 MMModemCdmaRegistrationState
 mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self)
 {
@@ -159,6 +248,16 @@ mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self)
     return self->priv->modem_cdma_cdma1x_registration_state;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_cdma_evdo_registration_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the current state of the registration in the EV-DO network.
+ *
+ * Returns: a #MMModemCdmaRegistrationState.
+ */
 MMModemCdmaRegistrationState
 mm_simple_status_get_cdma_evdo_registration_state (MMSimpleStatus *self)
 {
@@ -167,18 +266,38 @@ mm_simple_status_get_cdma_evdo_registration_state (MMSimpleStatus *self)
     return self->priv->modem_cdma_evdo_registration_state;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_cdma_sid:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the System Identification number of the CDMA network.
+ *
+ * Returns: the SID, or %MM_MODEM_CDMA_SID_UNKNOWN if unknown.
+ */
 guint
 mm_simple_status_get_cdma_sid (MMSimpleStatus *self)
 {
-    g_return_val_if_fail (MM_IS_SIMPLE_STATUS (self), 0);
+    g_return_val_if_fail (MM_IS_SIMPLE_STATUS (self), MM_MODEM_CDMA_SID_UNKNOWN);
 
     return self->priv->modem_cdma_sid;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_cdma_nid:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the Network Identification number of the CDMA network.
+ *
+ * Returns: the NID, or %MM_MODEM_CDMA_NID_UNKNOWN if unknown.
+ */
 guint
 mm_simple_status_get_cdma_nid (MMSimpleStatus *self)
 {
-    g_return_val_if_fail (MM_IS_SIMPLE_STATUS (self), 0);
+    g_return_val_if_fail (MM_IS_SIMPLE_STATUS (self), MM_MODEM_CDMA_NID_UNKNOWN);
 
     return self->priv->modem_cdma_nid;
 }
@@ -237,12 +356,12 @@ mm_simple_status_get_dictionary (MMSimpleStatus *self)
                                    "{sv}",
                                    MM_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
                                    g_variant_new_uint32 (self->priv->modem_cdma_cdma1x_registration_state));
-            if (self->priv->modem_cdma_sid  != SID_UNKNOWN)
+            if (self->priv->modem_cdma_sid  != MM_MODEM_CDMA_SID_UNKNOWN)
                 g_variant_builder_add (&builder,
                                        "{sv}",
                                        MM_SIMPLE_PROPERTY_CDMA_SID,
                                        g_variant_new_uint32 (self->priv->modem_cdma_sid));
-            if (self->priv->modem_cdma_nid  != NID_UNKNOWN)
+            if (self->priv->modem_cdma_nid  != MM_MODEM_CDMA_NID_UNKNOWN)
                 g_variant_builder_add (&builder,
                                        "{sv}",
                                        MM_SIMPLE_PROPERTY_CDMA_NID,
@@ -467,8 +586,8 @@ mm_simple_status_init (MMSimpleStatus *self)
     self->priv->signal_quality = g_variant_ref_sink (g_variant_new ("(ub)", 0, 0));
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    self->priv->modem_cdma_sid = SID_UNKNOWN;
-    self->priv->modem_cdma_nid = NID_UNKNOWN;
+    self->priv->modem_cdma_sid = MM_MODEM_CDMA_SID_UNKNOWN;
+    self->priv->modem_cdma_nid = MM_MODEM_CDMA_NID_UNKNOWN;
 }
 
 static void
@@ -582,8 +701,8 @@ mm_simple_status_class_init (MMSimpleStatusClass *klass)
                            "CDMA1x SID",
                            "System Identifier of the serving CDMA1x network",
                            0,
-                           SID_UNKNOWN,
-                           SID_UNKNOWN,
+                           MM_MODEM_CDMA_SID_UNKNOWN,
+                           MM_MODEM_CDMA_SID_UNKNOWN,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CDMA_SID, properties[PROP_CDMA_SID]);
 
@@ -592,8 +711,8 @@ mm_simple_status_class_init (MMSimpleStatusClass *klass)
                            "CDMA1x NID",
                            "Network Identifier of the serving CDMA1x network",
                            0,
-                           NID_UNKNOWN,
-                           NID_UNKNOWN,
+                           MM_MODEM_CDMA_NID_UNKNOWN,
+                           MM_MODEM_CDMA_NID_UNKNOWN,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CDMA_NID, properties[PROP_CDMA_NID]);
 }
