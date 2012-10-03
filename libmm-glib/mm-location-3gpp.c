@@ -21,6 +21,19 @@
 #include "mm-common-helpers.h"
 #include "mm-location-3gpp.h"
 
+/**
+ * SECTION: mm-location-3gpp
+ * @title: MMLocation3gpp
+ * @short_description: Helper object to handle 3GPP location information.
+ *
+ * The #MMLocation3gpp is an object handling the location information of the
+ * modem when this is reported by the 3GPP network.
+ *
+ * This object is retrieved with either mm_modem_location_get_3gpp(),
+ * mm_modem_location_get_3gpp_sync(), mm_modem_location_get_full() or
+ * mm_modem_location_get_full_sync().
+ */
+
 G_DEFINE_TYPE (MMLocation3gpp, mm_location_3gpp, G_TYPE_OBJECT);
 
 struct _MMLocation3gppPrivate {
@@ -32,36 +45,20 @@ struct _MMLocation3gppPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_location_3gpp_get_mobile_country_code:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the Mobile Country Code of the 3GPP network.
+ *
+ * Returns: the MCC, or 0 if unknown.
+ */
 guint
 mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
 
     return self->priv->mobile_country_code;
-}
-
-guint
-mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
-
-    return self->priv->mobile_network_code;
-}
-
-gulong
-mm_location_3gpp_get_location_area_code (MMLocation3gpp *self)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
-
-    return self->priv->location_area_code;
-}
-
-gulong
-mm_location_3gpp_get_cell_id (MMLocation3gpp *self)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
-
-    return self->priv->cell_id;
 }
 
 gboolean
@@ -78,6 +75,24 @@ mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
     return TRUE;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_location_3gpp_get_mobile_network_code:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the Mobile Network Code of the 3GPP network.
+ *
+ * Returns: the MNC, or 0 if unknown.
+ */
+guint
+mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
+    return self->priv->mobile_network_code;
+}
+
 gboolean
 mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
                                           guint mobile_network_code)
@@ -90,6 +105,24 @@ mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
 
     self->priv->mobile_network_code = mobile_network_code;
     return TRUE;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_location_3gpp_get_location_area_code:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the location area code of the 3GPP network.
+ *
+ * Returns: the location area code, or 0 if unknown.
+ */
+gulong
+mm_location_3gpp_get_location_area_code (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
+    return self->priv->location_area_code;
 }
 
 gboolean
@@ -106,6 +139,23 @@ mm_location_3gpp_set_location_area_code (MMLocation3gpp *self,
     return TRUE;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_location_3gpp_get_cell_id:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the cell ID of the 3GPP network.
+ *
+ * Returns: the cell ID, or 0 if unknown.
+ */
+gulong
+mm_location_3gpp_get_cell_id (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
+    return self->priv->cell_id;
+}
 
 gboolean
 mm_location_3gpp_set_cell_id (MMLocation3gpp *self,

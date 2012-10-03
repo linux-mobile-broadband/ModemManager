@@ -36,16 +36,38 @@ typedef struct _MMLocation3gpp MMLocation3gpp;
 typedef struct _MMLocation3gppClass MMLocation3gppClass;
 typedef struct _MMLocation3gppPrivate MMLocation3gppPrivate;
 
+/**
+ * MMLocation3gpp:
+ *
+ * The #MMLocation3gpp structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMLocation3gpp {
+    /*< private >*/
     GObject parent;
     MMLocation3gppPrivate *priv;
 };
 
 struct _MMLocation3gppClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_location_3gpp_get_type (void);
+
+guint  mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
+guint  mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
+gulong mm_location_3gpp_get_location_area_code  (MMLocation3gpp *self);
+gulong mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
+GVariant *mm_location_3gpp_get_string_variant (MMLocation3gpp *self);
 
 MMLocation3gpp *mm_location_3gpp_new (void);
 MMLocation3gpp *mm_location_3gpp_new_from_string_variant (GVariant *string,
@@ -60,12 +82,7 @@ gboolean mm_location_3gpp_set_location_area_code  (MMLocation3gpp *self,
 gboolean mm_location_3gpp_set_cell_id             (MMLocation3gpp *self,
                                                    gulong cell_id);
 
-guint  mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
-guint  mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
-gulong mm_location_3gpp_get_location_area_code  (MMLocation3gpp *self);
-gulong mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
-
-GVariant *mm_location_3gpp_get_string_variant (MMLocation3gpp *self);
+#endif
 
 G_END_DECLS
 
