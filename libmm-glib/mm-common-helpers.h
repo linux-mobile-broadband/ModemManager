@@ -18,6 +18,10 @@
 #include <glib.h>
 #include <ModemManager-enums.h>
 
+#if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
+#error "Only <libmm-glib.h> can be included directly."
+#endif
+
 #ifndef MM_COMMON_HELPERS_H
 #define MM_COMMON_HELPERS_H
 

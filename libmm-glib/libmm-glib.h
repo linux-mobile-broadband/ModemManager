@@ -17,11 +17,13 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
 #ifndef _LIBMM_GLIB_H_
 #define _LIBMM_GLIB_H_
+
+#define __LIBMM_GLIB_H_INSIDE__
 
 /* ModemManager generic headers */
 #include <ModemManager.h>

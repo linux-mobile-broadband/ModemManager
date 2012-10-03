@@ -24,6 +24,10 @@
 #ifndef _MM_MODEM_CDMA_H_
 #define _MM_MODEM_CDMA_H_
 
+#if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
+#error "Only <libmm-glib.h> can be included directly."
+#endif
+
 #include <ModemManager.h>
 
 #include "mm-gdbus-modem.h"

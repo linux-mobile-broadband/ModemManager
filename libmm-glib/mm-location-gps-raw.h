@@ -16,6 +16,10 @@
 #ifndef MM_LOCATION_GPS_RAW_H
 #define MM_LOCATION_GPS_RAW_H
 
+#if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
+#error "Only <libmm-glib.h> can be included directly."
+#endif
+
 #include <ModemManager.h>
 #include <glib-object.h>
 

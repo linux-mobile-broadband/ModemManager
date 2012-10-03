@@ -68,7 +68,8 @@ libmm_glib_la_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
 	-I${top_srcdir}/libmm-glib/generated \
-	-I${top_builddir}/libmm-glib/generated
+	-I${top_builddir}/libmm-glib/generated \
+	-DLIBMM_GLIB_COMPILATION
 
 libmm_glib_la_LIBADD = \
 	${top_builddir}/libmm-glib/generated/libmm-generated.la \
