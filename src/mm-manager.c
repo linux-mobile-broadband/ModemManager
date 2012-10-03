@@ -703,6 +703,14 @@ supports_callback (MMPlugin *plugin,
              * supports it.
              */
             next_plugin = existing_plugin;
+        } else if (plugin != existing_plugin) {
+            /* A modem object may have been created by one of this device's other
+             * ports while this port was getting probed; now that we have a
+             * modem, just use the modem's plugin and ignore this plugin
+             * completely.  All ports of a modem must be handled by the same
+             * plugin.
+             */
+            next_plugin = NULL;
         } else {
             mm_dbg ("(%s/%s): plugin %p (%s) existing %p (%s) info->best %p (%s)",
                     info->subsys, info->name,
