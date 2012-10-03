@@ -21,6 +21,18 @@
 #include "mm-common-helpers.h"
 #include "mm-sms-properties.h"
 
+/**
+ * SECTION: mm-sms-properties
+ * @title: MMSmsProperties
+ * @short_description: Helper object to handle SMS properties.
+ *
+ * The #MMSmsProperties is an object handling the properties to be set
+ * in newly created SMS objects.
+ *
+ * This object is created by the user and passed to ModemManager with either
+ * mm_modem_messaging_create() or mm_modem_messaging_create_sync().
+ */
+
 G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_TEXT                    "text"
@@ -46,6 +58,13 @@ struct _MMSmsPropertiesPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_sms_properties_set_text:
+ * @self: A #MMSmsProperties.
+ * @text: The text to set, in UTF-8.
+ *
+ * Sets the message text.
+ */
 void
 mm_sms_properties_set_text (MMSmsProperties *self,
                             const gchar *text)
@@ -56,6 +75,32 @@ mm_sms_properties_set_text (MMSmsProperties *self,
     self->priv->text = g_strdup (text);
 }
 
+/**
+ * mm_sms_properties_get_text:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the message text, in UTF-8.
+ *
+ * Returns: (transfer none): The message text, or %NULL if it doesn't contain any (e.g. contains data instead). Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_sms_properties_get_text (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
+    return self->priv->text;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_data:
+ * @self: A #MMSmsProperties.
+ * @data: The data to set.
+ * @data_length: Length of @data.
+ *
+ * Sets the message data.
+ */
 void
 mm_sms_properties_set_data (MMSmsProperties *self,
                             const guint8 *data,
@@ -74,6 +119,13 @@ mm_sms_properties_set_data (MMSmsProperties *self,
         self->priv->data = NULL;
 }
 
+/**
+ * mm_sms_properties_set_data_bytearray:
+ * @self: A #MMSmsProperties.
+ * @data: A #GByteArray with the data to set. This method takes a new reference of @data.
+ *
+ * Sets the message data.
+ */
 void
 mm_sms_properties_set_data_bytearray (MMSmsProperties *self,
                                       GByteArray *data)
@@ -86,74 +138,15 @@ mm_sms_properties_set_data_bytearray (MMSmsProperties *self,
     self->priv->data = (data ? g_byte_array_ref (data) : NULL);
 }
 
-void
-mm_sms_properties_set_number (MMSmsProperties *self,
-                              const gchar *number)
-{
-    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
-
-    g_free (self->priv->number);
-    self->priv->number = g_strdup (number);
-}
-
-void
-mm_sms_properties_set_smsc (MMSmsProperties *self,
-                            const gchar *smsc)
-{
-    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
-
-    g_free (self->priv->smsc);
-    self->priv->smsc = g_strdup (smsc);
-}
-
-void
-mm_sms_properties_set_validity (MMSmsProperties *self,
-                                guint validity)
-{
-    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
-
-    self->priv->validity_set = TRUE;
-    self->priv->validity = validity;
-}
-
-void
-mm_sms_properties_set_class (MMSmsProperties *self,
-                             guint class)
-{
-    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
-
-    self->priv->class_set = TRUE;
-    self->priv->class = class;
-}
-
-void
-mm_sms_properties_set_delivery_report_request (MMSmsProperties *self,
-                                               gboolean request)
-{
-    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
-
-    self->priv->delivery_report_request_set = TRUE;
-    self->priv->delivery_report_request = request;
-}
-
-/*****************************************************************************/
-
-const gchar *
-mm_sms_properties_get_text (MMSmsProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
-
-    return self->priv->text;
-}
-
-const gchar *
-mm_sms_properties_get_number (MMSmsProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
-
-    return self->priv->number;
-}
-
+/**
+ * mm_sms_properties_get_data:
+ * @self: A #MMSmsProperties.
+ * @data_len: (out): Size of the output data, if any given.
+ *
+ * Gets the message data.
+ *
+ * Returns: (transfer none): The message data, or %NULL if it doesn't contain any (e.g. contains text instead).
+ */
 const guint8 *
 mm_sms_properties_get_data (MMSmsProperties *self,
                             gsize *data_len)
@@ -166,6 +159,14 @@ mm_sms_properties_get_data (MMSmsProperties *self,
     return self->priv->data->data;
 }
 
+/**
+ * mm_sms_properties_peek_data_bytearray:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the message data.
+ *
+ * Returns: (transfer none): A #GByteArray with the message data, or %NULL if it doesn't contain any (e.g. contains text instead). Do not free the returned value, it is owned by @self.
+ */
 GByteArray *
 mm_sms_properties_peek_data_bytearray (MMSmsProperties *self)
 {
@@ -174,6 +175,14 @@ mm_sms_properties_peek_data_bytearray (MMSmsProperties *self)
     return self->priv->data;
 }
 
+/**
+ * mm_sms_properties_get_data_bytearray:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the message data.
+ *
+ * Returns: (transfer none): A #GByteArray with the message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_byte_array_unref().
+ */
 GByteArray *
 mm_sms_properties_get_data_bytearray (MMSmsProperties *self)
 {
@@ -182,6 +191,68 @@ mm_sms_properties_get_data_bytearray (MMSmsProperties *self)
     return (self->priv->data ? g_byte_array_ref (self->priv->data) : NULL);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_number:
+ * @self: A #MMSmsProperties.
+ * @number: The number.
+ *
+ * Sets the number to which the message is addressed.
+ */
+void
+mm_sms_properties_set_number (MMSmsProperties *self,
+                              const gchar *number)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    g_free (self->priv->number);
+    self->priv->number = g_strdup (number);
+}
+
+/**
+ * mm_sms_properties_get_number:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the number to which the message is addressed.
+ *
+ * Returns: (transfer none): The number, or %NULL if it couldn't be retrieved. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_sms_properties_get_number (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
+    return self->priv->number;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_smsc:
+ * @self: A #MMSmsProperties.
+ * @smsc: The SMSC number.
+ *
+ * Sets the SMS service center number.
+ */
+void
+mm_sms_properties_set_smsc (MMSmsProperties *self,
+                            const gchar *smsc)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    g_free (self->priv->smsc);
+    self->priv->smsc = g_strdup (smsc);
+}
+
+/**
+ * mm_sms_properties_get_smsc:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the SMS service center number.
+ *
+ * Returns: (transfer none): The number of the SMSC, or %NULL if it couldn't be retrieved. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_sms_properties_get_smsc (MMSmsProperties *self)
 {
@@ -190,6 +261,33 @@ mm_sms_properties_get_smsc (MMSmsProperties *self)
     return self->priv->smsc;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_validity:
+ * @self: A #MMSmsProperties.
+ * @validity: The validity.
+ *
+ * Sets the validity time of the SMS.
+ */
+void
+mm_sms_properties_set_validity (MMSmsProperties *self,
+                                guint validity)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->validity_set = TRUE;
+    self->priv->validity = validity;
+}
+
+/**
+ * mm_sms_properties_get_validity:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the validity time of the SMS.
+ *
+ * Returns: the validity time or 0 if unknown.
+ */
 guint
 mm_sms_properties_get_validity (MMSmsProperties *self)
 {
@@ -198,6 +296,33 @@ mm_sms_properties_get_validity (MMSmsProperties *self)
     return self->priv->validity;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_class:
+ * @self: A #MMSmsProperties.
+ * @class: The message class.
+ *
+ * Sets the 3GPP message class of the SMS.
+ */
+void
+mm_sms_properties_set_class (MMSmsProperties *self,
+                             guint class)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->class_set = TRUE;
+    self->priv->class = class;
+}
+
+/**
+ * mm_sms_properties_get_class:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the 3GPP message class of the SMS.
+ *
+ * Returns: the message class.
+ */
 guint
 mm_sms_properties_get_class (MMSmsProperties *self)
 {
@@ -206,6 +331,33 @@ mm_sms_properties_get_class (MMSmsProperties *self)
     return self->priv->class;
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_delivery_report_request:
+ * @self: A #MMSmsProperties.
+ * @request: %TRUE if delivery report is requested, %FALSE otherwise.
+ *
+ * Sets whether delivery report is requested for the SMS.
+ */
+void
+mm_sms_properties_set_delivery_report_request (MMSmsProperties *self,
+                                               gboolean request)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->delivery_report_request_set = TRUE;
+    self->priv->delivery_report_request = request;
+}
+
+/**
+ * mm_sms_properties_get_delivery_report_request:
+ * @self: A #MMSmsProperties.
+ *
+ * Checks whether delivery report is requested for the SMS.
+ *
+ * Returns: %TRUE if delivery report is requested, %FALSE otherwise.
+ */
 gboolean
 mm_sms_properties_get_delivery_report_request (MMSmsProperties *self)
 {
@@ -547,6 +699,13 @@ mm_sms_properties_dup (MMSmsProperties *orig)
 
 /*****************************************************************************/
 
+/**
+ * mm_sms_properties_new:
+ *
+ * Creates a new empty #MMSmsProperties.
+ *
+ * Returns: (transfer full): a #MMSmsProperties. The returned value should be freed with g_object_unref().
+ */
 MMSmsProperties *
 mm_sms_properties_new (void)
 {

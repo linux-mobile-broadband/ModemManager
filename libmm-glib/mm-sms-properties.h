@@ -36,24 +36,26 @@ typedef struct _MMSmsProperties MMSmsProperties;
 typedef struct _MMSmsPropertiesClass MMSmsPropertiesClass;
 typedef struct _MMSmsPropertiesPrivate MMSmsPropertiesPrivate;
 
+/**
+ * MMSmsProperties:
+ *
+ * The #MMSmsProperties structure contains private data and should only be
+ * accessed using the provided API.
+ */
 struct _MMSmsProperties {
+    /*< private >*/
     GObject parent;
     MMSmsPropertiesPrivate *priv;
 };
 
 struct _MMSmsPropertiesClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_sms_properties_get_type (void);
 
 MMSmsProperties *mm_sms_properties_new (void);
-MMSmsProperties *mm_sms_properties_new_from_string (const gchar *str,
-                                                    GError **error);
-MMSmsProperties *mm_sms_properties_new_from_dictionary (GVariant *dictionary,
-                                                        GError **error);
-
-MMSmsProperties *mm_sms_properties_dup (MMSmsProperties *orig);
 
 void mm_sms_properties_set_text                    (MMSmsProperties *self,
                                                     const gchar *text);
@@ -84,7 +86,23 @@ guint         mm_sms_properties_get_validity                (MMSmsProperties *se
 guint         mm_sms_properties_get_class                   (MMSmsProperties *self);
 gboolean      mm_sms_properties_get_delivery_report_request (MMSmsProperties *self);
 
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
+MMSmsProperties *mm_sms_properties_new_from_string (const gchar *str,
+                                                    GError **error);
+MMSmsProperties *mm_sms_properties_new_from_dictionary (GVariant *dictionary,
+                                                        GError **error);
+
+MMSmsProperties *mm_sms_properties_dup (MMSmsProperties *orig);
+
 GVariant *mm_sms_properties_get_dictionary (MMSmsProperties *self);
+
+#endif
 
 G_END_DECLS
 
