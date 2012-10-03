@@ -20,8 +20,8 @@
 
 #include <glib-object.h>
 
-#include <ModemManager-errors.h>
-#include <mm-errors-types.h>
+#include <ModemManager.h>
+#include <libmm-glib.h>
 
 GError *mm_connection_error_for_code         (MMConnectionError code);
 GError *mm_mobile_equipment_error_for_code   (MMMobileEquipmentError code);

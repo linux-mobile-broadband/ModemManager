@@ -16,7 +16,7 @@
  */
 
 #include <glib.h>
-#include <ModemManager-enums.h>
+#include <ModemManager.h>
 
 #if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
 #error "Only <libmm-glib.h> can be included directly."

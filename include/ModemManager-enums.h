@@ -17,6 +17,10 @@
 #ifndef _MODEMMANAGER_ENUMS_H_
 #define _MODEMMANAGER_ENUMS_H_
 
+#if !defined (__MODEM_MANAGER_H_INSIDE__)
+#error "Only <ModemManager.h> can be included directly."
+#endif
+
 /**
  * SECTION:mm-enums
  * @short_description: Common enumerations and types in the API.

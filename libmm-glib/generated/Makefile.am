@@ -41,7 +41,7 @@ BUILT_SOURCES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)
 # Enum types
 mm-enums-types.h: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include <ModemManager-enums.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n" \
+		--fhead "#include <ModemManager.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_ENUMS_TYPES_H__ */\n" \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
@@ -62,13 +62,13 @@ mm-errors-types.h: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top
 
 mm-errors-types.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-template.c mm-errors-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include <ModemManager-errors.h>\n#include \"mm-errors-types.h\"\n" \
+		--fhead "#include <ModemManager.h>\n#include \"mm-errors-types.h\"\n" \
 		--template $(top_srcdir)/build-aux/mm-errors-template.c \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
 mm-errors-quarks.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-quarks-template.c $(top_srcdir)/include/ModemManager-names.h mm-errors-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include <ModemManager-errors.h>\n#include \"mm-errors-types.h\"\n" \
+		--fhead "#include <ModemManager.h>\n#include \"mm-errors-types.h\"\n" \
 		--template $(top_srcdir)/build-aux/mm-errors-quarks-template.c \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
