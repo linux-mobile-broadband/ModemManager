@@ -19,6 +19,18 @@
 #include "mm-common-helpers.h"
 #include "mm-bearer-properties.h"
 
+/**
+ * SECTION: mm-bearer-properties
+ * @title: MMBearerProperties
+ * @short_description: Helper object to handle bearer properties.
+ *
+ * The #MMBearerProperties is an object handling the properties requested
+ * to ModemManager when creating a new bearer.
+ *
+ * This object is created by the user and passed to ModemManager with either
+ * mm_modem_create_bearer() or mm_modem_create_bearer_sync().
+ */
+
 G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_APN             "apn"
@@ -49,6 +61,13 @@ struct _MMBearerPropertiesPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_set_apn:
+ * @self: a #MMBearerProperties.
+ * @apn: Name of the access point.
+ *
+ * Sets the name of the access point to use when connecting.
+ */
 void
 mm_bearer_properties_set_apn (MMBearerProperties *self,
                               const gchar *apn)
@@ -59,6 +78,31 @@ mm_bearer_properties_set_apn (MMBearerProperties *self,
     self->priv->apn = g_strdup (apn);
 }
 
+/**
+ * mm_bearer_properties_get_apn:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the name of the access point to use when connecting.
+ *
+ * Returns: (transfer none): the access point, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_properties_get_apn (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
+    return self->priv->apn;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_user:
+ * @self: a #MMBearerProperties.
+ * @user: the username
+ *
+ * Sets the username used to authenticate with the access point.
+ */
 void
 mm_bearer_properties_set_user (MMBearerProperties *self,
                                const gchar *user)
@@ -69,6 +113,31 @@ mm_bearer_properties_set_user (MMBearerProperties *self,
     self->priv->user = g_strdup (user);
 }
 
+/**
+ * mm_bearer_properties_get_user:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the username used to authenticate with the access point.
+ *
+ * Returns: (transfer none): the username, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_properties_get_user (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
+    return self->priv->user;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_password:
+ * @self: a #MMBearerProperties.
+ * @password: the password
+ *
+ * Sets the password used to authenticate with the access point.
+ */
 void
 mm_bearer_properties_set_password (MMBearerProperties *self,
                                    const gchar *password)
@@ -79,6 +148,31 @@ mm_bearer_properties_set_password (MMBearerProperties *self,
     self->priv->password = g_strdup (password);
 }
 
+/**
+ * mm_bearer_properties_get_password:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the password used to authenticate with the access point.
+ *
+ * Returns: (transfer none): the password, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_properties_get_password (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
+    return self->priv->password;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_ip_type:
+ * @self: a #MMBearerProperties.
+ * @ip_type: a #MMBearerIpFamily.
+ *
+ * Sets the IP type to use.
+ */
 void
 mm_bearer_properties_set_ip_type (MMBearerProperties *self,
                                   MMBearerIpFamily ip_type)
@@ -88,6 +182,32 @@ mm_bearer_properties_set_ip_type (MMBearerProperties *self,
     self->priv->ip_type = ip_type;
 }
 
+/**
+ * mm_bearer_properties_get_ip_type:
+ * @self: a #MMBearerProperties.
+ *
+ * Sets the IP type to use.
+ *
+ * Returns: a #MMBearerIpFamily.
+ */
+MMBearerIpFamily
+mm_bearer_properties_get_ip_type (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
+
+    return self->priv->ip_type;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_allow_roaming:
+ * @self: a #MMBearerProperties.
+ * @allow_roaming: boolean value.
+ *
+ * Sets the flag to indicate whether roaming is allowed or not in the
+ * connection.
+ */
 void
 mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
                                         gboolean allow_roaming)
@@ -98,6 +218,31 @@ mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
     self->priv->allow_roaming_set = TRUE;
 }
 
+/**
+ * mm_bearer_properties_get_allow_roaming:
+ * @self: a #MMBearerProperties.
+ *
+ * Checks whether roaming is allowed in the connection.
+ *
+ * Returns: %TRUE if roaming is allowed, %FALSE otherwise..
+ */
+gboolean
+mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
+
+    return self->priv->allow_roaming;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_number:
+ * @self: a #MMBearerProperties.
+ * @number: the number.
+ *
+ * Sets the number to use when performing the connection.
+ */
 void
 mm_bearer_properties_set_number (MMBearerProperties *self,
                                  const gchar *number)
@@ -108,6 +253,31 @@ mm_bearer_properties_set_number (MMBearerProperties *self,
     self->priv->number = g_strdup (number);
 }
 
+/**
+ * mm_bearer_properties_get_number:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the number to use when performing the connection.
+ *
+ * Returns: (transfer none): the number, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_bearer_properties_get_number (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
+    return self->priv->number;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_rm_protocol:
+ * @self: a #MMBearerProperties.
+ * @protocol: a #MMModemCdmaRmProtocol.
+ *
+ * Sets the RM protocol to use in the CDMA connection.
+ */
 void
 mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
                                       MMModemCdmaRmProtocol protocol)
@@ -117,56 +287,14 @@ mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
     self->priv->rm_protocol = protocol;
 }
 
-/*****************************************************************************/
-
-const gchar *
-mm_bearer_properties_get_apn (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
-
-    return self->priv->apn;
-}
-
-const gchar *
-mm_bearer_properties_get_user (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
-
-    return self->priv->user;
-}
-
-const gchar *
-mm_bearer_properties_get_password (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
-
-    return self->priv->password;
-}
-
-MMBearerIpFamily
-mm_bearer_properties_get_ip_type (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
-
-    return self->priv->ip_type;
-}
-
-gboolean
-mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
-
-    return self->priv->allow_roaming;
-}
-
-const gchar *
-mm_bearer_properties_get_number (MMBearerProperties *self)
-{
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
-
-    return self->priv->number;
-}
-
+/**
+ * mm_bearer_properties_get_rm_protocol:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the RM protocol requested to use in the CDMA connection.
+ *
+ * Returns: a #MMModemCdmaRmProtocol.
+ */
 MMModemCdmaRmProtocol
 mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
 {
@@ -463,6 +591,13 @@ mm_bearer_properties_cmp (MMBearerProperties *a,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_new:
+ *
+ * Creates a new empty #MMBearerProperties.
+ *
+ * Returns: (transfer full): a #MMBearerProperties. The returned value should be freed with g_object_unref().
+ */
 MMBearerProperties *
 mm_bearer_properties_new (void)
 {

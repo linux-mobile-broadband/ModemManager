@@ -36,47 +36,63 @@ typedef struct _MMBearerProperties MMBearerProperties;
 typedef struct _MMBearerPropertiesClass MMBearerPropertiesClass;
 typedef struct _MMBearerPropertiesPrivate MMBearerPropertiesPrivate;
 
+/**
+ * MMBearerProperties:
+ *
+ * The #MMBearerProperties structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMBearerProperties {
+    /*< private >*/
     GObject parent;
     MMBearerPropertiesPrivate *priv;
 };
 
 struct _MMBearerPropertiesClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_bearer_properties_get_type (void);
 
 MMBearerProperties *mm_bearer_properties_new (void);
+
+void mm_bearer_properties_set_apn           (MMBearerProperties *self,
+                                             const gchar *apn);
+void mm_bearer_properties_set_user          (MMBearerProperties *self,
+                                             const gchar *user);
+void mm_bearer_properties_set_password      (MMBearerProperties *self,
+                                             const gchar *password);
+void mm_bearer_properties_set_ip_type       (MMBearerProperties *self,
+                                             MMBearerIpFamily ip_type);
+void mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
+                                             gboolean allow_roaming);
+void mm_bearer_properties_set_number        (MMBearerProperties *self,
+                                             const gchar *number);
+void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *self,
+                                             MMModemCdmaRmProtocol protocol);
+
+const gchar           *mm_bearer_properties_get_apn           (MMBearerProperties *self);
+const gchar           *mm_bearer_properties_get_user          (MMBearerProperties *self);
+const gchar           *mm_bearer_properties_get_password      (MMBearerProperties *self);
+MMBearerIpFamily       mm_bearer_properties_get_ip_type       (MMBearerProperties *self);
+gboolean               mm_bearer_properties_get_allow_roaming (MMBearerProperties *self);
+const gchar           *mm_bearer_properties_get_number        (MMBearerProperties *self);
+MMModemCdmaRmProtocol  mm_bearer_properties_get_rm_protocol   (MMBearerProperties *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
 MMBearerProperties *mm_bearer_properties_new_from_string (const gchar *str,
                                                           GError **error);
 MMBearerProperties *mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
                                                               GError **error);
 
 MMBearerProperties *mm_bearer_properties_dup (MMBearerProperties *orig);
-
-void mm_bearer_properties_set_apn           (MMBearerProperties *properties,
-                                             const gchar *apn);
-void mm_bearer_properties_set_user          (MMBearerProperties *properties,
-                                             const gchar *user);
-void mm_bearer_properties_set_password      (MMBearerProperties *properties,
-                                             const gchar *password);
-void mm_bearer_properties_set_ip_type       (MMBearerProperties *properties,
-                                             MMBearerIpFamily ip_type);
-void mm_bearer_properties_set_allow_roaming (MMBearerProperties *properties,
-                                             gboolean allow_roaming);
-void mm_bearer_properties_set_number        (MMBearerProperties *properties,
-                                             const gchar *number);
-void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *properties,
-                                             MMModemCdmaRmProtocol protocol);
-
-const gchar           *mm_bearer_properties_get_apn           (MMBearerProperties *properties);
-const gchar           *mm_bearer_properties_get_user          (MMBearerProperties *properties);
-const gchar           *mm_bearer_properties_get_password      (MMBearerProperties *properties);
-MMBearerIpFamily       mm_bearer_properties_get_ip_type       (MMBearerProperties *properties);
-gboolean               mm_bearer_properties_get_allow_roaming (MMBearerProperties *properties);
-const gchar           *mm_bearer_properties_get_number        (MMBearerProperties *properties);
-MMModemCdmaRmProtocol  mm_bearer_properties_get_rm_protocol   (MMBearerProperties *properties);
 
 gboolean mm_bearer_properties_consume_string (MMBearerProperties *self,
                                               const gchar *key,
@@ -92,6 +108,8 @@ GVariant *mm_bearer_properties_get_dictionary (MMBearerProperties *self);
 
 gboolean mm_bearer_properties_cmp (MMBearerProperties *a,
                                    MMBearerProperties *b);
+
+#endif
 
 G_END_DECLS
 
