@@ -36,16 +36,35 @@ typedef struct _MMLocationGpsNmea MMLocationGpsNmea;
 typedef struct _MMLocationGpsNmeaClass MMLocationGpsNmeaClass;
 typedef struct _MMLocationGpsNmeaPrivate MMLocationGpsNmeaPrivate;
 
+/**
+ * MMLocationGpsNmea:
+ *
+ * The #MMLocationGpsNmea structure contains private data and should
+ * only be accessed using the provided API.
+ */
 struct _MMLocationGpsNmea {
+    /*< private >*/
     GObject parent;
     MMLocationGpsNmeaPrivate *priv;
 };
 
 struct _MMLocationGpsNmeaClass {
+    /*< private >*/
     GObjectClass parent;
 };
 
 GType mm_location_gps_nmea_get_type (void);
+
+const gchar *mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
+                                             const gchar *trace_type);
+gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
 
 MMLocationGpsNmea *mm_location_gps_nmea_new (void);
 MMLocationGpsNmea *mm_location_gps_nmea_new_from_string_variant (GVariant *string,
@@ -53,10 +72,6 @@ MMLocationGpsNmea *mm_location_gps_nmea_new_from_string_variant (GVariant *strin
 
 gboolean mm_location_gps_nmea_add_trace (MMLocationGpsNmea *self,
                                          const gchar *trace);
-
-const gchar *mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
-                                             const gchar *trace_type);
-gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
 
 GVariant *mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self);
 

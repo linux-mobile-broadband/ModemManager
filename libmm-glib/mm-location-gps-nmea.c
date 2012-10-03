@@ -21,6 +21,19 @@
 #include "mm-errors-types.h"
 #include "mm-location-gps-nmea.h"
 
+/**
+ * SECTION: mm-location-gps-nmea
+ * @title: MMLocationGpsNmea
+ * @short_description: Helper object to handle NMEA-based GPS location information.
+ *
+ * The #MMLocationGpsNmea is an object handling the location information of the
+ * modem when this is reported by GPS.
+ *
+ * This object is retrieved with either mm_modem_location_get_gps_nmea(),
+ * mm_modem_location_get_gps_nmea_sync(), mm_modem_location_get_full() or
+ * mm_modem_location_get_full_sync().
+ */
+
 G_DEFINE_TYPE (MMLocationGpsNmea, mm_location_gps_nmea, G_TYPE_OBJECT);
 
 struct _MMLocationGpsNmeaPrivate {
@@ -110,6 +123,15 @@ mm_location_gps_nmea_add_trace (MMLocationGpsNmea *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_nmea_get_trace:
+ * @self: a #MMLocationGpsNmea.
+ * @trace_type: specific NMEA trace type to gather.
+ *
+ * Gets the last cached value of the specific @trace_type given.
+ *
+ * Returns: the NMEA trace, or %NULL if not available. Do not free the returned value, it is owned by @self.
+ */
 const gchar *
 mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
                                 const gchar *trace_type)
@@ -130,6 +152,14 @@ build_full_foreach (const gchar *trace_type,
         g_string_append_printf (*built, "\r\n%s", trace);
 }
 
+/**
+ * mm_location_gps_nmea_build_full:
+ * @self: a #MMLocationGpsNmea.
+ *
+ * Gets a compilation of all cached traces.
+ *
+ * Returns: (transfer full) a string containing all traces, or #NULL if none available. The returned value should be freed with g_free().
+ */
 gchar *
 mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 {

@@ -366,14 +366,16 @@ mm_location_3gpp_get_type
 <FILE>mm-location-gps-nmea</FILE>
 <TITLE>MMLocationGpsNmea</TITLE>
 MMLocationGpsNmea
-MMLocationGpsNmeaClass
-mm_location_gps_nmea_add_trace
-mm_location_gps_nmea_build_full
-mm_location_gps_nmea_get_string_variant
+<SUBSECTION Getters>
 mm_location_gps_nmea_get_trace
+mm_location_gps_nmea_build_full
+<SUBSECTION Private>
 mm_location_gps_nmea_new
 mm_location_gps_nmea_new_from_string_variant
+mm_location_gps_nmea_add_trace
+mm_location_gps_nmea_get_string_variant
 <SUBSECTION Standard>
+MMLocationGpsNmeaClass
 MMLocationGpsNmeaPrivate
 MM_IS_LOCATION_GPS_NMEA
 MM_IS_LOCATION_GPS_NMEA_CLASS
