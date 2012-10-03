@@ -530,14 +530,16 @@ mm_modem_firmware_get_type
 <FILE>mm-firmware-properties</FILE>
 <TITLE>MMFirmwareProperties</TITLE>
 MMFirmwareProperties
-MMFirmwarePropertiesClass
-mm_firmware_properties_get_dictionary
+<SUBSECTION Getters>
 mm_firmware_properties_get_image_type
 mm_firmware_properties_get_name
 mm_firmware_properties_get_version
+<SUBSECTION Private>
 mm_firmware_properties_new
 mm_firmware_properties_new_from_dictionary
+mm_firmware_properties_get_dictionary
 <SUBSECTION Standard>
+MMFirmwarePropertiesClass
 MMFirmwarePropertiesPrivate
 MM_FIRMWARE_PROPERTIES
 MM_FIRMWARE_PROPERTIES_CLASS

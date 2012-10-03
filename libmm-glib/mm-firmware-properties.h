@@ -55,17 +55,26 @@ struct _MMFirmwarePropertiesClass {
 
 GType mm_firmware_properties_get_type (void);
 
+const gchar         *mm_firmware_properties_get_name       (MMFirmwareProperties *self);
+const gchar         *mm_firmware_properties_get_version    (MMFirmwareProperties *self);
+MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties *self);
+
+/*****************************************************************************/
+/* ModemManager/libmm-glib/mmcli specific methods */
+
+#if defined (_LIBMM_INSIDE_MM) ||    \
+    defined (_LIBMM_INSIDE_MMCLI) || \
+    defined (LIBMM_GLIB_COMPILATION)
+
 MMFirmwareProperties *mm_firmware_properties_new (MMFirmwareImageType image_type,
                                                   const gchar *name,
                                                   const gchar *version);
 MMFirmwareProperties *mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
                                                                   GError **error);
 
-const gchar         *mm_firmware_properties_get_name       (MMFirmwareProperties *properties);
-const gchar         *mm_firmware_properties_get_version    (MMFirmwareProperties *properties);
-MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties *properties);
-
 GVariant *mm_firmware_properties_get_dictionary (MMFirmwareProperties *self);
+
+#endif
 
 G_END_DECLS
 

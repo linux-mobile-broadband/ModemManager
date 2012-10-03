@@ -19,6 +19,18 @@
 #include "mm-common-helpers.h"
 #include "mm-firmware-properties.h"
 
+/**
+ * SECTION: mm-firmware-properties
+ * @title: MMFirmwareProperties
+ * @short_description: Helper object to handle firmware information.
+ *
+ * The #MMFirmwareProperties is an object handling the properties exposed for
+ * available firmware images.
+ *
+ * This object is retrieved with either mm_modem_firmware_list()
+ * or mm_modem_firmware_list_sync().
+ */
+
 G_DEFINE_TYPE (MMFirmwareProperties, mm_firmware_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_NAME       "name"
@@ -52,6 +64,8 @@ mm_firmware_properties_get_name (MMFirmwareProperties *self)
     return self->priv->name;
 }
 
+/*****************************************************************************/
+
 /**
  * mm_firmware_properties_get_version:
  * @self: A #MMFirmwareProperties.
@@ -67,6 +81,8 @@ mm_firmware_properties_get_version (MMFirmwareProperties *self)
 
     return self->priv->version;
 }
+
+/*****************************************************************************/
 
 /**
  * mm_firmware_properties_get_image_type:
