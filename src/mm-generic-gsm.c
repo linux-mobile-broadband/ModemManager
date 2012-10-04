@@ -4437,44 +4437,6 @@ mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
     }
 }
 
-#define CIND_TAG "+CIND:"
-
-static void
-get_cind_signal_done (MMAtSerialPort *port,
-                      GString *response,
-                      GError *error,
-                      gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsmPrivate *priv;
-    GByteArray *indicators;
-    guint quality;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error)
-        info->error = g_error_copy (error);
-    else {
-        priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-
-        indicators = mm_parse_cind_query_response (response->str, &info->error);
-        if (indicators) {
-            if (indicators->len >= priv->signal_ind) {
-                quality = g_array_index (indicators, guint8, priv->signal_ind);
-                quality = CLAMP (quality, 0, 5) * 20;
-                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
-                mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-            }
-            g_byte_array_free (indicators, TRUE);
-        }
-    }
-
-    mm_callback_info_schedule (info);
-}
-
 static void
 get_csq_done (MMAtSerialPort *port,
               GString *response,
@@ -4524,6 +4486,44 @@ get_csq_done (MMAtSerialPort *port,
     }
 
 done:
+    mm_callback_info_schedule (info);
+}
+
+#define CIND_TAG "+CIND:"
+
+static void
+get_cind_signal_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
+    GByteArray *indicators;
+    guint quality;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        indicators = mm_parse_cind_query_response (response->str, &info->error);
+        if (indicators) {
+            if (indicators->len >= priv->signal_ind) {
+                quality = g_array_index (indicators, guint8, priv->signal_ind);
+                quality = CLAMP (quality, 0, 5) * 20;
+                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
+                mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+            }
+            g_byte_array_free (indicators, TRUE);
+        }
+    }
+
     mm_callback_info_schedule (info);
 }
 
