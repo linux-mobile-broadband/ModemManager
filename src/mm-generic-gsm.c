@@ -4500,31 +4500,40 @@ get_cind_signal_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv;
     GByteArray *indicators;
-    guint quality;
+    guint quality = 0;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
-    else {
-        priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-
-        indicators = mm_parse_cind_query_response (response->str, &info->error);
-        if (indicators) {
-            if (indicators->len >= priv->signal_ind) {
-                quality = g_array_index (indicators, guint8, priv->signal_ind);
-                quality = CLAMP (quality, 0, 5) * 20;
-                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
-                mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-            }
-            g_byte_array_free (indicators, TRUE);
-        }
+        mm_callback_info_schedule (info);
     }
 
-    mm_callback_info_schedule (info);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    indicators = mm_parse_cind_query_response (response->str, &info->error);
+    if (indicators) {
+        if (indicators->len >= priv->signal_ind) {
+            quality = g_array_index (indicators, guint8, priv->signal_ind);
+            quality = CLAMP (quality, 0, 5) * 20;
+        }
+        g_byte_array_free (indicators, TRUE);
+    }
+
+    if (quality > 0) {
+        mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+        mm_callback_info_schedule (info);
+    } else {
+        /* Some QMI-based devices say they support signal via CIND,
+         * but always report zero even though they have signal.  So
+         * if we get zero signal, try CSQ too.  (bgo #636040)
+         */
+        mm_at_serial_port_queue_command (port, "+CSQ", 3, get_csq_done, info);
+    }
 }
 
 static void
