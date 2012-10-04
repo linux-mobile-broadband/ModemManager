@@ -196,6 +196,8 @@ ModemManager_SOURCES = \
 	mm-iface-modem-messaging.c \
 	mm-iface-modem-time.h \
 	mm-iface-modem-time.c \
+	mm-iface-modem-firmware.h \
+	mm-iface-modem-firmware.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
 	mm-serial-parsers.c \
