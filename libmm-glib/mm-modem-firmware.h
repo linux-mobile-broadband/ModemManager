@@ -82,7 +82,7 @@ gboolean mm_modem_firmware_list_sync   (MMModemFirmware *self,
                                         GError **error);
 
 void     mm_modem_firmware_select        (MMModemFirmware *self,
-                                          const gchar *name,
+                                          const gchar *unique_id,
                                           GCancellable *cancellable,
                                           GAsyncReadyCallback callback,
                                           gpointer user_data);
@@ -90,7 +90,7 @@ gboolean mm_modem_firmware_select_finish (MMModemFirmware *self,
                                           GAsyncResult *res,
                                           GError **error);
 gboolean mm_modem_firmware_select_sync   (MMModemFirmware *self,
-                                          const gchar *name,
+                                          const gchar *unique_id,
                                           GCancellable *cancellable,
                                           GError **error);
 

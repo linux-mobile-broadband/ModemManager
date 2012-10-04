@@ -54,7 +54,7 @@ static GOptionEntry entries[] = {
     },
     { "firmware-select", 0, 0, G_OPTION_ARG_STRING, &select_str,
       "Select a given firmware image",
-      "[NAME]"
+      "[Unique ID]"
     },
     { NULL }
 };
@@ -157,17 +157,15 @@ list_process_reply (MMFirmwareProperties *selected,
             MMFirmwareProperties *props = MM_FIRMWARE_PROPERTIES (l->data);
 
             g_print ("\t[%u] %s%s\n"
-                     "\t\t   Type: '%s'\n"
-                     "\t\tVersion: '%s'\n",
+                     "\t\t   Type: '%s'\n",
                      i,
-                     mm_firmware_properties_get_name (props),
+                     mm_firmware_properties_get_unique_id (props),
                      ((selected &&
-                       g_str_equal (mm_firmware_properties_get_name (props),
-                                    mm_firmware_properties_get_name (selected))) ?
+                       g_str_equal (mm_firmware_properties_get_unique_id (props),
+                                    mm_firmware_properties_get_unique_id (selected))) ?
                       " (CURRENT)" : ""),
                      mm_firmware_image_type_get_string (
-                         mm_firmware_properties_get_image_type (props)),
-                     mm_firmware_properties_get_version (props));
+                         mm_firmware_properties_get_image_type (props)));
             g_object_unref (props);
         }
         g_list_free (result);

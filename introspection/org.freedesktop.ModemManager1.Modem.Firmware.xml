@@ -34,15 +34,15 @@
             will only expose only the mandatory properties.
           </listitem>
         </varlistentry>
-        <varlistentry><term><literal>"name"</literal></term>
+        <varlistentry><term><literal>"unique-id"</literal></term>
           <listitem>
-            (Required) A user-readable name for the firmware image, given as a
+            (Required) A user-readable unique ID for the firmware image, given as a
             string value (signature <literal>"s"</literal>).
           </listitem>
         </varlistentry>
         <varlistentry><term><literal>"version"</literal></term>
           <listitem>
-            (Required) The version of the firmware, given as a string value
+            (Optional) The version of the firmware, given as a string value
             (signature <literal>"s"</literal>). The format is
             unspecified; tools attempting to upgrade firmware automatically must
             understand the versioning scheme used by the modem driver they are
@@ -72,7 +72,7 @@
 
     <!--
         Select:
-        @name: The unique name of the firmware image to select.
+        @uniqueid: The unique ID of the firmware image to select.
 
         Selects a different firmware image to use, and immediately resets the
         modem so that it begins using the new firmware image.
@@ -83,7 +83,7 @@
         or if the image could not be selected for some reason.
     -->
     <method name="Select">
-      <arg name="name" type="s" direction="in" />
+      <arg name="uniqueid" type="s" direction="in" />
     </method>
 
     <!--

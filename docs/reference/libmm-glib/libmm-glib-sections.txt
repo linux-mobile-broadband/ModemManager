@@ -532,8 +532,7 @@ mm_modem_firmware_get_type
 MMFirmwareProperties
 <SUBSECTION Getters>
 mm_firmware_properties_get_image_type
-mm_firmware_properties_get_name
-mm_firmware_properties_get_version
+mm_firmware_properties_get_unique_id
 <SUBSECTION Private>
 mm_firmware_properties_new
 mm_firmware_properties_new_from_dictionary

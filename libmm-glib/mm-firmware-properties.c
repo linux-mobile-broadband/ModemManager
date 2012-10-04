@@ -33,15 +33,13 @@
 
 G_DEFINE_TYPE (MMFirmwareProperties, mm_firmware_properties, G_TYPE_OBJECT);
 
-#define PROPERTY_NAME       "name"
-#define PROPERTY_VERSION    "version"
+#define PROPERTY_UNIQUE_ID  "unique-id"
 #define PROPERTY_IMAGE_TYPE "image-type"
 
 struct _MMFirmwarePropertiesPrivate {
     /* Mandatory parameters */
     MMFirmwareImageType image_type;
-    gchar *name;
-    gchar *version;
+    gchar *unique_id;
 };
 
 static MMFirmwareProperties *firmware_properties_new_empty (void);
@@ -49,37 +47,19 @@ static MMFirmwareProperties *firmware_properties_new_empty (void);
 /*****************************************************************************/
 
 /**
- * mm_firmware_properties_get_name:
+ * mm_firmware_properties_get_unique_id:
  * @self: A #MMFirmwareProperties.
  *
- * Gets the unique name of the firmare image.
+ * Gets the unique ID of the firmare image.
  *
- * Returns: (transfer none): The name of the image. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The ID of the image. Do not free the returned value, it is owned by @self.
  */
 const gchar *
-mm_firmware_properties_get_name (MMFirmwareProperties *self)
+mm_firmware_properties_get_unique_id (MMFirmwareProperties *self)
 {
     g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
 
-    return self->priv->name;
-}
-
-/*****************************************************************************/
-
-/**
- * mm_firmware_properties_get_version:
- * @self: A #MMFirmwareProperties.
- *
- * Gets the version string of the firmare image.
- *
- * Returns: (transfer none): The version of the image. Do not free the returned value, it is owned by @self.
- */
-const gchar *
-mm_firmware_properties_get_version (MMFirmwareProperties *self)
-{
-    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
-
-    return self->priv->version;
+    return self->priv->unique_id;
 }
 
 /*****************************************************************************/
@@ -127,13 +107,8 @@ mm_firmware_properties_get_dictionary (MMFirmwareProperties *self)
 
     g_variant_builder_add (&builder,
                            "{sv}",
-                           PROPERTY_NAME,
-                           g_variant_new_string (self->priv->name));
-
-    g_variant_builder_add (&builder,
-                           "{sv}",
-                           PROPERTY_VERSION,
-                           g_variant_new_string (self->priv->version));
+                           PROPERTY_UNIQUE_ID,
+                           g_variant_new_string (self->priv->unique_id));
 
     g_variant_builder_add (&builder,
                            "{sv}",
@@ -151,12 +126,9 @@ consume_variant (MMFirmwareProperties *self,
                  GVariant *value,
                  GError **error)
 {
-    if (g_str_equal (key, PROPERTY_NAME)) {
-        g_free (self->priv->name);
-        self->priv->name = g_variant_dup_string (value, NULL);
-    } else if (g_str_equal (key, PROPERTY_VERSION)) {
-        g_free (self->priv->version);
-        self->priv->version = g_variant_dup_string (value, NULL);
+    if (g_str_equal (key, PROPERTY_UNIQUE_ID)) {
+        g_free (self->priv->unique_id);
+        self->priv->unique_id = g_variant_dup_string (value, NULL);
     } else if (g_str_equal (key, PROPERTY_IMAGE_TYPE))
         self->priv->image_type = g_variant_get_uint32 (value);
     else {
@@ -230,8 +202,7 @@ mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
     }
 
     /* If mandatory properties missing, destroy the object */
-    if (!self->priv->name ||
-        !self->priv->version ||
+    if (!self->priv->unique_id ||
         self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_UNKNOWN) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -250,8 +221,7 @@ mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
 /**
  * mm_firmware_properties_new:
  * @image_type: A #MMFirmwareImageType specifying the type of the image.
- * @name: The unique name of the image.
- * @version: The version of the image.
+ * @unique_id: The unique ID of the image.
  *
  * Creates a new #MMFirmwareProperties object with the properties specified.
  *
@@ -259,19 +229,16 @@ mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
  */
 MMFirmwareProperties *
 mm_firmware_properties_new (MMFirmwareImageType image_type,
-                            const gchar *name,
-                            const gchar *version)
+                            const gchar *unique_id)
 {
     MMFirmwareProperties *self;
 
     g_return_val_if_fail (image_type != MM_FIRMWARE_IMAGE_TYPE_UNKNOWN, NULL);
-    g_return_val_if_fail (name != NULL, NULL);
-    g_return_val_if_fail (version != NULL, NULL);
+    g_return_val_if_fail (unique_id != NULL, NULL);
 
     self = firmware_properties_new_empty ();
     self->priv->image_type = image_type;
-    self->priv->name = g_strdup (name);
-    self->priv->version = g_strdup (version);
+    self->priv->unique_id = g_strdup (unique_id);
 
     return self;
 }
@@ -299,8 +266,7 @@ finalize (GObject *object)
 {
     MMFirmwareProperties *self = MM_FIRMWARE_PROPERTIES (object);
 
-    g_free (self->priv->name);
-    g_free (self->priv->version);
+    g_free (self->priv->unique_id);
 
     G_OBJECT_CLASS (mm_firmware_properties_parent_class)->finalize (object);
 }

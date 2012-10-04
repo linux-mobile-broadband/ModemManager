@@ -105,7 +105,7 @@ mm_modem_firmware_select_finish (MMModemFirmware *self,
 /**
  * mm_modem_firmware_select:
  * @self: A #MMModemFirmware.
- * @name: Unique name of the firmware image to select.
+ * @unique_id: Unique ID of the firmware image to select.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -122,21 +122,21 @@ mm_modem_firmware_select_finish (MMModemFirmware *self,
  */
 void
 mm_modem_firmware_select (MMModemFirmware *self,
-                          const gchar *name,
+                          const gchar *unique_id,
                           GCancellable *cancellable,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_FIRMWARE (self));
-    g_return_if_fail (name != NULL || name[0] == '\0');
+    g_return_if_fail (unique_id != NULL || unique_id[0] == '\0');
 
-    mm_gdbus_modem_firmware_call_select (MM_GDBUS_MODEM_FIRMWARE (self), name, cancellable, callback, user_data);
+    mm_gdbus_modem_firmware_call_select (MM_GDBUS_MODEM_FIRMWARE (self), unique_id, cancellable, callback, user_data);
 }
 
 /**
  * mm_modem_firmware_select_sync:
  * @self: A #MMModemFirmware.
- * @name: Unique name of the firmware image to select.
+ * @unique_id: Unique ID of the firmware image to select.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -152,14 +152,14 @@ mm_modem_firmware_select (MMModemFirmware *self,
  */
 gboolean
 mm_modem_firmware_select_sync (MMModemFirmware *self,
-                               const gchar *name,
+                               const gchar *unique_id,
                                GCancellable *cancellable,
                                GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_FIRMWARE (self), FALSE);
-    g_return_val_if_fail (name != NULL || name[0] == '\0', FALSE);
+    g_return_val_if_fail (unique_id != NULL || unique_id[0] == '\0', FALSE);
 
-    return mm_gdbus_modem_firmware_call_select_sync (MM_GDBUS_MODEM_FIRMWARE (self), name, cancellable, error);
+    return mm_gdbus_modem_firmware_call_select_sync (MM_GDBUS_MODEM_FIRMWARE (self), unique_id, cancellable, error);
 }
 
 /*****************************************************************************/
@@ -218,7 +218,7 @@ build_results (const gchar *str_selected,
                 *installed = g_list_append (*installed, firmware);
 
                 if (str_selected &&
-                    g_str_equal (mm_firmware_properties_get_name (firmware), str_selected))
+                    g_str_equal (mm_firmware_properties_get_unique_id (firmware), str_selected))
                     *selected = g_object_ref (firmware);
             }
         }

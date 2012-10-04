@@ -55,8 +55,7 @@ struct _MMFirmwarePropertiesClass {
 
 GType mm_firmware_properties_get_type (void);
 
-const gchar         *mm_firmware_properties_get_name       (MMFirmwareProperties *self);
-const gchar         *mm_firmware_properties_get_version    (MMFirmwareProperties *self);
+const gchar         *mm_firmware_properties_get_unique_id  (MMFirmwareProperties *self);
 MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties *self);
 
 /*****************************************************************************/
@@ -67,8 +66,7 @@ MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties
     defined (LIBMM_GLIB_COMPILATION)
 
 MMFirmwareProperties *mm_firmware_properties_new (MMFirmwareImageType image_type,
-                                                  const gchar *name,
-                                                  const gchar *version);
+                                                  const gchar *unique_id);
 MMFirmwareProperties *mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
                                                                   GError **error);
 
