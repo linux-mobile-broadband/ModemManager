@@ -216,6 +216,7 @@ Makefile
 data/Makefile
 data/ModemManager.pc
 data/mm-glib.pc
+data/org.freedesktop.ModemManager1.policy
 include/Makefile
 build-aux/Makefile
 libqcdm/Makefile
