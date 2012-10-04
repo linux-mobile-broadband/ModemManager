@@ -1,4 +1,10 @@
 
+# Logos
+LOGOS_PNG = \
+	$(top_srcdir)/data/ModemManager-logo-square.png \
+	$(top_srcdir)/data/ModemManager-logo-wide.png \
+	$(top_srcdir)/data/ModemManager-logo-wide-text.png
+
 # The name of the module.
 DOC_MODULE = libmm-glib
 
@@ -41,6 +47,15 @@ GTKDOC_LIBS = \
 # Extra options to supply to gtkdoc-mkdb
 MKDB_OPTIONS = --output-format=xml --sgml-mode --name-space=mm
 
+# Images to copy into HTML directory
+HTML_IMAGES = \
+	$(LOGOS_PNG) \
+	$(NULL)
+
+content_files = \
+	$(HTML_IMAGES) \
+	$(NULL)
+
 if ENABLE_GTK_DOC
 include $(top_srcdir)/gtk-doc.make
 else
@@ -68,3 +83,8 @@ CLEANFILES += \
 	*.stamp \
 	-rf xml html tmpl \
 	$(NULL)
+
+# PNGs are removed only in maintainer-clean
+# Logos are copied to current directory by gtk-doc
+DISTCLEANFILES = \
+	$(notdir $(LOGOS_PNG))
