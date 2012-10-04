@@ -115,11 +115,6 @@ context_free (Context *ctx)
 static void
 ensure_modem_firmware (void)
 {
-    if (mm_modem_get_state (mm_object_peek_modem (ctx->object)) < MM_MODEM_STATE_ENABLED) {
-        g_printerr ("error: modem not enabled yet\n");
-        exit (EXIT_FAILURE);
-    }
-
     if (!ctx->modem_firmware) {
         g_printerr ("error: modem has no firmware capabilities\n");
         exit (EXIT_FAILURE);
