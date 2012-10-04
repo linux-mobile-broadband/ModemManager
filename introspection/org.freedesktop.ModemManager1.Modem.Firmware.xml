@@ -67,7 +67,7 @@
     -->
     <method name="List">
       <arg name="selected"  type="s"        direction="out" />
-      <arg name="installed" type="a{a{sv}}" direction="out" />
+      <arg name="installed" type="aa{sv}" direction="out" />
     </method>
 
     <!--
