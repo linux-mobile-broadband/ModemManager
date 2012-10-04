@@ -182,7 +182,7 @@ build_results (const gchar *str_selected,
     *selected = NULL;
 
     if (!dictionaries_installed) {
-        if (str_selected) {
+        if (str_selected && str_selected[0]) {
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_INVALID_ARGS,
@@ -201,7 +201,7 @@ build_results (const gchar *str_selected,
     if (n > 0) {
         GVariant *dictionary = NULL;
 
-        while (g_variant_iter_loop (&iter, "a{sv}", &dictionary)) {
+        while ((dictionary = g_variant_iter_next_value (&iter))) {
             MMFirmwareProperties *firmware;
             GError *inner_error = NULL;
 
@@ -217,14 +217,16 @@ build_results (const gchar *str_selected,
                 /* Save the firmware properties */
                 *installed = g_list_append (*installed, firmware);
 
-                if (str_selected &&
+                if (str_selected && str_selected[0] &&
                     g_str_equal (mm_firmware_properties_get_unique_id (firmware), str_selected))
                     *selected = g_object_ref (firmware);
             }
+
+            g_variant_unref (dictionary);
         }
     }
 
-    if (str_selected && *selected == NULL)
+    if (str_selected && str_selected[0] && *selected == NULL)
         g_warning ("Selected image '%s' was not found in the list of installed images",
                    str_selected);
 
