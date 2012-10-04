@@ -52,6 +52,11 @@
     <title>High level API</title>
 
     <chapter>
+      <title>Common enums and flags helpers</title>
+      <xi:include href="xml/mm-enums-types.xml"/>
+    </chapter>
+
+    <chapter>
       <title>The Manager object</title>
       <xi:include href="xml/mm-manager.xml"/>
     </chapter>
