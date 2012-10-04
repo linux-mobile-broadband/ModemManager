@@ -36,6 +36,7 @@
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-time.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sms-list.h"
@@ -55,6 +56,7 @@ static void iface_modem_simple_init (MMIfaceModemSimple *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_time_init (MMIfaceModemTime *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -64,7 +66,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 enum {
     PROP_0,
@@ -76,6 +79,7 @@ enum {
     PROP_MODEM_LOCATION_DBUS_SKELETON,
     PROP_MODEM_MESSAGING_DBUS_SKELETON,
     PROP_MODEM_TIME_DBUS_SKELETON,
+    PROP_MODEM_FIRMWARE_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
@@ -174,6 +178,10 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Time interface --->*/
     /* Properties */
     GObject *modem_time_dbus_skeleton;
+
+    /*<--- Modem Firmware interface --->*/
+    /* Properties */
+    GObject *modem_firmware_dbus_skeleton;
 };
 
 /*****************************************************************************/
@@ -6754,10 +6762,10 @@ typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_DISCONNECT_BEARERS,
     DISABLING_STEP_IFACE_SIMPLE,
+    DISABLING_STEP_IFACE_FIRMWARE,
     DISABLING_STEP_IFACE_TIME,
     DISABLING_STEP_IFACE_MESSAGING,
     DISABLING_STEP_IFACE_LOCATION,
-    DISABLING_STEP_IFACE_FIRMWARE,
     DISABLING_STEP_IFACE_CONTACTS,
     DISABLING_STEP_IFACE_CDMA,
     DISABLING_STEP_IFACE_3GPP_USSD,
@@ -6901,6 +6909,10 @@ disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_IFACE_FIRMWARE:
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_IFACE_TIME:
         if (ctx->self->priv->modem_time_dbus_skeleton) {
             mm_dbg ("Modem has time capabilities, disabling the Time interface...");
@@ -6934,10 +6946,6 @@ disabling_step (DisablingContext *ctx)
                                              ctx);
             return;
         }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case DISABLING_STEP_IFACE_FIRMWARE:
         /* Fall down to next step */
         ctx->step++;
 
@@ -7072,10 +7080,10 @@ typedef enum {
     ENABLING_STEP_IFACE_3GPP_USSD,
     ENABLING_STEP_IFACE_CDMA,
     ENABLING_STEP_IFACE_CONTACTS,
-    ENABLING_STEP_IFACE_FIRMWARE,
     ENABLING_STEP_IFACE_LOCATION,
     ENABLING_STEP_IFACE_MESSAGING,
     ENABLING_STEP_IFACE_TIME,
+    ENABLING_STEP_IFACE_FIRMWARE,
     ENABLING_STEP_IFACE_SIMPLE,
     ENABLING_STEP_LAST,
 } EnablingStep;
@@ -7251,10 +7259,6 @@ enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_IFACE_FIRMWARE:
-        /* Fall down to next step */
-        ctx->step++;
-
     case ENABLING_STEP_IFACE_LOCATION:
         if (ctx->self->priv->modem_location_dbus_skeleton) {
             mm_dbg ("Modem has location capabilities, enabling the Location interface...");
@@ -7291,6 +7295,10 @@ enabling_step (EnablingContext *ctx)
                                         ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_FIRMWARE:
         /* Fall down to next step */
         ctx->step++;
 
@@ -7396,10 +7404,10 @@ typedef enum {
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
     INITIALIZE_STEP_IFACE_CONTACTS,
-    INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_MESSAGING,
     INITIALIZE_STEP_IFACE_TIME,
+    INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_IFACE_SIMPLE,
     INITIALIZE_STEP_LAST,
 } InitializeStep;
@@ -7522,7 +7530,7 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
      * the initialization sequence. Instead, we will re-initialize once
      * we are unlocked. */
     if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-        /* Jump to the Simple interface */
+        /* Jump to the Simple interface. */
         ctx->step = INITIALIZE_STEP_IFACE_SIMPLE;
         initialize_step (ctx);
         return;
@@ -7580,6 +7588,7 @@ INTERFACE_INIT_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_firmware,  MM_IFACE_MODEM_FIRMWARE,  FALSE)
 
 static void
 initialize_step (InitializeContext *ctx)
@@ -7667,10 +7676,6 @@ initialize_step (InitializeContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZE_STEP_IFACE_FIRMWARE:
-        /* Fall down to next step */
-        ctx->step++;
-
     case INITIALIZE_STEP_IFACE_LOCATION:
         /* Initialize the Location interface */
         mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
@@ -7693,6 +7698,14 @@ initialize_step (InitializeContext *ctx)
                                         ctx->cancellable,
                                         (GAsyncReadyCallback)iface_modem_time_initialize_ready,
                                         ctx);
+        return;
+
+    case INITIALIZE_STEP_IFACE_FIRMWARE:
+        /* Initialize the Firmware interface */
+        mm_iface_modem_firmware_initialize (MM_IFACE_MODEM_FIRMWARE (ctx->self),
+                                            ctx->cancellable,
+                                            (GAsyncReadyCallback)iface_modem_firmware_initialize_ready,
+                                            ctx);
         return;
 
     case INITIALIZE_STEP_IFACE_SIMPLE:
@@ -7915,6 +7928,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_time_dbus_skeleton);
         self->priv->modem_time_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_FIRMWARE_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_firmware_dbus_skeleton);
+        self->priv->modem_firmware_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
@@ -7999,6 +8016,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_TIME_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_time_dbus_skeleton);
+        break;
+    case PROP_MODEM_FIRMWARE_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_firmware_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -8321,6 +8341,11 @@ iface_modem_time_init (MMIfaceModemTime *iface)
 }
 
 static void
+iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+{
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -8380,6 +8405,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_TIME_DBUS_SKELETON,
                                       MM_IFACE_MODEM_TIME_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_FIRMWARE_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_FIRMWARE_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
