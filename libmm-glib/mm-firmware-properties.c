@@ -33,13 +33,25 @@
 
 G_DEFINE_TYPE (MMFirmwareProperties, mm_firmware_properties, G_TYPE_OBJECT);
 
-#define PROPERTY_UNIQUE_ID  "unique-id"
-#define PROPERTY_IMAGE_TYPE "image-type"
+#define PROPERTY_UNIQUE_ID            "unique-id"
+#define PROPERTY_IMAGE_TYPE           "image-type"
+#define PROPERTY_GOBI_PRI_VERSION     "gobi-pri-version"
+#define PROPERTY_GOBI_PRI_INFO        "gobi-pri-info"
+#define PROPERTY_GOBI_BOOT_VERSION    "gobi-boot-version"
+#define PROPERTY_GOBI_PRI_UNIQUE_ID   "gobi-pri-unique-id"
+#define PROPERTY_GOBI_MODEM_UNIQUE_ID "gobi-modem-unique-id"
 
 struct _MMFirmwarePropertiesPrivate {
     /* Mandatory parameters */
     MMFirmwareImageType image_type;
     gchar *unique_id;
+
+    /* Gobi specific */
+    gchar *gobi_pri_version;
+    gchar *gobi_pri_info;
+    gchar *gobi_boot_version;
+    gchar *gobi_pri_unique_id;
+    gchar *gobi_modem_unique_id;
 };
 
 static MMFirmwareProperties *firmware_properties_new_empty (void);
@@ -83,6 +95,154 @@ mm_firmware_properties_get_image_type (MMFirmwareProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_firmware_properties_get_gobi_pri_version:
+ * @self: a #MMFirmwareProperties.
+ *
+ * Gets the PRI version of a firmware image of type %MM_FIRMWARE_IMAGE_TYPE_GOBI.
+ *
+ * Returns: The PRI version, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_properties_get_gobi_pri_version (MMFirmwareProperties *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
+    g_return_val_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI, NULL);
+
+    return self->priv->gobi_pri_version;
+}
+
+void
+mm_firmware_properties_set_gobi_pri_version (MMFirmwareProperties *self,
+                                             const gchar *version)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_PROPERTIES (self));
+    g_return_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI);
+
+    g_free (self->priv->gobi_pri_version);
+    self->priv->gobi_pri_version = g_strdup (version);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_firmware_properties_get_gobi_pri_info:
+ * @self: a #MMFirmwareProperties.
+ *
+ * Gets the PRI info of a firmware image of type %MM_FIRMWARE_IMAGE_TYPE_GOBI.
+ *
+ * Returns: The PRI info, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_properties_get_gobi_pri_info (MMFirmwareProperties *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
+    g_return_val_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI, NULL);
+
+    return self->priv->gobi_pri_info;
+}
+
+void
+mm_firmware_properties_set_gobi_pri_info (MMFirmwareProperties *self,
+                                          const gchar *info)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_PROPERTIES (self));
+    g_return_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI);
+
+    g_free (self->priv->gobi_pri_info);
+    self->priv->gobi_pri_info = g_strdup (info);
+}
+
+/**
+ * mm_firmware_properties_get_gobi_boot_version:
+ * @self: a #MMFirmwareProperties.
+ *
+ * Gets the boot version of a firmware image of type %MM_FIRMWARE_IMAGE_TYPE_GOBI.
+ *
+ * Returns: The boot version, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_properties_get_gobi_boot_version (MMFirmwareProperties *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
+    g_return_val_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI, NULL);
+
+    return self->priv->gobi_boot_version;
+}
+
+void
+mm_firmware_properties_set_gobi_boot_version (MMFirmwareProperties *self,
+                                              const gchar *version)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_PROPERTIES (self));
+    g_return_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI);
+
+    g_free (self->priv->gobi_boot_version);
+    self->priv->gobi_boot_version = g_strdup (version);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_firmware_properties_get_gobi_pri_unique_id:
+ * @self: a #MMFirmwareProperties.
+ *
+ * Gets the PRI unique ID of a firmware image of type %MM_FIRMWARE_IMAGE_TYPE_GOBI.
+ *
+ * Returns: The PRI unique ID, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_properties_get_gobi_pri_unique_id (MMFirmwareProperties *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
+    g_return_val_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI, NULL);
+
+    return self->priv->gobi_pri_unique_id;
+}
+
+void
+mm_firmware_properties_set_gobi_pri_unique_id (MMFirmwareProperties *self,
+                                               const gchar *unique_id)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_PROPERTIES (self));
+    g_return_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI);
+
+    g_free (self->priv->gobi_pri_unique_id);
+    self->priv->gobi_pri_unique_id = g_strdup (unique_id);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_firmware_properties_get_gobi_modem_unique_id:
+ * @self: a #MMFirmwareProperties.
+ *
+ * Gets the MODEM unique ID of a firmware image of type %MM_FIRMWARE_IMAGE_TYPE_GOBI.
+ *
+ * Returns: The PRI unique ID, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_properties_get_gobi_modem_unique_id (MMFirmwareProperties *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
+    g_return_val_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI, NULL);
+
+    return self->priv->gobi_modem_unique_id;
+}
+
+void
+mm_firmware_properties_set_gobi_modem_unique_id (MMFirmwareProperties *self,
+                                                 const gchar *unique_id)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_PROPERTIES (self));
+    g_return_if_fail (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI);
+
+    g_free (self->priv->gobi_modem_unique_id);
+    self->priv->gobi_modem_unique_id = g_strdup (unique_id);
+}
+
+/*****************************************************************************/
+
+/**
  * mm_firmware_properties_get_dictionary:
  * @self: A #MMFirmwareProperties.
  *
@@ -115,6 +275,34 @@ mm_firmware_properties_get_dictionary (MMFirmwareProperties *self)
                            PROPERTY_IMAGE_TYPE,
                            g_variant_new_uint32 (self->priv->image_type));
 
+    if (self->priv->image_type == MM_FIRMWARE_IMAGE_TYPE_GOBI) {
+        if (self->priv->gobi_pri_version)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_GOBI_PRI_VERSION,
+                                   g_variant_new_string (self->priv->gobi_pri_version));
+        if (self->priv->gobi_pri_info)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_GOBI_PRI_INFO,
+                                   g_variant_new_string (self->priv->gobi_pri_info));
+        if (self->priv->gobi_boot_version)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_GOBI_BOOT_VERSION,
+                                   g_variant_new_string (self->priv->gobi_boot_version));
+        if (self->priv->gobi_pri_unique_id)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_GOBI_PRI_UNIQUE_ID,
+                                   g_variant_new_string (self->priv->gobi_pri_unique_id));
+        if (self->priv->gobi_modem_unique_id)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_GOBI_MODEM_UNIQUE_ID,
+                                   g_variant_new_string (self->priv->gobi_modem_unique_id));
+    }
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -129,8 +317,24 @@ consume_variant (MMFirmwareProperties *self,
     if (g_str_equal (key, PROPERTY_UNIQUE_ID)) {
         g_free (self->priv->unique_id);
         self->priv->unique_id = g_variant_dup_string (value, NULL);
-    } else if (g_str_equal (key, PROPERTY_IMAGE_TYPE))
+    } else if (g_str_equal (key, PROPERTY_IMAGE_TYPE)) {
         self->priv->image_type = g_variant_get_uint32 (value);
+    } else if (g_str_equal (key, PROPERTY_GOBI_PRI_VERSION)) {
+        g_free (self->priv->gobi_pri_version);
+        self->priv->gobi_pri_version = g_variant_dup_string (value, NULL);
+    } else if (g_str_equal (key, PROPERTY_GOBI_PRI_INFO)) {
+        g_free (self->priv->gobi_pri_info);
+        self->priv->gobi_pri_info = g_variant_dup_string (value, NULL);
+    } else if (g_str_equal (key, PROPERTY_GOBI_BOOT_VERSION)) {
+        g_free (self->priv->gobi_boot_version);
+        self->priv->gobi_boot_version = g_variant_dup_string (value, NULL);
+    } else if (g_str_equal (key, PROPERTY_GOBI_PRI_UNIQUE_ID)) {
+        g_free (self->priv->gobi_pri_unique_id);
+        self->priv->gobi_pri_unique_id = g_variant_dup_string (value, NULL);
+    } else if (g_str_equal (key, PROPERTY_GOBI_MODEM_UNIQUE_ID)) {
+        g_free (self->priv->gobi_modem_unique_id);
+        self->priv->gobi_modem_unique_id = g_variant_dup_string (value, NULL);
+    }
     else {
         /* Set error */
         g_set_error (error,
@@ -267,6 +471,11 @@ finalize (GObject *object)
     MMFirmwareProperties *self = MM_FIRMWARE_PROPERTIES (object);
 
     g_free (self->priv->unique_id);
+    g_free (self->priv->gobi_pri_version);
+    g_free (self->priv->gobi_pri_info);
+    g_free (self->priv->gobi_boot_version);
+    g_free (self->priv->gobi_pri_unique_id);
+    g_free (self->priv->gobi_modem_unique_id);
 
     G_OBJECT_CLASS (mm_firmware_properties_parent_class)->finalize (object);
 }

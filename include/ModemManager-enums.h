@@ -688,12 +688,14 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_ussd_session_state >*/
  * MMFirmwareImageType:
  * @MM_FIRMWARE_IMAGE_TYPE_UNKNOWN: Unknown firmware type.
  * @MM_FIRMWARE_IMAGE_TYPE_GENERIC: Generic firmware image.
+ * @MM_FIRMWARE_IMAGE_TYPE_GOBI: Firmware image of Gobi devices.
  *
  * Type of firmware image.
  */
 typedef enum { /*< underscore_name=mm_firmware_image_type >*/
     MM_FIRMWARE_IMAGE_TYPE_UNKNOWN = 0,
-    MM_FIRMWARE_IMAGE_TYPE_GENERIC = 1
+    MM_FIRMWARE_IMAGE_TYPE_GENERIC = 1,
+    MM_FIRMWARE_IMAGE_TYPE_GOBI    = 2,
 } MMFirmwareImageType;
 
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

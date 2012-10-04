@@ -40,13 +40,39 @@
             string value (signature <literal>"s"</literal>).
           </listitem>
         </varlistentry>
-        <varlistentry><term><literal>"version"</literal></term>
+        <varlistentry><term><literal>"gobi-pri-version"</literal></term>
           <listitem>
-            (Optional) The version of the firmware, given as a string value
-            (signature <literal>"s"</literal>). The format is
-            unspecified; tools attempting to upgrade firmware automatically must
-            understand the versioning scheme used by the modem driver they are
-            interacting with.
+            (Optional) The version of the PRI firmware image, in images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+            given as a string value (signature <literal>"s"</literal>).
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"gobi-pri-info"</literal></term>
+          <listitem>
+            (Optional) Additional information of the PRI image, in images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+            given as a string value (signature <literal>"s"</literal>).
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"gobi-boot-version"</literal></term>
+          <listitem>
+            (Optional) The boot version of the PRI firmware image, in images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+            given as a string value (signature <literal>"s"</literal>).
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"gobi-pri-unique-id"</literal></term>
+          <listitem>
+            (Optional) The unique ID of the PRI firmware image, in images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+            given as a string value (signature <literal>"s"</literal>).
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"gobi-modem-unique-id"</literal></term>
+          <listitem>
+            (Optional) The unique ID of the Modem firmware image, in images of type
+            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+            given as a string value (signature <literal>"s"</literal>).
           </listitem>
         </varlistentry>
       </variablelist>

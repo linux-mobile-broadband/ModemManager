@@ -134,6 +134,9 @@ list_process_reply (MMFirmwareProperties *selected,
                     GList                *result,
                     const GError         *error)
 {
+#undef VALIDATE_UNKNOWN
+#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+
     if (error) {
         g_printerr ("error: couldn't list firmware images: '%s'\n",
                     error->message);
@@ -152,7 +155,7 @@ list_process_reply (MMFirmwareProperties *selected,
             MMFirmwareProperties *props = MM_FIRMWARE_PROPERTIES (l->data);
 
             g_print ("\t[%u] %s%s\n"
-                     "\t\t   Type: '%s'\n",
+                     "\t\tType: '%s'\n",
                      i,
                      mm_firmware_properties_get_unique_id (props),
                      ((selected &&
@@ -161,6 +164,20 @@ list_process_reply (MMFirmwareProperties *selected,
                       " (CURRENT)" : ""),
                      mm_firmware_image_type_get_string (
                          mm_firmware_properties_get_image_type (props)));
+
+            if (mm_firmware_properties_get_image_type (props) == MM_FIRMWARE_IMAGE_TYPE_GOBI) {
+                g_print ("\t\t[Gobi]     PRI version: '%s'\n"
+                         "\t\t[Gobi]        PRI info: '%s'\n"
+                         "\t\t[Gobi]    Boot version: '%s'\n"
+                         "\t\t[Gobi]   PRI Unique ID: '%s'\n"
+                         "\t\t[Gobi] Modem Unique ID: '%s'\n",
+                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_version (props)),
+                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_info (props)),
+                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_boot_version (props)),
+                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_unique_id (props)),
+                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_modem_unique_id (props)));
+            }
+
             g_object_unref (props);
         }
         g_list_free (result);

@@ -58,6 +58,13 @@ GType mm_firmware_properties_get_type (void);
 const gchar         *mm_firmware_properties_get_unique_id  (MMFirmwareProperties *self);
 MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties *self);
 
+/* Gobi specific */
+const gchar *mm_firmware_properties_get_gobi_pri_version     (MMFirmwareProperties *self);
+const gchar *mm_firmware_properties_get_gobi_pri_info        (MMFirmwareProperties *self);
+const gchar *mm_firmware_properties_get_gobi_boot_version    (MMFirmwareProperties *self);
+const gchar *mm_firmware_properties_get_gobi_pri_unique_id   (MMFirmwareProperties *self);
+const gchar *mm_firmware_properties_get_gobi_modem_unique_id (MMFirmwareProperties *self);
+
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 
@@ -69,6 +76,18 @@ MMFirmwareProperties *mm_firmware_properties_new (MMFirmwareImageType image_type
                                                   const gchar *unique_id);
 MMFirmwareProperties *mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
                                                                   GError **error);
+
+/* Gobi specific */
+void mm_firmware_properties_set_gobi_pri_version     (MMFirmwareProperties *self,
+                                                      const gchar *version);
+void mm_firmware_properties_set_gobi_pri_info        (MMFirmwareProperties *self,
+                                                      const gchar *info);
+void mm_firmware_properties_set_gobi_boot_version    (MMFirmwareProperties *self,
+                                                      const gchar *version);
+void mm_firmware_properties_set_gobi_pri_unique_id   (MMFirmwareProperties *self,
+                                                      const gchar *id);
+void mm_firmware_properties_set_gobi_modem_unique_id (MMFirmwareProperties *self,
+                                                      const gchar *id);
 
 GVariant *mm_firmware_properties_get_dictionary (MMFirmwareProperties *self);
 
