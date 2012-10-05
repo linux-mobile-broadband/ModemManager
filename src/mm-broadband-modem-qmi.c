@@ -6597,6 +6597,32 @@ find_firmware_properties_by_unique_id (MMBroadbandModemQmi *self,
     return NULL;
 }
 
+static MMFirmwareProperties *
+find_firmware_properties_by_gobi_pri_info_substring (MMBroadbandModemQmi *self,
+                                                     const gchar *str,
+                                                     guint *n_found)
+{
+    MMFirmwareProperties *first = NULL;
+    GList *l;
+
+    *n_found = 0;
+
+    for (l = self->priv->firmware_list; l; l = g_list_next (l)) {
+        const gchar *pri_info;
+
+        pri_info = mm_firmware_properties_get_gobi_pri_info (MM_FIRMWARE_PROPERTIES (l->data));
+        if (pri_info && strstr (pri_info, str)) {
+            if (!first && *n_found == 0)
+                first = g_object_ref (l->data);
+            else
+                g_clear_object (&first);
+            (*n_found)++;
+        }
+    }
+
+    return first;
+}
+
 static void
 firmware_change_current (MMIfaceModemFirmware *self,
                          const gchar *unique_id,
@@ -6625,23 +6651,43 @@ firmware_change_current (MMIfaceModemFirmware *self,
                                              user_data,
                                              firmware_change_current);
 
-    /* If we're already in the requested firmware, we're done */
-    if (ctx->self->priv->current_firmware &&
-        g_str_equal (mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware),
-                     unique_id)) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        firmware_change_current_context_complete_and_free (ctx);
-        return;
-    }
-
     /* Look for the firmware image with the requested unique ID */
     ctx->firmware = find_firmware_properties_by_unique_id (ctx->self, unique_id);
     if (!ctx->firmware) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_NOT_FOUND,
-                                         "Firmware with unique ID '%s' wasn't found",
-                                         unique_id);
+        guint n = 0;
+
+        /* Ok, let's look at the PRI info */
+        ctx->firmware = find_firmware_properties_by_gobi_pri_info_substring (ctx->self, unique_id, &n);
+        if (n > 1) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "Multiple firmware images (%u) found matching '%s' as PRI info substring",
+                                             n, unique_id);
+            firmware_change_current_context_complete_and_free (ctx);
+            return;
+        }
+
+        if (n == 0) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "Firmware with unique ID '%s' wasn't found",
+                                             unique_id);
+            firmware_change_current_context_complete_and_free (ctx);
+            return;
+        }
+
+        g_assert (n == 1 && MM_IS_FIRMWARE_PROPERTIES (ctx->firmware));
+    }
+
+    /* If we're already in the requested firmware, we're done */
+    if (ctx->self->priv->current_firmware &&
+        g_str_equal (mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware),
+                     mm_firmware_properties_get_unique_id (ctx->firmware))) {
+        mm_dbg ("Modem is already running firmware image '%s'",
+                mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware));
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         firmware_change_current_context_complete_and_free (ctx);
         return;
     }
