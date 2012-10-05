@@ -7530,8 +7530,9 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
      * the initialization sequence. Instead, we will re-initialize once
      * we are unlocked. */
     if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-        /* Jump to the Simple interface. */
-        ctx->step = INITIALIZE_STEP_IFACE_SIMPLE;
+        /* Jump to the Firmware interface. We do allow modems to export
+         * both the Firmware and Simple interfaces when locked. */
+        ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
         initialize_step (ctx);
         return;
     }
