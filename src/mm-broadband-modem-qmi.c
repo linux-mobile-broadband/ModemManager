@@ -6455,6 +6455,240 @@ firmware_load_current (MMIfaceModemFirmware *_self,
 }
 
 /*****************************************************************************/
+/* Change current firmware (Firmware interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientDms *client;
+    GSimpleAsyncResult *result;
+    MMFirmwareProperties *firmware;
+} FirmwareChangeCurrentContext;
+
+static void
+firmware_change_current_context_complete_and_free (FirmwareChangeCurrentContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->client);
+    if (ctx->firmware)
+        g_object_unref (ctx->firmware);
+    g_slice_free (FirmwareChangeCurrentContext, ctx);
+}
+
+static gboolean
+firmware_change_current_finish (MMIfaceModemFirmware *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+firmware_set_operating_mode_reset_ready (QmiClientDms *client,
+                                         GAsyncResult *res,
+                                         FirmwareChangeCurrentContext *ctx)
+{
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        mm_info ("Modem is being rebooted now");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_set_operating_mode_output_unref (output);
+
+    firmware_change_current_context_complete_and_free (ctx);
+}
+
+static void
+firmware_set_operating_mode_offline_ready (QmiClientDms *client,
+                                           GAsyncResult *res,
+                                           FirmwareChangeCurrentContext *ctx)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output) {
+        g_simple_async_result_take_error (ctx->result, error);
+        firmware_change_current_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        firmware_change_current_context_complete_and_free (ctx);
+        qmi_message_dms_set_operating_mode_output_unref (output);
+        return;
+    }
+
+    qmi_message_dms_set_operating_mode_output_unref (output);
+
+    /* Now, go into reset mode. This will fully reboot the modem, and the current
+     * modem object should get disposed. */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_RESET, NULL);
+    qmi_client_dms_set_operating_mode (ctx->client,
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)firmware_set_operating_mode_reset_ready,
+                                       ctx);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+static void
+firmware_select_stored_image_ready (QmiClientDms *client,
+                                    GAsyncResult *res,
+                                    FirmwareChangeCurrentContext *ctx)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    QmiMessageDmsSetFirmwarePreferenceOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_firmware_preference_finish (client, res, &error);
+    if (!output) {
+        g_simple_async_result_take_error (ctx->result, error);
+        firmware_change_current_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_dms_set_firmware_preference_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        firmware_change_current_context_complete_and_free (ctx);
+        qmi_message_dms_set_firmware_preference_output_unref (output);
+        return;
+    }
+
+    qmi_message_dms_set_firmware_preference_output_unref (output);
+
+    /* Now, go into offline mode */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_OFFLINE, NULL);
+    qmi_client_dms_set_operating_mode (ctx->client,
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)firmware_set_operating_mode_offline_ready,
+                                       ctx);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+static MMFirmwareProperties *
+find_firmware_properties_by_unique_id (MMBroadbandModemQmi *self,
+                                       const gchar *unique_id)
+{
+    GList *l;
+
+    for (l = self->priv->firmware_list; l; l = g_list_next (l)) {
+        if (g_str_equal (mm_firmware_properties_get_unique_id (MM_FIRMWARE_PROPERTIES (l->data)),
+                         unique_id))
+            return g_object_ref (l->data);
+    }
+
+    return NULL;
+}
+
+static void
+firmware_change_current (MMIfaceModemFirmware *self,
+                         const gchar *unique_id,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    QmiMessageDmsSetFirmwarePreferenceInput *input;
+    FirmwareChangeCurrentContext *ctx;
+    QmiClient *client = NULL;
+    GArray *array;
+    QmiMessageDmsSetFirmwarePreferenceInputListImage modem_image_id;
+    QmiMessageDmsSetFirmwarePreferenceInputListImage pri_image_id;
+    guint8 *tmp;
+    gsize tmp_len;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (FirmwareChangeCurrentContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             firmware_change_current);
+
+    /* If we're already in the requested firmware, we're done */
+    if (ctx->self->priv->current_firmware &&
+        g_str_equal (mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware),
+                     unique_id)) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        firmware_change_current_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Look for the firmware image with the requested unique ID */
+    ctx->firmware = find_firmware_properties_by_unique_id (ctx->self, unique_id);
+    if (!ctx->firmware) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_NOT_FOUND,
+                                         "Firmware with unique ID '%s' wasn't found",
+                                         unique_id);
+        firmware_change_current_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Modem image ID */
+    tmp_len = 0;
+    tmp = (guint8 *)mm_utils_hexstr2bin (mm_firmware_properties_get_gobi_modem_unique_id (ctx->firmware), &tmp_len);
+    modem_image_id.type = QMI_DMS_FIRMWARE_IMAGE_TYPE_MODEM;
+    modem_image_id.build_id = (gchar *)mm_firmware_properties_get_unique_id (ctx->firmware);
+    modem_image_id.unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
+    g_array_insert_vals (modem_image_id.unique_id, 0, tmp, tmp_len);
+    g_free (tmp);
+
+    /* PRI image ID */
+    tmp_len = 0;
+    tmp = (guint8 *)mm_utils_hexstr2bin (mm_firmware_properties_get_gobi_pri_unique_id (ctx->firmware), &tmp_len);
+    pri_image_id.type = QMI_DMS_FIRMWARE_IMAGE_TYPE_PRI;
+    pri_image_id.build_id = (gchar *)mm_firmware_properties_get_unique_id (ctx->firmware);
+    pri_image_id.unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
+    g_array_insert_vals (pri_image_id.unique_id, 0, tmp, tmp_len);
+    g_free (tmp);
+
+    mm_dbg ("Changing Gobi firmware to MODEM '%s' and PRI '%s' with Build ID '%s'...",
+            mm_firmware_properties_get_gobi_modem_unique_id (ctx->firmware),
+            mm_firmware_properties_get_gobi_pri_unique_id (ctx->firmware),
+            unique_id);
+
+    /* Build array of image IDs */
+    array = g_array_sized_new (FALSE, FALSE, sizeof (QmiMessageDmsSetFirmwarePreferenceInputListImage), 2);
+    g_array_append_val (array, modem_image_id);
+    g_array_append_val (array, pri_image_id);
+
+    input = qmi_message_dms_set_firmware_preference_input_new ();
+    qmi_message_dms_set_firmware_preference_input_set_list (input, array, NULL);
+    qmi_client_dms_set_firmware_preference (
+        ctx->client,
+        input,
+        10,
+        NULL,
+        (GAsyncReadyCallback)firmware_select_stored_image_ready,
+        ctx);
+    g_array_unref (modem_image_id.unique_id);
+    g_array_unref (pri_image_id.unique_id);
+    qmi_message_dms_set_firmware_preference_input_unref (input);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -6854,6 +7088,8 @@ iface_modem_firmware_init (MMIfaceModemFirmware *iface)
     iface->load_list_finish = firmware_load_list_finish;
     iface->load_current = firmware_load_current;
     iface->load_current_finish = firmware_load_current_finish;
+    iface->change_current = firmware_change_current;
+    iface->change_current_finish = firmware_change_current_finish;
 }
 
 static void
