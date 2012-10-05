@@ -181,7 +181,7 @@ change_current_ready (MMIfaceModemFirmware *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_firmware_complete_select (ctx->skeleton, ctx->invocation);
