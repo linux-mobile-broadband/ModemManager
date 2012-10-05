@@ -66,7 +66,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-pantech.la \
 	libmm-plugin-zte.la \
 	libmm-plugin-sierra.la \
-	libmm-plugin-mbm.la
+	libmm-plugin-mbm.la \
+	libmm-plugin-via.la
 
 # Generic
 libmm_plugin_generic_la_SOURCES = \
@@ -306,6 +307,15 @@ libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-broadband-modem-novatel.h
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# VIA modem
+libmm_plugin_via_la_SOURCES = \
+	via/mm-plugin-via.c \
+	via/mm-plugin-via.h \
+	via/mm-broadband-modem-via.c \
+	via/mm-broadband-modem-via.h
+libmm_plugin_via_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_via_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Additional files to include in the distribution
 EXTRA_DIST = \
