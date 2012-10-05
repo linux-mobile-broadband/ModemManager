@@ -236,6 +236,8 @@ print_modem_info (void)
     MMModemBand *bands = NULL;
     MMUnlockRetries *unlock_retries;
     guint n_bands = 0;
+    guint signal_quality = 0;
+    gboolean signal_quality_recent = FALSE;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
@@ -290,6 +292,9 @@ print_modem_info (void)
     prefixed_revision = mmcli_prefix_newlines ("           |                  ",
                                                mm_modem_get_revision (ctx->modem));
 
+    /* Get signal quality info */
+    signal_quality = mm_modem_get_signal_quality (ctx->modem, &signal_quality_recent);
+
     /* Global IDs */
     g_print ("\n"
              "%s (device id '%s')\n",
@@ -330,11 +335,13 @@ print_modem_info (void)
              "  Status   |           lock: '%s'\n"
              "           | unlock retries: '%s'\n"
              "           |          state: '%s'\n"
-             "           |    access tech: '%s'\n",
+             "           |    access tech: '%s'\n"
+             "           | signal quality: '%u' (%s)\n",
              mm_modem_lock_get_string (mm_modem_get_unlock_required (ctx->modem)),
              VALIDATE_UNKNOWN (unlock_retries_string),
              VALIDATE_UNKNOWN (mm_modem_state_get_string (mm_modem_get_state (ctx->modem))),
-             VALIDATE_UNKNOWN (access_technologies_string));
+             VALIDATE_UNKNOWN (access_technologies_string),
+             signal_quality, signal_quality_recent ? "recent" : "cached");
 
     /* Modes */
     g_print ("  -------------------------\n"
