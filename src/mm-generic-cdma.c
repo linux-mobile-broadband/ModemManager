@@ -1187,26 +1187,81 @@ get_signal_quality (MMModemCdma *modem,
 }
 
 static void
-get_string_done (MMAtSerialPort *port,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+qcdm_esn_cb (MMQcdmSerialPort *port,
+             GByteArray *response,
+             GError *error,
+             gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericCdmaPrivate *priv;
+    QcdmResult *result;
+    int err = QCDM_SUCCESS;
+    const char *esn = NULL;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
+    /* Parse the response */
+    result = qcdm_cmd_esn_result ((const char *) response->data, response->len, &err);
+    if (!result) {
+        g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Failed to parse ESN command result: %d", err);
+        goto done;
+    }
+
+    if (qcdm_result_get_string (result, QCDM_CMD_ESN_ITEM_ESN, &esn) != 0) {
+        g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Failed get ESN via QCDM");
+    } else
+        mm_callback_info_set_result (info, g_ascii_strdown (esn, -1), g_free);
+
+    qcdm_result_unref (result);
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_gsn_done (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericCdmaPrivate *priv;
     const char *p;
+    GByteArray *esn;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else {
-        p = mm_strip_tag (response->str, "+GSN:");
-        mm_callback_info_set_result (info, g_strdup (p), g_free);
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
+    if (error) {
+        /* Fall back to QCDM if we can */
+        if (!priv->qcdm) {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+        } else {
+            esn = g_byte_array_sized_new (20);
+            esn->len = qcdm_cmd_esn_new ((char *) esn->data, 20);
+            g_assert (esn->len);
+            mm_qcdm_serial_port_queue_command (priv->qcdm, esn, 3, qcdm_esn_cb, info);
+        }
+        return;
     }
 
+    /* AT response was OK */
+    p = mm_strip_tag (response->str, "+GSN:");
+    if (strncmp (p, "0x", 2) == 0)
+        p += 2;
+    mm_callback_info_set_result (info, g_ascii_strdown (p, -1), g_free);
     mm_callback_info_schedule (info);
 }
 
@@ -1222,11 +1277,12 @@ get_esn (MMModemCdma *modem,
 
     port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
     if (!port) {
-        mm_callback_info_schedule (info);
-        return;
+        /* Fall back to the primary port to retrieve the cached ESN */
+        port = MM_GENERIC_CDMA_GET_PRIVATE (modem)->primary;
+        g_clear_error (&info->error);
     }
 
-    mm_at_serial_port_queue_command_cached (port, "+GSN", 3, get_string_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GSN", 3, get_gsn_done, info);
 }
 
 static void
