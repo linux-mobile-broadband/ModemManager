@@ -533,7 +533,7 @@ dial_3gpp_context_new (MMBroadbandBearerIcera *self,
 static void
 dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
@@ -901,21 +901,49 @@ authenticate (Dial3gppContext *ctx)
     gchar *command;
     const gchar *user;
     const gchar *password;
+    MMBearerAllowedAuth allowed_auth;
 
     user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
     password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_bearer_peek_config (MM_BEARER (ctx->self)));
 
     /* Both user and password are required; otherwise firmware returns an error */
-    if (!user || !password)
+    if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
+        mm_dbg ("Not using authentication");
 		command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
-    else {
+    } else {
         gchar *quoted_user;
         gchar *quoted_password;
+        guint icera_auth;
+
+        if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+            mm_dbg ("Using default (PAP) authentication method");
+            icera_auth = 1;
+        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
+            mm_dbg ("Using PAP authentication method");
+            icera_auth = 1;
+        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
+            mm_dbg ("Using CHAP authentication method");
+            icera_auth = 2;
+        } else {
+            gchar *str;
+
+            str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_UNSUPPORTED,
+                "Cannot use any of the specified authentication methods (%s)",
+                str);
+            g_free (str);
+            dial_3gpp_context_complete_and_free (ctx);
+            return;
+        }
 
         quoted_user = mm_at_serial_port_quote_string (user);
         quoted_password = mm_at_serial_port_quote_string (password);
-        command = g_strdup_printf ("%%IPDPCFG=%d,0,1,%s,%s",
-                                   ctx->cid, quoted_user, quoted_password);
+        command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
+                                   ctx->cid, icera_auth, quoted_user, quoted_password);
         g_free (quoted_user);
         g_free (quoted_password);
     }
