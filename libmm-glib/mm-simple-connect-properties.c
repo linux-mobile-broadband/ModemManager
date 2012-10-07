@@ -268,6 +268,40 @@ mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_simple_connect_properties_set_allowed_auth:
+ * @self: a #MMSimpleConnectProperties.
+ * @allowed_auth: a bitmask of #MMBearerAllowedAuth values. %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default method.
+ *
+ * Sets the authentication method to use.
+ */
+void
+mm_simple_connect_properties_set_allowed_auth (MMSimpleConnectProperties *self,
+                                               MMBearerAllowedAuth allowed_auth)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_allowed_auth (self->priv->bearer_properties, allowed_auth);
+}
+
+/**
+ * mm_simple_connect_properties_get_allowed_auth:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the authentication methods allowed in the connection.
+ *
+ * Returns: a bitmask of #MMBearerAllowedAuth values, or %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ */
+MMBearerAllowedAuth
+mm_simple_connect_properties_get_allowed_auth (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_ALLOWED_AUTH_UNKNOWN);
+
+    return mm_bearer_properties_get_allowed_auth (self->priv->bearer_properties);
+}
+
+/*****************************************************************************/
+
+/**
  * mm_simple_connect_properties_set_user:
  * @self: a #MMSimpleConnectProperties.
  * @user: the username

@@ -86,6 +86,13 @@
               value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"allowed-auth"</literal></term>
+            <listitem>
+              The authentication method to use, given as a
+              <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link>
+              value (signature <literal>"u"</literal>). Optional in 3GPP.
+            </listitem>
+          </varlistentry>
           <varlistentry><term><literal>"user"</literal></term>
             <listitem>
               User name (if any) required by the network, given as a string

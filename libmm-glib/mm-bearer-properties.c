@@ -34,6 +34,7 @@
 G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_APN             "apn"
+#define PROPERTY_ALLOWED_AUTH    "allowed-auth"
 #define PROPERTY_USER            "user"
 #define PROPERTY_PASSWORD        "password"
 #define PROPERTY_IP_TYPE         "ip-type"
@@ -46,6 +47,8 @@ struct _MMBearerPropertiesPrivate {
     gchar *apn;
     /* IP type */
     MMBearerIpFamily ip_type;
+    /* Allowed auth */
+    MMBearerAllowedAuth allowed_auth;
     /* Number */
     gchar *number;
     /* User */
@@ -92,6 +95,40 @@ mm_bearer_properties_get_apn (MMBearerProperties *self)
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
     return self->priv->apn;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_allowed_auth:
+ * @self: a #MMBearerProperties.
+ * @allowed_auth: a bitmask of #MMBearerAllowedAuth values. %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default method.
+ *
+ * Sets the authentication method to use.
+ */
+void
+mm_bearer_properties_set_allowed_auth (MMBearerProperties *self,
+                                       MMBearerAllowedAuth allowed_auth)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    self->priv->allowed_auth = allowed_auth;
+}
+
+/**
+ * mm_bearer_properties_get_allowed_auth:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the authentication methods allowed in the connection.
+ *
+ * Returns: a bitmask of #MMBearerAllowedAuth values, or %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ */
+MMBearerAllowedAuth
+mm_bearer_properties_get_allowed_auth (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_ALLOWED_AUTH_UNKNOWN);
+
+    return self->priv->allowed_auth;
 }
 
 /*****************************************************************************/
@@ -324,6 +361,12 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_APN,
                                g_variant_new_string (self->priv->apn));
 
+    if (self->priv->allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ALLOWED_AUTH,
+                               g_variant_new_uint32 (self->priv->allowed_auth));
+
     if (self->priv->user)
         g_variant_builder_add (&builder,
                                "{sv}",
@@ -375,7 +418,17 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
 
     if (g_str_equal (key, PROPERTY_APN))
         mm_bearer_properties_set_apn (self, value);
-    else if (g_str_equal (key, PROPERTY_USER))
+    else if (g_str_equal (key, PROPERTY_ALLOWED_AUTH)) {
+        GError *inner_error = NULL;
+        MMBearerAllowedAuth allowed_auth;
+
+        allowed_auth = mm_common_get_allowed_auth_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_bearer_properties_set_allowed_auth (self, allowed_auth);
+    } else if (g_str_equal (key, PROPERTY_USER))
         mm_bearer_properties_set_user (self, value);
     else if (g_str_equal (key, PROPERTY_PASSWORD))
         mm_bearer_properties_set_password (self, value);
@@ -476,6 +529,10 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
         mm_bearer_properties_set_apn (
             properties,
             g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_ALLOWED_AUTH))
+        mm_bearer_properties_set_allowed_auth (
+            properties,
+            g_variant_get_uint32 (value));
     else if (g_str_equal (key, PROPERTY_USER))
         mm_bearer_properties_set_user (
             properties,
@@ -582,6 +639,7 @@ mm_bearer_properties_cmp (MMBearerProperties *a,
     return ((!g_strcmp0 (a->priv->apn, b->priv->apn)) &&
             (a->priv->ip_type == b->priv->ip_type) &&
             (!g_strcmp0 (a->priv->number, b->priv->number)) &&
+            (a->priv->allowed_auth == b->priv->allowed_auth) &&
             (!g_strcmp0 (a->priv->user, b->priv->user)) &&
             (!g_strcmp0 (a->priv->password, b->priv->password)) &&
             (a->priv->allow_roaming == b->priv->allow_roaming) &&
@@ -615,6 +673,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     /* Some defaults */
     self->priv->allow_roaming = TRUE;
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+    self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
 
     /* At some point in the future, this default should probably be changed
      * to IPV4V6. However, presently support for this PDP type is rare. An

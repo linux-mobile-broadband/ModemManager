@@ -63,6 +63,8 @@
           <listitem><para>Access Point Name, given as a string value (signature <literal>"s"</literal>). Required in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"ip-type"</literal></term>
           <listitem><para>Addressing type, given as a <link linkend="MMBearerIpFamily">MMBearerIpFamily</link> value (signature <literal>"u"</literal>). Optional in 3GPP and CDMA.</para></listitem></varlistentry>
+        <varlistentry><term><literal>"allowed-auth"</literal></term>
+          <listitem><para>The authentication method to use, given as a <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link> value (signature <literal>"u"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"user"</literal></term>
           <listitem><para>User name (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"password"</literal></term>

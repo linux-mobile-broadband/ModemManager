@@ -417,6 +417,66 @@ mm_common_get_ip_type_from_string (const gchar *str,
     return MM_BEARER_IP_FAMILY_UNKNOWN;
 }
 
+MMBearerAllowedAuth
+mm_common_get_allowed_auth_from_string (const gchar *str,
+                                        GError **error)
+{
+    GError *inner_error = NULL;
+    MMBearerAllowedAuth allowed_auth;
+    gchar **strings;
+	GFlagsClass *flags_class;
+
+    allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_BEARER_ALLOWED_AUTH));
+    strings = g_strsplit (str, "|", -1);
+
+    if (strings) {
+        guint i;
+
+        for (i = 0; strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (strings[i], flags_class->values[j].value_nick)) {
+                    allowed_auth |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMBearerAllowedAuth value",
+                    strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+    }
+
+    /* 'none' is a special value which, if given, must be given alone */
+    if (allowed_auth & MM_BEARER_ALLOWED_AUTH_NONE &&
+        allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Allowed auth 'none' cannot be given along with other values");
+        allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+    }
+
+    g_type_class_unref (flags_class);
+    g_strfreev (strings);
+    return allowed_auth;
+}
+
 MMSmsStorage
 mm_common_get_sms_storage_from_string (const gchar *str,
                                        GError **error)

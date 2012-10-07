@@ -552,6 +552,29 @@ typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
 } MMBearerIpFamily;
 
 /**
+ * MMBearerAllowedAuth:
+ * @MM_BEARER_ALLOWED_AUTH_UNKNOWN: Unknown.
+ * @MM_BEARER_ALLOWED_AUTH_NONE: None.
+ * @MM_BEARER_ALLOWED_AUTH_PAP: PAP.
+ * @MM_BEARER_ALLOWED_AUTH_CHAP: CHAP.
+ * @MM_BEARER_ALLOWED_AUTH_MSCHAP: MS-CHAP.
+ * @MM_BEARER_ALLOWED_AUTH_MSCHAPV2: MS-CHAP v2.
+ * @MM_BEARER_ALLOWED_AUTH_EAP: EAP.
+ *
+ * Allowed authentication methods when authenticating with the network.
+ */
+typedef enum { /*< underscore_name=mm_bearer_allowed_auth >*/
+    MM_BEARER_ALLOWED_AUTH_UNKNOWN  = 0,
+    /* bits 0..4 order match Ericsson device bitmap */
+    MM_BEARER_ALLOWED_AUTH_NONE     = 1 << 0,
+    MM_BEARER_ALLOWED_AUTH_PAP      = 1 << 1,
+    MM_BEARER_ALLOWED_AUTH_CHAP     = 1 << 2,
+    MM_BEARER_ALLOWED_AUTH_MSCHAP   = 1 << 3,
+    MM_BEARER_ALLOWED_AUTH_MSCHAPV2 = 1 << 4,
+    MM_BEARER_ALLOWED_AUTH_EAP      = 1 << 5,
+} MMBearerAllowedAuth;
+
+/**
  * MMModemCdmaRegistrationState:
  * @MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN: Registration status is unknown or the device is not registered.
  * @MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED: Registered, but roaming status is unknown or cannot be provided by the device. The device may or may not be roaming.

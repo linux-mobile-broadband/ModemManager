@@ -71,6 +71,8 @@ void mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *
                                                      MMModemMode preferred);
 void mm_simple_connect_properties_set_apn           (MMSimpleConnectProperties *self,
                                                      const gchar *apn);
+void mm_simple_connect_properties_set_allowed_auth  (MMSimpleConnectProperties *self,
+                                                     MMBearerAllowedAuth allowed_auth);
 void mm_simple_connect_properties_set_user          (MMSimpleConnectProperties *self,
                                                      const gchar *user);
 void mm_simple_connect_properties_set_password      (MMSimpleConnectProperties *self,
@@ -82,20 +84,21 @@ void mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *
 void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *self,
                                                      const gchar *number);
 
-const gchar      *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *self);
-const gchar      *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *self);
-gboolean          mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *self,
-                                                                  const MMModemBand **bands,
-                                                                  guint *n_bands);
-gboolean          mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
-                                                                  MMModemMode *allowed,
-                                                                  MMModemMode *preferred);
-const gchar      *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *self);
-const gchar      *mm_simple_connect_properties_get_user          (MMSimpleConnectProperties *self);
-const gchar      *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *self);
-MMBearerIpFamily  mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *self);
-gboolean          mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self);
-const gchar      *mm_simple_connect_properties_get_number        (MMSimpleConnectProperties *self);
+const gchar         *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *self);
+const gchar         *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *self);
+gboolean             mm_simple_connect_properties_get_bands         (MMSimpleConnectProperties *self,
+                                                                     const MMModemBand **bands,
+                                                                     guint *n_bands);
+gboolean             mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
+                                                                     MMModemMode *allowed,
+                                                                     MMModemMode *preferred);
+const gchar         *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *self);
+MMBearerAllowedAuth  mm_simple_connect_properties_get_allowed_auth  (MMSimpleConnectProperties *self);
+const gchar         *mm_simple_connect_properties_get_user          (MMSimpleConnectProperties *self);
+const gchar         *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *self);
+MMBearerIpFamily     mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *self);
+gboolean             mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self);
+const gchar         *mm_simple_connect_properties_get_number        (MMSimpleConnectProperties *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
