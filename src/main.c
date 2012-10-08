@@ -33,6 +33,9 @@
 # define MM_DIST_VERSION VERSION
 #endif
 
+/* Maximum time to wait for all modems to get disabled and removed */
+#define MAX_SHUTDOWN_TIME_SECS 20
+
 static GMainLoop *loop;
 static MMManager *manager;
 
@@ -154,17 +157,29 @@ main (int argc, char *argv[])
     g_main_loop_run (loop);
 
     if (manager) {
+        GTimer *timer;
+
         mm_manager_shutdown (manager);
 
-        /* Wait for all modems to be removed */
-        while (mm_manager_num_modems (manager)) {
+        /* Wait for all modems to be disabled and removed, but don't wait
+         * forever: if disabling the modems takes longer than 20s, just
+         * shutdown anyway. */
+        timer = g_timer_new ();
+        while (mm_manager_num_modems (manager) &&
+               g_timer_elapsed (timer, NULL) < (gdouble)MAX_SHUTDOWN_TIME_SECS) {
             GMainContext *ctx = g_main_loop_get_context (loop);
 
             g_main_context_iteration (ctx, FALSE);
             g_usleep (50);
         }
 
+        if (mm_manager_num_modems (manager))
+            mm_warn ("Disabling modems took too long, "
+                     "shutting down with '%u' modems around",
+                     mm_manager_num_modems (manager));
+
         g_object_unref (manager);
+        g_timer_destroy (timer);
     }
 
     g_bus_unown_name (name_id);
