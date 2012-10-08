@@ -184,6 +184,8 @@ main (int argc, char *argv[])
 
     g_bus_unown_name (name_id);
 
+    mm_info ("ModemManager is shut down");
+
     mm_log_shutdown ();
 
     return 0;
