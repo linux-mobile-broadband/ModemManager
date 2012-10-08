@@ -4008,10 +4008,7 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     else
         qmi_indication_nas_serving_system_output_get_cdma_system_id (indication_output, &sid, &nid, NULL);
 
-    /* TODO: Roaming flags */
-
-    /* Build registration states */
-
+    /* Build generic registration states */
     if (mm_access_technologies & MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK)
         mm_cdma1x_registration_state = mm_modem_cdma_registration_state_from_qmi_registration_state (registration_state);
     else
@@ -4021,6 +4018,61 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
         mm_evdo_registration_state = mm_modem_cdma_registration_state_from_qmi_registration_state (registration_state);
     else
         mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    /* Process per-technology roaming flags */
+    if (response_output) {
+        GArray *array;
+
+        if (qmi_message_nas_get_serving_system_output_get_roaming_indicator_list (response_output, &array, NULL)) {
+            guint i;
+
+            for (i = 0; i < array->len; i++) {
+                QmiMessageNasGetServingSystemOutputRoamingIndicatorListElement *element;
+
+                element = &g_array_index (array, QmiMessageNasGetServingSystemOutputRoamingIndicatorListElement, i);
+
+                if (element->radio_interface == QMI_NAS_RADIO_INTERFACE_CDMA_1X &&
+                    mm_cdma1x_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED) {
+                    if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_ON)
+                        mm_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+                    else if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_OFF)
+                        mm_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+                } else if (element->radio_interface == QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO &&
+                           mm_evdo_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED) {
+                    if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_ON)
+                        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+                    else if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_OFF)
+                        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+                }
+            }
+        }
+    } else {
+        GArray *array;
+
+        if (qmi_indication_nas_serving_system_output_get_roaming_indicator_list (indication_output, &array, NULL)) {
+            guint i;
+
+            for (i = 0; i < array->len; i++) {
+                QmiIndicationNasServingSystemOutputRoamingIndicatorListElement *element;
+
+                element = &g_array_index (array, QmiIndicationNasServingSystemOutputRoamingIndicatorListElement, i);
+
+                if (element->radio_interface == QMI_NAS_RADIO_INTERFACE_CDMA_1X &&
+                    mm_cdma1x_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED) {
+                    if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_ON)
+                        mm_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+                    else if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_OFF)
+                        mm_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+                } else if (element->radio_interface == QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO &&
+                           mm_evdo_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED) {
+                    if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_ON)
+                        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+                    else if (element->roaming_indicator == QMI_NAS_ROAMING_INDICATOR_STATUS_OFF)
+                        mm_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+                }
+            }
+        }
+    }
 
     /* Note: don't rely on the 'Detailed Service Status', it's not always given. */
 
