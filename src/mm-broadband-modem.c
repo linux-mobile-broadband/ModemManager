@@ -7006,12 +7006,17 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_IFACE_MODEM:
-        g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
-        /* Disabling the Modem interface */
-        mm_iface_modem_disable (MM_IFACE_MODEM (ctx->self),
-                               (GAsyncReadyCallback)iface_modem_disable_ready,
-                               ctx);
-        return;
+        /* This skeleton may be NULL when mm_base_modem_disable() gets called at
+         * the same time as modem object disposal. */
+        if (ctx->self->priv->modem_dbus_skeleton) {
+            /* Disabling the Modem interface */
+            mm_iface_modem_disable (MM_IFACE_MODEM (ctx->self),
+                                    (GAsyncReadyCallback)iface_modem_disable_ready,
+                                    ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case DISABLING_STEP_LAST:
         /* All disabled without errors! */
