@@ -58,10 +58,6 @@ libmm_glib_la_SOURCES = \
 	mm-firmware-properties.h \
 	mm-firmware-properties.c
 
-nodist_libmm_glib_la_SOURCES = \
-	$(GENERATED_H) \
-	$(GENERATED_C)
-
 libmm_glib_la_CPPFLAGS = \
 	$(LIBMM_GLIB_CFLAGS) \
 	-I$(top_srcdir) \
