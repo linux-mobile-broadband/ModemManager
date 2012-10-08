@@ -6813,7 +6813,8 @@ disabling_context_complete_and_free (DisablingContext *ctx)
     }
 
     g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -6837,10 +6838,7 @@ disable_finish (MMBaseModem *self,
                GAsyncResult *res,
                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return TRUE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 #undef INTERFACE_DISABLE_READY_FN
@@ -7079,12 +7077,12 @@ disable (MMBaseModem *self,
         ctx = g_new0 (DisablingContext, 1);
         ctx->self = g_object_ref (self);
         ctx->result = result;
-        ctx->cancellable = g_object_ref (cancellable);
+        ctx->cancellable = (cancellable ? g_object_ref (cancellable) : NULL);
         ctx->step = DISABLING_STEP_FIRST;
 
         disabling_step (ctx);
         return;
-    }
+      }
     }
 
     g_simple_async_result_complete_in_idle (result);
