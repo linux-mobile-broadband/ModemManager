@@ -1256,6 +1256,11 @@ dispose (GObject *object)
     g_clear_object (&self->priv->gps_control);
     g_clear_object (&self->priv->gps);
 #if defined WITH_QMI
+    /* We need to close the QMI port cleanly when disposing the modem object,
+     * otherwise the allocated CIDs will be kept allocated, and if we end up
+     * allocating too many newer allocations will fail with client-ids-exhausted
+     * errors. */
+    g_list_foreach (self->priv->qmi, (GFunc)mm_qmi_port_close, NULL);
     g_list_free_full (self->priv->qmi, g_object_unref);
     self->priv->qmi = NULL;
 #endif
