@@ -77,5 +77,9 @@ MMSmsStorage mm_sms_storage_from_qmi_storage_type (QmiWmsStorageType qmi_storage
 
 MMSmsState mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag);
 
+/*****************************************************************************/
+/* QMI/WDS to MM translations */
+
+QmiWdsAuthentication mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth);
 
 #endif  /* MM_MODEM_HELPERS_QMI_H */

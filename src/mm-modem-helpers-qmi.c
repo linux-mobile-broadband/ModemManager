@@ -879,3 +879,19 @@ mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag)
         return MM_SMS_STATE_UNKNOWN;
     }
 }
+
+/*****************************************************************************/
+
+QmiWdsAuthentication
+mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
+{
+    QmiWdsAuthentication out;
+
+    out = 0;
+    if (auth & MM_BEARER_ALLOWED_AUTH_PAP)
+        out |= QMI_WDS_AUTHENTICATION_PAP;
+    if (auth & MM_BEARER_ALLOWED_AUTH_CHAP)
+        out |= QMI_WDS_AUTHENTICATION_CHAP;
+
+    return out;
+}

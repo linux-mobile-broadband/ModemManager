@@ -25,6 +25,7 @@
 #include <libmm-glib.h>
 
 #include "mm-bearer-qmi.h"
+#include "mm-modem-helpers-qmi.h"
 #include "mm-serial-enums-types.h"
 #include "mm-log.h"
 
@@ -85,6 +86,7 @@ typedef struct {
     gchar *user;
     gchar *password;
     gchar *apn;
+    QmiWdsAuthentication auth;
     gboolean no_ip_family_preference;
     gboolean default_ip_family_set;
 
@@ -241,11 +243,14 @@ build_start_network_input (ConnectContext *ctx)
     if (ctx->apn)
         qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
 
-    if (ctx->user)
-        qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
+    if (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
+        qmi_message_wds_start_network_input_set_authentication_preference (input, ctx->auth, NULL);
 
-    if (ctx->password)
-        qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
+        if (ctx->user)
+            qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
+        if (ctx->password)
+            qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
+    }
 
     /* Only add the IP family preference TLV if explicitly requested a given
      * family. This TLV may be newer than the Start Network command itself, so
@@ -641,6 +646,8 @@ connect (MMBearer *self,
         return;
     }
 
+    g_object_unref (modem);
+
     mm_dbg ("Launching connection with QMI port (%s/%s) and data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (qmi))),
             mm_port_get_device (MM_PORT (qmi)),
@@ -663,6 +670,8 @@ connect (MMBearer *self,
                   NULL);
 
     if (properties) {
+        MMBearerAllowedAuth auth;
+
         ctx->apn = g_strdup (mm_bearer_properties_get_apn (properties));
         ctx->user = g_strdup (mm_bearer_properties_get_user (properties));
         ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
@@ -688,12 +697,33 @@ connect (MMBearer *self,
             break;
         }
 
+        auth = mm_bearer_properties_get_allowed_auth (properties);
         g_object_unref (properties);
+
+        if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+            mm_dbg ("Using default (PAP) authentication method");
+            ctx->auth = QMI_WDS_AUTHENTICATION_PAP;
+        } else if (ctx->auth & (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
+            /* Only PAP and/or CHAP are supported */
+            ctx->auth = mm_bearer_allowed_auth_to_qmi_authentication (auth);
+        } else {
+            gchar *str;
+
+            str = mm_bearer_allowed_auth_build_string_from_mask (auth);
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_UNSUPPORTED,
+                "Cannot use any of the specified authentication methods (%s)",
+                str);
+            g_free (str);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
     }
 
     /* Run! */
     connect_context_step (ctx);
-    g_object_unref (modem);
 }
 
 /*****************************************************************************/
