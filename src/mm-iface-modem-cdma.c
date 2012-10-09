@@ -115,6 +115,14 @@ handle_activate_auth_ready (MMBaseModem *self,
         return;
     }
 
+    /* If we're already activated, nothing to do */
+    if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED) {
+        mm_dbg ("Modem is already activated");
+        mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
+        handle_activate_context_free (ctx);
+        return;
+    }
+
     /* If activating OTA is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
@@ -261,7 +269,15 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* If manual activating is not implemented, report an error */
+    /* If we're already activated, nothing to do */
+    if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED) {
+        mm_dbg ("Modem is already activated");
+        mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton, ctx->invocation);
+        handle_activate_manual_context_free (ctx);
+        return;
+    }
+
+    /* If activating OTA is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
@@ -1181,6 +1197,55 @@ periodic_registration_check_enable (MMIfaceModemCdma *self)
 
 /*****************************************************************************/
 
+static GVariant *
+build_empty_dictionary (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
+    return g_variant_builder_end (&builder);
+}
+
+void
+mm_iface_modem_cdma_update_activation_state (MMIfaceModemCdma *self,
+                                             MMModemCdmaActivationState activation_state,
+                                             const GError *activation_error)
+{
+    MmGdbusModemCdma *skeleton = NULL;
+    MMCdmaActivationError error;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton)
+        return;
+
+    if (activation_error) {
+        mm_dbg ("Activation failed: %s", activation_error->message);
+        if (activation_error->domain == MM_CDMA_ACTIVATION_ERROR)
+            error = activation_error->code;
+        else {
+            mm_warn ("Error given is not an activation error");
+            error = MM_CDMA_ACTIVATION_ERROR_UNKNOWN;
+        }
+    }
+
+    /* Flush current change before signaling the state change,
+     * so that clients get the proper state already in the
+     * state-changed callback */
+    mm_gdbus_modem_cdma_set_activation_state (skeleton, activation_state);
+    g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
+    /* We don't know what changed, so just return an empty dictionary for now */
+    mm_gdbus_modem_cdma_emit_activation_state_changed (skeleton,
+                                                       activation_state,
+                                                       error,
+                                                       build_empty_dictionary ());
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
@@ -1700,6 +1765,7 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
         mm_gdbus_modem_cdma_set_esn (skeleton, NULL);
         mm_gdbus_modem_cdma_set_sid (skeleton, MM_MODEM_CDMA_SID_UNKNOWN);
         mm_gdbus_modem_cdma_set_nid (skeleton, MM_MODEM_CDMA_NID_UNKNOWN);
+        mm_gdbus_modem_cdma_set_activation_state (skeleton, MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN);
 
         /* Bind our Registration State properties */
         g_object_bind_property (self, MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,

@@ -103,7 +103,7 @@ struct _MMIfaceModemCdma {
 
     /* OTA activation */
     void (* activate) (MMIfaceModemCdma *self,
-                       const gchar *carrier,
+                       const gchar *carrier_code,
                        GAsyncReadyCallback callback,
                        gpointer user_data);
     gboolean (* activate_finish) (MMIfaceModemCdma *self,
@@ -251,8 +251,8 @@ gboolean mm_iface_modem_cdma_disable_finish (MMIfaceModemCdma *self,
 /* Shutdown CDMA interface */
 void mm_iface_modem_cdma_shutdown (MMIfaceModemCdma *self);
 
-/* Objects implementing this interface can report new registration states and
- * access technologies */
+/* Objects implementing this interface can report new registration states,
+ * access technologies and activation state changes */
 void mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                            MMModemCdmaRegistrationState state,
                                                            guint sid,
@@ -261,6 +261,10 @@ void mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                          MMModemCdmaRegistrationState state);
 void mm_iface_modem_cdma_update_access_technologies (MMIfaceModemCdma *self,
                                                      MMModemAccessTechnology access_tech);
+
+void mm_iface_modem_cdma_update_activation_state (MMIfaceModemCdma *self,
+                                                  MMModemCdmaActivationState activation_state,
+                                                  const GError *activation_error);
 
 /* Run all registration checks */
 void     mm_iface_modem_cdma_run_registration_checks        (MMIfaceModemCdma *self,
