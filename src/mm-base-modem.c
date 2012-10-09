@@ -655,12 +655,24 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
     g_object_unref (client);
 
     if (!found) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_NOT_FOUND,
-                     "Couldn't find associated QMI port for 'net/%s'",
+        /* For the case where we have only 1 data port and 1 QMI port and they
+         * don't match with the previous rules (e.g. in some Huawei modems),
+         * just return the found one */
+        if (g_list_length (self->priv->data) == 1 &&
+            g_list_length (self->priv->qmi) == 1 &&
+            self->priv->data->data == data) {
+            mm_info ("Assuming QMI port '%s' is associated to net/%s",
+                     mm_port_get_device (MM_PORT (self->priv->qmi->data)),
                      mm_port_get_device (data));
-        return NULL;
+            found = MM_QMI_PORT (self->priv->qmi->data);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_NOT_FOUND,
+                         "Couldn't find associated QMI port for 'net/%s'",
+                         mm_port_get_device (data));
+            return NULL;
+        }
     }
 
     return found;
