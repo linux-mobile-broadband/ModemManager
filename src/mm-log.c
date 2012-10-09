@@ -27,6 +27,10 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
+#if defined WITH_QMI
+#include <libqmi-glib.h>
+#endif
+
 #include "mm-log.h"
 
 enum {
@@ -179,9 +183,15 @@ mm_log_set_level (const char *level, GError **error)
             break;
         }
     }
+
     if (!found)
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                      "Unknown log level '%s'", level);
+
+#if defined WITH_QMI
+    qmi_utils_set_traces_enabled (log_level & LOGL_DEBUG ? TRUE : FALSE);
+#endif
+
     return found;
 }
 
