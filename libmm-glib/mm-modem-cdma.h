@@ -90,6 +90,7 @@ guint        mm_modem_cdma_get_nid  (MMModemCdma *self);
 
 MMModemCdmaRegistrationState mm_modem_cdma_get_cdma1x_registration_state (MMModemCdma *self);
 MMModemCdmaRegistrationState mm_modem_cdma_get_evdo_registration_state   (MMModemCdma *self);
+MMModemCdmaActivationState   mm_modem_cdma_get_activation_state          (MMModemCdma *self);
 
 void     mm_modem_cdma_activate        (MMModemCdma *self,
                                         const gchar *carrier,

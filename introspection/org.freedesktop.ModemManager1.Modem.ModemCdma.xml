@@ -62,6 +62,14 @@
     </signal>
 
     <!--
+        ActivationState:
+
+        A <link linkend="MMModemCdmaActivationState">MMModemCdmaActivationState</link>
+        value specifying the state of the activation in the 3GPP2 network.
+    -->
+    <property name="ActivationState" type="u" access="read" />
+
+    <!--
         Meid:
 
         The modem's <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>.

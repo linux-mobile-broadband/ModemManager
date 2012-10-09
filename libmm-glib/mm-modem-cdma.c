@@ -248,6 +248,24 @@ mm_modem_cdma_get_evdo_registration_state (MMModemCdma *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_cdma_get_activation_state:
+ * @self: A #MMModemCdma.
+ *
+ * Gets the state of the activation in the 3GPP2 network.
+ *
+ * Returns: a #MMModemCdmaActivationState.
+ */
+MMModemCdmaActivationState
+mm_modem_cdma_get_activation_state (MMModemCdma *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_CDMA (self), MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN);
+
+    return mm_gdbus_modem_cdma_get_activation_state (MM_GDBUS_MODEM_CDMA (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_cdma_activate_finish:
  * @self: A #MMModemCdma.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_cdma_activate().
