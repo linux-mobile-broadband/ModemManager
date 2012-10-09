@@ -68,6 +68,14 @@ struct _MMIfaceModemCdma {
                                 GAsyncResult *res,
                                 GError **error);
 
+    /* Loading of the initial activation state */
+    void (* load_activation_state) (MMIfaceModemCdma *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    MMModemCdmaActivationState (* load_activation_state_finish) (MMIfaceModemCdma *self,
+                                                                 GAsyncResult *res,
+                                                                 GError **error);
+
     /* Asynchronous setting up unsolicited events */
     void (* setup_unsolicited_events) (MMIfaceModemCdma *self,
                                        GAsyncReadyCallback callback,

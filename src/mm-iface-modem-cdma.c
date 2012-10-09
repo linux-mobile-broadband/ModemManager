@@ -1604,6 +1604,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_MEID,
     INITIALIZATION_STEP_ESN,
+    INITIALIZATION_STEP_ACTIVATION_STATE,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1668,6 +1669,27 @@ STR_REPLY_READY_FN (meid, "MEID")
 STR_REPLY_READY_FN (esn, "ESN")
 
 static void
+load_activation_state_ready (MMIfaceModemCdma *self,
+                             GAsyncResult *res,
+                             InitializationContext *ctx)
+{
+    GError *error = NULL;
+    MMModemCdmaActivationState state;
+
+    state = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_activation_state_finish (self, res, &error);
+    mm_gdbus_modem_cdma_set_activation_state (ctx->skeleton, state);
+
+    if (error) {
+        mm_warn ("couldn't load activation state: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitializationContext *ctx)
 {
     /* Don't run new steps if we're cancelled */
@@ -1705,6 +1727,22 @@ interface_initialization_step (InitializationContext *ctx)
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_esn (
                 ctx->self,
                 (GAsyncReadyCallback)load_esn_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_ACTIVATION_STATE:
+        /* Initial activation state is meant to be loaded only once during the
+         * whole lifetime of the modem. Therefore, if we already have it loaded,
+         * don't try to load it again. */
+        if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_activation_state &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_activation_state_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_activation_state (
+                ctx->self,
+                (GAsyncReadyCallback)load_activation_state_ready,
                 ctx);
             return;
         }
