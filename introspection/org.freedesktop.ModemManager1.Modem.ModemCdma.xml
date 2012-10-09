@@ -22,14 +22,16 @@
 
     <!--
         Activate:
-        @carrier: Name of carrier.
+        @carrier_code: Name of carrier, or carrier-specific code.
 
         Provisions the modem for use with a given carrier using the modem's
         <ulink url="http://en.wikipedia.org/wiki/Over-the-air_programming">Over-The-Air (OTA)</ulink>
         activation functionality, if any.
+
+        Some modems will reboot after this call is made.
     -->
     <method name="Activate">
-      <arg name="carrier" type="s" direction="in" />
+      <arg name="carrier_code" type="s" direction="in" />
     </method>
 
     <!--
@@ -49,7 +51,7 @@
         ActivationStateChanged:
         @activation_state: Current activation state, given as a <link linkend="MMModemCdmaActivationState">MMModemCdmaActivationState</link>.
         @activation_error: Carrier-specific error code, given as a <link linkend="MMCdmaActivationError">MMCdmaActivationError</link>.
-        @status_changes: Properties that have changed as a result of this activation state chage, including <literal>"mdn"</literal> and <literal>"min"</literal>.
+        @status_changes: Properties that have changed as a result of this activation state chage, including <literal>"mdn"</literal> and <literal>"min"</literal>. The dictionary may be empty if the changed properties are unknown.
 
         The device activation state changed.
     -->
