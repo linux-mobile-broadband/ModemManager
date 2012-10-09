@@ -5794,19 +5794,32 @@ disable_location_gathering (MMIfaceModemLocation *self,
     DisableLocationGatheringContext *ctx;
     QmiClient *client = NULL;
     gboolean stop_gps = FALSE;
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        disable_location_gathering);
+
+    /* Nothing to be done to disable 3GPP location */
+    if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
-                            callback, user_data))
+                            callback, user_data)) {
+        g_object_unref (result);
         return;
+    }
 
     ctx = g_slice_new0 (DisableLocationGatheringContext);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disable_location_gathering);
+    ctx->result = result;
 
     /* Only stop GPS engine if no GPS-related sources enabled */
     if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
@@ -5834,7 +5847,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
         return;
     }
 
-    /* For any other location (e.g. 3GPP), or if still some GPS needed, just return */
+    /* If still some GPS needed, just return */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     disable_location_gathering_context_complete_and_free (ctx);
 }
