@@ -628,6 +628,7 @@ typedef enum { /*< underscore_name=mm_modem_cdma_registration_state >*/
 
 /**
  * MMModemCdmaActivationState:
+ * @MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN: Unknown activation state.
  * @MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED: Device is not activated
  * @MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING: Device is activating
  * @MM_MODEM_CDMA_ACTIVATION_STATE_PARTIALLY_ACTIVATED: Device is partially activated; carrier-specific steps required to continue.
@@ -636,10 +637,11 @@ typedef enum { /*< underscore_name=mm_modem_cdma_registration_state >*/
  * Activation state of a CDMA modem.
  */
 typedef enum { /*< underscore_name=mm_modem_cdma_activation_state >*/
-    MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED       = 0,
-    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING          = 1,
-    MM_MODEM_CDMA_ACTIVATION_STATE_PARTIALLY_ACTIVATED = 2,
-    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED           = 3,
+    MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN             = 0,
+    MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED       = 1,
+    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING          = 2,
+    MM_MODEM_CDMA_ACTIVATION_STATE_PARTIALLY_ACTIVATED = 3,
+    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED           = 4,
 } MMModemCdmaActivationState;
 
 /**
