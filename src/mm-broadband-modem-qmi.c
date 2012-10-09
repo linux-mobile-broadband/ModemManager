@@ -4493,6 +4493,101 @@ modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Load initial activation state (CDMA interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientDms *client;
+    GSimpleAsyncResult *result;
+} LoadActivationStateContext;
+
+static void
+load_activation_state_context_complete_and_free (LoadActivationStateContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadActivationStateContext, ctx);
+}
+
+static MMModemCdmaActivationState
+modem_cdma_load_activation_state_finish (MMIfaceModemCdma *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN;
+
+    return (MMModemCdmaActivationState) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+get_activation_state_ready (QmiClientDms *client,
+                            GAsyncResult *res,
+                            LoadActivationStateContext *ctx)
+{
+    QmiDmsActivationState state = QMI_DMS_ACTIVATION_STATE_NOT_ACTIVATED;
+    QmiMessageDmsGetActivationStateOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_activation_state_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        load_activation_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_dms_get_activation_state_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get activation state: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_dms_get_activation_state_output_unref (output);
+        load_activation_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    qmi_message_dms_get_activation_state_output_get_info (output, &state, NULL);
+    qmi_message_dms_get_activation_state_output_unref (output);
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        GUINT_TO_POINTER (mm_modem_cdma_activation_state_from_qmi_activation_state (state)),
+        NULL);
+    load_activation_state_context_complete_and_free (ctx);
+}
+
+static void
+modem_cdma_load_activation_state (MMIfaceModemCdma *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    LoadActivationStateContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    /* Setup context */
+    ctx = g_slice_new0 (LoadActivationStateContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_cdma_load_activation_state);
+
+    qmi_client_dms_get_activation_state (ctx->client,
+                                         NULL,
+                                         10,
+                                         NULL,
+                                         (GAsyncReadyCallback)get_activation_state_ready,
+                                         ctx);
+}
+
+/* /\*****************************************************************************\/ */
 /* Setup/Cleanup unsolicited registration event handlers
  * (3GPP and CDMA interface) */
 
@@ -7589,6 +7684,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     /* Other actions */
     iface->run_registration_checks = modem_cdma_run_registration_checks;
     iface->run_registration_checks_finish = modem_cdma_run_registration_checks_finish;
+    iface->load_activation_state = modem_cdma_load_activation_state;
+    iface->load_activation_state_finish = modem_cdma_load_activation_state_finish;
 }
 
 static void

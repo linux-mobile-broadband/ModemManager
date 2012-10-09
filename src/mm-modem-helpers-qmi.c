@@ -1059,6 +1059,33 @@ mm_modem_cdma_registration_state_from_qmi_registration_state (QmiNasRegistration
 
 /*****************************************************************************/
 
+MMModemCdmaActivationState
+mm_modem_cdma_activation_state_from_qmi_activation_state (QmiDmsActivationState state)
+{
+    switch (state) {
+    case QMI_DMS_ACTIVATION_STATE_NOT_ACTIVATED:
+        return MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED;
+    case QMI_DMS_ACTIVATION_STATE_ACTIVATED:
+        return MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED;
+    case QMI_DMS_ACTIVATION_STATE_CONNECTING:
+    case QMI_DMS_ACTIVATION_STATE_CONNECTED:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_AUTHENTICATED:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_NAM:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_MDN:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_IMSI:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_PRL:
+    case QMI_DMS_ACTIVATION_STATE_OTASP_SPC:
+        return MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING;
+    case QMI_DMS_ACTIVATION_STATE_OTASP_COMMITED:
+        return MM_MODEM_CDMA_ACTIVATION_STATE_PARTIALLY_ACTIVATED;
+
+    default:
+        return MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
 QmiWmsStorageType
 mm_sms_storage_to_qmi_storage_type (MMSmsStorage storage)
 {

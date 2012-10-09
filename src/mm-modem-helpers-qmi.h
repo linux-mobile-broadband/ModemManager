@@ -75,6 +75,8 @@ MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_qmi_registrat
 
 MMModemCdmaRegistrationState mm_modem_cdma_registration_state_from_qmi_registration_state (QmiNasRegistrationState registration_state);
 
+MMModemCdmaActivationState mm_modem_cdma_activation_state_from_qmi_activation_state (QmiDmsActivationState state);
+
 /*****************************************************************************/
 /* QMI/WMS to MM translations */
 
