@@ -86,6 +86,11 @@ struct _MMBroadbandModemQmiPrivate {
     guint system_info_indication_id;
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
+    /* CDMA activation helpers */
+    MMModemCdmaActivationState activation_state;
+    guint activation_event_report_indication_id;
+    gpointer activation_ctx;
+
     /* Messaging helpers */
     gboolean messaging_unsolicited_events_enabled;
     gboolean messaging_unsolicited_events_setup;
@@ -4618,14 +4623,20 @@ load_activation_state_context_complete_and_free (LoadActivationStateContext *ctx
 }
 
 static MMModemCdmaActivationState
-modem_cdma_load_activation_state_finish (MMIfaceModemCdma *self,
+modem_cdma_load_activation_state_finish (MMIfaceModemCdma *_self,
                                          GAsyncResult *res,
                                          GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN;
 
-    return (MMModemCdmaActivationState) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    /* Cache the value and also return it */
+    self->priv->activation_state =
+        (MMModemCdmaActivationState) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+
+    return self->priv->activation_state;
 }
 
 static void
@@ -4693,7 +4704,335 @@ modem_cdma_load_activation_state (MMIfaceModemCdma *self,
                                          ctx);
 }
 
-/* /\*****************************************************************************\/ */
+/*****************************************************************************/
+/* OTA activation (CDMA interface) */
+
+typedef enum {
+    CDMA_ACTIVATION_STEP_FIRST,
+    CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS,
+    CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION,
+    CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED,
+    CDMA_ACTIVATION_STEP_POWER_CYCLE,
+    CDMA_ACTIVATION_STEP_LAST
+} CdmaActivationStep;
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientDms *client;
+    GSimpleAsyncResult *result;
+    CdmaActivationStep step;
+    gchar *carrier_code;
+} CdmaActivationContext;
+
+static void
+cdma_activation_context_complete_and_free (CdmaActivationContext *ctx)
+{
+    /* Cleanup the activation context from the private info */
+    ctx->self->priv->activation_ctx = NULL;
+
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_free (ctx->carrier_code);
+    g_slice_free (CdmaActivationContext, ctx);
+}
+
+static gboolean
+modem_cdma_activate_finish (MMIfaceModemCdma *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void cdma_activation_context_step (CdmaActivationContext *ctx);
+
+static void
+cdma_activation_disable_indications (CdmaActivationContext *ctx)
+{
+    QmiMessageDmsSetEventReportInput *input;
+
+    /* Remove the signal handler */
+    g_assert (ctx->self->priv->activation_event_report_indication_id != 0);
+    g_signal_handler_disconnect (ctx->client, ctx->self->priv->activation_event_report_indication_id);
+    ctx->self->priv->activation_event_report_indication_id = 0;
+
+    /* Disable the activation state change indications; don't worry about the result */
+    input = qmi_message_dms_set_event_report_input_new ();
+    qmi_message_dms_set_event_report_input_set_activation_state_reporting (input, FALSE, NULL);
+    qmi_client_dms_set_event_report (ctx->client, input, 5, NULL, NULL, NULL);
+    qmi_message_dms_set_event_report_input_unref (input);
+}
+
+static void
+activation_power_cycle_ready (MMBroadbandModemQmi *self,
+                              GAsyncResult *res,
+                              CdmaActivationContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!power_cycle_finish (self, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* And go on to next step */
+    ctx->step++;
+    cdma_activation_context_step (ctx);
+}
+
+static void
+activation_event_report_indication_cb (QmiClientDms *client,
+                                       QmiIndicationDmsEventReportOutput *output,
+                                       MMBroadbandModemQmi *self)
+{
+    QmiDmsActivationState state;
+    MMModemCdmaActivationState new;
+    GError *error;
+
+    /* If the indication doesn't have any activation state info, just return */
+    if (!qmi_indication_dms_event_report_output_get_activation_state (output, &state, NULL))
+        return;
+
+    mm_dbg ("Activation state update: '%s'",
+            qmi_dms_activation_state_get_string (state));
+
+    new = mm_modem_cdma_activation_state_from_qmi_activation_state (state);
+
+    if (self->priv->activation_state != new)
+        mm_info ("Activation state changed: '%s'-->'%s'",
+                 mm_modem_cdma_activation_state_get_string (self->priv->activation_state),
+                 mm_modem_cdma_activation_state_get_string (new));
+
+    /* Cache the new value */
+    self->priv->activation_state = new;
+
+    /* We consider a not-activated report in the indication as a failure */
+    error = (new == MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED ?
+             g_error_new (MM_CDMA_ACTIVATION_ERROR,
+                          MM_CDMA_ACTIVATION_ERROR_UNKNOWN,
+                          "Activation process failed") :
+             NULL);
+
+    /* Update activation state in the interface */
+    mm_iface_modem_cdma_update_activation_state (MM_IFACE_MODEM_CDMA (self), new, error);
+
+    /* Now, if we have a FINAL state, finish the ongoing activation state request */
+    if (new != MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING) {
+        CdmaActivationContext *ctx;
+
+        g_assert (self->priv->activation_ctx != NULL);
+        ctx = (CdmaActivationContext *)self->priv->activation_ctx;
+
+        /* Disable further indications. */
+        cdma_activation_disable_indications (ctx);
+
+        /* If there is any error, finish the async method */
+        if (error) {
+            g_simple_async_result_take_error (ctx->result, error);
+            cdma_activation_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Otherwise, go on to next step */
+        ctx->step++;
+        cdma_activation_context_step (ctx);
+        return;
+    }
+
+    mm_dbg ("Activation process still ongoing...");
+}
+
+static void
+activate_automatic_ready (QmiClientDms *client,
+                          GAsyncResult *res,
+                          CdmaActivationContext *ctx)
+{
+    QmiMessageDmsActivateAutomaticOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_activate_automatic_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        cdma_activation_disable_indications (ctx);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_dms_activate_automatic_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't request OTA activation: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_dms_activate_automatic_output_unref (output);
+        cdma_activation_disable_indications (ctx);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+    }
+
+    qmi_message_dms_activate_automatic_output_unref (output);
+
+    /* Keep on */
+    ctx->step++;
+    cdma_activation_context_step (ctx);
+}
+
+static void
+ser_activation_state_ready (QmiClientDms *client,
+                            GAsyncResult *res,
+                            CdmaActivationContext *ctx)
+{
+    QmiMessageDmsSetEventReportOutput *output;
+    GError *error = NULL;
+
+    /* We cannot ignore errors, we NEED the indications to finish the
+     * activation request properly */
+
+    output = qmi_client_dms_set_event_report_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_dms_set_event_report_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set event report: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_dms_set_event_report_output_unref (output);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+    }
+
+    qmi_message_dms_set_event_report_output_unref (output);
+
+    /* Setup the indication handler */
+    g_assert (ctx->self->priv->activation_event_report_indication_id == 0);
+    ctx->self->priv->activation_event_report_indication_id =
+        g_signal_connect (client,
+                          "event-report",
+                          G_CALLBACK (activation_event_report_indication_cb),
+                          ctx->self);
+
+    /* Keep on */
+    ctx->step++;
+    cdma_activation_context_step (ctx);
+}
+
+static void
+cdma_activation_context_step (CdmaActivationContext *ctx)
+{
+    switch (ctx->step) {
+    case CDMA_ACTIVATION_STEP_FIRST:
+        ctx->step++;
+        /* Fall down to next step */
+
+    case CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS: {
+        QmiMessageDmsSetEventReportInput *input;
+
+        mm_info ("Automatic activation step [1/5]: enabling indications");
+
+        input = qmi_message_dms_set_event_report_input_new ();
+        qmi_message_dms_set_event_report_input_set_activation_state_reporting (input, TRUE, NULL);
+        qmi_client_dms_set_event_report (
+            ctx->client,
+            input,
+            5,
+            NULL,
+            (GAsyncReadyCallback)ser_activation_state_ready,
+            ctx);
+        qmi_message_dms_set_event_report_input_unref (input);
+        return;
+    }
+
+    case CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION: {
+        QmiMessageDmsActivateAutomaticInput *input;
+
+        mm_info ("Automatic activation step [2/5]: requesting activation");
+
+        input = qmi_message_dms_activate_automatic_input_new ();
+        qmi_message_dms_activate_automatic_input_set_activation_code (input, ctx->carrier_code, NULL);
+        qmi_client_dms_activate_automatic (ctx->client,
+                                           input,
+                                           10,
+                                           NULL,
+                                           (GAsyncReadyCallback)activate_automatic_ready,
+                                           ctx);
+        qmi_message_dms_activate_automatic_input_unref (input);
+        return;
+    }
+
+    case CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED:
+        mm_info ("Automatic activation step [3/5]: waiting for activation state updates");
+        return;
+
+    case CDMA_ACTIVATION_STEP_POWER_CYCLE:
+        mm_info ("Automatic activation step [4/5]: power-cycling...");
+        power_cycle (ctx->self,
+                     (GAsyncReadyCallback)activation_power_cycle_ready,
+                     ctx);
+        return;
+
+    case CDMA_ACTIVATION_STEP_LAST:
+        mm_info ("Automatic activation step [5/5]: finished");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        cdma_activation_context_complete_and_free (ctx);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+modem_cdma_activate (MMIfaceModemCdma *_self,
+                     const gchar *carrier_code,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GSimpleAsyncResult *result;
+    CdmaActivationContext *ctx;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_cdma_activate);
+
+    /* Fail if we have already an activation ongoing */
+    if (self->priv->activation_ctx) {
+        g_simple_async_result_set_error (
+            result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_IN_PROGRESS,
+            "An activation operation is already in progress");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Setup context */
+    ctx = g_slice_new0 (CdmaActivationContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = result;
+    ctx->carrier_code = g_strdup (carrier_code);
+    ctx->step = CDMA_ACTIVATION_STEP_FIRST;
+
+    /* We keep the activation context in the private data, so that we don't
+     * allow multiple activation requests at the same time. */
+    self->priv->activation_ctx = ctx;
+    cdma_activation_context_step (ctx);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited registration event handlers
  * (3GPP and CDMA interface) */
 
@@ -7738,6 +8077,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->run_registration_checks_finish = modem_cdma_run_registration_checks_finish;
     iface->load_activation_state = modem_cdma_load_activation_state;
     iface->load_activation_state_finish = modem_cdma_load_activation_state_finish;
+    iface->activate = modem_cdma_activate;
+    iface->activate_finish = modem_cdma_activate_finish;
 }
 
 static void
