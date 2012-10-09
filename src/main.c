@@ -119,6 +119,7 @@ name_lost_cb (GDBusConnection *connection,
 int
 main (int argc, char *argv[])
 {
+    GMainLoop *inner;
     GError *err = NULL;
     guint name_id;
 
@@ -156,6 +157,11 @@ main (int argc, char *argv[])
     loop = g_main_loop_new (NULL, FALSE);
     g_main_loop_run (loop);
 
+    /* Clear the global variable, so that subsequent requests to
+     * exit succeed. */
+    inner = loop;
+    loop = NULL;
+
     if (manager) {
         GTimer *timer;
 
@@ -167,7 +173,7 @@ main (int argc, char *argv[])
         timer = g_timer_new ();
         while (mm_manager_num_modems (manager) &&
                g_timer_elapsed (timer, NULL) < (gdouble)MAX_SHUTDOWN_TIME_SECS) {
-            GMainContext *ctx = g_main_loop_get_context (loop);
+            GMainContext *ctx = g_main_loop_get_context (inner);
 
             g_main_context_iteration (ctx, FALSE);
             g_usleep (50);
@@ -181,6 +187,8 @@ main (int argc, char *argv[])
         g_object_unref (manager);
         g_timer_destroy (timer);
     }
+
+    g_main_loop_unref (inner);
 
     g_bus_unown_name (name_id);
 
