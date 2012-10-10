@@ -703,8 +703,10 @@ connect (MMBearer *self,
         if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
             mm_dbg ("Using default (PAP) authentication method");
             ctx->auth = QMI_WDS_AUTHENTICATION_PAP;
-        } else if (ctx->auth & (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
-            /* Only PAP and/or CHAP are supported */
+        } else if (auth & (MM_BEARER_ALLOWED_AUTH_PAP |
+                           MM_BEARER_ALLOWED_AUTH_CHAP |
+                           MM_BEARER_ALLOWED_AUTH_NONE)) {
+            /* Only PAP and/or CHAP or NONE are supported */
             ctx->auth = mm_bearer_allowed_auth_to_qmi_authentication (auth);
         } else {
             gchar *str;
