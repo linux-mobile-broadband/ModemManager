@@ -18,6 +18,9 @@
 
 #include <config.h>
 
+#include <ModemManager.h>
+#include "mm-errors-types.h"
+
 #include "mm-log.h"
 #include "mm-auth-provider-polkit.h"
 
