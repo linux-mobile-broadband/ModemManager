@@ -450,7 +450,7 @@ connect_context_step (ConnectContext *ctx)
         input = build_start_network_input (ctx);
         qmi_client_wds_start_network (ctx->client_ipv4,
                                       input,
-                                      10,
+                                      45,
                                       ctx->cancellable,
                                       (GAsyncReadyCallback)start_network_ready,
                                       ctx);
@@ -528,7 +528,7 @@ connect_context_step (ConnectContext *ctx)
         input = build_start_network_input (ctx);
         qmi_client_wds_start_network (ctx->client_ipv6,
                                       input,
-                                      10,
+                                      45,
                                       ctx->cancellable,
                                       (GAsyncReadyCallback)start_network_ready,
                                       ctx);
