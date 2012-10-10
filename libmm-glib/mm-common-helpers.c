@@ -462,16 +462,6 @@ mm_common_get_allowed_auth_from_string (const gchar *str,
         allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
     }
 
-    /* 'none' is a special value which, if given, must be given alone */
-    if (allowed_auth & MM_BEARER_ALLOWED_AUTH_NONE &&
-        allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Allowed auth 'none' cannot be given along with other values");
-        allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-    }
-
     g_type_class_unref (flags_class);
     g_strfreev (strings);
     return allowed_auth;
