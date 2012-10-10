@@ -157,6 +157,112 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
 }
 
 /*****************************************************************************/
+/* Power cycle */
+
+static gboolean
+power_cycle_finish (MMBroadbandModemQmi *self,
+                    GAsyncResult *res,
+                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+power_cycle_set_operating_mode_reset_ready (QmiClientDms *client,
+                                            GAsyncResult *res,
+                                            GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        mm_info ("Modem is being rebooted now");
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_set_operating_mode_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+power_cycle_set_operating_mode_offline_ready (QmiClientDms *client,
+                                              GAsyncResult *res,
+                                              GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        qmi_message_dms_set_operating_mode_output_unref (output);
+        return;
+    }
+
+    qmi_message_dms_set_operating_mode_output_unref (output);
+
+    /* Now, go into reset mode. This will fully reboot the modem, and the current
+     * modem object should get disposed. */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_RESET, NULL);
+    qmi_client_dms_set_operating_mode (client,
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)power_cycle_set_operating_mode_reset_ready,
+                                       simple);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+static void
+power_cycle (MMBroadbandModemQmi *self,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    GSimpleAsyncResult *simple;
+    QmiClient *client;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        power_cycle);
+
+    /* Now, go into offline mode */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_OFFLINE, NULL);
+    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)power_cycle_set_operating_mode_offline_ready,
+                                       simple);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -7012,64 +7118,17 @@ firmware_change_current_finish (MMIfaceModemFirmware *self,
 }
 
 static void
-firmware_set_operating_mode_reset_ready (QmiClientDms *client,
-                                         GAsyncResult *res,
-                                         FirmwareChangeCurrentContext *ctx)
+firmware_power_cycle_ready (MMBroadbandModemQmi *self,
+                            GAsyncResult *res,
+                            FirmwareChangeCurrentContext *ctx)
 {
-    QmiMessageDmsSetOperatingModeOutput *output;
     GError *error = NULL;
 
-    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
-    if (!output ||
-        !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+    if (!power_cycle_finish (self, res, &error))
         g_simple_async_result_take_error (ctx->result, error);
-    } else {
-        mm_info ("Modem is being rebooted now");
+    else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
-    if (output)
-        qmi_message_dms_set_operating_mode_output_unref (output);
-
     firmware_change_current_context_complete_and_free (ctx);
-}
-
-static void
-firmware_set_operating_mode_offline_ready (QmiClientDms *client,
-                                           GAsyncResult *res,
-                                           FirmwareChangeCurrentContext *ctx)
-{
-    QmiMessageDmsSetOperatingModeInput *input;
-    QmiMessageDmsSetOperatingModeOutput *output;
-    GError *error = NULL;
-
-    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
-    if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        firmware_change_current_context_complete_and_free (ctx);
-        return;
-    }
-
-    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        firmware_change_current_context_complete_and_free (ctx);
-        qmi_message_dms_set_operating_mode_output_unref (output);
-        return;
-    }
-
-    qmi_message_dms_set_operating_mode_output_unref (output);
-
-    /* Now, go into reset mode. This will fully reboot the modem, and the current
-     * modem object should get disposed. */
-    input = qmi_message_dms_set_operating_mode_input_new ();
-    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_RESET, NULL);
-    qmi_client_dms_set_operating_mode (ctx->client,
-                                       input,
-                                       20,
-                                       NULL,
-                                       (GAsyncReadyCallback)firmware_set_operating_mode_reset_ready,
-                                       ctx);
-    qmi_message_dms_set_operating_mode_input_unref (input);
 }
 
 static void
@@ -7077,7 +7136,6 @@ firmware_select_stored_image_ready (QmiClientDms *client,
                                     GAsyncResult *res,
                                     FirmwareChangeCurrentContext *ctx)
 {
-    QmiMessageDmsSetOperatingModeInput *input;
     QmiMessageDmsSetFirmwarePreferenceOutput *output;
     GError *error = NULL;
 
@@ -7098,15 +7156,9 @@ firmware_select_stored_image_ready (QmiClientDms *client,
     qmi_message_dms_set_firmware_preference_output_unref (output);
 
     /* Now, go into offline mode */
-    input = qmi_message_dms_set_operating_mode_input_new ();
-    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_OFFLINE, NULL);
-    qmi_client_dms_set_operating_mode (ctx->client,
-                                       input,
-                                       20,
-                                       NULL,
-                                       (GAsyncReadyCallback)firmware_set_operating_mode_offline_ready,
-                                       ctx);
-    qmi_message_dms_set_operating_mode_input_unref (input);
+    power_cycle (ctx->self,
+                 (GAsyncReadyCallback)firmware_power_cycle_ready,
+                 ctx);
 }
 
 static MMFirmwareProperties *
