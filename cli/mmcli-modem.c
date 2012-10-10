@@ -427,15 +427,18 @@ print_modem_info (void)
                  "           |            sid: '%s'\n"
                  "           |            nid: '%s'\n"
                  "           |   registration: CDMA1x '%s'\n"
-                 "           |                 EV-DO  '%s'\n",
+                 "           |                 EV-DO  '%s'\n"
+                 "           |     activation: '%s'\n",
                  VALIDATE_UNKNOWN (mm_modem_cdma_get_meid (ctx->modem_cdma)),
                  VALIDATE_UNKNOWN (mm_modem_cdma_get_esn (ctx->modem_cdma)),
                  VALIDATE_UNKNOWN (sid_str),
                  VALIDATE_UNKNOWN (nid_str),
                  mm_modem_cdma_registration_state_get_string (
-                     mm_modem_cdma_get_cdma1x_registration_state ((ctx->modem_cdma))),
+                     mm_modem_cdma_get_cdma1x_registration_state (ctx->modem_cdma)),
                  mm_modem_cdma_registration_state_get_string (
-                     mm_modem_cdma_get_evdo_registration_state ((ctx->modem_cdma))));
+                     mm_modem_cdma_get_evdo_registration_state (ctx->modem_cdma)),
+                 mm_modem_cdma_activation_state_get_string (
+                     mm_modem_cdma_get_activation_state (ctx->modem_cdma)));
 
         g_free (sid_str);
         g_free (nid_str);
