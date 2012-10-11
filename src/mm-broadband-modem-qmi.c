@@ -104,9 +104,19 @@ peek_qmi_client (MMBroadbandModemQmi *self,
                  QmiService service,
                  GError **error)
 {
+    MMQmiPort *port;
     QmiClient *client;
 
-    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    if (!port) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't peek QMI port");
+        return NULL;
+    }
+
+    client = mm_qmi_port_peek_client (port,
                                       service,
                                       MM_QMI_PORT_FLAG_DEFAULT);
     if (!client)
@@ -4941,16 +4951,21 @@ messaging_check_support (MMIfaceModemMessaging *self,
 {
     GSimpleAsyncResult *result;
     gboolean supported;
+    MMQmiPort *port;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         messaging_check_support);
 
-    /* If we have support for the WMS client, messaging is supported */
-    supported = !!mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
-                                           QMI_SERVICE_WMS,
-                                           MM_QMI_PORT_FLAG_DEFAULT);
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    if (!port)
+        supported = FALSE;
+    else
+        /* If we have support for the WMS client, messaging is supported */
+        supported = !!mm_qmi_port_peek_client (port,
+                                               QMI_SERVICE_WMS,
+                                               MM_QMI_PORT_FLAG_DEFAULT);
 
     /* We only handle 3GPP messaging (PDU based) currently, so just ignore
      * CDMA-only QMI modems */
@@ -5673,6 +5688,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 {
     MMModemLocationSource sources;
     GError *error = NULL;
+    MMQmiPort *port;
 
     sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
     if (error) {
@@ -5682,11 +5698,13 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         return;
     }
 
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+
     /* Now our own check.
      * If we have support for the PDS client, GPS location is supported */
-    if (mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)),
-                                 QMI_SERVICE_PDS,
-                                 MM_QMI_PORT_FLAG_DEFAULT))
+    if (port && mm_qmi_port_peek_client (port,
+                                         QMI_SERVICE_PDS,
+                                         MM_QMI_PORT_FLAG_DEFAULT))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
 
     /* So we're done, complete */
@@ -6931,7 +6949,16 @@ initialization_started (MMBroadbandModem *self,
                                              user_data,
                                              initialization_started);
     ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
-    g_assert (ctx->qmi);
+
+    /* This may happen if we unplug the modem unexpectedly */
+    if (!ctx->qmi) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Cannot initialize: QMI port went missing");
+        initialization_started_context_complete_and_free (ctx);
+        return;
+    }
 
     if (mm_qmi_port_is_open (ctx->qmi)) {
         /* Nothing to be done, just launch parent's callback */

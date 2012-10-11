@@ -40,16 +40,30 @@ ensure_qmi_client (MMSimQmi *self,
 {
     MMBaseModem *modem = NULL;
     QmiClient *client;
+    MMQmiPort *port;
 
     g_object_get (self,
                   MM_SIM_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (modem),
+    port = mm_base_modem_peek_port_qmi (modem);
+    g_object_unref (modem);
+
+    if (!port) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't peek QMI port");
+        return FALSE;
+    }
+
+    client = mm_qmi_port_peek_client (port,
                                       service,
                                       MM_QMI_PORT_FLAG_DEFAULT);
-    if (!client)
+    if (!client) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -57,11 +71,11 @@ ensure_qmi_client (MMSimQmi *self,
                                              MM_CORE_ERROR_FAILED,
                                              "Couldn't peek client for service '%s'",
                                              qmi_service_get_string (service));
-    else
-        *o_client = client;
+        return FALSE;
+    }
 
-    g_object_unref (modem);
-    return !!client;
+    *o_client = client;
+    return TRUE;
 }
 
 /*****************************************************************************/
