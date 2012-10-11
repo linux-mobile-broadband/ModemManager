@@ -293,6 +293,7 @@ set_allowed_modes_ready (MMBaseModem *self,
         if (g_error_matches (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED)) {
+            g_error_free (error);
             /* If setting bands is unsupported, keep on without sleep */
             ctx->step++;
             connection_step (ctx);
@@ -330,6 +331,7 @@ set_bands_ready (MMBaseModem *self,
         if (g_error_matches (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED)) {
+            g_error_free (error);
             /* If setting bands is unsupported, keep on without sleep */
             ctx->step++;
             connection_step (ctx);
