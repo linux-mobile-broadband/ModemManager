@@ -52,6 +52,8 @@ mm_iface_modem_bind_simple_status (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     g_object_bind_property (skeleton, "state",
                             status, MM_SIMPLE_PROPERTY_STATE,
@@ -141,60 +143,64 @@ bearer_status_changed (MMBearer *bearer,
     g_object_unref (list);
 }
 
+typedef struct {
+    MMIfaceModem *self;
+    MMBearerList *list;
+    GSimpleAsyncResult *result;
+} CreateBearerContext;
+
+static void
+create_bearer_context_complete_and_free (CreateBearerContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    if (ctx->list)
+        g_object_unref (ctx->list);
+    g_slice_free (CreateBearerContext, ctx);
+}
+
 MMBearer *
 mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    MMBearer *bearer;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    return g_object_ref (bearer);
+    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
 create_bearer_ready (MMIfaceModem *self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     CreateBearerContext *ctx)
 {
     MMBearer *bearer;
     GError *error = NULL;
 
-    bearer = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self,
-                                                                        res,
-                                                                        &error);
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else {
-        MMBearerList *list = NULL;
-
-        g_object_get (self,
-                      MM_IFACE_MODEM_BEARER_LIST, &list,
-                      NULL);
-
-        if (!mm_bearer_list_add_bearer (list, bearer, &error))
-            g_simple_async_result_take_error (simple, error);
-        else {
-            /* If bearer properly created and added to the list, follow its
-             * status */
-            g_signal_connect (bearer,
-                              "notify::"  MM_BEARER_STATUS,
-                              (GCallback)bearer_status_changed,
-                              self);
-            g_simple_async_result_set_op_res_gpointer (simple,
-                                                       g_object_ref (bearer),
-                                                       g_object_unref);
-        }
-        g_object_unref (bearer);
-        g_object_unref (list);
+    bearer = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        create_bearer_context_complete_and_free (ctx);
+        return;
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    if (!mm_bearer_list_add_bearer (ctx->list, bearer, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        create_bearer_context_complete_and_free (ctx);
+        g_object_unref (bearer);
+        return;
+    }
+
+    /* If bearer properly created and added to the list, follow its
+     * status */
+    g_signal_connect (bearer,
+                      "notify::"  MM_BEARER_STATUS,
+                      (GCallback)bearer_status_changed,
+                      self);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, g_object_ref (bearer), g_object_unref);
+    create_bearer_context_complete_and_free (ctx);
 }
 
 void
@@ -203,31 +209,43 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
-    MMBearerList *list = NULL;
+    CreateBearerContext *ctx;
 
+    ctx = g_slice_new (CreateBearerContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_create_bearer);
     g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  MM_IFACE_MODEM_BEARER_LIST, &ctx->list,
                   NULL);
+    if (!ctx->list) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Cannot add new bearer: bearer list not found");
+        create_bearer_context_complete_and_free (ctx);
+        return;
+    }
 
-    if (mm_bearer_list_get_count (list) == mm_bearer_list_get_max (list))
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
+    if (mm_bearer_list_get_count (ctx->list) == mm_bearer_list_get_max (ctx->list)) {
+        g_simple_async_result_set_error (
+            ctx->result,
             MM_CORE_ERROR,
             MM_CORE_ERROR_TOO_MANY,
             "Cannot add new bearer: already reached maximum (%u)",
-            mm_bearer_list_get_count (list));
-    else
-        MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
-            self,
-            properties,
-            (GAsyncReadyCallback)create_bearer_ready,
-            g_simple_async_result_new (G_OBJECT (self),
-                                       callback,
-                                       user_data,
-                                       mm_iface_modem_create_bearer));
-    g_object_unref (list);
+            mm_bearer_list_get_count (ctx->list));
+        create_bearer_context_complete_and_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
+        self,
+        properties,
+        (GAsyncReadyCallback)create_bearer_ready,
+        ctx);
 }
 
 typedef struct {
@@ -431,6 +449,7 @@ typedef struct {
     MmGdbusModem *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModem *self;
+    MMBearerList *list;
     gchar *bearer_path;
 } HandleDeleteBearerContext;
 
@@ -440,6 +459,8 @@ handle_delete_bearer_context_free (HandleDeleteBearerContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
+    if (ctx->list)
+        g_object_unref (ctx->list);
     g_free (ctx->bearer_path);
     g_free (ctx);
 }
@@ -449,7 +470,6 @@ handle_delete_bearer_auth_ready (MMBaseModem *self,
                                  GAsyncResult *res,
                                  HandleDeleteBearerContext *ctx)
 {
-    MMBearerList *list = NULL;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -458,16 +478,13 @@ handle_delete_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &list,
-                  NULL);
-
-    if (!mm_bearer_list_delete_bearer (list, ctx->bearer_path, &error))
+    if (!ctx->list)
+        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
+    else if (!mm_bearer_list_delete_bearer (ctx->list, ctx->bearer_path, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
 
-    g_object_unref (list);
     handle_delete_bearer_context_free (ctx);
 }
 
@@ -484,6 +501,9 @@ handle_delete_bearer (MmGdbusModem *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
     ctx->bearer_path = g_strdup (bearer);
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &ctx->list,
+                  NULL);
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
@@ -506,6 +526,13 @@ handle_list_bearers (MmGdbusModem *skeleton,
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "Bearer list not found");
+        return TRUE;
+    }
 
     paths = mm_bearer_list_get_paths (list);
     mm_gdbus_modem_complete_list_bearers (skeleton,
@@ -717,9 +744,6 @@ get_last_signal_quality_update_time (MMIfaceModem *self)
 static gboolean
 expire_signal_quality (MMIfaceModem *self)
 {
-    GVariant *old;
-    guint signal_quality = 0;
-    gboolean recent = FALSE;
     MmGdbusModem *skeleton = NULL;
     SignalQualityUpdateContext *ctx;
 
@@ -727,24 +751,30 @@ expire_signal_quality (MMIfaceModem *self)
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    old = mm_gdbus_modem_get_signal_quality (skeleton);
-    g_variant_get (old,
-                   "(ub)",
-                   &signal_quality,
-                   &recent);
+    if (skeleton) {
+        GVariant *old;
+        guint signal_quality = 0;
+        gboolean recent = FALSE;
 
-    /* If value is already not recent, we're done */
-    if (recent) {
-        mm_dbg ("Signal quality value not updated in %us, "
-                "marking as not being recent",
-                SIGNAL_QUALITY_RECENT_TIMEOUT_SEC);
-        mm_gdbus_modem_set_signal_quality (skeleton,
-                                           g_variant_new ("(ub)",
-                                                          signal_quality,
-                                                          FALSE));
+        old = mm_gdbus_modem_get_signal_quality (skeleton);
+        g_variant_get (old,
+                       "(ub)",
+                       &signal_quality,
+                       &recent);
+
+        /* If value is already not recent, we're done */
+        if (recent) {
+            mm_dbg ("Signal quality value not updated in %us, "
+                    "marking as not being recent",
+                    SIGNAL_QUALITY_RECENT_TIMEOUT_SEC);
+            mm_gdbus_modem_set_signal_quality (skeleton,
+                                               g_variant_new ("(ub)",
+                                                              signal_quality,
+                                                              FALSE));
+        }
+
+        g_object_unref (skeleton);
     }
-
-    g_object_unref (skeleton);
 
     /* Remove source id */
     ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
@@ -967,6 +997,14 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
                   NULL);
+
+    if (!skeleton || !bearer_list) {
+        if (skeleton)
+            g_object_unref (skeleton);
+        if (bearer_list)
+            g_object_unref (bearer_list);
+        return;
+    }
 
     /* While connected we don't want registration status changes to change
      * the modem's state away from CONNECTED. */
@@ -1463,8 +1501,10 @@ set_bands_context_complete_and_free (SetBandsContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->skeleton);
-    g_array_unref (ctx->bands_array);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
+    if (ctx->bands_array)
+        g_array_unref (ctx->bands_array);
     g_free (ctx);
 }
 
@@ -1576,9 +1616,6 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
         return;
     }
 
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
-                                                 bands_array->len);
-
     /* Setup context */
     ctx = g_new0 (SetBandsContext, 1);
     ctx->self = g_object_ref (self);
@@ -1589,6 +1626,17 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        set_bands_context_complete_and_free (ctx);
+        return;
+    }
+
+    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
+                                                 bands_array->len);
 
     /* Get list of supported bands */
     supported_bands_array = (mm_common_bands_variant_to_garray (
@@ -1776,7 +1824,8 @@ set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -1839,6 +1888,15 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
     /* Get list of supported modes */
     supported = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
 
@@ -2002,42 +2060,23 @@ handle_set_allowed_modes (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
-typedef struct _UnlockCheckContext UnlockCheckContext;
-struct _UnlockCheckContext {
+typedef struct {
     MMIfaceModem *self;
     guint pin_check_tries;
     guint pin_check_timeout_id;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
     MMModemLock lock;
-};
-
-static UnlockCheckContext *
-unlock_check_context_new (MMIfaceModem *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
-{
-    UnlockCheckContext *ctx;
-
-    ctx = g_new0 (UnlockCheckContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             unlock_check_context_new);
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
+} UnlockCheckContext;
 
 static void
-unlock_check_context_free (UnlockCheckContext *ctx)
+unlock_check_context_complete_and_free (UnlockCheckContext *ctx)
 {
-    g_object_unref (ctx->self);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->self);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -2145,8 +2184,7 @@ modem_after_sim_unlock_ready (MMIfaceModem *self,
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                GUINT_TO_POINTER (ctx->lock),
                                                NULL);
-    g_simple_async_result_complete (ctx->result);
-    unlock_check_context_free (ctx);
+    unlock_check_context_complete_and_free (ctx);
 }
 
 static void
@@ -2175,8 +2213,7 @@ unlock_check_ready (MMIfaceModem *self,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
             g_simple_async_result_take_error (ctx->result, error);
-            g_simple_async_result_complete (ctx->result);
-            unlock_check_context_free (ctx);
+            unlock_check_context_complete_and_free (ctx);
             return;
         }
 
@@ -2226,8 +2263,7 @@ unlock_check_ready (MMIfaceModem *self,
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                GUINT_TO_POINTER (ctx->lock),
                                                NULL);
-    g_simple_async_result_complete (ctx->result);
-    unlock_check_context_free (ctx);
+    unlock_check_context_complete_and_free (ctx);
 }
 
 void
@@ -2237,7 +2273,23 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 {
     UnlockCheckContext *ctx;
 
-    ctx = unlock_check_context_new (self, callback, user_data);
+    ctx = g_new0 (UnlockCheckContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_unlock_check);
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        unlock_check_context_complete_and_free (ctx);
+        return;
+    }
 
     /* If we're already unlocked, we're done */
     if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
@@ -2254,8 +2306,7 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
                                                NULL);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    unlock_check_context_free (ctx);
+    unlock_check_context_complete_and_free (ctx);
 }
 
 /*****************************************************************************/
@@ -2284,6 +2335,8 @@ update_unlock_retries (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     previous_dictionary = mm_gdbus_modem_get_unlock_retries (skeleton);
     previous_unlock_retries = mm_unlock_retries_new_from_dictionary (previous_dictionary);
@@ -2381,33 +2434,6 @@ struct _DisablingContext {
     MmGdbusModem *skeleton;
 };
 
-static DisablingContext *
-disabling_context_new (MMIfaceModem *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    DisablingContext *ctx;
-
-    ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disabling_context_new);
-    ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  MM_IFACE_MODEM_STATE, &ctx->previous_state,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    mm_iface_modem_update_state (ctx->self,
-                                 MM_MODEM_STATE_DISABLING,
-                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-
-    return ctx;
-}
-
 static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
@@ -2425,7 +2451,8 @@ disabling_context_complete_and_free (DisablingContext *ctx)
 
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -2514,9 +2541,33 @@ mm_iface_modem_disable (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    interface_disabling_step (disabling_context_new (self,
-                                                     callback,
-                                                     user_data));
+    DisablingContext *ctx;
+
+    ctx = g_new0 (DisablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_disable);
+    ctx->step = DISABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  MM_IFACE_MODEM_STATE, &ctx->previous_state,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_iface_modem_update_state (ctx->self,
+                                 MM_MODEM_STATE_DISABLING,
+                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+
+    interface_disabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -2549,34 +2600,6 @@ struct _EnablingContext {
     MmGdbusModem *skeleton;
 };
 
-static EnablingContext *
-enabling_context_new (MMIfaceModem *self,
-                      GCancellable *cancellable,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    EnablingContext *ctx;
-
-    ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_context_new);
-    ctx->step = ENABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    mm_iface_modem_update_state (ctx->self,
-                                 MM_MODEM_STATE_ENABLING,
-                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-
-    return ctx;
-}
-
 static void
 enabling_context_complete_and_free (EnablingContext *ctx)
 {
@@ -2586,7 +2609,7 @@ enabling_context_complete_and_free (EnablingContext *ctx)
         mm_iface_modem_update_state (ctx->self,
                                      MM_MODEM_STATE_ENABLED,
                                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-    else {
+    else if (ctx->skeleton) {
         MMModemLock lock;
 
         /* Fallback to DISABLED/LOCKED */
@@ -2604,7 +2627,8 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -2926,10 +2950,33 @@ mm_iface_modem_enable (MMIfaceModem *self,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
 {
-    interface_enabling_step (enabling_context_new (self,
-                                                   cancellable,
-                                                   callback,
-                                                   user_data));
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_enable);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_iface_modem_update_state (ctx->self,
+                                 MM_MODEM_STATE_ENABLING,
+                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+
+    interface_enabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -2966,29 +3013,6 @@ struct _InitializationContext {
     MmGdbusModem *skeleton;
     GError *fatal_error;
 };
-
-static InitializationContext *
-initialization_context_new (MMIfaceModem *self,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    InitializationContext *ctx;
-
-    ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_context_new);
-    ctx->step = INITIALIZATION_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
 
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
@@ -3648,9 +3672,6 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM (self), FALSE);
-    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
-
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -3660,9 +3681,8 @@ mm_iface_modem_initialize (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    InitializationContext *ctx;
     MmGdbusModem *skeleton = NULL;
-
-    g_return_if_fail (MM_IS_IFACE_MODEM (self));
 
     /* Did we already create it? */
     g_object_get (self,
@@ -3707,19 +3727,22 @@ mm_iface_modem_initialize (MMIfaceModem *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization_step (initialization_context_new (self,
-                                                               cancellable,
-                                                               callback,
-                                                               user_data));
-    g_object_unref (skeleton);
-    return;
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void
 mm_iface_modem_shutdown (MMIfaceModem *self)
 {
-    g_return_if_fail (MM_IS_IFACE_MODEM (self));
-
     /* Remove SignalQualityCheckContext object to make sure any pending
      * invocation of periodic_signal_quality_check is cancelled before
      * SignalQualityUpdateContext is removed (as signal_quality_check_ready may

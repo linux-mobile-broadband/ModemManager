@@ -475,35 +475,14 @@ struct _DisablingContext {
     MmGdbusModem3gppUssd *skeleton;
 };
 
-static DisablingContext *
-disabling_context_new (MMIfaceModem3gppUssd *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    DisablingContext *ctx;
-
-    ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disabling_context_new);
-    ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -596,9 +575,28 @@ mm_iface_modem_3gpp_ussd_disable (MMIfaceModem3gppUssd *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    interface_disabling_step (disabling_context_new (self,
-                                                     callback,
-                                                     user_data));
+    DisablingContext *ctx;
+
+    ctx = g_new0 (DisablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_3gpp_ussd_disable);
+    ctx->step = DISABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_disabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -620,35 +618,14 @@ struct _EnablingContext {
     MmGdbusModem3gppUssd *skeleton;
 };
 
-static EnablingContext *
-enabling_context_new (MMIfaceModem3gppUssd *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    EnablingContext *ctx;
-
-    ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_context_new);
-    ctx->step = ENABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 enabling_context_complete_and_free (EnablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -741,9 +718,28 @@ mm_iface_modem_3gpp_ussd_enable (MMIfaceModem3gppUssd *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    interface_enabling_step (enabling_context_new (self,
-                                                   callback,
-                                                   user_data));
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_3gpp_ussd_enable);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_enabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -764,27 +760,6 @@ struct _InitializationContext {
     GSimpleAsyncResult *result;
     InitializationStep step;
 };
-
-static InitializationContext *
-initialization_context_new (MMIfaceModem3gppUssd *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    InitializationContext *ctx;
-
-    ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_context_new);
-    ctx->step = INITIALIZATION_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
 
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
@@ -915,9 +890,6 @@ mm_iface_modem_3gpp_ussd_initialize_finish (MMIfaceModem3gppUssd *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM_3GPP_USSD (self), FALSE);
-    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
-
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -926,9 +898,8 @@ mm_iface_modem_3gpp_ussd_initialize (MMIfaceModem3gppUssd *self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
+    InitializationContext *ctx;
     MmGdbusModem3gppUssd *skeleton = NULL;
-
-    g_return_if_fail (MM_IS_IFACE_MODEM_3GPP_USSD (self));
 
     /* Did we already create it? */
     g_object_get (self,
@@ -948,18 +919,22 @@ mm_iface_modem_3gpp_ussd_initialize (MMIfaceModem3gppUssd *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization_step (initialization_context_new (self,
-                                                               callback,
-                                                               user_data));
-    g_object_unref (skeleton);
-    return;
+
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_3gpp_ussd_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void
 mm_iface_modem_3gpp_ussd_shutdown (MMIfaceModem3gppUssd *self)
 {
-    g_return_if_fail (MM_IS_IFACE_MODEM_3GPP_USSD (self));
-
     /* Unexport DBus interface and remove the skeleton */
     mm_gdbus_object_skeleton_set_modem3gpp_ussd (MM_GDBUS_OBJECT_SKELETON (self), NULL);
     g_object_set (self,

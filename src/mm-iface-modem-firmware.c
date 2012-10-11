@@ -253,29 +253,6 @@ struct _InitializationContext {
     InitializationStep step;
 };
 
-static InitializationContext *
-initialization_context_new (MMIfaceModemFirmware *self,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    InitializationContext *ctx;
-
-    ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_context_new);
-    ctx->step = INITIALIZATION_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_FIRMWARE_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
-
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
 {
@@ -418,9 +395,6 @@ mm_iface_modem_firmware_initialize_finish (MMIfaceModemFirmware *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM_FIRMWARE (self), FALSE);
-    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
-
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -430,9 +404,8 @@ mm_iface_modem_firmware_initialize (MMIfaceModemFirmware *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
+    InitializationContext *ctx;
     MmGdbusModemFirmware *skeleton = NULL;
-
-    g_return_if_fail (MM_IS_IFACE_MODEM_FIRMWARE (self));
 
     /* Did we already create it? */
     g_object_get (self,
@@ -446,11 +419,18 @@ mm_iface_modem_firmware_initialize (MMIfaceModemFirmware *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization_step (initialization_context_new (self,
-                                                               cancellable,
-                                                               callback,
-                                                               user_data));
-    g_object_unref (skeleton);
+
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_firmware_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void

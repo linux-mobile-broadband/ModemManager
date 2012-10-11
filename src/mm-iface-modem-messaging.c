@@ -205,7 +205,14 @@ handle_delete_auth_ready (MMBaseModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
-    g_assert (list != NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot delete SMS: missing SMS list");
+        handle_delete_context_free (ctx);
+        return;
+    }
 
     mm_sms_list_delete_sms (list,
                             ctx->path,
@@ -297,6 +304,7 @@ handle_create_auth_ready (MMBaseModem *self,
                                       properties,
                                       &error);
     if (!sms) {
+        g_object_unref (properties);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -305,7 +313,16 @@ handle_create_auth_ready (MMBaseModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
-    g_assert (list != NULL);
+    if (!list) {
+        g_object_unref (properties);
+        g_object_unref (sms);
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot create SMS: missing SMS list");
+        handle_create_context_free (ctx);
+        return;
+    }
 
     /* Add it to the list */
     mm_sms_list_add_sms (list, sms);
@@ -372,7 +389,13 @@ handle_list (MmGdbusModemMessaging *skeleton,
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
-    g_assert (list != NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot list SMS: missing SMS list");
+        return TRUE;
+    }
 
     paths = mm_sms_list_get_paths (list);
     mm_gdbus_modem_messaging_complete_list (skeleton,
@@ -398,7 +421,9 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
-    g_assert (list != NULL);
+    if (!list)
+        return FALSE;
+
     added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
     if (!added) {
         mm_dbg ("Couldn't take part in SMS list: '%s'", error->message);
@@ -504,35 +529,14 @@ struct _DisablingContext {
     MmGdbusModemMessaging *skeleton;
 };
 
-static DisablingContext *
-disabling_context_new (MMIfaceModemMessaging *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    DisablingContext *ctx;
-
-    ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disabling_context_new);
-    ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -633,12 +637,31 @@ interface_disabling_step (DisablingContext *ctx)
 
 void
 mm_iface_modem_messaging_disable (MMIfaceModemMessaging *self,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
 {
-    interface_disabling_step (disabling_context_new (self,
-                                                     callback,
-                                                     user_data));
+    DisablingContext *ctx;
+
+    ctx = g_new0 (DisablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_messaging_disable);
+    ctx->step = DISABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_disabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -665,30 +688,6 @@ struct _EnablingContext {
     guint mem1_storage_index;
 };
 
-static EnablingContext *
-enabling_context_new (MMIfaceModemMessaging *self,
-                      GCancellable *cancellable,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    EnablingContext *ctx;
-
-    ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_context_new);
-    ctx->step = ENABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 enabling_context_complete_and_free (EnablingContext *ctx)
 {
@@ -696,7 +695,8 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -722,28 +722,24 @@ mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-#undef VOID_REPLY_READY_FN
-#define VOID_REPLY_READY_FN(NAME)                                       \
-    static void                                                         \
-    NAME##_ready (MMIfaceModemMessaging *self,                          \
-                  GAsyncResult *res,                                    \
-                  EnablingContext *ctx)                                 \
-    {                                                                   \
-        GError *error = NULL;                                           \
-                                                                        \
-        MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
-        if (error) {                                                    \
-            g_simple_async_result_take_error (ctx->result, error);      \
-            enabling_context_complete_and_free (ctx);                   \
-            return;                                                     \
-        }                                                               \
-                                                                        \
-        /* Go on to next step */                                        \
-        ctx->step++;                                                    \
-        interface_enabling_step (ctx);                                  \
+static void
+setup_sms_format_ready (MMIfaceModemMessaging *self,
+                        GAsyncResult *res,
+                        EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
     }
 
-VOID_REPLY_READY_FN (setup_sms_format)
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
 
 static void load_initial_sms_parts_from_storages (EnablingContext *ctx);
 
@@ -820,7 +816,24 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
     return;
 }
 
-VOID_REPLY_READY_FN (setup_unsolicited_events)
+static void
+setup_unsolicited_events_ready (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
 
 static void
 enable_unsolicited_events_ready (MMIfaceModemMessaging *self,
@@ -989,10 +1002,29 @@ mm_iface_modem_messaging_enable (MMIfaceModemMessaging *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    interface_enabling_step (enabling_context_new (self,
-                                                   cancellable,
-                                                   callback,
-                                                   user_data));
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_messaging_enable);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_enabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -1015,29 +1047,6 @@ struct _InitializationContext {
     GSimpleAsyncResult *result;
     InitializationStep step;
 };
-
-static InitializationContext *
-initialization_context_new (MMIfaceModemMessaging *self,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    InitializationContext *ctx;
-
-    ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_context_new);
-    ctx->step = INITIALIZATION_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
 
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
@@ -1269,9 +1278,6 @@ mm_iface_modem_messaging_initialize_finish (MMIfaceModemMessaging *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM_MESSAGING (self), FALSE);
-    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
-
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -1281,9 +1287,8 @@ mm_iface_modem_messaging_initialize (MMIfaceModemMessaging *self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
+    InitializationContext *ctx;
     MmGdbusModemMessaging *skeleton = NULL;
-
-    g_return_if_fail (MM_IS_IFACE_MODEM_MESSAGING (self));
 
     /* Did we already create it? */
     g_object_get (self,
@@ -1304,18 +1309,23 @@ mm_iface_modem_messaging_initialize (MMIfaceModemMessaging *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization_step (initialization_context_new (self,
-                                                               cancellable,
-                                                               callback,
-                                                               user_data));
-    g_object_unref (skeleton);
+
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_messaging_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void
 mm_iface_modem_messaging_shutdown (MMIfaceModemMessaging *self)
 {
-    g_return_if_fail (MM_IS_IFACE_MODEM_MESSAGING (self));
-
     /* Unexport DBus interface and remove the skeleton */
     mm_gdbus_object_skeleton_set_modem_messaging (MM_GDBUS_OBJECT_SKELETON (self), NULL);
     g_object_set (self,

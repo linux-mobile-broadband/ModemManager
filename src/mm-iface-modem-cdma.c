@@ -45,6 +45,8 @@ mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
     g_object_get (self,
                   MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return;
 
     g_object_bind_property (skeleton, "cdma1x-registration-state",
                             status, MM_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
@@ -1189,35 +1191,14 @@ struct _DisablingContext {
     MmGdbusModemCdma *skeleton;
 };
 
-static DisablingContext *
-disabling_context_new (MMIfaceModemCdma *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    DisablingContext *ctx;
-
-    ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disabling_context_new);
-    ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -1317,9 +1298,28 @@ mm_iface_modem_cdma_disable (MMIfaceModemCdma *self,
                              GAsyncReadyCallback callback,
                              gpointer user_data)
 {
-    interface_disabling_step (disabling_context_new (self,
-                                                     callback,
-                                                     user_data));
+    DisablingContext *ctx;
+
+    ctx = g_new0 (DisablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_cdma_disable);
+    ctx->step = DISABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_disabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -1344,30 +1344,6 @@ struct _EnablingContext {
     MmGdbusModemCdma *skeleton;
 };
 
-static EnablingContext *
-enabling_context_new (MMIfaceModemCdma *self,
-                      GCancellable *cancellable,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    EnablingContext *ctx;
-
-    ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_context_new);
-    ctx->step = ENABLING_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-
-    return ctx;
-}
-
 static void
 enabling_context_complete_and_free (EnablingContext *ctx)
 {
@@ -1375,7 +1351,8 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->skeleton);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
     g_free (ctx);
 }
 
@@ -1520,10 +1497,29 @@ mm_iface_modem_cdma_enable (MMIfaceModemCdma *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    interface_enabling_step (enabling_context_new (self,
-                                                   cancellable,
-                                                   callback,
-                                                   user_data));
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_cdma_enable);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    if (!ctx->skeleton) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get interface skeleton");
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    interface_enabling_step (ctx);
 }
 
 /*****************************************************************************/
@@ -1545,29 +1541,6 @@ struct _InitializationContext {
     GSimpleAsyncResult *result;
     InitializationStep step;
 };
-
-static InitializationContext *
-initialization_context_new (MMIfaceModemCdma *self,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    InitializationContext *ctx;
-
-    ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_context_new);
-    ctx->step = INITIALIZATION_STEP_FIRST;
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
 
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
@@ -1695,9 +1668,6 @@ mm_iface_modem_cdma_initialize_finish (MMIfaceModemCdma *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM_CDMA (self), FALSE);
-    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
-
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -1707,9 +1677,8 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
+    InitializationContext *ctx;
     MmGdbusModemCdma *skeleton = NULL;
-
-    g_return_if_fail (MM_IS_IFACE_MODEM_CDMA (self));
 
     /* Did we already create it? */
     g_object_get (self,
@@ -1738,18 +1707,23 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization_step (initialization_context_new (self,
-                                                               cancellable,
-                                                               callback,
-                                                               user_data));
-    g_object_unref (skeleton);
+
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_cdma_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void
 mm_iface_modem_cdma_shutdown (MMIfaceModemCdma *self)
 {
-    g_return_if_fail (MM_IS_IFACE_MODEM_CDMA (self));
-
     /* Remove RegistrationCheckContext object to make sure any pending
      * invocation of periodic_registration_check is cancelled before the
      * DBus skeleton is removed. */
