@@ -1175,6 +1175,17 @@ modem_load_unlock_required (MMIfaceModem *self,
                                         user_data,
                                         modem_load_unlock_required);
 
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping unlock check in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
+                                                   NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
     mm_dbg ("loading unlock required...");
     qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (client),
                                        NULL,
