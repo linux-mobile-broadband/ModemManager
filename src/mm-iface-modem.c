@@ -199,7 +199,7 @@ create_bearer_ready (MMIfaceModem *self,
                       "notify::"  MM_BEARER_STATUS,
                       (GCallback)bearer_status_changed,
                       self);
-    g_simple_async_result_set_op_res_gpointer (ctx->result, g_object_ref (bearer), g_object_unref);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
     create_bearer_context_complete_and_free (ctx);
 }
 
