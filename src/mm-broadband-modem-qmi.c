@@ -1396,6 +1396,8 @@ modem_load_current_bands_finish (MMIfaceModem *self,
                                        G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+#if defined WITH_NEWEST_QMI_COMMANDS
+
 static void
 nas_get_rf_band_information_ready (QmiClientNas *client,
                                    GAsyncResult *res,
@@ -1439,6 +1441,67 @@ nas_get_rf_band_information_ready (QmiClientNas *client,
     g_object_unref (simple);
 }
 
+#endif /* WITH_NEWEST_QMI_COMMANDS */
+
+static void
+load_bands_get_system_selection_preference_ready (QmiClientNas *client,
+                                                  GAsyncResult *res,
+                                                  GSimpleAsyncResult *simple)
+{
+    QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't get system selection preference: %s", error->message);
+        g_error_free (error);
+    } else {
+        GArray *mm_bands;
+        QmiNasBandPreference band_preference_mask = 0;
+        QmiNasLteBandPreference lte_band_preference_mask = 0;
+
+        qmi_message_nas_get_system_selection_preference_output_get_band_preference (
+            output,
+            &band_preference_mask,
+            NULL);
+
+        qmi_message_nas_get_system_selection_preference_output_get_lte_band_preference (
+            output,
+            &lte_band_preference_mask,
+            NULL);
+
+        mm_bands = mm_modem_bands_from_qmi_band_preference (band_preference_mask,
+                                                            lte_band_preference_mask);
+
+        if (mm_bands->len == 0) {
+            g_array_unref (mm_bands);
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't parse the list of current bands");
+        } else {
+            gchar *str;
+
+            str = qmi_nas_band_preference_build_string_from_mask (band_preference_mask);
+            mm_dbg ("Bands reported in system selection preference: '%s'", str);
+            g_free (str);
+
+            g_simple_async_result_set_op_res_gpointer (simple,
+                                                       mm_bands,
+                                                       (GDestroyNotify)g_array_unref);
+        }
+    }
+
+    if (output)
+        qmi_message_nas_get_system_selection_preference_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
 static void
 modem_load_current_bands (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
@@ -1458,12 +1521,27 @@ modem_load_current_bands (MMIfaceModem *self,
                                         modem_load_current_bands);
 
     mm_dbg ("loading current bands...");
-    qmi_client_nas_get_rf_band_information (QMI_CLIENT_NAS (client),
-                                            NULL,
-                                            5,
-                                            NULL,
-                                            (GAsyncReadyCallback)nas_get_rf_band_information_ready,
-                                            result);
+
+#if defined WITH_NEWEST_QMI_COMMANDS
+    /* Introduced in NAS 1.19 */
+    if (qmi_client_check_version (ctx->client, 1, 19)) {
+        qmi_client_nas_get_rf_band_information (QMI_CLIENT_NAS (client),
+                                                NULL,
+                                                5,
+                                                NULL,
+                                                (GAsyncReadyCallback)nas_get_rf_band_information_ready,
+                                                result);
+        return;
+    }
+#endif
+
+    qmi_client_nas_get_system_selection_preference (
+        QMI_CLIENT_NAS (client),
+        NULL, /* no input */
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_bands_get_system_selection_preference_ready,
+        result);
 }
 
 /*****************************************************************************/
