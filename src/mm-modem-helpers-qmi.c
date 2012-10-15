@@ -465,11 +465,6 @@ mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
     *qmi_bands = 0;
     *qmi_lte_bands = 0;
 
-    /* Handle ANY separately */
-    if (mm_bands->len == 1 &&
-        g_array_index (mm_bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
-        return;
-
     for (i = 0; i < mm_bands->len; i++) {
         MMModemBand band;
 

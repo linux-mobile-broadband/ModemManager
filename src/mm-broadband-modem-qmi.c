@@ -65,6 +65,9 @@ struct _MMBroadbandModemQmiPrivate {
     gchar *meid;
     gchar *esn;
 
+    /* Cached supported frequency bands; in order to handle ANY */
+    GArray *supported_bands;
+
     /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
     gboolean unsolicited_events_enabled;
     gboolean unsolicited_events_setup;
@@ -1292,15 +1295,23 @@ modem_load_unlock_retries (MMIfaceModem *self,
 /* Load supported bands (Modem interface) */
 
 static GArray *
-modem_load_supported_bands_finish (MMIfaceModem *self,
+modem_load_supported_bands_finish (MMIfaceModem *_self,
                                    GAsyncResult *res,
                                    GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    if (self->priv->supported_bands)
+        g_array_unref (self->priv->supported_bands);
+
+    /* Cache the supported bands value */
+    self->priv->supported_bands = g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                                   G_SIMPLE_ASYNC_RESULT (res)));
+
+    return g_array_ref (self->priv->supported_bands);
 }
 
 static void
@@ -1583,11 +1594,12 @@ bands_set_system_selection_preference_ready (QmiClientNas *client,
 }
 
 static void
-set_bands (MMIfaceModem *self,
+set_bands (MMIfaceModem *_self,
            GArray *bands_array,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
     GSimpleAsyncResult *result;
     QmiClient *client = NULL;
@@ -1604,12 +1616,30 @@ set_bands (MMIfaceModem *self,
                                         user_data,
                                         set_bands);
 
+    /* Handle ANY separately */
+    if (bands_array->len == 1 &&
+        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        if (!self->priv->supported_bands) {
+            g_simple_async_result_set_error (result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Cannot handle 'ANY' if supported bands are unknown");
+            g_simple_async_result_complete_in_idle (result);
+            g_object_unref (result);
+            return;
+        }
+
+        mm_modem_bands_to_qmi_band_preference (self->priv->supported_bands,
+                                               &qmi_bands,
+                                               &qmi_lte_bands);
+    } else
+        mm_modem_bands_to_qmi_band_preference (bands_array,
+                                               &qmi_bands,
+                                               &qmi_lte_bands);
+
     input = qmi_message_nas_set_system_selection_preference_input_new ();
-
-    mm_modem_bands_to_qmi_band_preference (bands_array, &qmi_bands, &qmi_lte_bands);
-
     qmi_message_nas_set_system_selection_preference_input_set_band_preference (input, qmi_bands, NULL);
-    if (mm_iface_modem_is_3gpp_lte (self))
+    if (mm_iface_modem_is_3gpp_lte (_self))
         qmi_message_nas_set_system_selection_preference_input_set_lte_band_preference (input, qmi_lte_bands, NULL);
 
     qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
@@ -7195,6 +7225,8 @@ finalize (GObject *object)
     g_free (self->priv->esn);
     g_free (self->priv->current_operator_id);
     g_free (self->priv->current_operator_description);
+    if (self->priv->supported_bands)
+        g_array_unref (self->priv->supported_bands);
 
     G_OBJECT_CLASS (mm_broadband_modem_qmi_parent_class)->finalize (object);
 }
