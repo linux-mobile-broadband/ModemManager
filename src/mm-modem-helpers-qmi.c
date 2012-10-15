@@ -106,9 +106,9 @@ mm_3gpp_facility_to_qmi_uim_facility (MMModem3gppFacility mm)
 typedef struct {
     QmiDmsBandCapability qmi_band;
     MMModemBand mm_band;
-} BandsMap;
+} DmsBandsMap;
 
-static const BandsMap bands_map [] = {
+static const DmsBandsMap dms_bands_map [] = {
     /* CDMA bands */
     {
         (QMI_DMS_BAND_CAPABILITY_BC_0_A_SYSTEM | QMI_DMS_BAND_CAPABILITY_BC_0_B_SYSTEM),
@@ -166,8 +166,8 @@ static const BandsMap bands_map [] = {
 };
 
 static void
-add_qmi_bands (GArray *mm_bands,
-               QmiDmsBandCapability qmi_bands)
+dms_add_qmi_bands (GArray *mm_bands,
+                   QmiDmsBandCapability qmi_bands)
 {
     static QmiDmsBandCapability qmi_bands_expected = 0;
     QmiDmsBandCapability not_expected;
@@ -177,8 +177,8 @@ add_qmi_bands (GArray *mm_bands,
 
     /* Build mask of expected bands only once */
     if (G_UNLIKELY (qmi_bands_expected == 0)) {
-        for (i = 0; i < G_N_ELEMENTS (bands_map); i++) {
-            qmi_bands_expected |= bands_map[i].qmi_band;
+        for (i = 0; i < G_N_ELEMENTS (dms_bands_map); i++) {
+            qmi_bands_expected |= dms_bands_map[i].qmi_band;
         }
     }
 
@@ -193,18 +193,18 @@ add_qmi_bands (GArray *mm_bands,
     }
 
     /* And add the expected ones */
-    for (i = 0; i < G_N_ELEMENTS (bands_map); i++) {
-        if (qmi_bands & bands_map[i].qmi_band)
-            g_array_append_val (mm_bands, bands_map[i].mm_band);
+    for (i = 0; i < G_N_ELEMENTS (dms_bands_map); i++) {
+        if (qmi_bands & dms_bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, dms_bands_map[i].mm_band);
     }
 }
 
 typedef struct {
     QmiDmsLteBandCapability qmi_band;
     MMModemBand mm_band;
-} LteBandsMap;
+} DmsLteBandsMap;
 
-static const LteBandsMap lte_bands_map [] = {
+static const DmsLteBandsMap dms_lte_bands_map [] = {
     { QMI_DMS_LTE_BAND_CAPABILITY_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_I       },
     { QMI_DMS_LTE_BAND_CAPABILITY_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_II      },
     { QMI_DMS_LTE_BAND_CAPABILITY_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_III     },
@@ -247,8 +247,8 @@ static const LteBandsMap lte_bands_map [] = {
 };
 
 static void
-add_qmi_lte_bands (GArray *mm_bands,
-                   QmiDmsLteBandCapability qmi_bands)
+dms_add_qmi_lte_bands (GArray *mm_bands,
+                       QmiDmsLteBandCapability qmi_bands)
 {
     /* All QMI LTE bands have a counterpart in ModemManager, no need to check
      * for unexpected ones */
@@ -256,9 +256,9 @@ add_qmi_lte_bands (GArray *mm_bands,
 
     g_assert (mm_bands != NULL);
 
-    for (i = 0; i < G_N_ELEMENTS (lte_bands_map); i++) {
-        if (qmi_bands & lte_bands_map[i].qmi_band)
-            g_array_append_val (mm_bands, lte_bands_map[i].mm_band);
+    for (i = 0; i < G_N_ELEMENTS (dms_lte_bands_map); i++) {
+        if (qmi_bands & dms_lte_bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, dms_lte_bands_map[i].mm_band);
     }
 }
 
@@ -269,8 +269,180 @@ mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,
     GArray *mm_bands;
 
     mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
-    add_qmi_bands (mm_bands, qmi_bands);
-    add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+    dms_add_qmi_bands (mm_bands, qmi_bands);
+    dms_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+
+    return mm_bands;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    QmiNasBandPreference qmi_band;
+    MMModemBand mm_band;
+} NasBandsMap;
+
+static const NasBandsMap nas_bands_map [] = {
+    /* CDMA bands */
+    {
+        (QMI_NAS_BAND_PREFERENCE_BC_0_A_SYSTEM | QMI_NAS_BAND_PREFERENCE_BC_0_B_SYSTEM),
+        MM_MODEM_BAND_CDMA_BC0_CELLULAR_800
+    },
+    { QMI_NAS_BAND_PREFERENCE_BC_1_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC1_PCS_1900       },
+    { QMI_NAS_BAND_PREFERENCE_BC_2,            MM_MODEM_BAND_CDMA_BC2_TACS           },
+    { QMI_NAS_BAND_PREFERENCE_BC_3_A_SYSTEM,   MM_MODEM_BAND_CDMA_BC3_JTACS          },
+    { QMI_NAS_BAND_PREFERENCE_BC_4_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS     },
+    { QMI_NAS_BAND_PREFERENCE_BC_5_ALL_BLOCKS, MM_MODEM_BAND_CDMA_BC5_NMT450         },
+    { QMI_NAS_BAND_PREFERENCE_BC_6,            MM_MODEM_BAND_CDMA_BC6_IMT2000        },
+    { QMI_NAS_BAND_PREFERENCE_BC_7,            MM_MODEM_BAND_CDMA_BC7_CELLULAR_700   },
+    { QMI_NAS_BAND_PREFERENCE_BC_8,            MM_MODEM_BAND_CDMA_BC8_1800           },
+    { QMI_NAS_BAND_PREFERENCE_BC_9,            MM_MODEM_BAND_CDMA_BC9_900            },
+    { QMI_NAS_BAND_PREFERENCE_BC_10,           MM_MODEM_BAND_CDMA_BC10_SECONDARY_800 },
+    { QMI_NAS_BAND_PREFERENCE_BC_11,           MM_MODEM_BAND_CDMA_BC11_PAMR_400      },
+    { QMI_NAS_BAND_PREFERENCE_BC_12,           MM_MODEM_BAND_CDMA_BC12_PAMR_800      },
+    { QMI_NAS_BAND_PREFERENCE_BC_14,           MM_MODEM_BAND_CDMA_BC14_PCS2_1900     },
+    { QMI_NAS_BAND_PREFERENCE_BC_15,           MM_MODEM_BAND_CDMA_BC15_AWS           },
+    { QMI_NAS_BAND_PREFERENCE_BC_16,           MM_MODEM_BAND_CDMA_BC16_US_2500       },
+    { QMI_NAS_BAND_PREFERENCE_BC_17,           MM_MODEM_BAND_CDMA_BC17_US_FLO_2500   },
+    { QMI_NAS_BAND_PREFERENCE_BC_18,           MM_MODEM_BAND_CDMA_BC18_US_PS_700     },
+    { QMI_NAS_BAND_PREFERENCE_BC_19,           MM_MODEM_BAND_CDMA_BC19_US_LOWER_700  },
+
+    /* GSM bands */
+    { QMI_NAS_BAND_PREFERENCE_GSM_DCS_1800,     MM_MODEM_BAND_DCS  },
+    { QMI_NAS_BAND_PREFERENCE_GSM_900_EXTENDED, MM_MODEM_BAND_EGSM },
+    { QMI_NAS_BAND_PREFERENCE_GSM_PCS_1900,     MM_MODEM_BAND_PCS  },
+    { QMI_NAS_BAND_PREFERENCE_GSM_850,          MM_MODEM_BAND_G850 },
+
+    /* UMTS/WCDMA bands */
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_2100,       MM_MODEM_BAND_U2100 },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_DCS_1800,   MM_MODEM_BAND_U1800 },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_1700_US,    MM_MODEM_BAND_U17IV },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_800,        MM_MODEM_BAND_U800  },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_850_US,     MM_MODEM_BAND_U850  },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_900,        MM_MODEM_BAND_U900  },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_1700_JAPAN, MM_MODEM_BAND_U17IX },
+    { QMI_NAS_BAND_PREFERENCE_WCDMA_2600,       MM_MODEM_BAND_U2600 }
+
+    /* NOTE. The following bands were unmatched:
+     *
+     * - QMI_NAS_BAND_PREFERENCE_GSM_900_PRIMARY
+     * - QMI_NAS_BAND_PREFERENCE_GSM_450
+     * - QMI_NAS_BAND_PREFERENCE_GSM_480
+     * - QMI_NAS_BAND_PREFERENCE_GSM_750
+     * - QMI_NAS_BAND_PREFERENCE_GSM_900_RAILWAILS
+     * - QMI_NAS_BAND_PREFERENCE_WCDMA_1500
+     * - QMI_NAS_BAND_PREFERENCE_WCDMA_850_JAPAN
+     * - MM_MODEM_BAND_CDMA_BC13_IMT2000_2500
+     * - MM_MODEM_BAND_U1900
+     */
+};
+
+static void
+nas_add_qmi_bands (GArray *mm_bands,
+                   QmiNasBandPreference qmi_bands)
+{
+    static QmiNasBandPreference qmi_bands_expected = 0;
+    QmiNasBandPreference not_expected;
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    /* Build mask of expected bands only once */
+    if (G_UNLIKELY (qmi_bands_expected == 0)) {
+        for (i = 0; i < G_N_ELEMENTS (nas_bands_map); i++) {
+            qmi_bands_expected |= nas_bands_map[i].qmi_band;
+        }
+    }
+
+    /* Log about the bands that cannot be represented in ModemManager */
+    not_expected = ((qmi_bands_expected ^ qmi_bands) & qmi_bands);
+    if (not_expected) {
+        gchar *aux;
+
+        aux = qmi_nas_band_preference_build_string_from_mask (not_expected);
+        mm_dbg ("Cannot add the following bands: '%s'", aux);
+        g_free (aux);
+    }
+
+    /* And add the expected ones */
+    for (i = 0; i < G_N_ELEMENTS (nas_bands_map); i++) {
+        if (qmi_bands & nas_bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, nas_bands_map[i].mm_band);
+    }
+}
+
+typedef struct {
+    QmiNasLteBandPreference qmi_band;
+    MMModemBand mm_band;
+} NasLteBandsMap;
+
+static const NasLteBandsMap nas_lte_bands_map [] = {
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_I       },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_II      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_III     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_IV      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_5,  MM_MODEM_BAND_EUTRAN_V       },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_6,  MM_MODEM_BAND_EUTRAN_VI      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_7,  MM_MODEM_BAND_EUTRAN_VII     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_8,  MM_MODEM_BAND_EUTRAN_VIII    },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_9,  MM_MODEM_BAND_EUTRAN_IX      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_10, MM_MODEM_BAND_EUTRAN_X       },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_11, MM_MODEM_BAND_EUTRAN_XI      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_12, MM_MODEM_BAND_EUTRAN_XII     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_13, MM_MODEM_BAND_EUTRAN_XIII    },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_14, MM_MODEM_BAND_EUTRAN_XIV     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_17, MM_MODEM_BAND_EUTRAN_XVII    },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_18, MM_MODEM_BAND_EUTRAN_XVIII   },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_19, MM_MODEM_BAND_EUTRAN_XIX     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_20, MM_MODEM_BAND_EUTRAN_XX      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_21, MM_MODEM_BAND_EUTRAN_XXI     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_24, MM_MODEM_BAND_EUTRAN_XXIV    },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_25, MM_MODEM_BAND_EUTRAN_XXV     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_33, MM_MODEM_BAND_EUTRAN_XXXIII  },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_34, MM_MODEM_BAND_EUTRAN_XXXIV   },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_35, MM_MODEM_BAND_EUTRAN_XXXV    },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_36, MM_MODEM_BAND_EUTRAN_XXXVI   },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_37, MM_MODEM_BAND_EUTRAN_XXXVII  },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_38, MM_MODEM_BAND_EUTRAN_XXXVIII },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_39, MM_MODEM_BAND_EUTRAN_XXXIX   },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_40, MM_MODEM_BAND_EUTRAN_XL      },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_41, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_42, MM_MODEM_BAND_EUTRAN_XLI     },
+    { QMI_NAS_LTE_BAND_PREFERENCE_EUTRAN_43, MM_MODEM_BAND_EUTRAN_XLIII   }
+
+    /* NOTE. The following bands were unmatched:
+     *
+     * - MM_MODEM_BAND_EUTRAN_XXII
+     * - MM_MODEM_BAND_EUTRAN_XXIII
+     * - MM_MODEM_BAND_EUTRAN_XXVI
+     */
+};
+
+static void
+nas_add_qmi_lte_bands (GArray *mm_bands,
+                       QmiNasLteBandPreference qmi_bands)
+{
+    /* All QMI LTE bands have a counterpart in ModemManager, no need to check
+     * for unexpected ones */
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    for (i = 0; i < G_N_ELEMENTS (nas_lte_bands_map); i++) {
+        if (qmi_bands & nas_lte_bands_map[i].qmi_band)
+            g_array_append_val (mm_bands, nas_lte_bands_map[i].mm_band);
+    }
+}
+
+GArray *
+mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
+                                         QmiNasLteBandPreference qmi_lte_bands)
+{
+    GArray *mm_bands;
+
+    mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+    nas_add_qmi_bands (mm_bands, qmi_bands);
+    nas_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
 
     return mm_bands;
 }
