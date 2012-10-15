@@ -1545,6 +1545,86 @@ modem_load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Set bands (Modem interface) */
+
+static gboolean
+set_bands_finish (MMIfaceModem *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+bands_set_system_selection_preference_ready (QmiClientNas *client,
+                                             GAsyncResult *res,
+                                             GSimpleAsyncResult *simple)
+{
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set system selection preference: ");
+        g_simple_async_result_take_error (simple, error);
+
+    } else
+        /* Good! TODO: do we really need to wait for the indication? */
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (output)
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+set_bands (MMIfaceModem *self,
+           GArray *bands_array,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    QmiNasBandPreference qmi_bands = 0;
+    QmiNasLteBandPreference qmi_lte_bands = 0;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_bands);
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+
+    mm_modem_bands_to_qmi_band_preference (bands_array, &qmi_bands, &qmi_lte_bands);
+
+    qmi_message_nas_set_system_selection_preference_input_set_band_preference (input, qmi_bands, NULL);
+    if (mm_iface_modem_is_3gpp_lte (self))
+        qmi_message_nas_set_system_selection_preference_input_set_lte_band_preference (input, qmi_lte_bands, NULL);
+
+    qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
+
+    qmi_client_nas_set_system_selection_preference (
+        QMI_CLIENT_NAS (client),
+        input,
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)bands_set_system_selection_preference_ready,
+        result);
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
 static MMModemMode
@@ -7158,8 +7238,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_supported_bands = modem_load_supported_bands;
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
-    iface->load_current_bands = modem_load_current_bands;
-    iface->load_current_bands_finish = modem_load_current_bands_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
 
@@ -7184,6 +7262,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
+    iface->load_current_bands = modem_load_current_bands;
+    iface->load_current_bands_finish = modem_load_current_bands_finish;
+    iface->set_bands = set_bands;
+    iface->set_bands_finish = set_bands_finish;
 
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
