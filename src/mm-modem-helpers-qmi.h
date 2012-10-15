@@ -65,6 +65,9 @@ GArray *mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array);
 
 GArray *mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
                                                  QmiNasLteBandPreference qmi_lte_bands);
+void mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
+                                            QmiNasBandPreference *qmi_bands,
+                                            QmiNasLteBandPreference *qmi_lte_bands);
 
 MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_qmi_registration_state (QmiNasAttachState attach_state,
                                                                                            QmiNasRegistrationState registration_state,

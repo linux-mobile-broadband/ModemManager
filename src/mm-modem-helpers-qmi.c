@@ -447,6 +447,59 @@ mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
     return mm_bands;
 }
 
+void
+mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
+                                       QmiNasBandPreference *qmi_bands,
+                                       QmiNasLteBandPreference *qmi_lte_bands)
+{
+    guint i;
+
+    *qmi_bands = 0;
+    *qmi_lte_bands = 0;
+
+    /* Handle ANY separately */
+    if (mm_bands->len == 1 &&
+        g_array_index (mm_bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
+        return;
+
+    for (i = 0; i < mm_bands->len; i++) {
+        MMModemBand band;
+
+        band = g_array_index (mm_bands, MMModemBand, i);
+
+        if (band <= MM_MODEM_BAND_EUTRAN_XLIII &&
+            band >= MM_MODEM_BAND_EUTRAN_I) {
+            /* Add LTE band preference */
+            guint j;
+
+            for (j = 0; j < G_N_ELEMENTS (nas_lte_bands_map); j++) {
+                if (nas_lte_bands_map[j].mm_band == band) {
+                    *qmi_lte_bands |= nas_lte_bands_map[j].qmi_band;
+                    break;
+                }
+            }
+
+            if (j == G_N_ELEMENTS (nas_lte_bands_map))
+                mm_dbg ("Cannot add the following LTE band: '%s'",
+                        mm_modem_band_get_string (band));
+        } else {
+            /* Add non-LTE band preference */
+            guint j;
+
+            for (j = 0; j < G_N_ELEMENTS (nas_bands_map); j++) {
+                if (nas_bands_map[j].mm_band == band) {
+                    *qmi_bands |= nas_bands_map[j].qmi_band;
+                    break;
+                }
+            }
+
+            if (j == G_N_ELEMENTS (nas_bands_map))
+                mm_dbg ("Cannot add the following band: '%s'",
+                        mm_modem_band_get_string (band));
+        }
+    }
+}
+
 /*****************************************************************************/
 
 typedef struct {
