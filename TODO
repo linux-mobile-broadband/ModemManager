@@ -93,14 +93,6 @@ example to update the signal quality value or check registration status.
 
   ** Test cases for CIEV responses.
 
-  ** When a modem gets initialized for the first time it goes into DISABLED, but
-     it may really happen that the modem isn't really disabled (in low-power
-     mode, those which support it). Currently if you want to ensure that the
-     modem goes into low-power mode once detected, you need to enable the modem
-     and just after that disable it, so that the proper CFUN=0/4/7 is run. We
-     could probably run the disabling sequence, including power-off steps, as
-     soon as we end the initialization sequence.
-
   ** When a 3GPP modem is disabled, we run AT+CREG=0. That will just disable the
      automatic registration checks and unsolicited messages, the modem will
      still be registered in the network. AT+COPS=2 is the one doing manual
@@ -148,15 +140,6 @@ example to update the signal quality value or check registration status.
          QMI protocol error (5): 'client-ids-exhausted'
      This may force us to have something like a state file in /tmp with the IDs
      currently allocated, so that ModemManager can re-use them if needed.
-
-  ** QMI: A device may export multiple cdc-wdm interfaces, along with multiple
-     wwan interfaces. If this is the case, we should allow configuring multiple
-     bearers. Additional comments from Bjorn Mork:
-       "The code really should try to match the wwanX and cdc-wdmY devices by
-        USB interface and not by USB device.  If we ignore the unfortunate 3.4
-        and 3.5 kernels, then a matching wwanX and cdc-wdmY set will always
-        share the same parent USB interface on QMI devices. Having the same
-        parent USB device is *not* sufficient."
 
   ** QMI: in NAS >= 1.8 we don't have the operator name given in the
      registration status queries, we'll need to get it with "NAS Get PLMN Name".
