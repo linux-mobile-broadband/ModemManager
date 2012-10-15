@@ -21,7 +21,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-pantech.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-pantech.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
@@ -54,11 +54,11 @@ create_modem (MMPlugin *self,
     }
 #endif
 
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  drivers,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_pantech_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
 }
 
 static gboolean

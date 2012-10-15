@@ -250,7 +250,11 @@ udevrules_DATA += x22x/77-mm-x22x-port-types.rules
 # Pantech
 libmm_plugin_pantech_la_SOURCES = \
 	pantech/mm-plugin-pantech.c \
-	pantech/mm-plugin-pantech.h
+	pantech/mm-plugin-pantech.h \
+	pantech/mm-sim-pantech.c \
+	pantech/mm-sim-pantech.h \
+	pantech/mm-broadband-modem-pantech.c \
+	pantech/mm-broadband-modem-pantech.h
 libmm_plugin_pantech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_pantech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
