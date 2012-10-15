@@ -289,8 +289,11 @@ print_modem_info (void)
         drivers_string = NULL;
 
     /* Rework possible multiline strings */
-    prefixed_revision = mmcli_prefix_newlines ("           |                  ",
-                                               mm_modem_get_revision (ctx->modem));
+    if (mm_modem_get_revision (ctx->modem))
+        prefixed_revision = mmcli_prefix_newlines ("           |                  ",
+                                                   mm_modem_get_revision (ctx->modem));
+    else
+        prefixed_revision = NULL;
 
     /* Get signal quality info */
     signal_quality = mm_modem_get_signal_quality (ctx->modem, &signal_quality_recent);
