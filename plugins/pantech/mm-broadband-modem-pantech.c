@@ -22,6 +22,7 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
+#include "mm-iface-modem.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-broadband-modem-pantech.h"
@@ -56,6 +57,41 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return FALSE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    /* wait so sim pin is done */
+    g_timeout_add_seconds (5, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemPantech *
 mm_broadband_modem_pantech_new (const gchar *device,
@@ -84,6 +120,9 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create Pantech-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
 }
 
 static void
