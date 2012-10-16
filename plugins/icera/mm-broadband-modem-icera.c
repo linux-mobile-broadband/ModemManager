@@ -341,6 +341,8 @@ nwstate_to_act (const gchar *str)
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     else if (!strcmp (str, "3G-HSDPA-HSUPA") || !strcmp (str, "HSDPA-HSUPA"))
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    else if (!strcmp (str, "3G-HSDPA-HSUPA-HSPA+") || !strcmp (str, "HSDPA-HSUPA-HSPA+"))
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
 
     return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 }
