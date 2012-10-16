@@ -322,27 +322,27 @@ ipdpact_received (MMAtSerialPort *port,
 static MMModemAccessTechnology
 nwstate_to_act (const gchar *str)
 {
-    /* small 'g' means CS, big 'G' means PS */
-    if (!strcmp (str, "2g"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
-    else if (!strcmp (str, "2G-GPRS"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
-    else if (!strcmp (str, "2G-EDGE"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-    else if (!strcmp (str, "3G"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    else if (!strcmp (str, "3g"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    else if (!strcmp (str, "R99"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    else if (!strcmp (str, "3G-HSDPA") || !strcmp (str, "HSDPA"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
-    else if (!strcmp (str, "3G-HSUPA") || !strcmp (str, "HSUPA"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
-    else if (!strcmp (str, "3G-HSDPA-HSUPA") || !strcmp (str, "HSDPA-HSUPA"))
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    MMModemAccessTechnology technologies = 0;
 
-    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    /* small 'g' means CS, big 'G' means PS */
+    if (strstr (str, "2g") || strstr (str, "2G"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    if (strstr (str, "GPRS"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    if (strstr (str, "EDGE"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    if (strstr (str, "3g") || strstr (str, "3G") || strstr (str, "R99"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    if (strstr (str, "HSDPA-HSUPA") || strstr (str, "HSUPA-HSDPA"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    if (strstr (str, "HSDPA"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    if (strstr (str, "HSUPA"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    if (strstr (str, "HSPA+"))
+        technologies |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+
+    return technologies;
 }
 
 static void
