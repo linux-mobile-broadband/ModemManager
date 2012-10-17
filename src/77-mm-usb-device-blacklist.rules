@@ -68,5 +68,7 @@ ATTRS{idVendor}=="050d", ATTRS{idProduct}=="0103", ENV{ID_MM_DEVICE_IGNORE}="1"
 # ATEN Intl UC-232A (Prolific)
 ATTRS{idVendor}=="0557", ATTRS{idProduct}=="2008", ENV{ID_MM_DEVICE_IGNORE}="1"
 
-LABEL="mm_usb_device_blacklist_end"
+# GlobalScaleTechnologies SheevaPlug
+ATTRS{idVendor}=="9e88", ATTRS{idProduct}=="9e8f", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+LABEL="mm_usb_device_blacklist_end"
