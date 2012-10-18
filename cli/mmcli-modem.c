@@ -323,10 +323,12 @@ print_modem_info (void)
     g_print ("  -------------------------\n"
              "  System   |         device: '%s'\n"
              "           |        drivers: '%s'\n"
-             "           |         plugin: '%s'\n",
+             "           |         plugin: '%s'\n"
+             "           |   primary port: '%s'\n",
              VALIDATE_UNKNOWN (mm_modem_get_device (ctx->modem)),
              VALIDATE_UNKNOWN (drivers_string),
-             VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)));
+             VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)),
+             VALIDATE_UNKNOWN (mm_modem_get_primary_port (ctx->modem)));
 
     /* Numbers related stuff */
     g_print ("  -------------------------\n"

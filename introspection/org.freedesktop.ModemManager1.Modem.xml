@@ -297,6 +297,13 @@
     <property name="Plugin" type="s" access="read" />
 
     <!--
+        PrimaryPort:
+
+        The name of the primary port using to control the modem.
+    -->
+    <property name="PrimaryPort" type="s" access="read" />
+
+    <!--
         EquipmentIdentifier:
 
         The identity of the device.

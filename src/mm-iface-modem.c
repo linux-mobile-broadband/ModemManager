@@ -3328,6 +3328,21 @@ interface_initialization_step (InitializationContext *ctx)
             mm_gdbus_modem_set_plugin (ctx->skeleton, plugin);
             g_free (plugin);
         }
+        /* Load primary port if not done before */
+        if (!mm_gdbus_modem_get_primary_port (ctx->skeleton)) {
+            MMPort *primary;
+
+#if defined WITH_QMI
+            primary = MM_PORT (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (ctx->self)));
+            if (!primary)
+                primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)));
+#else
+            primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)));
+#endif
+
+            g_assert (primary != NULL);
+            mm_gdbus_modem_set_primary_port (ctx->skeleton, mm_port_get_device (primary));
+        }
         /* Fall down to next step */
         ctx->step++;
 

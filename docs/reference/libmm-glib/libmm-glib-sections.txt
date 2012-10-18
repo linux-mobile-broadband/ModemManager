@@ -89,6 +89,8 @@ mm_modem_get_drivers
 mm_modem_dup_drivers
 mm_modem_get_plugin
 mm_modem_dup_plugin
+mm_modem_get_primary_port
+mm_modem_dup_primary_port
 mm_modem_get_device
 mm_modem_dup_device
 mm_modem_get_equipment_identifier
@@ -1389,6 +1391,8 @@ mm_gdbus_modem_get_own_numbers
 mm_gdbus_modem_dup_own_numbers
 mm_gdbus_modem_get_plugin
 mm_gdbus_modem_dup_plugin
+mm_gdbus_modem_get_primary_port
+mm_gdbus_modem_dup_primary_port
 mm_gdbus_modem_get_preferred_mode
 mm_gdbus_modem_get_revision
 mm_gdbus_modem_dup_revision
@@ -1447,6 +1451,7 @@ mm_gdbus_modem_set_model
 mm_gdbus_modem_set_modem_capabilities
 mm_gdbus_modem_set_own_numbers
 mm_gdbus_modem_set_plugin
+mm_gdbus_modem_set_primary_port
 mm_gdbus_modem_set_preferred_mode
 mm_gdbus_modem_set_revision
 mm_gdbus_modem_set_signal_quality
