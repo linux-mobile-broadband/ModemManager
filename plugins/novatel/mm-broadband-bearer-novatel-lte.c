@@ -33,6 +33,7 @@
 #include "mm-modem-helpers.h"
 
 #define CONNECTION_CHECK_TIMEOUT_SEC 5
+#define QMISTATUS_TAG "$NWQMISTATUS:"
 
 G_DEFINE_TYPE (MMBroadbandBearerNovatelLte, mm_broadband_bearer_novatel_lte, MM_TYPE_BROADBAND_BEARER);
 
@@ -121,6 +122,22 @@ connect_3gpp_finish (MMBroadbandBearer *self,
 
 static gboolean connect_3gpp_qmistatus (DetailedConnectContext *ctx);
 
+static gboolean
+is_qmistatus_connected (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return g_strrstr (str, "QMI State: CONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_CONNECTED");
+}
+
+static gboolean
+is_qmistatus_disconnected (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return g_strrstr (str, "QMI State: DISCONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_DISCONNECTED");
+}
+
 static void
 poll_connection_ready (MMBaseModem *modem,
                        GAsyncResult *res,
@@ -136,8 +153,7 @@ poll_connection_ready (MMBaseModem *modem,
         return;
     }
 
-    result = mm_strip_tag (result, "$NWQMISTATUS:");
-    if (g_strrstr (result, "QMI State: DISCONNECTED")) {
+    if (is_qmistatus_disconnected (result)) {
         mm_bearer_report_disconnection (MM_BEARER (bearer));
         g_source_remove (bearer->priv->connection_poller);
         bearer->priv->connection_poller = 0;
@@ -182,8 +198,7 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         return;
     }
 
-    result = mm_strip_tag (result, "$NWQMISTATUS:");
-    if (g_strrstr (result, "QMI State: CONNECTED")) {
+    if (is_qmistatus_connected (result)) {
         MMBearerIpConfig *config;
 
         mm_dbg("Connected");
@@ -372,8 +387,7 @@ disconnect_3gpp_status_complete (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    result = mm_strip_tag (result, "$NWQMISTATUS:");
-    if (result && g_strrstr (result, "QMI State: DISCONNECTED"))
+    if (result && is_qmistatus_disconnected (result))
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     else
         g_simple_async_result_set_error (ctx->result,
