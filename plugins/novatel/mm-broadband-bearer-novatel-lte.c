@@ -193,12 +193,14 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                                               &error);
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
-        return;
-    }
-
-    if (is_qmistatus_connected (result)) {
+        if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
+            g_simple_async_result_take_error (ctx->result, error);
+            detailed_connect_context_complete_and_free (ctx);
+            return;
+        }
+        g_error_free (error);
+        result = "Unknown error";
+    } else if (is_qmistatus_connected (result)) {
         MMBearerIpConfig *config;
 
         mm_dbg("Connected");
