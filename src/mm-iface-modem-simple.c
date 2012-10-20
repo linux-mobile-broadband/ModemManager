@@ -599,16 +599,18 @@ connection_step (ConnectionContext *ctx)
             GArray *array;
             guint i;
 
-            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
-            for (i = 0; i < n_bands; i++)
-                g_array_insert_val (array, i, bands[i]);
+            if (bands && *bands) {
+                array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
+                for (i = 0; i < n_bands; i++)
+                    g_array_insert_val (array, i, bands[i]);
 
-            mm_iface_modem_set_bands (MM_IFACE_MODEM (ctx->self),
-                                      array,
-                                      (GAsyncReadyCallback)set_bands_ready,
-                                      ctx);
-            g_array_unref (array);
-            return;
+                mm_iface_modem_set_bands (MM_IFACE_MODEM (ctx->self),
+                                          array,
+                                          (GAsyncReadyCallback)set_bands_ready,
+                                          ctx);
+                g_array_unref (array);
+                return;
+            }
         }
 
         /* Fall down to next step */
