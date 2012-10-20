@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -73,6 +75,7 @@ typedef enum {
     CONNECT_STEP_WDS_CLIENT_IPV6,
     CONNECT_STEP_IP_FAMILY_IPV6,
     CONNECT_STEP_START_NETWORK_IPV6,
+    CONNECT_STEP_GET_CURRENT_SETTINGS,
     CONNECT_STEP_LAST
 } ConnectStep;
 
@@ -269,6 +272,184 @@ build_start_network_input (ConnectContext *ctx)
 }
 
 static void
+print_address4 (gboolean success, const char *tag, guint32 address, GError *error)
+{
+    struct in_addr a = { .s_addr = GUINT32_TO_BE (address) };
+    char buf[INET_ADDRSTRLEN + 1];
+
+    if (success) {
+        memset (buf, 0, sizeof (buf));
+        if (inet_ntop (AF_INET, &a, buf, sizeof (buf) - 1))
+            mm_dbg ("    %s: %s", tag, buf);
+        else
+            mm_dbg ("    %s: failed (address conversion error)", tag);
+        return;
+    }
+    mm_dbg ("    %s: failed (%s)", tag, error ? error->message : "unknown");
+}
+
+static void
+print_address6 (gboolean success,
+                const char *tag,
+                GArray *array,
+                guint32 prefix,
+                GError *error)
+{
+    struct in6_addr a;
+    char buf[INET6_ADDRSTRLEN + 1];
+    guint32 i;
+
+    if (success) {
+        g_assert (array);
+        g_assert (array->len == 8);
+
+        memset (buf, 0, sizeof (buf));
+        for (i = 0; i < array->len; i++)
+            a.s6_addr16[i] = GUINT16_TO_BE (g_array_index (array, guint16, i));
+
+        if (inet_ntop (AF_INET6, &a, buf, sizeof (buf) - 1))
+            mm_dbg ("    %s: %s/%d", tag, buf, prefix);
+        else
+            mm_dbg ("    %s: failed (address conversion error)", tag);
+
+        g_array_free (array, TRUE);
+        return;
+    }
+
+    mm_dbg ("    %s: failed (%s)", tag, error ? error->message : "unknown");
+}
+
+static void
+get_current_settings_ready (QmiClientWds *client,
+                            GAsyncResult *res,
+                            ConnectContext *ctx)
+{
+    GError *error = NULL;
+    QmiMessageWdsGetCurrentSettingsOutput *output;
+
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
+    output = qmi_client_wds_get_current_settings_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_wds_get_current_settings_output_get_result (output, &error)) {
+        /* Never treat this as a hard connection error; not all devices support
+         * "WDS Get Current Settings" */
+        mm_info ("error: couldn't get current settings: %s", error->message);
+        g_error_free (error);
+    } else {
+        gboolean success;
+        guint32 addr, mtu, i;
+        GArray *array;
+        guint8 prefix;
+
+        if (ctx->running_ipv4) {
+            mm_dbg ("QMI IPv4 Settings:");
+
+            /* IPv4 address */
+            success = qmi_message_wds_get_current_settings_output_get_ipv4_address (output, &addr, &error);
+            print_address4 (success, "Address", addr, error);
+            g_clear_error (&error);
+
+            /* IPv4 gateway address */
+            success = qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error);
+            print_address4 (success, "Gateway", addr, error);
+            g_clear_error (&error);
+
+            /* IPv4 subnet mask */
+            success = qmi_message_wds_get_current_settings_output_get_ipv4_gateway_subnet_mask (output, &addr, &error);
+            print_address4 (success, "Netmask", addr, error);
+            g_clear_error (&error);
+
+            /* IPv4 DNS #1 */
+            success = qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error);
+            print_address4 (success, " DNS #1", addr, error);
+            g_clear_error (&error);
+
+            /* IPv4 DNS #2 */
+            success = qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error);
+            print_address4 (success, " DNS #2", addr, error);
+            g_clear_error (&error);
+        } else {
+            mm_dbg ("QMI IPv6 Settings:");
+
+            /* IPv6 address */
+            success = qmi_message_wds_get_current_settings_output_get_ipv6_address (output, &array, &prefix, &error);
+            print_address6 (success, "Address", array, prefix, error);
+            g_clear_error (&error);
+
+            /* IPv6 gateway address */
+            success = qmi_message_wds_get_current_settings_output_get_ipv6_gateway_address (output, &array, &prefix, &error);
+            print_address6 (success, "Gateway", array, prefix, error);
+            g_clear_error (&error);
+
+            /* IPv6 DNS #1 */
+            success = qmi_message_wds_get_current_settings_output_get_ipv6_primary_dns_address (output, &array, &error);
+            print_address6 (success, " DNS #1", array, 0, error);
+            g_clear_error (&error);
+
+            /* IPv6 DNS #2 */
+            success = qmi_message_wds_get_current_settings_output_get_ipv6_secondary_dns_address (output, &array, &error);
+            print_address6 (success, " DNS #2", array, 0, error);
+            g_clear_error (&error);
+        }
+
+        /* Domain names */
+        if (qmi_message_wds_get_current_settings_output_get_domain_name_list (output, &array, &error)) {
+            GString *s = g_string_sized_new (array ? (array->len * 20) : 1);
+
+            for (i = 0; array && (i < array->len); i++) {
+                if (s->len)
+                    g_string_append (s, ", ");
+                g_string_append (s, g_array_index (array, const char *, i));
+            }
+            mm_dbg ("   Domains: %s", s->str);
+            g_string_free (s, TRUE);
+        } else {
+            mm_dbg ("   Domains: failed (%s)", error ? error->message : "unknown");
+            g_clear_error (&error);
+        }
+
+        if (qmi_message_wds_get_current_settings_output_get_mtu (output, &mtu, &error))
+            mm_dbg ("       MTU: %d", mtu);
+        else {
+            mm_dbg ("       MTU: failed (%s)", error ? error->message : "unknown");
+            g_clear_error (&error);
+        }
+    }
+
+    if (output)
+        qmi_message_wds_get_current_settings_output_unref (output);
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (ctx);
+}
+
+static QmiMessageWdsGetCurrentSettingsInput *
+build_get_current_settings_input (ConnectContext *ctx)
+{
+    QmiMessageWdsGetCurrentSettingsInput *input;
+    QmiWdsGetCurrentSettingsRequestedSettings requested = QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_NONE;
+
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
+    input = qmi_message_wds_get_current_settings_input_new ();
+
+    requested = QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_DNS_ADDRESS |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_GRANTED_QOS |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_IP_ADDRESS |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_GATEWAY_INFO |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_MTU |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_DOMAIN_NAME_LIST |
+                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_IP_FAMILY;
+
+    qmi_message_wds_get_current_settings_input_set_requested_settings (input, requested, NULL);
+    return input;
+}
+
+static void
 set_ip_family_ready (QmiClientWds *client,
                      GAsyncResult *res,
                      ConnectContext *ctx)
@@ -461,7 +642,7 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_IPV6:
         /* If no IPv6 setup needed, jump to last */
         if (!ctx->ipv6) {
-            ctx->step = CONNECT_STEP_LAST;
+            ctx->step = CONNECT_STEP_GET_CURRENT_SETTINGS;
             connect_context_step (ctx);
             return;
         }
@@ -536,6 +717,29 @@ connect_context_step (ConnectContext *ctx)
         return;
     }
 
+    case CONNECT_STEP_GET_CURRENT_SETTINGS: {
+        QmiMessageWdsGetCurrentSettingsInput *input;
+        QmiClientWds *client;
+
+        if (ctx->running_ipv4)
+            client = ctx->client_ipv4;
+        else if (ctx->running_ipv6)
+            client = ctx->client_ipv6;
+        else
+            g_assert_not_reached ();
+
+        mm_dbg ("Getting IP configuration...");
+        input = build_get_current_settings_input (ctx);
+        qmi_client_wds_get_current_settings (client,
+                                             input,
+                                             45,
+                                             ctx->cancellable,
+                                             (GAsyncReadyCallback)get_current_settings_ready,
+                                             ctx);
+        qmi_message_wds_get_current_settings_input_unref (input);
+        return;
+    }
+
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
         if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
@@ -602,10 +806,10 @@ connect_context_step (ConnectContext *ctx)
 }
 
 static void
-connect (MMBearer *self,
-         GCancellable *cancellable,
-         GAsyncReadyCallback callback,
-         gpointer user_data)
+_connect (MMBearer *self,
+          GCancellable *cancellable,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
 {
     MMBearerProperties *properties = NULL;
     ConnectContext *ctx;
@@ -1025,7 +1229,7 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     /* Virtual methods */
     object_class->dispose = dispose;
 
-    bearer_class->connect = connect;
+    bearer_class->connect = _connect;
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
