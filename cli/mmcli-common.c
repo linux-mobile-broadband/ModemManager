@@ -392,11 +392,23 @@ look_for_bearer_in_modem (GetBearerContext *ctx)
     /* Loop looking for the bearer in each modem found */
     ctx->current = MM_OBJECT (ctx->modems->data);
     ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
+
+    modem = mm_object_get_modem (ctx->current);
+
+    /* Don't look for bearers in modems which are not fully initialized */
+    if (mm_modem_get_state (modem) < MM_MODEM_STATE_DISABLED) {
+        g_debug ("Skipping modem '%s' when looking for bearers "
+                 "(not fully initialized)",
+                 mm_object_get_path (ctx->current));
+        g_object_unref (modem);
+        look_for_bearer_in_modem (ctx);
+        return;
+    }
+
     g_debug ("Looking for bearer '%s' in modem '%s'...",
              ctx->bearer_path,
              mm_object_get_path (ctx->current));
 
-    modem = mm_object_get_modem (ctx->current);
     mm_modem_list_bearers (modem,
                            ctx->cancellable,
                            (GAsyncReadyCallback)list_bearers_ready,
@@ -501,6 +513,16 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+
+        /* Don't look for bearers in modems which are not fully initialized */
+        if (mm_modem_get_state (modem) < MM_MODEM_STATE_DISABLED) {
+            g_debug ("Skipping modem '%s' when looking for bearers "
+                     "(not fully initialized)",
+                     mm_object_get_path (object));
+            g_object_unref (modem);
+            continue;
+        }
+
         bearers = mm_modem_list_bearers_sync (modem, NULL, &error);
         if (error) {
             g_printerr ("error: couldn't list bearers at '%s': '%s'\n",
