@@ -1526,8 +1526,20 @@ set_bands_ready (MMIfaceModem *self,
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands_finish (self, res, &error))
         g_simple_async_result_take_error (ctx->result, error);
     else {
-        mm_gdbus_modem_set_bands (ctx->skeleton,
-                                  mm_common_bands_garray_to_variant (ctx->bands_array));
+        /* Never show just 'any' in the interface */
+        if (ctx->bands_array->len == 1 &&
+            g_array_index (ctx->bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+            GArray *supported_bands;
+
+            supported_bands = (mm_common_bands_variant_to_garray (
+                                   mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
+            mm_gdbus_modem_set_bands (ctx->skeleton,
+                                      mm_common_bands_garray_to_variant (supported_bands));
+            g_array_unref (supported_bands);
+        } else
+            mm_gdbus_modem_set_bands (ctx->skeleton,
+                                      mm_common_bands_garray_to_variant (ctx->bands_array));
+
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     }
 
