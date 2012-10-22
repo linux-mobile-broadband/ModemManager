@@ -61,6 +61,9 @@ gchar *mm_create_device_identifier (guint vid,
 
 guint mm_netmask_to_cidr (const gchar *netmask);
 
+GArray *mm_filter_current_bands (const GArray *supported_bands,
+                                 const GArray *current_bands);
+
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/

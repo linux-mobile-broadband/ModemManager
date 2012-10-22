@@ -165,6 +165,56 @@ mm_netmask_to_cidr (const gchar *netmask)
 
 /*****************************************************************************/
 
+GArray *
+mm_filter_current_bands (const GArray *supported_bands,
+                         const GArray *current_bands)
+{
+    /* We will assure that the list given in 'current' bands maps the list
+     * given in 'supported' bands, unless 'UNKNOWN' or 'ANY' is given, of
+     * course */
+    guint i;
+    GArray *filtered;
+
+    if (!supported_bands ||
+        supported_bands->len == 0 ||
+        !current_bands ||
+        current_bands->len == 0)
+        return NULL;
+
+    if (supported_bands->len == 1 &&
+        (g_array_index (supported_bands, MMModemBand, 0) == MM_MODEM_BAND_UNKNOWN ||
+         g_array_index (supported_bands, MMModemBand, 0) == MM_MODEM_BAND_ANY))
+        return NULL;
+
+    if (current_bands->len == 1 &&
+        (g_array_index (current_bands, MMModemBand, 0) == MM_MODEM_BAND_UNKNOWN ||
+         g_array_index (current_bands, MMModemBand, 0) == MM_MODEM_BAND_ANY))
+        return NULL;
+
+    filtered = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), current_bands->len);
+
+    for (i = 0; i < current_bands->len; i++) {
+        guint j;
+
+        for (j = 0; j < supported_bands->len; j++) {
+            if (g_array_index (supported_bands, MMModemBand, j) == g_array_index (current_bands, MMModemBand, i)) {
+                g_array_append_val (filtered, g_array_index (current_bands, MMModemBand, i));
+                /* Found */
+                break;
+            }
+        }
+    }
+
+    if (filtered->len == 0) {
+        g_array_unref (filtered);
+        return NULL;
+    }
+
+    return filtered;
+}
+
+/*****************************************************************************/
+
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
 #define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
 

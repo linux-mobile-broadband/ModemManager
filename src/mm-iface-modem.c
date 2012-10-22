@@ -2757,15 +2757,25 @@ load_current_bands_ready (MMIfaceModem *self,
                           GAsyncResult *res,
                           EnablingContext *ctx)
 {
-    GArray *bands_array;
+    GArray *current_bands;
+    GArray *filtered_bands;
+    GArray *supported_bands;
     GError *error = NULL;
 
-    bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
+    current_bands = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
 
-    if (bands_array) {
+    supported_bands = (mm_common_bands_variant_to_garray (
+                           mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
+    filtered_bands = mm_filter_current_bands (supported_bands, current_bands);
+    if (current_bands)
+        g_array_unref (current_bands);
+    if (supported_bands)
+        g_array_unref (supported_bands);
+
+    if (filtered_bands) {
         mm_gdbus_modem_set_bands (ctx->skeleton,
-                                  mm_common_bands_garray_to_variant (bands_array));
-        g_array_unref (bands_array);
+                                  mm_common_bands_garray_to_variant (filtered_bands));
+        g_array_unref (filtered_bands);
     } else
         mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
 
