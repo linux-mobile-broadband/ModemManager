@@ -65,15 +65,17 @@ mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x0421, 0 };
+    static const gchar *vendor_strings[] = { "nokia", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOKIA,
-                      MM_PLUGIN_NAME,               "Nokia",
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
-                      MM_PLUGIN_ALLOWED_SINGLE_AT,  TRUE, /* only 1 AT port expected! */
-                      MM_PLUGIN_FORBIDDEN_ICERA,    TRUE, /* No Nokia/Icera modems */
+                      MM_PLUGIN_NAME,                   "Nokia",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
+                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
+                      MM_PLUGIN_CUSTOM_AT_PROBE,        custom_at_probe,
+                      MM_PLUGIN_ALLOWED_SINGLE_AT,      TRUE, /* only 1 AT port expected! */
+                      MM_PLUGIN_FORBIDDEN_ICERA,        TRUE, /* No Nokia/Icera modems */
                       NULL));
 }
 
