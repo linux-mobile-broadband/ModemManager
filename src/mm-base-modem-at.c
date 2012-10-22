@@ -176,7 +176,7 @@ at_sequence_parse_response (MMAtSerialPort *port,
             ctx->self,
             ctx->response_processor_context,
             ctx->current->command,
-            response->str,
+            response ? response->str : NULL,
             next->command ? FALSE : TRUE,  /* Last command in sequence? */
             error,
             &result,
