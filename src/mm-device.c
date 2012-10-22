@@ -435,8 +435,14 @@ modem_valid (MMBaseModem *modem,
         /* Modem no longer valid */
         mm_device_remove_modem (self);
     } else {
-        /* Modem now valid, export it */
-        export_modem (self);
+        /* Modem now valid, export it, but only if we really have it around.
+         * It may happen that the initialization sequence fails because the
+         * modem gets disconnected, and in that case we don't really need
+         * to export it */
+        if (self->priv->modem)
+            export_modem (self);
+        else
+            mm_dbg ("Not exporting modem; no longer available");
     }
 }
 
