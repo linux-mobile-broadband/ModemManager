@@ -187,27 +187,42 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
     case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
     case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
     case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
-        mm_dbg ("Bearer not allowed to connect, not registered");
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
-        mm_dbg ("Bearer allowed to connect, registered in home network");
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
-            mm_dbg ("Bearer allowed to connect, registered in roaming network");
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self))))
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
-        } else {
-            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
+        else
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
-        }
         break;
     }
 
     /* close connection if some reason found */
-    if (self->priv->reason_3gpp != CONNECTION_FORBIDDEN_REASON_NONE)
-        mm_bearer_disconnect_force (MM_BEARER (self));
+
+    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE)
+        return;
+
+    /* For mixed CDMA+LTE modems, don't close the connection if there is no
+     * CDMA reason to do so. */
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) &&
+        self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE)
+        return;
+
+    switch (self->priv->reason_3gpp) {
+    case CONNECTION_FORBIDDEN_REASON_UNREGISTERED:
+        mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
+        break;
+    case CONNECTION_FORBIDDEN_REASON_ROAMING:
+        mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
+        break;
+    default:
+        break;
+    }
+
+    mm_bearer_disconnect_force (MM_BEARER (self));
 }
 
 static void
@@ -225,25 +240,40 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 
     if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
         evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
-            mm_dbg ("Bearer allowed to connect, registered in roaming network");
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self))))
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
-        } else {
-            mm_dbg ("Bearer not allowed to connect, registered in roaming network");
+        else
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_ROAMING;
-        }
     } else if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN ||
                evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN) {
-        mm_dbg ("Bearer allowed to connect, registered in home network");
         self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
     } else {
-        mm_dbg ("Bearer not allowed to connect, not registered");
         self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
     }
 
     /* close connection if some reason found */
-    if (self->priv->reason_cdma != CONNECTION_FORBIDDEN_REASON_NONE)
-        mm_bearer_disconnect_force (MM_BEARER (self));
+
+    if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE)
+        return;
+
+    /* For mixed CDMA+LTE modems, don't close the connection if there is no
+     * 3GPP reason to do so. */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) &&
+        self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE)
+        return;
+
+    switch (self->priv->reason_cdma) {
+    case CONNECTION_FORBIDDEN_REASON_UNREGISTERED:
+        mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
+        break;
+    case CONNECTION_FORBIDDEN_REASON_ROAMING:
+        mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
+        break;
+    default:
+        break;
+    }
+
+    mm_bearer_disconnect_force (MM_BEARER (self));
 }
 
 static void
