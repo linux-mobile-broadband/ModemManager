@@ -3638,9 +3638,9 @@ interface_initialization_step (InitializationContext *ctx)
                 return;
             }
 
-            /* Loading supported bands not implemented, default to ANY */
-            mm_gdbus_modem_set_supported_bands (ctx->skeleton, mm_common_build_bands_any ());
-            mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_any ());
+            /* Loading supported bands not implemented, default to UNKNOWN */
+            mm_gdbus_modem_set_supported_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+            mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
         }
         g_array_unref (supported_bands);
 
