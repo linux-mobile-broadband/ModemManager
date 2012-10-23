@@ -1,0 +1,699 @@
+.\" mmcli(8) manual page
+.\"
+.\" Copyright (C) 2012 Martyn Russell
+.\"
+.\" Comment out '.nr' or set to 0 to eliminate WIDTH fiddlin' !
+.nr half_xtra 4
+
+.TH mmcli 8 "October 2012" GNU "User Commands"
+
+.SH NAME
+mmcli \- Control and monitor the ModemManager
+
+.SH SYNOPSIS
+\fBmmcli\fR [\fIOPTION\fR...]
+
+.SH DESCRIPTION
+ModemManager is a DBus-powered Linux daemon which provides a unified
+high level API for communicating with (mobile broadband) modems. It
+acts as a standard RIL (Radio Interface Layer) and may be used by
+different connection managers, like NetworkManager. Thanks to the
+built-in plugin architecture, ModemManager talks to very different
+kinds of modems with very different kinds of ports. In addition to the
+standard AT serial ports, Qualcomm-based QCDM and QMI ports are also
+supported.
+
+.SH HELP OPTIONS
+.TP
+.B \-h, \-\-help
+Show summary of options by group.
+.TP
+.B \-\-help\-all
+Show all groups and options.
+.TP
+.B \-\-help\-manager
+Show manager specific options.
+.TP
+.B \-\-help\-common
+Show common options. These are used for defining the device an option
+operates on. For example, modems, bearers, SIMs, SMS', etc.
+.TP
+.B \-\-help\-modem
+Show modem specific options.
+.TP
+.B \-\-help\-3gpp
+Show 3GPP specific options.
+.TP
+.B \-\-help\-cdma
+Show CDMA specific options.
+.TP
+.B \-\-help\-simple
+Show simple options. These are useful for getting connected or
+disconnected and understanding the state of things as fast as possible
+without worrying so much about the details.
+.TP
+.B \-\-help\-location
+Show location or positioning specific options.
+.TP
+.B \-\-help\-messaging
+Show messaging specific options. See also \fB\-\-help\-sms\fR which
+is related.
+.TP
+.B \-\-help\-time
+Show time specific options.
+.TP
+.B \-\-help\-firmware
+Show firmware specific options.
+.TP
+.B \-\-help\-sim
+Show SIM card specific options.
+.TP
+.B \-\-help\-bearer
+Show bearer specific options.
+.TP
+.B \-\-help\-sms
+Show SMS specific options. See also \fB\-\-help\-messaging\fR which
+is related.
+
+.SH MANAGER OPTIONS
+.TP
+.B \-G, \-\-set\-logging=[ERR|WARN|INFO|DEBUG]
+Set the logging level in ModemManager daemon. For debugging information you can supply \fBDEBUG\fR. Each value above \fBDEBUG\fR provides less detail. In most cases \fBERR\fR (for displaying errors) are the important messages.
+
+The default mode is \fBERR\fR.
+.TP
+.B \-L, \-\-list\-modems
+List available modems.
+.TP
+.B \-M, \-\-monitor\-modems
+List available modems and monitor modems added or removed.
+.TP
+.B \-S, \-\-scan-modems
+Scan for any potential new modems. This is only useful when expecting pure
+RS232 modems, as they are not notified automatically by the kernel.
+
+.SH COMMON OPTIONS
+All options below take a \fBPATH\fR or \fBINDEX\fR argument. If no action is
+provided, the default information about the modem, bearer, etc. is
+shown instead.
+
+The \fBPATH\fR and \fBINDEX\fR are created automatically when the
+modem is plugged in. They can be found using \fBmmcli \-L\fR. This
+produces something like (for modems only):
+
+.RS 7
+Found 1 modems:
+  /org/freedesktop/ModemManager1/Modem/\fB4\fR
+.RE
+
+In this case, the \fBINDEX\fR is \fB4\fR and the \fBPATH\fR is the entire string above.
+
+However, for the bearers, SIMs and SMS cases, the \fBPATH\fR is
+slightly different. The \fIModem\fR is replaced with the object name
+in use, like \fIBearer\fR. For example:
+
+.RS 7
+/org/freedesktop/ModemManager1/\fIBearer\fR/4
+.RE
+
+.TP
+.B \-m, \-\-modem=[PATH|INDEX]
+Specify a modem.
+.TP
+.B \-b, \-\-bearer=[PATH|INDEX]
+Specify a bearer.
+.TP
+.B \-i, \-\-sim=[PATH|INDEX]
+Specify a SIM card.
+.TP
+.B \-s, \-\-sms=[PATH|INDEX]
+Specify an SMS.
+
+.SH MODEM OPTIONS
+All of the modem options below make use of the \fB\-\-modem\fR or
+\fB\-m\fR switch to specify the modem to act on.
+
+Some operations require a \fBMODE\fR. \fBMODE\fR can be any
+combination of the modes actually supported by the modem. In the
+perfect case, the following are possible:
+
+.Bd -literal -compact
+  \fB'2G'\fR  - 2G technologies, e.g. EDGE, CDMA1x
+  \fB'3G'\fR  - 3G technologies, e.g. HSPA, EV-DO
+  \fB'4G'\fR  - 4G technologies, e.g. LTE
+  \fB'ANY'\fR - for all supported modes.
+.Ed
+.TP
+.B \-w, \-\-monitor\-state
+Monitor the state of a given modem.
+.TP
+.B \-e, \-\-enable
+Enable a given modem.
+
+This powers the antenna, starts the automatic registration process and
+in general prepares the modem to be connected.
+.TP
+.B \-d, \-\-disable
+Disable a given modem.
+
+This disconnects the existing connection(s) for the modem and puts it
+into a low power mode.
+.TP
+.B \-r, \-\-reset
+Resets the modem to the settings it had when it was power cycled.
+.TP
+.B \-\-factory\-reset=CODE
+Resets the modem to its original factory default settings.
+
+The \fBCODE\fR provided is vendor specific. Without the correct vendor
+code, it's unlikely this operation will succeed. This is not a common
+user action.
+.TP
+.B \-\-command=COMMAND
+Send an AT \fBCOMMAND\fR to the given modem. For example,
+\fBCOMMAND\fR could be 'AT+GMM' to probe for phone model information. This
+operation is only available when ModemManager is run in debug mode.
+.TP
+.B \-\-list\-bearers
+List packet data bearers that are available for the given modem.
+.TP
+.B \-\-create\-bearer=['KEY1=VALUE1,KEY2=VALUE2,...']
+Create a new packet data bearer for a given modem. The \fBKEY\fRs and
+some \fBVALUE\fRs are listed below:
+.RS 9
+.TP
+\fB'apn'\fR
+Access Point Name. Required in 3GPP.
+.TP
+\fB'ip-type'\fR
+Addressing type. Given as a MMBearerIpFamily value (e.g. 'ipv4', 'ipv6', 'ipv4v6'). Optional in 3GPP and CDMA.
+.TP
+\fB'allowed-auth'\fR
+Authentication method to use. Given as a MMBearerAllowedAuth value (e.g. 'none|pap|chap|mschap|mschapv2|eap'). Optional in 3GPP.
+.TP
+\fB'user'\fR
+User name (if any) required by the network. Optional in 3GPP.
+.TP
+\fB'password'\fR
+Password (if any) required by the network. Optional in 3GPP.
+.TP
+\fB'allow-roaming'\fR
+Flag to tell whether connection is allowed during roaming, given as a boolean value (i.e 'yes' or 'no'). Optional in 3GPP.
+.TP
+\fB'rm-protocol'\fR
+Protocol of the Rm interface, given as a MMModemCdmaRmProtocol value (e.g. 'async', 'packet-relay', 'packet-network-ppp', 'packet-network-slip', 'stu-iii'). Optional in CDMA.
+.TP
+\fB'number'\fR
+Telephone number to dial. Required in POTS.
+.RE
+.TP
+.B \-\-delete\-bearer=PATH
+Delete bearer from a given modem. This option explicitly uses a
+\fBPATH\fR to define the bearer, you can not use an \fBINDEX\fR to be
+deleted.
+.TP
+.B \-\-set\-allowed\-modes=[MODE1|MODE2|...]
+Set allowed modes for a given modem. For possible modes, see the
+beginning of this section.
+.TP
+.B \-\-set\-bands=[BAND1|BAND2|...]
+Set bands to be used for a given modem. These are frequency ranges
+the modem should use. There are quite a number of supported bands and
+listing them all here would be quite extensive. For details, see the
+MMModemBand documentation.
+
+An example would be: 'egsm|dcs|pcs|g850' to select all the GSM
+frequency bands.
+.TP
+.B \-\-set\-preferred\-mode=MODE
+Set the preferred \fBMODE\fR for the given modem. The \fBMODE\fR
+\fIMUST\fR be one of the allowed modes as set with the
+\fB\-\-set\-allowed\-modes\fR option. Possible \fBMODE\fR arguments
+are detailed at the beginning of this section.
+
+.SH 3GPP OPTIONS
+The 3rd Generation Partnership Project (3GPP) is a collaboration
+between groups of telecommunications associations. These options
+pertain to devices which support 3GPP.
+
+Included are options to control USSD (Unstructured Supplementary
+Service Data) sessions.
+
+All of the 3GPP options below make use of the \fB\-\-modem\fR or
+\fB\-m\fR switch to specify the modem to act on.
+.TP
+.B \-\-3gpp\-scan
+Scan for available 3GPP networks.
+.TP
+.B \-\-3gpp\-register\-home
+Request a given modem to register in its home network.
+
+This registers with the default network(s) specified by the modem,
+.TP
+.B \-\-3gpp\-register\-in\-operation=MCCMNC
+Request a given modem to register on the network of the given
+\fBMCCMNC\fR (Mobile Country Code, Mobile Network Code) based
+operator. This code is used for GSM/LTE, CDMA, iDEN, TETRA and UMTS
+public land mobile networks and some satellite mobile networks. The
+ITU-T Recommendation E.212 defines mobile country codes.
+.TP
+.B \-\-3gpp\-ussd\-status
+Request the status of \fIANY\fR ongoing USSD session.
+.TP
+.B \-\-3gpp\-ussd\-initiate=COMMAND
+Request the given modem to initiate a USSD session with \fBCOMMAND\fR.
+
+For example, \fBCOMMAND\fR could be '*101#' to give your current
+pre-pay balance.
+.TP
+.B \-\-3gpp\-ussd\-respond=RESPONSE
+When initiating an USSD session, a \fRRESPONSE\fR may be needed by a
+network-originated request. This option allows for that.
+.TP
+.B \-\-3gpp\-ussd\-cancel
+Cancel an ongoing USSD session for a given modem.
+
+.SH CDMA OPTIONS
+All CDMA (Code Division Multiple Access) options require the
+\fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-cdma\-activate=CARRIER
+Activate the given modem using OTA (Over the Air) settings. The
+\fBCARRIER\fR is a code provided by the network for the default
+settings they provide.
+
+.SH SIMPLE OPTIONS
+All simple options must be used with \fB\-\-modem\fR or \fB\-m\fR.
+
+.TP
+.B \-\-simple\-connect=['KEY1=VALUE1,KEY2=VALUE2,...']
+Run a full connection sequence using \fBKEY\fR / \fBVALUE\fR pairs.
+The possible \fBKEY\fRs you can use include:
+.RS 9
+.TP
+\fB'pin'\fR
+SIM-PIN unlock code.
+.TP
+\fB'operator-id'\fR
+ETSI MCC-MNC of a network to force registration.
+.TP
+\fB'bands'\fR
+List of MMModemBand values, to specify all the bands allowed in the modem.
+.TP
+\fB'allowed-modes'\fR
+Bitmask of MMModemMode values, to specify all the modes allowed in the modem.
+.TP
+\fB'preferred-mode'\fR
+Specific MMModemMode preferred among the ones allowed, if any. You can
+also use the \fB\-\-create\-bearer\fR options as key/value pairs here.
+.RE
+.TP
+.B \-\-simple\-disconnect
+Disconnect \fIALL\fR connected bearers for a given modem.
+.TP
+.B \-\-simple\-status
+Display the status of the given modem.
+
+.SH LOCATION OPTIONS
+These options detail how to discover your location using Global
+Positioning System (GPS), 3rd Generation Partnership Project
+(3GPP) and National Marine Electronics Association (NMEA)
+technologies.
+
+All location options must be used with \fB\-\-modem\fR or \fB\-m\fR.
+
+.TP
+.B \-\-location\-status
+Show the current status for discovering our location.
+.TP
+.B \-\-location\-get
+Show all location information available.
+.TP
+.B \-\-location\-enable\-3gpp
+Enable location discovery using 3GPP.
+.TP
+.B \-\-location\-disable\-3gpp
+Disable location discovery using 3GPP.
+.TP
+.B \-\-location\-get\-3gpp
+Show 3GPP based location information.
+.TP
+.B \-\-location\-enable\-gps\-nmea
+Enable location discovery using GPS and reported with NMEA traces.
+.TP
+.B \-\-location\-disable\-gps\-nmea
+Disable location discovery using GPS and NMEA traces.
+.TP
+.B \-\-location\-get\-gps\-nmea
+Show GPS based location with NMEA trace information.
+.TP
+.B \-\-location\-enable\-gps\-raw
+Enable location discovery using GPS and reported with raw (i.e.
+longitude/latitude) values.
+.TP
+.B \-\-location\-disable\-gps\-raw
+Disable location discovery using GPS and raw values.
+.TP
+.B \-\-location\-get\-gps\-raw
+Show GPS based location information with raw values.
+
+.SH MESSAGING OPTIONS
+All messaging options must be used with \fB\-\-modem\fR or \fB\-m\fR.
+
+.TP
+.B \-\-messaging\-status
+Show the status of the messaging support.
+.TP
+.B \-\-messaging\-list-sms
+List SMS messages available on a given modem.
+.TP
+.B \-\-messaging\-create-sms=['KEY1=VALUE1,...']
+Create a new SMS on a given modem. \fBKEY\fRs can be any of the following:
+.RS 9
+.TP
+\fB'number'\fR
+ Number to which the message is addressed.
+.TP
+\fB'text'\fR
+Message text, in UTF-8. When sending, if the text is larger than the
+limit of the technology or modem, the message will be broken into
+multiple parts or messages. Note that text and data are never given at
+the same time.
+.TP
+\fB'smsc'\fR
+Indicates the SMS service center number.
+.TP
+\fB'validity'\fR
+Specifies when the SMS expires in the SMSC.
+.TP
+\fB'class'\fR
+3GPP message class (0..3).
+.TP
+\fB'delivery-report-request'\fR
+Specifies whether delivery report is requested when sending the SMS
+('yes' or 'no')
+.TP
+\fB'storage'\fR
+Specifies the storage where this message is kept. Storages may
+be 'sm', 'me', 'mt', 'sr', 'bm', 'ta'.
+.RE
+.TP
+.B \-\-messaging\-create-sms-with-data=PATH
+Use \fBPATH\fR to a filename as the data to create a new SMS.
+.TP
+.B \-\-messaging\-delete-sms=PATH
+Delete an SMS from a given modem. \fBPATH\fR indicates the SMS path.
+
+.SH TIME OPTIONS
+All time operations require the \fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-time
+Display the current network time from the operator. This includes the
+timezone which is usually of importance.
+
+.SH FIRMWARE OPTIONS
+All firmware options require the \fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-firmware\-list
+List all the firmware images installed on a given modem.
+.TP
+.B \-\-firmware\-select=ID
+Select a firmware image from those installed on a given modem. A list
+of available firmware images can be seen using the
+\fB\-\-firmware\-list\fR option.
+
+The \fBID\fR provided is a \fIUNIQUE\fR identifier for the firmware.
+
+.SH SIM OPTIONS
+.TP
+.B \-\-pin=PIN
+Send \fBPIN\fR code to a given SIM card.
+.TP
+.B \-\-puk=PUK
+Send \fBPUK\fR code to a given SIM card. This must be used \fIWITH\fR
+\fB\-\-pin\fR.
+.TP
+.B \-\-enable\-pin
+Enable PIN request for a given SIM card. This must be used \fIWITH\fR
+\fB\-\-pin\fR.
+.TP
+.B \-\-disable\-pin
+Disable PIN request for a given SIM card. This must be used \fIWITH\fR
+\fB\-\-pin\fR.
+.TP
+.B \-\-change\-pin=PIN
+Change the PIN for a given SIM card. It will be set to \fBPIN\fR. This
+must be used \fIWITH\fR \fB\-\-pin\fR to supply the old PIN number.
+
+.SH BEARER OPTIONS
+All bearer options require the \fB\-\-bearer\fR or \fB\-b\fR option.
+
+.TP
+.B \-c, \-\-connect
+Connect to a given bearer.
+.TP
+.B \-x, \-\-disconnect
+Disconnect from a given bearer.
+
+.SH SMS OPTIONS
+All SMS options require the \fB\-\-sms\fR or \fB\-s\fR option.
+
+.TP
+.B \-\-send
+Send an SMS.
+.TP
+.B \-\-store
+This option will store the SMS in the default storage defined by the
+modem, which may be either modem-memory or SMS-memory. To know what
+the existing default storage is, see the \fB\-\-messaging\-status\fR
+option.
+
+.TP
+.B \-\-store\-in\-storage=STORAGE
+This option states which \fBSTORAGE\fR to use for SMS messages.
+Possible values for \fBSTORAGE\fR include:
+.RS 9
+.TP
+\fB'sm'\fR
+SIM card storage area.
+.TP
+\fB'me'\fR
+Mobile equipment storage area.
+.TP
+\fB'mt'\fR
+Sum of SIM and Mobile equipment storages
+.TP
+\fB'sr'\fR
+Status report message storage area.
+.TP
+\fB'bm'\fR
+Broadcast message storage area.
+.TP
+\fB'ta'\fR
+Terminal adaptor message storage area.
+.RE
+.TP
+.B \-\-create\-file\-with\-data\=PATH
+This option takes an SMS that has \fIDATA\fR (not \fITEXT\fR) and will
+create a local file described by \fBPATH\fR and store the content of
+the SMS there.
+
+.SH APPLICATION OPTIONS
+.TP
+.B \-v, \-\-verbose
+Perform actions with more details reported and/or logged.
+.TP
+.B \-V, \-\-version
+Returns the version of this program.
+.TP
+.B \-a, \-\-async
+Use asynchronous methods. This is purely a development tool and has no
+practical benefit to most user operations.
+.TP
+.B \-\-timeout=SECONDS
+Use \fBSECONDS\fR for the timeout when performing operations with this
+command. This option is useful when executing long running operations, like
+\-\-3gpp\-scan.
+
+.SH EXAMPLES
+.SS Creating a new SMS message & storing it
+
+Using the “sm” (SIM), you can do this using:
+
+.Bd -literal -compact
+    $ mmcli -m 0 --messaging-create-sms="text='Hello world',number='+1234567890'"
+    Successfully created new SMS:
+        /org/freedesktop/ModemManager1/SMS/21 (unknown)
+
+    $ sudo mmcli -s 21 --store-in-storage="sm"
+    successfully stored the SMS
+
+    $ sudo mmcli -s 21
+    SMS '/org/freedesktop/ModemManager1/SMS/21'
+      -----------------------------------
+      Content    |              number: '+1234567890'
+                 |                text: 'Hello world'
+      -----------------------------------
+      Properties |            PDU type: 'submit'
+                 |               state: 'stored'
+                 |                smsc: 'unknown'
+                 |            validity: '0'
+                 |               class: '0'
+                 |             storage: 'sm'
+                 |     delivery report: 'not requested'
+                 |   message reference: '0'
+
+    $ sudo mmcli -m 0 --messaging-status
+    /org/freedesktop/ModemManager1/Modem/0
+      ----------------------------
+      Messaging | supported storages: 'sm, me'
+                |    default storage: 'me'
+.Ed
+
+.SS Sending SMS messages from files
+
+As you can see below, the important part is the
+\fB\-\-messaging\-create\-sms\-with\-data\fR and the \fBPATH\fR provided.
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 \\
+           --messaging-create-sms="number='+1234567890'" \\
+           --messaging-create-sms-with-data=/path/to/your/file
+    Successfully created new SMS:
+        /org/freedesktop/ModemManager1/SMS/22 (unknown)
+
+    $ sudo mmcli -s 22 --send
+    successfully sent the SMS
+.Ed
+
+.SS Listing SMS messages
+
+When the receiver gets all the parts of the message, they can now
+recover the sent file with another \fBmmcli\fR command in their
+ModemManager setup:
+
+.Bd -literal -compact
+    $> sudo mmcli -m 0 --messaging-list-sms
+    Found 1 SMS messages:
+        /org/freedesktop/ModemManager1/SMS/0 (received)
+
+    $> sudo mmcli -s 0 --create-file-with-data=/path/to/the/output/file
+.Ed
+
+.SS GPS location status
+
+You first need to check whether the modem has GPS-specific location
+capabilities. Note that we’ll assume the modem is exposed as index 0;
+if you have more than one modem, just use --list-modems to check the
+proper modem index:
+
+.Bd -literal -compact
+    $ mmcli -m 0 --location-status
+    /org/freedesktop/ModemManager1/Modem/0
+      ----------------------------
+      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
+               |      enabled: 'none'
+               |      signals: 'no'
+.Ed
+
+The output says that the modem supports 3GPP Location area code/Cell
+ID, GPS raw and GPS-NMEA location sources. None is enabled yet, as we
+didn’t enable the modem, which we can do issuing:
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 --enable
+    successfully enabled the modem
+
+    $ mmcli -m 0 --location-status
+    /org/freedesktop/ModemManager1/Modem/0
+      ----------------------------
+      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
+               |      enabled: '3gpp-lac-ci'
+               |      signals: 'no'
+.Ed
+
+.SS GPS location technology enabling
+
+We can enable the RAW and NMEA GPS location sources using:
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 \\
+                 --location-enable-gps-raw \\
+                 --location-enable-gps-nmea
+    successfully setup location gathering
+.Ed
+
+If we do check again the status, we’ll see the GPS-specific locations are enabled:
+
+.Bd -literal -compact
+    $ mmcli -m 0 --location-status
+    /org/freedesktop/ModemManager1/Modem/0
+      ----------------------------
+      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
+               |      enabled: '3gpp-lac-ci, gps-raw, gps-nmea'
+               |      signals: 'no'
+.Ed
+
+.SS GPS location retrieval
+
+You can query location source specific information with
+\fB\-\-location\-get\-3gpp\fR, \fB\-\-location\-get\-gps\-nmea\fR and
+\fB\-\-location\-get\-gps\-raw\fR; but also for all at the same time:
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 --location-get
+    /org/freedesktop/ModemManager1/Modem/0
+      -------------------------
+      3GPP location   | Mobile country code: '214'
+                      | Mobile network code: '3'
+                      |  Location area code: '21071'
+                      |             Cell ID: '7033737'
+      -------------------------
+      GPS NMEA traces | $GPGGA,,,,,,0,,,,,,,,*66
+                      | $GPRMC,,V,,,,,,,,,,N*53
+                      | $GPGSA,A,1,,,,,,,,,,,,,,,*1E
+                      | $GPGSV,4,1,16,24,,,,29,,,,05,,,,18,,,*7A
+                      | $GPGSV,4,2,16,22,,,,14,,,,11,,,,17,,,*7B
+                      | $GPGSV,4,3,16,03,,,,12,,,,30,,,,13,,,*78
+                      | $GPGSV,4,4,16,23,,,,15,,,,27,,,,07,,,*79
+                      | $GPVTG,,T,,M,,N,,K,N*2C
+      -------------------------
+      Raw GPS         | Not available
+.Ed
+
+An example of RAW GPS location information:
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 --location-get-gps-raw
+    /org/freedesktop/ModemManager1/Modem/0
+      -------------------------
+      Raw GPS         |  UTC time: '155142.2'
+                      | Longitude: '-3.513941'
+                      |  Latitude: '40.502603'
+                      |  Altitude: '18.000000'
+.Ed
+
+.SH AUTHOR
+Martyn Russell <martyn@lanedo.com>
+
+.SH SEE ALSO
+\fBModemManager\fR(8), \fBNetworkManager\fR(8)
+
+AT (http://en.wikipedia.org/wiki/AT_commands).
+
+3GPP (http://en.wikipedia.org/wiki/3GPP).
+
+MCCMNC (http://en.wikipedia.org/wiki/Mobile_Network_Code).
+
+USSD (http://en.wikipedia.org/wiki/Unstructured_Supplementary_Service_Data).
+
+CDMA (http://en.wikipedia.org/wiki/Code_division_multiple_access).
+
+OTA (http://en.wikipedia.org/wiki/Over-the-air_programming).
+
+GPS (http://en.wikipedia.org/wiki/Global_Positioning_System)
+
+NMEA (http://en.wikipedia.org/wiki/NMEA_0183)
