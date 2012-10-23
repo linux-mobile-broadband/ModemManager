@@ -504,6 +504,7 @@ typedef struct {
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     guint authentication_retries;
+    GError *saved_error;
 } Dial3gppContext;
 
 static Dial3gppContext *
@@ -612,20 +613,31 @@ connect_timed_out_cb (MMBroadbandBearerIcera *self)
 {
     Dial3gppContext *ctx;
 
-    /* Recover context and remove cancellation */
+    /* Recover context and remove it from the private info */
     ctx = self->priv->connect_pending;
-
-    g_cancellable_disconnect (ctx->cancellable,
-                              self->priv->connect_cancellable_id);
-
     self->priv->connect_pending = NULL;
-    self->priv->connect_pending_id = 0;
-    self->priv->connect_cancellable_id = 0;
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_MOBILE_EQUIPMENT_ERROR,
-                                     MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
-                                     "Connection attempt timed out");
+    /* Remove cancellation, if found */
+    if (self->priv->connect_cancellable_id) {
+        g_cancellable_disconnect (ctx->cancellable,
+                                  self->priv->connect_cancellable_id);
+        self->priv->connect_cancellable_id = 0;
+    }
+
+    /* Cleanup timeout ID */
+    self->priv->connect_pending_id = 0;
+
+    /* If we were cancelled, prefer that error */
+    if (ctx->saved_error) {
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+    } else
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_MOBILE_EQUIPMENT_ERROR,
+                                         MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
+                                         "Connection attempt timed out");
+
+    /* It's probably pointless to try to reset this here, but anyway... */
     connect_reset (ctx);
 
     return FALSE;
@@ -635,22 +647,23 @@ static void
 connect_cancelled_cb (GCancellable *cancellable,
                       MMBroadbandBearerIcera *self)
 {
-    GError *error = NULL;
     Dial3gppContext *ctx;
 
-    /* Recover context and remove timeout */
+    /* Recover context but DON'T remove it from the private info */
     ctx = self->priv->connect_pending;
 
-    g_source_remove (self->priv->connect_pending_id);
-
-    self->priv->connect_pending = NULL;
-    self->priv->connect_pending_id = 0;
+    /* Remove the cancellable
+     * NOTE: we shouldn't remove the timeout yet. We still need to wait
+     * to get connected before running the explicit connection reset */
+    g_cancellable_disconnect (ctx->cancellable,
+                              self->priv->connect_cancellable_id);
     self->priv->connect_cancellable_id = 0;
 
-    g_assert (dial_3gpp_context_set_error_if_cancelled (ctx, &error));
+    /* Store cancelled error */
+    g_assert (dial_3gpp_context_set_error_if_cancelled (ctx, &ctx->saved_error));
 
-    g_simple_async_result_take_error (ctx->result, error);
-    connect_reset (ctx);
+    /* We cannot reset right here, we need to wait for the connection
+     * attempt to finish */
 }
 
 static void
@@ -693,7 +706,7 @@ report_connect_status (MMBroadbandBearerIcera *self,
 {
     Dial3gppContext *ctx;
 
-    /* Recover context */
+    /* Recover context and remove it from the private info */
     ctx = self->priv->connect_pending;
     self->priv->connect_pending = NULL;
 
@@ -711,12 +724,25 @@ report_connect_status (MMBroadbandBearerIcera *self,
 
     switch (status) {
     case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN:
-        g_warn_if_reached ();
         break;
 
     case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED:
         if (!ctx)
+            /* We may get this if the timeout for the connection attempt is
+             * reached before the unsolicited response. We should probably
+             * keep the CID around to request explicit disconnection in this
+             * case. */
             break;
+
+        /* If we wanted to get cancelled before, do it now */
+        if (ctx->saved_error) {
+            /* Keep error */
+            g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+            ctx->saved_error = NULL;
+            /* Cancel connection */
+            connect_reset (ctx);
+            return;
+        }
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         dial_3gpp_context_complete_and_free (ctx);
@@ -725,6 +751,15 @@ report_connect_status (MMBroadbandBearerIcera *self,
     case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED:
         if (!ctx)
             break;
+
+        /* If we wanted to get cancelled before and now we couldn't connect,
+         * use the cancelled error and return */
+        if (ctx->saved_error) {
+            g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+            ctx->saved_error = NULL;
+            dial_3gpp_context_complete_and_free (ctx);
+            return;
+        }
 
         /* Try to gather additional info about the connection failure */
         mm_base_modem_at_command_full (
@@ -741,17 +776,29 @@ report_connect_status (MMBroadbandBearerIcera *self,
 
     case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED:
         if (ctx) {
+            /* If we wanted to get cancelled before and now we couldn't connect,
+             * use the cancelled error and return */
+            if (ctx->saved_error) {
+                g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+                ctx->saved_error = NULL;
+                dial_3gpp_context_complete_and_free (ctx);
+                return;
+            }
+
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
                                              "Call setup failed");
             dial_3gpp_context_complete_and_free (ctx);
-        } else {
-            /* Just ensure we mark ourselves as being disconnected... */
-            mm_bearer_report_disconnection (MM_BEARER (self));
+            return;
         }
-        break;
+
+        /* Just ensure we mark ourselves as being disconnected... */
+        mm_bearer_report_disconnection (MM_BEARER (self));
+        return;
     }
+
+    g_warn_if_reached ();
 }
 
 static void
@@ -787,13 +834,15 @@ activate_ready (MMBaseModem *modem,
     }
 
     /* We will now setup a timeout and keep the context in the bearer's private.
-     * Reports of modem being connected will arrive via unsolicited messages. */
+     * Reports of modem being connected will arrive via unsolicited messages.
+     * This timeout should be long enough. Actually... ideally should never get
+     * reached. */
     self->priv->connect_pending_id = g_timeout_add_seconds (60,
                                                             (GSourceFunc)connect_timed_out_cb,
                                                             self);
 
-    /* From now on, if we get cancelled, we'll need to run the connection
-     * reset ourselves just in case */
+    /* From now on, if we get cancelled, we'll still need to wait for the connection
+     * attempt to finish before resetting it */
     self->priv->connect_cancellable_id = g_cancellable_connect (ctx->cancellable,
                                                                 G_CALLBACK (connect_cancelled_cb),
                                                                 self,
