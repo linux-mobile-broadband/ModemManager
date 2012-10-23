@@ -519,6 +519,49 @@ command. This option is useful when executing long running operations, like
 \-\-3gpp\-scan.
 
 .SH EXAMPLES
+.SS Send the PIN to the SIM card
+
+You'll need first to know which the proper path/index is for the SIM in your
+modem:
+.Bd -literal -compact
+    $ mmcli -m 0 | grep SIM
+    SIM | path: '/org/freedesktop/ModemManager1/SIM/0'
+.Ed
+
+And after that, you can just use the SIM index:
+.Bd -literal -compact
+    $ mmcli -i 0 --pin=1234
+    successfully sent PIN code to the SIM
+.Ed
+
+.SS Simple connect and disconnect
+
+You can launch the simple connection process like:
+.Bd -literal -compact
+    $ mmcli -m 0 --simple-connect="pin=1234,apn=internet"
+    successfully connected the modem
+.Ed
+
+Then, you can disconnect it like:
+.Bd -literal -compact
+    $ mmcli -m 0 --simple-disconnect
+    successfully disconnected all bearers in the modem
+.Ed
+
+.SS 3GPP network scan
+
+Scanning for 3GPP networks may really take a long time, so a specific timeout
+must be given:
+.Bd -literal -compact
+    $ mmcli -m 0 --3gpp-scan --timeout=300
+
+    Found 4 networks:
+    21404 - Yoigo (umts, available)
+    21407 - Movistar (umts, current)
+    21401 - vodafone ES (umts, forbidden)
+    21403 - Orange (umts, forbidden)
+.Ed
+
 .SS Creating a new SMS message & storing it
 
 Using the “sm” (SIM), you can do this using:
