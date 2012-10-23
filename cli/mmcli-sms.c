@@ -61,7 +61,7 @@ static GOptionEntry entries[] = {
     },
     { "store-in-storage", 0, 0, G_OPTION_ARG_STRING, &store_in_storage_str,
       "Store the SMS in the device, at the specified storage",
-      NULL,
+      "[Storage]",
     },
     { "create-file-with-data", 0, 0, G_OPTION_ARG_STRING, &create_file_with_data_str,
       "Create a file with the data contents of the SMS.",
