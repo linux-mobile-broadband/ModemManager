@@ -437,6 +437,15 @@ MMBearer *mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
                                                GAsyncResult *res,
                                                GError **error);
 
+/* Helper method to wait for a final state */
+void         mm_iface_modem_wait_for_final_state        (MMIfaceModem *self,
+                                                         MMModemState final_state,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+MMModemState mm_iface_modem_wait_for_final_state_finish (MMIfaceModem *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
 void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
                                         MMSimpleStatus *status);
 
