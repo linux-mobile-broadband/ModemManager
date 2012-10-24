@@ -2594,7 +2594,6 @@ struct _DisablingContext {
     MMIfaceModem *self;
     DisablingStep step;
     MMModemState previous_state;
-    gboolean disabled;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
 };
@@ -2603,17 +2602,6 @@ static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
-
-    if (ctx->disabled)
-        mm_iface_modem_update_state (ctx->self,
-                                     MM_MODEM_STATE_DISABLED,
-                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-    else
-        /* Fallback to previous state */
-        mm_iface_modem_update_state (ctx->self,
-                                     ctx->previous_state,
-                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     if (ctx->skeleton)
@@ -2693,7 +2681,6 @@ interface_disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        ctx->disabled = TRUE;
         disabling_context_complete_and_free (ctx);
         return;
     }
@@ -2727,10 +2714,6 @@ mm_iface_modem_disable (MMIfaceModem *self,
         disabling_context_complete_and_free (ctx);
         return;
     }
-
-    mm_iface_modem_update_state (ctx->self,
-                                 MM_MODEM_STATE_DISABLING,
-                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     interface_disabling_step (ctx);
 }
