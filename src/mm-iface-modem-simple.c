@@ -782,6 +782,8 @@ connect_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &current,
                   NULL);
 
+    mm_info ("Simple connect started...");
+
     if (current >= MM_MODEM_STATE_ENABLED)
         ctx->step = CONNECTION_STEP_ENABLE + 1;
     else if (current >= MM_MODEM_STATE_DISABLED)

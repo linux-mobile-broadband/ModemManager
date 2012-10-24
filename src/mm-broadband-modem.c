@@ -6953,6 +6953,7 @@ disabling_step (DisablingContext *ctx)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
+        mm_info ("Modem disabling...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -7065,6 +7066,7 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_LAST:
+        mm_info ("Modem fully disabled...");
         /* All disabled without errors! */
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         disabling_context_complete_and_free (ctx);
@@ -7262,6 +7264,7 @@ enabling_step (EnablingContext *ctx)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        mm_info ("Modem enabling...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -7374,6 +7377,7 @@ enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_LAST:
+        mm_info ("Modem fully enabled...");
         /* All enabled without errors! */
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         enabling_context_complete_and_free (ctx);
@@ -7667,6 +7671,7 @@ initialize_step (InitializeContext *ctx)
 
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST:
+        mm_info ("Modem initializing...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -7811,6 +7816,8 @@ initialize_step (InitializeContext *ctx)
             initialize_context_complete_and_free (ctx);
             return;
         }
+
+        mm_info ("Modem fully initialized");
 
         /* All initialized without errors!
          * Set as disabled (a.k.a. initialized) */
