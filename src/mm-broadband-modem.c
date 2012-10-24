@@ -7162,6 +7162,7 @@ disable (MMBaseModem *self,
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_WAIT_FOR_FINAL_STATE,
     ENABLING_STEP_STARTED,
     ENABLING_STEP_IFACE_MODEM,
     ENABLING_STEP_IFACE_3GPP,
@@ -7181,6 +7182,8 @@ typedef struct {
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     EnablingStep step;
+    MMModemState previous_state;
+    gboolean enabled;
 } EnablingContext;
 
 static void enabling_step (EnablingContext *ctx);
@@ -7190,6 +7193,20 @@ enabling_context_complete_and_free (EnablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+
+    if (ctx->enabled)
+        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                     MM_MODEM_STATE_ENABLED,
+                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    else if (ctx->previous_state != MM_MODEM_STATE_ENABLED) {
+        /* Fallback to previous state */
+        mm_info ("Falling back to previous state '%s'",
+                 mm_modem_state_get_string (ctx->previous_state));
+        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                     ctx->previous_state,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+    }
+
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
@@ -7218,24 +7235,6 @@ enable_finish (MMBaseModem *self,
         return FALSE;
 
     return TRUE;
-}
-
-static void
-enabling_started_ready (MMBroadbandModem *self,
-                        GAsyncResult *result,
-                        EnablingContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_started_finish (self, result, &error)) {
-        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error);
-        enabling_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Go on to next step */
-    ctx->step++;
-    enabling_step (ctx);
 }
 
 #undef INTERFACE_ENABLE_READY_FN
@@ -7275,6 +7274,56 @@ INTERFACE_ENABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALS
 INTERFACE_ENABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 
 static void
+enabling_started_ready (MMBroadbandModem *self,
+                        GAsyncResult *result,
+                        EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_started_finish (self, result, &error)) {
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    enabling_step (ctx);
+}
+
+static void
+enabling_wait_for_final_state_ready (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->previous_state = mm_iface_modem_wait_for_final_state_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (ctx->previous_state >= MM_MODEM_STATE_ENABLED) {
+        /* Just return success, don't relaunch enabling */
+        mm_info ("Modem is already fully enabled...");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We're in a final state now, go on */
+
+    mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                 MM_MODEM_STATE_ENABLING,
+                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+
+    ctx->step++;
+    enabling_step (ctx);
+}
+
+static void
 enabling_step (EnablingContext *ctx)
 {
     /* Don't run new steps if we're cancelled */
@@ -7286,6 +7335,13 @@ enabling_step (EnablingContext *ctx)
         mm_info ("Modem enabling...");
         /* Fall down to next step */
         ctx->step++;
+
+    case ENABLING_STEP_WAIT_FOR_FINAL_STATE:
+        mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
+                                             MM_MODEM_STATE_UNKNOWN, /* just any */
+                                             (GAsyncReadyCallback)enabling_wait_for_final_state_ready,
+                                             ctx);
+        return;
 
     case ENABLING_STEP_STARTED:
         if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started &&
@@ -7397,6 +7453,7 @@ enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_LAST:
         mm_info ("Modem fully enabled...");
+        ctx->enabled = TRUE;
         /* All enabled without errors! */
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         enabling_context_complete_and_free (ctx);

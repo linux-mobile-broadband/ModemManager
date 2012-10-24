@@ -2742,7 +2742,6 @@ struct _EnablingContext {
     EnablingStep step;
     MMModemCharset supported_charsets;
     const MMModemCharset *current_charset;
-    gboolean enabled;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     MmGdbusModem *skeleton;
@@ -2752,26 +2751,6 @@ static void
 enabling_context_complete_and_free (EnablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
-
-    if (ctx->enabled)
-        mm_iface_modem_update_state (ctx->self,
-                                     MM_MODEM_STATE_ENABLED,
-                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-    else if (ctx->skeleton) {
-        MMModemLock lock;
-
-        /* Fallback to DISABLED/LOCKED */
-        lock = mm_gdbus_modem_get_unlock_required (ctx->skeleton);
-        mm_iface_modem_update_state (
-            ctx->self,
-            ((lock == MM_MODEM_LOCK_NONE ||
-              lock == MM_MODEM_LOCK_SIM_PIN2 ||
-              lock == MM_MODEM_LOCK_SIM_PUK2) ?
-             MM_MODEM_STATE_DISABLED :
-             MM_MODEM_STATE_LOCKED),
-            MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-    }
-
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
@@ -3094,7 +3073,6 @@ interface_enabling_step (EnablingContext *ctx)
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        ctx->enabled = TRUE;
         enabling_context_complete_and_free (ctx);
         return;
     }
@@ -3129,10 +3107,6 @@ mm_iface_modem_enable (MMIfaceModem *self,
         enabling_context_complete_and_free (ctx);
         return;
     }
-
-    mm_iface_modem_update_state (ctx->self,
-                                 MM_MODEM_STATE_ENABLING,
-                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     interface_enabling_step (ctx);
 }
