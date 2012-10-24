@@ -1267,6 +1267,22 @@ test_cgdcont_response_nokia (void *f, gpointer d)
     test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+static void
+test_cgdcont_response_samsung (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CGDCONT: 1,\"IP\",\"nate.sktelecom.com\",\"\",0,0\r\n"
+        "+CGDCONT: 2,\"IP\",\"epc.tmobile.com\",\"\",0,0\r\n"
+        "+CGDCONT: 3,\"IP\",\"MAXROAM.com\",\"\",0,0\r\n";
+    static MM3gppPdpContext expected[] = {
+        { 1, MM_BEARER_IP_FAMILY_IPV4, "nate.sktelecom.com" },
+        { 2, MM_BEARER_IP_FAMILY_IPV4, "epc.tmobile.com"    },
+        { 3, MM_BEARER_IP_FAMILY_IPV4, "MAXROAM.com"        }
+    };
+
+    test_cgdcont_results ("Samsung", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
 /*****************************************************************************/
 /* Test CPMS responses */
 
@@ -1620,6 +1636,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cpms_response_cinterion, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_nokia, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_samsung, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic, NULL));
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_without_detail, NULL));
