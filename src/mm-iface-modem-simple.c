@@ -173,6 +173,7 @@ typedef enum {
     CONNECTION_STEP_UNLOCK_CHECK,
     CONNECTION_STEP_WAIT_FOR_INITIALIZED,
     CONNECTION_STEP_ENABLE,
+    CONNECTION_STEP_WAIT_FOR_ENABLED,
     CONNECTION_STEP_ALLOWED_MODES,
     CONNECTION_STEP_BANDS,
     CONNECTION_STEP_REGISTER,
@@ -350,6 +351,37 @@ set_bands_ready (MMBaseModem *self,
 }
 
 static void
+wait_for_enabled_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        ConnectionContext *ctx)
+{
+    GError *error = NULL;
+    MMModemState state;
+
+    state = mm_iface_modem_wait_for_final_state_finish (self, res, &error);
+    if (error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    if (state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (
+            ctx->invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_WRONG_STATE,
+            "Couldn't wait for 'enabled': new state is '%s'",
+            mm_modem_state_get_string (state));
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Enabled now, cool. */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
 enable_ready (MMBaseModem *self,
               GAsyncResult *res,
               ConnectionContext *ctx)
@@ -367,48 +399,21 @@ enable_ready (MMBaseModem *self,
     connection_step (ctx);
 }
 
-static gboolean
-state_changed_wait_expired (ConnectionContext *ctx)
-{
-    g_assert (ctx->state_changed_id != 0);
-    g_assert (ctx->state_changed_wait_id != 0);
-    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
-    ctx->state_changed_id = 0;
-    g_source_remove (ctx->state_changed_wait_id);
-    ctx->state_changed_wait_id = 0;
-
-    g_dbus_method_invocation_return_error (ctx->invocation,
-                                           MM_CORE_ERROR,
-                                           MM_CORE_ERROR_RETRY,
-                                           "Too much time waiting to get initialized");
-    connection_context_free (ctx);
-    return FALSE;
-}
-
 static void
-state_changed (MMIfaceModemSimple *self,
-               GParamSpec *spec,
-               ConnectionContext *ctx)
+wait_for_initialized_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            ConnectionContext *ctx)
 {
-    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+    GError *error = NULL;
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &state,
-                  NULL);
-
-    /* We're waiting to get initialized */
-    if (state < MM_MODEM_STATE_DISABLED)
+    mm_iface_modem_wait_for_final_state_finish (self, res, &error);
+    if (error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
         return;
+    }
 
-    /* Got !initializing, we're done now */
-    g_assert (ctx->state_changed_id != 0);
-    g_assert (ctx->state_changed_wait_id != 0);
-    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
-    ctx->state_changed_id = 0;
-    g_source_remove (ctx->state_changed_wait_id);
-    ctx->state_changed_wait_id = 0;
-
-    /* Keep on with the next step now */
+    /* Initialized now, cool. */
     ctx->step++;
     connection_step (ctx);
 }
@@ -524,35 +529,14 @@ connection_step (ConnectionContext *ctx)
                                      ctx);
         return;
 
-    case CONNECTION_STEP_WAIT_FOR_INITIALIZED: {
-        MMModemState state = MM_MODEM_STATE_UNKNOWN;
-
+    case CONNECTION_STEP_WAIT_FOR_INITIALIZED:
         mm_info ("Simple connect state (%d/%d): Wait to get fully initialized",
                  ctx->step, CONNECTION_STEP_LAST);
-
-        g_object_get (ctx->self,
-                      MM_IFACE_MODEM_STATE, &state,
-                      NULL);
-
-        /* If we just sent the PIN code we may still be initializing,
-         * and if so, we really do need to wait to get into DISABLED state
-         */
-        if (state < MM_MODEM_STATE_DISABLED) {
-            /* Want to get notified when modem state changes */
-            ctx->state_changed_id = g_signal_connect (ctx->self,
-                                                      "notify::" MM_IFACE_MODEM_STATE,
-                                                      G_CALLBACK (state_changed),
-                                                      ctx);
-            /* But we don't want to wait forever */
-            ctx->state_changed_wait_id = g_timeout_add_seconds (10,
-                                                                (GSourceFunc)state_changed_wait_expired,
-                                                                ctx);
-            return;
-        }
-
-        /* Fall down to next step */
-        ctx->step++;
-    }
+        mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
+                                             MM_MODEM_STATE_DISABLED, /* disabled == initialized */
+                                             (GAsyncReadyCallback)wait_for_initialized_ready,
+                                             ctx);
+        return;
 
     case CONNECTION_STEP_ENABLE:
         mm_info ("Simple connect state (%d/%d): Enable",
@@ -560,6 +544,15 @@ connection_step (ConnectionContext *ctx)
         mm_base_modem_enable (MM_BASE_MODEM (ctx->self),
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
+        return;
+
+    case CONNECTION_STEP_WAIT_FOR_ENABLED:
+        mm_info ("Simple connect state (%d/%d): Wait to get fully enabled",
+                 ctx->step, CONNECTION_STEP_LAST);
+        mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
+                                             MM_MODEM_STATE_UNKNOWN, /* just a final state */
+                                             (GAsyncReadyCallback)wait_for_enabled_ready,
+                                             ctx);
         return;
 
     case CONNECTION_STEP_ALLOWED_MODES: {
@@ -784,13 +777,40 @@ connect_auth_ready (MMBaseModem *self,
 
     mm_info ("Simple connect started...");
 
-    if (current >= MM_MODEM_STATE_ENABLED)
-        ctx->step = CONNECTION_STEP_ENABLE + 1;
-    else if (current >= MM_MODEM_STATE_DISABLED)
-        ctx->step = CONNECTION_STEP_WAIT_FOR_INITIALIZED + 1;
-    else
+    switch (current) {
+    case MM_MODEM_STATE_FAILED:
+    case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_LOCKED:
+        /* If we need unlocking, start from the very beginning */
         ctx->step = CONNECTION_STEP_FIRST;
+        break;
 
+    case MM_MODEM_STATE_INITIALIZING:
+    case MM_MODEM_STATE_DISABLING:
+        /* If we are transitioning to the DISABLED (initialized) state,
+         * wait to get there before going on */
+        ctx->step = CONNECTION_STEP_WAIT_FOR_INITIALIZED;
+        break;
+
+    case MM_MODEM_STATE_DISABLED:
+        ctx->step = CONNECTION_STEP_ENABLE;
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_DISCONNECTING:
+        /* If we are transitioning to the ENABLED/REGISTERED state,
+         * wait to get there before going on */
+        ctx->step = CONNECTION_STEP_WAIT_FOR_ENABLED;
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        ctx->step = CONNECTION_STEP_ENABLE + 1;
+        break;
+    }
     connection_step (ctx);
 }
 
