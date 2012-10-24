@@ -1329,11 +1329,22 @@ mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
                                        MMModemStateChangeReason reason)
 {
     MMModemState consolidated;
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
 
     /* We may have different subsystems being handled (e.g. 3GPP and CDMA), and
      * the registration status value is unique, so if we get subsystem-specific
      * state updates, we'll need to merge all to get a consolidated one. */
     consolidated = get_updated_consolidated_state (self, subsystem, new_state);
+
+    /* Don't update registration-related states while disabling/enabling */
+    if (state == MM_MODEM_STATE_ENABLING ||
+        state == MM_MODEM_STATE_DISABLING)
+        return;
+
     mm_iface_modem_update_state (self, consolidated, reason);
 }
 
