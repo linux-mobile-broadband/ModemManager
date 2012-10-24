@@ -1160,6 +1160,10 @@ mm_iface_modem_update_state (MMIfaceModem *self,
             new_state = old_state;
     }
 
+    /* Enabled may really be searching or registered */
+    if (new_state == MM_MODEM_STATE_ENABLED)
+        new_state = get_current_consolidated_state (self);
+
     /* Update state only if different */
     if (new_state != old_state) {
         const gchar *dbus_path;
