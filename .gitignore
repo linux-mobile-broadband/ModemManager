@@ -102,8 +102,6 @@ docs/reference/libmm-glib/html
 docs/reference/libmm-glib/tmpl
 docs/reference/libmm-glib/xml
 
-docs/man/ModemManager.8
-
 m4/gtk-doc.m4
 m4/intltool.m4
 m4/libtool.m4
