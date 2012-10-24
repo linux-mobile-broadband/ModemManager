@@ -30,6 +30,7 @@ mm_plugin_create (void)
 {
     return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_VIA,
                                     MM_PLUGIN_BASE_NAME, "Via CBP7",
+                                    MM_PLUGIN_BASE_SORT_LAST, TRUE,
                                     NULL));
 }
 
