@@ -916,6 +916,8 @@ parse_pdp_list (MMBaseModem *modem,
     }
 
     cid = 0;
+
+    /* Show all found PDP contexts in debug log */
     mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
     for (l = pdp_list; l; l = g_list_next (l)) {
         MM3gppPdpContext *pdp = l->data;
@@ -924,6 +926,12 @@ parse_pdp_list (MMBaseModem *modem,
                 pdp->cid,
                 mm_bearer_ip_family_get_string (pdp->pdp_type),
                 pdp->apn ? pdp->apn : "");
+    }
+
+    /* Look for the exact PDP context we want */
+    for (l = pdp_list; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp = l->data;
+
         if (pdp->pdp_type == mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)))) {
             /* PDP with no APN set? we may use that one if not exact match found */
             if (!pdp->apn || !pdp->apn[0]) {
