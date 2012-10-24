@@ -229,12 +229,22 @@ bearer_status_changed (MMBearer *bearer,
 {
     CountOthersConnectedContext ctx;
     MMBearerList *list = NULL;
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
 
     g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
     if (!list)
         return;
+
+    if (state == MM_MODEM_STATE_DISABLING ||
+        state == MM_MODEM_STATE_ENABLING) {
+        /* Don't log modem bearer-specific status changes if we're disabling
+         * or enabling */
+        g_object_unref (list);
+        return;
+    }
 
     ctx.self = bearer;
     ctx.others_connected = 0;
