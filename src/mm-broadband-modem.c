@@ -2316,8 +2316,25 @@ modem_init_sequence_ready (MMBaseModem *self,
     mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error)
         g_simple_async_result_take_error (simple, error);
-    else
+    else {
+        MMAtSerialPort *secondary;
+
+        /* Disable echo in secondary port as well, if any */
+        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+        if (secondary)
+            /* No need to wait for the reply */
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           secondary,
+                                           "E0",
+                                           3,
+                                           FALSE,
+                                           FALSE, /* raw */
+                                           NULL, /* cancellable */
+                                           NULL,
+                                           NULL);
+
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
