@@ -3694,9 +3694,11 @@ interface_initialization_step (InitializationContext *ctx)
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         }
 
-        /* Finally, export the new interface, even if we got errors */
-        mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (ctx->self),
-                                            MM_GDBUS_MODEM (ctx->skeleton));
+        /* Finally, export the new interface, even if we got errors, but only if not
+         * done already */
+        if (!mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (ctx->self)))
+            mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+                                                MM_GDBUS_MODEM (ctx->skeleton));
         initialization_context_complete_and_free (ctx);
         return;
     }
