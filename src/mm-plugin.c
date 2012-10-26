@@ -326,16 +326,27 @@ apply_pre_probing_filters (MMPlugin *self,
         }
     }
 
-    /* If we need to filter by vendor/product strings, need to probe for both.
-     * This covers the case where a RS232 modem is connected via a USB<->RS232
-     * adaptor, and we get in udev the vendor ID of the adaptor */
-
-    if (self->priv->product_strings ||
-        self->priv->forbidden_product_strings) {
-        *need_vendor_probing = TRUE;
-        *need_product_probing = TRUE;
-    } else if (self->priv->vendor_strings)
-        *need_vendor_probing = TRUE;
+    /* Check if we need vendor/product string probing
+     * Only require these probings if the corresponding filters are given, and:
+     *  1) if there was no vendor/product ID probing
+     *  2) if there was vendor/product ID probing but we got filtered
+     *
+     * In other words, don't require vendor/product string probing if the plugin
+     * already had vendor/product ID filters and we actually passed those. */
+    if ((!self->priv->vendor_ids && !self->priv->product_ids) ||
+        vendor_filtered ||
+        product_filtered) {
+        /* If product strings related filters around, we need to probe for both
+         * vendor and product strings */
+        if (self->priv->product_strings ||
+            self->priv->forbidden_product_strings) {
+            *need_vendor_probing = TRUE;
+            *need_product_probing = TRUE;
+        }
+        /* If only vendor string filter is needed, only probe for vendor string */
+        else if (self->priv->vendor_strings)
+            *need_vendor_probing = TRUE;
+    }
 
     /* The plugin may specify that only ports with some given udev tags are
      * supported. If that is the case, filter by udev tag */
@@ -362,6 +373,7 @@ apply_pre_probing_filters (MMPlugin *self,
 /* Returns TRUE if the support check request was filtered out */
 static gboolean
 apply_post_probing_filters (MMPlugin *self,
+                            MMPortProbeFlag flags,
                             MMPortProbe *probe)
 {
     gboolean vendor_filtered = FALSE;
@@ -369,7 +381,8 @@ apply_post_probing_filters (MMPlugin *self,
 
     /* The plugin may specify that only some vendor strings are supported. If
      * that is the case, filter by vendor string. */
-    if (self->priv->vendor_strings) {
+    if ((flags & MM_PORT_PROBE_AT_VENDOR) &&
+        self->priv->vendor_strings) {
         const gchar *vendor;
 
         vendor = mm_port_probe_get_vendor (probe);
@@ -409,8 +422,9 @@ apply_post_probing_filters (MMPlugin *self,
     /* The plugin may specify that only some vendor+product string pairs are
      * supported or unsupported. If that is the case, filter by product
      * string */
-    if (self->priv->product_strings ||
-        self->priv->forbidden_product_strings) {
+    if ((flags & MM_PORT_PROBE_AT_PRODUCT) &&
+        (self->priv->product_strings ||
+         self->priv->forbidden_product_strings)) {
         const gchar *vendor;
         const gchar *product;
 
@@ -545,7 +559,7 @@ port_probe_run_ready (MMPortProbe *probe,
         /* Probing succeeded */
         MMPluginSupportsResult supports_result;
 
-        if (!apply_post_probing_filters (ctx->self, probe)) {
+        if (!apply_post_probing_filters (ctx->self, ctx->flags, probe)) {
             /* Port is supported! */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
 
