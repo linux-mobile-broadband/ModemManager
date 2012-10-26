@@ -135,8 +135,7 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
         gboolean cancel_remaining;
         GList *l;
 
-        mm_dbg ("(%s/%s): not supported by any plugin",
-                g_udev_device_get_subsystem (port_probe_ctx->port),
+        mm_dbg ("(Plugin Manager) [%s] not supported by any plugin",
                 g_udev_device_get_name (port_probe_ctx->port));
 
         /* Tell the device to ignore this port */
@@ -175,10 +174,9 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
              device_plugin != port_probe_ctx->best_plugin)) {
             /* Only log best plugin if it's not the generic one */
             if (!g_str_equal (mm_plugin_get_name (port_probe_ctx->best_plugin), MM_PLUGIN_GENERIC_NAME))
-                mm_dbg ("(%s/%s): found best plugin (%s) for device (%s)",
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
-                        g_udev_device_get_name (port_probe_ctx->port),
+                mm_dbg ("(Plugin Manager) (%s) [%s]: found best plugin for device (%s)",
                         mm_plugin_get_name (port_probe_ctx->best_plugin),
+                        g_udev_device_get_name (port_probe_ctx->port),
                         mm_device_get_path (ctx->device));
 
             mm_device_set_plugin (ctx->device, G_OBJECT (port_probe_ctx->best_plugin));
@@ -190,8 +188,7 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
          * best plugin found for the the first probed port */
         else if (!g_str_equal (mm_plugin_get_name (device_plugin),
                                mm_plugin_get_name (port_probe_ctx->best_plugin)))
-            mm_warn ("(%s/%s): plugin mismatch error (expected: '%s', got: '%s')",
-                     g_udev_device_get_subsystem (port_probe_ctx->port),
+            mm_warn ("(Plugin Manager) (%s): plugin mismatch error (expected: '%s', got: '%s')",
                      g_udev_device_get_name (port_probe_ctx->port),
                      mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
                      mm_plugin_get_name (port_probe_ctx->best_plugin));
@@ -249,17 +246,15 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
              * complete it */
             if (port_probe_ctx->defer_until_suggested) {
                 if (suggested_plugin) {
-                    mm_dbg ("(%s/%s) deferred task completed, got suggested plugin (%s)",
-                            g_udev_device_get_subsystem (port_probe_ctx->port),
-                            g_udev_device_get_name (port_probe_ctx->port),
-                            mm_plugin_get_name (suggested_plugin));
+                    mm_dbg ("(Plugin Manager) (%s) [%s] deferred task completed, got suggested plugin",
+                            mm_plugin_get_name (suggested_plugin),
+                            g_udev_device_get_name (port_probe_ctx->port));
                     /* Advance to the suggested plugin and re-check support there */
                     port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
                     port_probe_ctx->current = g_list_find (port_probe_ctx->current,
                                                            port_probe_ctx->suggested_plugin);
                 } else {
-                    mm_dbg ("(%s/%s) deferred task cancelled, no suggested plugin",
-                            g_udev_device_get_subsystem (port_probe_ctx->port),
+                    mm_dbg ("(Plugin Manager) [%s] deferred task cancelled, no suggested plugin",
                             g_udev_device_get_name (port_probe_ctx->port));
                     port_probe_ctx->best_plugin = NULL;
                     port_probe_ctx->current = NULL;
@@ -277,9 +272,8 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
                      /* The GENERIC plugin is NEVER suggested to others */
                      !g_str_equal (mm_plugin_get_name (suggested_plugin),
                                    MM_PLUGIN_GENERIC_NAME)) {
-                mm_dbg ("(%s): (%s/%s) suggested plugin for port",
+                mm_dbg ("(Plugin Manager) (%s) [%s] suggested plugin for port",
                         mm_plugin_get_name (suggested_plugin),
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
                         g_udev_device_get_name (port_probe_ctx->port));
                 port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
             }
@@ -299,9 +293,8 @@ plugin_supports_port_ready (MMPlugin *plugin,
     support_result = mm_plugin_supports_port_finish (plugin, result, &error);
 
     if (error) {
-        mm_warn ("(%s): (%s/%s) error when checking support: '%s'",
+        mm_warn ("(Plugin Manager) (%s) [%s] error when checking support: '%s'",
                  mm_plugin_get_name (plugin),
-                 g_udev_device_get_subsystem (port_probe_ctx->port),
                  g_udev_device_get_name (port_probe_ctx->port),
                  error->message);
         g_error_free (error);
@@ -319,9 +312,8 @@ plugin_supports_port_ready (MMPlugin *plugin,
             g_warn_if_reached ();
         }
 
-        mm_dbg ("(%s): (%s/%s) found best plugin for port",
+        mm_dbg ("(Plugin Manager) (%s) [%s] found best plugin for port",
                 mm_plugin_get_name (port_probe_ctx->best_plugin),
-                g_udev_device_get_subsystem (port_probe_ctx->port),
                 g_udev_device_get_name (port_probe_ctx->port));
         port_probe_ctx->current = NULL;
 
@@ -338,8 +330,7 @@ plugin_supports_port_ready (MMPlugin *plugin,
                  * right plugin since it claimed this port's physical modem,
                  * just drop the port.
                  */
-                mm_dbg ("(%s/%s): ignoring port unsupported by physical modem's plugin",
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
+                mm_dbg ("(Plugin Manager) [%s] ignoring port unsupported by physical modem's plugin",
                         g_udev_device_get_name (port_probe_ctx->port));
                 port_probe_ctx->best_plugin = NULL;
                 port_probe_ctx->current = NULL;
@@ -365,17 +356,15 @@ plugin_supports_port_ready (MMPlugin *plugin,
     case MM_PLUGIN_SUPPORTS_PORT_DEFER:
         /* Try with the suggested one after being deferred */
         if (port_probe_ctx->suggested_plugin) {
-            mm_dbg ("(%s): (%s/%s) deferring support check, suggested: %s",
+            mm_dbg ("(Plugin Manager) (%s) [%s] deferring support check, suggested: %s",
                     mm_plugin_get_name (MM_PLUGIN (port_probe_ctx->current->data)),
-                    g_udev_device_get_subsystem (port_probe_ctx->port),
                     g_udev_device_get_name (port_probe_ctx->port),
                     mm_plugin_get_name (MM_PLUGIN (port_probe_ctx->suggested_plugin)));
             port_probe_ctx->current = g_list_find (port_probe_ctx->current,
                                                    port_probe_ctx->suggested_plugin);
         } else {
-            mm_dbg ("(%s): (%s/%s) deferring support check",
+            mm_dbg ("(Plugin Manager) (%s) [%s] deferring support check",
                     mm_plugin_get_name (MM_PLUGIN (port_probe_ctx->current->data)),
-                    g_udev_device_get_subsystem (port_probe_ctx->port),
                     g_udev_device_get_name (port_probe_ctx->port));
         }
 
@@ -390,16 +379,14 @@ plugin_supports_port_ready (MMPlugin *plugin,
         /* If we arrived here and we already have a plugin suggested, use it */
         if (port_probe_ctx->suggested_plugin) {
             if (port_probe_ctx->suggested_plugin == plugin) {
-                mm_dbg ("(%s): (%s/%s) task completed, got suggested plugin",
+                mm_dbg ("(Plugin Manager) (%s) [%s] task completed, got suggested plugin",
                         mm_plugin_get_name (port_probe_ctx->suggested_plugin),
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
                         g_udev_device_get_name (port_probe_ctx->port));
                 port_probe_ctx->best_plugin = g_object_ref (port_probe_ctx->suggested_plugin);
                 port_probe_ctx->current = NULL;
             } else {
-                mm_dbg ("(%s): (%s/%s) re-checking support on deferred task, got suggested plugin",
+                mm_dbg ("(Plugin Manager) (%s) [%s] re-checking support on deferred task, got suggested plugin",
                         mm_plugin_get_name (port_probe_ctx->suggested_plugin),
-                        g_udev_device_get_subsystem (port_probe_ctx->port),
                         g_udev_device_get_name (port_probe_ctx->port));
                 port_probe_ctx->current = g_list_find (port_probe_ctx->current,
                                                        port_probe_ctx->suggested_plugin);
@@ -413,8 +400,7 @@ plugin_supports_port_ready (MMPlugin *plugin,
         /* We are deferred until a suggested plugin is given. If last supports task
          * of a given device is finished without finding a best plugin, this task
          * will get finished reporting unsupported. */
-        mm_dbg ("(%s/%s) deferring support check until result suggested",
-                g_udev_device_get_subsystem (port_probe_ctx->port),
+        mm_dbg ("(Plugin Manager) [%s] deferring support check until result suggested",
                 g_udev_device_get_name (port_probe_ctx->port));
         port_probe_ctx->defer_until_suggested = TRUE;
         return;
@@ -697,12 +683,6 @@ mm_plugin_manager_init (MMPluginManager *manager)
     manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
                                                  MM_TYPE_PLUGIN_MANAGER,
                                                  MMPluginManagerPrivate);
-
-    /* manager->priv->supports = g_hash_table_new_full ( */
-    /*     g_str_hash, */
-    /*     g_str_equal, */
-    /*     g_free, */
-    /*     (GDestroyNotify)supports_info_list_free); */
 }
 
 static gboolean
@@ -718,13 +698,6 @@ static void
 finalize (GObject *object)
 {
     MMPluginManager *self = MM_PLUGIN_MANAGER (object);
-
-	/* /\* The Plugin Manager will only be finalized when all support tasks have */
-    /*  * been finished (as the GSimpleAsyncResult takes a reference to the object. */
-    /*  * Therefore, the hash table of support tasks should always be empty. */
-    /*  *\/ */
-    /* g_assert (g_hash_table_size (self->priv->supports) == 0); */
-    /* g_hash_table_destroy (self->priv->supports); */
 
     /* Cleanup list of plugins */
     g_list_free_full (self->priv->plugins, (GDestroyNotify)g_object_unref);

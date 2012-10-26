@@ -35,10 +35,8 @@
 #include "mm-serial-parsers.h"
 #include "mm-marshal.h"
 #include "mm-private-boxed-types.h"
-#include "libqcdm/src/commands.h"
-#include "libqcdm/src/utils.h"
-#include "libqcdm/src/errors.h"
 #include "mm-log.h"
+#include "mm-daemon-enums-types.h"
 
 G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
 
@@ -197,8 +195,12 @@ apply_pre_probing_filters (MMPlugin *self,
         }
 
         /* If we didn't match any subsystem: unsupported */
-        if (!self->priv->subsystems[i])
+        if (!self->priv->subsystems[i]) {
+            mm_dbg ("(%s) [%s] filtered by subsystem",
+                    self->priv->name,
+                    g_udev_device_get_name (port));
             return TRUE;
+        }
     }
 
     /* The plugin may specify that only some drivers are supported, or that some
@@ -214,8 +216,12 @@ apply_pre_probing_filters (MMPlugin *self,
                    mm_device_get_drivers (device));
 
         /* If error retrieving driver: unsupported */
-        if (!drivers)
+        if (!drivers) {
+            mm_dbg ("(%s) [%s] filtered as couldn't retrieve drivers",
+                    self->priv->name,
+                    g_udev_device_get_name (port));
             return TRUE;
+        }
 
         /* Filtering by allowed drivers */
         if (self->priv->drivers) {
@@ -231,8 +237,12 @@ apply_pre_probing_filters (MMPlugin *self,
             }
 
             /* If we didn't match any driver: unsupported */
-            if (!found)
+            if (!found) {
+                mm_dbg ("(%s) [%s] filtered by drivers",
+                        self->priv->name,
+                        g_udev_device_get_name (port));
                 return TRUE;
+            }
         }
         /* Filtering by forbidden drivers */
         else {
@@ -241,8 +251,12 @@ apply_pre_probing_filters (MMPlugin *self,
 
                 for (j = 0; drivers[j]; j++) {
                     /* If we match a forbidden driver: unsupported */
-                    if (g_str_equal (drivers[j], self->priv->forbidden_drivers[i]))
+                    if (g_str_equal (drivers[j], self->priv->forbidden_drivers[i])) {
+                        mm_dbg ("(%s) [%s] filtered by forbidden drivers",
+                                self->priv->name,
+                                g_udev_device_get_name (port));
                         return TRUE;
+                    }
                 }
             }
         }
@@ -291,16 +305,26 @@ apply_pre_probing_filters (MMPlugin *self,
     if ((vendor_filtered || product_filtered) &&
         !self->priv->vendor_strings &&
         !self->priv->product_strings &&
-        !self->priv->forbidden_product_strings)
+        !self->priv->forbidden_product_strings) {
+        mm_dbg ("(%s) [%s] filtered by vendor/product IDs",
+                self->priv->name,
+                g_udev_device_get_name (port));
         return TRUE;
+    }
 
     /* The plugin may specify that some product IDs are not supported. If
      * that is the case, filter by forbidden vendor+product ID pair */
-    if (self->priv->forbidden_product_ids && product && vendor)
-        for (i = 0; self->priv->forbidden_product_ids[i].l; i++)
+    if (self->priv->forbidden_product_ids && product && vendor) {
+        for (i = 0; self->priv->forbidden_product_ids[i].l; i++) {
             if (vendor == self->priv->forbidden_product_ids[i].l &&
-                product == self->priv->forbidden_product_ids[i].r)
+                product == self->priv->forbidden_product_ids[i].r) {
+                mm_dbg ("(%s) [%s] filtered by forbidden vendor/product IDs",
+                        self->priv->name,
+                        g_udev_device_get_name (port));
                 return TRUE;
+            }
+        }
+    }
 
     /* If we need to filter by vendor/product strings, need to probe for both.
      * This covers the case where a RS232 modem is connected via a USB<->RS232
@@ -324,8 +348,12 @@ apply_pre_probing_filters (MMPlugin *self,
         }
 
         /* If we didn't match any udev tag: unsupported */
-        if (!self->priv->udev_tags[i])
+        if (!self->priv->udev_tags[i]) {
+            mm_dbg ("(%s) [%s] filtered by udev tags",
+                    self->priv->name,
+                    g_udev_device_get_name (port));
             return TRUE;
+        }
     }
 
     return FALSE;
@@ -367,8 +395,12 @@ apply_post_probing_filters (MMPlugin *self,
         }
 
         if (vendor_filtered) {
-            if (!self->priv->product_strings)
+            if (!self->priv->product_strings) {
+                mm_dbg ("(%s) [%s] filtered by vendor strings",
+                        self->priv->name,
+                        mm_port_probe_get_port_name (probe));
                 return TRUE;
+            }
         } else
             /* Vendor matched */
             return FALSE;
@@ -387,8 +419,12 @@ apply_post_probing_filters (MMPlugin *self,
 
         if (self->priv->product_strings) {
             /* If we didn't get any vendor or product: filtered */
-            if (!vendor || !product)
+            if (!vendor || !product) {
+                mm_dbg ("(%s) [%s] filtered as no vendor/product strings given",
+                        self->priv->name,
+                        mm_port_probe_get_port_name (probe));
                 return TRUE;
+            }
             else {
                 for (i = 0; self->priv->product_strings[i].l; i++) {
                     gboolean found;
@@ -406,8 +442,12 @@ apply_post_probing_filters (MMPlugin *self,
                 }
 
                 /* If we didn't match any product: unsupported */
-                if (!self->priv->product_strings[i].l)
+                if (!self->priv->product_strings[i].l) {
+                    mm_dbg ("(%s) [%s] filtered by vendor/product strings",
+                            self->priv->name,
+                            mm_port_probe_get_port_name (probe));
                     return TRUE;
+                }
             }
         }
 
@@ -423,9 +463,13 @@ apply_post_probing_filters (MMPlugin *self,
                          !!strstr (product, casefolded_product));
                 g_free (casefolded_vendor);
                 g_free (casefolded_product);
-                if (found)
+                if (found) {
                     /* If we match a forbidden product: unsupported */
+                    mm_dbg ("(%s) [%s] filtered by forbidden vendor/product strings",
+                            self->priv->name,
+                            mm_port_probe_get_port_name (probe));
                     return TRUE;
+                }
             }
         }
 
@@ -437,6 +481,9 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->allowed_icera &&
         !mm_port_probe_is_icera (probe)) {
         /* Unsupported! */
+        mm_dbg ("(%s) [%s] filtered as modem is not icera",
+                self->priv->name,
+                mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -445,6 +492,9 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->forbidden_icera &&
         mm_port_probe_is_icera (probe)) {
         /* Unsupported! */
+        mm_dbg ("(%s) [%s] filtered as modem is icera",
+                self->priv->name,
+                mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -564,6 +614,7 @@ mm_plugin_supports_port (MMPlugin *self,
     gboolean need_vendor_probing;
     gboolean need_product_probing;
     MMPortProbeFlag probe_run_flags;
+    gchar *probe_list_str;
 
     async_result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
@@ -600,13 +651,11 @@ mm_plugin_supports_port (MMPlugin *self,
         goto out;
     }
 
-    mm_dbg ("(%s) checking port support (%s,%s)",
-            self->priv->name,
-            g_udev_device_get_subsystem (port),
-            g_udev_device_get_name (port));
-
     /* Before launching any probing, check if the port is a net device. */
     if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
+        mm_dbg ("(%s) [%s] probing deferred until result suggested",
+                self->priv->name,
+                g_udev_device_get_name (port));
         g_simple_async_result_set_op_res_gpointer (
             async_result,
             GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
@@ -644,10 +693,9 @@ mm_plugin_supports_port (MMPlugin *self,
     if (self->priv->single_at &&
         mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device)) &&
         !mm_port_probe_is_at (probe)) {
-        mm_dbg ("(%s)   not setting up AT probing tasks for (%s,%s): "
+        mm_dbg ("(%s) [%s] not setting up AT probing tasks: "
                 "modem already has the expected single AT port",
                 self->priv->name,
-                g_udev_device_get_subsystem (port),
                 g_udev_device_get_name (port));
 
         /* Assuming it won't be an AT port. We still run the probe anyway, in
@@ -663,10 +711,13 @@ mm_plugin_supports_port (MMPlugin *self,
     ctx->flags = probe_run_flags;
 
     /* Launch the probe */
-    mm_dbg ("(%s)   launching probe for (%s,%s)",
+    probe_list_str = mm_port_probe_flag_build_string_from_mask (ctx->flags);
+    mm_dbg ("(%s) [%s] probe required: '%s'",
             self->priv->name,
-            g_udev_device_get_subsystem (port),
-            g_udev_device_get_name (port));
+            g_udev_device_get_name (port),
+            probe_list_str);
+    g_free (probe_list_str);
+
     mm_port_probe_run (probe,
                        ctx->flags,
                        self->priv->send_delay,
