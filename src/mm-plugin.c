@@ -43,31 +43,48 @@ G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
 /* Virtual port corresponding to the embeded modem */
 static gchar *virtual_port[] = {"smd0", NULL};
 
+#define HAS_POST_PROBING_FILTERS(self)          \
+    (self->priv->vendor_strings ||              \
+     self->priv->product_strings ||             \
+     self->priv->forbidden_product_strings ||   \
+     self->priv->allowed_icera ||               \
+     self->priv->forbidden_icera ||             \
+     self->priv->custom_init)
+
+
 struct _MMPluginPrivate {
     gchar *name;
     GHashTable *tasks;
 
-    /* Plugin-specific setups */
+    /* Pre-probing filters */
     gchar **subsystems;
     gchar **drivers;
     gchar **forbidden_drivers;
     guint16 *vendor_ids;
     mm_uint16_pair *product_ids;
     mm_uint16_pair *forbidden_product_ids;
+    gchar **udev_tags;
+
+    /* Post probing filters */
     gchar **vendor_strings;
     mm_str_pair *product_strings;
     mm_str_pair *forbidden_product_strings;
-    gchar **udev_tags;
+    gboolean allowed_icera;
+    gboolean forbidden_icera;
+
+    /* Probing setup */
     gboolean at;
     gboolean single_at;
     gboolean qcdm;
     gboolean icera_probe;
-    gboolean allowed_icera;
-    gboolean forbidden_icera;
     MMPortProbeAtCommand *custom_at_probe;
-    MMAsyncMethod *custom_init;
     guint64 send_delay;
     gboolean remove_echo;
+
+    /* Probing setup and/or post-probing filter.
+     * Plugins may use this method to decide whether they support a given
+     * port or not, so should also be considered kind of post-probing filter. */
+    MMAsyncMethod *custom_init;
 };
 
 enum {
@@ -102,30 +119,6 @@ const gchar *
 mm_plugin_get_name (MMPlugin *self)
 {
     return self->priv->name;
-}
-
-/*****************************************************************************/
-
-gint
-mm_plugin_cmp (const MMPlugin *plugin_a,
-               const MMPlugin *plugin_b)
-{
-    /* If we have any post-probing filter, we need to sort the plugin last */
-#define SORT_LAST(self) (self->priv->vendor_strings || \
-                         self->priv->product_strings || \
-                         self->priv->forbidden_product_strings)
-
-    /* The order of the plugins in the list is the same order used to check
-     * whether the plugin can manage a given modem:
-     *  - First, modems that will check vendor ID from udev.
-     *  - Then, modems that report to be sorted last (those which will check
-     *    vendor ID also from the probed ones..
-     */
-    if (SORT_LAST (plugin_a) && !SORT_LAST (plugin_b))
-        return 1;
-    if (!SORT_LAST (plugin_a) && SORT_LAST (plugin_b))
-        return -1;
-    return 0;
 }
 
 /*****************************************************************************/
@@ -743,6 +736,37 @@ mm_plugin_supports_port (MMPlugin *self,
 
 out:
     g_object_unref (async_result);
+}
+
+/*****************************************************************************/
+
+MMPluginSupportsHint
+mm_plugin_discard_port_early (MMPlugin *self,
+                              MMDevice *device,
+                              GUdevDevice *port)
+{
+    gboolean need_vendor_probing = FALSE;
+    gboolean need_product_probing = FALSE;
+
+    /* If fully filtered by pre-probing filters, port unsupported */
+    if (apply_pre_probing_filters (self,
+                                   device,
+                                   port,
+                                   &need_vendor_probing,
+                                   &need_product_probing))
+        return MM_PLUGIN_SUPPORTS_HINT_UNSUPPORTED;
+
+    /* If there are no post-probing filters, this plugin is the only one (except
+     * for the generic one) which will grab the port */
+    if (!HAS_POST_PROBING_FILTERS (self))
+        return MM_PLUGIN_SUPPORTS_HINT_SUPPORTED;
+
+    /* If  no vendor/product probing needed, plugin is likely supported */
+    if (!need_vendor_probing && !need_product_probing)
+        return MM_PLUGIN_SUPPORTS_HINT_LIKELY;
+
+    /* If vendor/product probing is needed, plugin may be supported */
+    return MM_PLUGIN_SUPPORTS_HINT_MAYBE;
 }
 
 /*****************************************************************************/

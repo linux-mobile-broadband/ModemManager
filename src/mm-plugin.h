@@ -67,6 +67,13 @@ typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_SUPPORTED
 } MMPluginSupportsResult;
 
+typedef enum {
+    MM_PLUGIN_SUPPORTS_HINT_UNSUPPORTED,
+    MM_PLUGIN_SUPPORTS_HINT_MAYBE,
+    MM_PLUGIN_SUPPORTS_HINT_LIKELY,
+    MM_PLUGIN_SUPPORTS_HINT_SUPPORTED,
+} MMPluginSupportsHint;
+
 typedef struct _MMPlugin MMPlugin;
 typedef struct _MMPluginClass MMPluginClass;
 typedef struct _MMPluginPrivate MMPluginPrivate;
@@ -102,8 +109,12 @@ struct _MMPluginClass {
 GType mm_plugin_get_type (void);
 
 const gchar *mm_plugin_get_name (MMPlugin *plugin);
-gint         mm_plugin_cmp      (const MMPlugin *plugin_a,
-                                 const MMPlugin *plugin_b);
+
+/* This method will run all pre-probing filters, to see if we can discard this
+ * plugin from the probing logic as soon as possible. */
+MMPluginSupportsHint mm_plugin_discard_port_early (MMPlugin *plugin,
+                                                   MMDevice *device,
+                                                   GUdevDevice *port);
 
 void                   mm_plugin_supports_port        (MMPlugin *plugin,
                                                        MMDevice *device,
