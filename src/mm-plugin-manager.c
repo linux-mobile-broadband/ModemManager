@@ -695,14 +695,17 @@ initable_init (GInitable *initable,
 }
 
 static void
-finalize (GObject *object)
+dispose (GObject *object)
 {
     MMPluginManager *self = MM_PLUGIN_MANAGER (object);
 
     /* Cleanup list of plugins */
-    g_list_free_full (self->priv->plugins, (GDestroyNotify)g_object_unref);
+    if (self->priv->plugins) {
+        g_list_free_full (self->priv->plugins, (GDestroyNotify)g_object_unref);
+        self->priv->plugins = NULL;
+    }
 
-    G_OBJECT_CLASS (mm_plugin_manager_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_plugin_manager_parent_class)->dispose (object);
 }
 
 static void
@@ -719,5 +722,5 @@ mm_plugin_manager_class_init (MMPluginManagerClass *manager_class)
     g_type_class_add_private (object_class, sizeof (MMPluginManagerPrivate));
 
     /* Virtual methods */
-    object_class->finalize = finalize;
+    object_class->dispose = dispose;
 }
