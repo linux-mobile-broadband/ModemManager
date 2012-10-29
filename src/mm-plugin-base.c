@@ -458,6 +458,7 @@ static struct modem_caps modem_caps[] = {
     {"+MS",       MM_PLUGIN_BASE_PORT_CAP_MS},
     {"+FCLASS",   MM_PLUGIN_BASE_PORT_CAP_FCLASS},
     {"+WIRIDIUM", MM_PLUGIN_BASE_PORT_CAP_IRIDIUM},
+    {"CDMA 1x",   MM_PLUGIN_BASE_PORT_CAP_IS707_A}, /* Huawei Data07, ATI reply */
     {NULL}
 };
 
