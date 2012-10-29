@@ -7279,6 +7279,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
+    iface->modem_init_power_down = modem_power_down;
+    iface->modem_init_power_down_finish = modem_power_up_down_finish;
 
     /* Enabling/disabling */
     iface->modem_init = NULL;
@@ -7287,6 +7289,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = modem_power_up_down_finish;
     iface->modem_after_power_up = NULL;
     iface->modem_after_power_up_finish = NULL;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->setup_flow_control = NULL;
     iface->setup_flow_control_finish = NULL;
     iface->load_supported_charsets = NULL;
@@ -7297,8 +7301,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
-    iface->modem_power_down = modem_power_down;
-    iface->modem_power_down_finish = modem_power_up_down_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
     iface->load_current_bands = modem_load_current_bands;
