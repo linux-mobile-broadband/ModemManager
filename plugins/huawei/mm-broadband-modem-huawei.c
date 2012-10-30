@@ -68,6 +68,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *csnr_regex;
     GRegex *simst_regex;
     GRegex *srvst_regex;
+    GRegex *stin_regex;
 };
 
 /*****************************************************************************/
@@ -1530,6 +1531,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             ports[i],
             self->priv->srvst_regex,
             NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->stin_regex,
+            NULL, NULL, NULL);
     }
 }
 
@@ -1591,6 +1596,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->srvst_regex = g_regex_new ("\\r\\n\\^SRVST:.+\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->stin_regex = g_regex_new ("\\r\\n\\^STIN:.+\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -1607,6 +1614,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->csnr_regex);
     g_regex_unref (self->priv->simst_regex);
     g_regex_unref (self->priv->srvst_regex);
+    g_regex_unref (self->priv->stin_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
 }
