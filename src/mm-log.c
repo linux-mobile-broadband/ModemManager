@@ -236,6 +236,13 @@ mm_log_setup (const char *level,
                        log_handler,
                        NULL);
 
+#if defined WITH_QMI
+    g_log_set_handler ("Qmi",
+                       G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+                       log_handler,
+                       NULL);
+#endif
+
     return TRUE;
 }
 
