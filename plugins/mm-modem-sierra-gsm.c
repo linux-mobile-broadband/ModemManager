@@ -760,7 +760,7 @@ auth_done (MMAtSerialPort *port,
 
     /* Activate data on the net port */
     command = g_strdup_printf ("!SCACT=1,%d", cid);
-    mm_at_serial_port_queue_command (port, command, 3, net_activate_done, info);
+    mm_at_serial_port_queue_command (port, command, 10, net_activate_done, info);
     g_free (command);
 }
 
