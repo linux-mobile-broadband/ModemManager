@@ -1090,6 +1090,10 @@ get_property (GObject *object,
         /* Use AT+CFUN=4 for power down (low power mode) */
         g_value_set_string (value, "+CFUN=4");
         break;
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+        /* Use AT+CFUN=1,0 for power up, to avoid reset that +cfun=1 can trigger in some modems */
+        g_value_set_string (value, "+CFUN=1,0");
+        break;
     default:
         break;
     }
@@ -1111,6 +1115,10 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
                                       MM_GENERIC_GSM_POWER_DOWN_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+                                      MM_GENERIC_GSM_POWER_UP_CMD);
 
     gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
