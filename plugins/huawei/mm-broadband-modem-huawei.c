@@ -813,26 +813,6 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             enable ? (MMAtSerialUnsolicitedMsgFn)huawei_status_changed : NULL,
             enable ? self : NULL,
             NULL);
-
-        /* Other unsolicited events to always ignore */
-        if (!enable) {
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                ports[i],
-                self->priv->boot_regex,
-                NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                ports[i],
-                self->priv->csnr_regex,
-                NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                ports[i],
-                self->priv->simst_regex,
-                NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                ports[i],
-                self->priv->srvst_regex,
-                NULL, NULL, NULL);
-        }
     }
 }
 
@@ -1521,10 +1501,46 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 /* Setup ports (Broadband modem class) */
 
 static void
+set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->boot_regex,
+            NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->csnr_regex,
+            NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->simst_regex,
+            NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->srvst_regex,
+            NULL, NULL, NULL);
+    }
+}
+
+static void
 setup_ports (MMBroadbandModem *self)
 {
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_huawei_parent_class)->setup_ports (self);
+
+    /* Unsolicited messages to always ignore */
+    set_ignored_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self));
 
     /* Now reset the unsolicited messages we'll handle when enabled */
     set_3gpp_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
