@@ -254,7 +254,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->primary,
                                            command,
-                                           3,
+                                           10,
                                            FALSE,
                                            FALSE, /* raw */
                                            NULL, /* cancellable */
