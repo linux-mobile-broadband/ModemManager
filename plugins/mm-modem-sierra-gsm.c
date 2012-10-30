@@ -582,6 +582,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
 {
     MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm);
     char *driver = NULL;
+    guint seconds = 5;
 
     if (error) {
         /* Chain up to parent */
@@ -589,17 +590,28 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* Old Sierra devices (like the PCMCIA-based 860) return OK on +CFUN=1 right
-     * away but need some time to finish initialization.  Anything driven by
-     * 'sierra' is new enough to need no delay.
-     */
-    g_object_get (G_OBJECT (gsm), MM_MODEM_DRIVER, &driver, NULL);
-    if (g_strcmp0 (driver, "sierra") == 0)
+    if (response == NULL) {
+        /* If both error and response are NULL, that means the modem was already
+         * powered up and the power-up command was skipped.  So we don't need to
+         * wait for the modem to settle after CFUN=1 is sent.
+         */
         sierra_enabled (info);
-    else {
-        g_warn_if_fail (priv->enable_wait_id == 0);
-        priv->enable_wait_id = g_timeout_add_seconds (10, sierra_enabled, info);
+        return;
     }
+
+    /* Most Sierra devices return OK immediately in response to CFUN=1 but
+     * need some time to finish powering up.
+     */
+    g_warn_if_fail (priv->enable_wait_id == 0);
+    g_object_get (G_OBJECT (gsm), MM_MODEM_DRIVER, &driver, NULL);
+    if (g_strcmp0 (driver, "sierra") != 0) {
+        /* more time for older devices like the AC860, which aren't driven
+         * by the 'sierra' driver.
+         */
+        seconds = 10;
+    }
+
+    priv->enable_wait_id = g_timeout_add_seconds (seconds, sierra_enabled, info);
 }
 
 static void
