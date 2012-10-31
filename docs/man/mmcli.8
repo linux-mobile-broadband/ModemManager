@@ -317,9 +317,8 @@ Display the status of the given modem.
 
 .SH LOCATION OPTIONS
 These options detail how to discover your location using Global
-Positioning System (GPS), 3rd Generation Partnership Project
-(3GPP) and National Marine Electronics Association (NMEA)
-technologies.
+Positioning System (GPS) or directly from your mobile network infrastructure
+(either 3GPP or 3GPP2).
 
 All location options must be used with \fB\-\-modem\fR or \fB\-m\fR.
 
@@ -331,13 +330,13 @@ Show the current status for discovering our location.
 Show all location information available.
 .TP
 .B \-\-location\-enable\-3gpp
-Enable location discovery using 3GPP.
+Enable location discovery using the 3GPP network.
 .TP
 .B \-\-location\-disable\-3gpp
-Disable location discovery using 3GPP.
+Disable location discovery using the 3GPP network.
 .TP
 .B \-\-location\-get\-3gpp
-Show 3GPP based location information.
+Show 3GPP based location information (MCC, MNC, LAC, CI).
 .TP
 .B \-\-location\-enable\-gps\-nmea
 Enable location discovery using GPS and reported with NMEA traces.
@@ -356,7 +355,16 @@ longitude/latitude) values.
 Disable location discovery using GPS and raw values.
 .TP
 .B \-\-location\-get\-gps\-raw
-Show GPS based location information with raw values.
+Show GPS based location information with raw values (e.g. latitude, longitude).
+.TP
+.B \-\-location\-enable\-cdma-bs
+Enable location discovery using the 3GPP2 network.
+.TP
+.B \-\-location\-disable\-cdma-bs
+Disable location discovery using the 3GPP2 network.
+.TP
+.B \-\-location\-get\-cdma-bs
+Show 3GPP2 based location information (location of the CDMA base station).
 
 .SH MESSAGING OPTIONS
 All messaging options must be used with \fB\-\-modem\fR or \fB\-m\fR.
@@ -705,6 +713,8 @@ You can query location source specific information with
                       | $GPVTG,,T,,M,,N,,K,N*2C
       -------------------------
       Raw GPS         | Not available
+      -------------------------
+      CDMA BS         | Not available
 .Ed
 
 An example of RAW GPS location information:
