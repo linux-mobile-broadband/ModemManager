@@ -6584,7 +6584,8 @@ initialization_stopped (MMBroadbandModem *self,
 {
     PortsContext *ctx = (PortsContext *)user_data;
 
-    ports_context_unref (ctx);
+    if (ctx)
+        ports_context_unref (ctx);
     return TRUE;
 }
 
@@ -6609,12 +6610,13 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
+    gpointer ref;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    return ((gpointer) ports_context_ref (
-                g_simple_async_result_get_op_res_gpointer (
-                    G_SIMPLE_ASYNC_RESULT (res))));
+    ref = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return ref ? ports_context_ref (ref) : NULL;
 }
 
 static gboolean
@@ -7622,8 +7624,9 @@ initialization_started_ready (MMBroadbandModem *self,
     GError *error = NULL;
     gpointer ports_ctx;
 
+    /* May return NULL without error */
     ports_ctx = MM_BROADBAND_MODEM_GET_CLASS (self)->initialization_started_finish (self, result, &error);
-    if (!ports_ctx) {
+    if (error) {
         mm_warn ("Couldn't start initialization: %s", error->message);
         g_error_free (error);
 

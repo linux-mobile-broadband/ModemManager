@@ -7024,6 +7024,56 @@ firmware_change_current (MMIfaceModemFirmware *self,
 }
 
 /*****************************************************************************/
+/* First enabling step */
+
+static gboolean
+enabling_started_finish (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_enabling_started_ready (MMBroadbandModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started_finish (
+            self,
+            res,
+            &error)) {
+        /* Don't treat this as fatal. Parent enabling may fail if it cannot grab a primary
+         * AT port, which isn't really an issue in QMI-based modems */
+        mm_dbg ("Couldn't start parent enabling: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+enabling_started (MMBroadbandModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        enabling_started);
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started (
+        self,
+        (GAsyncReadyCallback)parent_enabling_started_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -7070,11 +7120,13 @@ parent_initialization_started_ready (MMBroadbandModem *self,
         res,
         &error);
     if (error) {
-        g_prefix_error (&error, "Couldn't start parent initialization: ");
-        g_simple_async_result_take_error (ctx->result, error);
-    } else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
+        /* Don't treat this as fatal. Parent initialization may fail if it cannot grab a primary
+         * AT port, which isn't really an issue in QMI-based modems */
+        mm_dbg ("Couldn't start parent initialization: %s", error->message);
+        g_error_free (error);
+    }
 
+    g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
     initialization_started_context_complete_and_free (ctx);
 }
 
@@ -7455,4 +7507,6 @@ mm_broadband_modem_qmi_class_init (MMBroadbandModemQmiClass *klass)
 
     broadband_modem_class->initialization_started = initialization_started;
     broadband_modem_class->initialization_started_finish = initialization_started_finish;
+    broadband_modem_class->enabling_started = enabling_started;
+    broadband_modem_class->enabling_started_finish = enabling_started_finish;
 }

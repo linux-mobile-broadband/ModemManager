@@ -920,23 +920,39 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
     /* Fall back to a secondary port if we didn't find a primary port */
     if (!primary) {
+#if defined WITH_QMI
+        /* On QMI-based modems we do allow not having a primary AT port */
+        if (!secondary && !qmi_primary) {
+#else
         if (!secondary) {
+#endif
             g_set_error_literal (error,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
-                                 "Failed to find primary port");
+                                 "Failed to find primary AT port");
             return FALSE;
+        } else {
+            primary = secondary;
+            secondary = NULL;
         }
-        primary = secondary;
-        secondary = NULL;
     }
-    g_assert (primary);
 
     /* If the plugin didn't give us any secondary ports, use any additional
      * primary ports or backup secondary ports as secondary.
      */
     if (!secondary)
         secondary = backup_primary ? backup_primary : backup_secondary;
+
+#if defined WITH_QMI
+    /* On QMI-based modems, we need to have at least a net port */
+    if (qmi_primary && !data_primary) {
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to find a net port in the QMI modem");
+        return FALSE;
+    }
+#endif
 
     /* Data port defaults to primary AT port */
     if (!data_primary)
