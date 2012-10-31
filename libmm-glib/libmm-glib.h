@@ -61,6 +61,7 @@
 #include <mm-location-3gpp.h>
 #include <mm-location-gps-raw.h>
 #include <mm-location-gps-nmea.h>
+#include <mm-location-cdma-bs.h>
 #include <mm-unlock-retries.h>
 #include <mm-network-timezone.h>
 #include <mm-firmware-properties.h>

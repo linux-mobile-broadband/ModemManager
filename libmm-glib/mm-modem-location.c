@@ -230,6 +230,7 @@ build_locations (GVariant *dictionary,
                  MMLocation3gpp **location_3gpp,
                  MMLocationGpsNmea **location_gps_nmea,
                  MMLocationGpsRaw **location_gps_raw,
+                 MMLocationCdmaBs **location_cdma_bs,
                  GError **error)
 {
     GError *inner_error = NULL;
@@ -257,6 +258,10 @@ build_locations (GVariant *dictionary,
             if (location_gps_raw)
                 *location_gps_raw = mm_location_gps_raw_new_from_dictionary (value, &inner_error);
             break;
+        case MM_MODEM_LOCATION_SOURCE_CDMA_BS:
+            if (location_cdma_bs)
+                *location_cdma_bs = mm_location_cdma_bs_new_from_dictionary (value, &inner_error);
+            break;
         default:
             g_warn_if_reached ();
             break;
@@ -283,6 +288,7 @@ build_locations (GVariant *dictionary,
  * @location_3gpp: (out) (allow-none) (transfer full): Return location for a #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
+ * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_full().
  * @error: Return location for error or %NULL.
  *
@@ -296,6 +302,7 @@ mm_modem_location_get_full_finish (MMModemLocation *self,
                                    MMLocation3gpp **location_3gpp,
                                    MMLocationGpsNmea **location_gps_nmea,
                                    MMLocationGpsRaw **location_gps_raw,
+                                   MMLocationCdmaBs **location_cdma_bs,
                                    GError **error)
 {
     GVariant *dictionary = NULL;
@@ -305,7 +312,7 @@ mm_modem_location_get_full_finish (MMModemLocation *self,
     if (!mm_gdbus_modem_location_call_get_location_finish (MM_GDBUS_MODEM_LOCATION (self), &dictionary, res, error))
         return FALSE;
 
-    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, error);
+    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, location_cdma_bs, error);
 }
 
 /**
@@ -342,6 +349,7 @@ mm_modem_location_get_full (MMModemLocation *self,
  * @location_3gpp: (out) (allow-none) (transfer full): Return location for a #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
+ * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -357,6 +365,7 @@ mm_modem_location_get_full_sync (MMModemLocation *self,
                                  MMLocation3gpp **location_3gpp,
                                  MMLocationGpsNmea **location_gps_nmea,
                                  MMLocationGpsRaw **location_gps_raw,
+                                 MMLocationCdmaBs **location_cdma_bs,
                                  GCancellable *cancellable,
                                  GError **error)
 {
@@ -367,7 +376,7 @@ mm_modem_location_get_full_sync (MMModemLocation *self,
     if (!mm_gdbus_modem_location_call_get_location_sync (MM_GDBUS_MODEM_LOCATION (self), &dictionary, cancellable, error))
         return FALSE;
 
-    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, error);
+    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, location_cdma_bs, error);
 }
 
 /*****************************************************************************/
@@ -389,7 +398,7 @@ mm_modem_location_get_3gpp_finish (MMModemLocation *self,
 {
     MMLocation3gpp *location = NULL;
 
-    mm_modem_location_get_full_finish (self, res, &location, NULL, NULL, error);
+    mm_modem_location_get_full_finish (self, res, &location, NULL, NULL, NULL, error);
 
     return location;
 }
@@ -437,7 +446,7 @@ mm_modem_location_get_3gpp_sync (MMModemLocation *self,
 {
     MMLocation3gpp *location = NULL;
 
-    mm_modem_location_get_full_sync (self, &location, NULL, NULL, cancellable, error);
+    mm_modem_location_get_full_sync (self, &location, NULL, NULL, NULL, cancellable, error);
 
     return location;
 }
@@ -461,7 +470,7 @@ mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
 {
     MMLocationGpsNmea *location = NULL;
 
-    mm_modem_location_get_full_finish (self, res, NULL, &location, NULL, error);
+    mm_modem_location_get_full_finish (self, res, NULL, &location, NULL, NULL, error);
 
     return location;
 }
@@ -509,7 +518,7 @@ mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
 {
     MMLocationGpsNmea *location = NULL;
 
-    mm_modem_location_get_full_sync (self, NULL, &location, NULL, cancellable, error);
+    mm_modem_location_get_full_sync (self, NULL, &location, NULL, NULL, cancellable, error);
 
     return location;
 }
@@ -533,7 +542,7 @@ mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
 {
     MMLocationGpsRaw *location = NULL;
 
-    mm_modem_location_get_full_finish (self, res, NULL, NULL, &location, error);
+    mm_modem_location_get_full_finish (self, res, NULL, NULL, &location, NULL, error);
 
     return location;
 }
@@ -581,7 +590,79 @@ mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
 {
     MMLocationGpsRaw *location = NULL;
 
-    mm_modem_location_get_full_sync (self, NULL, NULL, &location, cancellable, error);
+    mm_modem_location_get_full_sync (self, NULL, NULL, &location, NULL, cancellable, error);
+
+    return location;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_location_get_cdma_bs_finish:
+ * @self: A #MMModemLocation.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_cdma_bs().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_location_get_cdma_bs().
+ *
+ * Returns: (transfer full) A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ */
+MMLocationCdmaBs *
+mm_modem_location_get_cdma_bs_finish (MMModemLocation *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMLocationCdmaBs *location = NULL;
+
+    mm_modem_location_get_full_finish (self, res, NULL, NULL, NULL, &location, error);
+
+    return location;
+}
+
+/**
+ * mm_modem_location_get_cdma_bs:
+ * @self: A #MMModemLocation.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously gets the current CDMA base station location information.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_location_get_cdma_bs_finish() to get the result of the operation.
+ *
+ * See mm_modem_location_get_cdma_bs_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_location_get_cdma_bs (MMModemLocation *self,
+                               GCancellable *cancellable,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    mm_modem_location_get_full (self, cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_location_get_cdma_bs_sync:
+ * @self: A #MMModemLocation.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously gets the current CDMA base station location information.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_location_get_cdma_bs()
+ * for the asynchronous version of this method.
+ *
+ * Returns: (transfer full) A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ */
+MMLocationCdmaBs *
+mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,
+                                    GCancellable *cancellable,
+                                    GError **error)
+{
+    MMLocationCdmaBs *location = NULL;
+
+    mm_modem_location_get_full_sync (self, NULL, NULL, NULL, &location, cancellable, error);
 
     return location;
 }

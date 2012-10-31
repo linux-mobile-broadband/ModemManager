@@ -93,6 +93,7 @@
         <xi:include href="xml/mm-location-3gpp.xml"/>
         <xi:include href="xml/mm-location-gps-nmea.xml"/>
         <xi:include href="xml/mm-location-gps-raw.xml"/>
+        <xi:include href="xml/mm-location-cdma-bs.xml"/>
       </section>
       <section>
         <title>Messaging support</title>

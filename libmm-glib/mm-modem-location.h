@@ -34,6 +34,7 @@
 #include "mm-location-3gpp.h"
 #include "mm-location-gps-nmea.h"
 #include "mm-location-gps-raw.h"
+#include "mm-location-cdma-bs.h"
 
 G_BEGIN_DECLS
 
@@ -123,6 +124,17 @@ MMLocationGpsRaw *mm_modem_location_get_gps_raw_sync   (MMModemLocation *self,
                                                         GCancellable *cancellable,
                                                         GError **error);
 
+void              mm_modem_location_get_cdma_bs        (MMModemLocation *self,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+MMLocationCdmaBs *mm_modem_location_get_cdma_bs_finish (MMModemLocation *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+MMLocationCdmaBs *mm_modem_location_get_cdma_bs_sync   (MMModemLocation *self,
+                                                        GCancellable *cancellable,
+                                                        GError **error);
+
 void     mm_modem_location_get_full        (MMModemLocation *self,
                                             GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
@@ -132,11 +144,13 @@ gboolean mm_modem_location_get_full_finish (MMModemLocation *self,
                                             MMLocation3gpp **location_3gpp,
                                             MMLocationGpsNmea **location_gps_nmea,
                                             MMLocationGpsRaw **location_gps_raw,
+                                            MMLocationCdmaBs **location_cdma_bs,
                                             GError **error);
 gboolean mm_modem_location_get_full_sync   (MMModemLocation *self,
                                             MMLocation3gpp **location_3gpp,
                                             MMLocationGpsNmea **location_gps_nmea,
                                             MMLocationGpsRaw **location_gps_raw,
+                                            MMLocationCdmaBs **location_cdma_bs,
                                             GCancellable *cancellable,
                                             GError **error);
 
