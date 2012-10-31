@@ -46,6 +46,8 @@ typedef struct {
     MMLocationGpsNmea *location_gps_nmea;
     time_t location_gps_raw_last_time;
     MMLocationGpsRaw *location_gps_raw;
+    /* CDMA BS location */
+    MMLocationCdmaBs *location_cdma_bs;
 } LocationContext;
 
 static void
@@ -57,6 +59,8 @@ location_context_free (LocationContext *ctx)
         g_object_unref (ctx->location_gps_nmea);
     if (ctx->location_gps_raw)
         g_object_unref (ctx->location_gps_raw);
+    if (ctx->location_cdma_bs)
+        g_object_unref (ctx->location_cdma_bs);
     g_free (ctx);
 }
 
@@ -103,11 +107,13 @@ static GVariant *
 build_location_dictionary (GVariant *previous,
                            MMLocation3gpp *location_3gpp,
                            MMLocationGpsNmea *location_gps_nmea,
-                           MMLocationGpsRaw *location_gps_raw)
+                           MMLocationGpsRaw *location_gps_raw,
+                           MMLocationCdmaBs *location_cdma_bs)
 {
     GVariant *location_3gpp_value = NULL;
     GVariant *location_gps_nmea_value = NULL;
     GVariant *location_gps_raw_value = NULL;
+    GVariant *location_cdma_bs_value = NULL;
     GVariantBuilder builder;
 
     /* If a previous dictionary given, parse its values */
@@ -127,6 +133,9 @@ build_location_dictionary (GVariant *previous,
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_RAW:
                 location_gps_raw_value = value;
+                break;
+            case MM_MODEM_LOCATION_SOURCE_CDMA_BS:
+                location_cdma_bs_value = value;
                 break;
             default:
                 g_warn_if_reached ();
@@ -178,6 +187,19 @@ build_location_dictionary (GVariant *previous,
                                MM_MODEM_LOCATION_SOURCE_GPS_RAW,
                                location_gps_raw_value);
 
+    /* If a new one given, use it */
+    if (location_cdma_bs) {
+        if (location_cdma_bs_value)
+            g_variant_unref (location_cdma_bs_value);
+        location_cdma_bs_value = mm_location_cdma_bs_get_dictionary (location_cdma_bs);
+    }
+
+    if (location_cdma_bs_value)
+        g_variant_builder_add (&builder,
+                               "{uv}",
+                               MM_MODEM_LOCATION_SOURCE_CDMA_BS,
+                               location_cdma_bs_value);
+
     return g_variant_builder_end (&builder);
 }
 
@@ -203,7 +225,8 @@ notify_gps_location_update (MMIfaceModemLocation *self,
             build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
                                        NULL,
                                        location_gps_nmea,
-                                       location_gps_raw));
+                                       location_gps_raw,
+                                       NULL));
 }
 
 void
@@ -274,7 +297,8 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
             skeleton,
             build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
                                        location_3gpp,
-                                       NULL, NULL));
+                                       NULL, NULL,
+                                       NULL));
 }
 
 void
@@ -368,6 +392,64 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
 /*****************************************************************************/
 
 static void
+notify_cdma_bs_location_update (MMIfaceModemLocation *self,
+                                MmGdbusModemLocation *skeleton,
+                                MMLocationCdmaBs *location_cdma_bs)
+{
+    const gchar *dbus_path;
+
+    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+    mm_info ("Modem %s: CDMA BS location updated "
+             "(Longitude: '%lf', Latitude: '%lf')",
+             dbus_path,
+             mm_location_cdma_bs_get_longitude (location_cdma_bs),
+             mm_location_cdma_bs_get_latitude (location_cdma_bs));
+
+    /* We only update the property if we are supposed to signal
+     * location */
+    if (mm_gdbus_modem_location_get_signals_location (skeleton))
+        mm_gdbus_modem_location_set_location (
+            skeleton,
+            build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
+                                       NULL,
+                                       NULL, NULL,
+                                       location_cdma_bs));
+}
+
+void
+mm_iface_modem_location_cdma_bs_update (MMIfaceModemLocation *self,
+                                        gdouble longitude,
+                                        gdouble latitude)
+{
+    MmGdbusModemLocation *skeleton;
+    LocationContext *ctx;
+
+    ctx = get_location_context (self);
+    g_object_get (self,
+                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton)
+        return;
+
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
+        if (mm_location_cdma_bs_set (ctx->location_cdma_bs, longitude, latitude))
+            notify_cdma_bs_location_update (self, skeleton, ctx->location_cdma_bs);
+    }
+
+    g_object_unref (skeleton);
+}
+
+void
+mm_iface_modem_location_cdma_bs_clear (MMIfaceModemLocation *self)
+{
+    mm_iface_modem_location_cdma_bs_update (self,
+                                            MM_LOCATION_LONGITUDE_UNKNOWN,
+                                            MM_LOCATION_LATITUDE_UNKNOWN);
+}
+
+/*****************************************************************************/
+
+static void
 update_location_source_status (MMIfaceModemLocation *self,
                                MMModemLocationSource source,
                                gboolean enabled)
@@ -413,6 +495,13 @@ update_location_source_status (MMIfaceModemLocation *self,
                 ctx->location_gps_raw = mm_location_gps_raw_new ();
         } else
             g_clear_object (&ctx->location_gps_raw);
+        break;
+    case MM_MODEM_LOCATION_SOURCE_CDMA_BS:
+        if (enabled) {
+            if (!ctx->location_cdma_bs)
+                ctx->location_cdma_bs = mm_location_cdma_bs_new ();
+        } else
+            g_clear_object (&ctx->location_cdma_bs);
         break;
     default:
         break;
@@ -521,7 +610,7 @@ setup_gathering_step (SetupGatheringContext *ctx)
         return;
     }
 
-    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
         gchar *source_str;
 
         if (ctx->to_enable & ctx->current) {
@@ -618,7 +707,7 @@ setup_gathering (MMIfaceModemLocation *self,
 
     /* Loop through all known bits in the bitmask to enable/disable specific location sources */
     for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-         source <= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
+         source <= MM_MODEM_LOCATION_SOURCE_CDMA_BS;
          source = source << 1) {
         /* skip unsupported sources */
         if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
@@ -752,11 +841,12 @@ handle_setup_auth_ready (MMBaseModem *self,
                 build_location_dictionary (mm_gdbus_modem_location_get_location (ctx->skeleton),
                                            location_ctx->location_3gpp,
                                            location_ctx->location_gps_nmea,
-                                           location_ctx->location_gps_raw));
+                                           location_ctx->location_gps_raw,
+                                           location_ctx->location_cdma_bs));
         else
             mm_gdbus_modem_location_set_location (
                 ctx->skeleton,
-                build_location_dictionary (NULL, NULL, NULL, NULL));
+                build_location_dictionary (NULL, NULL, NULL, NULL, NULL));
     }
 
     str = mm_modem_location_source_build_string_from_mask (ctx->sources);
@@ -847,7 +937,8 @@ handle_get_location_auth_ready (MMBaseModem *self,
         build_location_dictionary (NULL,
                                    location_ctx->location_3gpp,
                                    location_ctx->location_gps_nmea,
-                                   location_ctx->location_gps_raw));
+                                   location_ctx->location_gps_raw,
+                                   location_ctx->location_cdma_bs));
     handle_get_location_context_free (ctx);
 }
 
@@ -1067,8 +1158,7 @@ interface_enabling_step (EnablingContext *ctx)
     case ENABLING_STEP_ENABLE_GATHERING: {
         MMModemLocationSource default_sources;
 
-        /* By default, we'll enable all NON-GPS sources
-         * (so, only 3GPP-LAC-CI if available) */
+        /* By default, we'll enable all NON-GPS sources */
         default_sources = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
         default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA);
 
@@ -1282,7 +1372,7 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
         mm_gdbus_modem_location_set_enabled (skeleton, MM_MODEM_LOCATION_SOURCE_NONE);
         mm_gdbus_modem_location_set_signals_location (skeleton, FALSE);
         mm_gdbus_modem_location_set_location (skeleton,
-                                              build_location_dictionary (NULL, NULL, NULL, NULL));
+                                              build_location_dictionary (NULL, NULL, NULL, NULL, NULL));
 
         g_object_set (self,
                       MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, skeleton,

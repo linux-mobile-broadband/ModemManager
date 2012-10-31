@@ -104,6 +104,12 @@ void mm_iface_modem_location_3gpp_update_lac_ci  (MMIfaceModemLocation *self,
 void mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
                                          const gchar *nmea_trace);
 
+/* Update CDMA BS location */
+void mm_iface_modem_location_cdma_bs_update (MMIfaceModemLocation *self,
+                                             gdouble longitude,
+                                             gdouble latitude);
+void mm_iface_modem_location_cdma_bs_clear (MMIfaceModemLocation *self);
+
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
                                                  MMSimpleStatus *status);
