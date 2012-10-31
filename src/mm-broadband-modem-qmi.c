@@ -4162,8 +4162,11 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     MMModemAccessTechnology mm_access_technologies;
     MMModemCdmaRegistrationState mm_cdma1x_registration_state;
     MMModemCdmaRegistrationState mm_evdo_registration_state;
-    guint16 sid;
-    guint16 nid;
+    guint16 sid = 0;
+    guint16 nid = 0;
+    guint16 bs_id = 0;
+    gint32 bs_longitude = MM_LOCATION_LONGITUDE_UNKNOWN;
+    gint32 bs_latitude = MM_LOCATION_LATITUDE_UNKNOWN;
 
     if (response_output)
         qmi_message_nas_get_serving_system_output_get_serving_system (
@@ -4215,6 +4218,7 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
         mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        mm_iface_modem_location_cdma_bs_clear (MM_IFACE_MODEM_LOCATION (self));
         return;
     }
 
@@ -4223,6 +4227,12 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
         qmi_message_nas_get_serving_system_output_get_cdma_system_id (response_output, &sid, &nid, NULL);
     else
         qmi_indication_nas_serving_system_output_get_cdma_system_id (indication_output, &sid, &nid, NULL);
+
+    /* Get BS location */
+    if (response_output)
+        qmi_message_nas_get_serving_system_output_get_cdma_base_station_info (response_output, &bs_id, &bs_latitude, &bs_longitude, NULL);
+    else
+        qmi_indication_nas_serving_system_output_get_cdma_base_station_info (indication_output, &bs_id, &bs_latitude, &bs_longitude, NULL);
 
     /* Build generic registration states */
     if (mm_access_technologies & MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK)
@@ -4302,6 +4312,21 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
 
     /* Note: don't update access technologies with the ones retrieved here; they
      * are not really the 'current' access technologies */
+
+    /* Longitude and latitude given in units of 0.25 secs
+     * Note that multiplying by 0.25 is like dividing by 4, so 60*60*4=14400 */
+#define QMI_LONGITUDE_TO_DEGREES(longitude)       \
+    (longitude != MM_LOCATION_LONGITUDE_UNKNOWN ? \
+     (((gdouble)longitude) / 14400.0) :           \
+     MM_LOCATION_LONGITUDE_UNKNOWN)
+#define QMI_LATITUDE_TO_DEGREES(latitude)         \
+    (latitude != MM_LOCATION_LATITUDE_UNKNOWN ?   \
+     (((gdouble)latitude) / 14400.0) :            \
+     MM_LOCATION_LATITUDE_UNKNOWN)
+
+    mm_iface_modem_location_cdma_bs_update (MM_IFACE_MODEM_LOCATION (self),
+                                            QMI_LONGITUDE_TO_DEGREES (bs_longitude),
+                                            QMI_LATITUDE_TO_DEGREES (bs_latitude));
 }
 
 static void
@@ -5906,12 +5931,17 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
 
-    /* Now our own check.
-     * If we have support for the PDS client, GPS location is supported */
+    /* Now our own checks */
+
+    /* If we have support for the PDS client, GPS location is supported */
     if (port && mm_qmi_port_peek_client (port,
                                          QMI_SERVICE_PDS,
                                          MM_QMI_PORT_FLAG_DEFAULT))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
+
+    /* If the modem is CDMA, we have support for CDMA BS location */
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
+        sources |= MM_MODEM_LOCATION_SOURCE_CDMA_BS;
 
     /* So we're done, complete */
     g_simple_async_result_set_op_res_gpointer (simple,
@@ -6025,8 +6055,9 @@ disable_location_gathering (MMIfaceModemLocation *self,
                                         user_data,
                                         disable_location_gathering);
 
-    /* Nothing to be done to disable 3GPP location */
-    if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
+    /* Nothing to be done to disable 3GPP or CDMA locations */
+    if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI ||
+        source == MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
         g_simple_async_result_set_op_res_gboolean (result, TRUE);
         g_simple_async_result_complete_in_idle (result);
         g_object_unref (result);
@@ -6273,6 +6304,16 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
     }
 
     /* Now our own enabling */
+
+    /* CDMA modems need to re-run registration checks when enabling the CDMA BS
+     * location source, so that we get up to date BS location information.
+     * Note that we don't care for when the registration checks get finished.
+     */
+    if (ctx->source == MM_MODEM_LOCATION_SOURCE_CDMA_BS &&
+        mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
+        /* Reload registration to get LAC/CI */
+        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (self), NULL, NULL);
+    }
 
     /* NMEA and RAW are both enabled in the same way */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
