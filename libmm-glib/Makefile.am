@@ -45,6 +45,7 @@ libmm_glib_la_SOURCES = \
 	mm-sms-properties.c \
 	mm-bearer-ip-config.h \
 	mm-bearer-ip-config.c \
+	mm-location-common.h \
 	mm-location-3gpp.h \
 	mm-location-3gpp.c \
 	mm-location-gps-raw.h \
@@ -93,6 +94,7 @@ include_HEADERS = \
 	mm-bearer-properties.h \
 	mm-sms-properties.h \
 	mm-bearer-ip-config.h \
+	mm-location-common.h \
 	mm-location-3gpp.h \
 	mm-location-gps-nmea.h \
 	mm-location-gps-raw.h \

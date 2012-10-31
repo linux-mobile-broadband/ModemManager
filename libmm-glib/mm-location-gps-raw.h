@@ -23,6 +23,8 @@
 #include <ModemManager.h>
 #include <glib-object.h>
 
+#include "mm-location-common.h"
+
 G_BEGIN_DECLS
 
 #define MM_TYPE_LOCATION_GPS_RAW            (mm_location_gps_raw_get_type ())
@@ -31,31 +33,6 @@ G_BEGIN_DECLS
 #define MM_IS_LOCATION_GPS_RAW(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_LOCATION_GPS_RAW))
 #define MM_IS_LOCATION_GPS_RAW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_LOCATION_GPS_RAW))
 #define MM_LOCATION_GPS_RAW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_LOCATION_GPS_RAW, MMLocationGpsRawClass))
-
-/**
- * MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN:
- *
- * Identifier for an unknown longitude value.
- *
- * Proper longitude values fall in the [-180,180] range.
- */
-#define MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN G_MINDOUBLE
-
-/**
- * MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN:
- *
- * Identifier for an unknown latitude value.
- *
- * Proper latitude values fall in the [-90,90] range.
- */
-#define MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN  G_MINDOUBLE
-
-/**
- * MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN:
- *
- * Identifier for an unknown altitude value.
- */
-#define MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN  G_MINDOUBLE
 
 typedef struct _MMLocationGpsRaw MMLocationGpsRaw;
 typedef struct _MMLocationGpsRawClass MMLocationGpsRawClass;

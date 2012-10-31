@@ -76,13 +76,13 @@ mm_location_gps_raw_get_utc_time (MMLocationGpsRaw *self)
  *
  * Gets the longitude, in the [-180,180] range.
  *
- * Returns: the longitude, or %MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN if unknown.
+ * Returns: the longitude, or %MM_LOCATION_LONGITUDE_UNKNOWN if unknown.
  */
 gdouble
 mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_GPS_RAW (self),
-                          MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN);
+                          MM_LOCATION_LONGITUDE_UNKNOWN);
 
     return self->priv->longitude;
 }
@@ -95,13 +95,13 @@ mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
  *
  * Gets the latitude, in the [-90,90] range.
  *
- * Returns: the latitude, or %MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN if unknown.
+ * Returns: the latitude, or %MM_LOCATION_LATITUDE_UNKNOWN if unknown.
  */
 gdouble
 mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_GPS_RAW (self),
-                          MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN);
+                          MM_LOCATION_LATITUDE_UNKNOWN);
 
     return self->priv->latitude;
 }
@@ -114,13 +114,13 @@ mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
  *
  * Gets the altitude, in the [-90,90] range.
  *
- * Returns: the altitude, or %MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN if unknown.
+ * Returns: the altitude, or %MM_LOCATION_ALTITUDE_UNKNOWN if unknown.
  */
 gdouble
 mm_location_gps_raw_get_altitude (MMLocationGpsRaw *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_GPS_RAW (self),
-                          MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN);
+                          MM_LOCATION_ALTITUDE_UNKNOWN);
 
     return self->priv->altitude;
 }
@@ -208,7 +208,7 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
         self->priv->utc_time = g_match_info_fetch (match_info, 1);
 
         /* Latitude */
-        self->priv->latitude = MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN;
+        self->priv->latitude = MM_LOCATION_LATITUDE_UNKNOWN;
         if (get_longitude_or_latitude_from_match_info (match_info, 2, &self->priv->latitude)) {
             gchar *str;
 
@@ -220,7 +220,7 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
         }
 
         /* Longitude */
-        self->priv->longitude = MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN;
+        self->priv->longitude = MM_LOCATION_LONGITUDE_UNKNOWN;
         if (get_longitude_or_latitude_from_match_info (match_info, 4, &self->priv->longitude)) {
             gchar *str;
 
@@ -232,7 +232,7 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
         }
 
         /* Altitude */
-        self->priv->altitude = MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN;
+        self->priv->altitude = MM_LOCATION_ALTITUDE_UNKNOWN;
         mm_get_double_from_match_info (match_info, 9, &self->priv->altitude);
     }
 
@@ -256,8 +256,8 @@ mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self)
 
     /* If mandatory parameters are not found, return NULL */
     if (!self->priv->utc_time ||
-        self->priv->longitude == MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN ||
-        self->priv->latitude == MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN)
+        self->priv->longitude == MM_LOCATION_LONGITUDE_UNKNOWN ||
+        self->priv->latitude == MM_LOCATION_LATITUDE_UNKNOWN)
         return NULL;
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
@@ -275,7 +275,7 @@ mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self)
                            g_variant_new_double (self->priv->latitude));
 
     /* Altitude is optional */
-    if (self->priv->altitude != MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN)
+    if (self->priv->altitude != MM_LOCATION_ALTITUDE_UNKNOWN)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_ALTITUDE,
@@ -327,8 +327,8 @@ mm_location_gps_raw_new_from_dictionary (GVariant *dictionary,
 
     /* If any of the mandatory parameters is missing, cleanup */
     if (!self->priv->utc_time ||
-        self->priv->longitude == MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN ||
-        self->priv->latitude == MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN) {
+        self->priv->longitude == MM_LOCATION_LONGITUDE_UNKNOWN ||
+        self->priv->latitude == MM_LOCATION_LATITUDE_UNKNOWN) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
@@ -336,8 +336,8 @@ mm_location_gps_raw_new_from_dictionary (GVariant *dictionary,
                      "mandatory parameters missing "
                      "(utc-time: %s, longitude: %s, latitude: %s)",
                      self->priv->utc_time ? "yes" : "missing",
-                     (self->priv->longitude != MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN) ? "yes" : "missing",
-                     (self->priv->latitude != MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN) ? "yes" : "missing");
+                     (self->priv->longitude != MM_LOCATION_LONGITUDE_UNKNOWN) ? "yes" : "missing",
+                     (self->priv->latitude != MM_LOCATION_LATITUDE_UNKNOWN) ? "yes" : "missing");
         g_clear_object (&self);
     }
 
@@ -361,9 +361,9 @@ mm_location_gps_raw_init (MMLocationGpsRaw *self)
                                               MMLocationGpsRawPrivate);
 
     self->priv->utc_time = NULL;
-    self->priv->latitude = MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN;
-    self->priv->longitude = MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN;
-    self->priv->altitude = MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN;
+    self->priv->latitude = MM_LOCATION_LATITUDE_UNKNOWN;
+    self->priv->longitude = MM_LOCATION_LONGITUDE_UNKNOWN;
+    self->priv->altitude = MM_LOCATION_ALTITUDE_UNKNOWN;
 }
 
 static void

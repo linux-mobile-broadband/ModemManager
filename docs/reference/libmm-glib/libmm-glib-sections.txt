@@ -302,6 +302,9 @@ mm_modem_cdma_get_type
 <FILE>mm-modem-location</FILE>
 <TITLE>MMModemLocation</TITLE>
 MMModemLocation
+MM_LOCATION_LONGITUDE_UNKNOWN
+MM_LOCATION_LATITUDE_UNKNOWN
+MM_LOCATION_ALTITUDE_UNKNOWN
 <SUBSECTION Getters>
 mm_modem_location_get_path
 mm_modem_location_dup_path
@@ -392,9 +395,6 @@ mm_location_gps_nmea_get_type
 <FILE>mm-location-gps-raw</FILE>
 <TITLE>MMLocationGpsRaw</TITLE>
 MMLocationGpsRaw
-MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN
-MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN
-MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN
 <SUBSECTION Getters>
 mm_location_gps_raw_get_utc_time
 mm_location_gps_raw_get_longitude
