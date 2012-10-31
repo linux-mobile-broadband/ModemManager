@@ -237,6 +237,30 @@
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry><term><link linkend="MM-MODEM-LOCATION-SOURCE-CDMA-BS:CAPS">MM_MODEM_LOCATION_SOURCE_CDMA_BS</link></term>
+          <listitem>
+            <para>
+              Devices supporting this
+              capability return a D-Bus dictionary (signature <literal>"a{sv}"</literal>) mapping well-known
+              keys to values with defined formats.
+            </para>
+            <para>
+              The allowed key/value pairs and their formats are:
+            </para>
+            <variablelist>
+              <varlistentry><term><literal>"latitude"</literal></term>
+                <listitem>
+                  (Required) Latitude in Decimal Degrees (positive numbers mean N quadrasphere, negative mean S quadrasphere), given as a double value (signature <literal>"d"</literal>). e.g. <literal>38.889722</literal>, meaning 38d 53' 22" N.
+                </listitem>
+              </varlistentry>
+              <varlistentry><term><literal>"longitude"</literal></term>
+                <listitem>
+                  (Required) Longitude in Decimal Degrees (positive numbers mean E quadrasphere, negative mean W quadrasphere), given as a double value (signature <literal>"d"</literal>). e.g. <literal>-77.008889</literal>, meaning 77d 0' 32" W.
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
         </variablelist>
     -->
     <property name="Location" type="a{uv}" access="read" />
