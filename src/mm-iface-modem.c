@@ -3128,10 +3128,10 @@ typedef enum {
     INITIALIZATION_STEP_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
-    INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_UNLOCK_RETRIES,
     INITIALIZATION_STEP_SIM,
+    INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_SUPPORTED_MODES,
     INITIALIZATION_STEP_SUPPORTED_BANDS,
     INITIALIZATION_STEP_LAST
@@ -3649,22 +3649,6 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_OWN_NUMBERS:
-        /* Own numbers is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
-        if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
-                ctx->self,
-                (GAsyncReadyCallback)load_own_numbers_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
@@ -3709,6 +3693,22 @@ interface_initialization_step (InitializationContext *ctx)
             g_object_unref (sim);
             return;
         }
+
+    case INITIALIZATION_STEP_OWN_NUMBERS:
+        /* Own numbers is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
+                ctx->self,
+                (GAsyncReadyCallback)load_own_numbers_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
         g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL);
