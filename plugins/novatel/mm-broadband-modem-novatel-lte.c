@@ -152,9 +152,9 @@ modem_after_sim_unlock (MMIfaceModem *self,
                                         user_data,
                                         modem_after_sim_unlock);
 
-    /* A 2-second wait is necessary for SIM to become ready.
+    /* A 3-second wait is necessary for SIM to become ready.
      * Otherwise, a subsequent AT+CRSM command will likely fail. */
-    g_timeout_add_seconds (2, (GSourceFunc)after_sim_unlock_wait_cb, result);
+    g_timeout_add_seconds (3, (GSourceFunc)after_sim_unlock_wait_cb, result);
 }
 
 /*****************************************************************************/
