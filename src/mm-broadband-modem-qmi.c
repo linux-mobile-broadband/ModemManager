@@ -1464,11 +1464,11 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
-        mm_dbg ("QMI operation failed: %s", error->message);
-        g_error_free (error);
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
-        mm_dbg ("Couldn't get system selection preference: %s", error->message);
-        g_error_free (error);
+        g_prefix_error (&error, "Couldn't get system selection preference: ");
+        g_simple_async_result_take_error (simple, error);
     } else {
         GArray *mm_bands;
         QmiNasBandPreference band_preference_mask = 0;
