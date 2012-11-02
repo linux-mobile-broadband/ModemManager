@@ -309,6 +309,33 @@ setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported modes (Modem inteface) */
+
+static MMModemMode
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    /* Report CS only, Iridium connections are circuit-switched */
+    return MM_MODEM_MODE_CS;
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_modes);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem inteface) */
 
 static MMSim *
@@ -446,6 +473,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = NULL;
     iface->modem_init_power_down = NULL;
     iface->modem_init_power_down_finish = NULL;
+
+    /* Supported modes cannot be queried */
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
 }
 
 static void
