@@ -5571,6 +5571,10 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
         input,
         mm_sms_storage_to_qmi_storage_type (storage),
         NULL);
+    qmi_message_wms_list_messages_input_set_message_mode (
+        input,
+        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        NULL);
     qmi_client_wms_list_messages (QMI_CLIENT_WMS (ctx->client),
                                   input,
                                   5,
