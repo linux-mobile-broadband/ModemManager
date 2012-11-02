@@ -752,8 +752,13 @@ load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
 
     MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self, res, &error);
     if (error) {
+        StorageContext *storage_ctx;
+
+        storage_ctx = get_storage_context (ctx->self);
         mm_dbg ("Couldn't load SMS parts from storage '%s': '%s'",
-                mm_sms_storage_get_string (ctx->mem1_storage_index),
+                mm_sms_storage_get_string (g_array_index (storage_ctx->supported_mem1,
+                                                          MMSmsStorage,
+                                                          ctx->mem1_storage_index)),
                 error->message);
         g_error_free (error);
     }
