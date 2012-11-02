@@ -318,13 +318,6 @@ set_allowed_modes (MMIfaceModem *self,
                                         user_data,
                                         set_allowed_modes);
 
-    /* There is no explicit config for CS connections, we just assume we may
-     * have them as part of 2G when no GPRS is available */
-    if (allowed & MM_MODEM_MODE_CS) {
-        allowed |= MM_MODEM_MODE_2G;
-        allowed &= ~MM_MODEM_MODE_CS;
-    }
-
     if (allowed == MM_MODEM_MODE_2G) {
         cm_mode = 1;
         pref_acq = 0;

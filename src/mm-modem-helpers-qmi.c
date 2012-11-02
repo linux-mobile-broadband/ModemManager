@@ -751,8 +751,7 @@ mm_modem_mode_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPrefere
     MMModemMode mode = MM_MODEM_MODE_NONE;
 
     if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2) {
-        if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM)
-            mode |= MM_MODEM_MODE_CS; /* AMPS */
+        /* Ignore AMPS, we really don't report CS mode in QMI modems */
         if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
             mode |= MM_MODEM_MODE_2G; /* CDMA */
         if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR)
@@ -761,7 +760,7 @@ mm_modem_mode_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPrefere
 
     if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP) {
         if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM)
-            mode |= (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G); /* GSM */
+            mode |= MM_MODEM_MODE_2G; /* GSM */
         if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA)
             mode |= MM_MODEM_MODE_3G; /* WCDMA */
     }
@@ -819,10 +818,6 @@ mm_modem_mode_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
 
     if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_LTE)
         mode |= MM_MODEM_MODE_4G;
-
-    /* Assume CS if 2G supported */
-    if (mode & MM_MODEM_MODE_2G)
-        mode |= MM_MODEM_MODE_CS;
 
     return mode;
 }

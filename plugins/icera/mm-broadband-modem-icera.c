@@ -113,7 +113,7 @@ modem_load_allowed_modes_finish (MMIfaceModem *self,
         *preferred = MM_MODEM_MODE_3G;
         return TRUE;
     case 5: /* any */
-        *allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
         *preferred = MM_MODEM_MODE_NONE;
         return TRUE;
     default:
@@ -184,13 +184,6 @@ modem_set_allowed_modes (MMIfaceModem *self,
                                         callback,
                                         user_data,
                                         modem_set_allowed_modes);
-
-    /* There is no explicit config for CS connections, we just assume we may
-     * have them as part of 2G when no GPRS is available */
-    if (allowed & MM_MODEM_MODE_CS) {
-        allowed |= MM_MODEM_MODE_2G;
-        allowed &= ~MM_MODEM_MODE_CS;
-    }
 
     /*
      * The core has checked the following:

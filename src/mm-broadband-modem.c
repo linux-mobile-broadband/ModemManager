@@ -1205,13 +1205,6 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
         }
     }
 
-    /* We'll assume CS supported if we have 2G */
-    if (!(ctx->mode & MM_MODEM_MODE_CS) &&
-        ctx->mode & MM_MODEM_MODE_2G) {
-        mm_dbg ("Assuming device allows (3GPP) 2G/3G network modes");
-        ctx->mode |= MM_MODEM_MODE_CS;
-    }
-
     /* Now keep on with the loading, we may need CDMA-specific checks */
     ctx->run_ws46 = FALSE;
     load_supported_modes_step (ctx);
