@@ -158,6 +158,107 @@ modem_after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load own numbers (Modem interface) */
+
+static GStrv
+load_own_numbers_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    GVariant *result;
+    GStrv own_numbers;
+
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+    if (!result)
+        return NULL;
+
+    own_numbers = (GStrv) g_variant_dup_strv (result, NULL);
+    return own_numbers;
+}
+
+static gboolean
+response_processor_cnum_ignore_at_errors (MMBaseModem *self,
+                                          gpointer none,
+                                          const gchar *command,
+                                          const gchar *response,
+                                          gboolean last_command,
+                                          const GError *error,
+                                          GVariant **result,
+                                          GError **result_error)
+{
+    GStrv own_numbers;
+
+    if (error) {
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+            *result_error = g_error_copy (error);
+
+        return FALSE;
+    }
+
+    own_numbers = mm_3gpp_parse_cnum_exec_response (response, result_error);
+    if (!own_numbers)
+        return FALSE;
+
+    *result = g_variant_new_strv ((const gchar *const *) own_numbers, -1);
+    g_strfreev (own_numbers);
+    return TRUE;
+}
+
+static gboolean
+response_processor_nwmdn_ignore_at_errors (MMBaseModem *self,
+                                           gpointer none,
+                                           const gchar *command,
+                                           const gchar *response,
+                                           gboolean last_command,
+                                           const GError *error,
+                                           GVariant **result,
+                                           GError **result_error)
+{
+    GArray *array;
+    GStrv own_numbers;
+    gchar *mdn;
+
+    if (error) {
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+            *result_error = g_error_copy (error);
+
+        return FALSE;
+    }
+
+    mdn = g_strdup (mm_strip_tag (response, "$NWMDN:"));
+    array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+    g_array_append_val (array, mdn);
+    own_numbers = (GStrv) g_array_free (array, FALSE);
+
+    *result = g_variant_new_strv ((const gchar *const *) own_numbers, -1);
+    g_strfreev (own_numbers);
+    return TRUE;
+}
+
+static const MMBaseModemAtCommand own_numbers_commands[] = {
+    { "+CNUM",  3, TRUE, response_processor_cnum_ignore_at_errors },
+    { "$NWMDN", 3, TRUE, response_processor_nwmdn_ignore_at_errors },
+    { NULL }
+};
+
+static void
+load_own_numbers (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    mm_dbg ("loading (Novatel LTE) own numbers...");
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        own_numbers_commands,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 /* Load supported bands (Modem interface) */
 
 /*
@@ -449,6 +550,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_sim_finish = modem_create_sim_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+    iface->load_own_numbers = load_own_numbers;
+    iface->load_own_numbers_finish = load_own_numbers_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
