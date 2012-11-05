@@ -49,6 +49,7 @@ full_functionality_status_ready (MMBaseModem *self,
     GError *error = NULL;
     guint i;
     const gchar **drivers;
+    gboolean is_new_sierra = FALSE;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
         g_simple_async_result_take_error (simple, error);
@@ -57,23 +58,21 @@ full_functionality_status_ready (MMBaseModem *self,
         return;
     }
 
-    /* Old Sierra devices (like the PCMCIA-based 860) return OK on +CFUN=1 right
-     * away but need some time to finish initialization.  Anything driven by
-     * 'sierra' is new enough to need no delay.
+    /* Most Sierra devices return OK immediately in response to CFUN=1 but
+     * need some time to finish powering up.  Give more time for older devices
+     * like the AC860, which aren't driven by the 'sierra' driver.
      */
     drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
     for (i = 0; drivers[i]; i++) {
         if (g_str_equal (drivers[i], "sierra")) {
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
-            return;
+            is_new_sierra = TRUE;
+            break;
         }
     }
 
     /* The modem object will be valid in the callback as 'result' keeps a
      * reference to it. */
-    g_timeout_add_seconds (10, (GSourceFunc)sierra_power_up_wait_cb, simple);
+    g_timeout_add_seconds (is_new_sierra ? 5 : 10, (GSourceFunc)sierra_power_up_wait_cb, simple);
 }
 
 static void
