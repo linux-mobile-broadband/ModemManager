@@ -486,7 +486,8 @@ init_async_context_free (InitAsyncContext *ctx)
 {
     g_object_unref (ctx->manager);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
     g_free (ctx);
 }
 
