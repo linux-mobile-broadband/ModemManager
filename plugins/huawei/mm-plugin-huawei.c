@@ -63,6 +63,7 @@ first_interface_context_free (FirstInterfaceContext *ctx)
 
 #define TAG_HUAWEI_PCUI_PORT       "huawei-pcui-port"
 #define TAG_HUAWEI_MODEM_PORT      "huawei-modem-port"
+#define TAG_HUAWEI_NDIS_PORT       "huawei-ndis-port"
 #define TAG_HUAWEI_DIAG_PORT       "huawei-diag-port"
 #define TAG_GETPORTMODE_SUPPORTED  "getportmode-supported"
 #define TAG_AT_PORT_FLAGS          "at-port-flags"
@@ -152,6 +153,7 @@ getportmode_ready (MMAtSerialPort *port,
         device = mm_port_probe_peek_device (ctx->probe);
         cache_port_mode (device, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
         cache_port_mode (device, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (device, response->str, "NDIS:", TAG_HUAWEI_NDIS_PORT);
         cache_port_mode (device, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
         g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
 
@@ -402,6 +404,10 @@ propagate_port_mode_results (GList *probes)
             if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT)))
                 at_port_flags = MM_AT_PORT_FLAG_PRIMARY;
             else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
+                at_port_flags = MM_AT_PORT_FLAG_PPP;
+            else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
+                     usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT)))
+                /* If NDIS reported only instead of MDM, use it */
                 at_port_flags = MM_AT_PORT_FLAG_PPP;
         } else if (usbif == 0 &&
                    mm_port_probe_is_at (MM_PORT_PROBE (l->data))) {
