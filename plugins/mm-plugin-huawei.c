@@ -49,6 +49,7 @@ mm_plugin_create (void)
 
 #define TAG_HUAWEI_PCUI_PORT "huawei-pcui-port"
 #define TAG_HUAWEI_MODEM_PORT "huawei-modem-port"
+#define TAG_HUAWEI_NDIS_PORT "huawei-ndis-port"
 #define TAG_HUAWEI_DIAG_PORT "huawei-diag-port"
 #define TAG_GETPORTMODE_SUPPORTED "getportmode-supported"
 
@@ -114,7 +115,8 @@ getportmode_response_cb (MMPluginBaseSupportsTask *task,
         MMPlugin *plugin = mm_plugin_base_supports_task_get_plugin (task);
 
         cache_port_mode (plugin, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
-        cache_port_mode (plugin, response->str, "MDM:", TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (plugin, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (plugin, response->str, "NDIS:", TAG_HUAWEI_NDIS_PORT);
         cache_port_mode (plugin, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
 
         g_object_set_data (G_OBJECT (plugin), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (1));
@@ -293,6 +295,10 @@ grab_port (MMPluginBase *base,
     if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_PCUI_PORT)))
         pflags = MM_AT_PORT_FLAG_PRIMARY;
     else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_MODEM_PORT)))
+        pflags = MM_AT_PORT_FLAG_PPP;
+    else if (!g_object_get_data (G_OBJECT (base), TAG_HUAWEI_MODEM_PORT) &&
+             usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_NDIS_PORT)))
+        /* If NDIS reported only instead of MDM, use it */
         pflags = MM_AT_PORT_FLAG_PPP;
     else if (!g_object_get_data (G_OBJECT (base), TAG_GETPORTMODE_SUPPORTED)) {
         /* If GETPORTMODE is not supported, we assume usbif 0 is the modem port */
