@@ -902,7 +902,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     /* Don't wait for pending data when closing the port; this can cause some
      * stupid devices that don't respond to URBs on a particular port to hang
-     * for 30 seconds when probin fails.
+     * for 30 seconds when probing fails.  See GNOME bug #630670.
      */
     if (ioctl (priv->fd, TIOCGSERIAL, &sinfo) == 0) {
         sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
@@ -980,10 +980,24 @@ mm_serial_port_close (MMSerialPort *self)
 
     if (priv->fd >= 0) {
         GTimeVal tv_start, tv_end;
+        struct serial_struct sinfo;
 
         mm_info ("(%s) closing serial port...", device);
 
         mm_port_set_connected (MM_PORT (self), FALSE);
+
+        /* Paranoid: ensure our closing_wait value is still set so we ignore
+         * pending data when closing the port.  See GNOME bug #630670.
+         */
+        if (ioctl (priv->fd, TIOCGSERIAL, &sinfo) == 0) {
+            if (sinfo.closing_wait != ASYNC_CLOSING_WAIT_NONE) {
+                mm_warn ("(%s): serial port closing_wait was reset!", device);
+                sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
+                (void) ioctl (priv->fd, TIOCSSERIAL, &sinfo);
+            }
+        }
+
+        g_get_current_time (&tv_start);
 
         if (priv->channel) {
             g_source_remove (priv->watch_id);
@@ -992,8 +1006,6 @@ mm_serial_port_close (MMSerialPort *self)
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
         }
-
-        g_get_current_time (&tv_start);
 
         tcsetattr (priv->fd, TCSANOW, &priv->old_t);
         tcflush (priv->fd, TCIOFLUSH);
