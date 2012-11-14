@@ -427,7 +427,7 @@ typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
 struct DMCmdLog {
     u_int8_t code;
     u_int8_t more;
-    u_int16_t len;
+    u_int16_t len;       /* size of packet after this member */
     u_int16_t _unknown2; /* contains same value as len */
     u_int16_t log_code;
     u_int64_t timestamp;
