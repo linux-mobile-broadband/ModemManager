@@ -4501,39 +4501,45 @@ get_cind_signal_done (MMAtSerialPort *port,
     MMGenericGsmPrivate *priv;
     GByteArray *indicators;
     guint quality = 0;
+    GError *local = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    }
+    if (!error) {
+        indicators = mm_parse_cind_query_response (response->str, &local);
+        if (indicators) {
+            priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
-    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-
-    indicators = mm_parse_cind_query_response (response->str, &info->error);
-    if (indicators) {
-        if (indicators->len >= priv->signal_ind) {
-            quality = g_array_index (indicators, guint8, priv->signal_ind);
-            quality = CLAMP (quality, 0, 5) * 20;
+            if (indicators->len >= priv->signal_ind) {
+                quality = g_array_index (indicators, guint8, priv->signal_ind);
+                quality = CLAMP (quality, 0, 5) * 20;
+            } else {
+                mm_dbg ("(%s): +CIND respose didn't include signal",
+                        mm_port_get_device (MM_PORT (port)));
+            }
+            g_byte_array_free (indicators, TRUE);
+        } else if (local) {
+            mm_dbg ("(%s): %s", mm_port_get_device (MM_PORT (port)), local->message);
+            g_error_free (local);
         }
-        g_byte_array_free (indicators, TRUE);
+
+        if (quality > 0) {
+            mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+            mm_callback_info_schedule (info);
+            return;
+        }
     }
 
-    if (quality > 0) {
-        mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Some QMI-based devices say they support signal via CIND,
-         * but always report zero even though they have signal.  So
-         * if we get zero signal, try CSQ too.  (bgo #636040)
-         */
-        mm_at_serial_port_queue_command (port, "+CSQ", 3, get_csq_done, info);
-    }
+    /* Always fall back to +CSQ if for whatever reason +CIND failed.  Also,
+     * some QMI-based devices say they support signal via CIND, but always
+     * report zero even though they have signal.  So if we get zero signal
+     * from +CIND, try CSQ too.  (bgo #636040)
+     */
+    mm_at_serial_port_queue_command (port, "+CSQ", 3, get_csq_done, info);
 }
 
 static void
