@@ -880,7 +880,7 @@ static const guint8 zerobuf[32] = {
 static void
 serial_buffer_full (MMSerialPort *serial,
                     GByteArray *buffer,
-                    PortProbeRunTask *task)
+                    MMPortProbe *self)
 {
     const gchar **iter;
     size_t iter_len;
@@ -892,7 +892,11 @@ serial_buffer_full (MMSerialPort *serial,
     if (   (buffer->len >= sizeof (zerobuf))
         && (memcmp (buffer->data, zerobuf, sizeof (zerobuf)) == 0)) {
         mm_serial_port_close (serial);
-        port_probe_run_task_complete (task, FALSE, NULL);
+        port_probe_run_task_complete (self->priv->task,
+                                      FALSE,
+                                      g_error_new_literal (MM_CORE_ERROR,
+                                                           MM_CORE_ERROR_FAILED,
+                                                           "Probing stopped due to non-AT response"));
         return;
     }
 
@@ -913,7 +917,11 @@ serial_buffer_full (MMSerialPort *serial,
             if (!memcmp (&buffer->data[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
                 mm_serial_port_close (serial);
-                port_probe_run_task_complete (task, FALSE, NULL);
+                port_probe_run_task_complete (self->priv->task,
+                                              FALSE,
+                                              g_error_new_literal (MM_CORE_ERROR,
+                                                                   MM_CORE_ERROR_FAILED,
+                                                                   "Probing stopped due to non-AT response"));
                 return;
             }
         }
