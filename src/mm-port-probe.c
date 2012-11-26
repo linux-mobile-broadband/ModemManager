@@ -572,10 +572,9 @@ serial_probe_at_icera_result_processor (MMPortProbe *self,
                                         GVariant *result)
 {
     if (result) {
-        /* If any result given, it must be a boolean */
-        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_BOOLEAN));
-
-        if (g_variant_get_boolean (result)) {
+        /* If any result given, it must be a string */
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
+        if (strstr (g_variant_get_string (result, NULL), "%IPSYS:")) {
             mm_port_probe_set_result_at_icera (self, TRUE);
             return;
         }
@@ -756,7 +755,7 @@ static const MMPortProbeAtCommand product_probing[] = {
 };
 
 static const MMPortProbeAtCommand icera_probing[] = {
-    { "%IPSYS?", 3, mm_port_probe_response_processor_no_error },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
     { NULL }
 };
 
