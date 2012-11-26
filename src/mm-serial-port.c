@@ -771,25 +771,24 @@ data_available (GIOChannel *source,
     do {
         GError *err = NULL;
 
+        bytes_read = 0;
         status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
         if (status == G_IO_STATUS_ERROR) {
-            if (err && err->message)
-                g_warning ("%s", err->message);
+            if (err && err->message) {
+                g_warning ("(%s) read error: %s",
+                           mm_port_get_device (MM_PORT (self)),
+                           err->message);
+            }
             g_clear_error (&err);
-
-            /* Serial port is closed; we're done */
-            if (priv->watch_id == 0)
-                break;
         }
 
         /* If no bytes read, just let g_io_channel wait for more data */
         if (bytes_read == 0)
             break;
 
-        if (bytes_read > 0) {
-            serial_debug (self, "<--", buf, bytes_read);
-            g_byte_array_append (priv->response, (const guint8 *) buf, bytes_read);
-        }
+        g_assert (bytes_read > 0);
+        serial_debug (self, "<--", buf, bytes_read);
+        g_byte_array_append (priv->response, (const guint8 *) buf, bytes_read);
 
         /* Make sure the response doesn't grow too long */
         if ((priv->response->len > SERIAL_BUF_SIZE) && priv->spew_control) {
@@ -803,7 +802,8 @@ data_available (GIOChannel *source,
             priv->n_consecutive_timeouts = 0;
             mm_serial_port_got_response (self, err);
         }
-    } while (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
+    } while (   (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN)
+             && (priv->watch_id > 0));
 
     return TRUE;
 }
