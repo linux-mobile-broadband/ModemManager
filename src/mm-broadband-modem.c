@@ -1426,53 +1426,55 @@ signal_quality_cind_ready (MMBroadbandModem *self,
     GError *error = NULL;
     const gchar *result;
     GByteArray *indicators;
-    guint quality;
+    guint quality = 0;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!error)
-        indicators = mm_3gpp_parse_cind_read_response (result, &error);
-
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        signal_quality_context_complete_and_free (ctx);
-        return;
+        g_clear_error (&error);
+        goto try_csq;
+    }
+
+    indicators = mm_3gpp_parse_cind_read_response (result, &error);
+    if (!indicators) {
+        mm_dbg ("(%s) Could not parse CIND signal quality results: %s",
+                mm_port_get_device (MM_PORT (ctx->port)),
+                error->message);
+        g_clear_error (&error);
+        goto try_csq;
     }
 
     if (indicators->len < self->priv->modem_cind_indicator_signal_quality) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Could not parse CIND signal quality results "
-                                         "signal index (%u) outside received range (0-%u)",
-                                         self->priv->modem_cind_indicator_signal_quality,
-                                         indicators->len);
-        g_byte_array_free (indicators, TRUE);
+        mm_dbg ("(%s) Could not parse CIND signal quality results; signal "
+                "index (%u) outside received range (0-%u)",
+                mm_port_get_device (MM_PORT (ctx->port)),
+                self->priv->modem_cind_indicator_signal_quality,
+                indicators->len);
+    } else {
+        quality = g_array_index (indicators,
+                                 guint8,
+                                 self->priv->modem_cind_indicator_signal_quality);
+        quality = normalize_ciev_cind_signal_quality (quality,
+                                                      self->priv->modem_cind_min_signal_quality,
+                                                      self->priv->modem_cind_max_signal_quality);
+    }
+    g_byte_array_free (indicators, TRUE);
+
+    if (quality > 0) {
+        /* +CIND success */
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (quality),
+                                                   NULL);
         signal_quality_context_complete_and_free (ctx);
         return;
     }
 
-    quality = g_array_index (indicators,
-                             guint8,
-                             self->priv->modem_cind_indicator_signal_quality);
-    g_byte_array_free (indicators, TRUE);
-
-    quality = normalize_ciev_cind_signal_quality (quality,
-                                                  self->priv->modem_cind_min_signal_quality,
-                                                  self->priv->modem_cind_max_signal_quality);
-
-    /* Some LTE devices say they support signal via CIND,
-     * but always report zero even though they have signal.  So
-     * if we get zero signal, try CSQ too.  (bgo #636040)
+try_csq:
+    /* Always fall back to +CSQ if for whatever reason +CIND failed.  Also,
+     * some QMI-based devices say they support signal via CIND, but always
+     * report zero even though they have signal.  So if we get zero signal
+     * from +CIND, try CSQ too.  (bgo #636040)
      */
-    if (quality == 0) {
-        signal_quality_csq (ctx);
-        return;
-    }
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (quality),
-                                               NULL);
-    signal_quality_context_complete_and_free (ctx);
+    signal_quality_csq (ctx);
 }
 
 static void
