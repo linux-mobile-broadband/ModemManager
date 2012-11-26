@@ -1649,8 +1649,10 @@ test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data)
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (buf, reply_len, &err);
     if (!result) {
         /* Obviously not all devices implement this command */
-        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
-        return;
+        if (   err == -QCDM_ERROR_RESPONSE_BAD_COMMAND
+            || err == -QCDM_ERROR_RESPONSE_BAD_LENGTH)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
     g_assert (result);
 
