@@ -184,8 +184,8 @@ mm_serial_port_print_config (MMSerialPort *port, const char *detail)
 
     err = tcgetattr (priv->fd, &stbuf);
     if (err) {
-        g_warning ("*** %s (%s): (%s) tcgetattr() error %d",
-                   __func__, detail, mm_port_get_device (MM_PORT (port)), errno);
+        mm_warn ("*** %s (%s): (%s) tcgetattr() error %d",
+                 __func__, detail, mm_port_get_device (MM_PORT (port)), errno);
         return;
     }
 
@@ -251,7 +251,7 @@ parse_baudrate (guint i)
         speed = B460800;
         break;
     default:
-        g_warning ("Invalid baudrate '%d'", i);
+        mm_warn ("Invalid baudrate '%d'", i);
         speed = B9600;
     }
 
@@ -277,7 +277,7 @@ parse_bits (guint i)
         bits = CS8;
         break;
     default:
-        g_warning ("Invalid bits (%d). Valid values are 5, 6, 7, 8.", i);
+        mm_warn ("Invalid bits (%d). Valid values are 5, 6, 7, 8.", i);
         bits = CS8;
     }
 
@@ -303,7 +303,7 @@ parse_parity (char c)
         parity = PARENB | PARODD;
         break;
     default:
-        g_warning ("Invalid parity (%c). Valid values are n, e, o", c);
+        mm_warn ("Invalid parity (%c). Valid values are n, e, o", c);
         parity = 0;
     }
 
@@ -323,7 +323,7 @@ parse_stopbits (guint i)
         stopbits = CSTOPB;
         break;
     default:
-        g_warning ("Invalid stop bits (%d). Valid values are 1 and 2)", i);
+        mm_warn ("Invalid stop bits (%d). Valid values are 1 and 2)", i);
         stopbits = 0;
     }
 
@@ -347,10 +347,9 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
 
     memset (&stbuf, 0, sizeof (struct termios));
     if (tcgetattr (fd, &stbuf) != 0) {
-        g_warning ("%s (%s): tcgetattr() error: %d",
-                   __func__,
-                   mm_port_get_device (MM_PORT (self)),
-                   errno);
+        mm_warn ("(%s): tcgetattr() error: %d",
+                 mm_port_get_device (MM_PORT (self)),
+                 errno);
     }
 
     stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY );
@@ -675,11 +674,10 @@ mm_serial_port_queue_process (gpointer data)
             /* Ensure the response array is fully empty before setting the
              * cached response.  */
             if (priv->response->len > 0) {
-                g_warning ("%s: (%s) response array is not empty when using "
-                           "cached reply, cleaning up %u bytes",
-                           __func__,
-                           mm_port_get_device (MM_PORT (self)),
-                           priv->response->len);
+                mm_warn ("(%s) response array is not empty when using cached "
+                         "reply, cleaning up %u bytes",
+                         mm_port_get_device (MM_PORT (self)),
+                         priv->response->len);
                 g_byte_array_set_size (priv->response, 0);
             }
 
@@ -775,9 +773,9 @@ data_available (GIOChannel *source,
         status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
         if (status == G_IO_STATUS_ERROR) {
             if (err && err->message) {
-                g_warning ("(%s) read error: %s",
-                           mm_port_get_device (MM_PORT (self)),
-                           err->message);
+                mm_warn ("(%s): read error: %s",
+                         mm_port_get_device (MM_PORT (self)),
+                         err->message);
             }
             g_clear_error (&err);
         }
@@ -824,12 +822,11 @@ port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
     connected = mm_port_get_connected (MM_PORT (self));
 
     if (ioctl (priv->fd, (connected ? TIOCNXCL : TIOCEXCL)) < 0) {
-        g_warning ("%s: (%s) could not %s serial port lock: (%d) %s",
-                   __func__,
-                   mm_port_get_device (MM_PORT (self)),
-                   connected ? "drop" : "re-acquire",
-                   errno,
-                   strerror (errno));
+        mm_warn ("(%s): could not %s serial port lock: (%d) %s",
+                 mm_port_get_device (MM_PORT (self)),
+                 connected ? "drop" : "re-acquire",
+                 errno,
+                 strerror (errno));
         if (!connected) {
             // FIXME: do something here, maybe try again in a few seconds or
             // close the port and error out?
