@@ -108,7 +108,10 @@ MMManager *
 mm_manager_new_finish (GAsyncResult  *res,
                        GError       **error)
 {
-    return MM_MANAGER (mm_gdbus_object_manager_client_new_finish (res, error));
+    GDBusObjectManager *ret;
+
+    ret = mm_gdbus_object_manager_client_new_finish (res, error);
+    return (ret ? MM_MANAGER (ret) : NULL);
 }
 
 /**
