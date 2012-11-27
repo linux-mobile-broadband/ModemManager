@@ -350,6 +350,9 @@ port_probe_run_is_cancelled (MMPortProbe *self)
     return FALSE;
 }
 
+/***************************************************************/
+/* QMI */
+
 #if defined WITH_QMI
 
 static void
@@ -410,6 +413,9 @@ wdm_probe_qmi (MMPortProbe *self)
 
     return FALSE;
 }
+
+/***************************************************************/
+/* QCDM */
 
 static void
 serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
@@ -567,6 +573,59 @@ serial_probe_qcdm (MMPortProbe *self)
     return FALSE;
 }
 
+/***************************************************************/
+/* AT */
+
+static const gchar *non_at_strings[] = {
+    /* Option Icera-based devices */
+    "option/faema_",
+    "os_logids.h",
+    /* Sierra CnS port */
+    "NETWORK SERVICE CHANGE",
+    "/SRC/AMSS",
+    NULL
+};
+
+static const guint8 zerobuf[32] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static gboolean
+is_non_at_response (const guint8 *data, gsize len)
+{
+    const gchar **iter;
+    size_t iter_len;
+    int i;
+
+    /* Some devices (observed on a ZTE branded "QUALCOMM INCORPORATED" model
+     * "154") spew NULLs from some ports.
+     */
+    if (   (len >= sizeof (zerobuf))
+        && (memcmp (data, zerobuf, sizeof (zerobuf)) == 0))
+        return TRUE;
+
+    /* Check for a well-known non-AT response.  There are some ports (eg many
+     * Icera-based chipsets, Qualcomm Gobi devices before their firmware is
+     * loaded, Sierra CnS ports) that just shouldn't be probed for AT capability
+     * if we get a certain response since that response means they aren't AT
+     * ports.  Also, kernel bugs (at least with 2.6.31 and 2.6.32) trigger port
+     * flow control kernel oopses if we read too much data for these ports.
+     */
+    for (iter = &non_at_strings[0]; iter && *iter; iter++) {
+        /* Search in the response for the item; the response could have embedded
+         * nulls so we can't use memcmp() or strstr() on the whole response.
+         */
+        iter_len = strlen (*iter);
+        for (i = 0; (len >= iter_len) && (i < len - iter_len); i++) {
+            if (!memcmp (&data[i], *iter, iter_len))
+                return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 static void
 serial_probe_at_icera_result_processor (MMPortProbe *self,
                                         GVariant *result)
@@ -650,6 +709,16 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
         task->at_result_processor (self, NULL);
+        serial_probe_schedule (self);
+        return;
+    }
+
+    /* Early-abort AT probing if we get a response that indicates this is
+     * certainly not an AT-capable port.
+     */
+    if (response && is_non_at_response ((const guint8 *) response->str, response->len)) {
+        task->at_result_processor (self, NULL);
+        mm_port_probe_set_result_at (self, FALSE);
         serial_probe_schedule (self);
         return;
     }
@@ -777,6 +846,8 @@ at_custom_init_ready (MMPortProbe *self,
     serial_probe_schedule (self);
 }
 
+/***************************************************************/
+
 static void
 serial_probe_schedule (MMPortProbe *self)
 {
@@ -862,69 +933,15 @@ serial_flash_done (MMSerialPort *port,
     serial_probe_schedule (self);
 }
 
-static const gchar *dq_strings[] = {
-    /* Option Icera-based devices */
-    "option/faema_",
-    "os_logids.h",
-    /* Sierra CnS port */
-    "NETWORK SERVICE CHANGE",
-    "/SRC/AMSS",
-    NULL
-};
-
-static const guint8 zerobuf[32] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
 static void
 serial_buffer_full (MMSerialPort *serial,
                     GByteArray *buffer,
                     MMPortProbe *self)
 {
-    const gchar **iter;
-    size_t iter_len;
-    int i;
-
-    /* Some devices (observed on a ZTE branded "QUALCOMM INCORPORATED" model
-     * "154") spew NULLs from some ports.
-     */
-    if (   (buffer->len >= sizeof (zerobuf))
-        && (memcmp (buffer->data, zerobuf, sizeof (zerobuf)) == 0)) {
+    if (is_non_at_response (buffer->data, buffer->len)) {
         mm_serial_port_close (serial);
-        port_probe_run_task_complete (self->priv->task,
-                                      FALSE,
-                                      g_error_new_literal (MM_CORE_ERROR,
-                                                           MM_CORE_ERROR_FAILED,
-                                                           "Probing stopped due to non-AT response"));
-        return;
-    }
-
-    /* Check for an immediate disqualification response.  There are some
-     * ports (Option Icera-based chipsets have them, as do Qualcomm Gobi
-     * devices before their firmware is loaded) that just shouldn't be
-     * probed if we get a certain response because we know they can't be
-     * used.  Kernel bugs (at least with 2.6.31 and 2.6.32) also trigger port
-     * flow control kernel oopses if we read too much data for these ports.
-     */
-
-    for (iter = &dq_strings[0]; iter && *iter; iter++) {
-        /* Search in the response for the item; the response could have embedded
-         * nulls so we can't use memcmp() or strstr() on the whole response.
-         */
-        iter_len = strlen (*iter);
-        for (i = 0; i < buffer->len - iter_len; i++) {
-            if (!memcmp (&buffer->data[i], *iter, iter_len)) {
-                /* Immediately close the port and complete probing */
-                mm_serial_port_close (serial);
-                port_probe_run_task_complete (self->priv->task,
-                                              FALSE,
-                                              g_error_new_literal (MM_CORE_ERROR,
-                                                                   MM_CORE_ERROR_FAILED,
-                                                                   "Probing stopped due to non-AT response"));
-                return;
-            }
-        }
+        mm_port_probe_set_result_at (self, FALSE);
+        serial_probe_schedule (self);
     }
 }
 
