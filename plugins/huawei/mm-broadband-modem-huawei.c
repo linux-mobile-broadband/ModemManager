@@ -1203,11 +1203,21 @@ modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
                                         user_data,
                                         modem_cdma_setup_unsolicited_events);
 
-    /* Chain up parent's setup */
-    iface_modem_cdma_parent->setup_unsolicited_events (
-        self,
-        (GAsyncReadyCallback)parent_cdma_setup_unsolicited_events_ready,
-        result);
+    /* Chain up parent's setup if needed */
+    if (iface_modem_cdma_parent->setup_unsolicited_events &&
+        iface_modem_cdma_parent->setup_unsolicited_events_finish) {
+        iface_modem_cdma_parent->setup_unsolicited_events (
+            self,
+            (GAsyncReadyCallback)parent_cdma_setup_unsolicited_events_ready,
+            result);
+        return;
+    }
+
+    /* Otherwise just run our setup and complete */
+    set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), TRUE);
+    g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (result), TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 static void
