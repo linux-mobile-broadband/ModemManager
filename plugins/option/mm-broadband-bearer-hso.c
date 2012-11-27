@@ -495,8 +495,6 @@ connect_cancelled_cb (GCancellable *cancellable,
     /* Remove the cancellable
      * NOTE: we shouldn't remove the timeout yet. We still need to wait
      * to get connected before running the explicit connection reset */
-    g_cancellable_disconnect (ctx->cancellable,
-                              self->priv->connect_cancellable_id);
     self->priv->connect_cancellable_id = 0;
 
     /* Store cancelled error */
