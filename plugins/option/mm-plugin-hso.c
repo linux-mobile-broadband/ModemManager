@@ -89,7 +89,12 @@ hso_custom_init (MMPortProbe *probe,
                 mm_port_probe_set_result_qcdm (probe, FALSE);
             } else if (g_str_has_prefix (contents, "Diag")) {
                 g_object_set_data (G_OBJECT (probe), TAG_HSO_DIAG, GUINT_TO_POINTER (TRUE));
-                mm_port_probe_set_result_qcdm (probe, TRUE);
+                mm_port_probe_set_result_at (probe, FALSE);
+
+                /* Don't automatically tag as QCDM, as the 'hso' driver reports
+                 * a DIAG port for some Icera-based modems, which don't have
+                 * QCDM ports since they aren't made by Qualcomm.
+                 */
             }
             g_free (contents);
         }
