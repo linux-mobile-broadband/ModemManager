@@ -435,10 +435,13 @@ parse_caps_gcap (MMBaseModem *self,
     const ModemCaps *cap = modem_caps;
     guint32 ret = 0;
 
+    if (!response)
+        return FALSE;
+
     /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
      * will respond to ATI.  Ignore the error and continue.
      */
-    if (response && strstr (response, "+CME ERROR:"))
+    if (strstr (response, "+CME ERROR:"))
         return FALSE;
 
     while (cap->name) {
@@ -465,6 +468,9 @@ parse_caps_cpin (MMBaseModem *self,
                  GVariant **result,
                  GError **result_error)
 {
+    if (!response)
+        return FALSE;
+
     if (strcasestr (response, "SIM PIN") ||
         strcasestr (response, "SIM PUK") ||
         strcasestr (response, "PH-SIM PIN") ||
@@ -498,6 +504,9 @@ parse_caps_cgmm (MMBaseModem *self,
                  GVariant **result,
                  GError **result_error)
 {
+    if (!response)
+        return FALSE;
+
     /* This check detects some really old Motorola GPRS dongles and phones */
     if (strstr (response, "GSM900") ||
         strstr (response, "GSM1800") ||
