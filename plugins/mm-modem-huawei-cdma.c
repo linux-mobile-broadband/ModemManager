@@ -30,7 +30,10 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-G_DEFINE_TYPE (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA)
+static void modem_cdma_init (MMModemCdma *cdma_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_CDMA, modem_cdma_init));
 
 
 MMModem *
@@ -67,15 +70,20 @@ mm_modem_huawei_cdma_new (const char *device,
                                    NULL));
 }
 
+/*****************************************************************************/
+
 /* Unsolicited message handlers */
 
-static gint
-parse_quality (const char *str, const char *detail)
+static int
+parse_quality (const char *str, const char *tag, const char *detail)
 {
-    long int quality = 0;
+    unsigned long int quality = 0;
+
+    if (tag)
+        str = mm_strip_tag (str, tag);
 
     errno = 0;
-    quality = strtol (str, NULL, 10);
+    quality = strtoul (str, NULL, 10);
     if (errno == 0) {
         quality = CLAMP (quality, 0, 100);
         mm_dbg ("%s: %ld", detail, quality);
@@ -94,7 +102,7 @@ handle_1x_quality_change (MMAtSerialPort *port,
     gint quality;
 
     str = g_match_info_fetch (match_info, 1);
-    quality = parse_quality (str, "1X signal quality");
+    quality = parse_quality (str, NULL, "1X unsolicited signal quality");
     g_free (str);
 
     if (quality >= 0)
@@ -111,11 +119,131 @@ handle_evdo_quality_change (MMAtSerialPort *port,
     gint quality;
 
     str = g_match_info_fetch (match_info, 1);
-    quality = parse_quality (str, "EVDO signal quality");
+    quality = parse_quality (str, NULL, "EVDO unsolicited signal quality");
     g_free (str);
 
     if (quality >= 0)
         mm_generic_cdma_update_evdo_quality (MM_GENERIC_CDMA (self), (guint32) quality);
+}
+
+static void
+parent_csq_done (MMModem *modem,
+                 guint32 result,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_1x_signal_quality_done (MMAtSerialPort *port,
+                            GString *response,
+                            GError *error,
+                            gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCdma *parent_iface;
+    int quality;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error || !response || !response->str) {
+        /* Fallback to parent's method */
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (info->modem));
+        parent_iface->get_signal_quality (MM_MODEM_CDMA (info->modem), parent_csq_done, info);
+        return;
+    }
+
+    quality = parse_quality (response->str, "^CSQLVL:", "1X requested signal quality");
+    if (quality == 0) {
+        /* 0 means no service */
+        info->error = g_error_new_literal (MM_MOBILE_ERROR,
+                                           MM_MOBILE_ERROR_NO_NETWORK,
+                                           "No service");
+    } else if (quality > 0) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER ((guint32) quality), NULL);
+        mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (info->modem), (guint32) quality);
+    } else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse signal quality results");
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_evdo_signal_quality_done (MMAtSerialPort *port,
+                              GString *response,
+                              GError *error,
+                              gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCdma *parent_iface;
+    int quality;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error || !response || !response->str) {
+        /* Fallback to parent's method */
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (info->modem));
+        parent_iface->get_signal_quality (MM_MODEM_CDMA (info->modem), parent_csq_done, info);
+        return;
+    }
+
+    quality = parse_quality (response->str, "^HDRCSQLVL:", "EVDO requested signal quality");
+    if (quality >= 0) {
+        /* We only get here if EVDO is registered, so we don't treat
+         * 0 signal as "no service" for EVDO.
+         */
+        mm_callback_info_set_result (info, GUINT_TO_POINTER ((guint32) quality), NULL);
+        mm_generic_cdma_update_evdo_quality (MM_GENERIC_CDMA (info->modem), (guint32) quality);
+    } else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse signal quality results");
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_signal_quality (MMModemCdma *modem,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMModemCdma *parent_iface;
+    MMAtSerialPort *port;
+    MMModemCdmaRegistrationState evdo_reg_state;
+
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), NULL);
+    if (!port) {
+        /* Let the superclass handle it */
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (modem));
+        parent_iface->get_signal_quality (MM_MODEM_CDMA (modem), callback, user_data);
+        return;
+    }
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    evdo_reg_state = mm_generic_cdma_evdo_get_registration_state_sync (MM_GENERIC_CDMA (modem));
+    if (evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        mm_at_serial_port_queue_command (port, "^HDRCSQLVL", 3, get_evdo_signal_quality_done, info);
+    else
+        mm_at_serial_port_queue_command (port, "^CSQLVL", 3, get_1x_signal_quality_done, info);
 }
 
 /*****************************************************************************/
@@ -252,6 +380,12 @@ port_grabbed (MMGenericCdma *cdma,
 }
 
 /*****************************************************************************/
+
+static void
+modem_cdma_init (MMModemCdma *cdma_class)
+{
+    cdma_class->get_signal_quality = get_signal_quality;
+}
 
 static void
 mm_modem_huawei_cdma_init (MMModemHuaweiCdma *self)
