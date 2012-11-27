@@ -116,6 +116,7 @@ load_access_technologies_finish (MMIfaceModem *self,
     GRegex *r;
     GMatchInfo *match_info = NULL;
     gint srv_stat = 0;
+    GError *inner_error = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
@@ -125,8 +126,19 @@ load_access_technologies_finish (MMIfaceModem *self,
     r = g_regex_new ("\\^SYSINFO:\\s*(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?)$", G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, error)) {
-        g_prefix_error (error, "Could not parse ^SYSINFO results: ");
+    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, &inner_error)) {
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            g_prefix_error (error, "Could not parse ^SYSINFO results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match ^SYSINFO reply");
+        }
+
+        if (match_info)
+            g_match_info_unref (match_info);
         g_regex_unref (r);
         return FALSE;
     }
