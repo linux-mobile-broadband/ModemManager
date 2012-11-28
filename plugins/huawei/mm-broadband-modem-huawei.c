@@ -72,11 +72,72 @@ struct _MMBroadbandModemHuaweiPrivate {
 };
 
 /*****************************************************************************/
+
+static gboolean
+sysinfo_parse (const char *reply,
+               guint *out_srv_status,
+               guint *out_srv_domain,
+               guint *out_roam_status,
+               guint *out_sys_mode,
+               guint *out_sim_state,
+               gboolean *out_sys_submode_valid,
+               guint *out_sys_submode,
+               GError **error)
+{
+    gboolean matched;
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+
+    /* Can't just use \d here since sometimes you get "^SYSINFO:2,1,0,3,1,,3" */
+    r = g_regex_new ("\\^SYSINFO:\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),?(\\d*),?(\\d*)$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    matched = g_regex_match_full (r, reply, -1, 0, 0, &match_info, &match_error);
+    if (!matched) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse ^SYSINFO results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match ^SYSINFO reply");
+        }
+    } else {
+        if (out_srv_status)
+            mm_get_uint_from_match_info (match_info, 1, out_srv_status);
+        if (out_srv_domain)
+            mm_get_uint_from_match_info (match_info, 2, out_srv_domain);
+        if (out_roam_status)
+            mm_get_uint_from_match_info (match_info, 3, out_roam_status);
+        if (out_sys_mode)
+            mm_get_uint_from_match_info (match_info, 4, out_sys_mode);
+        if (out_sim_state)
+            mm_get_uint_from_match_info (match_info, 5, out_sim_state);
+
+        /* Remember that g_match_info_get_match_count() includes match #0 */
+        if (g_match_info_get_match_count (match_info) >= 8) {
+            if (out_sys_submode_valid) {
+                *out_sys_submode_valid = TRUE;
+                mm_get_uint_from_match_info (match_info, 7, out_sys_submode);
+            }
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+    return matched;
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static MMModemAccessTechnology
-huawei_sysinfo_to_act (gint huawei)
+huawei_sysinfo_submode_to_act (gint huawei)
 {
+    /* new more detailed system mode/access technology */
     switch (huawei) {
     case 1:
         return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
@@ -92,9 +153,44 @@ huawei_sysinfo_to_act (gint huawei)
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 7:
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-    case 9:
+    case 9:  /* HSPA+ */
+    case 17: /* HSPA+ (64QAM) */
+    case 18: /* HSPA+ (MIMO) */
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    case 10:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case 11:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    case 12:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+    case 13:  /* 1xRTT */
+    case 16:  /* 3xRTT */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
     case 8:
+        /* TD-SCDMA */
+    default:
+        break;
+    }
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static MMModemAccessTechnology
+huawei_sysinfo_sysmode_to_act (gint huawei)
+{
+    /* Older, less detailed system mode/access technology */
+    switch (huawei) {
+    case 2:  /* CDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 3:  /* GSM/GPRS */
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    case 4:  /* HDR */
+    case 8:  /* CDMA/HDR hybrid */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case 5:  /* WCDMA */
+    case 7:  /* GSM/WCDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 15:
         /* TD-SCDMA */
     default:
         break;
@@ -112,48 +208,26 @@ load_access_technologies_finish (MMIfaceModem *self,
 {
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     const gchar *result;
-    gchar *str;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    gint srv_stat = 0;
-    GError *inner_error = NULL;
+    char *str;
+    guint srv_stat = 0;
+    gboolean submode_valid = FALSE;
+    guint submode = 0;
+    guint sysmode = 0;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
         return FALSE;
 
-    /* Can't just use \d here since sometimes you get "^SYSINFO:2,1,0,3,1,,3" */
-    r = g_regex_new ("\\^SYSINFO:\\s*(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?)$", G_REGEX_UNGREEDY, 0, NULL);
-    g_assert (r != NULL);
-
-    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, &inner_error)) {
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            g_prefix_error (error, "Could not parse ^SYSINFO results: ");
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't match ^SYSINFO reply");
-        }
-
-        if (match_info)
-            g_match_info_unref (match_info);
-        g_regex_unref (r);
+    if (!sysinfo_parse (result, &srv_stat, NULL, NULL, &sysmode, NULL, &submode_valid, &submode, error))
         return FALSE;
-    }
-
-    str = g_match_info_fetch (match_info, 1);
-    if (str && str[0])
-        srv_stat = atoi (str);
-    g_free (str);
 
     if (srv_stat != 0) {
         /* Valid service */
-        str = g_match_info_fetch (match_info, 7);
-        if (str && str[0])
-            act = huawei_sysinfo_to_act (atoi (str));
-        g_free (str);
+        if (submode_valid)
+            act = huawei_sysinfo_submode_to_act (submode);
+
+        if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            act = huawei_sysinfo_sysmode_to_act (sysmode);
     }
 
     str = mm_modem_access_technology_build_string_from_mask (act);
@@ -162,9 +236,6 @@ load_access_technologies_finish (MMIfaceModem *self,
 
     *access_technologies = act;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return TRUE;
 }
 
@@ -719,7 +790,7 @@ huawei_mode_changed (MMAtSerialPort *port,
     g_free (str);
 
     str = g_match_info_fetch (match_info, 2);
-    act = huawei_sysinfo_to_act (atoi (str));
+    act = huawei_sysinfo_submode_to_act (atoi (str));
     g_free (str);
 
     switch (a) {
@@ -1414,8 +1485,9 @@ sysinfo_ready (MMIfaceModemCdma *self,
 {
     GError *error = NULL;
     const gchar *response;
-    GRegex *r;
-    GMatchInfo *match_info;
+    guint srv_stat = 0;
+    guint sysmode = 0;
+    guint roaming = 0;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
 
@@ -1429,57 +1501,36 @@ sysinfo_ready (MMIfaceModemCdma *self,
         return;
     }
 
-    response = mm_strip_tag (response, "^SYSINFO:");
+    if (!sysinfo_parse (response, &srv_stat, NULL, &roaming, &sysmode, NULL, NULL, NULL, NULL)) {
+        /* NOTE: always complete NOT in idle here */
+        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
+        detailed_registration_state_context_complete_and_free (ctx);
+        return;
+    }
 
-    /* Format is "<srv_status>,<srv_domain>,<roam_status>,<sys_mode>,<sim_state>" */
-    r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)",
-                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (r != NULL);
+    if (srv_stat == 2) {
+        MMModemCdmaRegistrationState reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
 
-    /* Try to parse the results */
-
-    g_regex_match (r, response, 0, &match_info);
-    if (g_match_info_get_match_count (match_info) >= 5) {
-        MMModemCdmaRegistrationState reg_state;
-        guint val = 0;
-
-        /* At this point the generic code already knows we've been registered */
-        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
-
-        if (mm_get_uint_from_match_info (match_info, 1, &val)) {
-            if (val == 2) {
-                /* Service available, check roaming state */
-                val = 0;
-                if (mm_get_uint_from_match_info (match_info, 3, &val)) {
-                    if (val == 0)
-                        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
-                    else if (val == 1)
-                        reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
-                }
-            }
-        }
+        /* Service available, check roaming state */
+        if (roaming == 0)
+            reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+        else if (roaming == 1)
+            reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
 
         /* Check service type */
-        val = 0;
-        if (mm_get_uint_from_match_info (match_info, 4, &val)) {
-            if (val == 2)
-                ctx->state.detailed_cdma1x_state = reg_state;
-            else if (val == 4)
-                ctx->state.detailed_evdo_state = reg_state;
-            else if (val == 8) {
-                ctx->state.detailed_cdma1x_state = reg_state;
-                ctx->state.detailed_evdo_state = reg_state;
-            }
+        if (sysmode == 2)
+            ctx->state.detailed_cdma1x_state = reg_state;
+        else if (sysmode == 4)
+            ctx->state.detailed_evdo_state = reg_state;
+        else if (sysmode == 8) {
+            ctx->state.detailed_cdma1x_state = reg_state;
+            ctx->state.detailed_evdo_state = reg_state;
         } else {
             /* Say we're registered to something even though sysmode parsing failed */
             mm_dbg ("SYSMODE parsing failed: assuming registered at least in CDMA1x");
-            ctx->state.detailed_cdma1x_state = reg_state;
+            ctx->state.detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
         }
-    } else
-        mm_warn ("Huawei: failed to parse ^SYSINFO response: '%s'", response);
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    }
 
     /* NOTE: always complete NOT in idle here */
     g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
