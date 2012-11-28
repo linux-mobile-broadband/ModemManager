@@ -42,6 +42,7 @@ static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
+static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 static MMIfaceModemCdma *iface_modem_cdma_parent;
 
@@ -1216,7 +1217,6 @@ decode (MMIfaceModem3gppUssd *self,
 }
 
 /*****************************************************************************/
-/* Setup/Cleanup unsolicited events (CDMA interface) */
 
 static void
 huawei_1x_signal_changed (MMAtSerialPort *port,
@@ -1247,6 +1247,132 @@ huawei_evdo_signal_changed (MMAtSerialPort *port,
     mm_dbg ("EVDO signal quality: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
 }
+
+/* Signal quality loading (Modem interface) */
+
+static guint
+modem_load_signal_quality_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return 0;
+
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_signal_quality_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    guint signal_quality;
+
+    signal_quality = iface_modem_parent->load_signal_quality_finish (self, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (signal_quality),
+                                                   NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+signal_ready (MMBaseModem *self,
+              GAsyncResult *res,
+              GSimpleAsyncResult *simple)
+{
+    const gchar *response, *command;
+    gchar buf[5];
+    guint quality = 0, i = 0;
+
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (!response) {
+        /* Fallback to parent's method */
+        iface_modem_parent->load_signal_quality (
+            MM_IFACE_MODEM (self),
+            (GAsyncReadyCallback)parent_load_signal_quality_ready,
+            simple);
+        return;
+    }
+
+    command = g_object_get_data (G_OBJECT (simple), "command");
+    g_assert (command);
+    response = mm_strip_tag (response, command);
+    /* 'command' won't include the trailing ':' in the response, so strip that */
+    while ((*response == ':') || isspace (*response))
+        response++;
+
+    /* Sanitize response for mm_get_uint_from_str() which wants only digits */
+    memset (buf, 0, sizeof (buf));
+    while (i < (sizeof (buf) - 1) && isdigit (*response))
+        buf[i++] = *response++;
+
+    if (mm_get_uint_from_str (buf, &quality)) {
+        quality = CLAMP (quality, 0, 100);
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (quality),
+                                                   NULL);
+    } else {
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't parse %s response: '%s'",
+                                         command, response);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_signal_quality (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    const char *command = "^CSQLVL";
+
+    mm_dbg ("loading signal quality...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_signal_quality);
+
+    /* 3GPP modems can just run parent's signal quality loading */
+    if (mm_iface_modem_is_3gpp (self)) {
+        iface_modem_parent->load_signal_quality (
+            self,
+            (GAsyncReadyCallback)parent_load_signal_quality_ready,
+            result);
+        return;
+    }
+
+    /* CDMA modems need custom signal quality loading */
+
+    g_object_get (G_OBJECT (self),
+                  MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE, &evdo_state,
+                  NULL);
+    if (evdo_state > MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        command = "^HDRCSQLVL";
+    g_object_set_data (G_OBJECT (result), "command", (gpointer) command);
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)signal_ready,
+        result);
+}
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited events (CDMA interface) */
 
 static void
 set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
@@ -1732,6 +1858,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
@@ -1744,6 +1872,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_signal_quality = modem_load_signal_quality;
+    iface->load_signal_quality_finish = modem_load_signal_quality_finish;
 }
 
 static void
