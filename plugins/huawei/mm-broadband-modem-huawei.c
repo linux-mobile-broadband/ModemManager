@@ -1498,11 +1498,20 @@ modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
     /* Our own cleanup first */
     set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
 
-    /* And now chain up parent's cleanup */
-    iface_modem_cdma_parent->cleanup_unsolicited_events (
-        self,
-        (GAsyncReadyCallback)parent_cdma_cleanup_unsolicited_events_ready,
-        result);
+    /* Chain up parent's setup if needed */
+    if (iface_modem_cdma_parent->cleanup_unsolicited_events &&
+        iface_modem_cdma_parent->cleanup_unsolicited_events_finish) {
+        iface_modem_cdma_parent->cleanup_unsolicited_events (
+            self,
+            (GAsyncReadyCallback)parent_cdma_cleanup_unsolicited_events_ready,
+            result);
+        return;
+    }
+
+    /* Otherwise we're done */
+    g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (result), TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
