@@ -784,13 +784,16 @@ huawei_mode_changed (MMAtSerialPort *port,
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     gchar *str;
     gint a;
+    guint32 mask = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     str = g_match_info_fetch (match_info, 1);
     a = atoi (str);
     g_free (str);
 
+    /* CDMA/EVDO devices may not send this */
     str = g_match_info_fetch (match_info, 2);
-    act = huawei_sysinfo_submode_to_act (atoi (str));
+    if (str[0])
+        act = huawei_sysinfo_submode_to_act (atoi (str));
     g_free (str);
 
     switch (a) {
@@ -804,6 +807,7 @@ huawei_mode_changed (MMAtSerialPort *port,
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
+        mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
         break;
 
     case 5:
@@ -816,6 +820,36 @@ huawei_mode_changed (MMAtSerialPort *port,
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
+        mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+        break;
+
+    case 2:
+        /* CDMA mode */
+        if (act != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN &&
+            act != MM_MODEM_ACCESS_TECHNOLOGY_1XRTT) {
+            str = mm_modem_access_technology_build_string_from_mask (act);
+            mm_warn ("Unexpected access technology (%s) in CDMA mode", str);
+            g_free (str);
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        }
+        if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            act = MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+        mask = MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK;
+        break;
+
+    case 4:  /* HDR mode */
+    case 8:  /* CDMA/HDR hybrid mode */
+        if (act != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN &&
+            (act < MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 ||
+             act > MM_MODEM_ACCESS_TECHNOLOGY_EVDOB)) {
+            str = mm_modem_access_technology_build_string_from_mask (act);
+            mm_warn ("Unexpected access technology (%s) in EVDO mode", str);
+            g_free (str);
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        }
+        if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            act = MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+        mask = MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK;
         break;
 
     case 0:
@@ -831,9 +865,7 @@ huawei_mode_changed (MMAtSerialPort *port,
     mm_dbg ("Access Technology: '%s'", str);
     g_free (str);
 
-    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                               act,
-                                               MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self), act, mask);
 }
 
 static void
@@ -1244,6 +1276,13 @@ set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             enable ? (MMAtSerialUnsolicitedMsgFn)huawei_evdo_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
+        /* Access technology related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->mode_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_mode_changed : NULL,
+            enable ? self : NULL,
+            NULL);
     }
 }
 
@@ -1650,8 +1689,13 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->hrssilvl_regex = g_regex_new ("\\r\\n\\^HRSSILVL:(\\d+)\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    self->priv->mode_regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n",
+
+    /* 3GPP: <cr><lf>^MODE:5<cr><lf>
+     * CDMA: <cr><lf>^MODE: 2<cr><cr><lf>
+     */
+    self->priv->mode_regex = g_regex_new ("\\r\\n\\^MODE:\\s*(\\d*),?(\\d*)\\r+\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
     self->priv->dsflowrpt_regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n",
                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->boot_regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n",
