@@ -655,6 +655,31 @@ set_bands (MMIfaceModem *self,
 /* Load initial allowed/preferred modes (Modem interface) */
 
 static gboolean
+parse_prefmode (const gchar *response, MMModemMode *preferred, GError **error)
+{
+    int a;
+
+    response = mm_strip_tag (response, "^PREFMODE:");
+    a = atoi (response);
+    if (a == 2) {
+        *preferred = MM_MODEM_MODE_2G;
+        return TRUE;
+    } else if (a == 4) {
+        *preferred = MM_MODEM_MODE_3G;
+        return TRUE;
+    } else if (a == 8) {
+        *preferred = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
+        return TRUE;
+    }
+
+    g_set_error_literal (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Failed to parse ^PREFMODE response");
+    return FALSE;
+}
+
+static gboolean
 load_allowed_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
@@ -667,6 +692,14 @@ load_allowed_modes_finish (MMIfaceModem *self,
     if (!response)
         return FALSE;
 
+    if (mm_iface_modem_is_cdma_only (self)) {
+        /* CDMA-only devices always support 2G and 3G if they have 3G, so just
+         * use the modes from GCAP as the list of allowed modes.
+         */
+        *allowed = mm_iface_modem_get_supported_modes (self);
+        return parse_prefmode (response, preferred, error);
+    }
+
     return parse_syscfg (response, NULL, allowed, preferred, error);
 }
 
@@ -675,9 +708,13 @@ load_allowed_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
+    const char *command;
+
     mm_dbg ("loading allowed_modes (huawei)...");
+
+    command = mm_iface_modem_is_cdma_only (self) ? "^PREFMODE?" : "^SYSCFG?";
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^SYSCFG?",
+                              command,
                               3,
                               FALSE,
                               callback,
@@ -686,6 +723,33 @@ load_allowed_modes (MMIfaceModem *self,
 
 /*****************************************************************************/
 /* Set allowed modes (Modem interface) */
+
+static gboolean
+allowed_mode_to_prefmode (MMModemMode allowed, guint *huawei_mode, GError **error)
+{
+    char *allowed_str;
+
+    *huawei_mode = 0;
+    if (allowed == MM_MODEM_MODE_ANY)
+        *huawei_mode = 8;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))
+        *huawei_mode = 8;
+    else if (allowed == MM_MODEM_MODE_2G)
+        *huawei_mode = 2;
+    else if (allowed == MM_MODEM_MODE_3G)
+        *huawei_mode = 4;
+    else {
+        /* Not supported */
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Requested mode (allowed: '%s') not supported by the modem.",
+                     allowed_str);
+        g_free (allowed_str);
+    }
+    return *huawei_mode ? TRUE : FALSE;
+}
 
 static gboolean
 set_allowed_modes_finish (MMIfaceModem *self,
@@ -720,8 +784,8 @@ set_allowed_modes (MMIfaceModem *self,
                    gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    gchar *command;
-    guint mode;
+    gchar *command = NULL;
+    guint mode = 0;
     guint acquisition_order;
     GError *error = NULL;
 
@@ -730,25 +794,32 @@ set_allowed_modes (MMIfaceModem *self,
                                         user_data,
                                         set_allowed_modes);
 
-    if (!allowed_mode_to_huawei (allowed,
-                                 preferred,
-                                 &mode,
-                                 &acquisition_order,
-                                 &error)) {
+    if (mm_iface_modem_is_cdma_only (self)) {
+        if (allowed_mode_to_prefmode (allowed, &mode, &error))
+            command = g_strdup_printf ("^PREFMODE=%d", mode);
+    } else {
+        if (allowed_mode_to_huawei (allowed,
+                                    preferred,
+                                    &mode,
+                                    &acquisition_order,
+                                    &error))
+            command = g_strdup_printf ("AT^SYSCFG=%d,%d,40000000,2,4", mode, acquisition_order);
+    }
+
+    if (command) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            command,
+            3,
+            FALSE,
+            (GAsyncReadyCallback)allowed_mode_update_ready,
+            result);
+    } else {
+        g_assert (error);
         g_simple_async_result_take_error (result, error);
         g_simple_async_result_complete_in_idle (result);
         g_object_unref (result);
-        return;
     }
-
-    command = g_strdup_printf ("AT^SYSCFG=%d,%d,40000000,2,4", mode, acquisition_order);
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        command,
-        3,
-        FALSE,
-        (GAsyncReadyCallback)allowed_mode_update_ready,
-        result);
     g_free (command);
 }
 
