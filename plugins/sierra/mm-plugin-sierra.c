@@ -100,7 +100,7 @@ gcap_ready (MMAtSerialPort *port,
          * for command and status while connected.  Older modems (ie 8775) say
          * they can but fail during PPP.
          */
-        if (strstr (response->str, "C885"))
+        if (strstr (response->str, "C885") || strstr (response->str, "USB 306"))
             g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
 
         /* For debugging: let users figure out if their device supports it or not */
