@@ -2289,11 +2289,13 @@ simple_reg_callback (MMModemCdma *modem,
         /* Not registered yet, queue up a retry */
         priv->reg_tries++;
         if (priv->reg_tries > 15) {
-            error = g_error_new_literal (MM_MOBILE_ERROR,
-                                         MM_MOBILE_ERROR_NO_NETWORK,
-                                         "No service");
-            simple_state_machine (MM_MODEM (modem), error, info);
-            g_error_free (error);
+            GError *inner_error;
+
+            inner_error = g_error_new_literal (MM_MOBILE_ERROR,
+                                               MM_MOBILE_ERROR_NO_NETWORK,
+                                               "No service");
+            simple_state_machine (MM_MODEM (modem), inner_error, info);
+            g_error_free (inner_error);
             return;
         }
 
@@ -2722,4 +2724,3 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *generic_class)
                                   TRUE,
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
-
