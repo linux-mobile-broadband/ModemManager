@@ -2280,7 +2280,6 @@ simple_reg_callback (MMModemCdma *modem,
     /* Fail immediately on anything but "no service" */
     if (error && !no_service_error) {
         simple_state_machine (MM_MODEM (modem), error, info);
-        g_error_free (error);
         return;
     }
 
