@@ -100,6 +100,7 @@ struct _MMSerialPortClass {
     /* Signals */
     void (*buffer_full)           (MMSerialPort *port, const GByteArray *buffer);
     void (*timed_out)             (MMSerialPort *port, guint n_consecutive_replies);
+    void (*forced_close)          (MMSerialPort *port);
 };
 
 GType mm_serial_port_get_type (void);

@@ -50,6 +50,7 @@ struct _MMBroadbandBearerIceraPrivate {
     gpointer connect_pending;
     guint connect_pending_id;
     gulong connect_cancellable_id;
+    gulong connect_port_closed_id;
 
     /* Disconnection related */
     gpointer disconnect_pending;
@@ -624,6 +625,12 @@ connect_timed_out_cb (MMBroadbandBearerIcera *self)
         self->priv->connect_cancellable_id = 0;
     }
 
+    /* Remove closed port watch, if found */
+    if (ctx && self->priv->connect_port_closed_id) {
+        g_signal_handler_disconnect (ctx->primary, self->priv->connect_port_closed_id);
+        self->priv->connect_port_closed_id = 0;
+    }
+
     /* Cleanup timeout ID */
     self->priv->connect_pending_id = 0;
 
@@ -662,6 +669,16 @@ connect_cancelled_cb (GCancellable *cancellable,
 
     /* We cannot reset right here, we need to wait for the connection
      * attempt to finish */
+}
+
+static void
+forced_close_cb (MMSerialPort *port,
+                 MMBroadbandBearerIcera *self)
+{
+    /* Just treat the forced close event as any other unsolicited message */
+    mm_broadband_bearer_icera_report_connection_status (
+        self,
+        MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED);
 }
 
 static void
@@ -708,7 +725,7 @@ report_connect_status (MMBroadbandBearerIcera *self,
     ctx = self->priv->connect_pending;
     self->priv->connect_pending = NULL;
 
-    /* Cleanup cancellable and timeout, if any */
+    /* Cleanup cancellable, timeout and port closed watch, if any */
     if (self->priv->connect_pending_id) {
         g_source_remove (self->priv->connect_pending_id);
         self->priv->connect_pending_id = 0;
@@ -718,6 +735,11 @@ report_connect_status (MMBroadbandBearerIcera *self,
         g_cancellable_disconnect (ctx->cancellable,
                                   self->priv->connect_cancellable_id);
         self->priv->connect_cancellable_id = 0;
+    }
+
+    if (ctx && self->priv->connect_port_closed_id) {
+        g_signal_handler_disconnect (ctx->primary, self->priv->connect_port_closed_id);
+        self->priv->connect_port_closed_id = 0;
     }
 
     switch (status) {
@@ -845,6 +867,12 @@ activate_ready (MMBaseModem *modem,
                                                                 G_CALLBACK (connect_cancelled_cb),
                                                                 self,
                                                                 NULL);
+
+    /* If we get the port closed, we treat as a connect error */
+    self->priv->connect_port_closed_id = g_signal_connect (ctx->primary,
+                                                           "forced-close",
+                                                           G_CALLBACK (forced_close_cb),
+                                                           self);
 }
 
 static void

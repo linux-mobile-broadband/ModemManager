@@ -57,6 +57,7 @@ enum {
 enum {
     BUFFER_FULL,
     TIMED_OUT,
+    FORCED_CLOSE,
 
     LAST_SIGNAL
 };
@@ -1093,6 +1094,9 @@ mm_serial_port_close_force (MMSerialPort *self)
     /* Mark as having forced the close, so that we don't warn about incorrect
      * open counts */
     priv->forced_close = TRUE;
+
+    /* Notify about the forced close status */
+    g_signal_emit (self, signals[FORCED_CLOSE], 0);
 }
 
 static void
@@ -1670,4 +1674,13 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                       NULL, NULL,
                       g_cclosure_marshal_VOID__UINT,
 					  G_TYPE_NONE, 1, G_TYPE_UINT);
+
+    signals[FORCED_CLOSE] =
+        g_signal_new ("forced-close",
+                  G_OBJECT_CLASS_TYPE (object_class),
+                  G_SIGNAL_RUN_FIRST,
+                  G_STRUCT_OFFSET (MMSerialPortClass, forced_close),
+                  NULL, NULL,
+                  g_cclosure_marshal_VOID__VOID,
+                  G_TYPE_NONE, 0);
 }

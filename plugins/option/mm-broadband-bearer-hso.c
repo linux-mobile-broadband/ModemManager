@@ -40,6 +40,7 @@ struct _MMBroadbandBearerHsoPrivate {
     gpointer connect_pending;
     guint connect_pending_id;
     gulong connect_cancellable_id;
+    gulong connect_port_closed_id;
 };
 
 /*****************************************************************************/
@@ -372,6 +373,11 @@ mm_broadband_bearer_hso_report_connection_status (MMBroadbandBearerHso *self,
         self->priv->connect_cancellable_id = 0;
     }
 
+    if (ctx && self->priv->connect_port_closed_id) {
+        g_signal_handler_disconnect (ctx->primary, self->priv->connect_port_closed_id);
+        self->priv->connect_port_closed_id = 0;
+    }
+
     switch (status) {
     case MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN:
         break;
@@ -461,6 +467,12 @@ connect_timed_out_cb (MMBroadbandBearerHso *self)
         self->priv->connect_cancellable_id = 0;
     }
 
+    /* Remove closed port watch, if found */
+    if (ctx && self->priv->connect_port_closed_id) {
+        g_signal_handler_disconnect (ctx->primary, self->priv->connect_port_closed_id);
+        self->priv->connect_port_closed_id = 0;
+    }
+
     /* Cleanup timeout ID */
     self->priv->connect_pending_id = 0;
 
@@ -505,6 +517,16 @@ connect_cancelled_cb (GCancellable *cancellable,
 }
 
 static void
+forced_close_cb (MMSerialPort *port,
+                 MMBroadbandBearerHso *self)
+{
+    /* Just treat the forced close event as any other unsolicited message */
+    mm_broadband_bearer_hso_report_connection_status (
+        self,
+        MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED);
+}
+
+static void
 activate_ready (MMBaseModem *modem,
                 GAsyncResult *res,
                 MMBroadbandBearerHso *self)
@@ -546,6 +568,12 @@ activate_ready (MMBaseModem *modem,
                                                                 G_CALLBACK (connect_cancelled_cb),
                                                                 self,
                                                                 NULL);
+
+    /* If we get the port closed, we treat as a connect error */
+    self->priv->connect_port_closed_id = g_signal_connect (ctx->primary,
+                                                           "forced-close",
+                                                           G_CALLBACK (forced_close_cb),
+                                                           self);
 }
 
 static void authenticate (Dial3gppContext *ctx);
