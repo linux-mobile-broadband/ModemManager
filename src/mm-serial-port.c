@@ -840,7 +840,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     MMSerialPortPrivate *priv;
     char *devfile;
     const char *device;
-    struct serial_struct sinfo;
+    struct serial_struct sinfo = { 0 };
     GTimeVal tv_start, tv_end;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
@@ -977,7 +977,7 @@ mm_serial_port_close (MMSerialPort *self)
 
     if (priv->fd >= 0) {
         GTimeVal tv_start, tv_end;
-        struct serial_struct sinfo;
+        struct serial_struct sinfo = { 0 };
 
         mm_info ("(%s) closing serial port...", device);
 
