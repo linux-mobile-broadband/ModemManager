@@ -11,8 +11,9 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Google Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2011 - 2012 Google Inc.
+ * Copyright (C) 2012 Huawei Technologies Co., Ltd
  */
 
 #include <config.h>
@@ -38,6 +39,8 @@
 #include "mm-iface-modem-time.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-broadband-modem-huawei.h"
+#include "mm-broadband-bearer-huawei.h"
+#include "mm-broadband-bearer.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -1237,6 +1240,80 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+huawei_modem_create_bearer_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    MMBearer *bearer;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New huawei bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+    return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_huawei_new_ready (GObject *source,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    MMBearer *bearer;
+    GError *error = NULL;
+
+    bearer = ((GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (res), "huawei-bearer"))) ?
+              mm_broadband_bearer_huawei_new_finish (res, &error) :
+              mm_broadband_bearer_new_finish (res, &error));
+
+    if (!bearer)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+huawei_modem_create_bearer (MMIfaceModem *self,
+                            MMBearerProperties *properties,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMPort *data_port;
+
+    data_port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self));
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        huawei_modem_create_bearer);
+
+    if (mm_port_get_port_type (data_port) == MM_PORT_TYPE_NET) {
+        mm_dbg ("Creating huawei bearer...");
+        g_object_set_data (G_OBJECT (result), "huawei-bearer", GUINT_TO_POINTER (TRUE));
+        mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (self),
+                                        properties,
+                                        NULL, /* cancellable */
+                                        (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
+                                        result);
+    } else {
+        mm_dbg ("Creating default bearer...");
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
+                                 properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
+                                 result);
+   }
+}
+
+
+/*****************************************************************************/
 /* USSD encode/decode (3GPP-USSD interface) */
 
 static gchar *
@@ -2078,6 +2155,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_signal_quality = modem_load_signal_quality;
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
+    iface->create_bearer = huawei_modem_create_bearer;
+    iface->create_bearer_finish = huawei_modem_create_bearer_finish;
 }
 
 static void
