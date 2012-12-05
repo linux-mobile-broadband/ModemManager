@@ -607,19 +607,33 @@ modem_load_current_capabilities (MMIfaceModem *self,
 /* Manufacturer loading (Modem interface) */
 
 static gchar *
+sanitize_info_reply (GVariant *v, const char *prefix)
+{
+    const gchar *reply, *p;
+    gchar *sanitized;
+
+    /* Strip any leading command reply */
+    reply = g_variant_get_string (v, NULL);
+    p = strstr (reply, prefix);
+    if (p)
+        reply = p + strlen (prefix);
+    sanitized = g_strdup (reply);
+    return mm_strip_quotes (g_strstrip (sanitized));
+}
+
+static gchar *
 modem_load_manufacturer_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
     GVariant *result;
-    gchar *manufacturer;
+    gchar *manufacturer = NULL;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (!result)
-        return NULL;
-
-    manufacturer = g_strstrip (g_variant_dup_string (result, NULL));
-    mm_dbg ("loaded manufacturer: %s", manufacturer);
+    if (result) {
+        manufacturer = sanitize_info_reply (result, "GMI:");
+        mm_dbg ("loaded manufacturer: %s", manufacturer);
+    }
     return manufacturer;
 }
 
@@ -653,24 +667,13 @@ modem_load_model_finish (MMIfaceModem *self,
                          GError **error)
 {
     GVariant *result;
-    const gchar *p;
-    gchar *model;
+    gchar *model = NULL;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (!result)
-        return NULL;
-
-    p = g_variant_get_string (result, NULL);
-
-    /* Some devices (e.g. ZTE MF820D) seem to include the command prefix */
-    p = mm_strip_tag (p, "+CGMM:");
-    p = mm_strip_tag (p, "+GMM:");
-    model = g_strdup (p);
-
-    /* Stripping quotes modifies string in place */
-    model = mm_strip_quotes (model);
-
-    mm_dbg ("loaded model: %s", model);
+    if (result) {
+        model = sanitize_info_reply (result, "GMM:");
+        mm_dbg ("loaded model: %s", model);
+    }
     return model;
 }
 
@@ -704,14 +707,13 @@ modem_load_revision_finish (MMIfaceModem *self,
                             GError **error)
 {
     GVariant *result;
-    gchar *revision;
+    gchar *revision = NULL;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (!result)
-        return NULL;
-
-    revision = g_strstrip (g_variant_dup_string (result, NULL));
-    mm_dbg ("loaded revision: %s", revision);
+    if (result) {
+        revision = sanitize_info_reply (result, "GMR:");
+        mm_dbg ("loaded revision: %s", revision);
+    }
     return revision;
 }
 
@@ -745,15 +747,20 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
                                         GError **error)
 {
     GVariant *result;
-    gchar *equipment_identifier;
+    gchar *equip_id = NULL, *tmp;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (!result)
-        return NULL;
-
-    equipment_identifier = g_variant_dup_string (result, NULL);
-    mm_dbg ("loaded equipment identifier: %s", equipment_identifier);
-    return equipment_identifier;
+    if (result) {
+        equip_id = sanitize_info_reply (result, "GSN:");
+        /* Some CDMA devices prefix the ESN with "0x" */
+        if (strncmp (equip_id, "0x", 2) == 0 && strlen (equip_id) == 10) {
+            tmp = g_strdup (equip_id + 2);
+            g_free (equip_id);
+            equip_id = tmp;
+        }
+        mm_dbg ("loaded equipment identifier: %s", equip_id);
+    }
+    return equip_id;
 }
 
 static const MMBaseModemAtCommand equipment_identifiers[] = {
