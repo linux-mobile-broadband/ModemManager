@@ -1474,7 +1474,10 @@ mm_string_to_access_tech (const gchar *string)
     if (strcasestr (string, "EvDO RelA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
 
-    if (strcasestr (string, "1xRTT"))
+    if (strcasestr (string, "EvDO RelB"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+
+    if (strcasestr (string, "1xRTT") || strcasestr (string, "CDMA2000 1X"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
 
     return act;
