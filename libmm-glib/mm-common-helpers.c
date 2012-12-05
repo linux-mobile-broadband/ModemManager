@@ -700,6 +700,17 @@ mm_get_int_from_match_info (GMatchInfo *match_info,
     return ret;
 }
 
+/**
+ * mm_get_uint_from_str:
+ * @str: the string to convert to an unsigned int
+ * @out: on success, the number
+ *
+ * Converts a string to an unsigned number.  All characters in the string
+ * MUST be valid digits (0 - 9), otherwise FALSE is returned.
+ *
+ * Returns: %TRUE if the string was converted, %FALSE if it was not or if it
+ * did not contain only digits.
+ */
 gboolean
 mm_get_uint_from_str (const gchar *str,
                       guint *out)
