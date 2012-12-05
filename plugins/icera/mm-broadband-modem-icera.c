@@ -1535,6 +1535,37 @@ modem_time_load_network_time (MMIfaceModemTime *self,
 }
 
 /*****************************************************************************/
+/* Check support (Time interface) */
+
+static gboolean
+modem_time_check_support_finish (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    /* We assume Icera devices always support *TLTS, since they appear
+     * to return ERROR if the modem is not powered up, and thus we cannot
+     * check for *TLTS support during modem initialization.
+     */
+    return TRUE;
+}
+
+static void
+modem_time_check_support (MMIfaceModemTime *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_time_check_support);
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -1677,7 +1708,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_time_init (MMIfaceModemTime *iface)
 {
-    /* Use default Icera implementation */
+    iface->check_support = modem_time_check_support;
+    iface->check_support_finish = modem_time_check_support_finish;
     iface->load_network_time = modem_time_load_network_time;
     iface->load_network_time_finish = modem_time_load_network_time_finish;
     iface->load_network_timezone = modem_time_load_network_timezone;
