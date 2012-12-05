@@ -1445,9 +1445,15 @@ parse_tlts_query_reply (const gchar *response,
         }
 
         if (iso8601) {
+            /* Icera modems only report a 2-digit year, while ISO-8601 requires
+             * a 4-digit year.  Assume 2000.
+             */
+            if (year < 100)
+                year += 2000;
+
             /* don't give tz info in the date/time string, we have another
              * property for that */
-            *iso8601 = g_strdup_printf ("%02d/%02d/%02d %02d:%02d:%02d",
+            *iso8601 = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
                                         year, month, day,
                                         hour, minute, second);
         }
