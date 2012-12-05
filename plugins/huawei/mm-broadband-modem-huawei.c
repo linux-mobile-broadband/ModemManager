@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <time.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -34,6 +35,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-ussd.h"
+#include "mm-iface-modem-time.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-broadband-modem-huawei.h"
 
@@ -41,6 +43,7 @@ static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
@@ -50,7 +53,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TY
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
@@ -1810,6 +1814,126 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Load network time (Time interface) */
+
+static gchar *
+modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    const gchar *response;
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+    guint year, month, day, hour, minute, second;
+    gchar *result = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+
+    /* Already in ISO-8601 format, but verify just to be sure */
+    r = g_regex_new ("\\^TIME:\\s*(\\d+)/(\\d+)/(\\d+)\\s*(\\d+):(\\d+):(\\d*)$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse ^TIME results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match ^TIME reply");
+        }
+    } else {
+        /* Remember that g_match_info_get_match_count() includes match #0 */
+        g_assert (g_match_info_get_match_count (match_info) >= 7);
+
+        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+            mm_get_uint_from_match_info (match_info, 2, &month) &&
+            mm_get_uint_from_match_info (match_info, 3, &day) &&
+            mm_get_uint_from_match_info (match_info, 4, &hour) &&
+            mm_get_uint_from_match_info (match_info, 5, &minute) &&
+            mm_get_uint_from_match_info (match_info, 6, &second)) {
+            /* Return ISO-8601 format date/time string */
+            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
+                                      year, month, day, hour, minute, second);
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse ^TIME reply");
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+    return result;
+}
+
+static void
+modem_time_load_network_time (MMIfaceModemTime *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^TIME",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Check support (Time interface) */
+
+static gboolean
+modem_time_check_support_finish (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_time_check_ready (MMBroadbandModem *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_time_check_support (MMIfaceModemTime *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_time_check_support);
+
+    /* Only CDMA devices support this at the moment */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^TIME",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)modem_time_check_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -1991,6 +2115,15 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->setup_registration_checks_finish = setup_registration_checks_finish;
     iface->get_detailed_registration_state = get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
+}
+
+static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+    iface->check_support = modem_time_check_support;
+    iface->check_support_finish = modem_time_check_support_finish;
+    iface->load_network_time = modem_time_load_network_time;
+    iface->load_network_time_finish = modem_time_load_network_time_finish;
 }
 
 static void
