@@ -1,25 +1,9 @@
-Overview of changes in ModemManager 0.5
-----------------------------------------
+Overview of changes in ModemManager 0.8.0
+-------------------------------------------
 
-- Added a mechanism to get remaining incorrect PIN attempts
-- Added a mechanism to retrieve the equipment identifier (MEID/ESN, IMEI)
-- Added support for returning devices to factory settings
-- Better compatibility with Blackberry GSM devices
-- Added a Location Services API with support for GSM devices
-- Fixes for Novatel CDMA devices (home/roaming status, better signal quality reporting)
-- Better detection of EVDO registration when device is in 1X mode
-- Add support for newer Alcatel devices like X220D
-- Support for more ZTE devices
-- Fix modem detection failures with some Sierra devices
-- Add support for newer Ericsson devices
-- Add an SIM identifier for use when auto-unlocking modems
-- Add an device identifier for use when MEID/IMEI is not yet available
-- Handle signal quality reporting for GSM modems that don't support AT+CSQ
-- Add preliminary USSD support
-- Fix reconnection attempts with some Sierra devices
-- Add support for pseduo-ethernet interface on newer Sierra devices
-
-Fixed bugs:
-rh#597296 rh#583691 rh#597088 bgo#626421 rh#585394 bgo#628105 bgo#627935
-bgo#621815 rh#632516 lp:682282 bgo#590798
+- More flexible D-Bus API that accounts for the capabilities of modern devices
+- Native support for Gobi and QMI-based Qualcomm devices via libqmi
+- Preliminary support for GPS-based Location Services with some devices
+- More complete messaging API
+- Fully-featured command-line client (mmcli)
 
