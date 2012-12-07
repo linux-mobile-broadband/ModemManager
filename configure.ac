@@ -1,6 +1,6 @@
 AC_PREREQ([2.60])
 
-AC_INIT([ModemManager],[0.7.0],[dcbw@redhat.com],[ModemManager])
+AC_INIT([ModemManager],[0.7.990],[dcbw@redhat.com],[ModemManager])
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-bzip2 -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_MAINTAINER_MODE
