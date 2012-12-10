@@ -29,9 +29,11 @@
 
 typedef struct _MMBroadbandModemSierra MMBroadbandModemSierra;
 typedef struct _MMBroadbandModemSierraClass MMBroadbandModemSierraClass;
+typedef struct _MMBroadbandModemSierraPrivate MMBroadbandModemSierraPrivate;
 
 struct _MMBroadbandModemSierra {
     MMBroadbandModem parent;
+    MMBroadbandModemSierraPrivate *priv;
 };
 
 struct _MMBroadbandModemSierraClass{

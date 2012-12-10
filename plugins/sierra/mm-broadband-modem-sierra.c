@@ -32,15 +32,28 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
+#include "mm-iface-modem-time.h"
 #include "mm-common-sierra.h"
 #include "mm-broadband-bearer-sierra.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
+
+typedef enum {
+    TIME_METHOD_UNKNOWN = 0,
+    TIME_METHOD_TIME = 1,
+    TIME_METHOD_SYSTIME = 2,
+} TimeMethod;
+
+struct _MMBroadbandModemSierraPrivate {
+    TimeMethod time_method;
+};
 
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
@@ -863,6 +876,218 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Load network time (Time interface) */
+
+static gchar *
+parse_time (const gchar *response,
+            const gchar *regex,
+            const gchar *tag,
+            GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+    guint year, month, day, hour, minute, second;
+    gchar *result = NULL;
+
+    r = g_regex_new (regex, 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse %s results: ", tag);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Couldn't match %s reply", tag);
+        }
+    } else {
+        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+            mm_get_uint_from_match_info (match_info, 2, &month) &&
+            mm_get_uint_from_match_info (match_info, 3, &day) &&
+            mm_get_uint_from_match_info (match_info, 4, &hour) &&
+            mm_get_uint_from_match_info (match_info, 5, &minute) &&
+            mm_get_uint_from_match_info (match_info, 6, &second)) {
+            /* Return ISO-8601 format date/time string */
+            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
+                                      year, month, day, hour, minute, second);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Failed to parse %s reply", tag);
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+    return result;
+}
+
+
+static gchar *
+parse_3gpp_time (const gchar *response, GError **error)
+{
+    /* Returns both local time and UTC time, but we have no good way to
+     * determine the timezone from all of that, so just report local time.
+     */
+    return parse_time (response,
+                       "\\s*!TIME:\\s+"
+                       "(\\d+)/(\\d+)/(\\d+)\\s+"
+                       "(\\d+):(\\d+):(\\d+)\\s*\\(local\\)\\s+"
+                       "(\\d+)/(\\d+)/(\\d+)\\s+"
+                       "(\\d+):(\\d+):(\\d+)\\s*\\(UTC\\)\\s*",
+                       "!TIME",
+                       error);
+}
+
+static gchar *
+parse_cdma_time (const gchar *response, GError **error)
+{
+    /* YYYYMMDDWHHMMSS */
+    return parse_time (response,
+                       "\\s*(\\d{4})(\\d{2})(\\d{2})\\d(\\d{2})(\\d{2})(\\d{2})\\s*",
+                       "!SYSTIME",
+                       error);
+}
+
+static gchar *
+modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    const gchar *response = NULL;
+    char *iso8601 = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (response) {
+        if (strstr (response, "!TIME:"))
+            iso8601 = parse_3gpp_time (response, error);
+        else
+            iso8601 = parse_cdma_time (response, error);
+    }
+    return iso8601;
+}
+
+static void
+modem_time_load_network_time (MMIfaceModemTime *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    const char *command;
+
+    switch (MM_BROADBAND_MODEM_SIERRA (self)->priv->time_method) {
+    case TIME_METHOD_TIME:
+        command = "!TIME?";
+        break;
+    case TIME_METHOD_SYSTIME:
+        command = "!SYSTIME?";
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Check support (Time interface) */
+
+enum {
+    TIME_SUPPORTED = 1,
+    SYSTIME_SUPPORTED = 2,
+};
+
+static gboolean
+modem_time_check_support_finish (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+modem_time_check_ready (MMBaseModem *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    GVariant *result;
+
+    g_simple_async_result_set_op_res_gboolean (simple, FALSE);
+
+    result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    if (!error) {
+        MMBroadbandModemSierra *sierra = MM_BROADBAND_MODEM_SIERRA (self);
+
+        sierra->priv->time_method = g_variant_get_uint32 (result);
+        if (sierra->priv->time_method != TIME_METHOD_UNKNOWN)
+            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+    g_clear_error (&error);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static gboolean
+parse_time_reply (MMBaseModem *self,
+                  gpointer none,
+                  const gchar *command,
+                  const gchar *response,
+                  gboolean last_command,
+                  const GError *error,
+                  GVariant **result,
+                  GError **result_error)
+{
+    /* If error, try next command */
+    if (!error) {
+        if (strstr (command, "!TIME"))
+            *result = g_variant_new_uint32 (TIME_METHOD_TIME);
+        else if (strstr (command, "!SYSTIME"))
+            *result = g_variant_new_uint32 (TIME_METHOD_SYSTIME);
+    }
+
+    /* Stop sequence if we get a result, but not on errors */
+    return *result ? TRUE : FALSE;
+}
+
+static const MMBaseModemAtCommand time_check_sequence[] = {
+    { "!TIME?", 3, FALSE, parse_time_reply },    /* 3GPP */
+    { "!SYSTIME?", 3, FALSE, parse_time_reply }, /* CDMA */
+    { NULL }
+};
+
+static void
+modem_time_check_support (MMIfaceModemTime *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_time_check_support);
+
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        time_check_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        (GAsyncReadyCallback)modem_time_check_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -895,6 +1120,10 @@ mm_broadband_modem_sierra_new (const gchar *device,
 static void
 mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_MODEM_SIERRA,
+                                              MMBroadbandModemSierraPrivate);
 }
 
 static void
@@ -926,9 +1155,21 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 }
 
 static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+    iface->check_support = modem_time_check_support;
+    iface->check_support_finish = modem_time_check_support_finish;
+    iface->load_network_time = modem_time_load_network_time;
+    iface->load_network_time_finish = modem_time_load_network_time_finish;
+}
+
+static void
 mm_broadband_modem_sierra_class_init (MMBroadbandModemSierraClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemSierraPrivate));
 
     broadband_modem_class->setup_ports = setup_ports;
 }
