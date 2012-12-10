@@ -58,13 +58,16 @@ full_functionality_status_ready (MMBaseModem *self,
         return;
     }
 
-    /* Most Sierra devices return OK immediately in response to CFUN=1 but
-     * need some time to finish powering up.  Give more time for older devices
-     * like the AC860, which aren't driven by the 'sierra' driver.
+    /* Many Sierra devices return OK immediately in response to CFUN=1 but
+     * need some time to finish powering up, otherwise subsequent commands
+     * may return failure or even crash the modem.  Give more time for older
+     * devices like the AC860 and C885, which aren't driven by the 'sierra_net'
+     * driver.  Assume any DirectIP (ie, sierra_net) device is new enough
+     * to allow a lower timeout.
      */
     drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
     for (i = 0; drivers[i]; i++) {
-        if (g_str_equal (drivers[i], "sierra")) {
+        if (g_str_equal (drivers[i], "sierra_net")) {
             is_new_sierra = TRUE;
             break;
         }
