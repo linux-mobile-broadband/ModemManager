@@ -582,7 +582,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
 {
     MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm);
     char *driver = NULL;
-    guint seconds = 5;
+    guint seconds = 10;
 
     if (error) {
         /* Chain up to parent */
@@ -599,17 +599,17 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* Most Sierra devices return OK immediately in response to CFUN=1 but
-     * need some time to finish powering up.
+    /* Many Sierra devices return OK immediately in response to CFUN=1 but
+     * need some time to finish powering up, otherwise subsequent commands
+     * may return failure or even crash the modem.  Give more time for older
+     * devices like the AC860 and C885, which aren't driven by the 'sierra_net'
+     * driver.  Assume any DirectIP (ie, sierra_net) device is new enough
+     * to allow a lower timeout.
      */
     g_warn_if_fail (priv->enable_wait_id == 0);
     g_object_get (G_OBJECT (gsm), MM_MODEM_DRIVER, &driver, NULL);
-    if (g_strcmp0 (driver, "sierra") != 0) {
-        /* more time for older devices like the AC860, which aren't driven
-         * by the 'sierra' driver.
-         */
-        seconds = 10;
-    }
+    if (g_strcmp0 (driver, "sierra_net") == 0)
+        seconds = 5;
 
     priv->enable_wait_id = g_timeout_add_seconds (seconds, sierra_enabled, info);
 }
