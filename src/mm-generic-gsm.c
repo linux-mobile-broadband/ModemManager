@@ -4220,39 +4220,39 @@ cid_range_read (MMAtSerialPort *port,
         r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
-        if (r) {
-            g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
-            while (cid == 0 && g_match_info_matches (match_info)) {
-                char *tmp;
+        g_assert (r);
 
-                tmp = g_match_info_fetch (match_info, 3);
-                if (!strcmp (tmp, "IP")) {
-                    int max_cid;
-                    int highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
+        g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
+        while (cid == 0 && g_match_info_matches (match_info)) {
+            char *tmp;
 
-                    g_free (tmp);
-
-                    tmp = g_match_info_fetch (match_info, 2);
-                    max_cid = atoi (tmp);
-
-                    if (highest_cid < max_cid)
-                        cid = highest_cid + 1;
-                    else
-                        cid = highest_cid;
-                }
+            tmp = g_match_info_fetch (match_info, 3);
+            if (!strcmp (tmp, "IP")) {
+                int max_cid;
+                int highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
 
                 g_free (tmp);
-                g_match_info_next (match_info, NULL);
+
+                tmp = g_match_info_fetch (match_info, 2);
+                max_cid = atoi (tmp);
+
+                if (highest_cid < max_cid)
+                    cid = highest_cid + 1;
+                else
+                    cid = highest_cid;
             }
 
-            if (cid == 0) {
-                /* Choose something */
-                cid = 1;
-            }
-
-            g_match_info_free (match_info);
-            g_regex_unref (r);
+            g_free (tmp);
+            g_match_info_next (match_info, NULL);
         }
+
+        if (cid == 0) {
+            /* Choose something */
+            cid = 1;
+        }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
     } else
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
@@ -4296,47 +4296,48 @@ existing_apns_read (MMAtSerialPort *port,
     } else if (g_str_has_prefix (response->str, "+CGDCONT:")) {
         GRegex *r;
         GMatchInfo *match_info;
+        const char *new_apn;
 
         r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S*)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
-        if (r) {
-            const char *new_apn = (const char *) mm_callback_info_get_data (info, "apn");
+        g_assert (r);
 
-            g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
-            while (!found && g_match_info_matches (match_info)) {
-                char *cid;
-                char *pdp_type;
-                char *apn;
-                int num_cid;
+        new_apn = (const char *) mm_callback_info_get_data (info, "apn");
 
-                cid = g_match_info_fetch (match_info, 1);
-                num_cid = atoi (cid);
-                pdp_type = g_match_info_fetch (match_info, 2);
-                apn = g_match_info_fetch (match_info, 3);
+        g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
+        while (!found && g_match_info_matches (match_info)) {
+            char *cid;
+            char *pdp_type;
+            char *apn;
+            int num_cid;
 
-                if (!strcmp (apn, new_apn)) {
-                    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->cid = num_cid;
-                    found = TRUE;
-                }
+            cid = g_match_info_fetch (match_info, 1);
+            num_cid = atoi (cid);
+            pdp_type = g_match_info_fetch (match_info, 2);
+            apn = g_match_info_fetch (match_info, 3);
 
-                if (!found && !strcmp (pdp_type, "IP")) {
-                    int highest_cid;
-
-                    highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
-                    if (num_cid > highest_cid)
-                        mm_callback_info_set_data (info, "highest-cid", GINT_TO_POINTER (num_cid), NULL);
-                }
-
-                g_free (cid);
-                g_free (pdp_type);
-                g_free (apn);
-                g_match_info_next (match_info, NULL);
+            if (!strcmp (apn, new_apn)) {
+                MM_GENERIC_GSM_GET_PRIVATE (info->modem)->cid = num_cid;
+                found = TRUE;
             }
 
-            g_match_info_free (match_info);
-            g_regex_unref (r);
+            if (!found && !strcmp (pdp_type, "IP")) {
+                int highest_cid;
+
+                highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
+                if (num_cid > highest_cid)
+                    mm_callback_info_set_data (info, "highest-cid", GINT_TO_POINTER (num_cid), NULL);
+            }
+
+            g_free (cid);
+            g_free (pdp_type);
+            g_free (apn);
+            g_match_info_next (match_info, NULL);
         }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
     } else if (strlen (response->str) == 0) {
         /* No APNs configured, just don't set error */
     } else
