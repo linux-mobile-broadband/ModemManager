@@ -320,15 +320,18 @@ reset_signal_handlers (MMBearer *self)
         return;
 
     if (self->priv->id_3gpp_registration_change) {
-        g_signal_handler_disconnect (self->priv->modem, self->priv->id_3gpp_registration_change);
+        if (g_signal_handler_is_connected (self->priv->modem, self->priv->id_3gpp_registration_change))
+            g_signal_handler_disconnect (self->priv->modem, self->priv->id_3gpp_registration_change);
         self->priv->id_3gpp_registration_change = 0;
     }
     if (self->priv->id_cdma1x_registration_change) {
-        g_signal_handler_disconnect (self->priv->modem, self->priv->id_cdma1x_registration_change);
+        if (g_signal_handler_is_connected (self->priv->modem, self->priv->id_cdma1x_registration_change))
+            g_signal_handler_disconnect (self->priv->modem, self->priv->id_cdma1x_registration_change);
         self->priv->id_cdma1x_registration_change = 0;
     }
     if (self->priv->id_evdo_registration_change) {
-        g_signal_handler_disconnect (self->priv->modem, self->priv->id_evdo_registration_change);
+        if (g_signal_handler_is_connected (self->priv->modem, self->priv->id_evdo_registration_change))
+            g_signal_handler_disconnect (self->priv->modem, self->priv->id_evdo_registration_change);
         self->priv->id_evdo_registration_change = 0;
     }
 }
