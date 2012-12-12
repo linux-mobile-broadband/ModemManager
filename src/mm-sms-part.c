@@ -485,8 +485,7 @@ mm_sms_part_new_from_pdu (guint index,
     }
 
     part = mm_sms_part_new_from_binary_pdu (index, pdu, pdu_len, error);
-    if (!part)
-        g_free (pdu);
+    g_free (pdu);
 
     return part;
 }
