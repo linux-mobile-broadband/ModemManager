@@ -39,9 +39,8 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 /* Custom init */
 
-#define TAG_SIERRA_APP1_PORT      "sierra-app1-port"
-#define TAG_SIERRA_APP_PPP_OK     "sierra-app-ppp-ok"
-#define TAG_SIERRA_SECONDARY_PORT "sierra-secondary-port"
+#define TAG_SIERRA_APP_PORT       "sierra-app-port"
+#define TAG_SIERRA_APP1_PPP_OK    "sierra-app1-ppp-ok"
 
 typedef struct {
     MMPortProbe *probe;
@@ -86,28 +85,36 @@ gcap_ready (MMAtSerialPort *port,
         return;
     }
 
-    /* A valid reply to +GCAP tells us this is an AT port already */
+    /* A valid reply to ATI tells us this is an AT port already */
     mm_port_probe_set_result_at (ctx->probe, TRUE);
 
-    /* Some secondary ports in sierra modems like to reply just 'OK' to any
-     * command passed, like +GCAP. Detect that as soon as possible */
-    if (!g_str_has_prefix (response->str, "+GCAP")) {
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_SECONDARY_PORT, GUINT_TO_POINTER (TRUE));
-    } else if (strstr (response->str, "APP1")) {
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PORT, GUINT_TO_POINTER (TRUE));
+    /* Sierra APPx ports have limited AT command parsers that just reply with
+     * "OK" to most commands.  These can sometimes be used for PPP while the
+     * main port is used for status and control, but older modems tend to crash
+     * or fail PPP.  So we whitelist modems that are known to allow PPP on the
+     * secondary APP ports.
+     */
+    if (strstr (response->str, "APP1")) {
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
 
-        /* 885 can handle PPP on the APP ports, leaving the primary port open
-         * for command and status while connected.  Older modems (ie 8775) say
-         * they can but fail during PPP.
-         */
+        /* PPP-on-APP1-port whitelist */
         if (strstr (response->str, "C885") || strstr (response->str, "USB 306"))
-            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
 
-        /* For debugging: let users figure out if their device supports it or not */
+        /* For debugging: let users figure out if their device supports PPP
+         * on the APP1 port or not.
+         */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
             mm_dbg ("Sierra: APP1 PPP OK '%s'", response->str);
-            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
+    } else if (strstr (response->str, "APP2") ||
+               strstr (response->str, "APP3") ||
+               strstr (response->str, "APP4")) {
+        /* Additional APP ports don't support most AT commands, so they cannot
+         * be used as the primary port.
+         */
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
     }
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -139,7 +146,7 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
     ctx->retries--;
     mm_at_serial_port_queue_command (
         ctx->port,
-        "AT+GCAP",
+        "ATI",
         3,
         FALSE, /* raw */
         ctx->cancellable,
@@ -181,8 +188,7 @@ sierra_port_probe_list_is_icera (GList *probes)
          * secondary. This will skip the stupid ports which reply OK to every
          * AT command, even the one we use to check for Icera support */
         if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)) &&
-            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_SECONDARY_PORT) &&
-            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_APP1_PORT))
+            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_APP_PORT))
             return TRUE;
     }
 
@@ -235,13 +241,11 @@ grab_port (MMPlugin *self,
     ptype = mm_port_probe_get_port_type (probe);
 
     /* Is it a GSM secondary port? */
-    if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP1_PORT)) {
-        if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP_PPP_OK))
+    if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP_PORT)) {
+        if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK))
             pflags = MM_AT_PORT_FLAG_PPP;
         else
             pflags = MM_AT_PORT_FLAG_SECONDARY;
-    } else if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_SECONDARY_PORT)) {
-        pflags = MM_AT_PORT_FLAG_SECONDARY;
     } else if (ptype == MM_PORT_TYPE_AT)
         pflags = MM_AT_PORT_FLAG_PRIMARY;
 
