@@ -38,8 +38,8 @@ mm_plugin_create (void)
 
 /*****************************************************************************/
 
-#define TAG_SIERRA_APP1_PORT      "sierra-app1-port"
-#define TAG_SIERRA_APP_PPP_OK     "sierra-app-ppp-ok"
+#define TAG_SIERRA_APP_PORT      "sierra-app-port"
+#define TAG_SIERRA_APP1_PPP_OK   "sierra-app1-ppp-ok"
 
 #define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
                   MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
@@ -69,21 +69,28 @@ handle_probe_response (MMPluginBase *self,
     }
 
     if (strstr (response, "APP1")) {
-        g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT, GUINT_TO_POINTER (TRUE));
+        g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
 
         /* 885 can handle PPP on the APP ports, leaving the primary port open
          * for command and status while connected.  Older modems (ie 8775) say
          * they can but fail during PPP.
          */
         if (strstr (response, "C885") || strstr (response, "USB 306"))
-            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
 
         /* For debugging: let users figure out if their device supports it or not */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
             mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
-            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
 
+        mm_plugin_base_supports_task_complete (task, 10);
+        return;
+    }
+
+    if (strstr (response, "APP2") || strstr (response, "APP3") || strstr (response, "APP4")) {
+        /* Ensure the other APP ports don't get used as primary */
+        g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
         mm_plugin_base_supports_task_complete (task, 10);
         return;
     }
@@ -162,7 +169,7 @@ grab_port (MMPluginBase *base,
     MMPortType ptype;
     guint16 vendor = 0, product = 0;
     MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
-    gboolean sierra_app1_port;
+    gboolean sierra_app_port;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -174,9 +181,9 @@ grab_port (MMPluginBase *base,
     ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
 
     /* Is it a GSM secondary port? */
-    sierra_app1_port = !!g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT);
-    if (sierra_app1_port) {
-        if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK))
+    sierra_app_port = !!g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP_PORT);
+    if (sierra_app_port) {
+        if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP1_PPP_OK))
             pflags = MM_AT_PORT_FLAG_PPP;
         else
             pflags = MM_AT_PORT_FLAG_SECONDARY;
@@ -196,7 +203,7 @@ grab_port (MMPluginBase *base,
 
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
-        if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || sierra_app1_port) {
+        if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || sierra_app_port) {
             modem = mm_modem_sierra_gsm_new (sysfs_path,
                                              mm_plugin_base_supports_task_get_driver (task),
                                              mm_plugin_get_name (MM_PLUGIN (base)),
