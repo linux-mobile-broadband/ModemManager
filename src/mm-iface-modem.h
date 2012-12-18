@@ -365,23 +365,17 @@ gboolean mm_iface_modem_disable_finish (MMIfaceModem *self,
 /* Shutdown Modem interface */
 void mm_iface_modem_shutdown (MMIfaceModem *self);
 
-/* Request unlock recheck.
+/* Request lock info update.
  * It will not only return the lock status, but also set the property values
- * in the DBus interface. */
-void        mm_iface_modem_unlock_check        (MMIfaceModem *self,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data);
-MMModemLock mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error);
-
-/* Check unlock retries */
-void mm_iface_modem_update_unlock_retries            (MMIfaceModem *self,
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-gboolean mm_iface_modem_update_unlock_retries_finish (MMIfaceModem *self,
-                                                      GAsyncResult *res,
-                                                      GError **error);
+ * in the DBus interface. If 'known_lock' is given, that lock status will be
+ * assumed. */
+void        mm_iface_modem_update_lock_info        (MMIfaceModem *self,
+                                                    MMModemLock known_lock,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data);
+MMModemLock mm_iface_modem_update_lock_info_finish (MMIfaceModem *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
 
 /* Request signal quality check update.
  * It will not only return the signal quality status, but also set the property

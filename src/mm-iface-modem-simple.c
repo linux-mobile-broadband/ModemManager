@@ -437,15 +437,15 @@ send_pin_ready (MMSim *sim,
 }
 
 static void
-unlock_check_ready (MMIfaceModem *self,
-                    GAsyncResult *res,
-                    ConnectionContext *ctx)
+update_lock_info_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        ConnectionContext *ctx)
 {
     GError *error = NULL;
     MMModemLock lock;
     MMSim *sim;
 
-    lock = mm_iface_modem_unlock_check_finish (self, res, &error);
+    lock = mm_iface_modem_update_lock_info_finish (self, res, &error);
     if (error) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
@@ -524,9 +524,10 @@ connection_step (ConnectionContext *ctx)
     case CONNECTION_STEP_UNLOCK_CHECK:
         mm_info ("Simple connect state (%d/%d): Unlock check",
                  ctx->step, CONNECTION_STEP_LAST);
-        mm_iface_modem_unlock_check (MM_IFACE_MODEM (ctx->self),
-                                     (GAsyncReadyCallback)unlock_check_ready,
-                                     ctx);
+        mm_iface_modem_update_lock_info (MM_IFACE_MODEM (ctx->self),
+                                         MM_MODEM_LOCK_UNKNOWN, /* ask */
+                                         (GAsyncReadyCallback)update_lock_info_ready,
+                                         ctx);
         return;
 
     case CONNECTION_STEP_WAIT_FOR_INITIALIZED:

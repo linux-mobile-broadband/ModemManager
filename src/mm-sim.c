@@ -143,11 +143,14 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     gchar *old_pin;
     gchar *new_pin;
+    GError *save_error;
 } HandleChangePinContext;
 
 static void
 handle_change_pin_context_free (HandleChangePinContext *ctx)
 {
+    g_assert (ctx->save_error == NULL);
+
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->old_pin);
@@ -156,15 +159,21 @@ handle_change_pin_context_free (HandleChangePinContext *ctx)
 }
 
 static void
-after_change_unlock_retries_ready (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   HandleChangePinContext *ctx)
+after_change_update_lock_info_ready (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     HandleChangePinContext *ctx)
 {
     /* We just want to ensure that we tried to update the unlock
      * retries, no big issue if it failed */
-    mm_iface_modem_update_unlock_retries_finish (self, res, NULL);
+    mm_iface_modem_update_lock_info_finish (self, res, NULL);
 
-    mm_gdbus_sim_complete_change_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    if (ctx->save_error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
+        ctx->save_error = NULL;
+    } else {
+        mm_gdbus_sim_complete_change_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    }
+
     handle_change_pin_context_free (ctx);
 }
 
@@ -173,20 +182,20 @@ handle_change_pin_ready (MMSim *self,
                          GAsyncResult *res,
                          HandleChangePinContext *ctx)
 {
-    GError *error = NULL;
+    MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    MM_SIM_GET_CLASS (self)->change_pin_finish (self, res, &error);
-    if (error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_change_pin_context_free (ctx);
-        return;
+    if (!MM_SIM_GET_CLASS (self)->change_pin_finish (self, res, &ctx->save_error)) {
+        if (g_error_matches (ctx->save_error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
+            known_lock = MM_MODEM_LOCK_SIM_PUK;
     }
 
-    /* Before returning success, ensure that we get the unlock retry
-     * counts updated properly. */
-    mm_iface_modem_update_unlock_retries (MM_IFACE_MODEM (self->priv->modem),
-                                          (GAsyncReadyCallback)after_change_unlock_retries_ready,
-                                          ctx);
+    mm_iface_modem_update_lock_info (
+        MM_IFACE_MODEM (self->priv->modem),
+        known_lock,
+        (GAsyncReadyCallback)after_change_update_lock_info_ready,
+        ctx);
 }
 
 static void
@@ -306,11 +315,14 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     gchar *pin;
     gboolean enabled;
+    GError *save_error;
 } HandleEnablePinContext;
 
 static void
 handle_enable_pin_context_free (HandleEnablePinContext *ctx)
 {
+    g_assert (ctx->save_error == NULL);
+
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->pin);
@@ -318,15 +330,23 @@ handle_enable_pin_context_free (HandleEnablePinContext *ctx)
 }
 
 static void
-after_enable_unlock_retries_ready (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   HandleEnablePinContext *ctx)
+after_enable_update_lock_info_ready (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     HandleEnablePinContext *ctx)
 {
     /* We just want to ensure that we tried to update the unlock
      * retries, no big issue if it failed */
-    mm_iface_modem_update_unlock_retries_finish (self, res, NULL);
+    mm_iface_modem_update_lock_info_finish (self, res, NULL);
 
-    mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    if (ctx->save_error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
+        ctx->save_error = NULL;
+    } else {
+        /* Signal about the new lock state */
+        g_signal_emit (self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
+        mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    }
+
     handle_enable_pin_context_free (ctx);
 }
 
@@ -335,23 +355,20 @@ handle_enable_pin_ready (MMSim *self,
                          GAsyncResult *res,
                          HandleEnablePinContext *ctx)
 {
-    GError *error = NULL;
+    MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    MM_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &error);
-    if (error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_enable_pin_context_free (ctx);
-        return;
+    if (!MM_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &ctx->save_error)) {
+        if (g_error_matches (ctx->save_error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
+            known_lock = MM_MODEM_LOCK_SIM_PUK;
     }
 
-    /* Signal about the new lock state */
-    g_signal_emit (self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
-
-    /* Before returning success, ensure that we get the unlock retry
-     * counts updated properly. */
-    mm_iface_modem_update_unlock_retries (MM_IFACE_MODEM (self->priv->modem),
-                                          (GAsyncReadyCallback)after_enable_unlock_retries_ready,
-                                          ctx);
+    mm_iface_modem_update_lock_info (
+        MM_IFACE_MODEM (self->priv->modem),
+        known_lock,
+        (GAsyncReadyCallback)after_enable_update_lock_info_ready,
+        ctx);
 }
 
 static void
@@ -555,14 +572,14 @@ mm_sim_send_puk_finish (MMSim *self,
 }
 
 static void
-unlock_check_ready (MMIfaceModem *modem,
-                    GAsyncResult *res,
-                    SendPinPukContext *ctx)
+update_lock_info_ready (MMIfaceModem *modem,
+                        GAsyncResult *res,
+                        SendPinPukContext *ctx)
 {
     GError *error = NULL;
     MMModemLock lock;
 
-    lock = mm_iface_modem_unlock_check_finish (modem, res, &error);
+    lock = mm_iface_modem_update_lock_info_finish (modem, res, &error);
     /* Even if we may be SIM-PIN2/PUK2 locked, we don't consider this an error
      * in the PIN/PUK sending */
     if (lock != MM_MODEM_LOCK_NONE &&
@@ -595,12 +612,21 @@ send_pin_ready (MMSim *self,
                 GAsyncResult *res,
                 SendPinPukContext *ctx)
 {
-    MM_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error);
+    MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
+
+    if (!MM_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error)) {
+        if (g_error_matches (ctx->save_error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
+            known_lock = MM_MODEM_LOCK_SIM_PUK;
+    }
 
     /* Once pin/puk has been sent, recheck lock */
-    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
-                                 (GAsyncReadyCallback)unlock_check_ready,
-                                 ctx);
+    mm_iface_modem_update_lock_info (
+        MM_IFACE_MODEM (self->priv->modem),
+        known_lock,
+        (GAsyncReadyCallback)update_lock_info_ready,
+        ctx);
 }
 
 static void
@@ -611,9 +637,10 @@ send_puk_ready (MMSim *self,
     MM_SIM_GET_CLASS (self)->send_puk_finish (self, res, &ctx->save_error);
 
     /* Once pin/puk has been sent, recheck lock */
-    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
-                                 (GAsyncReadyCallback)unlock_check_ready,
-                                 ctx);
+    mm_iface_modem_update_lock_info (MM_IFACE_MODEM (self->priv->modem),
+                                     MM_MODEM_LOCK_UNKNOWN, /* ask */
+                                     (GAsyncReadyCallback)update_lock_info_ready,
+                                     ctx);
 }
 
 void

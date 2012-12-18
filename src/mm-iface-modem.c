@@ -2225,26 +2225,6 @@ handle_set_allowed_modes (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
-typedef struct {
-    MMIfaceModem *self;
-    guint pin_check_tries;
-    guint pin_check_timeout_id;
-    GSimpleAsyncResult *result;
-    MmGdbusModem *skeleton;
-    MMModemLock lock;
-} UnlockCheckContext;
-
-static void
-unlock_check_context_complete_and_free (UnlockCheckContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    if (ctx->skeleton)
-        g_object_unref (ctx->skeleton);
-    g_free (ctx);
-}
-
 static void
 reinitialize_ready (MMBaseModem *self,
                     GAsyncResult *res)
@@ -2303,191 +2283,6 @@ set_lock_status (MMIfaceModem *self,
     }
 }
 
-MMModemLock
-mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
-                                    GAsyncResult *res,
-                                    GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
-
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void unlock_check_ready (MMIfaceModem *self,
-                                GAsyncResult *res,
-                                UnlockCheckContext *ctx);
-
-static gboolean
-unlock_check_again  (UnlockCheckContext *ctx)
-{
-    ctx->pin_check_timeout_id = 0;
-
-    MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
-        ctx->self,
-        (GAsyncReadyCallback)unlock_check_ready,
-        ctx);
-    return FALSE;
-}
-
-static void
-modem_after_sim_unlock_ready (MMIfaceModem *self,
-                              GAsyncResult *res,
-                              UnlockCheckContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
-        /* Complete anyway */
-        mm_warn ("After SIM unlock failed setup: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    /* Update lock status and modem status if needed */
-    set_lock_status (self, ctx->skeleton, ctx->lock);
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (ctx->lock),
-                                               NULL);
-    unlock_check_context_complete_and_free (ctx);
-}
-
-static void
-unlock_check_ready (MMIfaceModem *self,
-                    GAsyncResult *res,
-                    UnlockCheckContext *ctx)
-{
-    GError *error = NULL;
-
-    ctx->lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error);
-    if (error) {
-        /* Treat several SIM related, serial and other core errors as critical
-         * and abort the checks. These will end up moving the modem to a FAILED
-         * state. */
-        if (error->domain == MM_SERIAL_ERROR ||
-            g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
-            g_simple_async_result_take_error (ctx->result, error);
-            unlock_check_context_complete_and_free (ctx);
-            return;
-        }
-
-        mm_dbg ("Couldn't check if unlock required: '%s'",
-                error->message);
-        g_error_free (error);
-
-        /* Retry up to 6 times */
-        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
-            ++ctx->pin_check_tries < 6) {
-            mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
-            if (ctx->pin_check_timeout_id)
-                g_source_remove (ctx->pin_check_timeout_id);
-            ctx->pin_check_timeout_id = g_timeout_add_seconds (
-                2,
-                (GSourceFunc)unlock_check_again,
-                ctx);
-            return;
-        }
-
-        /* If reached max retries and still reporting error, set UNKNOWN */
-        ctx->lock = MM_MODEM_LOCK_UNKNOWN;
-    }
-
-    /* If we get that no lock is required, run the after SIM unlock step
-     * in order to wait for the SIM to get ready */
-    if (ctx->lock == MM_MODEM_LOCK_NONE ||
-        ctx->lock == MM_MODEM_LOCK_SIM_PIN2 ||
-        ctx->lock == MM_MODEM_LOCK_SIM_PUK2) {
-        if (MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock != NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish != NULL) {
-            mm_dbg ("SIM is ready, running after SIM unlock step...");
-            MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock(
-                self,
-                (GAsyncReadyCallback)modem_after_sim_unlock_ready,
-                ctx);
-            return;
-        }
-
-        /* If no way to run after SIM unlock step, we're done */
-        mm_dbg ("SIM is ready, and no need for the after SIM unlock step...");
-    }
-
-    /* Update lock status and modem status if needed */
-    set_lock_status (self, ctx->skeleton, ctx->lock);
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (ctx->lock),
-                                               NULL);
-    unlock_check_context_complete_and_free (ctx);
-}
-
-void
-mm_iface_modem_unlock_check (MMIfaceModem *self,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data)
-{
-    UnlockCheckContext *ctx;
-
-    ctx = g_new0 (UnlockCheckContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_unlock_check);
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        unlock_check_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If we're already unlocked, we're done */
-    if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
-            self,
-            (GAsyncReadyCallback)unlock_check_ready,
-            ctx);
-        return;
-    }
-
-    /* Just assume that no lock is required */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
-                                               NULL);
-    unlock_check_context_complete_and_free (ctx);
-}
-
-/*****************************************************************************/
-/* Unlock retry count */
-
-gboolean
-mm_iface_modem_update_unlock_retries_finish (MMIfaceModem *self,
-                                             GAsyncResult *res,
-                                             GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
-}
-
 static void
 update_unlock_retries (MMIfaceModem *self,
                        MMUnlockRetries *unlock_retries)
@@ -2524,56 +2319,276 @@ update_unlock_retries (MMIfaceModem *self,
     g_object_unref (skeleton);
 }
 
+typedef enum {
+    UPDATE_LOCK_INFO_CONTEXT_STEP_FIRST = 0,
+    UPDATE_LOCK_INFO_CONTEXT_STEP_LOCK,
+    UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES,
+    UPDATE_LOCK_INFO_CONTEXT_STEP_AFTER_UNLOCK,
+    UPDATE_LOCK_INFO_CONTEXT_STEP_LAST
+} UpdateLockInfoContextStep;
+
+typedef struct {
+    MMIfaceModem *self;
+    UpdateLockInfoContextStep step;
+    guint pin_check_tries;
+    guint pin_check_timeout_id;
+    GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton;
+    MMModemLock lock;
+    GError *saved_error;
+} UpdateLockInfoContext;
+
 static void
-unlock_retries_ready (MMIfaceModem *self,
-                      GAsyncResult *res,
-                      GSimpleAsyncResult *simple)
+update_lock_info_context_complete_and_free (UpdateLockInfoContext *ctx)
+{
+    g_assert (ctx->saved_error == NULL);
+
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    if (ctx->skeleton)
+        g_object_unref (ctx->skeleton);
+    g_slice_free (UpdateLockInfoContext, ctx);
+}
+
+MMModemLock
+mm_iface_modem_update_lock_info_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCK_UNKNOWN;
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void update_lock_info_context_step (UpdateLockInfoContext *ctx);
+
+static void
+load_unlock_retries_ready (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           UpdateLockInfoContext *ctx)
 {
     GError *error = NULL;
     MMUnlockRetries *unlock_retries;
 
     unlock_retries = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries_finish (self, res, &error);
     if (!unlock_retries) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
+        mm_warn ("Couldn't load unlock retries: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        /* Update the dictionary in the DBus interface */
+        update_unlock_retries (self, unlock_retries);
+        g_object_unref (unlock_retries);
     }
 
-    /* Update the dictionary in the DBus interface */
-    update_unlock_retries (self, unlock_retries);
-    g_object_unref (unlock_retries);
+    /* Go on to next step */
+    ctx->step++;
+    update_lock_info_context_step (ctx);
+}
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+static void
+modem_after_sim_unlock_ready (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              UpdateLockInfoContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
+        mm_warn ("After SIM unlock failed setup: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    update_lock_info_context_step (ctx);
+}
+
+static gboolean
+load_unlock_required_again (UpdateLockInfoContext *ctx)
+{
+    ctx->pin_check_timeout_id = 0;
+    /* Retry the step */
+    update_lock_info_context_step (ctx);
+    return FALSE;
+}
+
+static void
+load_unlock_required_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            UpdateLockInfoContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error);
+    if (error) {
+        /* Treat several SIM related, serial and other core errors as critical
+         * and abort the checks. These will end up moving the modem to a FAILED
+         * state. */
+        if (error->domain == MM_SERIAL_ERROR ||
+            g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_CANCELLED) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+            ctx->saved_error = error;
+            ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
+            update_lock_info_context_step (ctx);
+            return;
+        }
+
+        mm_dbg ("Couldn't check if unlock required: '%s'", error->message);
+        g_error_free (error);
+
+        /* Retry up to 6 times */
+        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
+            ++ctx->pin_check_tries < 6) {
+            mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
+            if (ctx->pin_check_timeout_id)
+                g_source_remove (ctx->pin_check_timeout_id);
+            ctx->pin_check_timeout_id = g_timeout_add_seconds (
+                2,
+                (GSourceFunc)load_unlock_required_again,
+                ctx);
+            return;
+        }
+
+        /* If reached max retries and still reporting error, set UNKNOWN */
+        ctx->lock = MM_MODEM_LOCK_UNKNOWN;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    update_lock_info_context_step (ctx);
+}
+
+static void
+update_lock_info_context_step (UpdateLockInfoContext *ctx)
+{
+    switch (ctx->step) {
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_FIRST:
+        /* We need the skeleton around */
+        if (!ctx->skeleton) {
+            ctx->saved_error = g_error_new (MM_CORE_ERROR,
+                                            MM_CORE_ERROR_FAILED,
+                                            "Couldn't get interface skeleton");
+            ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
+            update_lock_info_context_step (ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_LOCK:
+        /* Don't re-ask if already known */
+        if (ctx->lock == MM_MODEM_LOCK_UNKNOWN) {
+            /* If we're already unlocked, we're done */
+            if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_unlock_required_ready,
+                    ctx);
+                return;
+            }
+
+            /* Just assume that no lock is required */
+            ctx->lock = MM_MODEM_LOCK_NONE;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES:
+        /* Load unlock retries if possible */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries (
+                ctx->self,
+                (GAsyncReadyCallback)load_unlock_retries_ready,
+                ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_AFTER_UNLOCK:
+        /* If we get that no lock is required, run the after SIM unlock step
+         * in order to wait for the SIM to get ready */
+        if (ctx->lock == MM_MODEM_LOCK_NONE ||
+            ctx->lock == MM_MODEM_LOCK_SIM_PIN2 ||
+            ctx->lock == MM_MODEM_LOCK_SIM_PUK2) {
+            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_sim_unlock != NULL &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_sim_unlock_finish != NULL) {
+                mm_dbg ("SIM is ready, running after SIM unlock step...");
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_sim_unlock (
+                    ctx->self,
+                    (GAsyncReadyCallback)modem_after_sim_unlock_ready,
+                    ctx);
+                return;
+            }
+
+            /* If no way to run after SIM unlock step, we're done */
+            mm_dbg ("SIM is ready, and no need for the after SIM unlock step...");
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_LAST:
+        if (ctx->saved_error) {
+            /* Return saved error */
+            g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+            ctx->saved_error = NULL;
+        } else {
+            /* Update lock status and modem status if needed */
+            set_lock_status (ctx->self, ctx->skeleton, ctx->lock);
+
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       GUINT_TO_POINTER (ctx->lock),
+                                                       NULL);
+        }
+
+        update_lock_info_context_complete_and_free (ctx);
+        return;
+
+    default:
+        g_assert_not_reached();
+    }
 }
 
 void
-mm_iface_modem_update_unlock_retries (MMIfaceModem *self,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+mm_iface_modem_update_lock_info (MMIfaceModem *self,
+                                 MMModemLock known_lock,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    UpdateLockInfoContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_update_unlock_retries);
+    ctx = g_slice_new0 (UpdateLockInfoContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_update_lock_info);
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
 
-    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries &&
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries_finish) {
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries (
-            self,
-            (GAsyncReadyCallback)unlock_retries_ready,
-            result);
-        return;
-    }
+    /* If the given lock is known, we will avoid re-asking for it */
+    ctx->lock = known_lock;
 
-    /* Return FALSE when we cannot load unlock retries */
-    g_simple_async_result_set_op_res_gboolean (result, FALSE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    update_lock_info_context_step (ctx);
 }
 
 /*****************************************************************************/
@@ -3129,7 +3144,6 @@ typedef enum {
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
-    INITIALIZATION_STEP_UNLOCK_RETRIES,
     INITIALIZATION_STEP_SIM,
     INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_SUPPORTED_MODES,
@@ -3333,12 +3347,12 @@ load_supported_bands_ready (MMIfaceModem *self,
 }
 
 static void
-load_unlock_required_ready (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            InitializationContext *ctx)
+modem_update_lock_info_ready (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              InitializationContext *ctx)
 {
     /* NOTE: we already propagated the lock state, no need to do it again */
-    mm_iface_modem_unlock_check_finish (self, res, &ctx->fatal_error);
+    mm_iface_modem_update_lock_info_finish (self, res, &ctx->fatal_error);
     if (ctx->fatal_error) {
         g_prefix_error (&ctx->fatal_error,
                         "Couldn't check unlock status: ");
@@ -3348,24 +3362,6 @@ load_unlock_required_ready (MMIfaceModem *self,
         /* Go on to next step */
         ctx->step++;
 
-    interface_initialization_step (ctx);
-}
-
-static void
-update_unlock_retries_ready (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             InitializationContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_iface_modem_update_unlock_retries_finish (self, res, &error);
-    if (error) {
-        mm_warn ("couldn't update unlock retries: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    /* Go on to next step */
-    ctx->step++;
     interface_initialization_step (ctx);
 }
 
@@ -3652,19 +3648,14 @@ interface_initialization_step (InitializationContext *ctx)
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
-            mm_iface_modem_unlock_check (ctx->self,
-                                         (GAsyncReadyCallback)load_unlock_required_ready,
-                                         ctx);
+            mm_iface_modem_update_lock_info (ctx->self,
+                                             MM_MODEM_LOCK_UNKNOWN, /* ask */
+                                             (GAsyncReadyCallback)modem_update_lock_info_ready,
+                                             ctx);
             return;
         }
         /* Fall down to next step */
         ctx->step++;
-
-    case INITIALIZATION_STEP_UNLOCK_RETRIES:
-        mm_iface_modem_update_unlock_retries (ctx->self,
-                                              (GAsyncReadyCallback)update_unlock_retries_ready,
-                                              ctx);
-        return;
 
     case INITIALIZATION_STEP_SIM:
         /* If the modem doesn't need any SIM, skip */
