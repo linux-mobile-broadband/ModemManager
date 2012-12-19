@@ -233,6 +233,33 @@ load_imsi (MMSim *self,
 /*****************************************************************************/
 /* Send PIN */
 
+static GError *
+pin_qmi_error_to_mobile_equipment_error (GError *qmi_error)
+{
+    GError *me_error = NULL;
+
+    if (g_error_matches (qmi_error,
+                         QMI_PROTOCOL_ERROR,
+                         QMI_PROTOCOL_ERROR_INCORRECT_PIN)) {
+        me_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD,
+                                qmi_error->message);
+    } else if (g_error_matches (qmi_error,
+                                QMI_PROTOCOL_ERROR,
+                                QMI_PROTOCOL_ERROR_PIN_BLOCKED)) {
+        me_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK,
+                                qmi_error->message);
+    }
+
+    if (me_error) {
+        g_error_free (qmi_error);
+        return me_error;
+    }
+
+    return qmi_error;
+}
+
 static gboolean
 send_pin_finish (MMSim *self,
                  GAsyncResult *res,
@@ -255,7 +282,8 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_uim_verify_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't verify PIN: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (simple,
+                                          pin_qmi_error_to_mobile_equipment_error (error));
     } else {
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
@@ -328,7 +356,8 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_uim_unblock_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't unblock PIN: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (simple,
+                                          pin_qmi_error_to_mobile_equipment_error (error));
     } else {
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
@@ -404,7 +433,8 @@ dms_uim_change_pin_ready (QmiClientDms *client,
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_uim_change_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't change PIN: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (simple,
+                                          pin_qmi_error_to_mobile_equipment_error (error));
     } else {
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
@@ -480,7 +510,8 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_uim_set_pin_protection_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't enable PIN: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (simple,
+                                          pin_qmi_error_to_mobile_equipment_error (error));
     } else {
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
