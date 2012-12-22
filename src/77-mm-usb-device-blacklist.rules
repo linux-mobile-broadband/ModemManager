@@ -74,4 +74,7 @@ ATTRS{idVendor}=="9e88", ATTRS{idProduct}=="9e8f", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Atmel Corp at91sam SAMBA bootloader
 ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="6124", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Dangerous Prototypes Bus Pirate v4
+ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="fb00" ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
