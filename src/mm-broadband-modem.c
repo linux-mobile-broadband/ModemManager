@@ -6458,7 +6458,8 @@ enable_location_gathering (MMIfaceModemLocation *self,
         /* Reload registration to get LAC/CI */
         mm_iface_modem_3gpp_run_registration_checks (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
         /* Reload operator to get MCC/MNC */
-        if (MM_BROADBAND_MODEM (self)->priv->modem_state >= MM_MODEM_STATE_REGISTERED)
+        if (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+            MM_BROADBAND_MODEM (self)->priv->modem_3gpp_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
             mm_iface_modem_3gpp_reload_current_operator (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
     }
 
