@@ -248,7 +248,8 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
         g_assert (ctx->location_gps_nmea != NULL);
         if (mm_location_gps_nmea_add_trace (ctx->location_gps_nmea, nmea_trace) &&
-            ctx->location_gps_nmea_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
+            (ctx->location_gps_nmea_last_time == 0 ||
+             time (NULL) - ctx->location_gps_nmea_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS)) {
             ctx->location_gps_nmea_last_time = time (NULL);
             update_nmea = TRUE;
         }
@@ -257,7 +258,8 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_RAW) {
         g_assert (ctx->location_gps_raw != NULL);
         if (mm_location_gps_raw_add_trace (ctx->location_gps_raw, nmea_trace) &&
-            ctx->location_gps_raw_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
+            (ctx->location_gps_raw_last_time == 0 ||
+             time (NULL) - ctx->location_gps_raw_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS)) {
             ctx->location_gps_raw_last_time = time (NULL);
             update_raw = TRUE;
         }
