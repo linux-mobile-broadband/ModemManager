@@ -82,8 +82,19 @@ grab_port (MMPlugin *self,
 {
     GUdevDevice *port;
     MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortType ptype;
 
     port = mm_port_probe_peek_port (probe);
+
+    /* Ignore net ports on non-Icera modems */
+    ptype = mm_port_probe_get_port_type (probe);
+    if (ptype == MM_PORT_TYPE_NET && !MM_IS_BROADBAND_MODEM_ZTE_ICERA (modem)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Ignoring net port in non-Icera ZTE modem");
+        return FALSE;
+    }
 
     if (mm_port_probe_is_at (probe)) {
         /* Look for port type hints */
@@ -103,7 +114,7 @@ grab_port (MMPlugin *self,
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_get_port_subsys (probe),
                                     mm_port_probe_get_port_name (probe),
-                                    mm_port_probe_get_port_type (probe),
+                                    ptype,
                                     pflags,
                                     error);
 }
