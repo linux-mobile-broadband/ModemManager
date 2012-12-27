@@ -495,7 +495,6 @@ device_port_grabbed_cb (MMDevice *device,
 {
     PortProbeContext *port_probe_ctx;
 
-
     /* Launch probing task on this port with the first plugin of the list */
     port_probe_ctx = g_slice_new0 (PortProbeContext);
     port_probe_ctx->parent_ctx = ctx;
@@ -505,13 +504,19 @@ device_port_grabbed_cb (MMDevice *device,
     port_probe_ctx->plugins = build_plugins_list (ctx->self, device, port);
     port_probe_ctx->current = port_probe_ctx->plugins;
 
-    /* If we got one suggested, it will be the first one */
+    /* If we got one suggested, it will be the first one, unless it is the generic plugin */
     port_probe_ctx->suggested_plugin = (!!mm_device_peek_plugin (device) ?
                                         MM_PLUGIN (mm_device_get_plugin (device)) :
                                         NULL);
-    if (port_probe_ctx->suggested_plugin)
-        port_probe_ctx->current = g_list_find (port_probe_ctx->current,
-                                               port_probe_ctx->suggested_plugin);
+    if (port_probe_ctx->suggested_plugin) {
+        if (g_str_equal (mm_plugin_get_name (port_probe_ctx->suggested_plugin),
+                         MM_PLUGIN_GENERIC_NAME))
+            /* Initially ignore generic plugin suggested */
+            g_clear_object (&port_probe_ctx->suggested_plugin);
+        else
+            port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                                   port_probe_ctx->suggested_plugin);
+    }
 
     /* Set as running */
     ctx->running_probes = g_list_prepend (ctx->running_probes, port_probe_ctx);
