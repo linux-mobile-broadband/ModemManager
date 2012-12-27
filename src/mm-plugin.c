@@ -820,7 +820,18 @@ mm_plugin_create_modem (MMPlugin  *self,
                                            MM_CORE_ERROR_UNSUPPORTED,
                                            "unsupported subsystem: '%s'",
                                            mm_port_probe_get_port_subsys (probe));
-            } else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
+            }
+#if !defined WITH_QMI
+            else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
+                     g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
+                                  "qmi_wwan")) {
+                grabbed = FALSE;
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_UNSUPPORTED,
+                                           "ignoring QMI net port");
+            }
+#endif
+            else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
                 grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
                                                                  modem,
                                                                  probe,

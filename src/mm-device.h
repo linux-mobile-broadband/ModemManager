@@ -94,4 +94,6 @@ GObject     *mm_device_get_port_probe       (MMDevice *self,
 GList       *mm_device_peek_port_probe_list (MMDevice *self);
 GList       *mm_device_get_port_probe_list  (MMDevice *self);
 
+const gchar *mm_device_utils_get_port_driver (GUdevDevice *udev_port);
+
 #endif /* MM_DEVICE_H */

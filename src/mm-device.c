@@ -197,16 +197,16 @@ out:
     return success;
 }
 
-static gchar *
-get_driver_name (GUdevDevice *device)
+const gchar *
+mm_device_utils_get_port_driver (GUdevDevice *udev_port)
 {
-    GUdevDevice *parent = NULL;
     const gchar *driver, *subsys;
-    gchar *ret = NULL;
 
-    driver = g_udev_device_get_driver (device);
+    driver = g_udev_device_get_driver (udev_port);
     if (!driver) {
-        parent = g_udev_device_get_parent (device);
+        GUdevDevice *parent;
+
+        parent = g_udev_device_get_parent (udev_port);
         if (parent)
             driver = g_udev_device_get_driver (parent);
 
@@ -218,32 +218,29 @@ get_driver_name (GUdevDevice *device)
             if (subsys && !strcmp (subsys, "bluetooth"))
                 driver = "bluetooth";
         }
+
+        if (parent)
+            g_object_unref (parent);
     }
 
-    if (driver)
-        ret = g_strdup (driver);
-    if (parent)
-        g_object_unref (parent);
-
-    return ret;
+    return driver;
 }
 
 static void
 add_port_driver (MMDevice *self,
                  GUdevDevice *udev_port)
 {
-    gchar *driver = NULL;
+    const gchar *driver;
     guint n_items;
     guint i;
 
-    driver = get_driver_name (udev_port);
+    driver = mm_device_utils_get_port_driver (udev_port);
 
     n_items = (self->priv->drivers ? g_strv_length (self->priv->drivers) : 0);
     if (n_items > 0) {
         /* Add driver to our list of drivers, if not already there */
         for (i = 0; self->priv->drivers[i]; i++) {
             if (g_str_equal (self->priv->drivers[i], driver)) {
-                g_free (driver);
                 driver = NULL;
                 break;
             }
@@ -255,7 +252,7 @@ add_port_driver (MMDevice *self,
 
     self->priv->drivers = g_realloc (self->priv->drivers,
                                      (n_items + 2) * sizeof (gchar *));
-    self->priv->drivers[n_items] = driver;
+    self->priv->drivers[n_items] = g_strdup (driver);
     self->priv->drivers[n_items + 1] = NULL;
 }
 
