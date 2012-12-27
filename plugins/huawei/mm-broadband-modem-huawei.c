@@ -14,6 +14,7 @@
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google Inc.
  * Copyright (C) 2012 Huawei Technologies Co., Ltd
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <config.h>
@@ -1242,6 +1243,22 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
+typedef struct {
+    MMBroadbandModemHuawei *self;
+    GSimpleAsyncResult *result;
+    MMBearerProperties *properties;
+} CreateBearerContext;
+
+static void
+create_bearer_context_complete_and_free (CreateBearerContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->properties);
+    g_slice_free (CreateBearerContext, ctx);
+}
+
 static MMBearer *
 huawei_modem_create_bearer_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
@@ -1260,23 +1277,56 @@ huawei_modem_create_bearer_finish (MMIfaceModem *self,
 static void
 broadband_bearer_huawei_new_ready (GObject *source,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+                                   CreateBearerContext *ctx)
 {
     MMBearer *bearer;
     GError *error = NULL;
 
-    bearer = ((GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (res), "huawei-bearer"))) ?
-              mm_broadband_bearer_huawei_new_finish (res, &error) :
-              mm_broadband_bearer_new_finish (res, &error));
-
+    bearer = mm_broadband_bearer_huawei_new_finish (res, &error);
     if (!bearer)
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (ctx->result, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   (GDestroyNotify)g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+    create_bearer_context_complete_and_free (ctx);
+}
+
+static void
+broadband_bearer_new_ready (GObject *source,
+                            GAsyncResult *res,
+                            CreateBearerContext *ctx)
+{
+    MMBearer *bearer;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+    create_bearer_context_complete_and_free (ctx);
+}
+
+static void
+ndisdup_check_ready (MMIfaceModem *self,
+                     GAsyncResult *res,
+                     CreateBearerContext *ctx)
+{
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL)) {
+        mm_dbg ("^NDISDUP not supported, creating default bearer...");
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
+                                 ctx->properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_new_ready,
+                                 ctx);
+        return;
+    }
+
+    mm_dbg ("^NDISDUP supported, creating huawei bearer...");
+    mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (self),
+                                    ctx->properties,
+                                    NULL, /* cancellable */
+                                    (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
+                                    ctx);
 }
 
 static void
@@ -1285,31 +1335,34 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-    MMPort *data_port;
+    CreateBearerContext *ctx;
 
-    data_port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self));
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        huawei_modem_create_bearer);
+    ctx = g_slice_new0 (CreateBearerContext);
+    ctx->self = g_object_ref (self);
+    ctx->properties = g_object_ref (properties);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             huawei_modem_create_bearer);
 
-    if (mm_port_get_port_type (data_port) == MM_PORT_TYPE_NET) {
-        mm_dbg ("Creating huawei bearer...");
-        g_object_set_data (G_OBJECT (result), "huawei-bearer", GUINT_TO_POINTER (TRUE));
-        mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (self),
-                                        properties,
-                                        NULL, /* cancellable */
-                                        (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
-                                        result);
-    } else {
-        mm_dbg ("Creating default bearer...");
-        mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
-                                 properties,
-                                 NULL, /* cancellable */
-                                 (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
-                                 result);
-   }
+    if (mm_port_get_port_type (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self))) == MM_PORT_TYPE_NET) {
+        /* If we get a data port, check for NDISDUP support */
+        mm_dbg ("Checking ^NDISDUP support...");
+        mm_base_modem_at_command (MM_BASE_MODEM(self),
+                                  "^NDISDUP?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)ndisdup_check_ready,
+                                  ctx);
+        return;
+    }
+
+    mm_dbg ("Creating default bearer...");
+    mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
+                             properties,
+                             NULL, /* cancellable */
+                             (GAsyncReadyCallback)broadband_bearer_new_ready,
+                             ctx);
 }
 
 
