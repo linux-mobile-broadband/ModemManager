@@ -157,6 +157,33 @@ is_virtual_port (const gchar *device_name)
 
 /* Returns TRUE if the support check request was filtered out */
 static gboolean
+apply_subsystem_filter (MMPlugin *self,
+                        GUdevDevice *port)
+{
+    if (self->priv->subsystems) {
+        const gchar *subsys;
+        guint i;
+
+        subsys = g_udev_device_get_subsystem (port);
+        for (i = 0; self->priv->subsystems[i]; i++) {
+            if (g_str_equal (subsys, self->priv->subsystems[i]))
+                break;
+            /* New kernels may report as 'usbmisc' the subsystem */
+            else if (g_str_equal (self->priv->subsystems[i], "usb") &&
+                     g_str_equal (subsys, "usbmisc"))
+                break;
+        }
+
+        /* If we didn't match any subsystem: unsupported */
+        if (!self->priv->subsystems[i])
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+/* Returns TRUE if the support check request was filtered out */
+static gboolean
 apply_pre_probing_filters (MMPlugin *self,
                            MMDevice *device,
                            GUdevDevice *port,
@@ -174,26 +201,11 @@ apply_pre_probing_filters (MMPlugin *self,
 
     /* The plugin may specify that only some subsystems are supported. If that
      * is the case, filter by subsystem */
-    if (self->priv->subsystems) {
-        const gchar *subsys;
-
-        subsys = g_udev_device_get_subsystem (port);
-        for (i = 0; self->priv->subsystems[i]; i++) {
-            if (g_str_equal (subsys, self->priv->subsystems[i]))
-                break;
-            /* New kernels may report as 'usbmisc' the subsystem */
-            else if (g_str_equal (self->priv->subsystems[i], "usb") &&
-                     g_str_equal (subsys, "usbmisc"))
-                break;
-        }
-
-        /* If we didn't match any subsystem: unsupported */
-        if (!self->priv->subsystems[i]) {
-            mm_dbg ("(%s) [%s] filtered by subsystem",
-                    self->priv->name,
-                    g_udev_device_get_name (port));
-            return TRUE;
-        }
+    if (apply_subsystem_filter (self, port)) {
+        mm_dbg ("(%s) [%s] filtered by subsystem",
+                self->priv->name,
+                g_udev_device_get_name (port));
+        return TRUE;
     }
 
     /* The plugin may specify that only some drivers are supported, or that some
@@ -799,7 +811,16 @@ mm_plugin_create_modem (MMPlugin  *self,
             /* If grabbing a port fails, just warn. We'll decide if the modem is
              * valid or not when all ports get organized */
 
-            if (MM_PLUGIN_GET_CLASS (self)->grab_port)
+            /* We apply again the subsystem filter, as the port may have been
+             * probed and accepted by the generic plugin, which is overwritten
+             * by the specific one when needed. */
+            if (apply_subsystem_filter (self, mm_port_probe_peek_port (probe))) {
+                grabbed = FALSE;
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_UNSUPPORTED,
+                                           "unsupported subsystem: '%s'",
+                                           mm_port_probe_get_port_subsys (probe));
+            } else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
                 grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
                                                                  modem,
                                                                  probe,
