@@ -26,6 +26,10 @@
 #include "mm-broadband-modem-zte.h"
 #include "mm-broadband-modem-zte-icera.h"
 
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
+#endif
+
 G_DEFINE_TYPE (MMPluginZte, mm_plugin_zte, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -60,6 +64,17 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_QMI
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_dbg ("QMI-powered ZTE modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+#endif
+
     if (mm_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_zte_icera_new (sysfs_path,
                                                                 drivers,
@@ -86,13 +101,13 @@ grab_port (MMPlugin *self,
 
     port = mm_port_probe_peek_port (probe);
 
-    /* Ignore net ports on non-Icera modems */
+    /* Ignore net ports on non-Icera non-QMI modems */
     ptype = mm_port_probe_get_port_type (probe);
-    if (ptype == MM_PORT_TYPE_NET && !MM_IS_BROADBAND_MODEM_ZTE_ICERA (modem)) {
+    if (ptype == MM_PORT_TYPE_NET && MM_IS_BROADBAND_MODEM_ZTE (modem)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
-                     "Ignoring net port in non-Icera ZTE modem");
+                     "Ignoring net port in ZTE modem");
         return FALSE;
     }
 
@@ -131,7 +146,7 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const guint16 vendor_ids[] = { 0x19d2, 0 };
 
     return MM_PLUGIN (
@@ -142,6 +157,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,        TRUE,
                       MM_PLUGIN_ICERA_PROBE,        TRUE,
                       NULL));
 }
