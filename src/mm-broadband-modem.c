@@ -7643,9 +7643,8 @@ initialization_started_ready (MMBroadbandModem *self,
         mm_warn ("Couldn't start initialization: %s", error->message);
         g_error_free (error);
 
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     MM_MODEM_STATE_FAILED,
-                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        /* There is no Modem interface yet, so just update the variable directly */
+        ctx->self->priv->modem_state = MM_MODEM_STATE_FAILED;
 
         /* Just jump to the last step */
         ctx->step = INITIALIZE_STEP_LAST;
@@ -7880,20 +7879,32 @@ initialize_step (InitializeContext *ctx)
 
     case INITIALIZE_STEP_LAST:
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
-            /* Fatal SIM failure :-( */
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_WRONG_STATE,
-                                             "Modem is unusable, "
-                                             "cannot fully initialize");
-            /* Ensure we only leave the Modem interface around */
-            mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
-            mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
-            mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
-            mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
-            mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
-            mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
-            mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
+
+
+            if (!ctx->self->priv->modem_dbus_skeleton) {
+                /* Error setting up ports. Abort without even exporting the
+                 * Modem interface */
+                g_simple_async_result_set_error (ctx->result,
+                                                 MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_ABORTED,
+                                                 "Modem is unusable, "
+                                                 "cannot fully initialize");
+            } else {
+                /* Fatal SIM failure :-( */
+                g_simple_async_result_set_error (ctx->result,
+                                                 MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_WRONG_STATE,
+                                                 "Modem is unusable, "
+                                                 "cannot fully initialize");
+                /* Ensure we only leave the Modem interface around */
+                mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
+                mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
+                mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
+                mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
+                mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
+                mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
+                mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
+            }
             initialize_context_complete_and_free (ctx);
             return;
         }
