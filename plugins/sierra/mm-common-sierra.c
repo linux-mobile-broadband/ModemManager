@@ -118,7 +118,7 @@ get_current_functionality_status_ready (MMBaseModem *self,
      */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN=1,0", /* ",0" ensures no reset */
-                              3,
+                              10,
                               FALSE,
                               (GAsyncReadyCallback)full_functionality_status_ready,
                               simple);
