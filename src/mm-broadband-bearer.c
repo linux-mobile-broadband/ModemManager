@@ -438,32 +438,11 @@ typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
+    MMAtSerialPort *dial_port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     GError *saved_error;
 } Dial3gppContext;
-
-static Dial3gppContext *
-dial_3gpp_context_new (MMBroadbandBearer *self,
-                       MMBaseModem *modem,
-                       MMAtSerialPort *primary,
-                       GCancellable *cancellable,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    Dial3gppContext *ctx;
-
-    ctx = g_new0 (Dial3gppContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (modem);
-    ctx->primary = g_object_ref (primary);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             dial_3gpp_context_new);
-    ctx->cancellable = g_object_ref (cancellable);
-    return ctx;
-}
 
 static void
 dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
@@ -473,15 +452,16 @@ dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
     g_object_unref (ctx->cancellable);
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->dial_port);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (Dial3gppContext, ctx);
 }
 
 static gboolean
 dial_3gpp_context_set_error_if_cancelled (Dial3gppContext *ctx,
-                                              GError **error)
+                                          GError **error)
 {
     if (!g_cancellable_is_cancelled (ctx->cancellable))
         return FALSE;
@@ -576,7 +556,7 @@ static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMAtSerialPort *primary,
-           MMPort *data, /* unused by us */
+           MMPort *data,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -587,17 +567,24 @@ dial_3gpp (MMBroadbandBearer *self,
 
     g_assert (primary != NULL);
 
-    ctx = dial_3gpp_context_new (self,
-                                 modem,
-                                 primary,
-                                 cancellable,
-                                 callback,
-                                 user_data);
+    ctx = g_slice_new0 (Dial3gppContext);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (modem);
+    /* Dial port might not be the primary port */
+    ctx->primary = g_object_ref (primary);
+    ctx->dial_port = (data && MM_IS_AT_SERIAL_PORT (data) ?
+                      g_object_ref (data) :
+                      g_object_ref (primary));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             dial_3gpp);
+    ctx->cancellable = g_object_ref (cancellable);
 
     /* Use default *99 to connect */
     command = g_strdup_printf ("ATD*99***%d#", cid);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   ctx->dial_port,
                                    command,
                                    60,
                                    FALSE,
