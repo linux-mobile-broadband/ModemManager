@@ -41,8 +41,8 @@ typedef enum {
     DIAL_3GPP_STEP_FIRST,
     DIAL_3GPP_STEP_PS_ATTACH,
     DIAL_3GPP_STEP_AUTHENTICATE,
-    DIAL_3GPP_CONNECT,
-    DIAL_3GPP_LAST
+    DIAL_3GPP_STEP_CONNECT,
+    DIAL_3GPP_STEP_LAST
 } Dial3gppStep;
 
 typedef struct {
@@ -247,7 +247,10 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             return;
         }
 
-    case DIAL_3GPP_CONNECT:
+        /* Fall down */
+        ctx->step++;
+
+    case DIAL_3GPP_STEP_CONNECT:
         if (!MM_IS_AT_SERIAL_PORT (ctx->data)) {
             gchar *command;
 
@@ -277,7 +280,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             ctx);
         return;
 
-    case DIAL_3GPP_LAST:
+    case DIAL_3GPP_STEP_LAST:
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         dial_3gpp_context_complete_and_free (ctx);
         return;
