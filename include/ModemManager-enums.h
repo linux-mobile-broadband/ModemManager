@@ -129,6 +129,22 @@ typedef enum { /*< underscore_name=mm_modem_state >*/
 } MMModemState;
 
 /**
+ * MMModemPowerState:
+ * @MM_MODEM_POWER_STATE_UNKNOWN: Unknown power state.
+ * @MM_MODEM_POWER_STATE_OFF: Off.
+ * @MM_MODEM_POWER_STATE_LOW: Low-power mode.
+ * @MM_MODEM_POWER_STATE_ON: Full power mode.
+ *
+ * Power state of the modem.
+ */
+typedef enum { /*< underscore_name=mm_modem_power_state >*/
+    MM_MODEM_POWER_STATE_UNKNOWN = 0,
+    MM_MODEM_POWER_STATE_OFF     = 1,
+    MM_MODEM_POWER_STATE_LOW     = 2,
+    MM_MODEM_POWER_STATE_ON      = 3
+} MMModemPowerState;
+
+/**
  * MMModemStateChangeReason:
  * @MM_MODEM_STATE_CHANGE_REASON_UNKNOWN: Reason unknown or not reportable.
  * @MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED: State change was requested by an interface user.

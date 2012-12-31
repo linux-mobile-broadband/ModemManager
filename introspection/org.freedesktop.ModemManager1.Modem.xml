@@ -125,6 +125,18 @@
     </method>
 
     <!--
+        SetPowerState:
+	@state: A <link linkend="MMModemPowerState">MMModemPowerState</link> value, to specify the desired power state.
+
+        Set the power state of the modem. This action can only be run when the
+	modem is in <link linkend="MM-MODEM-STATE-DISABLED:CAPS"><constant>MM_MODEM_STATE_DISABLED</constant></link>
+	state.
+    -->
+    <method name="SetPowerState">
+      <arg name="state" type="u" direction="in" />
+    </method>
+
+    <!--
         SetAllowedModes:
         @modes: Bitmask of <link linkend="MMModemMode">MMModemMode</link> values, to specify all the modes allowed in the modem.
         @preferred: Specific <link linkend="MMModemMode">MMModemMode</link> preferred among the ones allowed, if any.
@@ -376,6 +388,14 @@
         modem.
     -->
     <property name="OwnNumbers" type="as" access="read" />
+
+    <!--
+        PowerState:
+
+	A <link linkend="MMModemPowerState">MMModemPowerState</link> value
+	specifying the current power state of the modem.
+    -->
+    <property name="PowerState" type="u" access="read" />
 
     <!--
         SupportedModes:

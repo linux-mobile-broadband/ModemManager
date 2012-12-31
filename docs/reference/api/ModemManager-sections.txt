@@ -21,6 +21,7 @@ MMModemLock
 MMModemMode
 MMModemState
 MMModemStateChangeReason
+MMModemPowerState
 MMSmsPduType
 MMSmsState
 MMSmsDeliveryState
