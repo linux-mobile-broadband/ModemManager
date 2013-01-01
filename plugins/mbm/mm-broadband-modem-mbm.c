@@ -59,8 +59,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
 #define MBM_E2NAP_CONNECTING   2
 
 struct _MMBroadbandModemMbmPrivate {
-    guint network_mode;
-
     gboolean have_emrdy;
 
     GRegex *e2nap_regex;
@@ -295,9 +293,6 @@ set_allowed_modes (MMIfaceModem *_self,
         return;
     }
 
-    /* Cache the value for next power-ups */
-    self->priv->network_mode = mbm_mode;
-
     command = g_strdup_printf ("+CFUN=%d", mbm_mode);
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
@@ -443,7 +438,9 @@ modem_power_up (MMIfaceModem *_self,
     MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
     gchar *command;
 
-    command = g_strdup_printf ("+CFUN=%u", self->priv->network_mode);
+    /* The power-up command will be run *only* during the first enabling
+     * of the modem, as there is no power-down command implemented */
+    command = g_strdup_printf ("+CFUN=%u", MBM_NETWORK_MODE_ANY);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               command,
                               5,
@@ -1054,8 +1051,6 @@ mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
                                               MM_TYPE_BROADBAND_MODEM_MBM,
                                               MMBroadbandModemMbmPrivate);
 
-    self->priv->network_mode = MBM_NETWORK_MODE_ANY;
-
     /* Prepare regular expressions to setup */
     self->priv->e2nap_regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -1102,14 +1097,21 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
-    iface->modem_power_up = modem_power_up;
-    iface->modem_power_up_finish = modem_power_up_finish;
     iface->reset = reset;
     iface->reset_finish = reset_finish;
     iface->factory_reset = factory_reset;
     iface->factory_reset_finish = factory_reset_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+
+    /* Initially we'll assume power state is unknown; which will force an
+     * initial unconditional power-up during the first enabling.
+     * In these modems CFUN is associated to the allowed/preferred modes,
+     * so don't play with it much. */
+    iface->load_power_state = NULL;
+    iface->load_power_state_finish = NULL;
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = modem_power_up_finish;
 }
 
 static void
