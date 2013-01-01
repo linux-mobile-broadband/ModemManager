@@ -200,6 +200,8 @@ iface_modem_init (MMIfaceModem *iface)
      * to be in CFUN=1 before we'll be able to talk to it in the first place,
      * we shouldn't bother with CFUN at all.
      */
+    iface->load_power_state = NULL;
+    iface->load_power_state_finish = NULL;
     iface->modem_power_up = NULL;
     iface->modem_power_up_finish = NULL;
     iface->modem_init_power_down = NULL;
