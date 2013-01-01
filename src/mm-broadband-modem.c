@@ -2239,6 +2239,100 @@ modem_setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+static MMModemPowerState
+load_power_state_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+cfun_query_ready (MMBaseModem *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    const gchar *result;
+    guint state;
+    GError *error = NULL;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!result) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Parse power state reply */
+    result = mm_strip_tag (result, "+CFUN:");
+    if (!mm_get_uint_from_str (result, &state)) {
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse +CFUN? response '%s'",
+                                         result);
+    } else {
+        switch (state) {
+        case 0:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+            break;
+        case 1:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+            break;
+        case 4:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
+            break;
+        default:
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled power state: '%u'",
+                                             state);
+            break;
+        }
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_power_state (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_power_state);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Assuming full power state in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_dbg ("loading power state...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)cfun_query_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Powering up the modem (Modem interface) */
 
 static gboolean
@@ -8361,6 +8455,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_sim_finish = modem_create_sim_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
+    iface->load_power_state = load_power_state;
+    iface->load_power_state_finish = load_power_state_finish;
 
     /* Enabling steps */
     iface->modem_init = modem_init;
