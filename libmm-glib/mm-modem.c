@@ -817,6 +817,24 @@ mm_modem_get_state (MMModem *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_power_state:
+ * @self: A #MMModem.
+ *
+ * Gets the power state of the #MMModem.
+ *
+ * Returns: A #MMModemPowerState value.
+ */
+MMModemPowerState
+mm_modem_get_power_state (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_POWER_STATE_UNKNOWN);
+
+    return (MMModemPowerState) mm_gdbus_modem_get_power_state (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_get_access_technology:
  * @self: A #MMModem.
  *
@@ -2063,6 +2081,82 @@ mm_modem_command_sync (MMModem *self,
         return NULL;
 
     return result;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_set_power_state_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_power_state().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_set_power_state().
+ *
+ * Returns: %TRUE if the power state was successfully set, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_set_power_state_finish (MMModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_power_state_finish (MM_GDBUS_MODEM (self), res, error);
+}
+
+/**
+ * mm_modem_set_power_state:
+ * @self: A #MMModem.
+ * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every other #MMModemPowerState value is not allowed.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously sets the power state of the device. This method can only be
+ * used while the modem is in %MM_MODEM_STATE_DISABLED state.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_set_power_state_finish() to get the result of the operation.
+ *
+ * See mm_modem_set_power_state_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_set_power_state (MMModem *self,
+                          MMModemPowerState state,
+                          GCancellable *cancellable,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+
+    mm_gdbus_modem_call_set_power_state (MM_GDBUS_MODEM (self), state, cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_set_power_state_sync:
+ * @self: A #MMModem.
+ * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every other #MMModemPowerState value is not allowed.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously sets the power state of the device. This method can only be
+ * used while the modem is in %MM_MODEM_STATE_DISABLED state.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_set_power_state()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the power state was successfully set, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_set_power_state_sync (MMModem *self,
+                               MMModemPowerState state,
+                               GCancellable *cancellable,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_power_state_sync (MM_GDBUS_MODEM (self), state, cancellable, error);
 }
 
 /*****************************************************************************/

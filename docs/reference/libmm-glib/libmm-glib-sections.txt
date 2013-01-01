@@ -77,6 +77,7 @@ MMModem
 mm_modem_get_path
 mm_modem_dup_path
 mm_modem_get_state
+mm_modem_get_power_state
 mm_modem_get_modem_capabilities
 mm_modem_get_current_capabilities
 mm_modem_get_manufacturer
@@ -126,6 +127,9 @@ mm_modem_enable_sync
 mm_modem_disable
 mm_modem_disable_finish
 mm_modem_disable_sync
+mm_modem_set_power_state
+mm_modem_set_power_state_finish
+mm_modem_set_power_state_sync
 mm_modem_set_allowed_modes
 mm_modem_set_allowed_modes_finish
 mm_modem_set_allowed_modes_sync

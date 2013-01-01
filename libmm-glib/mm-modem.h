@@ -118,6 +118,8 @@ MMUnlockRetries   *mm_modem_peek_unlock_retries      (MMModem *self);
 
 MMModemState       mm_modem_get_state                (MMModem *self);
 
+MMModemPowerState  mm_modem_get_power_state          (MMModem *self);
+
 MMModemAccessTechnology mm_modem_get_access_technologies (MMModem *self);
 
 guint              mm_modem_get_signal_quality       (MMModem *self,
@@ -240,6 +242,19 @@ gchar    *mm_modem_command_sync   (MMModem *self,
                                    guint timeout,
                                    GCancellable *cancellable,
                                    GError **error);
+
+void     mm_modem_set_power_state        (MMModem *self,
+                                          MMModemPowerState state,
+                                          GCancellable *cancellable,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+gboolean mm_modem_set_power_state_finish (MMModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+gboolean mm_modem_set_power_state_sync   (MMModem *self,
+                                          MMModemPowerState state,
+                                          GCancellable *cancellable,
+                                          GError **error);
 
 void     mm_modem_set_allowed_modes        (MMModem *self,
                                             MMModemMode modes,
