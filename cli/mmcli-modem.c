@@ -49,6 +49,8 @@ static gboolean info_flag; /* set when no action found */
 static gboolean monitor_state_flag;
 static gboolean enable_flag;
 static gboolean disable_flag;
+static gboolean set_power_state_on_flag;
+static gboolean set_power_state_low_flag;
 static gboolean reset_flag;
 static gchar *factory_reset_str;
 static gchar *command_str;
@@ -70,6 +72,14 @@ static GOptionEntry entries[] = {
     },
     { "disable", 'd', 0, G_OPTION_ARG_NONE, &disable_flag,
       "Disable a given modem",
+      NULL
+    },
+    { "set-power-state-on", 0, 0, G_OPTION_ARG_NONE, &set_power_state_on_flag,
+      "Set full power state in the modem",
+      NULL
+    },
+    { "set-power-state-low", 0, 0, G_OPTION_ARG_NONE, &set_power_state_low_flag,
+      "Set low power state in the modem",
       NULL
     },
     { "reset", 'r', 0, G_OPTION_ARG_NONE, &reset_flag,
@@ -139,6 +149,8 @@ mmcli_modem_options_enabled (void)
     n_actions = (monitor_state_flag +
                  enable_flag +
                  disable_flag +
+                 set_power_state_on_flag +
+                 set_power_state_low_flag +
                  reset_flag +
                  list_bearers_flag +
                  !!create_bearer_str +
@@ -492,6 +504,33 @@ disable_ready (MMModem      *modem,
 
     operation_result = mm_modem_disable_finish (modem, result, &error);
     disable_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+set_power_state_process_reply (gboolean      result,
+                               const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set new power state in the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set new power state in the modem\n");
+}
+
+static void
+set_power_state_ready (MMModem      *modem,
+                       GAsyncResult *result,
+                       gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_set_power_state_finish (modem, result, &error);
+    set_power_state_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -864,6 +903,28 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to full power the modem? */
+    if (set_power_state_on_flag) {
+        g_debug ("Asynchronously setting full power...");
+        mm_modem_set_power_state (ctx->modem,
+                                  MM_MODEM_POWER_STATE_ON,
+                                  ctx->cancellable,
+                                  (GAsyncReadyCallback)set_power_state_ready,
+                                  NULL);
+        return;
+    }
+
+    /* Request to low power the modem? */
+    if (set_power_state_low_flag) {
+        g_debug ("Asynchronously setting low power...");
+        mm_modem_set_power_state (ctx->modem,
+                                  MM_MODEM_POWER_STATE_LOW,
+                                  ctx->cancellable,
+                                  (GAsyncReadyCallback)set_power_state_ready,
+                                  NULL);
+        return;
+    }
+
     /* Request to reset the modem? */
     if (reset_flag) {
         g_debug ("Asynchronously reseting modem...");
@@ -1044,6 +1105,26 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         g_debug ("Synchronously disabling modem...");
         result = mm_modem_disable_sync (ctx->modem, NULL, &error);
         disable_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set full power state? */
+    if (set_power_state_on_flag) {
+        gboolean result;
+
+        g_debug ("Synchronously setting full power...");
+        result = mm_modem_set_power_state_sync (ctx->modem, MM_MODEM_POWER_STATE_ON, NULL, &error);
+        set_power_state_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set low power state? */
+    if (set_power_state_low_flag) {
+        gboolean result;
+
+        g_debug ("Synchronously setting low power...");
+        result = mm_modem_set_power_state_sync (ctx->modem, MM_MODEM_POWER_STATE_LOW, NULL, &error);
+        set_power_state_process_reply (result, error);
         return;
     }
 
