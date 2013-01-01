@@ -1040,56 +1040,14 @@ modem_power_up_finish (MMIfaceModem *self,
                        GAsyncResult *res,
                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
 }
 
 static void
-full_functionality_status_ready (MMBaseModem *self,
-                                 GAsyncResult *res,
-                                 GSimpleAsyncResult *simple)
+modem_power_up (MMIfaceModem *self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
 {
-    GError *error = NULL;
-
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
-get_current_functionality_status_ready (MMBaseModem *self,
-                                        GAsyncResult *res,
-                                        GSimpleAsyncResult *simple)
-{
-    const gchar *response;
-    GError *error = NULL;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        mm_warn ("Failed checking if power-up command is needed: '%s'. "
-                 "Will assume it isn't.",
-                 error->message);
-        g_error_free (error);
-        /* On error, just assume we don't need the power-up command */
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    response = mm_strip_tag (response, "+CFUN:");
-    if (response && *response == '1') {
-        /* If reported functionality status is '1', then we do not need to
-         * issue the power-up command. Otherwise, do it. */
-        mm_dbg ("Already in full functionality status, skipping power-up command");
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
     mm_warn ("Not in full functionality status, power-up command is needed. "
              "Note that it may reboot the modem.");
 
@@ -1100,28 +1058,8 @@ get_current_functionality_status_ready (MMBaseModem *self,
                               "+CFUN=1,0",
                               3,
                               FALSE,
-                              (GAsyncReadyCallback)full_functionality_status_ready,
-                              simple);
-}
-
-static void
-modem_power_up (MMIfaceModem *self,
-                GAsyncReadyCallback callback,
-                gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_up);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CFUN?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)get_current_functionality_status_ready,
-                              result);
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
