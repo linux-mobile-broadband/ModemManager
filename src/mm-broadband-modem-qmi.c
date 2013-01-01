@@ -2056,6 +2056,97 @@ modem_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+static MMModemPowerState
+load_power_state_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+dms_get_operating_mode_ready (QmiClientDms *client,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsGetOperatingModeOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_operating_mode_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_get_operating_mode_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get operating mode: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        QmiDmsOperatingMode mode = QMI_DMS_OPERATING_MODE_UNKNOWN;
+
+        qmi_message_dms_get_operating_mode_output_get_mode (output, &mode, NULL);
+
+        switch (mode) {
+        case QMI_DMS_OPERATING_MODE_ONLINE:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+            break;
+        case QMI_DMS_OPERATING_MODE_LOW_POWER:
+        case QMI_DMS_OPERATING_MODE_PERSISTENT_LOW_POWER:
+        case QMI_DMS_OPERATING_MODE_MODE_ONLY_LOW_POWER:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
+            break;
+        case QMI_DMS_OPERATING_MODE_OFFLINE:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+            break;
+        default:
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled power state: '%s' (%u)",
+                                             qmi_dms_operating_mode_get_string (mode),
+                                             mode);
+            break;
+        }
+    }
+
+    if (output)
+        qmi_message_dms_get_operating_mode_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_power_state (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_power_state);
+
+    mm_dbg ("Getting device operating mode...");
+    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)dms_get_operating_mode_ready,
+                                       result);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMSim *
@@ -7378,6 +7469,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
     iface->modem_init_power_down = modem_power_down;
     iface->modem_init_power_down_finish = modem_power_up_down_finish;
+    iface->load_power_state = load_power_state;
+    iface->load_power_state_finish = load_power_state_finish;
 
     /* Enabling/disabling */
     iface->modem_init = NULL;
