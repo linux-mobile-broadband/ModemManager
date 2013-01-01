@@ -21,6 +21,13 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 
+void              mm_common_sierra_load_power_state        (MMIfaceModem *self,
+                                                            GAsyncReadyCallback callback,
+                                                            gpointer user_data);
+MMModemPowerState mm_common_sierra_load_power_state_finish (MMIfaceModem *self,
+                                                            GAsyncResult *res,
+                                                            GError **error);
+
 void     mm_common_sierra_modem_power_up        (MMIfaceModem *self,
                                                  GAsyncReadyCallback callback,
                                                  gpointer user_data);
@@ -36,5 +43,7 @@ MMSim *mm_common_sierra_create_sim_finish (MMIfaceModem *self,
                                            GError **error);
 
 void mm_common_sierra_setup_ports (MMBroadbandModem *self);
+
+void mm_common_sierra_peek_parent_interfaces (MMIfaceModem *iface);
 
 #endif /* MM_COMMON_SIERRA_H */

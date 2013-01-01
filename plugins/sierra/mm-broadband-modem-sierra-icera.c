@@ -130,6 +130,10 @@ mm_broadband_modem_sierra_icera_init (MMBroadbandModemSierraIcera *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    mm_common_sierra_peek_parent_interfaces (iface);
+
+    iface->load_power_state = mm_common_sierra_load_power_state;
+    iface->load_power_state_finish = mm_common_sierra_load_power_state_finish;
     iface->modem_power_up = mm_common_sierra_modem_power_up;
     iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
     iface->create_sim = mm_common_sierra_create_sim;

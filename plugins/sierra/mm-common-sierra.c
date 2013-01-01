@@ -21,6 +21,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-sim-sierra.h"
 
+static MMIfaceModem *iface_modem_parent;
+
 /*****************************************************************************/
 /* Modem power up (Modem interface) */
 
@@ -42,9 +44,9 @@ sierra_power_up_wait_cb (GSimpleAsyncResult *result)
 }
 
 static void
-full_functionality_status_ready (MMBaseModem *self,
-                                 GAsyncResult *res,
-                                 GSimpleAsyncResult *simple)
+cfun_enable_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
     guint i;
@@ -76,52 +78,6 @@ full_functionality_status_ready (MMBaseModem *self,
     /* The modem object will be valid in the callback as 'result' keeps a
      * reference to it. */
     g_timeout_add_seconds (is_new_sierra ? 5 : 10, (GSourceFunc)sierra_power_up_wait_cb, simple);
-}
-
-static void
-get_current_functionality_status_ready (MMBaseModem *self,
-                                        GAsyncResult *res,
-                                        GSimpleAsyncResult *simple)
-{
-    const gchar *response;
-    GError *error = NULL;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        mm_warn ("Failed checking if power-up command is needed: '%s'. "
-                 "Will assume it isn't.",
-                 error->message);
-        g_error_free (error);
-        /* On error, just assume we don't need the power-up command */
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    response = mm_strip_tag (response, "+CFUN:");
-    if (response && *response == '1') {
-        /* If reported functionality status is '1', then we do not need to
-         * issue the power-up command. Otherwise, do it. */
-        mm_dbg ("Already in full functionality status, skipping power-up command");
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    mm_warn ("Not in full functionality status, power-up command is needed. "
-             "Note that it may reboot the modem.");
-
-    /* Try to go to full functionality mode without rebooting the system.
-     * Works well if we previously switched off the power with CFUN=4
-     */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CFUN=1,0", /* ",0" ensures no reset */
-                              10,
-                              FALSE,
-                              (GAsyncReadyCallback)full_functionality_status_ready,
-                              simple);
 }
 
 static void
@@ -162,13 +118,77 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
         return;
     }
 
-    /* For 3GPP modems, check if we'll need the power up */
+    mm_warn ("Not in full functionality status, power-up command is needed. "
+             "Note that it may reboot the modem.");
+
+    /* Try to go to full functionality mode without rebooting the system.
+     * Works well if we previously switched off the power with CFUN=4
+     */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CFUN?",
-                              3,
+                              "+CFUN=1,0", /* ",0" requests no reset */
+                              10,
                               FALSE,
-                              (GAsyncReadyCallback)get_current_functionality_status_ready,
+                              (GAsyncReadyCallback)cfun_enable_ready,
                               result);
+}
+
+/*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+MMModemPowerState
+mm_common_sierra_load_power_state_finish (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_power_state_ready (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MMModemPowerState state;
+
+    state = iface_modem_parent->load_power_state_finish (self, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (state), NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_common_sierra_load_power_state (MMIfaceModem *self,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_common_sierra_load_power_state);
+
+    /* Assume we're initially offline in CDMA-only modems so that we power-up
+     * with !pcstate */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Assuming offline in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Otherwise run parent's */
+    iface_modem_parent->load_power_state (self,
+                                          (GAsyncReadyCallback)parent_load_power_state_ready,
+                                          result);
 }
 
 /*****************************************************************************/
@@ -233,4 +253,12 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
     }
 
     g_regex_unref (pacsp_regex);
+}
+
+/*****************************************************************************/
+
+void
+mm_common_sierra_peek_parent_interfaces (MMIfaceModem *iface)
+{
+    iface_modem_parent = g_type_interface_peek_parent (iface);
 }

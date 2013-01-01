@@ -1153,6 +1153,8 @@ mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    mm_common_sierra_peek_parent_interfaces (iface);
+
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
@@ -1161,6 +1163,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
+    iface->load_power_state = mm_common_sierra_load_power_state;
+    iface->load_power_state_finish = mm_common_sierra_load_power_state_finish;
     iface->modem_power_up = mm_common_sierra_modem_power_up;
     iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
     iface->modem_init_power_down = modem_power_down;
