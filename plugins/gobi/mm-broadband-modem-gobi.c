@@ -114,8 +114,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
 
-    iface->modem_init_power_down = NULL;
-    iface->modem_init_power_down_finish = NULL;
     iface->modem_power_down = NULL;
     iface->modem_power_down_finish = NULL;
 }

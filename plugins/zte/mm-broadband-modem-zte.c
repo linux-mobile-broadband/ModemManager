@@ -576,8 +576,6 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
-    iface->modem_init_power_down = modem_power_down;
-    iface->modem_init_power_down_finish = modem_power_down_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->load_access_technologies = load_access_technologies;

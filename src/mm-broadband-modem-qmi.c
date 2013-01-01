@@ -7467,8 +7467,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
-    iface->modem_init_power_down = modem_power_down;
-    iface->modem_init_power_down_finish = modem_power_up_down_finish;
     iface->load_power_state = load_power_state;
     iface->load_power_state_finish = load_power_state_finish;
 

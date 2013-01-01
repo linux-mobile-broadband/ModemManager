@@ -1167,8 +1167,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state_finish = mm_common_sierra_load_power_state_finish;
     iface->modem_power_up = mm_common_sierra_modem_power_up;
     iface->modem_power_up_finish = mm_common_sierra_modem_power_up_finish;
-    iface->modem_init_power_down = modem_power_down;
-    iface->modem_init_power_down_finish = modem_power_down_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->create_sim = mm_common_sierra_create_sim;

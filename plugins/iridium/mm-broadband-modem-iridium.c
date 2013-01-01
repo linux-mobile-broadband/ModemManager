@@ -473,8 +473,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = NULL;
     iface->modem_power_down = NULL;
     iface->modem_power_down_finish = NULL;
-    iface->modem_init_power_down = NULL;
-    iface->modem_init_power_down_finish = NULL;
 
     /* Supported modes cannot be queried */
     iface->load_supported_modes = load_supported_modes;
