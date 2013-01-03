@@ -1147,7 +1147,8 @@ periodic_registration_checks_ready (MMIfaceModem3gpp *self,
 
     /* Remove the running tag */
     ctx = g_object_get_qdata (G_OBJECT (self), registration_check_context_quark);
-    ctx->running = FALSE;
+    if (ctx)
+        ctx->running = FALSE;
 }
 
 static gboolean
