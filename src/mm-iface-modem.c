@@ -3930,6 +3930,26 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
 
 /*****************************************************************************/
 
+MMModemAccessTechnology
+mm_iface_modem_get_access_technologies (MMIfaceModem *self)
+{
+    MMModemAccessTechnology access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        access_tech = mm_gdbus_modem_get_access_technologies (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return access_tech;
+}
+
+/*****************************************************************************/
+
 MMModemMode
 mm_iface_modem_get_supported_modes (MMIfaceModem *self)
 {

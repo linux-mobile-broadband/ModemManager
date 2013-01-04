@@ -29,15 +29,18 @@
 #include "mm-sim-novatel-lte.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatelLte, mm_broadband_modem_novatel_lte, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
@@ -519,6 +522,96 @@ reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Scan networks (3GPP interface) */
+
+static GList *
+scan_networks_finish (MMIfaceModem3gpp *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+cops_query_ready (MMBroadbandModemNovatelLte *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GList *scan_result;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    scan_result = mm_3gpp_parse_cops_test_response (response, &error);
+    if (error) {
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (operation_result,
+                                               scan_result,
+                                               NULL);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+scan_networks (MMIfaceModem3gpp *self,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMModemAccessTechnology access_tech;
+
+    mm_dbg ("scanning for networks (Novatel LTE)...");
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        scan_networks);
+
+    access_tech = mm_iface_modem_get_access_technologies (MM_IFACE_MODEM (self));
+    /* The Novatel LTE modem does not properly support AT+COPS=? in LTE mode.
+     * Thus, do not try to scan networks when the current access technologies
+     * include LTE.
+     */
+    if (access_tech & MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
+        gchar *access_tech_string;
+
+        access_tech_string = mm_modem_access_technology_build_string_from_mask (access_tech);
+        mm_warn ("Couldn't scan for networks with access technologies: %s", access_tech_string);
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Couldn't scan for networks with access technologies: %s",
+                                         access_tech_string);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        g_free (access_tech_string);
+        return;
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+COPS=?",
+                              120,
+                              FALSE,
+                              (GAsyncReadyCallback)cops_query_ready,
+                              result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemNovatelLte *
 mm_broadband_modem_novatel_lte_new (const gchar *device,
@@ -561,6 +654,13 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->reset = reset;
     iface->reset_finish = reset_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface->scan_networks = scan_networks;
+    iface->scan_networks_finish = scan_networks_finish;
 }
 
 static void

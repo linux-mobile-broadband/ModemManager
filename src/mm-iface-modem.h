@@ -315,6 +315,9 @@ struct _MMIfaceModem {
 
 GType mm_iface_modem_get_type (void);
 
+/* Helpers to query access technologies */
+MMModemAccessTechnology mm_iface_modem_get_access_technologies (MMIfaceModem *self);
+
 /* Helpers to query capabilities */
 MMModemCapability mm_iface_modem_get_current_capabilities (MMIfaceModem *self);
 gboolean          mm_iface_modem_is_3gpp                  (MMIfaceModem *self);
