@@ -7678,8 +7678,9 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                                      MM_MODEM_STATE_FAILED,
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
-        /* Just jump to the last step */
-        ctx->step = INITIALIZE_STEP_LAST;
+        /* Jump to the firmware step. We allow firmware switching even in failed
+         * state */
+        ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
         initialize_step (ctx);
         return;
     }
@@ -7873,7 +7874,8 @@ initialize_step (InitializeContext *ctx)
         return;
 
     case INITIALIZE_STEP_IFACE_SIMPLE:
-        mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
+        if (ctx->self->priv->modem_state != MM_MODEM_STATE_FAILED)
+            mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
         /* Fall down to next step */
         ctx->step++;
 
