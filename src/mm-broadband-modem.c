@@ -1473,13 +1473,13 @@ signal_quality_csq_ready (MMBroadbandModem *self,
     }
 
     result_str = g_variant_get_string (result, NULL);
-    if (result_str &&
-        !strncmp (result_str, "+CSQ: ", 6)) {
+    if (result_str) {
         /* Got valid reply */
         int quality;
         int ber;
 
-        if (sscanf (result_str + 6, "%d, %d", &quality, &ber)) {
+        result_str = mm_strip_tag (result_str, "+CSQ:");
+        if (sscanf (result_str, "%d, %d", &quality, &ber)) {
             /* 99 means unknown */
             if (quality == 99) {
                 g_simple_async_result_take_error (
