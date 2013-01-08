@@ -868,23 +868,6 @@ registration_check_step (RunRegistrationChecksContext *ctx)
         mm_iface_modem_cdma_update_evdo_registration_state (ctx->self,
                                                             ctx->evdo_state);
 
-        /* Update access technologies.
-         * TODO: proper EV-DO revision reporting */
-        {
-            MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-
-            if (ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
-                ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
-                ctx->cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
-                act |= MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK;
-
-            if (ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
-                ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
-                ctx->evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
-                act |= MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
-            mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (ctx->self), act);
-        }
-
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         run_registration_checks_context_complete_and_free (ctx);
         return;
