@@ -430,7 +430,7 @@ get_one_quality (const gchar *reply,
                  const gchar *tag)
 {
     gint quality = -1;
-    const gchar *p;
+    char *temp, *p;
     gint dbm;
     gboolean success = FALSE;
 
@@ -445,12 +445,24 @@ get_one_quality (const gchar *reply,
     while (isspace (*p))
         p++;
 
-    if (mm_get_int_from_str (p, &dbm)) {
-        if (*p == '-') {
+    p = temp = g_strdup (p);
+
+    /* Cut off the string after the dBm */
+    while (isdigit (*p) || (*p == '-'))
+        p++;
+    *p = '\0';
+
+    /* When registered with EVDO, RX0/RX1 are returned by many cards with
+     * negative dBm.  When registered only with 1x, some cards return "1x RSSI"
+     * with positive dBm.
+     */
+
+    if (mm_get_int_from_str (temp, &dbm)) {
+        if (*temp == '-') {
             /* Some cards appear to use RX0/RX1 and output RSSI in negative dBm */
             if (dbm < 0)
                 success = TRUE;
-        } else if (isdigit (*p) && (dbm > 0) && (dbm < 115)) {
+        } else if (isdigit (*temp) && (dbm > 0) && (dbm < 115)) {
             /* S720 appears to use "1x RSSI" and print RSSI in dBm without '-' */
             dbm *= -1;
             success = TRUE;
@@ -462,6 +474,7 @@ get_one_quality (const gchar *reply,
         quality = 100 - ((dbm + 51) * 100 / (-113 + 51));
     }
 
+    g_free (temp);
     return quality;
 }
 
