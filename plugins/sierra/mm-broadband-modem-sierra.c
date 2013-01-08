@@ -41,6 +41,7 @@ static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 static MMIfaceModem *iface_modem_parent;
+static MMIfaceModemCdma *iface_modem_cdma_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -692,6 +693,94 @@ modem_power_down (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup registration checks (CDMA interface) */
+
+typedef struct {
+    gboolean skip_qcdm_call_manager_step;
+    gboolean skip_qcdm_hdr_step;
+    gboolean skip_at_cdma_service_status_step;
+    gboolean skip_at_cdma1x_serving_system_step;
+    gboolean skip_detailed_registration_state;
+} SetupRegistrationChecksResults;
+
+static gboolean
+setup_registration_checks_finish (MMIfaceModemCdma *self,
+                                  GAsyncResult *res,
+                                  gboolean *skip_qcdm_call_manager_step,
+                                  gboolean *skip_qcdm_hdr_step,
+                                  gboolean *skip_at_cdma_service_status_step,
+                                  gboolean *skip_at_cdma1x_serving_system_step,
+                                  gboolean *skip_detailed_registration_state,
+                                  GError **error)
+{
+    SetupRegistrationChecksResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *skip_qcdm_call_manager_step = results->skip_qcdm_call_manager_step;
+    *skip_qcdm_hdr_step = results->skip_qcdm_hdr_step;
+    *skip_at_cdma_service_status_step = results->skip_at_cdma_service_status_step;
+    *skip_at_cdma1x_serving_system_step = results->skip_at_cdma1x_serving_system_step;
+    *skip_detailed_registration_state = results->skip_detailed_registration_state;
+    return TRUE;
+}
+
+static void
+parent_setup_registration_checks_ready (MMIfaceModemCdma *self,
+                                        GAsyncResult *res,
+                                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    SetupRegistrationChecksResults results = { 0 };
+
+    if (!iface_modem_cdma_parent->setup_registration_checks_finish (self,
+                                                                    res,
+                                                                    &results.skip_qcdm_call_manager_step,
+                                                                    &results.skip_qcdm_hdr_step,
+                                                                    &results.skip_at_cdma_service_status_step,
+                                                                    &results.skip_at_cdma1x_serving_system_step,
+                                                                    &results.skip_detailed_registration_state,
+                                                                    &error)) {
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        /* Skip +CSS */
+        results.skip_at_cdma1x_serving_system_step = TRUE;
+        /* Skip +CAD */
+        results.skip_at_cdma_service_status_step = TRUE;
+
+        /* Force to always use the detailed registration checks, as we have
+         * !STATUS for that */
+        results.skip_detailed_registration_state = FALSE;
+
+        g_simple_async_result_set_op_res_gpointer (simple, &results, NULL);
+    }
+
+    /* All done. NOTE: complete NOT in idle! */
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+setup_registration_checks (MMIfaceModemCdma *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_registration_checks);
+
+    /* Run parent's checks first */
+    iface_modem_cdma_parent->setup_registration_checks (self,
+                                                        (GAsyncReadyCallback)parent_setup_registration_checks_ready,
+                                                        result);
+}
+
+/*****************************************************************************/
 /* Detailed registration state (CDMA interface) */
 
 typedef enum {
@@ -1300,6 +1389,10 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
+    iface_modem_cdma_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_registration_checks = setup_registration_checks;
+    iface->setup_registration_checks_finish = setup_registration_checks_finish;
     iface->get_detailed_registration_state = get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
 }
