@@ -315,6 +315,25 @@ parse_status (const char *response,
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
+typedef struct {
+    MMModemAccessTechnology act;
+    guint mask;
+} AccessTechInfo;
+
+static void
+access_tech_set_result (GSimpleAsyncResult *simple,
+                        MMModemAccessTechnology act,
+                        guint mask)
+{
+    AccessTechInfo *info;
+
+    info = g_new (AccessTechInfo, 1);
+    info->act = act;
+    info->mask = mask;
+
+    g_simple_async_result_set_op_res_gpointer (simple, info, g_free);
+}
+
 static gboolean
 load_access_technologies_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
@@ -322,21 +341,22 @@ load_access_technologies_finish (MMIfaceModem *self,
                                  guint *mask,
                                  GError **error)
 {
+    AccessTechInfo *info;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
 
-    /* We are reporting ALL 3GPP access technologies here */
-    *access_technologies = ((MMModemAccessTechnology) GPOINTER_TO_UINT (
-                                g_simple_async_result_get_op_res_gpointer (
-                                    G_SIMPLE_ASYNC_RESULT (res))));
-    *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+    info = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_assert (info);
+    *access_technologies = info->act;
+    *mask = info->mask;
     return TRUE;
 }
 
 static void
-cnti_set_ready (MMBaseModem *self,
-                GAsyncResult *res,
-                GSimpleAsyncResult *simple)
+access_tech_3gpp_ready (MMBaseModem *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
     const gchar *response;
@@ -361,7 +381,38 @@ cnti_set_ready (MMBaseModem *self,
                 "Couldn't parse access technologies result: '%s'",
                 response);
         else
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (act), NULL);
+            access_tech_set_result (simple, act, MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+access_tech_cdma_ready (MMIfaceModemCdma *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        MMModemCdmaRegistrationState cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+        if (!parse_status (response, &cdma1x_state, &evdo_state, &act))
+            g_simple_async_result_set_error (
+                simple,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_FAILED,
+                "Couldn't parse access technologies result: '%s'",
+                response);
+        else
+            access_tech_set_result (simple, act, MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK);
     }
 
     g_simple_async_result_complete (simple);
@@ -385,18 +436,17 @@ load_access_technologies (MMIfaceModem *self,
                                   "*CNTI=0",
                                   3,
                                   FALSE,
-                                  (GAsyncReadyCallback)cnti_set_ready,
+                                  (GAsyncReadyCallback)access_tech_3gpp_ready,
                                   result);
-        return;
+    } else if (mm_iface_modem_is_cdma (self)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "!STATUS",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)access_tech_cdma_ready,
+                                  result);
     }
-
-    /* Cannot do this in CDMA modems */
-    g_simple_async_result_set_error (result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "Cannot load access technologies in CDMA modems");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
