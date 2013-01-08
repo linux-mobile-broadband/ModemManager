@@ -40,6 +40,8 @@ static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_time_init (MMIfaceModemTime *iface);
 
+static MMIfaceModem *iface_modem_parent;
+
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
@@ -433,6 +435,122 @@ set_allowed_modes (MMIfaceModem *self,
                                    (GAsyncReadyCallback)selrat_set_ready,
                                    result);
     g_free (command);
+}
+
+/*****************************************************************************/
+/* Load own numbers (Modem interface) */
+
+static GStrv
+modem_load_own_numbers_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+parent_load_own_numbers_ready (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    GStrv numbers;
+
+    numbers = iface_modem_parent->load_own_numbers_finish (self, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, numbers, NULL);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+#define MDN_TAG  "MDN: "
+
+static void
+own_numbers_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
+{
+    const gchar *response, *p;
+    const gchar *numbers[2] = { NULL, NULL };
+    gchar mdn[15];
+    guint i;
+
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (!response)
+        goto fallback;
+
+    p = strstr (response, MDN_TAG);
+    if (!p)
+        goto fallback;
+
+    response = p + strlen (MDN_TAG);
+    while (isspace (*response))
+        response++;
+
+    for (i = 0; i < (sizeof (mdn) - 1) && isdigit (response[i]); i++)
+        mdn[i] = response[i];
+    mdn[i] = '\0';
+    numbers[0] = &mdn[0];
+
+    /* MDNs are 10 digits in length */
+    if (i != 10) {
+        mm_warn ("Failed to parse MDN: expected 10 digits, got %d", i);
+        goto fallback;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (simple,
+                                               g_strdupv ((gchar **) numbers),
+                                               NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+    return;
+
+fallback:
+    /* Fall back to parent method */
+    iface_modem_parent->load_own_numbers (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_own_numbers_ready,
+        simple);
+}
+
+static void
+modem_load_own_numbers (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    mm_dbg ("loading own numbers (Sierra)...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_own_numbers);
+
+    /* 3GPP modems can just run parent's own number loading */
+    if (mm_iface_modem_is_3gpp (self)) {
+        iface_modem_parent->load_own_numbers (
+            self,
+            (GAsyncReadyCallback)parent_load_own_numbers_ready,
+            result);
+        return;
+    }
+
+    /* CDMA modems try AT~NAMVAL?0 first, then fall back to parent for
+     * loading own number from NV memory with QCDM.
+     */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "~NAMVAL?0",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)own_numbers_ready,
+        result);
 }
 
 /*****************************************************************************/
@@ -1153,6 +1271,8 @@ mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     mm_common_sierra_peek_parent_interfaces (iface);
 
     iface->load_allowed_modes = load_allowed_modes;
@@ -1161,6 +1281,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_own_numbers = modem_load_own_numbers;
+    iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
     iface->load_power_state = mm_common_sierra_load_power_state;
