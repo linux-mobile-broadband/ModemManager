@@ -824,8 +824,8 @@ registration_check_step (RunRegistrationChecksContext *ctx)
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state_finish) {
             /* We pass the CDMA1x/EVDO registration states we got up to now.
-             * If the implementation can't improve the detail, it can either
-             * must return the values it already got as input, or issue an error,
+             * If the implementation can't improve the detail, it must either
+             * return the values it already got as input, or issue an error,
              * and we'll assume it couldn't get any better value. */
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state (
                 ctx->self,
