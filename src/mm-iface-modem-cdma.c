@@ -418,6 +418,7 @@ typedef enum {
 
     REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE,
     REGISTRATION_CHECK_STEP_QCDM_HDR_STATE,
+    REGISTRATION_CHECK_STEP_QCDM_CDMA1X_SERVING_SYSTEM,
     REGISTRATION_CHECK_STEP_QCDM_LAST,
 
     REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS,
@@ -630,6 +631,8 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
 {
     GError *error = NULL;
 
+    /* Note: used for *both* AT and QCDM serving system checks */
+
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish (
             self,
             res,
@@ -761,6 +764,22 @@ registration_check_step (RunRegistrationChecksContext *ctx)
             return;
         }
         mm_dbg ("  Skipping HDR check");
+        /* Fall down to next step */
+        ctx->step++;
+
+    case REGISTRATION_CHECK_STEP_QCDM_CDMA1X_SERVING_SYSTEM:
+        /* We only care about SID/NID here; nothing to do with registration
+         * state.
+         */
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system (
+                ctx->self,
+                (GAsyncReadyCallback)get_cdma1x_serving_system_ready,
+                ctx);
+            return;
+        }
+        mm_dbg ("  Skipping CDMA1x Serving System check");
         /* Fall down to next step */
         ctx->step++;
 
