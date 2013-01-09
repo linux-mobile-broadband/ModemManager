@@ -1346,19 +1346,28 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                                              huawei_modem_create_bearer);
 
     if (mm_port_get_port_type (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self))) == MM_PORT_TYPE_NET) {
-        /* If we get a data port, check for NDISDUP support */
-        mm_dbg ("Checking ^NDISDUP support...");
-        mm_base_modem_at_command (MM_BASE_MODEM(self),
-                                  "^NDISDUP?",
-                                  3,
-                                  FALSE,
-                                  (GAsyncReadyCallback)ndisdup_check_ready,
-                                  ctx);
-        return;
+        /* If we get a 'net' port, check if driver is 'cdc_ether' or 'cdc_ncm' */
+        const gchar **drivers;
+        guint i;
+
+        drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
+        for (i = 0; drivers[i]; i++) {
+            if (g_str_equal (drivers[i], "cdc_ether") || g_str_equal (drivers[i], "cdc_ncm")) {
+                /* If being handled by cdc-ether or cdc-ncm, check for NDISDUP support */
+                mm_dbg ("Checking ^NDISDUP support...");
+                mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                          "^NDISDUP?",
+                                          3,
+                                          FALSE,
+                                          (GAsyncReadyCallback)ndisdup_check_ready,
+                                          ctx);
+                return;
+            }
+        }
     }
 
     mm_dbg ("Creating default bearer...");
-    mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
+    mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
                              properties,
                              NULL, /* cancellable */
                              (GAsyncReadyCallback)broadband_bearer_new_ready,
