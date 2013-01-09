@@ -132,6 +132,7 @@ enum {
     DIAG_SUBSYS_CM              = 15, /* Call manager */
     DIAG_SUBSYS_FS              = 19, /* File System (EFS2) */
     DIAG_SUBSYS_NW_CONTROL_6500 = 50, /* for Novatel Wireless MSM6500-based devices */
+    DIAG_SUBSYS_LTE             = 68,
     DIAG_SUBSYS_ZTE             = 101, /* for ZTE EVDO devices */
     DIAG_SUBSYS_NW_CONTROL_6800 = 250 /* for Novatel Wireless MSM6800-based devices */
 };
