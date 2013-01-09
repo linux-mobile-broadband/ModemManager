@@ -77,4 +77,7 @@ ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="6124", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Dangerous Prototypes Bus Pirate v4
 ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="fb00" ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# All devices from the Swiss Federal Institute of Technology
+ATTRS{idVendor}=="0617", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
