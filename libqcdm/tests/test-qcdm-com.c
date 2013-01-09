@@ -640,6 +640,9 @@ test_com_read_mode_pref (void *f, void *data)
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_LTE_ONLY:
         msg = "LTE only";
         break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_LTE_ONLY:
+        msg = "GSM/UMTS/LTE only";
+        break;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY:
         msg = "CDMA 1x, HDR, and LTE only";
         break;
@@ -1109,17 +1112,41 @@ test_com_cm_subsys_state_info (void *f, void *data)
     n32 = 0;
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, &n32);
     switch (n32) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AMPS_ONLY:
+        detail = "AMPS only";
+        break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_DIGITAL_ONLY:
         detail = "digital only";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO:
         detail = "automatic";
         break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_EMERGENCY:
+        detail = "emergency";
+        break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_1X_ONLY:
         detail = "1X only";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_HDR_ONLY:
         detail = "HDR only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_1X_AMPS_ONLY:
+        detail = "1x/AMPS only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_GPS_ONLY:
+        detail = "GPS only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_GSM_ONLY:
+        detail = "GSM only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_WCDMA_ONLY:
+        detail = "WCDMA only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_LTE_ONLY:
+        detail = "LTE only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_GSM_WCDMA_LTE_ONLY:
+        detail = "GSM/WCDMA/LTE only";
         break;
     default:
         detail = "unknown";
