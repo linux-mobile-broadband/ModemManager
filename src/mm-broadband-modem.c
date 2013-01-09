@@ -1746,6 +1746,338 @@ modem_load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load access technology (Modem interface) */
+
+typedef struct {
+    MMModemAccessTechnology access_technologies;
+    guint mask;
+} AccessTechAndMask;
+
+static gboolean
+modem_load_access_technologies_finish (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       MMModemAccessTechnology *access_technologies,
+                                       guint *mask,
+                                       GError **error)
+{
+    AccessTechAndMask *tech;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    tech = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_assert (tech);
+
+    *access_technologies = tech->access_technologies;
+    *mask = tech->mask;
+    return TRUE;
+}
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMQcdmSerialPort *port;
+
+    guint32 opmode;
+    guint32 sysmode;
+    gboolean hybrid;
+
+    gboolean wcdma_open;
+    gboolean evdo_open;
+} AccessTechContext;
+
+static void
+access_tech_context_complete_and_free (AccessTechContext *ctx)
+{
+    AccessTechAndMask *tech;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    guint mask = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    mm_dbg ("QCDM operating mode: %d", ctx->opmode);
+    mm_dbg ("QCDM system mode: %d", ctx->sysmode);
+    mm_dbg ("QCDM hybrid pref: %d", ctx->hybrid);
+    mm_dbg ("QCDM WCDMA open: %d", ctx->wcdma_open);
+    mm_dbg ("QCDM EVDO open: %d", ctx->evdo_open);
+
+    if (ctx->opmode == QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE) {
+        switch (ctx->sysmode) {
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
+            if (!ctx->hybrid || !ctx->evdo_open) {
+                act = MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+                mask = MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK;
+                break;
+            }
+            /* Fall through */
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
+            /* Assume EVDOr0; can't yet determine r0 vs. rA with QCDM */
+            if (ctx->evdo_open)
+                act = MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+            mask = MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK;
+            break;
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GSM:
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GW:
+            if (ctx->wcdma_open) {
+                /* Assume UMTS; can't yet determine UMTS/HSxPA/HSPA+ with QCDM */
+                act = MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+            } else {
+                /* Assume GPRS; can't yet determine GSM/GPRS/EDGE with QCDM */
+                act = MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+            }
+            mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+            break;
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_LTE:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+            mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+            break;
+        }
+    }
+
+    tech = g_new0 (AccessTechAndMask, 1);
+    tech->access_technologies = act;
+    tech->mask = mask;
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, tech, g_free);
+    g_simple_async_result_complete (ctx->result);
+
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    if (ctx->port)
+        g_object_unref (ctx->port);
+    g_free (ctx);
+}
+
+static void
+access_tech_qcdm_wcdma_ready (MMQcdmSerialPort *port,
+                              GByteArray *response,
+                              GError *error,
+                              AccessTechContext *ctx)
+{
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    guint8 l1;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_wcdma_subsys_state_info_result ((const gchar *) response->data,
+                                                      response->len,
+                                                      &err);
+    if (result) {
+        qcdm_result_get_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, &l1);
+        qcdm_result_unref (result);
+
+        if (l1 == QCDM_WCDMA_L1_STATE_PCH ||
+            l1 == QCDM_WCDMA_L1_STATE_FACH ||
+            l1 == QCDM_WCDMA_L1_STATE_DCH)
+            ctx->wcdma_open = TRUE;
+    }
+
+    access_tech_context_complete_and_free (ctx);
+}
+
+static void
+access_tech_qcdm_gsm_ready (MMQcdmSerialPort *port,
+                            GByteArray *response,
+                            GError *error,
+                            AccessTechContext *ctx)
+{
+    GByteArray *cmd;
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    guint8 opmode = 0;
+    guint8 sysmode = 0;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_gsm_subsys_state_info_result ((const gchar *) response->data,
+                                                    response->len,
+                                                    &err);
+    if (!result) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse GSM subsys command result: %d",
+                                         err);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE, &opmode);
+    qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE, &sysmode);
+    qcdm_result_unref (result);
+
+    ctx->opmode = opmode;
+    ctx->sysmode = sysmode;
+
+    /* WCDMA subsystem state */
+    cmd = g_byte_array_sized_new (50);
+    cmd->len = qcdm_cmd_wcdma_subsys_state_info_new ((char *) cmd->data, 50);
+    g_assert (cmd->len);
+
+    mm_qcdm_serial_port_queue_command (port,
+                                       cmd,
+                                       3,
+                                       NULL,
+                                       (MMQcdmSerialResponseFn) access_tech_qcdm_wcdma_ready,
+                                       ctx);
+}
+
+static void
+access_tech_qcdm_hdr_ready (MMQcdmSerialPort *port,
+                            GByteArray *response,
+                            GError *error,
+                            AccessTechContext *ctx)
+{
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    guint8 session = 0;
+    guint8 almp = 0;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_hdr_subsys_state_info_result ((const gchar *) response->data,
+                                                    response->len,
+                                                    &err);
+    if (result) {
+        qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session);
+        qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp);
+        qcdm_result_unref (result);
+
+        if (session == QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_OPEN &&
+            (almp == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_IDLE ||
+             almp == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_CONNECTED))
+            ctx->evdo_open = TRUE;
+    }
+
+    access_tech_context_complete_and_free (ctx);
+}
+
+static void
+access_tech_qcdm_cdma_ready (MMQcdmSerialPort *port,
+                             GByteArray *response,
+                             GError *error,
+                             AccessTechContext *ctx)
+{
+    GByteArray *cmd;
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    guint32 hybrid;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_cm_subsys_state_info_result ((const gchar *) response->data,
+                                                   response->len,
+                                                   &err);
+    if (!result) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse CM subsys command result: %d",
+                                         err);
+        access_tech_context_complete_and_free (ctx);
+        return;
+    }
+
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &ctx->opmode);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &ctx->sysmode);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF, &hybrid);
+    qcdm_result_unref (result);
+
+    ctx->hybrid = !!hybrid;
+
+    /* HDR subsystem state */
+    cmd = g_byte_array_sized_new (50);
+    cmd->len = qcdm_cmd_hdr_subsys_state_info_new ((char *) cmd->data, 50);
+    g_assert (cmd->len);
+
+    mm_qcdm_serial_port_queue_command (port,
+                                       cmd,
+                                       3,
+                                       NULL,
+                                       (MMQcdmSerialResponseFn) access_tech_qcdm_hdr_ready,
+                                       ctx);
+}
+
+static void
+modem_load_access_technologies (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    MMQcdmSerialPort *port;
+    AccessTechContext *ctx;
+    GByteArray *cmd;
+
+    mm_dbg ("loading access technologies via QCDM...");
+
+    /* For modems where only QCDM provides detailed information, try to
+     * get access technologies via the various QCDM subsystems.
+     */
+    port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
+    if (!port) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot get access technology without a QCDM port");
+        return;
+    }
+
+    ctx = g_new0 (AccessTechContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (port);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_access_technologies);
+
+    if (mm_iface_modem_is_3gpp (self)) {
+        cmd = g_byte_array_sized_new (50);
+        cmd->len = qcdm_cmd_gsm_subsys_state_info_new ((char *) cmd->data, 50);
+        g_assert (cmd->len);
+
+        mm_qcdm_serial_port_queue_command (port,
+                                           cmd,
+                                           3,
+                                           NULL,
+                                           (MMQcdmSerialResponseFn) access_tech_qcdm_gsm_ready,
+                                           ctx);
+    } else if (mm_iface_modem_is_cdma (self)) {
+        cmd = g_byte_array_sized_new (50);
+        cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
+        g_assert (cmd->len);
+
+        mm_qcdm_serial_port_queue_command (port,
+                                           cmd,
+                                           3,
+                                           NULL,
+                                           (MMQcdmSerialResponseFn) access_tech_qcdm_cdma_ready,
+                                           ctx);
+    } else
+        g_assert_not_reached ();
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static gboolean
@@ -8602,6 +8934,9 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_bearer_finish = modem_create_bearer_finish;
     iface->command = modem_command;
     iface->command_finish = modem_command_finish;
+
+    iface->load_access_technologies = modem_load_access_technologies;
+    iface->load_access_technologies_finish = modem_load_access_technologies_finish;
 }
 
 static void
