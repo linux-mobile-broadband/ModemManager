@@ -192,6 +192,41 @@ curc_ready (MMAtSerialPort *port,
 }
 
 static void
+try_next_usbif (MMDevice *device)
+{
+    FirstInterfaceContext *fi_ctx;
+    GList *l;
+    gint closest;
+
+    fi_ctx = g_object_get_data (G_OBJECT (device), TAG_FIRST_INTERFACE_CONTEXT);
+    g_assert (fi_ctx != NULL);
+
+    /* Look for the next closest one among the list of interfaces in the device,
+     * and enable that one as being first */
+    closest = G_MAXINT;
+    for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
+        gint usbif;
+
+        usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
+        if (usbif == fi_ctx->first_usbif) {
+            g_warn_if_reached ();
+        } else if (usbif > fi_ctx->first_usbif &&
+                   usbif < closest) {
+            closest = usbif;
+        }
+    }
+
+    if (closest == G_MAXINT) {
+        /* Retry with interface 0... */
+        closest = 0;
+    }
+
+    mm_dbg ("(Huawei) Will try initial probing with interface '%d' instead", closest);
+
+    fi_ctx->first_usbif = closest;
+}
+
+static void
 huawei_custom_init_step (HuaweiCustomInitContext *ctx)
 {
     FirstInterfaceContext *fi_ctx;
@@ -213,6 +248,8 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
             /* All retries consumed, probably not an AT port */
             mm_port_probe_set_result_at (ctx->probe, FALSE);
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            /* Try with next */
+            try_next_usbif (mm_port_probe_peek_device (ctx->probe));
             huawei_custom_init_context_complete_and_free (ctx);
             return;
         }
@@ -262,37 +299,7 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
 static gboolean
 first_interface_missing_timeout_cb (MMDevice *device)
 {
-    FirstInterfaceContext *fi_ctx;
-    GList *l;
-    gint closest;
-
-    fi_ctx = g_object_get_data (G_OBJECT (device), TAG_FIRST_INTERFACE_CONTEXT);
-    g_assert (fi_ctx != NULL);
-
-    /* First interface didn't appear, look for the next closest one among the list of
-     * interfaces in the device, and enable that one as being first */
-    closest = G_MAXINT;
-    for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
-        gint usbif;
-
-        usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
-        if (usbif == fi_ctx->first_usbif) {
-            g_warn_if_reached ();
-        } else if (usbif > fi_ctx->first_usbif &&
-                   usbif < closest) {
-            closest = usbif;
-        }
-    }
-
-    if (closest == G_MAXINT) {
-        /* Retry with interface 0... */
-        closest = 0;
-    }
-
-    mm_dbg ("(Huawei) Couldn't find interface '%d' to start probing, will try with interface '%d' first instead",
-            fi_ctx->first_usbif, closest);
-
-    fi_ctx->first_usbif = closest;
+    try_next_usbif (device);
 
     /* Reload the timeout, just in case we end up not having the next interface to probe...
      * which is anyway very unlikely as we got it by looking at the real probe list, but anyway... */
