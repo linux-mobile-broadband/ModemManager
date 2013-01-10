@@ -241,15 +241,15 @@ pin_qmi_error_to_mobile_equipment_error (GError *qmi_error)
     if (g_error_matches (qmi_error,
                          QMI_PROTOCOL_ERROR,
                          QMI_PROTOCOL_ERROR_INCORRECT_PIN)) {
-        me_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                                MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD,
-                                qmi_error->message);
+        me_error = g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
+                                        MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD,
+                                        qmi_error->message);
     } else if (g_error_matches (qmi_error,
                                 QMI_PROTOCOL_ERROR,
                                 QMI_PROTOCOL_ERROR_PIN_BLOCKED)) {
-        me_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                                MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK,
-                                qmi_error->message);
+        me_error = g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
+                                        MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK,
+                                        qmi_error->message);
     }
 
     if (me_error) {
