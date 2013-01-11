@@ -203,19 +203,40 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
     /* Remove us from the list of running probes */
     g_assert (g_list_find (ctx->running_probes, port_probe_ctx) != NULL);
     ctx->running_probes = g_list_remove (ctx->running_probes, port_probe_ctx);
-    port_probe_context_free (port_probe_ctx);
 
     /* If there are running probes around, wait for them to finish */
-    if (ctx->running_probes != NULL)
-        return;
+    if (ctx->running_probes != NULL) {
+        GList *l;
+        GString *s = NULL;
+        guint i = 0;
 
+        for (l = ctx->running_probes; l; l = g_list_next (l)) {
+            const gchar *portname = g_udev_device_get_name (((PortProbeContext *)l->data)->port);
+
+            if (!s)
+                s = g_string_new (portname);
+            else
+                g_string_append_printf (s, ", %s", portname);
+            i++;
+        }
+
+        mm_dbg ("(Plugin Manager) '%s' port probe finished, still %u running probes in this device (%s)",
+                g_udev_device_get_name (port_probe_ctx->port), i, s->str);
+        g_string_free (s, TRUE);
+    }
     /* If we didn't use the minimum probing time, wait for it to finish */
-    if (ctx->timeout_id > 0)
-        return;
+    else if (ctx->timeout_id > 0) {
+        mm_dbg ("(Plugin Manager) '%s' port probe finished, last one in device, but minimum probing time not consumed yet",
+                g_udev_device_get_name (port_probe_ctx->port));
+    } else {
+        mm_dbg ("(Plugin Manager) '%s' port probe finished, last one in device",
+                g_udev_device_get_name (port_probe_ctx->port));
+        /* If we just finished the last running probe, we can now finish the device
+         * support check */
+        find_device_support_context_complete_and_free (ctx);
+    }
 
-    /* If we just finished the last running probe, we can now finish the device
-     * support check */
-    find_device_support_context_complete_and_free (ctx);
+    port_probe_context_free (port_probe_ctx);
 }
 
 static gboolean
@@ -539,8 +560,10 @@ min_probing_timeout_cb (FindDeviceSupportContext *ctx)
     ctx->timeout_id = 0;
 
     /* If there are no running probes around, we're free to finish */
-    if (ctx->running_probes == NULL)
+    if (ctx->running_probes == NULL) {
+        mm_dbg ("(Plugin Manager) Minimum probing time consumed and no more ports to probe");
         find_device_support_context_complete_and_free (ctx);
+    }
 
     return FALSE;
 }
