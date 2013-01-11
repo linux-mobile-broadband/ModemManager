@@ -60,6 +60,12 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TY
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
+typedef enum {
+    NDISDUP_SUPPORT_UNKNOWN,
+    NDISDUP_NOT_SUPPORTED,
+    NDISDUP_SUPPORTED
+} NdisdupSupport;
+
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
     GRegex *rssi_regex;
@@ -78,6 +84,8 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *simst_regex;
     GRegex *srvst_regex;
     GRegex *stin_regex;
+
+    NdisdupSupport ndisdup_support;
 };
 
 /*****************************************************************************/
@@ -1307,26 +1315,41 @@ broadband_bearer_new_ready (GObject *source,
 }
 
 static void
-ndisdup_check_ready (MMIfaceModem *self,
-                     GAsyncResult *res,
-                     CreateBearerContext *ctx)
+create_bearer_for_net_port (CreateBearerContext *ctx)
 {
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL)) {
+    switch (ctx->self->priv->ndisdup_support) {
+    case NDISDUP_SUPPORT_UNKNOWN:
+        g_assert_not_reached ();
+    case NDISDUP_NOT_SUPPORTED:
         mm_dbg ("^NDISDUP not supported, creating default bearer...");
-        mm_broadband_bearer_new (MM_BROADBAND_MODEM(self),
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
                                  ctx->properties,
                                  NULL, /* cancellable */
                                  (GAsyncReadyCallback)broadband_bearer_new_ready,
                                  ctx);
         return;
+    case NDISDUP_SUPPORTED:
+        mm_dbg ("^NDISDUP supported, creating huawei bearer...");
+        mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (ctx->self),
+                                        ctx->properties,
+                                        NULL, /* cancellable */
+                                        (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
+                                        ctx);
+        return;
     }
+}
 
-    mm_dbg ("^NDISDUP supported, creating huawei bearer...");
-    mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (self),
-                                    ctx->properties,
-                                    NULL, /* cancellable */
-                                    (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
-                                    ctx);
+static void
+ndisdup_check_ready (MMIfaceModem *self,
+                     GAsyncResult *res,
+                     CreateBearerContext *ctx)
+{
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL))
+        ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
+    else
+        ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
+
+    create_bearer_for_net_port (ctx);
 }
 
 static void
@@ -1353,14 +1376,19 @@ huawei_modem_create_bearer (MMIfaceModem *self,
         drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
         for (i = 0; drivers[i]; i++) {
             if (g_str_equal (drivers[i], "cdc_ether") || g_str_equal (drivers[i], "cdc_ncm")) {
-                /* If being handled by cdc-ether or cdc-ncm, check for NDISDUP support */
-                mm_dbg ("Checking ^NDISDUP support...");
-                mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                          "^NDISDUP?",
-                                          3,
-                                          FALSE,
-                                          (GAsyncReadyCallback)ndisdup_check_ready,
-                                          ctx);
+                /* If never checked yet, check NDISDUP support */
+                if (ctx->self->priv->ndisdup_support == NDISDUP_SUPPORT_UNKNOWN) {
+                    mm_dbg ("Checking ^NDISDUP support...");
+                    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                              "^NDISDUP?",
+                                              3,
+                                              FALSE,
+                                              (GAsyncReadyCallback)ndisdup_check_ready,
+                                              ctx);
+                } else {
+                    /* Already checked, create bearer */
+                    create_bearer_for_net_port (ctx);
+                }
                 return;
             }
         }
@@ -2177,6 +2205,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->stin_regex = g_regex_new ("\\r\\n\\^STIN:.+\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
 }
 
 static void
