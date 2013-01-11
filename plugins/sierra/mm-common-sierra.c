@@ -163,6 +163,53 @@ parent_load_power_state_ready (MMIfaceModem *self,
     g_object_unref (simple);
 }
 
+static void
+pcstate_query_ready (MMBaseModem *self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    const gchar *result;
+    guint state;
+    GError *error = NULL;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!result) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Parse power state reply */
+    result = mm_strip_tag (result, "!PCSTATE:");
+    if (!mm_get_uint_from_str (result, &state)) {
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse !PCSTATE response '%s'",
+                                         result);
+    } else {
+        switch (state) {
+        case 0:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+            break;
+        case 1:
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+            break;
+        default:
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled power state: '%u'",
+                                             state);
+            break;
+        }
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
 void
 mm_common_sierra_load_power_state (MMIfaceModem *self,
                                    GAsyncReadyCallback callback,
@@ -175,13 +222,14 @@ mm_common_sierra_load_power_state (MMIfaceModem *self,
                                         user_data,
                                         mm_common_sierra_load_power_state);
 
-    /* Assume we're initially offline in CDMA-only modems so that we power-up
-     * with !pcstate */
+    /* Check power state with AT!PCSTATE? */
     if (mm_iface_modem_is_cdma_only (self)) {
-        mm_dbg ("Assuming offline in CDMA-only modem...");
-        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "!pcstate?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)pcstate_query_ready,
+                                  result);
         return;
     }
 
