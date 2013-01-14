@@ -498,9 +498,6 @@ connect_cancelled_cb (GCancellable *cancellable,
 {
     Dial3gppContext *ctx;
 
-    /* Recover context and remove timeout */
-    ctx = self->priv->connect_pending;
-
     /* Recover context but DON'T remove it from the private info */
     ctx = self->priv->connect_pending;
 
