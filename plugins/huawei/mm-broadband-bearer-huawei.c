@@ -115,6 +115,7 @@ connect_dhcp_check_ready (MMBaseModem *modem,
                           MMBroadbandBearerHuawei *self)
 {
     Connect3gppContext *ctx;
+    GError *error = NULL;
 
     ctx = self->priv->connect_pending;
     g_assert (ctx != NULL);
@@ -122,11 +123,25 @@ connect_dhcp_check_ready (MMBaseModem *modem,
     /* Balance refcount */
     g_object_unref (self);
 
-    if (!mm_base_modem_at_command_full_finish (modem, res, NULL)) {
-        /* Setup timeout to retry the same step */
-        g_timeout_add_seconds (1,
-                               (GSourceFunc)connect_retry_dhcp_check_cb,
-                               g_object_ref (self));
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
+        /* Only retry the DHCP check if we get a mobile equipment error, or if
+         * the command timed out. */
+        if (error->domain == MM_MOBILE_EQUIPMENT_ERROR ||
+            g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
+            g_error_free (error);
+            /* Setup timeout to retry the same step */
+            g_timeout_add_seconds (1,
+                                   (GSourceFunc)connect_retry_dhcp_check_cb,
+                                   g_object_ref (self));
+            return;
+        }
+
+        /* Fatal error happened; e.g. modem unplugged */
+        self->priv->connect_pending = NULL;
+        g_simple_async_result_take_error (ctx->result, error);
+        connect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
