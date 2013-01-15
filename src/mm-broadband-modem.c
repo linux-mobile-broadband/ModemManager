@@ -6329,6 +6329,10 @@ qcdm_cdma_status_ready (MMQcdmSerialPort *port,
         nid = MM_MODEM_CDMA_NID_UNKNOWN;
     }
 
+    mm_dbg ("CDMA 1x Status RX state: %d", rxstate);
+    mm_dbg ("CDMA 1x Status SID: %d", sid);
+    mm_dbg ("CDMA 1x Status NID: %d", nid);
+
     results = g_new0 (Cdma1xServingSystemResults, 1);
     results->sid = sid;
     results->nid = nid;
