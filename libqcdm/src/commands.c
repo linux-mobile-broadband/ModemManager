@@ -1474,16 +1474,16 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_new (char *buf,
     cmd->hdr.code = DIAG_CMD_SUBSYS;
     switch (chipset) {
     case QCDM_NW_CHIPSET_6500:
-        cmd->hdr.subsys_id = DIAG_SUBSYS_NW_CONTROL_6500;
+        cmd->hdr.subsys_id = DIAG_SUBSYS_NOVATEL_6500;
         break;
     case QCDM_NW_CHIPSET_6800:
-        cmd->hdr.subsys_id = DIAG_SUBSYS_NW_CONTROL_6800;
+        cmd->hdr.subsys_id = DIAG_SUBSYS_NOVATEL_6800;
         break;
     default:
         qcdm_assert_not_reached ();
     }
-    cmd->hdr.subsys_cmd = htole16 (DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT);
-    cmd->technology = DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT_TECH_CDMA_EVDO;
+    cmd->hdr.subsys_cmd = htole16 (DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT);
+    cmd->technology = DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT_TECH_CDMA_EVDO;
     cmd->snapshot_mask = htole32 (0xFFFF);
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
