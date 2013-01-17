@@ -1702,6 +1702,66 @@ test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data)
 }
 
 void
+test_com_nw_subsys_eri (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    int err = QCDM_SUCCESS;
+    char buf[200];
+    gint len;
+    QcdmResult *result;
+    gsize reply_len;
+    guint8 num8 = 0;
+    const char *str = NULL;
+
+    len = qcdm_cmd_nw_subsys_eri_new (buf, sizeof (buf), QCDM_NW_CHIPSET_6800);
+    g_assert_cmpint (len, ==, 7);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nw_subsys_eri_result (buf, reply_len, &err);
+    if (!result) {
+        /* Obviously not all devices implement this command */
+        if (   err == -QCDM_ERROR_RESPONSE_BAD_COMMAND
+            || err == -QCDM_ERROR_RESPONSE_BAD_LENGTH)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
+    }
+    g_assert (result);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ROAM, &num8);
+    g_message ("%s: Roam: %d", __func__, num8);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_INDICATOR_ID, &num8);
+    g_message ("%s: Indicator ID: %d", __func__, num8);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_ID, &num8);
+    g_message ("%s: Icon ID: %d", __func__, num8);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_MODE, &num8);
+    g_message ("%s: Icon Mode: %d", __func__, num8);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_CALL_PROMPT_ID, &num8);
+    g_message ("%s: Call Prompt ID: %d", __func__, num8);
+
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ALERT_ID, &num8);
+    g_message ("%s: Alert ID: %d", __func__, num8);
+
+    qcdm_result_get_string (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_TEXT, &str);
+    g_message ("%s: Banner: '%s'", __func__, str);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_wcdma_subsys_state_info (void *f, void *data)
 {
     TestComData *d = data;
