@@ -66,6 +66,19 @@ enum {
     QCDM_HDR_REV_A = 0x02
 };
 
+enum {
+    QCDM_ERI_ROAMING_ICON_ON = 0,
+    QCDM_ERI_ROAMING_ICON_OFF = 1,
+    QCDM_ERI_ROAMING_ICON_FLASH = 2,
+    /* Values greater than 2 are OEM defined */
+};
+
+enum {
+    /* Valid with QCDM_ERI_ROAMING_ICON_FLASH and greater */
+    QCDM_ERI_ROAMING_ICON_MODE_NORMAL = 0,
+    QCDM_ERI_ROAMING_ICON_MODE_FLASH = 1,
+};
+
 /**********************************************************************/
 
 #define QCDM_CMD_VERSION_INFO_ITEM_COMP_DATE "comp-date"
@@ -618,6 +631,32 @@ size_t      qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
 QcdmResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
                                                            size_t len,
                                                            int *out_error);
+
+/**********************************************************************/
+
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_ROAM           "roam"
+
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_INDICATOR_ID   "indicator-id"
+
+/* One of QCDM_ERI_ROAMING_ICON_* */
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_ID        "icon-id"
+
+/* One of QCDM_ERI_ROAMING_ICON_MODE_* */
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_MODE      "icon-mode"
+
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_CALL_PROMPT_ID "call-prompt-id"
+
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_ALERT_ID       "alert-id"
+
+#define QCDM_CMD_NW_SUBSYS_ERI_ITEM_TEXT           "text"
+
+size_t      qcdm_cmd_nw_subsys_eri_new    (char *buf,
+                                           size_t len,
+                                           u_int8_t chipset);
+
+QcdmResult *qcdm_cmd_nw_subsys_eri_result (const char *buf,
+                                           size_t len,
+                                           int *out_error);
 
 /**********************************************************************/
 

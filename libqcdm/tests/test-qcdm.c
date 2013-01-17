@@ -116,6 +116,7 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_com_log_config, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_zte_subsys_status, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_nw_subsys_modem_snapshot_cdma, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_nw_subsys_eri, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_wcdma_subsys_state_info, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_gsm_subsys_state_info, data->com_data));
     }

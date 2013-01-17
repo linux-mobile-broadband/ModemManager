@@ -1536,6 +1536,76 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, size_t len, int 
 
 /**********************************************************************/
 
+size_t
+qcdm_cmd_nw_subsys_eri_new (char *buf,
+                            size_t len,
+                            u_int8_t chipset)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    /* Validate chipset */
+    if (chipset != QCDM_NW_CHIPSET_6500 && chipset != QCDM_NW_CHIPSET_6800) {
+        qcdm_err (0, "Unknown Novatel chipset 0x%X", chipset);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    switch (chipset) {
+    case QCDM_NW_CHIPSET_6500:
+        cmd->subsys_id = DIAG_SUBSYS_NOVATEL_6500;
+        break;
+    case QCDM_NW_CHIPSET_6800:
+        cmd->subsys_id = DIAG_SUBSYS_NOVATEL_6800;
+        break;
+    default:
+        qcdm_assert_not_reached ();
+    }
+    cmd->subsys_cmd = htole16 (DIAG_SUBSYS_NOVATEL_ERI);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_nw_subsys_eri_result (const char *buf, size_t len, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdSubsysNwEriRsp *rsp = (DMCmdSubsysNwEriRsp *) buf;
+    char str[50];
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysNwEriRsp), out_error))
+        return NULL;
+
+    /* FIXME: check 'status' when we know what it means */
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ROAM, rsp->roam);
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_INDICATOR_ID, rsp->indicator_id);
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_ID, rsp->icon_id);
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_MODE, rsp->icon_mode);
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_CALL_PROMPT_ID, rsp->call_prompt_id);
+    qcdm_result_add_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ALERT_ID, rsp->alert_id);
+
+    qcdm_warn_if_fail (rsp->text_len < sizeof (str));
+    if (rsp->text_len < sizeof (str)) {
+        qcdm_assert (sizeof (str) > sizeof (rsp->text));
+        memcpy (str, rsp->text, sizeof (rsp->text));
+        str[rsp->text_len] = '\0';
+        qcdm_result_add_string (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_TEXT, str);
+    }
+
+    return result;
+}
+
+/**********************************************************************/
+
 static size_t
 qcdm_cmd_log_config_new (char *buf,
                          size_t len,

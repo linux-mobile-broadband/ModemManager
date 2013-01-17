@@ -473,7 +473,7 @@ struct DMCmdSubsysNwSnapshotRsp {
     u_int8_t response_code;
     u_int32_t bitfield1;
     u_int32_t bitfield2;
-    u_int8_t data[100];
+    u_int8_t data[100];     /* DMCmdSubsysNwSnapshotCdma */
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotRsp DMCmdSubsysNwSnapshotRsp;
 
@@ -501,6 +501,27 @@ struct DMCmdSubsysNwSnapshotCdma {
     u_int8_t hdr_rev;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotCdma DMCmdSubsysNwSnapshotCdma;
+
+/* DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT response */
+struct DMCmdSubsysNwEriRsp {
+    DMCmdSubsysHeader hdr;
+    u_int8_t status;
+    u_int16_t error;
+    u_int8_t roam;
+    u_int8_t eri_header[6];
+    u_int8_t eri_call_prompt[38];
+
+    /* Roaming Indicator */
+    u_int8_t indicator_id;
+    u_int8_t icon_id;
+    u_int8_t icon_mode;
+    u_int8_t call_prompt_id;  /* Call Guard? */
+    u_int8_t alert_id;        /* Ringer? */
+    u_int8_t encoding_type;
+    u_int8_t text_len;
+    u_int8_t text[32];
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysNwEriRsp DMCmdSubsysNwEriRsp;
 
 enum {
     DIAG_CMD_LOG_CONFIG_OP_GET_RANGE = 0x01,
