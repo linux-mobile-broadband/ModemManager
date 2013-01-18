@@ -27,9 +27,10 @@
 #include "mm-log.h"
 #include "mm-context.h"
 
-#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC     60
-#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC      30
-#define ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC 30
+#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC        60
+#define SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC 3
+#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC         30
+#define ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC    30
 
 #define STATE_UPDATE_CONTEXT_TAG              "state-update-context-tag"
 #define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG     "signal-quality-update-context-tag"
@@ -996,6 +997,8 @@ mm_iface_modem_update_signal_quality (MMIfaceModem *self,
 /*****************************************************************************/
 
 typedef struct {
+    guint interval;
+    guint initial_retries;
     guint timeout_source;
     gboolean running;
 } SignalQualityCheckContext;
@@ -1007,6 +1010,8 @@ signal_quality_check_context_free (SignalQualityCheckContext *ctx)
         g_source_remove (ctx->timeout_source);
     g_free (ctx);
 }
+
+static gboolean periodic_signal_quality_check (MMIfaceModem *self);
 
 static void
 signal_quality_check_ready (MMIfaceModem *self,
@@ -1029,8 +1034,20 @@ signal_quality_check_ready (MMIfaceModem *self,
      * mm_iface_modem_shutdown when this function is invoked as a callback of
      * load_signal_quality. */
     ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
-    if (ctx)
+    if (ctx) {
+        if (ctx->interval == SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC &&
+            (signal_quality != 0 || --ctx->initial_retries == 0)) {
+            ctx->interval = SIGNAL_QUALITY_CHECK_TIMEOUT_SEC;
+            if (ctx->timeout_source) {
+                mm_dbg ("Periodic signal quality checks rescheduled (interval = %ds)", ctx->interval);
+                g_source_remove(ctx->timeout_source);
+                ctx->timeout_source = g_timeout_add_seconds (ctx->interval,
+                                                             (GSourceFunc)periodic_signal_quality_check,
+                                                             self);
+            }
+        }
         ctx->running = FALSE;
+    }
 }
 
 static gboolean
@@ -1043,7 +1060,7 @@ periodic_signal_quality_check (MMIfaceModem *self)
     /* Only launch a new one if not one running already OR if the last one run
      * was more than 15s ago. */
     if (!ctx->running ||
-        (time (NULL) - get_last_signal_quality_update_time (self) > 15)) {
+        (time (NULL) - get_last_signal_quality_update_time (self) > (ctx->interval / 2))) {
         ctx->running = TRUE;
         MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
             self,
@@ -1097,9 +1114,14 @@ periodic_signal_quality_check_enable (MMIfaceModem *self)
     }
 
     /* Create context and keep it as object data */
-    mm_dbg ("Periodic signal quality checks enabled");
     ctx = g_new0 (SignalQualityCheckContext, 1);
-    ctx->timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_CHECK_TIMEOUT_SEC,
+    /* Schedule the signal quality check using a shorter period, up to 5
+     * periods, initially until a non-zero signal quality value is obtained
+     * and then switch back to the normal period. */
+    ctx->interval = SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC;
+    ctx->initial_retries = 5;
+    mm_dbg ("Periodic signal quality checks enabled (interval = %ds)", ctx->interval);
+    ctx->timeout_source = g_timeout_add_seconds (ctx->interval,
                                                  (GSourceFunc)periodic_signal_quality_check,
                                                  self);
     g_object_set_qdata_full (G_OBJECT (self),
