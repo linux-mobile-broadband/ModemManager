@@ -216,7 +216,8 @@ find_physical_device (GUdevDevice *child)
 
 static void
 device_added (MMManager *manager,
-              GUdevDevice *port)
+              GUdevDevice *port,
+              gboolean hotplugged)
 {
     MMDevice *device;
     const char *subsys, *name, *physdev_path, *physdev_subsys;
@@ -292,7 +293,7 @@ device_added (MMManager *manager,
         FindDeviceSupportContext *ctx;
 
         /* Keep the device listed in the Manager */
-        device = mm_device_new (physdev);
+        device = mm_device_new (physdev, hotplugged);
         g_hash_table_insert (manager->priv->devices,
                              g_strdup (physdev_path),
                              device);
@@ -394,7 +395,7 @@ handle_uevent (GUdevClient *client,
     name = g_udev_device_get_name (device);
     if (   (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change"))
         && (!g_str_has_prefix (subsys, "usb") || (name && g_str_has_prefix (name, "cdc-wdm"))))
-        device_added (self, device);
+        device_added (self, device, TRUE);
     else if (g_str_equal (action, "remove"))
         device_removed (self, device);
 }
@@ -411,14 +412,14 @@ mm_manager_start (MMManager *manager)
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        device_added (manager, G_UDEV_DEVICE (iter->data));
+        device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "net");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        device_added (manager, G_UDEV_DEVICE (iter->data));
+        device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -429,7 +430,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            device_added (manager, G_UDEV_DEVICE (iter->data));
+            device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -441,7 +442,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            device_added (manager, G_UDEV_DEVICE (iter->data));
+            device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);

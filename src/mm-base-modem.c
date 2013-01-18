@@ -67,6 +67,7 @@ struct _MMBaseModemPrivate {
     guint vendor_id;
     guint product_id;
 
+    gboolean hotplugged;
     gboolean valid;
 
     guint max_timeouts;
@@ -408,6 +409,23 @@ mm_base_modem_initialize (MMBaseModem *self,
         self->priv->cancellable,
         callback,
         user_data);
+}
+
+void
+mm_base_modem_set_hotplugged (MMBaseModem *self,
+                              gboolean hotplugged)
+{
+    g_return_if_fail (MM_IS_BASE_MODEM (self));
+
+    self->priv->hotplugged = hotplugged;
+}
+
+gboolean
+mm_base_modem_get_hotplugged (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
+
+    return self->priv->hotplugged;
 }
 
 void

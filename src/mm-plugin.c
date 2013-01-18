@@ -802,6 +802,8 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                       port_probes,
                                                       error);
     if (modem) {
+        mm_base_modem_set_hotplugged (modem, mm_device_get_hotplugged (device));
+
         /* Grab each port */
         for (l = port_probes; l; l = g_list_next (l)) {
             GError *inner_error = NULL;

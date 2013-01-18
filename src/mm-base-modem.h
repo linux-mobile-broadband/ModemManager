@@ -143,6 +143,10 @@ MMAtSerialPort   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
 
+void     mm_base_modem_set_hotplugged (MMBaseModem *self,
+                                       gboolean hotplugged);
+gboolean mm_base_modem_get_hotplugged (MMBaseModem *self);
+
 void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
 gboolean mm_base_modem_get_valid    (MMBaseModem *self);

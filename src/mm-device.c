@@ -68,6 +68,9 @@ struct _MMDevicePrivate {
 
     /* When exported, a reference to the object manager */
     GDBusObjectManagerServer *object_manager;
+
+    /* Whether the device was hot-plugged. */
+    gboolean hotplugged;
 };
 
 /*****************************************************************************/
@@ -593,14 +596,24 @@ mm_device_get_port_probe_list (MMDevice *self)
     return copy;
 }
 
+gboolean
+mm_device_get_hotplugged (MMDevice *self)
+{
+    return self->priv->hotplugged;
+}
+
 /*****************************************************************************/
 
 MMDevice *
-mm_device_new (GUdevDevice *udev_device)
+mm_device_new (GUdevDevice *udev_device, gboolean hotplugged)
 {
-    return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
-                                    MM_DEVICE_UDEV_DEVICE, udev_device,
-                                    NULL));
+    MMDevice *device;
+
+    device = MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
+                                      MM_DEVICE_UDEV_DEVICE, udev_device,
+                                      NULL));
+    device->priv->hotplugged = hotplugged;
+    return device;
 }
 
 static void
