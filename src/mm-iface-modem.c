@@ -1526,7 +1526,7 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_INVALID_ARGS,
                                                "Cannot set '%s' power state",
-                                               ctx->power_state);
+                                               mm_modem_power_state_get_string (ctx->power_state));
         handle_set_power_state_context_free (ctx);
         return;
     }
