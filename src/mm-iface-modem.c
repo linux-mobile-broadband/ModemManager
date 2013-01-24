@@ -3402,12 +3402,12 @@ typedef enum {
     INITIALIZATION_STEP_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
-    INITIALIZATION_STEP_UNLOCK_REQUIRED,
-    INITIALIZATION_STEP_SIM,
-    INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_SUPPORTED_MODES,
     INITIALIZATION_STEP_SUPPORTED_BANDS,
     INITIALIZATION_STEP_POWER_STATE,
+    INITIALIZATION_STEP_UNLOCK_REQUIRED,
+    INITIALIZATION_STEP_SIM,
+    INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -3873,62 +3873,6 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_UNLOCK_REQUIRED:
-        /* Only check unlock required if we were previously not unlocked */
-        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
-            mm_iface_modem_update_lock_info (ctx->self,
-                                             MM_MODEM_LOCK_UNKNOWN, /* ask */
-                                             (GAsyncReadyCallback)modem_update_lock_info_ready,
-                                             ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case INITIALIZATION_STEP_SIM:
-        /* If the modem doesn't need any SIM, skip */
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish) {
-            MMSim *sim = NULL;
-
-            g_object_get (ctx->self,
-                          MM_IFACE_MODEM_SIM, &sim,
-                          NULL);
-            if (!sim) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim (
-                    MM_IFACE_MODEM (ctx->self),
-                    (GAsyncReadyCallback)sim_new_ready,
-                    ctx);
-                return;
-            }
-
-            /* If already available the sim object, relaunch initialization.
-             * This will try to load any missing property value that couldn't be
-             * retrieved before due to having the SIM locked. */
-            mm_sim_initialize (sim,
-                               NULL, /* TODO: cancellable */
-                               (GAsyncReadyCallback)sim_reinit_ready,
-                               ctx);
-            g_object_unref (sim);
-            return;
-        }
-
-    case INITIALIZATION_STEP_OWN_NUMBERS:
-        /* Own numbers is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
-        if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
-                ctx->self,
-                (GAsyncReadyCallback)load_own_numbers_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
     case INITIALIZATION_STEP_SUPPORTED_MODES:
         g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL);
         g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish != NULL);
@@ -3992,6 +3936,62 @@ interface_initialization_step (InitializationContext *ctx)
 
             /* We don't know how to load current power state; assume ON */
             mm_gdbus_modem_set_power_state (ctx->skeleton, MM_MODEM_POWER_STATE_ON);
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_UNLOCK_REQUIRED:
+        /* Only check unlock required if we were previously not unlocked */
+        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
+            mm_iface_modem_update_lock_info (ctx->self,
+                                             MM_MODEM_LOCK_UNKNOWN, /* ask */
+                                             (GAsyncReadyCallback)modem_update_lock_info_ready,
+                                             ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_SIM:
+        /* If the modem doesn't need any SIM, skip */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish) {
+            MMSim *sim = NULL;
+
+            g_object_get (ctx->self,
+                          MM_IFACE_MODEM_SIM, &sim,
+                          NULL);
+            if (!sim) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim (
+                    MM_IFACE_MODEM (ctx->self),
+                    (GAsyncReadyCallback)sim_new_ready,
+                    ctx);
+                return;
+            }
+
+            /* If already available the sim object, relaunch initialization.
+             * This will try to load any missing property value that couldn't be
+             * retrieved before due to having the SIM locked. */
+            mm_sim_initialize (sim,
+                               NULL, /* TODO: cancellable */
+                               (GAsyncReadyCallback)sim_reinit_ready,
+                               ctx);
+            g_object_unref (sim);
+            return;
+        }
+
+    case INITIALIZATION_STEP_OWN_NUMBERS:
+        /* Own numbers is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
+                ctx->self,
+                (GAsyncReadyCallback)load_own_numbers_ready,
+                ctx);
+            return;
         }
         /* Fall down to next step */
         ctx->step++;
