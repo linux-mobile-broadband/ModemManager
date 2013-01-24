@@ -205,7 +205,7 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
 
 /*****************************************************************************/
 
-static MMModemState get_current_consolidated_state (MMIfaceModem *self);
+static MMModemState get_current_consolidated_state (MMIfaceModem *self, MMModemState modem_state);
 
 typedef struct {
     MMBearer *self;
@@ -270,7 +270,7 @@ bearer_status_changed (MMBearer *bearer,
             new_state = MM_MODEM_STATE_DISCONNECTING;
             break;
         case MM_BEARER_STATUS_DISCONNECTED:
-            new_state = get_current_consolidated_state (self);
+            new_state = get_current_consolidated_state (self, state);
             break;
         }
 
@@ -1184,7 +1184,7 @@ mm_iface_modem_update_state (MMIfaceModem *self,
 
     /* Enabled may really be searching or registered */
     if (new_state == MM_MODEM_STATE_ENABLED)
-        new_state = get_current_consolidated_state (self);
+        new_state = get_current_consolidated_state (self, new_state);
 
     /* Update state only if different */
     if (new_state != old_state) {
@@ -1260,9 +1260,9 @@ subsystem_state_array_free (GArray *array)
 }
 
 static MMModemState
-get_current_consolidated_state (MMIfaceModem *self)
+get_current_consolidated_state (MMIfaceModem *self, MMModemState modem_state)
 {
-    MMModemState consolidated = MM_MODEM_STATE_DISABLED;
+    MMModemState consolidated = modem_state;
     GArray *subsystem_states;
 
     if (G_UNLIKELY (!state_update_context_quark))
@@ -1293,6 +1293,7 @@ get_current_consolidated_state (MMIfaceModem *self)
 
 static MMModemState
 get_updated_consolidated_state (MMIfaceModem *self,
+                                MMModemState modem_state,
                                 const gchar *subsystem,
                                 MMModemState subsystem_state)
 {
@@ -1345,7 +1346,7 @@ get_updated_consolidated_state (MMIfaceModem *self,
         g_array_append_val (subsystem_states, s);
     }
 
-    return get_current_consolidated_state (self);
+    return get_current_consolidated_state (self, modem_state);
 }
 
 void
@@ -1364,7 +1365,7 @@ mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
     /* We may have different subsystems being handled (e.g. 3GPP and CDMA), and
      * the registration status value is unique, so if we get subsystem-specific
      * state updates, we'll need to merge all to get a consolidated one. */
-    consolidated = get_updated_consolidated_state (self, subsystem, new_state);
+    consolidated = get_updated_consolidated_state (self, state, subsystem, new_state);
 
     /* Don't update registration-related states while disabling/enabling */
     if (state == MM_MODEM_STATE_ENABLING ||
