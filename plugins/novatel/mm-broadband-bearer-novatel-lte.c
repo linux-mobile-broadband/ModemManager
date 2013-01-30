@@ -325,6 +325,7 @@ typedef struct {
     MMAtSerialPort *secondary;
     MMPort *data;
     GSimpleAsyncResult *result;
+    gint retries;
 } DetailedDisconnectContext;
 
 static DetailedDisconnectContext *
@@ -348,6 +349,7 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              detailed_disconnect_context_new);
+    ctx->retries = 4;
     return ctx;
 }
 
@@ -373,33 +375,71 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static gboolean disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx);
+
 static void
-disconnect_3gpp_status_complete (MMBaseModem *modem,
-                                 GAsyncResult *res,
-                                 DetailedDisconnectContext *ctx)
+disconnect_3gpp_status_ready (MMBaseModem *modem,
+                              GAsyncResult *res,
+                              DetailedDisconnectContext *ctx)
 {
     const gchar *result;
     GError *error = NULL;
+    gboolean is_connected = FALSE;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
                                               res,
                                               &error);
-    if (error) {
-        mm_dbg("QMI connection status failed: %s", error->message);
+    if (result) {
+        mm_dbg ("QMI connection status: %s", result);
+        if (is_qmistatus_disconnected (result)) {
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            detailed_disconnect_context_complete_and_free (ctx);
+            return;
+        } else if (is_qmistatus_connected (result)) {
+            is_connected = TRUE;
+        }
+    } else {
+        mm_dbg ("QMI connection status failed: %s", error->message);
         g_error_free (error);
     }
 
-    if (result && is_qmistatus_disconnected (result))
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    else
+    if (ctx->retries > 0) {
+        ctx->retries--;
+        mm_dbg ("Retrying status check in a second. %d retries left.",
+                ctx->retries);
+        g_timeout_add_seconds (1, (GSourceFunc)disconnect_3gpp_qmistatus, ctx);
+        return;
+    }
+
+    /* If $NWQMISTATUS reports a CONNECTED QMI state, returns an error such that
+     * the modem state remains 'connected'. Otherwise, assumes the modem is
+     * disconnected from the network successfully. */
+    if (is_connected)
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
-                                         "Error checking if disconnected (%s)",
-                                         result ? result : "no result");
+                                         "QMI disconnect failed: %s",
+                                         result);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
     detailed_disconnect_context_complete_and_free (ctx);
 }
+
+static gboolean
+disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
+{
+    mm_base_modem_at_command (
+        ctx->modem,
+        "$NWQMISTATUS",
+        3, /* timeout */
+        FALSE, /* allow_cached */
+        (GAsyncReadyCallback)disconnect_3gpp_status_ready, /* callback */
+        ctx); /* user_data */
+
+    return FALSE;
+}
+
 
 static void
 disconnect_3gpp_check_status (MMBaseModem *modem,
@@ -416,13 +456,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    mm_base_modem_at_command (
-        ctx->modem,
-        "$NWQMISTATUS",
-        3, /* timeout */
-        FALSE, /* allow_cached */
-        (GAsyncReadyCallback)disconnect_3gpp_status_complete,
-        ctx); /* user_data */
+    disconnect_3gpp_qmistatus (ctx);
 }
 
 static void
