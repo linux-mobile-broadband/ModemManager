@@ -3979,6 +3979,8 @@ interface_initialization_step (InitializationContext *ctx)
             g_object_unref (sim);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_OWN_NUMBERS:
         /* Own numbers is meant to be loaded only once during the whole
