@@ -544,9 +544,9 @@ get_hdr_state_ready (MMIfaceModemCdma *self,
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state_finish (
             self,
             res,
+            &ctx->hdr_hybrid_mode,
             &ctx->hdr_session_state,
             &ctx->hdr_almp_state,
-            &ctx->hdr_hybrid_mode,
             &error)) {
         mm_dbg ("Could not get HDR state: %s", error->message);
         g_error_free (error);
