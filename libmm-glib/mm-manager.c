@@ -483,13 +483,8 @@ mm_manager_scan_devices_sync (MMManager     *manager,
 {
     g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
 
-    if (!manager->priv->manager_iface_proxy) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_NOT_FOUND,
-                     "ModemManager unavailable");
+    if (!ensure_modem_manager1_proxy (manager, error))
         return FALSE;
-    }
 
     return (mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices_sync (
                 manager->priv->manager_iface_proxy,
