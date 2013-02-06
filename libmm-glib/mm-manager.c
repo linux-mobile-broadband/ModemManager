@@ -42,15 +42,7 @@
  * modem objects.
  */
 
-static void initable_iface_init       (GInitableIface      *iface);
-static void async_initable_iface_init (GAsyncInitableIface *iface);
-
-static GInitableIface      *initable_parent_iface;
-static GAsyncInitableIface *async_initable_parent_iface;
-
-G_DEFINE_TYPE_EXTENDED (MMManager, mm_manager, MM_GDBUS_TYPE_OBJECT_MANAGER_CLIENT, 0,
-                        G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init)
-                        G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE, async_initable_iface_init))
+G_DEFINE_TYPE (MMManager, mm_manager, MM_GDBUS_TYPE_OBJECT_MANAGER_CLIENT)
 
 struct _MMManagerPrivate {
   /* The proxy for the Manager interface */
@@ -91,6 +83,42 @@ get_proxy_type (GDBusObjectManagerClient *manager,
     if (ret == (GType) 0)
         ret = G_TYPE_DBUS_PROXY;
     return ret;
+}
+
+/*****************************************************************************/
+
+static gboolean
+ensure_modem_manager1_proxy (MMManager  *self,
+                             GError    **error)
+{
+    gchar *name = NULL;
+    gchar *object_path = NULL;
+    GDBusObjectManagerClientFlags flags = G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE;
+    GDBusConnection *connection = NULL;
+
+    if (self->priv->manager_iface_proxy)
+        return TRUE;
+
+    /* Get the Manager proxy created synchronously now */
+    g_object_get (self,
+                  "name",        &name,
+                  "object-path", &object_path,
+                  "flags",       &flags,
+                  "connection",  &connection,
+                  NULL);
+
+    self->priv->manager_iface_proxy =
+        mm_gdbus_org_freedesktop_modem_manager1_proxy_new_sync (connection,
+                                                                flags,
+                                                                name,
+                                                                object_path,
+                                                                NULL,
+                                                                error);
+    g_object_unref (connection);
+    g_free (object_path);
+    g_free (name);
+
+    return !!self->priv->manager_iface_proxy;
 }
 
 /*****************************************************************************/
@@ -196,11 +224,16 @@ mm_manager_new_sync (GDBusConnection                *connection,
  *
  * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer none): The #GDBusProxy interface of @manager. Do not free the returned object, it is owned by @manager.
+ * Returns: (transfer none): The #GDBusProxy interface of @manager, or #NULL if none. Do not free the returned object, it is owned by @manager.
  */
 GDBusProxy *
 mm_manager_peek_proxy (MMManager *manager)
 {
+    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+
+    if (!ensure_modem_manager1_proxy (manager, NULL))
+        return NULL;
+
     return G_DBUS_PROXY (manager->priv->manager_iface_proxy);
 }
 
@@ -210,11 +243,16 @@ mm_manager_peek_proxy (MMManager *manager)
  *
  * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer full): The #GDBusProxy interface of @manager, which must be freed with g_object_unref().
+ * Returns: (transfer full): The #GDBusProxy interface of @manager, or #NULL if none. The returned object must be freed with g_object_unref().
  */
 GDBusProxy *
 mm_manager_get_proxy (MMManager *manager)
 {
+    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+
+    if (!ensure_modem_manager1_proxy (manager, NULL))
+        return NULL;
+
     return G_DBUS_PROXY (g_object_ref (manager->priv->manager_iface_proxy));
 }
 
@@ -282,11 +320,21 @@ mm_manager_set_logging (MMManager           *manager,
                         gpointer             user_data)
 {
     GSimpleAsyncResult *result;
+    GError *inner_error = NULL;
+
+    g_return_if_fail (MM_IS_MANAGER (manager));
 
     result = g_simple_async_result_new (G_OBJECT (manager),
                                         callback,
                                         user_data,
                                         mm_manager_set_logging);
+
+    if (!ensure_modem_manager1_proxy (manager, &inner_error)) {
+        g_simple_async_result_take_error (result, inner_error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     mm_gdbus_org_freedesktop_modem_manager1_call_set_logging (
         manager->priv->manager_iface_proxy,
@@ -317,6 +365,11 @@ mm_manager_set_logging_sync (MMManager     *manager,
                              GCancellable  *cancellable,
                              GError       **error)
 {
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+
+    if (!ensure_modem_manager1_proxy (manager, error))
+        return FALSE;
+
     return (mm_gdbus_org_freedesktop_modem_manager1_call_set_logging_sync (
                 manager->priv->manager_iface_proxy,
                 level,
@@ -341,11 +394,7 @@ mm_manager_scan_devices_finish (MMManager     *manager,
                                 GAsyncResult  *res,
                                 GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
-                                               error))
-        return FALSE;
-
-    return TRUE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
@@ -390,11 +439,21 @@ mm_manager_scan_devices (MMManager           *manager,
                          gpointer             user_data)
 {
     GSimpleAsyncResult *result;
+    GError *inner_error = NULL;
+
+    g_return_if_fail (MM_IS_MANAGER (manager));
 
     result = g_simple_async_result_new (G_OBJECT (manager),
                                         callback,
                                         user_data,
                                         mm_manager_scan_devices);
+
+    if (!ensure_modem_manager1_proxy (manager, &inner_error)) {
+        g_simple_async_result_take_error (result, inner_error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices (
         manager->priv->manager_iface_proxy,
@@ -422,178 +481,20 @@ mm_manager_scan_devices_sync (MMManager     *manager,
                               GCancellable  *cancellable,
                               GError       **error)
 {
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+
+    if (!manager->priv->manager_iface_proxy) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "ModemManager unavailable");
+        return FALSE;
+    }
+
     return (mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices_sync (
                 manager->priv->manager_iface_proxy,
                 cancellable,
                 error));
-}
-
-/*****************************************************************************/
-
-static gboolean
-initable_init_sync (GInitable     *initable,
-                    GCancellable  *cancellable,
-                    GError       **error)
-{
-    MMManagerPrivate *priv = MM_MANAGER (initable)->priv;
-	GError *inner_error = NULL;
-    gchar *name = NULL;
-    gchar *object_path = NULL;
-    GDBusObjectManagerClientFlags flags = G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE;
-    GDBusConnection *connection = NULL;
-
-	/* Chain up parent's initable callback before calling child's one */
-	if (!initable_parent_iface->init (initable, cancellable, &inner_error)) {
-		g_propagate_error (error, inner_error);
-		return FALSE;
-	}
-
-    /* Get the Manager proxy created synchronously now */
-    g_object_get (initable,
-                  "name", &name,
-                  "object-path", &object_path,
-                  "flags", &flags,
-                  "connection", &connection,
-                  NULL);
-    priv->manager_iface_proxy =
-        mm_gdbus_org_freedesktop_modem_manager1_proxy_new_sync (connection,
-                                                                flags,
-                                                                name,
-                                                                object_path,
-                                                                cancellable,
-                                                                &inner_error);
-    g_object_unref (connection);
-    g_free (object_path);
-    g_free (name);
-
-    if (!priv->manager_iface_proxy) {
-		g_propagate_error (error, inner_error);
-		return FALSE;
-    }
-
-    /* All good */
-	return TRUE;
-}
-
-/*****************************************************************************/
-
-typedef struct {
-    GSimpleAsyncResult *result;
-    int io_priority;
-    GCancellable *cancellable;
-    MMManager *manager;
-} InitAsyncContext;
-
-static void
-init_async_context_free (InitAsyncContext *ctx)
-{
-    g_object_unref (ctx->manager);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_free (ctx);
-}
-
-static gboolean
-initable_init_finish (GAsyncInitable  *initable,
-                      GAsyncResult    *result,
-                      GError         **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
-                                               error))
-        return FALSE;
-
-    return TRUE;
-}
-
-static void
-initable_init_async_manager_proxy_ready (GObject      *source,
-                                         GAsyncResult *res,
-                                         gpointer      user_data)
-{
-    GError *inner_error = NULL;
-    InitAsyncContext *ctx = user_data;
-    MMManagerPrivate *priv = ctx->manager->priv;
-
-    priv->manager_iface_proxy =
-        mm_gdbus_org_freedesktop_modem_manager1_proxy_new_finish (res,
-                                                                  &inner_error);
-    if (!priv->manager_iface_proxy)
-        g_simple_async_result_take_error (ctx->result, inner_error);
-    else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-
-    g_simple_async_result_complete (ctx->result);
-    init_async_context_free (ctx);
-}
-
-static void
-initable_init_async_parent_ready (GObject      *source,
-                                  GAsyncResult *res,
-                                  gpointer      user_data)
-{
-    GError *inner_error = NULL;
-    InitAsyncContext *ctx = user_data;
-    gchar *name = NULL;
-    gchar *object_path = NULL;
-    GDBusObjectManagerClientFlags flags = G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE;
-    GDBusConnection *connection = NULL;
-
-    /* Parent init ready, check it */
-    if (!async_initable_parent_iface->init_finish (G_ASYNC_INITABLE (source),
-                                                   res,
-                                                   &inner_error)) {
-        g_simple_async_result_take_error (ctx->result, inner_error);
-        g_simple_async_result_complete (ctx->result);
-        init_async_context_free (ctx);
-        return;
-    }
-
-    /* Get the Manager proxy created asynchronously now */
-    g_object_get (ctx->manager,
-                  "name", &name,
-                  "object-path", &object_path,
-                  "flags", &flags,
-                  "connection", &connection,
-                  NULL);
-    mm_gdbus_org_freedesktop_modem_manager1_proxy_new (connection,
-                                                       flags,
-                                                       name,
-                                                       object_path,
-                                                       ctx->cancellable,
-                                                       initable_init_async_manager_proxy_ready,
-                                                       ctx);
-    g_object_unref (connection);
-    g_free (object_path);
-    g_free (name);
-}
-
-static void
-initable_init_async (GAsyncInitable      *initable,
-                     int                  io_priority,
-                     GCancellable        *cancellable,
-                     GAsyncReadyCallback  callback,
-                     gpointer             user_data)
-{
-    InitAsyncContext *ctx;
-
-    ctx = g_new (InitAsyncContext, 1);
-    ctx->manager = g_object_ref (initable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (initable),
-                                             callback,
-                                             user_data,
-                                             initable_init_async);
-    ctx->cancellable = (cancellable ?
-                        g_object_ref (cancellable) :
-                        NULL);
-    ctx->io_priority = io_priority;
-
-	/* Chain up parent's initable callback before calling child's one */
-    async_initable_parent_iface->init_async (initable,
-                                             io_priority,
-                                             cancellable,
-                                             initable_init_async_parent_ready,
-                                             ctx);
 }
 
 /*****************************************************************************/
@@ -634,21 +535,6 @@ dispose (GObject *object)
     g_clear_object (&self->priv->manager_iface_proxy);
 
     G_OBJECT_CLASS (mm_manager_parent_class)->dispose (object);
-}
-
-static void
-initable_iface_init (GInitableIface *iface)
-{
-    initable_parent_iface = g_type_interface_peek_parent (iface);
-	iface->init = initable_init_sync;
-}
-
-static void
-async_initable_iface_init (GAsyncInitableIface *iface)
-{
-    async_initable_parent_iface = g_type_interface_peek_parent (iface);
-	iface->init_async = initable_init_async;
-	iface->init_finish = initable_init_finish;
 }
 
 static void
