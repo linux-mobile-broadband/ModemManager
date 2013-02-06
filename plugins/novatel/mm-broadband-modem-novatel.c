@@ -617,46 +617,76 @@ modem_cdma_get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-parse_modem_snapshot (DetailedRegistrationStateContext *ctx,
-                      QcdmResult *result)
+parse_modem_eri (DetailedRegistrationStateContext *ctx, QcdmResult *result)
 {
     MMModemCdmaRegistrationState new_state;
-    guint8 eri = 0;
+    guint8 indicator_id = 0, icon_id = 0, icon_mode = 0;
 
-    /* Roaming? */
-    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri) == 0) {
-        gchar *str;
-        gboolean roaming = FALSE;
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_INDICATOR_ID, &indicator_id);
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_ID, &icon_id);
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_MODE, &icon_mode);
 
-        str = g_strdup_printf ("%u", eri);
-        if (mm_cdma_parse_eri (str, &roaming, NULL, NULL)) {
-            new_state = roaming ? MM_MODEM_CDMA_REGISTRATION_STATE_HOME : MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
-            if (ctx->state.detailed_cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-                ctx->state.detailed_cdma1x_state = new_state;
-            if (ctx->state.detailed_evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-                ctx->state.detailed_evdo_state = new_state;
-        }
-        g_free (str);
-    }
+    /* We use the "Icon ID" (also called the "Icon Index") because if it is 1,
+     * the device is never roaming.  Any operator-defined IDs (greater than 2)
+     * may or may not be roaming, but that's operator-defined and we don't
+     * know anything about them.
+     *
+     * Indicator ID:
+     * 0 appears to be "not roaming", contrary to standard ERI values
+     * >= 1 appears to be the actual ERI value, which may or may not be
+     *      roaming depending on the operator's custom ERI list
+     *
+     * Icon ID:
+     * 0 = roaming indicator on
+     * 1 = roaming indicator off
+     * 2 = roaming indicator flash
+     *
+     * Icon Mode:
+     * 0 = normal
+     * 1 = flash  (only used with Icon ID >= 2)
+     *
+     * Roaming example:
+     *    Roam:         160
+     *    Indicator ID: 160
+     *    Icon ID:      3
+     *    Icon Mode:    0
+     *    Call Prompt:  1
+     *
+     * Home example:
+     *    Roam:         0
+     *    Indicator ID: 0
+     *    Icon ID:      1
+     *    Icon Mode:    0
+     *    Call Prompt:  1
+     */
+    if (icon_id == 1)
+        new_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+    else
+        new_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+
+    if (ctx->state.detailed_cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        ctx->state.detailed_cdma1x_state = new_state;
+    if (ctx->state.detailed_evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        ctx->state.detailed_evdo_state = new_state;
 }
 
 static void
-reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+reg_eri_6500_cb (MMQcdmSerialPort *port,
+                 GByteArray *response,
+                 GError *error,
+                 gpointer user_data)
 {
     DetailedRegistrationStateContext *ctx = user_data;
 
     if (error) {
         /* Just ignore the error and complete with the input info */
-        mm_dbg ("Couldn't run QCDM MSM6500 snapshot: '%s'", error->message);
+        mm_dbg ("Couldn't run QCDM MSM6500 ERI: '%s'", error->message);
     } else {
         QcdmResult *result;
 
-        result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+        result = qcdm_cmd_nw_subsys_eri_result ((const gchar *) response->data, response->len, NULL);
         if (result) {
-            parse_modem_snapshot (ctx, result);
+            parse_modem_eri (ctx, result);
             qcdm_result_unref (result);
         }
     }
@@ -667,31 +697,31 @@ reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
 }
 
 static void
-reg_nwsnap_6800_cb (MMQcdmSerialPort *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+reg_eri_6800_cb (MMQcdmSerialPort *port,
+                 GByteArray *response,
+                 GError *error,
+                 gpointer user_data)
 {
     DetailedRegistrationStateContext *ctx = user_data;
 
     if (error) {
         /* Just ignore the error and complete with the input info */
-        mm_dbg ("Couldn't run QCDM MSM6800 snapshot: '%s'", error->message);
+        mm_dbg ("Couldn't run QCDM MSM6800 ERI: '%s'", error->message);
     } else {
         QcdmResult *result;
-        GByteArray *nwsnap;
+        GByteArray *nweri;
 
         /* Parse the response */
-        result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+        result = qcdm_cmd_nw_subsys_eri_result ((const gchar *) response->data, response->len, NULL);
         if (result) {
-            parse_modem_snapshot (ctx, result);
+            parse_modem_eri (ctx, result);
             qcdm_result_unref (result);
         } else {
             /* Try for MSM6500 */
-            nwsnap = g_byte_array_sized_new (25);
-            nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
-            g_assert (nwsnap->len);
-            mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, reg_nwsnap_6500_cb, ctx);
+            nweri = g_byte_array_sized_new (25);
+            nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6500);
+            g_assert (nweri->len);
+            mm_qcdm_serial_port_queue_command (port, nweri, 3, NULL, reg_eri_6500_cb, ctx);
             return;
         }
     }
@@ -709,7 +739,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
                                             gpointer user_data)
 {
     DetailedRegistrationStateContext *ctx;
-    GByteArray *nwsnap;
+    GByteArray *nweri;
     MMQcdmSerialPort *port;
 
     /* Setup context */
@@ -725,10 +755,10 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
 
     /* Try MSM6800 first since newer cards use that */
-    nwsnap = g_byte_array_sized_new (25);
-    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
-    g_assert (nwsnap->len);
-    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, reg_nwsnap_6800_cb, ctx);
+    nweri = g_byte_array_sized_new (25);
+    nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6800);
+    g_assert (nweri->len);
+    mm_qcdm_serial_port_queue_command (port, nweri, 3, NULL, reg_eri_6800_cb, ctx);
 }
 
 /*****************************************************************************/
