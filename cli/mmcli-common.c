@@ -77,7 +77,7 @@ mmcli_get_manager (GDBusConnection *connection,
                                         user_data,
                                         mmcli_get_manager);
     mm_manager_new (connection,
-                    G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+                    G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
                     cancellable,
                     (GAsyncReadyCallback)manager_new_ready,
                     result);
@@ -91,7 +91,7 @@ mmcli_get_manager_sync (GDBusConnection *connection)
     GError *error = NULL;
 
     manager = mm_manager_new_sync (connection,
-                                   G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+                                   G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
                                    NULL,
                                    &error);
     if (!manager) {
