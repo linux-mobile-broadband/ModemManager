@@ -91,7 +91,7 @@ mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 MMSms *
 mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self)
 {
-    g_assert (MM_IFACE_MODEM_MESSAGING (self)->create_sms != NULL);
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->create_sms != NULL);
 
     return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->create_sms (self);
 }
