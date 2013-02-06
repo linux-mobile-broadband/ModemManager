@@ -110,6 +110,14 @@ else
 fi
 AC_SUBST(UDEV_BASE_DIR)
 
+# systemd system unit directory
+AC_ARG_WITH([systemdsystemunitdir], AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [where systemd service files are]),
+            [], [with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)])
+if test "x$with_systemdsystemunitdir" != xno; then
+    AC_SUBST([SYSTEMD_UNIT_DIR],  [$with_systemdsystemunitdir])
+fi
+AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
+
 # PolicyKit
 AC_ARG_WITH(polkit, AS_HELP_STRING([--with-polkit], [Build with PolicyKit support]))
 AM_CONDITIONAL(WITH_POLKIT, test "x$with_polkit" = "xyes")
@@ -256,6 +264,7 @@ echo "
 
     D-Bus system directory:  ${DBUS_SYS_DIR}
     udev base directory:     ${UDEV_BASE_DIR}
+    systemd unit directory:  ${with_systemdsystemunitdir}
 
     PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}

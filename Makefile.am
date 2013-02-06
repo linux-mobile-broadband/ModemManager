@@ -3,6 +3,7 @@ SUBDIRS = . build-aux data include libqcdm libwmc libmm-glib src plugins cli int
 
 DISTCHECK_CONFIGURE_FLAGS = \
 	--with-udev-base-dir="$$dc_install_base" \
+	--with-systemdsystemunitdir="$$dc_install_base/$(SYSTEMD_UNIT_DIR)" \
 	--with-tests=yes \
 	--with-docs=yes
 

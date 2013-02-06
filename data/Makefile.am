@@ -1,4 +1,11 @@
 
+edit = @sed \
+       -e 's|@sbindir[@]|$(sbindir)|g' \
+       -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
+       -e 's|@localstatedir[@]|$(localstatedir)|g' \
+       -e 's|@libexecdir[@]|$(libexecdir)|g'
+
+
 # DBus Service file
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager1.conf
@@ -14,17 +21,28 @@ org.freedesktop.ModemManager1.conf:  $(top_srcdir)/data/$(dbusservice_file_nopol
 endif
 
 
-# DBus Activation file
-edit = @sed \
-       -e 's|@sbindir[@]|$(sbindir)|g' \
-       -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
-       -e 's|@localstatedir[@]|$(localstatedir)|g' \
-       -e 's|@libexecdir[@]|$(libexecdir)|g'
-dbusactivationdir = $(datadir)/dbus-1/system-services
-dbusactivation_in_files = org.freedesktop.ModemManager1.service.in
-dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
-%service: %service.in
+# systemd unit file
+systemdsystemunitdir = $(SYSTEMD_UNIT_DIR)
+systemdsystemunit_in_files = ModemManager.service.in
+if HAVE_SYSTEMD
+systemdsystemunit_DATA = ModemManager.service
+ModemManager.service: ModemManager.service.in
 	$(edit) $< >$@
+endif
+
+
+# DBus Activation file
+dbusactivationdir = $(datadir)/dbus-1/system-services
+dbusactivation_DATA = org.freedesktop.ModemManager1.service
+dbusactivation_in_files_systemd = org.freedesktop.ModemManager1.service.systemd.in
+dbusactivation_in_files_nosystemd = org.freedesktop.ModemManager1.service.nosystemd.in
+if HAVE_SYSTEMD
+org.freedesktop.ModemManager1.service: org.freedesktop.ModemManager1.service.systemd.in
+	$(edit) $< >$@
+else
+org.freedesktop.ModemManager1.service: org.freedesktop.ModemManager1.service.nosystemd.in
+	$(edit) $< >$@
+endif
 
 
 # Icon
@@ -59,8 +77,15 @@ DISTCLEANFILES = \
 	$(dbusactivation_DATA) \
 	$(dbusservice_DATA)
 
+if HAVE_SYSTEMD
+DISTCLEANFILES += $(systemdsystemunit_DATA)
+endif
+
+
 EXTRA_DIST = \
-	$(dbusactivation_in_files) \
+	$(systemdsystemunit_in_files) \
+	$(dbusactivation_in_files_systemd) \
+	$(dbusactivation_in_files_nosystemd) \
 	$(dbusservice_file_polkit) \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
