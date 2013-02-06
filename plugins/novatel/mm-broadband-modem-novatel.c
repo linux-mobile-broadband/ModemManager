@@ -305,6 +305,151 @@ set_allowed_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
+typedef struct {
+    guint hdr_revision;    /* QCDM_HDR_REV_x */
+    MMModemAccessTechnology generic_act;
+    guint mask;
+} SnapshotResult;
+
+typedef struct {
+    MMBaseModem *self;
+    MMQcdmSerialPort *port;
+    GSimpleAsyncResult *simple;
+    MMModemAccessTechnology generic_act;
+    guint mask;
+} SnapshotContext;
+
+static void
+snapshot_result_complete (GSimpleAsyncResult *simple,
+                          guint hdr_revision,
+                          MMModemAccessTechnology generic_act,
+                          guint mask)
+{
+    SnapshotResult *r;
+
+    r = g_new0 (SnapshotResult, 1);
+    r->hdr_revision = hdr_revision;
+    r->generic_act = generic_act;
+    r->mask = mask;
+
+    g_simple_async_result_set_op_res_gpointer (simple, r, g_free);
+    g_simple_async_result_complete (simple);
+}
+
+static void
+snapshot_result_complete_simple (GSimpleAsyncResult *simple,
+                                 MMModemAccessTechnology generic_act,
+                                 guint mask)
+{
+    snapshot_result_complete (simple, QCDM_HDR_REV_UNKNOWN, generic_act, mask);
+}
+
+static void
+snapshot_context_complete_and_free (SnapshotContext *ctx, guint hdr_revision)
+{
+    snapshot_result_complete (ctx->simple,
+                              hdr_revision,
+                              ctx->generic_act,
+                              ctx->mask);
+    g_object_unref (ctx->simple);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->port);
+    g_free (ctx);
+}
+
+static void
+nw_snapshot_old_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    SnapshotContext *ctx = user_data;
+    QcdmResult *result;
+    guint8 hdr_revision = QCDM_HDR_REV_UNKNOWN;
+
+    if (error) {
+        /* Just ignore the error and complete with the input info */
+        mm_dbg ("Couldn't run QCDM Novatel Modem MSM6500 snapshot: '%s'", error->message);
+        snapshot_context_complete_and_free (ctx, QCDM_HDR_REV_UNKNOWN);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+    if (result) {
+        qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &hdr_revision);
+        qcdm_result_unref (result);
+    } else
+        mm_dbg ("Failed to get QCDM Novatel Modem MSM6500 snapshot.");
+
+    snapshot_context_complete_and_free (ctx, hdr_revision);
+}
+
+static void
+nw_snapshot_new_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    SnapshotContext *ctx = user_data;
+    QcdmResult *result;
+    GByteArray *nwsnap;
+    guint8 hdr_revision = QCDM_HDR_REV_UNKNOWN;
+
+    if (error) {
+        mm_dbg ("Couldn't run QCDM Novatel Modem MSM6800 snapshot: '%s'", error->message);
+        snapshot_context_complete_and_free (ctx, QCDM_HDR_REV_UNKNOWN);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+    if (result) {
+        qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &hdr_revision);
+        qcdm_result_unref (result);
+        snapshot_context_complete_and_free (ctx, hdr_revision);
+        return;
+    }
+
+    mm_dbg ("Failed to get QCDM Novatel Modem MSM6800 snapshot.");
+
+    /* Try for MSM6500 */
+    nwsnap = g_byte_array_sized_new (25);
+    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
+    g_assert (nwsnap->len);
+    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, nw_snapshot_old_cb, ctx);
+}
+
+static gboolean
+get_nw_modem_snapshot (MMBaseModem *self,
+                       GSimpleAsyncResult *simple,
+                       MMModemAccessTechnology generic_act,
+                       guint mask)
+{
+    SnapshotContext *ctx;
+    GByteArray *nwsnap;
+    MMQcdmSerialPort *port;
+
+    port = mm_base_modem_peek_port_qcdm (self);
+    if (!port)
+        return FALSE;
+
+    /* Setup context */
+    ctx = g_new0 (SnapshotContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (port);
+    ctx->simple = simple;
+    ctx->generic_act = generic_act;
+    ctx->mask = mask;
+
+    /* Try MSM6800 first since newer cards use that */
+    nwsnap = g_byte_array_sized_new (25);
+    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
+    g_assert (nwsnap->len);
+    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, nw_snapshot_new_cb, ctx);
+    return TRUE;
+}
+
 static gboolean
 modem_load_access_technologies_finish (MMIfaceModem *self,
                                        GAsyncResult *res,
@@ -312,12 +457,31 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
                                        guint *mask,
                                        GError **error)
 {
+    SnapshotResult *r;
+    MMModemAccessTechnology act;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
 
-    /* Remember we're only giving 3GPP access technologies */
-    *access_technologies = GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+    r = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    act = r->generic_act;
+    if (act & MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK) {
+        /* Update access technology with specific EVDO revision from QCDM */
+        if (r->hdr_revision == QCDM_HDR_REV_0) {
+            mm_dbg ("Novatel Modem Snapshot EVDO revision: 0");
+            act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
+            act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+        } else if (r->hdr_revision == QCDM_HDR_REV_A) {
+            mm_dbg ("Novatel Modem Snapshot EVDO revision: A");
+            act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
+            act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+        } else
+            mm_dbg ("Novatel Modem Snapshot EVDO revision: %d (unknown)", r->hdr_revision);
+    }
+
+    *access_technologies = act;
+    *mask = r->mask;
     return TRUE;
 }
 
@@ -340,22 +504,59 @@ cnti_set_ready (MMBaseModem *self,
 
     p = mm_strip_tag (response, "$CNTI:");
     p = strchr (p, ',');
-    if (p) {
-        g_simple_async_result_set_op_res_gpointer (
-            simple,
-            GUINT_TO_POINTER (mm_string_to_access_tech (p)),
-            NULL);
-    } else {
-        g_simple_async_result_set_error (
-            simple,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Couldn't parse $CNTI result '%s'",
-            response);
+    if (!p) {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Couldn't parse $CNTI result '%s'",
+                             response);
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    snapshot_result_complete_simple (simple,
+                                     mm_string_to_access_tech (p),
+                                     MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+}
+
+static void
+parent_load_access_technologies_ready (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    guint mask = 0;
+    GError *error = NULL;
+
+    if (!iface_modem_parent->load_access_technologies_finish (self,
+                                                              res,
+                                                              &act,
+                                                              &mask,
+                                                              &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* No point in checking EVDO revision if EVDO isn't being used or if for
+     * some reason we don't have a QCDM port.
+     */
+    if (!(act & MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK)) {
+        snapshot_result_complete (simple, QCDM_HDR_REV_UNKNOWN, act, mask);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Pass along the access tech & mask that the parent determined so we
+     * can specialize it based on the EVDO revision from QCDM.
+     */
+    if (!get_nw_modem_snapshot (MM_BASE_MODEM (self), simple, act, mask)) {
+        /* If there's any error, use the access tech that the parent interface determined */
+        snapshot_result_complete (simple, QCDM_HDR_REV_UNKNOWN, act, mask);
+        g_object_unref (simple);
+    }
 }
 
 static void
@@ -370,15 +571,15 @@ modem_load_access_technologies (MMIfaceModem *self,
                                         user_data,
                                         modem_load_access_technologies);
 
-    /* Load access technologies only in 3GPP modems */
-    if (!mm_iface_modem_is_3gpp (self)) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_UNSUPPORTED,
-            "Loading access technologies not supported in CDMA-only modems");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+    /* CDMA-only modems defer to parent for generic access technology
+     * checking, but can determine EVDOr0 vs. EVDOrA through proprietary
+     * QCDM commands.
+     */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        iface_modem_parent->load_access_technologies (
+            self,
+            (GAsyncReadyCallback)parent_load_access_technologies_ready,
+            result);
         return;
     }
 
