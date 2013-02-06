@@ -152,10 +152,14 @@ set_allowed_modes (MMIfaceModem *self,
         mododr = 3;
     else if (allowed == MM_MODEM_MODE_3G)
         mododr = 1;
-    else if (allowed == MM_MODEM_MODE_ANY &&
-             preferred == MM_MODEM_MODE_NONE)
-        /* Not sure about this, it may be '3G preferred' */
-        mododr = 2;
+    else if (allowed == MM_MODEM_MODE_ANY || (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))) {
+        if (preferred == MM_MODEM_MODE_2G)
+            mododr = 4;
+        else if (preferred == MM_MODEM_MODE_3G ||
+                 preferred == MM_MODEM_MODE_NONE ||
+                 preferred == MM_MODEM_MODE_ANY)
+            mododr = 2;
+    }
 
     if (mododr == 0) {
         gchar *allowed_str;
