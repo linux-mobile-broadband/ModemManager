@@ -86,8 +86,14 @@ PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= 147)
 AC_SUBST(GUDEV_CFLAGS)
 AC_SUBST(GUDEV_LIBS)
 
-AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
+# Some required utilities
+GLIB_GENMARSHAL=`$PKG_CONFIG --variable=glib_genmarshal glib-2.0`
+AC_SUBST(GLIB_GENMARSHAL)
+GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
+AC_SUBST(GLIB_MKENUMS)
 
+# DBus system directory
+AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
     DBUS_SYS_DIR="$with_dbus_sys_dir"
 else
@@ -95,20 +101,14 @@ else
 fi
 AC_SUBST(DBUS_SYS_DIR)
 
+# udev base directory
 AC_ARG_WITH(udev-base-dir, AS_HELP_STRING([--with-udev-base-dir=DIR], [where udev base directory is]))
-
 if test -n "$with_udev_base_dir" ; then
     UDEV_BASE_DIR="$with_udev_base_dir"
 else
     UDEV_BASE_DIR="/lib/udev"
 fi
 AC_SUBST(UDEV_BASE_DIR)
-
-GLIB_GENMARSHAL=`$PKG_CONFIG --variable=glib_genmarshal glib-2.0`
-AC_SUBST(GLIB_GENMARSHAL)
-
-GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
-AC_SUBST(GLIB_MKENUMS)
 
 # PolicyKit
 AC_ARG_WITH(polkit, AS_HELP_STRING([--with-polkit], [Build with PolicyKit support]))
