@@ -461,7 +461,7 @@ initable_init_sync (GInitable     *initable,
                                                                 name,
                                                                 object_path,
                                                                 cancellable,
-                                                                error);
+                                                                &inner_error);
     g_object_unref (connection);
     g_free (object_path);
     g_free (name);
