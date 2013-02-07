@@ -674,6 +674,9 @@ erinfo_received (MMAtSerialPort *port,
         case 2:
             act = MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
             break;
+        case 3:
+            act = MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+            break;
         default:
             break;
         }
