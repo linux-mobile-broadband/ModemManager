@@ -687,6 +687,14 @@ mbm_do_connect_done (MMModemMbm *self, gboolean success)
 }
 
 static void
+e2nap_disconnect_done (MMModem *modem,
+                       GError *error,
+                       gpointer user_data)
+{
+    mm_info ("Disconnected because the data connection failed");
+}
+
+static void
 mbm_e2nap_received (MMAtSerialPort *port,
                     GMatchInfo *info,
                     gpointer user_data)
@@ -701,7 +709,10 @@ mbm_e2nap_received (MMAtSerialPort *port,
 
     if (MBM_E2NAP_DISCONNECTED == state) {
         mm_dbg ("disconnected");
-        mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
+        if (mm_modem_get_state (MM_MODEM (user_data)) == MM_MODEM_STATE_CONNECTED)
+            mm_modem_disconnect (MM_MODEM (user_data), MM_MODEM_STATE_REASON_CONNECTION_FAILED, e2nap_disconnect_done, NULL);
+        else
+            mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
     } else if (MBM_E2NAP_CONNECTED == state) {
         mm_dbg ("connected");
         mbm_do_connect_done (MM_MODEM_MBM (user_data), TRUE);

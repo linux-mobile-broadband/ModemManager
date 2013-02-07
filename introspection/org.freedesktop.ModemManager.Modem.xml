@@ -319,6 +319,11 @@
           is not allowed.
         </tp:docstring>
       </tp:enumvalue>
+      <tp:enumvalue suffix="CONNECTION_FAILED" value="4">
+        <tp:docstring>
+          State change was caused because the data connection failed.
+        </tp:docstring>
+      </tp:enumvalue>
     </tp:enum>
 
   </interface>
