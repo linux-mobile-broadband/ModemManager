@@ -190,39 +190,70 @@ get_signal_quality (MMModemCdma *modem,
 /*****************************************************************************/
 
 static void
-parse_modem_snapshot (MMCallbackInfo *info, QcdmResult *result)
+parse_modem_eri (MMCallbackInfo *info, QcdmResult *result)
 {
     MMModemCdmaRegistrationState evdo_state, cdma1x_state, new_state;
-    guint8 eri = 0;
+    guint8 indicator_id = 0, icon_id = 0, icon_mode = 0;
 
     g_return_if_fail (info != NULL);
     g_return_if_fail (result != NULL);
 
-    evdo_state = mm_generic_cdma_query_reg_state_get_callback_evdo_state (info);
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_INDICATOR_ID, &indicator_id);
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_ID, &icon_id);
+    qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_ERI_ITEM_ICON_MODE, &icon_mode);
+
+    /* We use the "Icon ID" (also called the "Icon Index") because if it is 1,
+     * the device is never roaming.  Any operator-defined IDs (greater than 2)
+     * may or may not be roaming, but that's operator-defined and we don't
+     * know anything about them.
+     *
+     * Indicator ID:
+     * 0 appears to be "not roaming", contrary to standard ERI values
+     * >= 1 appears to be the actual ERI value, which may or may not be
+     *      roaming depending on the operator's custom ERI list
+     *
+     * Icon ID:
+     * 0 = roaming indicator on
+     * 1 = roaming indicator off
+     * 2 = roaming indicator flash
+     *
+     * Icon Mode:
+     * 0 = normal
+     * 1 = flash  (only used with Icon ID >= 2)
+     *
+     * Roaming example:
+     *    Roam:         160
+     *    Indicator ID: 160
+     *    Icon ID:      3
+     *    Icon Mode:    0
+     *    Call Prompt:  1
+     *
+     * Home example:
+     *    Roam:         0
+     *    Indicator ID: 0
+     *    Icon ID:      1
+     *    Icon Mode:    0
+     *    Call Prompt:  1
+     */
+    if (icon_id == 1)
+        new_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+    else
+        new_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+
     cdma1x_state = mm_generic_cdma_query_reg_state_get_callback_1x_state (info);
+    if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, new_state);
 
-    /* Roaming? */
-    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri) == 0) {
-        char *str;
-        gboolean roaming = FALSE;
-
-        str = g_strdup_printf ("%u", eri);
-        if (mm_cdma_parse_eri (str, &roaming, NULL, NULL)) {
-            new_state = roaming ? MM_MODEM_CDMA_REGISTRATION_STATE_HOME : MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
-            if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-                mm_generic_cdma_query_reg_state_set_callback_1x_state (info, new_state);
-            if (evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-                mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, new_state);
-        }
-        g_free (str);
-    }
+    evdo_state = mm_generic_cdma_query_reg_state_get_callback_evdo_state (info);
+    if (evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, new_state);
 }
 
 static void
-reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+reg_eri_6500_cb (MMQcdmSerialPort *port,
+                 GByteArray *response,
+                 GError *error,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     QcdmResult *result;
@@ -230,7 +261,7 @@ reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
     if (!error) {
         result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, NULL);
         if (result) {
-            parse_modem_snapshot (info, result);
+            parse_modem_eri (info, result);
             qcdm_result_unref (result);
         }
     }
@@ -238,30 +269,30 @@ reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
 }
 
 static void
-reg_nwsnap_6800_cb (MMQcdmSerialPort *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+reg_eri_6800_cb (MMQcdmSerialPort *port,
+                 GByteArray *response,
+                 GError *error,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     QcdmResult *result;
-    GByteArray *nwsnap;
+    GByteArray *nweri;
 
     if (error)
         goto done;
 
     /* Parse the response */
-    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, NULL);
+    result = qcdm_cmd_nw_subsys_eri_result ((const char *) response->data, response->len, NULL);
     if (!result) {
         /* Try for MSM6500 */
-        nwsnap = g_byte_array_sized_new (25);
-        nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
-        g_assert (nwsnap->len);
-        mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6500_cb, info);
+        nweri = g_byte_array_sized_new (25);
+        nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6500);
+        g_assert (nweri->len);
+        mm_qcdm_serial_port_queue_command (port, nweri, 3, reg_eri_6500_cb, info);
         return;
     }
 
-    parse_modem_snapshot (info, result);
+    parse_modem_eri (info, result);
     qcdm_result_unref (result);
 
 done:
@@ -277,7 +308,7 @@ query_registration_state (MMGenericCdma *cdma,
 {
     MMCallbackInfo *info;
     MMQcdmSerialPort *port;
-    GByteArray *nwsnap;
+    GByteArray *nweri;
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, cur_cdma_state, cur_evdo_state, callback, user_data);
 
@@ -288,10 +319,10 @@ query_registration_state (MMGenericCdma *cdma,
     }
 
     /* Try MSM6800 first since newer cards use that */
-    nwsnap = g_byte_array_sized_new (25);
-    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
-    g_assert (nwsnap->len);
-    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6800_cb, info);
+    nweri = g_byte_array_sized_new (25);
+    nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6800);
+    g_assert (nweri->len);
+    mm_qcdm_serial_port_queue_command (port, nweri, 3, reg_eri_6800_cb, info);
 }
 
 /*****************************************************************************/
