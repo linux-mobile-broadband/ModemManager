@@ -244,6 +244,9 @@ mbm_erinfo_received (MMAtSerialPort *port,
         case 2:
             act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
             break;
+        case 3:
+            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+            break;
         default:
             break;
         }
