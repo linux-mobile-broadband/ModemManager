@@ -438,14 +438,19 @@ load_access_technologies (MMIfaceModem *self,
                                   FALSE,
                                   (GAsyncReadyCallback)access_tech_3gpp_ready,
                                   result);
-    } else if (mm_iface_modem_is_cdma (self)) {
+        return;
+    }
+
+    if (mm_iface_modem_is_cdma (self)) {
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "!STATUS",
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)access_tech_cdma_ready,
                                   result);
+        return;
     }
+
     g_assert_not_reached ();
 }
 
