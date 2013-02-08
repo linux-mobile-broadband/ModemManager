@@ -652,7 +652,7 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     sets_len = rsp->candidate_count * sizeof (DMCmdPilotSetsSet);
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
-                                  PILOT_SETS_CMD_ACTIVE_SET,
+                                  PILOT_SETS_CMD_CANDIDATE_SET,
                                   (const u_int8_t *) &rsp->sets[rsp->active_count],
                                   sets_len);
     }
@@ -660,7 +660,7 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     sets_len = rsp->neighbor_count * sizeof (DMCmdPilotSetsSet);
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
-                                  PILOT_SETS_CMD_ACTIVE_SET,
+                                  PILOT_SETS_CMD_NEIGHBOR_SET,
                                   (const u_int8_t *) &rsp->sets[rsp->active_count + rsp->candidate_count],
                                   sets_len);
     }
