@@ -1205,6 +1205,36 @@ mm_serial_port_queue_command_cached (MMSerialPort *self,
     internal_queue_command (self, command, take_command, TRUE, timeout_seconds, cancellable, callback, user_data);
 }
 
+gboolean
+mm_serial_port_reopen (MMSerialPort *self,
+                       GError **error)
+{
+    MMSerialPortPrivate *priv;
+    guint initial_open_count;
+    guint i;
+
+    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
+
+    priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    initial_open_count = priv->open_count;
+
+    mm_dbg ("(%s) reopening port (%u)",
+            mm_port_get_device (MM_PORT (self)),
+            initial_open_count);
+
+    for (i = 0; i < initial_open_count; i++)
+        mm_serial_port_close (self);
+
+    for (i = 0; i < initial_open_count; i++) {
+        if (!mm_serial_port_open (self, error)) {
+            g_prefix_error (error, "Couldn't reopen port (%u): ", i);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
 static gboolean
 get_speed (MMSerialPort *self, speed_t *speed, GError **error)
 {
@@ -1676,7 +1706,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     g_object_class_install_property
         (object_class, PROP_FLASH_OK,
          g_param_spec_boolean (MM_SERIAL_PORT_FLASH_OK,
-                               "FlaskOk",
+                               "FlashOk",
                                "Flashing the port (0 baud for a short period) "
                                "is allowed.",
                                TRUE,

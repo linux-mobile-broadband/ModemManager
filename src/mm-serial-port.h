@@ -39,6 +39,7 @@
 #define MM_SERIAL_PORT_FD           "fd" /* Construct-only */
 #define MM_SERIAL_PORT_SPEW_CONTROL "spew-control" /* Construct-only */
 #define MM_SERIAL_PORT_FLASH_OK     "flash-ok" /* Construct-only */
+#define MM_SERIAL_PORT_FLASH_REOPEN "flash-reopen" /* Construct-only */
 
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
@@ -121,6 +122,9 @@ gboolean mm_serial_port_open              (MMSerialPort *self,
                                            GError  **error);
 
 void     mm_serial_port_close             (MMSerialPort *self);
+
+gboolean mm_serial_port_reopen            (MMSerialPort *self,
+                                           GError **error);
 
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
