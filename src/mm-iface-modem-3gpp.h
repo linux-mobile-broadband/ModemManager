@@ -30,8 +30,9 @@
 
 #define MM_IFACE_MODEM_3GPP_DBUS_SKELETON        "iface-modem-3gpp-dbus-skeleton"
 #define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE   "iface-modem-3gpp-registration-state"
-#define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED "iface-modem-3gpp-ps-network-supported"
 #define MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED "iface-modem-3gpp-cs-network-supported"
+#define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED "iface-modem-3gpp-ps-network-supported"
+#define MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED "iface-modem-3gpp-eps-network-supported"
 
 #define MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK    \
     (MM_MODEM_ACCESS_TECHNOLOGY_GSM |                       \
@@ -110,6 +111,7 @@ struct _MMIfaceModem3gpp {
     void (*enable_unsolicited_registration_events) (MMIfaceModem3gpp *self,
                                                     gboolean cs_supported,
                                                     gboolean ps_supported,
+                                                    gboolean eps_supported,
                                                     GAsyncReadyCallback callback,
                                                     gpointer user_data);
     gboolean (*enable_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
@@ -127,18 +129,20 @@ struct _MMIfaceModem3gpp {
     void (*disable_unsolicited_registration_events) (MMIfaceModem3gpp *self,
                                                      gboolean cs_supported,
                                                      gboolean ps_supported,
+                                                     gboolean eps_supported,
                                                      GAsyncReadyCallback callback,
                                                      gpointer user_data);
     gboolean (*disable_unsolicited_registration_events_finish) (MMIfaceModem3gpp *self,
                                                                 GAsyncResult *res,
                                                                 GError **error);
 
-    /* Run CS/PS registration state checks..
+    /* Run CS/PS/EPS registration state checks..
      * Note that no registration state is returned, implementations should call
      * mm_iface_modem_3gpp_update_registration_state(). */
     void (* run_registration_checks) (MMIfaceModem3gpp *self,
                                       gboolean cs_supported,
                                       gboolean ps_supported,
+                                      gboolean eps_supported,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
     gboolean (*run_registration_checks_finish) (MMIfaceModem3gpp *self,
@@ -219,6 +223,8 @@ void mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
                                                        MMModem3gppRegistrationState state);
 void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                        MMModem3gppRegistrationState state);
+void mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
+                                                        MMModem3gppRegistrationState state);
 void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
                                                      MMModemAccessTechnology access_tech);
 void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,

@@ -72,6 +72,7 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
 typedef struct {
     MMModem3gppRegistrationState cs;
     MMModem3gppRegistrationState ps;
+    MMModem3gppRegistrationState eps;
     gboolean manual_registration;
     GCancellable *pending_registration_cancellable;
     gboolean reloading_operator;
@@ -102,6 +103,7 @@ get_registration_state_context (MMIfaceModem3gpp *self)
         ctx = g_slice_new0 (RegistrationStateContext);
         ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
         ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        ctx->eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
         g_object_set_qdata_full (
             G_OBJECT (self),
@@ -129,11 +131,18 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
         return ctx->ps;
 
+    if (ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return ctx->eps;
+
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
         return ctx->cs;
 
     if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
         return ctx->ps;
+
+    if (ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->eps;
 
     return ctx->cs;
 }
@@ -183,6 +192,7 @@ register_in_network_context_failed (RegisterInNetworkContext *ctx,
 {
     mm_iface_modem_3gpp_update_cs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_ps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_eps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
     mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
 
@@ -719,21 +729,25 @@ mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 {
     gboolean cs_supported = FALSE;
     gboolean ps_supported = FALSE;
+    gboolean eps_supported = FALSE;
 
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks != NULL);
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
                   MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
+                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
                   NULL);
 
-    mm_dbg ("Running registration checks (CS: '%s', PS: '%s')",
+    mm_dbg ("Running registration checks (CS: '%s', PS: '%s', EPS: '%s')",
             cs_supported ? "yes" : "no",
-            ps_supported ? "yes" : "no");
+            ps_supported ? "yes" : "no",
+            eps_supported ? "yes" : "no");
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks (self,
                                                                        cs_supported,
                                                                        ps_supported,
+                                                                       eps_supported,
                                                                        callback,
                                                                        user_data);
 }
@@ -1117,6 +1131,25 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
     update_registration_state (self, get_consolidated_reg_state (ctx));
 }
 
+void
+mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
+                                                   MMModem3gppRegistrationState state)
+{
+    RegistrationStateContext *ctx;
+    gboolean supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &supported,
+                  NULL);
+
+    if (!supported)
+        return;
+
+    ctx = get_registration_state_context (self);
+    ctx->eps = state;
+    update_registration_state (self, get_consolidated_reg_state (ctx));
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -1297,10 +1330,12 @@ interface_disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS: {
         gboolean cs_supported = FALSE;
         gboolean ps_supported = FALSE;
+        gboolean eps_supported = FALSE;
 
         g_object_get (ctx->self,
                       MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
                       MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
+                      MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
                       NULL);
 
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->disable_unsolicited_registration_events &&
@@ -1309,6 +1344,7 @@ interface_disabling_step (DisablingContext *ctx)
                 ctx->self,
                 cs_supported,
                 ps_supported,
+                eps_supported,
                 (GAsyncReadyCallback)disable_unsolicited_registration_events_ready,
                 ctx);
             return;
@@ -1618,10 +1654,12 @@ interface_enabling_step (EnablingContext *ctx)
     case ENABLING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS: {
         gboolean cs_supported = FALSE;
         gboolean ps_supported = FALSE;
+        gboolean eps_supported = FALSE;
 
         g_object_get (ctx->self,
                       MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
                       MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
+                      MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
                       NULL);
 
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_registration_events &&
@@ -1630,6 +1668,7 @@ interface_enabling_step (EnablingContext *ctx)
                 ctx->self,
                 cs_supported,
                 ps_supported,
+                eps_supported,
                 (GAsyncReadyCallback)enable_unsolicited_registration_events_ready,
                 ctx);
             return;
@@ -1994,6 +2033,14 @@ iface_modem_3gpp_init (gpointer g_iface)
                                "PS network supported",
                                "Whether the modem works in the PS network",
                                TRUE,
+                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
+                               "EPS network supported",
+                               "Whether the modem works in the EPS network",
+                               FALSE,
                                G_PARAM_READWRITE));
 
     initialized = TRUE;

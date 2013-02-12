@@ -3984,6 +3984,7 @@ static void
 modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     gboolean cs_supported,
                                     gboolean ps_supported,
+                                    gboolean eps_supported,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
@@ -4138,6 +4139,7 @@ static void
 modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                     gboolean cs_supported,
                                                     gboolean ps_supported,
+                                                    gboolean eps_supported,
                                                     GAsyncReadyCallback callback,
                                                     gpointer user_data)
 {
@@ -4183,6 +4185,7 @@ static void
 modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                    gboolean cs_supported,
                                                    gboolean ps_supported,
+                                                   gboolean eps_supported,
                                                    GAsyncReadyCallback callback,
                                                    gpointer user_data)
 {

@@ -473,6 +473,7 @@ typedef struct {
 
     guint regex_num;
     gboolean cgreg;
+    gboolean cereg;
 } CregResult;
 
 static void
@@ -488,7 +489,7 @@ test_creg_match (const char *test,
     MMModemAccessTechnology access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     gulong lac = 0, ci = 0;
     GError *error = NULL;
-    gboolean success, cgreg = FALSE;
+    gboolean success, cgreg = FALSE, cereg = FALSE;
     guint regex_num = 0;
     GPtrArray *array;
 
@@ -522,7 +523,7 @@ test_creg_match (const char *test,
     g_assert (info != NULL);
     g_assert_cmpuint (regex_num, ==, result->regex_num);
 
-    success = mm_3gpp_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &error);
+    success = mm_3gpp_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &cereg, &error);
     g_assert (success);
     g_assert_no_error (error);
     g_assert_cmpuint (state, ==, result->state);
@@ -533,6 +534,7 @@ test_creg_match (const char *test,
              access_tech, result->act);
     g_assert_cmpuint (access_tech, ==, result->act);
     g_assert_cmpuint (cgreg, ==, result->cgreg);
+    g_assert_cmpuint (cereg, ==, result->cereg);
 }
 
 static void
@@ -540,7 +542,7 @@ test_creg1_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 1,3";
-    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, FALSE};
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, FALSE, FALSE };
 
     test_creg_match ("CREG=1", TRUE, reply, data, &result);
 }
@@ -550,7 +552,7 @@ test_creg1_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 3\r\n";
-    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, FALSE};
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, FALSE, FALSE };
 
     test_creg_match ("CREG=1", FALSE, reply, data, &result);
 }
@@ -560,7 +562,7 @@ test_creg2_mercury_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 0,1,84CD,00D30173";
-    const CregResult result = { 1, 0x84cd, 0xd30173, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 1, 0x84cd, 0xd30173, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     test_creg_match ("Sierra Mercury CREG=2", TRUE, reply, data, &result);
 }
@@ -570,7 +572,7 @@ test_creg2_mercury_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 1,84CD,00D30156\r\n";
-    const CregResult result = { 1, 0x84cd, 0xd30156, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
+    const CregResult result = { 1, 0x84cd, 0xd30156, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE, FALSE };
 
     test_creg_match ("Sierra Mercury CREG=2", FALSE, reply, data, &result);
 }
@@ -580,7 +582,7 @@ test_creg2_sek850i_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,\"CE00\",\"01CEAD8F\"";
-    const CregResult result = { 1, 0xce00, 0x01cead8f, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 1, 0xce00, 0x01cead8f, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     test_creg_match ("Sony Ericsson K850i CREG=2", TRUE, reply, data, &result);
 }
@@ -590,7 +592,7 @@ test_creg2_sek850i_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 1,\"CE00\",\"00005449\"\r\n";
-    const CregResult result = { 1, 0xce00, 0x5449, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
+    const CregResult result = { 1, 0xce00, 0x5449, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE, FALSE };
 
     test_creg_match ("Sony Ericsson K850i CREG=2", FALSE, reply, data, &result);
 }
@@ -600,7 +602,7 @@ test_creg2_e160g_solicited_unregistered (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,0,00,0";
-    const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     test_creg_match ("Huawei E160G unregistered CREG=2", TRUE, reply, data, &result);
 }
@@ -610,7 +612,7 @@ test_creg2_e160g_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,8BE3,2BAF";
-    const CregResult result = { 1, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 1, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     test_creg_match ("Huawei E160G CREG=2", TRUE, reply, data, &result);
 }
@@ -620,7 +622,7 @@ test_creg2_e160g_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,8BE3,2BAF\r\n";
-    const CregResult result = { 2, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
+    const CregResult result = { 2, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE, FALSE };
 
     test_creg_match ("Huawei E160G CREG=2", FALSE, reply, data, &result);
 }
@@ -630,7 +632,7 @@ test_creg2_tm506_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,\"8BE3\",\"00002BAF\"";
-    const CregResult result = { 1, 0x8BE3, 0x2BAF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 1, 0x8BE3, 0x2BAF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     /* Test leading zeros in the CI */
     test_creg_match ("Sony Ericsson TM-506 CREG=2", TRUE, reply, data, &result);
@@ -641,7 +643,7 @@ test_creg2_xu870_unsolicited_unregistered (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,,\r\n";
-    const CregResult result = { 2, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
+    const CregResult result = { 2, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE, FALSE };
 
     test_creg_match ("Novatel XU870 unregistered CREG=2", FALSE, reply, data, &result);
 }
@@ -651,7 +653,7 @@ test_creg2_iridium_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG:002,001,\"18d8\",\"ffff\"";
-    const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE};
+    const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE, FALSE };
 
     test_creg_match ("Iridium, CREG=2", TRUE, reply, data, &result);
 }
@@ -661,7 +663,7 @@ test_cgreg1_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CGREG: 1,3";
-    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, TRUE};
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, TRUE, FALSE };
 
     test_creg_match ("CGREG=1", TRUE, reply, data, &result);
 }
@@ -671,7 +673,7 @@ test_cgreg1_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 3\r\n";
-    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, TRUE};
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, TRUE, FALSE };
 
     test_creg_match ("CGREG=1", FALSE, reply, data, &result);
 }
@@ -681,7 +683,7 @@ test_cgreg2_f3607gw_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CGREG: 2,1,\"8BE3\",\"00002B5D\",3";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 6, TRUE};
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 6, TRUE, FALSE };
 
     test_creg_match ("Ericsson F3607gw CGREG=2", TRUE, reply, data, &result);
 }
@@ -691,7 +693,7 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"8BE3\",\"00002B5D\",3\r\n";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 5, TRUE};
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 5, TRUE, FALSE };
 
     test_creg_match ("Ericsson F3607gw CGREG=2", FALSE, reply, data, &result);
 }
@@ -701,7 +703,7 @@ test_creg2_md400_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,5,\"0502\",\"0404736D\"\r\n";
-    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
+    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE, FALSE };
 
     test_creg_match ("Sony-Ericsson MD400 CREG=2", FALSE, reply, data, &result);
 }
@@ -711,7 +713,7 @@ test_cgreg2_md400_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 5,\"0502\",\"0404736D\",2\r\n";
-    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UMTS, 5, TRUE};
+    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UMTS, 5, TRUE, FALSE };
 
     test_creg_match ("Sony-Ericsson MD400 CGREG=2", FALSE, reply, data, &result);
 }
@@ -721,7 +723,7 @@ test_creg_cgreg_multi_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 5\r\n\r\n+CGREG: 0\r\n";
-    const CregResult result = { 5, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, FALSE};
+    const CregResult result = { 5, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, FALSE, FALSE };
 
     test_creg_match ("Multi CREG/CGREG", FALSE, reply, data, &result);
 }
@@ -731,7 +733,7 @@ test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 0\r\n\r\n+CREG: 5\r\n";
-    const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, TRUE};
+    const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, TRUE, FALSE };
 
     test_creg_match ("Multi CREG/CGREG #2", FALSE, reply, data, &result);
 }
@@ -741,7 +743,7 @@ test_cgreg2_x220_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 2,1, 81ED, 1A9CEB\r\n";
-    const CregResult result = { 1, 0x81ED, 0x1A9CEB, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, TRUE};
+    const CregResult result = { 1, 0x81ED, 0x1A9CEB, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, TRUE, FALSE };
 
     /* Tests random spaces in response */
     test_creg_match ("Alcatel One-Touch X220D CGREG=2", FALSE, reply, data, &result);
@@ -752,7 +754,7 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,000B,2816, B, C2816\r\n";
-    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 7, FALSE};
+    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 7, FALSE, FALSE };
 
     test_creg_match ("Samsung Wave S8500 CREG=2", FALSE, reply, data, &result);
 }
@@ -762,7 +764,7 @@ test_creg2_gobi_weird_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,  0 5, 2715\r\n";
-    const CregResult result = { 1, 0x0000, 0x2715, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE};
+    const CregResult result = { 1, 0x0000, 0x2715, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE, FALSE };
 
     test_creg_match ("Qualcomm Gobi 1000 CREG=2", TRUE, reply, data, &result);
 }
@@ -772,9 +774,69 @@ test_cgreg2_unsolicited_with_rac (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"1422\",\"00000142\",3,\"00\"\r\n";
-    const CregResult result = { 1, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 8, TRUE };
+    const CregResult result = { 1, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 8, TRUE, FALSE };
 
     test_creg_match ("CGREG=2 with RAC", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg1_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "+CEREG: 1,3";
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, FALSE, TRUE };
+
+    test_creg_match ("CEREG=1", TRUE, reply, data, &result);
+}
+
+static void
+test_cereg1_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 3\r\n";
+    const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, FALSE, TRUE };
+
+    test_creg_match ("CEREG=1", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg2_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 2,1, 1F00, 79D903 ,7\r\n";
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, TRUE };
+
+    test_creg_match ("CEREG=2", TRUE, reply, data, &result);
+}
+
+static void
+test_cereg2_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 1, 1F00, 79D903 ,7\r\n";
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 5, FALSE, TRUE };
+
+    test_creg_match ("CEREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg2_novatel_lte_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 2,1, 1F00, 20 ,79D903 ,7\r\n";
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 10, FALSE, TRUE };
+
+    test_creg_match ("Novatel LTE E362 CEREG=2", TRUE, reply, data, &result);
+}
+
+static void
+test_cereg2_novatel_lte_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 1, 1F00, 20 ,79D903 ,7\r\n";
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 9, FALSE, TRUE };
+
+    test_creg_match ("Novatel LTE E362 CEREG=2", FALSE, reply, data, &result);
 }
 
 /*****************************************************************************/
@@ -1616,6 +1678,13 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_x220_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_unsolicited_with_rac, reg_data));
+
+    g_test_suite_add (suite, TESTCASE (test_cereg1_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg1_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_unsolicited, reg_data));
 
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, reg_data));

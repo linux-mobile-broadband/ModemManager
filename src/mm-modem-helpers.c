@@ -216,22 +216,22 @@ mm_filter_current_bands (const GArray *supported_bands,
 /*****************************************************************************/
 
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
-#define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
+#define CREG1 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
-#define CREG2 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])"
+#define CREG2 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])"
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
-#define CREG3 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG3 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
+#define CREG4 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-#define CREG5 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+#define CREG5 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-#define CREG6 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+#define CREG6 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
 /* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
@@ -240,10 +240,16 @@ mm_filter_current_bands (const GArray *supported_bands,
 /* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
 #define CREG8 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)"
 
+/* +CEREG: <stat>,<lac>,<rac>,<ci>,<AcT>     (ETSI 27.007 v8.6 CREG=2 unsolicited with RAC) */
+#define CEREG1 "\\+(CEREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+
+/* +CEREG: <n>,<stat>,<lac>,<rac>,<ci>,<AcT> (ETSI 27.007 v8.6 CREG=2 solicited with RAC) */
+#define CEREG2 "\\+(CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+
 GPtrArray *
 mm_3gpp_creg_regex_get (gboolean solicited)
 {
-    GPtrArray *array = g_ptr_array_sized_new (7);
+    GPtrArray *array = g_ptr_array_sized_new (10);
     GRegex *regex;
 
     /* #1 */
@@ -307,6 +313,22 @@ mm_3gpp_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CREG8 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CREG8 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* CEREG #1 */
+    if (solicited)
+        regex = g_regex_new (CEREG1 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CEREG1 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* CEREG #2 */
+    if (solicited)
+        regex = g_regex_new (CEREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CEREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
@@ -723,6 +745,7 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
                              gulong *out_ci,
                              MMModemAccessTechnology *out_act,
                              gboolean *out_cgreg,
+                             gboolean *out_cereg,
                              GError **error)
 {
     gboolean success = FALSE, foo;
@@ -737,10 +760,11 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
     g_return_val_if_fail (out_ci != NULL, FALSE);
     g_return_val_if_fail (out_act != NULL, FALSE);
     g_return_val_if_fail (out_cgreg != NULL, FALSE);
+    g_return_val_if_fail (out_cereg != NULL, FALSE);
 
     str = g_match_info_fetch (info, 1);
-    if (str && strstr (str, "CGREG"))
-        *out_cgreg = TRUE;
+    *out_cgreg = (str && strstr (str, "CGREG")) ? TRUE : FALSE;
+    *out_cereg = (str && strstr (str, "CEREG")) ? TRUE : FALSE;
     g_free (str);
 
     /* Normally the number of matches could be used to determine what each
@@ -777,19 +801,43 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
     } else if (n_matches == 7) {
         /* CREG=2 (solicited):            +CREG: <n>,<stat>,<lac>,<ci>,<AcT>
          * CREG=2 (unsolicited with RAC): +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC>
+         * CEREG=2 (solicited):           +CEREG: <n>,<stat>,<lac>,<ci>,<AcT>
+         * CEREG=2 (unsolicited with RAC): +CEREG: <stat>,<lac>,<rac>,<ci>,<AcT>
          */
 
-        /* Check if the third item is the LAC to distinguish the two cases */
-        if (item_is_lac_not_stat (info, 3)) {
-            istat = 2;
-            ilac = 3;
-            ici = 4;
-            iact = 5;
-        } else {
-            istat = 3;
-            ilac = 4;
+        if (*out_cereg) {
+            /* Check if the third item is the LAC to distinguish the two cases */
+            if (item_is_lac_not_stat (info, 3)) {
+                istat = 2;
+                ilac = 3;
+            } else {
+                istat = 3;
+                ilac = 4;
+            }
             ici = 5;
             iact = 6;
+        } else {
+            /* Check if the third item is the LAC to distinguish the two cases */
+            if (item_is_lac_not_stat (info, 3)) {
+                istat = 2;
+                ilac = 3;
+                ici = 4;
+                iact = 5;
+            } else {
+                istat = 3;
+                ilac = 4;
+                ici = 5;
+                iact = 6;
+            }
+        }
+    } else if (n_matches == 8) {
+        /* CEREG=2 (solicited with RAC):  +CEREG: <n>,<stat>,<lac>,<rac>,<ci>,<AcT>
+         */
+        if (*out_cereg) {
+            istat = 3;
+            ilac = 4;
+            ici = 6;
+            iact = 7;
         }
      }
 

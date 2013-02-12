@@ -106,6 +106,7 @@ gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       gulong *out_ci,
                                       MMModemAccessTechnology *out_act,
                                       gboolean *out_cgreg,
+                                      gboolean *out_cereg,
                                       GError **error);
 
 /* AT+CMGF=? (SMS message format) response parser */
