@@ -32,18 +32,37 @@
 
 static GMainLoop *loop = NULL;
 
+#if GLIB_CHECK_VERSION(2,30,0)
+#include <glib-unix.h>
+
+static gboolean
+quit_cb (gpointer user_data)
+{
+	mm_info ("Caught signal, shutting down...");
+    if (loop)
+        g_idle_add ((GSourceFunc) g_main_loop_quit, loop);
+    else
+        _exit (0);
+    return FALSE;
+}
+
+static void
+setup_signals (void)
+{
+    g_unix_signal_add (SIGTERM, quit_cb, NULL);
+    g_unix_signal_add (SIGINT, quit_cb, NULL);
+}
+
+#else
+
 static void
 mm_signal_handler (int signo)
 {
-    if (signo == SIGUSR1)
-        mm_log_usr1 ();
-	else if (signo == SIGINT || signo == SIGTERM) {
-		mm_info ("Caught signal %d, shutting down...", signo);
-        if (loop)
-            g_main_loop_quit (loop);
-        else
-            _exit (0);
-    }
+	mm_info ("Caught signal %d, shutting down...", signo);
+    if (loop)
+        g_main_loop_quit (loop);
+    else
+        _exit (0);
 }
 
 static void
@@ -56,10 +75,10 @@ setup_signals (void)
     action.sa_handler = mm_signal_handler;
     action.sa_mask = mask;
     action.sa_flags = 0;
-    sigaction (SIGUSR1, &action, NULL);
     sigaction (SIGTERM, &action, NULL);
     sigaction (SIGINT, &action, NULL);
 }
+#endif
 
 static void
 destroy_cb (DBusGProxy *proxy, gpointer user_data)

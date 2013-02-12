@@ -221,11 +221,6 @@ mm_log_setup (const char *level,
 }
 
 void
-mm_log_usr1 (void)
-{
-}
-
-void
 mm_log_shutdown (void)
 {
     if (logfd < 0)
