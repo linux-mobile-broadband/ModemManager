@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include <gio/gio.h>
+#include <glib-unix.h>
 
 #include "ModemManager.h"
 
@@ -39,33 +40,15 @@
 static GMainLoop *loop;
 static MMManager *manager;
 
-static void
-mm_signal_handler (int signo)
+static gboolean
+quit_cb (gpointer user_data)
 {
-    if (signo == SIGUSR1)
-        mm_log_usr1 ();
-	else if (signo == SIGINT || signo == SIGTERM) {
-		mm_info ("Caught signal %d, shutting down...", signo);
-        if (loop)
-            g_main_loop_quit (loop);
-        else
-            _exit (0);
-    }
-}
-
-static void
-setup_signals (void)
-{
-    struct sigaction action;
-    sigset_t mask;
-
-    sigemptyset (&mask);
-    action.sa_handler = mm_signal_handler;
-    action.sa_mask = mask;
-    action.sa_flags = 0;
-    sigaction (SIGUSR1, &action, NULL);
-    sigaction (SIGTERM, &action, NULL);
-    sigaction (SIGINT, &action, NULL);
+	mm_info ("Caught signal, shutting down...");
+    if (loop)
+        g_idle_add ((GSourceFunc) g_main_loop_quit, loop);
+    else
+        _exit (0);
+    return FALSE;
 }
 
 static void
@@ -139,7 +122,8 @@ main (int argc, char *argv[])
         exit (1);
     }
 
-    setup_signals ();
+    g_unix_signal_add (SIGTERM, quit_cb, NULL);
+    g_unix_signal_add (SIGINT, quit_cb, NULL);
 
     mm_info ("ModemManager (version " MM_DIST_VERSION ") starting...");
 
