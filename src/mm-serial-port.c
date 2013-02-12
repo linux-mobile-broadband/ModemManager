@@ -767,6 +767,10 @@ data_available (GIOChannel *source,
     if (info && (info->started == TRUE) && (info->done == FALSE))
         return TRUE;
 
+    /* Don't steal data from PPP if we're connected */
+    if (mm_port_get_connected (MM_PORT (self)))
+        return TRUE;
+
     do {
         GError *err = NULL;
 
