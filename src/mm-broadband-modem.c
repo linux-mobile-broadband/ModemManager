@@ -1790,11 +1790,18 @@ typedef struct {
 } AccessTechContext;
 
 static void
-access_tech_context_complete_and_free (AccessTechContext *ctx, gboolean idle)
+access_tech_context_complete_and_free (AccessTechContext *ctx,
+                                       GError *error, /* takes ownership */
+                                       gboolean idle)
 {
     AccessTechAndMask *tech;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     guint mask = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        goto done;
+    }
 
     if (ctx->fallback_mask) {
         mm_dbg ("Fallback access technology: 0x%08x", ctx->fallback_act);
@@ -1844,11 +1851,13 @@ access_tech_context_complete_and_free (AccessTechContext *ctx, gboolean idle)
     }
 
 done:
-    tech = g_new0 (AccessTechAndMask, 1);
-    tech->access_technologies = act;
-    tech->mask = mask;
+    if (error == NULL) {
+        tech = g_new0 (AccessTechAndMask, 1);
+        tech->access_technologies = act;
+        tech->mask = mask;
+        g_simple_async_result_set_op_res_gpointer (ctx->result, tech, g_free);
+    }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, tech, g_free);
     if (idle)
         g_simple_async_result_complete_in_idle (ctx->result);
     else
@@ -1872,8 +1881,7 @@ access_tech_qcdm_wcdma_ready (MMQcdmSerialPort *port,
     guint8 l1;
 
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
         return;
     }
 
@@ -1891,7 +1899,7 @@ access_tech_qcdm_wcdma_ready (MMQcdmSerialPort *port,
             ctx->wcdma_open = TRUE;
     }
 
-    access_tech_context_complete_and_free (ctx, FALSE);
+    access_tech_context_complete_and_free (ctx, NULL, FALSE);
 }
 
 static void
@@ -1907,8 +1915,7 @@ access_tech_qcdm_gsm_ready (MMQcdmSerialPort *port,
     guint8 sysmode = 0;
 
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
         return;
     }
 
@@ -1917,12 +1924,11 @@ access_tech_qcdm_gsm_ready (MMQcdmSerialPort *port,
                                                     response->len,
                                                     &err);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse GSM subsys command result: %d",
-                                         err);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to parse GSM subsys command result: %d",
+                             err);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -1958,8 +1964,7 @@ access_tech_qcdm_hdr_ready (MMQcdmSerialPort *port,
     guint8 almp = 0;
 
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
         return;
     }
 
@@ -1978,7 +1983,7 @@ access_tech_qcdm_hdr_ready (MMQcdmSerialPort *port,
             ctx->evdo_open = TRUE;
     }
 
-    access_tech_context_complete_and_free (ctx, FALSE);
+    access_tech_context_complete_and_free (ctx, NULL, FALSE);
 }
 
 static void
@@ -1993,8 +1998,7 @@ access_tech_qcdm_cdma_ready (MMQcdmSerialPort *port,
     guint32 hybrid;
 
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
         return;
     }
 
@@ -2003,12 +2007,11 @@ access_tech_qcdm_cdma_ready (MMQcdmSerialPort *port,
                                                    response->len,
                                                    &err);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse CM subsys command result: %d",
-                                         err);
-        access_tech_context_complete_and_free (ctx, FALSE);
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to parse CM subsys command result: %d",
+                             err);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -2056,8 +2059,6 @@ access_tech_from_cdma_registration_state (MMBroadbandModem *self,
     mm_dbg ("EVDO registration: %d", self->priv->modem_cdma_evdo_registration_state);
     mm_dbg ("CDMA1x registration: %d", self->priv->modem_cdma_cdma1x_registration_state);
     mm_dbg ("Fallback access tech: 0x%08x", ctx->fallback_act);
-
-    access_tech_context_complete_and_free (ctx, TRUE);
 }
 
 static void
@@ -2067,8 +2068,7 @@ modem_load_access_technologies (MMIfaceModem *self,
 {
     AccessTechContext *ctx;
     GByteArray *cmd;
-
-    mm_dbg ("loading access technologies via QCDM...");
+    GError *error = NULL;
 
     /* For modems where only QCDM provides detailed information, try to
      * get access technologies via the various QCDM subsystems or from
@@ -2082,15 +2082,27 @@ modem_load_access_technologies (MMIfaceModem *self,
                                              user_data,
                                              modem_load_access_technologies);
 
-    if (!mm_iface_modem_is_cdma (self) && !ctx->port) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
+    if (!ctx->port) {
+        if (mm_iface_modem_is_cdma (self)) {
+            /* If we don't have a QCDM port but the modem is CDMA-only, then
+             * guess access technologies from the registration information.
+             */
+            access_tech_from_cdma_registration_state (MM_BROADBAND_MODEM (self), ctx);
+        } else {
+            error = g_error_new_literal (MM_CORE_ERROR,
                                          MM_CORE_ERROR_UNSUPPORTED,
-                                         "%s",
                                          "Cannot get 3GPP access technology without a QCDM port");
-        access_tech_context_complete_and_free (ctx, TRUE);
+        }
+        access_tech_context_complete_and_free (ctx, error, TRUE);
         return;
     }
+
+    mm_dbg ("loading access technologies via QCDM...");
+
+    /* FIXME: we may want to run both the CDMA and 3GPP in sequence to ensure
+     * that a multi-mode device that's in CDMA-mode but still has 3GPP capabilities
+     * will get the correct access tech, since the 3GPP check is run first.
+     */
 
     if (mm_iface_modem_is_3gpp (self)) {
         cmd = g_byte_array_sized_new (50);
@@ -2104,23 +2116,16 @@ modem_load_access_technologies (MMIfaceModem *self,
                                            (MMQcdmSerialResponseFn) access_tech_qcdm_gsm_ready,
                                            ctx);
     } else if (mm_iface_modem_is_cdma (self)) {
-        /* If we don't have a QCDM port but the modem is CDMA-only, then
-         * guess access technologies from the registration information.
-         */
-        if (!ctx->port)
-            access_tech_from_cdma_registration_state (MM_BROADBAND_MODEM (self), ctx);
-        else {
-            cmd = g_byte_array_sized_new (50);
-            cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
-            g_assert (cmd->len);
+        cmd = g_byte_array_sized_new (50);
+        cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
+        g_assert (cmd->len);
 
-            mm_qcdm_serial_port_queue_command (ctx->port,
-                                               cmd,
-                                               3,
-                                               NULL,
-                                               (MMQcdmSerialResponseFn) access_tech_qcdm_cdma_ready,
-                                               ctx);
-        }
+        mm_qcdm_serial_port_queue_command (ctx->port,
+                                           cmd,
+                                           3,
+                                           NULL,
+                                           (MMQcdmSerialResponseFn) access_tech_qcdm_cdma_ready,
+                                           ctx);
     } else
         g_assert_not_reached ();
 }

@@ -759,7 +759,9 @@ access_technologies_check_ready (MMIfaceModem *self,
             &access_technologies,
             &mask,
             &error)) {
-        mm_dbg ("Couldn't refresh access technologies: '%s'", error->message);
+        /* Ignore issues when the operation is unsupported, don't even log */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED))
+            mm_dbg ("Couldn't refresh access technologies: '%s'", error->message);
         g_error_free (error);
     } else
         mm_iface_modem_update_access_technologies (self, access_technologies, mask);
