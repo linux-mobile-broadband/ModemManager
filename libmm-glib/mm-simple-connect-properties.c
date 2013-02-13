@@ -622,17 +622,16 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
     }
     else if (ctx.allowed_modes_str || ctx.preferred_mode_str) {
         MMModemMode allowed_modes;
-        MMModemMode preferred_mode;
+        MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
 
         allowed_modes = (ctx.allowed_modes_str ?
                          mm_common_get_modes_from_string (ctx.allowed_modes_str,
                                                           &ctx.error) :
                          MM_MODEM_MODE_ANY);
-        if (!ctx.error) {
-            preferred_mode = (ctx.preferred_mode_str ?
-                              mm_common_get_modes_from_string (ctx.preferred_mode_str,
-                                                               &ctx.error) :
-                              MM_MODEM_MODE_NONE);
+
+        if (!ctx.error && ctx.preferred_mode_str) {
+            preferred_mode = mm_common_get_modes_from_string (ctx.preferred_mode_str,
+                                                              &ctx.error);
         }
 
         if (ctx.error) {
