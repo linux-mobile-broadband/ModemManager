@@ -7496,6 +7496,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_bands = set_bands;
     iface->set_bands_finish = set_bands_finish;
 
+    /* Don't try to load access technologies, as we would be using parent's
+     * generic method (QCDM based). Access technologies are already reported via
+     * QMI when we load signal quality. */
+    iface->load_access_technologies = NULL;
+    iface->load_access_technologies_finish = NULL;
+
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
