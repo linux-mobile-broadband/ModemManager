@@ -51,6 +51,7 @@ def lg_unpack(data):
     fmt += "%ds" % (len(data) - 14)  # AT data
 
     (magic, seq, l, chan, resp) = struct.unpack(fmt, data)
+    resp = resp[:l]
 
     if magic != 0xa512485a:
         raise Exception("Bad magic: 0x%08x" % magic)
@@ -64,14 +65,28 @@ def lg_unpack(data):
     # > 5a 48 12 a5 08 00 00 00 0a 00 00 00 11 f0 41 54 2b 43 45 52 45 47 3f 0a 
     # < 5a 48 12 a5 4e 00 00 00 15 00 00 00 11 f0 2b 43 45 52 45 47 3a 20 30 2c 31 0d 0a 00 00 4f 4b 0d 0a 00 47 74 
     #
-    # where there's a trailing "00 47 74".  The trailing bytes appear
-    # totally random in value and length.
+    # where there's a trailing "00 47" (the 0x74 is not included in the packet
+    # due to the data length field).  The trailing bytes appear totally random
+    # in value and length.
+
+    # status is last two bytes for most commands if there are trailing bytes
+    status = []
+    if (resp >= 2):
+        statbytes = resp[len(resp) - 2:]
+        status = [ ord(statbytes[0]), ord(statbytes[1]) ]
 
     crlf = resp.rfind("\r\n")
     if crlf == -1:
-        return ""
+        # if last char is a newline then it's probably an echo, otherwise status
+        if resp[len(resp) - 1:] == '\n':
+            status = []
+        resp = ""
+    else:
+        if crlf == len(resp) - 2:
+            status = []
+        resp = resp[:crlf + 2]
 
-    return resp[:crlf + 2]
+    return (resp, status)
 
 def dump_raw(data, to_modem):
     if debug:
@@ -90,7 +105,7 @@ def make_printable(data):
         if c in string.printable and ord(c) >= 32 or c == '\n' or c == '\r':
             p += c
         else:
-            p += "<%2x>" % ord(c)
+            p += "<%02x>" % ord(c)
     return p
 
 
@@ -132,9 +147,18 @@ while 1:
     if fd in rfd:
         data = os.read(fd, 4096)
         dump_raw(data, False)
-        line = lg_unpack(data)
+        (line, status) = lg_unpack(data)
         if line:
             print make_printable(line)
+        if (len(status) == 2):
+            if status[0] == 0x30 and status[1] == 0x0d:
+                print "OK\n"
+            elif status[0] == 0x34 and status[1] == 0x0d:
+                print "ERROR\n"
+            elif status[0] == 0x33 and status[1] == 0x0d:
+                print "ERROR\n"
+            else:
+                print "STAT: 0x%02x 0x%02x" % (status[0], status[1])
 
     if infd in rfd:
         line = os.read(infd, 512)

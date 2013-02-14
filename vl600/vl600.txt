@@ -31,10 +31,34 @@ u16: MUX channel (21 f0: CMD) (11 f0: AT)
 Packets are 4-byte aligned with padding of zeros, and this padding is included
 in the length given in the header.
 
-AT commands may have trailing junk bytes.  It appears that interpreters should
-simply ignore any data in AT packets after the last CRLF.
+AT commands may have trailing bytes outside the data length specified in the
+header, obviously these should be ignored.  AT commands may also have trailing
+status bytes after the last 0x0D 0x0A which may take the place of OK and
+ERROR in some AT commands.  Status bytes include 0x30 0x0d (success) and
+0x34 0x0d (unknown AT command).
 
 CMD packets are terminated with a standard HDLC CRC-16 and 0x7E.
+
+Known CMD numbers are:
+0xf14a - network attach, ethernet port start (use DHCP and IPv6 RA)
+
+
+
+AT SMS Indications
+------------------
+They appear out of nowhere without AT formatting:
+
+MT MSG: "612804xxxx","13/02/13,19:27:11+00",73
+Heyy it's Tiffany i uploaded some pics on my profile on www.hottsites.com
+
+
+Misc AT command notes:
+----------------------
++VZWMRUE: <entry>,<rat>,<band>,<channel>
+
+%LCNWINFO: <rat>, <roam>, <1x>, <Ev>, <LTE>, <state>, <cause>, <PDNid>
+%LCNWINFO: <rat>, <roam>, <1x>, <Ev>, <LTE>, <state>, <cause>
+<rat> = 6:LTE
 
 
 Reported AT Commands
