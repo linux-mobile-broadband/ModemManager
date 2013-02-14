@@ -1071,7 +1071,7 @@ disconnect_context_step (DisconnectContext *ctx)
             ctx->running_ipv6 = FALSE;
             qmi_client_wds_stop_network (ctx->client_ipv4,
                                          input,
-                                         10,
+                                         30,
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
                                          ctx);
@@ -1092,7 +1092,7 @@ disconnect_context_step (DisconnectContext *ctx)
             ctx->running_ipv6 = TRUE;
             qmi_client_wds_stop_network (ctx->client_ipv6,
                                          input,
-                                         10,
+                                         30,
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
                                          ctx);
