@@ -754,6 +754,27 @@ data_available (GIOChannel *source,
 }
 
 static void
+data_watch_enable (MMSerialPort *self, gboolean enable)
+{
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->watch_id) {
+        if (enable)
+            g_warn_if_fail (priv->watch_id == 0);
+
+        g_source_remove (priv->watch_id);
+        priv->watch_id = 0;
+    }
+
+    if (enable) {
+        g_return_if_fail (priv->channel != NULL);
+        priv->watch_id = g_io_add_watch (priv->channel,
+                                         G_IO_IN | G_IO_ERR | G_IO_HUP,
+                                         data_available, self);
+    }
+}
+
+static void
 port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
@@ -780,6 +801,9 @@ port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
             // close the port and error out?
         }
     }
+
+    /* When connected ignore let PPP have all the data */
+    data_watch_enable (self, !connected);
 }
 
 gboolean
@@ -861,9 +885,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     priv->channel = g_io_channel_unix_new (priv->fd);
     g_io_channel_set_encoding (priv->channel, NULL, NULL);
-    priv->watch_id = g_io_add_watch (priv->channel,
-                                     G_IO_IN | G_IO_ERR | G_IO_HUP,
-                                     data_available, self);
+    data_watch_enable (self, TRUE);
 
     g_warn_if_fail (priv->connected_id == 0);
     priv->connected_id = g_signal_connect (self, "notify::" MM_PORT_CONNECTED,
@@ -939,8 +961,7 @@ mm_serial_port_close (MMSerialPort *self)
         g_get_current_time (&tv_start);
 
         if (priv->channel) {
-            g_source_remove (priv->watch_id);
-            priv->watch_id = 0;
+            data_watch_enable (self, FALSE);
             g_io_channel_shutdown (priv->channel, TRUE, NULL);
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
