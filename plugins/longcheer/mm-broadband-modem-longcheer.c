@@ -67,15 +67,22 @@ load_allowed_modes_finish (MMIfaceModem *self,
     mododr = atoi (str);
     switch (mododr) {
     case 1:
+        /* UMTS only */
         *allowed = MM_MODEM_MODE_3G;
         *preferred = MM_MODEM_MODE_NONE;
         return TRUE;
     case 2:
-    case 4:
+        /* UMTS preferred */
         *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
         *preferred = MM_MODEM_MODE_3G;
         return TRUE;
+    case 4:
+        /* GSM preferred */
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_2G;
+        return TRUE;
     case 3:
+        /* GSM only */
         *allowed = MM_MODEM_MODE_2G;
         *preferred = MM_MODEM_MODE_NONE;
         return TRUE;
@@ -182,7 +189,7 @@ set_allowed_modes (MMIfaceModem *self,
         return;
     }
 
-    command = g_strdup_printf ("+MODODR=%d,2", mododr);
+    command = g_strdup_printf ("+MODODR=%d", mododr);
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         command,
