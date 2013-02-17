@@ -37,23 +37,6 @@ G_DEFINE_TYPE (MMBearerIridium, mm_bearer_iridium, MM_TYPE_BEARER);
 /* Connect */
 
 typedef struct {
-    MMPort *data;
-    MMBearerIpConfig *ipv4_config;
-    MMBearerIpConfig *ipv6_config;
-} ConnectResult;
-
-static void
-connect_result_free (ConnectResult *result)
-{
-    if (result->ipv4_config)
-        g_object_unref (result->ipv4_config);
-    if (result->ipv6_config)
-        g_object_unref (result->ipv6_config);
-    g_object_unref (result->data);
-    g_free (result);
-}
-
-typedef struct {
     MMBearerIridium *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
@@ -75,25 +58,15 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_free (ctx);
 }
 
-static gboolean
+static MMBearerConnectResult *
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
-                MMPort **data,
-                MMBearerIpConfig **ipv4_config,
-                MMBearerIpConfig **ipv6_config,
                 GError **error)
 {
-    ConnectResult *result;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+        return NULL;
 
-    result = (ConnectResult *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *data = MM_PORT (g_object_ref (result->data));
-    *ipv4_config = (result->ipv4_config ? g_object_ref (result->ipv4_config) : NULL);
-    *ipv6_config = (result->ipv6_config ? g_object_ref (result->ipv6_config) : NULL);
-
-    return TRUE;
+    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
@@ -141,7 +114,6 @@ dial_ready (MMBaseModem *modem,
             ConnectContext *ctx)
 {
     MMBearerIpConfig *config;
-    ConnectResult *result;
 
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
@@ -169,16 +141,13 @@ dial_ready (MMBaseModem *modem,
     config = mm_bearer_ip_config_new ();
     mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_PPP);
 
-    /* Build result */
-    result = g_new0 (ConnectResult, 1);
-    result->data = g_object_ref (ctx->primary);
-    result->ipv4_config = config;
-    result->ipv6_config = g_object_ref (config);
-
     /* Set operation result */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               result,
-                                               (GDestroyNotify)connect_result_free);
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        mm_bearer_connect_result_new (MM_PORT (ctx->primary), config, NULL),
+        (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (config);
+
     connect_context_complete_and_free (ctx);
 }
 

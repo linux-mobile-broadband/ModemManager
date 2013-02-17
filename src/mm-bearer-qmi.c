@@ -47,23 +47,6 @@ struct _MMBearerQmiPrivate {
 /*****************************************************************************/
 /* Connect */
 
-typedef struct {
-    MMPort *data;
-    MMBearerIpConfig *ipv4_config;
-    MMBearerIpConfig *ipv6_config;
-} ConnectResult;
-
-static void
-connect_result_free (ConnectResult *result)
-{
-    if (result->ipv4_config)
-        g_object_unref (result->ipv4_config);
-    if (result->ipv6_config)
-        g_object_unref (result->ipv6_config);
-    g_object_unref (result->data);
-    g_slice_free (ConnectResult, result);
-}
-
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
@@ -129,25 +112,15 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_slice_free (ConnectContext, ctx);
 }
 
-static gboolean
+static MMBearerConnectResult *
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
-                MMPort **data,
-                MMBearerIpConfig **ipv4_config,
-                MMBearerIpConfig **ipv6_config,
                 GError **error)
 {
-    ConnectResult *result;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+        return NULL;
 
-    result = (ConnectResult *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *data = MM_PORT (g_object_ref (result->data));
-    *ipv4_config = (result->ipv4_config ? g_object_ref (result->ipv4_config) : NULL);
-    *ipv6_config = (result->ipv6_config ? g_object_ref (result->ipv6_config) : NULL);
-
-    return TRUE;
+    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void connect_context_step (ConnectContext *ctx);
@@ -744,7 +717,6 @@ connect_context_step (ConnectContext *ctx)
         /* If one of IPv4 or IPv6 succeeds, we're connected */
         if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
             MMBearerIpConfig *config;
-            ConnectResult *result;
 
             /* Port is connected; update the state */
             mm_port_set_connected (MM_PORT (ctx->data), TRUE);
@@ -771,20 +743,15 @@ connect_context_step (ConnectContext *ctx)
             config = mm_bearer_ip_config_new ();
             mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
 
-            /* Build result */
-            result = g_slice_new0 (ConnectResult);
-            result->data = g_object_ref (ctx->data);
-            if (ctx->packet_data_handle_ipv4)
-                result->ipv4_config = g_object_ref (config);
-            if (ctx->packet_data_handle_ipv6)
-                result->ipv6_config = g_object_ref (config);
-
-            g_object_unref (config);
-
             /* Set operation result */
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       result,
-                                                       (GDestroyNotify)connect_result_free);
+            g_simple_async_result_set_op_res_gpointer (
+                ctx->result,
+                mm_bearer_connect_result_new (
+                    ctx->data,
+                    ctx->packet_data_handle_ipv4 ? config : NULL,
+                    ctx->packet_data_handle_ipv6 ? config : NULL),
+                (GDestroyNotify)mm_bearer_connect_result_unref);
+            g_object_unref (config);
         } else {
             GError *error;
 

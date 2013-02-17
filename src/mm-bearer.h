@@ -13,6 +13,7 @@
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  *
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #ifndef MM_BEARER_H
@@ -25,6 +26,21 @@
 #include <libmm-glib.h>
 
 #include "mm-base-modem.h"
+
+/*****************************************************************************/
+/* Helpers to implement connect() */
+
+typedef struct _MMBearerConnectResult MMBearerConnectResult;
+MMBearerConnectResult *mm_bearer_connect_result_new              (MMPort *data,
+                                                                  MMBearerIpConfig *ipv4_config,
+                                                                  MMBearerIpConfig *ipv6_config);
+void                   mm_bearer_connect_result_unref            (MMBearerConnectResult *result);
+MMBearerConnectResult *mm_bearer_connect_result_ref              (MMBearerConnectResult *result);
+MMPort                *mm_bearer_connect_result_peek_data        (MMBearerConnectResult *result);
+MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv4_config (MMBearerConnectResult *result);
+MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv6_config (MMBearerConnectResult *result);
+
+/*****************************************************************************/
 
 #define MM_TYPE_BEARER            (mm_bearer_get_type ())
 #define MM_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER, MMBearer))
@@ -63,12 +79,9 @@ struct _MMBearerClass {
                       GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data);
-    gboolean (* connect_finish) (MMBearer *bearer,
-                                 GAsyncResult *res,
-                                 MMPort **data,
-                                 MMBearerIpConfig **ipv4_config,
-                                 MMBearerIpConfig **ipv6_config,
-                                 GError **error);
+    MMBearerConnectResult * (* connect_finish) (MMBearer *bearer,
+                                                GAsyncResult *res,
+                                                GError **error);
 
     /* Disconnect this bearer */
     void (* disconnect) (MMBearer *bearer,

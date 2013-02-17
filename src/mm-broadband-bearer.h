@@ -13,6 +13,7 @@
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  *
  * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2011 - 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #ifndef MM_BROADBAND_BEARER_H
@@ -55,12 +56,9 @@ struct _MMBroadbandBearerClass {
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
-    gboolean (* connect_3gpp_finish) (MMBroadbandBearer *self,
-                                      GAsyncResult *res,
-                                      MMPort **data,
-                                      MMBearerIpConfig **ipv4_config,
-                                      MMBearerIpConfig **ipv6_config,
-                                      GError **error);
+    MMBearerConnectResult * (* connect_3gpp_finish) (MMBroadbandBearer *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
     /* Dialing sub-part of 3GPP connection */
     void     (* dial_3gpp)        (MMBroadbandBearer *self,
@@ -113,12 +111,9 @@ struct _MMBroadbandBearerClass {
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
-    gboolean (* connect_cdma_finish) (MMBroadbandBearer *self,
-                                      GAsyncResult *res,
-                                      MMPort **data,
-                                      MMBearerIpConfig **ipv4_config,
-                                      MMBearerIpConfig **ipv6_config,
-                                      GError **error);
+    MMBearerConnectResult * (* connect_cdma_finish) (MMBroadbandBearer *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
     /* Full CDMA disconnection sequence */
     void     (* disconnect_cdma)        (MMBroadbandBearer *self,

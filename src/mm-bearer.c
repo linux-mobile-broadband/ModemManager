@@ -13,6 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <config.h>
@@ -373,17 +374,11 @@ connect_ready (MMBearer *self,
 {
     GError *error = NULL;
     gboolean launch_disconnect = FALSE;
-    MMPort *data = NULL;
-    MMBearerIpConfig *ipv4_config = NULL;
-    MMBearerIpConfig *ipv6_config = NULL;
+    MMBearerConnectResult *result;
 
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
-    if (!MM_BEARER_GET_CLASS (self)->connect_finish (self,
-                                                     res,
-                                                     &data,
-                                                     &ipv4_config,
-                                                     &ipv6_config,
-                                                     &error)) {
+    result = MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
+    if (!result) {
         mm_dbg ("Couldn't connect bearer '%s': '%s'",
                 self->priv->path,
                 error->message);
@@ -400,11 +395,7 @@ connect_ready (MMBearer *self,
     /* Handle cancellations detected after successful connection */
     else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
         mm_dbg ("Connected bearer '%s', but need to disconnect", self->priv->path);
-
-        g_clear_object (&data);
-        g_clear_object (&ipv4_config);
-        g_clear_object (&ipv6_config);
-
+        mm_bearer_connect_result_unref (result);
         g_simple_async_result_set_error (
             simple,
             MM_CORE_ERROR,
@@ -416,15 +407,12 @@ connect_ready (MMBearer *self,
         mm_dbg ("Connected bearer '%s'", self->priv->path);
 
         /* Update bearer and interface status */
-        bearer_update_status_connected (self,
-                                        mm_port_get_device (data),
-                                        ipv4_config,
-                                        ipv6_config);
-
-        g_clear_object (&data);
-        g_clear_object (&ipv4_config);
-        g_clear_object (&ipv6_config);
-
+        bearer_update_status_connected (
+            self,
+            mm_port_get_device (mm_bearer_connect_result_peek_data (result)),
+            mm_bearer_connect_result_peek_ipv4_config (result),
+            mm_bearer_connect_result_peek_ipv6_config (result));
+        mm_bearer_connect_result_unref (result);
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
@@ -1122,4 +1110,73 @@ mm_bearer_class_init (MMBearerClass *klass)
                              MM_TYPE_BEARER_PROPERTIES,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CONFIG, properties[PROP_CONFIG]);
+}
+
+/*****************************************************************************/
+/* Helpers to implement connect() */
+
+struct _MMBearerConnectResult {
+    volatile gint ref_count;
+    MMPort *data;
+    MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
+};
+
+MMBearerConnectResult *
+mm_bearer_connect_result_ref (MMBearerConnectResult *result)
+{
+    g_atomic_int_inc (&result->ref_count);
+    return result;
+}
+
+void
+mm_bearer_connect_result_unref (MMBearerConnectResult *result)
+{
+    if (g_atomic_int_dec_and_test (&result->ref_count)) {
+        if (result->ipv4_config)
+            g_object_unref (result->ipv4_config);
+        if (result->ipv6_config)
+            g_object_unref (result->ipv6_config);
+        if (result->data)
+            g_object_unref (result->data);
+        g_slice_free (MMBearerConnectResult, result);
+    }
+}
+
+MMPort *
+mm_bearer_connect_result_peek_data (MMBearerConnectResult *result)
+{
+    return result->data;
+}
+
+MMBearerIpConfig *
+mm_bearer_connect_result_peek_ipv4_config (MMBearerConnectResult *result)
+{
+    return result->ipv4_config;
+}
+
+MMBearerIpConfig *
+mm_bearer_connect_result_peek_ipv6_config (MMBearerConnectResult *result)
+{
+    return result->ipv6_config;
+}
+
+MMBearerConnectResult *
+mm_bearer_connect_result_new (MMPort *data,
+                              MMBearerIpConfig *ipv4_config,
+                              MMBearerIpConfig *ipv6_config)
+{
+    MMBearerConnectResult *result;
+
+    /* 'data' must always be given */
+    g_assert (MM_IS_PORT (data));
+
+    result = g_slice_new0 (MMBearerConnectResult);
+    result->ref_count = 1;
+    result->data = g_object_ref (data);
+    if (ipv4_config)
+        result->ipv4_config = g_object_ref (ipv4_config);
+    if (ipv6_config)
+        result->ipv6_config = g_object_ref (ipv6_config);
+    return result;
 }

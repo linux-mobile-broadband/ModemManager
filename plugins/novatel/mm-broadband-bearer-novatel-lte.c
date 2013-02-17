@@ -96,28 +96,15 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
     g_free (ctx);
 }
 
-static gboolean
+static MMBearerConnectResult *
 connect_3gpp_finish (MMBroadbandBearer *self,
                      GAsyncResult *res,
-                     MMPort **data,
-                     MMBearerIpConfig **ipv4_config,
-                     MMBearerIpConfig **ipv6_config,
                      GError **error)
 {
-    MMBearerIpConfig *config;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+        return NULL;
 
-    config = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    /* In the default implementation, we assume only IPv4 is supported */
-    *ipv4_config = g_object_ref (config);
-    *ipv6_config = NULL;
-    /* We used the input suggested data port */
-    *data = NULL;
-
-    return TRUE;
+    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static gboolean connect_3gpp_qmistatus (DetailedConnectContext *ctx);
@@ -209,9 +196,11 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                                                                     ctx->self);
         config = mm_bearer_ip_config_new ();
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   config,
-                                                   (GDestroyNotify)g_object_unref);
+        g_simple_async_result_set_op_res_gpointer (
+            ctx->result,
+            mm_bearer_connect_result_new (ctx->data, config, NULL),
+            (GDestroyNotify)mm_bearer_connect_result_unref);
+        g_object_unref (config);
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
