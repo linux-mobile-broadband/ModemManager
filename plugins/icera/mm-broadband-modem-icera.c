@@ -733,25 +733,6 @@ broadband_bearer_icera_new_ready (GObject *source,
 }
 
 static void
-broadband_bearer_new_ready (GObject *source,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
-{
-    MMBearer *bearer = NULL;
-    GError *error = NULL;
-
-    bearer = mm_broadband_bearer_new_finish (res, &error);
-    if (!bearer)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   (GDestroyNotify)g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
 modem_create_bearer (MMIfaceModem *self,
                      MMBearerProperties *properties,
                      GAsyncReadyCallback callback,
@@ -763,17 +744,6 @@ modem_create_bearer (MMIfaceModem *self,
                                         callback,
                                         user_data,
                                         modem_create_bearer);
-
-    /* If data port is AT create a generic bearer */
-    if (MM_IS_AT_SERIAL_PORT (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self)))) {
-        mm_broadband_bearer_new (
-            MM_BROADBAND_MODEM (self),
-            properties,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)broadband_bearer_new_ready,
-            result);
-        return;
-    }
 
     /* Otherwise create a Icera bearer */
     mm_broadband_bearer_icera_new (

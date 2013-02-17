@@ -699,16 +699,18 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 #endif /* WITH_QMI */
 
 MMPort *
-mm_base_modem_get_best_data_port (MMBaseModem *self)
+mm_base_modem_get_best_data_port (MMBaseModem *self,
+                                  MMPortType type)
 {
     MMPort *port;
 
-    port = mm_base_modem_peek_best_data_port (self);
+    port = mm_base_modem_peek_best_data_port (self, type);
     return (port ? g_object_ref (port) : NULL);
 }
 
 MMPort *
-mm_base_modem_peek_best_data_port (MMBaseModem *self)
+mm_base_modem_peek_best_data_port (MMBaseModem *self,
+                                   MMPortType type)
 {
     GList *l;
 
@@ -716,8 +718,11 @@ mm_base_modem_peek_best_data_port (MMBaseModem *self)
 
     /* Return first not-connected data port */
     for (l = self->priv->data; l; l = g_list_next (l)) {
-        if (!mm_port_get_connected ((MMPort *)l->data))
+        if (!mm_port_get_connected ((MMPort *)l->data) &&
+            (mm_port_get_port_type ((MMPort *)l->data) == type ||
+             type == MM_PORT_TYPE_UNKNOWN)) {
             return (MMPort *)l->data;
+        }
     }
 
     return NULL;

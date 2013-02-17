@@ -329,7 +329,6 @@ connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
               MMAtSerialPort *primary,
               MMAtSerialPort *secondary,
-              MMPort *data,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -343,7 +342,6 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -353,6 +351,19 @@ connect_3gpp (MMBroadbandBearer *self,
 
     g_assert (ctx->self->priv->connect_pending == NULL);
     g_assert (ctx->self->priv->disconnect_pending == NULL);
+
+    /* We need a net data port */
+    ctx->data = mm_base_modem_get_best_data_port (MM_BASE_MODEM (modem),
+                                                  MM_PORT_TYPE_NET);
+    if (!ctx->data) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_NOT_FOUND,
+            "No valid data port found to launch connection");
+        connect_3gpp_context_complete_and_free (ctx);
+        return;
+    }
 
     /* Run! */
     connect_3gpp_context_step (ctx);

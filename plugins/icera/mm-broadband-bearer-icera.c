@@ -504,44 +504,23 @@ typedef struct {
     guint cid;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
+    MMPort *data;
     guint authentication_retries;
     GError *saved_error;
 } Dial3gppContext;
-
-static Dial3gppContext *
-dial_3gpp_context_new (MMBroadbandBearerIcera *self,
-                       MMBaseModem *modem,
-                       MMAtSerialPort *primary,
-                       guint cid,
-                       GCancellable *cancellable,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
-{
-    Dial3gppContext *ctx;
-
-    ctx = g_new0 (Dial3gppContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (modem);
-    ctx->primary = g_object_ref (primary);
-    ctx->cid = cid;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             dial_3gpp_context_new);
-    ctx->cancellable = g_object_ref (cancellable);
-    return ctx;
-}
 
 static void
 dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
+    if (ctx->data)
+        g_object_unref (ctx->data);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (Dial3gppContext, ctx);
 }
 
 static gboolean
@@ -571,12 +550,15 @@ dial_3gpp_context_complete_and_free_if_cancelled (Dial3gppContext *ctx)
     return TRUE;
 }
 
-static gboolean
+static MMPort *
 dial_3gpp_finish (MMBroadbandBearer *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
 }
 
 static void
@@ -764,7 +746,9 @@ report_connect_status (MMBroadbandBearerIcera *self,
             return;
         }
 
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   g_object_ref (ctx->data),
+                                                   (GDestroyNotify)g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
 
@@ -1039,21 +1023,39 @@ static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMAtSerialPort *primary,
-           MMPort *data, /* unused by us */
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
+    Dial3gppContext *ctx;
+
     g_assert (primary != NULL);
 
-    authenticate (dial_3gpp_context_new (MM_BROADBAND_BEARER_ICERA (self),
-                                         modem,
-                                         primary,
-                                         cid,
-                                         cancellable,
-                                         callback,
-                                         user_data));
+    ctx = g_slice_new0 (Dial3gppContext);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (modem);
+    ctx->primary = g_object_ref (primary);
+    ctx->cid = cid;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             dial_3gpp);
+    ctx->cancellable = g_object_ref (cancellable);
+
+    /* We need a net data port */
+    ctx->data = mm_base_modem_get_best_data_port (modem, MM_PORT_TYPE_NET);
+    if (!ctx->data) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_NOT_FOUND,
+            "No valid data port found to launch connection");
+        dial_3gpp_context_complete_and_free (ctx);
+        return;
+    }
+
+    authenticate (ctx);
 }
 
 /*****************************************************************************/

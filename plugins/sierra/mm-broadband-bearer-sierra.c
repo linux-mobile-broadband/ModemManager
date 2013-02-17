@@ -69,12 +69,15 @@ dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
     g_slice_free (Dial3gppContext, ctx);
 }
 
-static gboolean
+static MMPort *
 dial_3gpp_finish (MMBroadbandBearer *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
 }
 
 static void dial_3gpp_context_step (Dial3gppContext *ctx);
@@ -86,7 +89,8 @@ parent_dial_3gpp_ready (MMBroadbandBearer *self,
 {
     GError *error = NULL;
 
-    if (!MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->dial_3gpp_finish (self, res, &error)) {
+    ctx->data = MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->dial_3gpp_finish (self, res, &error);
+    if (!ctx->data) {
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
@@ -251,7 +255,9 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
         ctx->step++;
 
     case DIAL_3GPP_STEP_CONNECT:
-        if (!MM_IS_AT_SERIAL_PORT (ctx->data)) {
+        /* We need a net or AT data port */
+        ctx->data = mm_base_modem_get_best_data_port (ctx->modem, MM_PORT_TYPE_NET);
+        if (ctx->data) {
             gchar *command;
 
             command = g_strdup_printf ("!SCACT=1,%d", ctx->cid);
@@ -273,7 +279,6 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             MM_BROADBAND_BEARER (ctx->self),
             ctx->modem,
             ctx->primary,
-            ctx->data,
             ctx->cid,
             ctx->cancellable,
             (GAsyncReadyCallback)parent_dial_3gpp_ready,
@@ -281,7 +286,9 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
         return;
 
     case DIAL_3GPP_STEP_LAST:
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   g_object_ref (ctx->data),
+                                                   (GDestroyNotify)g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
     }
@@ -291,7 +298,6 @@ static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMAtSerialPort *primary,
-           MMPort *data,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -311,7 +317,6 @@ dial_3gpp (MMBroadbandBearer *self,
                                              user_data,
                                              dial_3gpp);
     ctx->cancellable = g_object_ref (cancellable);
-    ctx->data = g_object_ref (data);
     ctx->step = DIAL_3GPP_STEP_FIRST;
 
     dial_3gpp_context_step (ctx);

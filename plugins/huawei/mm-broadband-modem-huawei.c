@@ -1368,7 +1368,7 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                                              user_data,
                                              huawei_modem_create_bearer);
 
-    if (mm_port_get_port_type (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self))) == MM_PORT_TYPE_NET) {
+    if (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
         /* If we get a 'net' port, check if driver is 'cdc_ether' or 'cdc_ncm' */
         const gchar **drivers;
         guint i;

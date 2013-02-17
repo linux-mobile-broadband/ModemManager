@@ -791,7 +791,7 @@ _connect (MMBearer *self,
     g_assert (modem);
 
     /* Grab a data port */
-    data = mm_base_modem_get_best_data_port (modem);
+    data = mm_base_modem_get_best_data_port (modem, MM_PORT_TYPE_NET);
     if (!data) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),

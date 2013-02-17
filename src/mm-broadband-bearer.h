@@ -52,7 +52,6 @@ struct _MMBroadbandBearerClass {
                                       MMBroadbandModem *modem,
                                       MMAtSerialPort *primary,
                                       MMAtSerialPort *secondary,
-                                      MMPort *data,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
@@ -64,12 +63,11 @@ struct _MMBroadbandBearerClass {
     void     (* dial_3gpp)        (MMBroadbandBearer *self,
                                    MMBaseModem *modem,
                                    MMAtSerialPort *primary,
-                                   MMPort *data,
                                    guint cid,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
-    gboolean (* dial_3gpp_finish) (MMBroadbandBearer *self,
+    MMPort * (* dial_3gpp_finish) (MMBroadbandBearer *self,
                                    GAsyncResult *res,
                                    GError **error);
 
@@ -107,7 +105,6 @@ struct _MMBroadbandBearerClass {
                                       MMBroadbandModem *modem,
                                       MMAtSerialPort *primary,
                                       MMAtSerialPort *secondary,
-                                      MMPort *data,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);

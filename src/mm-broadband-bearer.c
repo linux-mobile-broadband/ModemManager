@@ -76,9 +76,11 @@ typedef struct {
     MMBaseModem *modem;
     MMAtSerialPort *primary;
     MMAtSerialPort *secondary;
-    MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
+
+    MMPort *data;
+    gboolean close_data_on_exit;
 
     /* 3GPP-specific */
     guint cid;
@@ -102,10 +104,14 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     if (ctx->secondary)
         g_object_unref (ctx->secondary);
+    if (ctx->data) {
+        if (ctx->close_data_on_exit)
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+        g_object_unref (ctx->data);
+    }
     g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_slice_free (DetailedConnectContext, ctx);
@@ -143,7 +149,6 @@ detailed_connect_context_new (MMBroadbandBearer *self,
                               MMBroadbandModem *modem,
                               MMAtSerialPort *primary,
                               MMAtSerialPort *secondary,
-                              MMPort *data,
                               GCancellable *cancellable,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
@@ -155,7 +160,6 @@ detailed_connect_context_new (MMBroadbandBearer *self,
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
-    ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -165,6 +169,37 @@ detailed_connect_context_new (MMBroadbandBearer *self,
      * whether the operation is to be cancelled at each step. */
     ctx->cancellable = g_object_ref (cancellable);
     return ctx;
+}
+
+/*****************************************************************************/
+/* Generic implementations (both 3GPP and CDMA) are always AT-port based */
+
+static MMAtSerialPort *
+common_get_at_data_port (MMBaseModem *modem,
+                         GError **error)
+{
+    MMPort *data;
+
+    /* Look for best data port, NULL if none available. */
+    data = mm_base_modem_peek_best_data_port (modem, MM_PORT_TYPE_AT);
+    if (!data) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_CONNECTED,
+                     "Couldn't connect: no port available");
+        return NULL;
+    }
+
+    g_assert (MM_IS_AT_SERIAL_PORT (data));
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (data), error)) {
+        g_prefix_error (error, "Couldn't connect: cannot keep data port open.");
+        return NULL;
+    }
+
+    mm_dbg ("Connection through a plain serial AT port (%s)", mm_port_get_device (data));
+
+    return MM_AT_SERIAL_PORT (g_object_ref (data));
 }
 
 /*****************************************************************************/
@@ -199,6 +234,9 @@ dial_cdma_ready (MMBaseModem *modem,
 
     /* else... Yuhu! */
 
+    /* Keep port open during connection */
+    ctx->close_data_on_exit = FALSE;
+
     /* Generic CDMA connections are done over PPP always */
     g_assert (MM_IS_AT_SERIAL_PORT (ctx->data));
     config = mm_bearer_ip_config_new ();
@@ -231,7 +269,7 @@ cdma_connect_context_dial (DetailedConnectContext *ctx)
         command = g_strdup ("DT#777");
 
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_AT_SERIAL_PORT (ctx->data),
                                    command,
                                    90,
                                    FALSE,
@@ -339,31 +377,32 @@ connect_cdma (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
               MMAtSerialPort *primary,
               MMAtSerialPort *secondary, /* unused by us */
-              MMPort *data,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
 {
     DetailedConnectContext *ctx;
-    MMPort *real_data;
+    GError *error = NULL;
 
     g_assert (primary != NULL);
-
-    if (MM_IS_AT_SERIAL_PORT (data))
-        real_data = data;
-    else {
-        mm_dbg ("Ignoring 'net' interface in CDMA connection");
-        real_data = MM_PORT (primary);
-    }
 
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
                                         NULL,
-                                        real_data,
                                         cancellable,
                                         callback,
                                         user_data);
+
+    /* Grab dial port. This gets a reference to the dial port and OPENs it.
+     * If we fail, we'll need to close it ourselves. */
+    ctx->data = (MMPort *)common_get_at_data_port (ctx->modem, &error);
+    if (!ctx->data) {
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+    ctx->close_data_on_exit = TRUE;
 
     if (mm_bearer_properties_get_rm_protocol (
             mm_bearer_peek_config (MM_BEARER (self))) !=
@@ -393,10 +432,12 @@ typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
-    MMAtSerialPort *dial_port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     GError *saved_error;
+
+    MMAtSerialPort *dial_port;
+    gboolean close_dial_port_on_exit;
 } Dial3gppContext;
 
 static void
@@ -404,10 +445,11 @@ dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
 {
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
+    if (ctx->dial_port)
+        g_object_unref (ctx->dial_port);
     g_object_unref (ctx->cancellable);
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->dial_port);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
@@ -441,12 +483,15 @@ dial_3gpp_context_complete_and_free_if_cancelled (Dial3gppContext *ctx)
     return TRUE;
 }
 
-static gboolean
+static MMPort *
 dial_3gpp_finish (MMBroadbandBearer *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
 }
 
 static void
@@ -474,6 +519,9 @@ extended_error_ready (MMBaseModem *modem,
                                           ctx->saved_error);
 
     ctx->saved_error = NULL;
+
+    /* Close the dialling port as we got an error */
+    mm_serial_port_close (MM_SERIAL_PORT (ctx->dial_port));
 
     /* Done with errors */
     dial_3gpp_context_complete_and_free (ctx);
@@ -503,7 +551,9 @@ atd_ready (MMBaseModem *modem,
         return;
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               g_object_ref (ctx->dial_port),
+                                               (GDestroyNotify)g_object_unref);
     dial_3gpp_context_complete_and_free (ctx);
 }
 
@@ -511,7 +561,6 @@ static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMAtSerialPort *primary,
-           MMPort *data,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -519,22 +568,28 @@ dial_3gpp (MMBroadbandBearer *self,
 {
     gchar *command;
     Dial3gppContext *ctx;
+    GError *error = NULL;
 
     g_assert (primary != NULL);
 
     ctx = g_slice_new0 (Dial3gppContext);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
-    /* Dial port might not be the primary port */
     ctx->primary = g_object_ref (primary);
-    ctx->dial_port = (data && MM_IS_AT_SERIAL_PORT (data) ?
-                      g_object_ref (data) :
-                      g_object_ref (primary));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              dial_3gpp);
     ctx->cancellable = g_object_ref (cancellable);
+
+    /* Grab dial port. This gets a reference to the dial port and OPENs it.
+     * If we fail, we'll need to close it ourselves. */
+    ctx->dial_port = common_get_at_data_port (ctx->modem, &error);
+    if (!ctx->dial_port) {
+        g_simple_async_result_take_error (ctx->result, error);
+        dial_3gpp_context_complete_and_free (ctx);
+        return;
+    }
 
     /* Use default *99 to connect */
     command = g_strdup_printf ("ATD*99***%d#", cid);
@@ -584,6 +639,10 @@ get_ip_config_3gpp_ready (MMBroadbandModem *modem,
         return;
     }
 
+    /* Keep port open during connection */
+    if (MM_IS_AT_SERIAL_PORT (ctx->data))
+        ctx->close_data_on_exit = FALSE;
+
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
         mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config),
@@ -604,15 +663,19 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     MMBearerIpConfig *config;
     GError *error = NULL;
 
-    if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self,
-                                                                      res,
-                                                                      &error)) {
+    ctx->data = MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self, res, &error);
+    if (!ctx->data) {
         /* Clear CID when it failed to connect. */
         ctx->self->priv->cid = 0;
         g_simple_async_result_take_error (ctx->result, error);
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
+
+    /* If the dialling operation used an AT port, it is assumed to have an extra
+     * open() count. */
+    if (MM_IS_AT_SERIAL_PORT (ctx->data))
+        ctx->close_data_on_exit = TRUE;
 
     if (MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp &&
         MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish) {
@@ -630,6 +693,10 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     }
 
     /* Yuhu! */
+
+    /* Keep port open during connection */
+    if (MM_IS_AT_SERIAL_PORT (ctx->data))
+        ctx->close_data_on_exit = FALSE;
 
     /* If no specific IP retrieval requested, set the default implementation
      * (PPP if data port is AT, DHCP otherwise) */
@@ -674,7 +741,6 @@ initialize_pdp_context_ready (MMBaseModem *modem,
     MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
                                                           ctx->modem,
                                                           ctx->primary,
-                                                          ctx->data,
                                                           ctx->cid,
                                                           ctx->cancellable,
                                                           (GAsyncReadyCallback)dial_3gpp_ready,
@@ -920,7 +986,6 @@ connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
               MMAtSerialPort *primary,
               MMAtSerialPort *secondary,
-              MMPort *data,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -933,7 +998,6 @@ connect_3gpp (MMBroadbandBearer *self,
                                         modem,
                                         primary,
                                         secondary,
-                                        data,
                                         cancellable,
                                         callback,
                                         user_data);
@@ -955,7 +1019,6 @@ connect_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearer *self;
     GSimpleAsyncResult *result;
-    MMPort *suggested_data;
 } ConnectContext;
 
 static void
@@ -963,7 +1026,6 @@ connect_context_complete_and_free (ConnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->suggested_data);
     g_object_unref (ctx->self);
     g_slice_free (ConnectContext, ctx);
 }
@@ -1044,7 +1106,6 @@ connect (MMBearer *self,
 {
     MMBaseModem *modem = NULL;
     MMAtSerialPort *primary;
-    MMPort *suggested_data;
     ConnectContext *ctx;
 
     /* Don't try to connect if already connected */
@@ -1092,44 +1153,9 @@ connect (MMBearer *self,
         return;
     }
 
-    /* Look for best data port, NULL if none available. */
-    suggested_data = mm_base_modem_peek_best_data_port (modem);
-    if (!suggested_data) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Couldn't connect: all available data ports already connected");
-        g_object_unref (modem);
-        return;
-    }
-
-    /* If data port is AT, we need to ensure it's open during the whole
-     * connection. For the case where the primary port is used as data port,
-     * which is actually always right now, this is already ensured because the
-     * primary port is kept open as long as the modem is enabled, but anyway
-     * there's no real problem in keeping an open count here as well. */
-    if (MM_IS_AT_SERIAL_PORT (suggested_data)) {
-        GError *error = NULL;
-
-        if (!mm_serial_port_open (MM_SERIAL_PORT (suggested_data), &error)) {
-            g_prefix_error (&error, "Couldn't connect: cannot keep data port open.");
-            g_simple_async_report_take_gerror_in_idle (
-                G_OBJECT (self),
-                callback,
-                user_data,
-                error);
-            g_object_unref (modem);
-            return;
-        }
-    }
-
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
-    ctx->suggested_data = g_object_ref (suggested_data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1142,7 +1168,6 @@ connect (MMBearer *self,
             MM_BROADBAND_MODEM (modem),
             primary,
             mm_base_modem_peek_port_secondary (modem),
-            suggested_data,
             cancellable,
             (GAsyncReadyCallback) connect_3gpp_ready,
             ctx);
@@ -1157,7 +1182,6 @@ connect (MMBearer *self,
             MM_BROADBAND_MODEM (modem),
             primary,
             mm_base_modem_peek_port_secondary (modem),
-            suggested_data,
             cancellable,
             (GAsyncReadyCallback) connect_cdma_ready,
             ctx);

@@ -55,45 +55,18 @@ typedef struct {
     gint retries;
 } DetailedConnectContext;
 
-static DetailedConnectContext *
-detailed_connect_context_new (MMBroadbandBearer *self,
-                              MMBroadbandModem *modem,
-                              MMAtSerialPort *primary,
-                              MMPort *data,
-                              GCancellable *cancellable,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
-{
-    DetailedConnectContext *ctx;
-
-    ctx = g_new0 (DetailedConnectContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    /* NOTE:
-     * We don't currently support cancelling AT commands, so we'll just check
-     * whether the operation is to be cancelled at each step. */
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             detailed_connect_context_new);
-    ctx->retries = 4;
-    return ctx;
-}
-
 static void
 detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->data);
+    if (ctx->data)
+        g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (DetailedConnectContext, ctx);
 }
 
 static MMBearerConnectResult *
@@ -264,28 +237,12 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
 }
 
 static void
-connect_3gpp (MMBroadbandBearer *bearer,
-              MMBroadbandModem *modem,
-              MMAtSerialPort *primary,
-              MMAtSerialPort *secondary,
-              MMPort *data,
-              GCancellable *cancellable,
-              GAsyncReadyCallback callback,
-              gpointer user_data)
+connect_3gpp_authenticate (DetailedConnectContext *ctx)
 {
-    DetailedConnectContext *ctx;
-    gchar *command, *apn, *user, *password;
     MMBearerProperties *config;
+    gchar *command, *apn, *user, *password;
 
-    ctx = detailed_connect_context_new (bearer,
-                                        modem,
-                                        primary,
-                                        data,
-                                        cancellable,
-                                        callback,
-                                        user_data);
-
-    config = mm_bearer_peek_config (MM_BEARER (bearer));
+    config = mm_bearer_peek_config (MM_BEARER (ctx->self));
     apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (config));
     user = mm_at_serial_port_quote_string (mm_bearer_properties_get_user (config));
     password = mm_at_serial_port_quote_string (mm_bearer_properties_get_password (config));
@@ -302,6 +259,44 @@ connect_3gpp (MMBroadbandBearer *bearer,
         (GAsyncReadyCallback)connect_3gpp_qmiconnect_ready,
         ctx); /* user_data */
     g_free (command);
+}
+
+static void
+connect_3gpp (MMBroadbandBearer *self,
+              MMBroadbandModem *modem,
+              MMAtSerialPort *primary,
+              MMAtSerialPort *secondary,
+              GCancellable *cancellable,
+              GAsyncReadyCallback callback,
+              gpointer user_data)
+{
+    DetailedConnectContext *ctx;
+
+    ctx = g_slice_new0 (DetailedConnectContext);
+    ctx->self = g_object_ref (self);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             connect_3gpp);
+    ctx->retries = 4;
+
+    /* Get a 'net' data port */
+    ctx->data = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem),
+                                                   MM_PORT_TYPE_NET);
+    if (!ctx->data) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Couldn't connect: no available net port available");
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    connect_3gpp_authenticate (ctx);
 }
 
 /*****************************************************************************/

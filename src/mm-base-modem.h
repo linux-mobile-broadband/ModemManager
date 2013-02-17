@@ -127,7 +127,7 @@ MMQmiPort        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 MMAtSerialPort   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
-MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self);
+MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
 
 MMAtSerialPort   *mm_base_modem_get_port_primary      (MMBaseModem *self);
@@ -140,7 +140,7 @@ MMQmiPort        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 MMAtSerialPort   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
-MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self);
+MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
 
 void     mm_base_modem_set_hotplugged (MMBaseModem *self,
