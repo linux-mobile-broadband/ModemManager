@@ -1379,10 +1379,10 @@ data_flash_3gpp_ready (MMSerialPort *data,
         mm_dbg ("Port flashing failed (not fatal): %s", error->message);
     }
 
-    /* Don't bother doing the CGACT again if it was done on a secondary port
-     * or if not needed */
+    /* Don't bother doing the CGACT again if it was already done on the
+     * primary or secondary port */
     if (ctx->cgact_sent) {
-        mm_dbg ("PDP disconnection already sent in secondary port");
+        mm_dbg ("PDP disconnection already sent");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
@@ -1460,13 +1460,28 @@ disconnect_3gpp (MMBroadbandBearer *self,
                           g_strdup_printf ("+CGACT=0,%d", cid) :
                           g_strdup_printf ("+CGACT=0"));
 
-    /* If the primary port is connected (with PPP) then try sending the PDP
+    /* If the primary port is NOT connected (doesn't have to be the data port),
+     * we'll send CGACT there */
+    if (!mm_port_get_connected (MM_PORT (ctx->primary))) {
+        mm_dbg ("Sending PDP context deactivation in primary port...");
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       ctx->cgact_command,
+                                       10,
+                                       FALSE,
+                                       FALSE, /* raw */
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)cgact_ready,
+                                       ctx);
+        return;
+    }
+
+    /* If the primary port is connected, then try sending the PDP
      * context deactivation on the secondary port because not all modems will
      * respond to flashing (since either the modem or the kernel's serial
      * driver doesn't support it).
      */
-    if (ctx->secondary &&
-        mm_port_get_connected (MM_PORT (ctx->primary))) {
+    if (ctx->secondary) {
         mm_dbg ("Sending PDP context deactivation in secondary port...");
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->secondary,
