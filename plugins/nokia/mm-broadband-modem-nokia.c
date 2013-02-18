@@ -114,18 +114,10 @@ modem_init_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Send the init command twice; some devices (Nokia N900) appear to take a
-     * few commands before responding correctly.  Instead of penalizing them for
-     * being stupid the first time by failing to enable the device, just
-     * try again.
-     *
-     * TODO: only send init command 2nd time if 1st time failed?
-     *
-     * Also, when initializing a Nokia phone, first enable the echo,
+    /* Also, when initializing a Nokia phone, first enable the echo,
      * and then disable it, so that we get it properly disabled.
      */
-    { "Z E1 E0 V1", 3, FALSE, NULL },
-    { "Z E1 E0 V1", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { "E1 E0 V1", 3, FALSE, NULL },
 
     /* Setup errors */
     { "+CMEE=1", 3, FALSE, NULL },
@@ -147,6 +139,100 @@ modem_init (MMIfaceModem *self,
                                NULL,  /* response_processor_context_free */
                                callback,
                                user_data);
+}
+
+/*****************************************************************************/
+/* Initializing the modem (during first enabling) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModemNokia *self;
+    guint retries;
+} EnablingModemInitContext;
+
+static void
+enabling_modem_init_context_complete_and_free (EnablingModemInitContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (EnablingModemInitContext, ctx);
+}
+
+static gboolean
+enabling_modem_init_finish (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void retry_atz (EnablingModemInitContext *ctx);
+
+static void
+atz_ready (MMBaseModem *self,
+           GAsyncResult *res,
+           EnablingModemInitContext *ctx)
+{
+    GError *error = NULL;
+
+    /* One retry less */
+    ctx->retries--;
+
+    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
+        /* Consumed all retries... */
+        if (ctx->retries == 0) {
+            g_simple_async_result_take_error (ctx->result, error);
+            enabling_modem_init_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Retry... */
+        g_error_free (error);
+        retry_atz (ctx);
+        return;
+    }
+
+    /* Good! */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enabling_modem_init_context_complete_and_free (ctx);
+}
+
+static void
+retry_atz (EnablingModemInitContext *ctx)
+{
+    mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+                                   "Z",
+                                   6,
+                                   FALSE,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)atz_ready,
+                                   ctx);
+}
+
+static void
+enabling_modem_init (MMBroadbandModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    EnablingModemInitContext *ctx;
+
+    ctx = g_slice_new0 (EnablingModemInitContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enabling_modem_init);
+    ctx->self = g_object_ref (self);
+
+    /* Send the init command twice; some devices (Nokia N900) appear to take a
+     * few commands before responding correctly.  Instead of penalizing them for
+     * being stupid the first time by failing to enable the device, just
+     * try again. */
+    ctx->retries = 2;
+    retry_atz (ctx);
 }
 
 /*****************************************************************************/
@@ -214,4 +300,8 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_nokia_class_init (MMBroadbandModemNokiaClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->enabling_modem_init = enabling_modem_init;
+    broadband_modem_class->enabling_modem_init_finish = enabling_modem_init_finish;
 }

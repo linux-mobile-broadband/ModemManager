@@ -307,63 +307,93 @@ set_allowed_modes (MMIfaceModem *_self,
 /*****************************************************************************/
 /* Initializing the modem (Modem interface) */
 
-typedef struct {
-    GSimpleAsyncResult *result;
-    MMBroadbandModemMbm *self;
-} ModemInitContext;
-
-static void
-modem_init_context_complete_and_free (ModemInitContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (ModemInitContext, ctx);
-}
-
 static gboolean
 modem_init_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
     /* Ignore errors */
-    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, NULL);
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, NULL);
     return TRUE;
 }
 
 static void
-init_sequence_ready (MMBaseModem *self,
-                     GAsyncResult *res,
-                     ModemInitContext *ctx)
+modem_init (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
 {
-    mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    modem_init_context_complete_and_free (ctx);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                   "E0 V1 X4 &C1 +CMEE=1",
+                                   3,
+                                   FALSE,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   callback,
+                                   user_data);
 }
 
-static const MMBaseModemAtCommand modem_init_sequence[] = {
+/*****************************************************************************/
+/* Initializing the modem (during first enabling) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModemMbm *self;
+} EnablingModemInitContext;
+
+static void
+enabling_modem_init_context_complete_and_free (EnablingModemInitContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (EnablingModemInitContext, ctx);
+}
+
+static gboolean
+enabling_modem_init_finish (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+enabling_init_sequence_ready (MMBaseModem *self,
+                              GAsyncResult *res,
+                              EnablingModemInitContext *ctx)
+{
+    /* Ignore errors */
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, NULL);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enabling_modem_init_context_complete_and_free (ctx);
+}
+
+static const MMBaseModemAtCommand enabling_modem_init_sequence[] = {
     /* Init command */
-    { "&F E0 V1 X4 &C1 +CMEE=1", 3, FALSE, NULL },
+    { "&F", 3, FALSE, NULL },
     /* Ensure disconnected */
     { "*ENAP=0", 3, FALSE, NULL },
     { NULL }
 };
 
 static void
-run_init_sequence (ModemInitContext *ctx)
+run_enabling_init_sequence (EnablingModemInitContext *ctx)
 {
-    mm_base_modem_at_sequence (MM_BASE_MODEM (ctx->self),
-                               modem_init_sequence,
-                               NULL,  /* response_processor_context */
-                               NULL,  /* response_processor_context_free */
-                               (GAsyncReadyCallback)init_sequence_ready,
-                               ctx);
+    mm_base_modem_at_sequence_full (MM_BASE_MODEM (ctx->self),
+                                    mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+                                    enabling_modem_init_sequence,
+                                    NULL,  /* response_processor_context */
+                                    NULL,  /* response_processor_context_free */
+                                    NULL, /* cancellable */
+                                    (GAsyncReadyCallback)enabling_init_sequence_ready,
+                                    ctx);
 }
 
 static void
 emrdy_ready (MMBaseModem *self,
              GAsyncResult *res,
-             ModemInitContext *ctx)
+             EnablingModemInitContext *ctx)
 {
     GError *error = NULL;
 
@@ -386,26 +416,26 @@ emrdy_ready (MMBaseModem *self,
         g_error_free (error);
     }
 
-    run_init_sequence (ctx);
+    run_enabling_init_sequence (ctx);
 }
 
 static void
-modem_init (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+enabling_modem_init (MMBroadbandModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
 {
-    ModemInitContext *ctx;
+    EnablingModemInitContext *ctx;
 
-    ctx = g_slice_new0 (ModemInitContext);
+    ctx = g_slice_new0 (EnablingModemInitContext);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             modem_init);
+                                             enabling_modem_init);
     ctx->self = g_object_ref (self);
 
     /* Modem is ready?, no need to check EMRDY */
     if (ctx->self->priv->have_emrdy) {
-        run_init_sequence (ctx);
+        run_enabling_init_sequence (ctx);
         return;
     }
 
@@ -1143,4 +1173,6 @@ mm_broadband_modem_mbm_class_init (MMBroadbandModemMbmClass *klass)
 
     object_class->finalize = finalize;
     broadband_modem_class->setup_ports = setup_ports;
+    broadband_modem_class->enabling_modem_init = enabling_modem_init;
+    broadband_modem_class->enabling_modem_init_finish = enabling_modem_init_finish;
 }

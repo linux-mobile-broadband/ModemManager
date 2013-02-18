@@ -107,6 +107,7 @@ typedef struct _PortsContext PortsContext;
 struct _MMBroadbandModemPrivate {
     /* Broadband modem specific implementation */
     PortsContext *enabled_ports_ctx;
+    gboolean modem_init_run;
 
     /*<--- Modem interface --->*/
     /* Properties */
@@ -2959,13 +2960,6 @@ modem_init_sequence_ready (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Init command. ITU rec v.250 (6.1.1) says:
-     *   The DTE should not include additional commands on the same command line
-     *   after the Z command because such commands may be ignored.
-     * So run ATZ alone.
-     */
-    { "Z", 6, FALSE, mm_base_modem_response_processor_no_result_continue },
-
     /* Ensure echo is off after the init command */
     { "E0 V1",      3, FALSE, NULL },
 
@@ -7434,6 +7428,38 @@ disabling_stopped (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
+/* Initializing the modem (during first enabling) */
+
+static gboolean
+enabling_modem_init_finish (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+enabling_modem_init (MMBroadbandModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    /* Init command. ITU rec v.250 (6.1.1) says:
+     *   The DTE should not include additional commands on the same command line
+     *   after the Z command because such commands may be ignored.
+     * So run ATZ alone.
+     */
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                   "Z",
+                                   6,
+                                   FALSE,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   callback,
+                                   user_data);
+}
+
+/*****************************************************************************/
 /* Enabling started */
 
 typedef struct {
@@ -7458,6 +7484,74 @@ enabling_started_finish (MMBroadbandModem *self,
                          GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
+{
+    /* Store enabled ports context and complete */
+    ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enabling_started_context_complete_and_free (ctx);
+    return FALSE;
+}
+
+static void
+enabling_modem_init_ready (MMBroadbandModem *self,
+                           GAsyncResult *res,
+                           EnablingStartedContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish (self, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_started_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Specify that the modem init was run once */
+    ctx->self->priv->modem_init_run = TRUE;
+
+    /* After the modem init sequence, give a 500ms period for the modem to settle */
+    mm_dbg ("Giving some time to settle the modem...");
+    g_timeout_add (500, (GSourceFunc)enabling_after_modem_init_timeout, ctx);
+}
+
+static void
+enabling_flash_done (MMSerialPort *port,
+                     GError *error,
+                     EnablingStartedContext *ctx)
+{
+    if (error) {
+        g_prefix_error (&error, "Primary port flashing failed: ");
+        g_simple_async_result_set_from_error (ctx->result, error);
+        enabling_started_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Skip modem initialization if the device was hotplugged OR if we already
+     * did it (i.e. don't reinitialize if the modem got disabled and enabled
+     * again) */
+    if (ctx->self->priv->modem_init_run)
+        mm_dbg ("Skipping modem initialization: not first enabling");
+    else if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (ctx->self))) {
+        ctx->self->priv->modem_init_run = TRUE;
+        mm_dbg ("Skipping modem initialization: device hotplugged");
+    } else if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init ||
+             !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish)
+        mm_dbg ("Skipping modem initialization: not required");
+    else {
+        mm_dbg ("Running modem initialization sequence...");
+        MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init (ctx->self,
+                                                                       (GAsyncReadyCallback)enabling_modem_init_ready,
+                                                                       ctx);
+        return;
+    }
+
+    /* Store enabled ports context and complete */
+    ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enabling_started_context_complete_and_free (ctx);
 }
 
 static gboolean
@@ -7506,22 +7600,6 @@ open_ports_enabling (MMBroadbandModem *self,
 }
 
 static void
-enabling_flash_done (MMSerialPort *port,
-                     GError *error,
-                     EnablingStartedContext *ctx)
-{
-    if (error) {
-        g_prefix_error (&error, "Primary port flashing failed: ");
-        g_simple_async_result_set_from_error (ctx->result, error);
-    } else {
-        ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
-    enabling_started_context_complete_and_free (ctx);
-}
-
-static void
 enabling_started (MMBroadbandModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -7547,7 +7625,7 @@ enabling_started (MMBroadbandModem *self,
     }
 
     /* Ports were correctly opened, now flash the primary port */
-    mm_dbg ("Flashing primary port before enabling...");
+    mm_dbg ("Flashing primary AT port before enabling...");
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->ports->primary),
                           100,
                           FALSE,
@@ -9284,6 +9362,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     klass->initialization_stopped = initialization_stopped;
     klass->enabling_started = enabling_started;
     klass->enabling_started_finish = enabling_started_finish;
+    klass->enabling_modem_init = enabling_modem_init;
+    klass->enabling_modem_init_finish = enabling_modem_init_finish;
     klass->disabling_stopped = disabling_stopped;
 
     g_object_class_override_property (object_class,

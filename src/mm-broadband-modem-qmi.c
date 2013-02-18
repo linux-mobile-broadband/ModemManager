@@ -7654,4 +7654,7 @@ mm_broadband_modem_qmi_class_init (MMBroadbandModemQmiClass *klass)
     broadband_modem_class->initialization_started_finish = initialization_started_finish;
     broadband_modem_class->enabling_started = enabling_started;
     broadband_modem_class->enabling_started_finish = enabling_started_finish;
+    /* Do not initialize the QMI modem through AT commands */
+    broadband_modem_class->enabling_modem_init = NULL;
+    broadband_modem_class->enabling_modem_init_finish = NULL;
 }

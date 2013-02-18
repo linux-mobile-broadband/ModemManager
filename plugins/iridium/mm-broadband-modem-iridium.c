@@ -46,14 +46,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_
 /*****************************************************************************/
 /* Initializing the modem (Modem interface) */
 
-static gboolean
-modem_init_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
 static const MMBaseModemAtCommand modem_init_sequence[] = {
     /* Init command */
     { "E0 V1", 3, FALSE, NULL },
@@ -61,58 +53,12 @@ static const MMBaseModemAtCommand modem_init_sequence[] = {
     { NULL }
 };
 
-static void
-init_sequence_ready (MMBroadbandModem *self,
-                     GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
 static gboolean
-after_atz_sleep_cb (GSimpleAsyncResult *simple)
+modem_init_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
 {
-    MMBaseModem *self;
-
-    self = MM_BASE_MODEM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
-    /* Now, run the remaining sequence */
-    mm_base_modem_at_sequence (self,
-                               modem_init_sequence,
-                               NULL,  /* response_processor_context */
-                               NULL,  /* response_processor_context_free */
-                               (GAsyncReadyCallback)init_sequence_ready,
-                               simple);
-    g_object_unref (self);
-    return FALSE;
-}
-
-static void
-atz_ready (MMBroadbandModem *self,
-           GAsyncResult *res,
-           GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    /* Once ATZ reply is received, we need to wait a bit before going on,
-     * otherwise, the next commands given will receive garbage as reply
-     * (500ms should be enough) */
-    g_timeout_add (500, (GSourceFunc)after_atz_sleep_cb, simple);
+    return !!mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
 }
 
 static void
@@ -120,19 +66,12 @@ modem_init (MMIfaceModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_init);
-    /* First, send ATZ alone */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "Z",
-                              3,
-                              TRUE,
-                              (GAsyncReadyCallback)atz_ready,
-                              result);
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               modem_init_sequence,
+                               NULL,  /* response_processor_context */
+                               NULL,  /* response_processor_context_free */
+                               callback,
+                               user_data);
 }
 
 /*****************************************************************************/

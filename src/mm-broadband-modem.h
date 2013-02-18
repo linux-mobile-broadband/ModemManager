@@ -69,6 +69,17 @@ struct _MMBroadbandModemClass {
                                           GAsyncResult *res,
                                           GError **error);
 
+    /* Modem initialization. During the 'enabling' step, this setup will be
+     * called in order to initialize the modem, only if it wasn't hotplugged,
+     * as we assume that a hotplugged modem is already initialized. */
+    void     (* enabling_modem_init)        (MMBroadbandModem *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+    gboolean (* enabling_modem_init_finish) (MMBroadbandModem *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
+
     /* Last disabling step */
     gboolean (* disabling_stopped) (MMBroadbandModem *self,
                                     GError **error);
