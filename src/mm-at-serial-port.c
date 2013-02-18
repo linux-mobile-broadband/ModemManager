@@ -31,6 +31,8 @@ G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_SERIAL_PORT)
 enum {
     PROP_0,
     PROP_REMOVE_ECHO,
+    PROP_INIT_SEQUENCE_ENABLED,
+    PROP_INIT_SEQUENCE,
     LAST_PROP
 };
 
@@ -44,7 +46,10 @@ typedef struct {
 
     MMAtPortFlag flags;
 
+    /* Properties */
     gboolean remove_echo;
+    guint init_sequence_enabled;
+    gchar **init_sequence;
 } MMAtSerialPortPrivate;
 
 /*****************************************************************************/
@@ -417,6 +422,40 @@ mm_at_serial_port_get_flags (MMAtSerialPort *self)
 
 /*****************************************************************************/
 
+void
+mm_at_serial_port_run_init_sequence (MMAtSerialPort *self)
+{
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
+    guint i;
+
+    if (!priv->init_sequence)
+        return;
+
+    mm_dbg ("(%s): running init sequence...", mm_port_get_device (MM_PORT (self)));
+
+    /* Just queue the init commands, don't wait for reply */
+    for (i = 0; priv->init_sequence[i]; i++) {
+        mm_at_serial_port_queue_command (self,
+                                         priv->init_sequence[i],
+                                         3,
+                                         FALSE,
+                                         NULL,
+                                         NULL,
+                                         NULL);
+    }
+}
+
+static void
+config (MMSerialPort *self)
+{
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->init_sequence_enabled)
+        mm_at_serial_port_run_init_sequence (MM_AT_SERIAL_PORT (self));
+}
+
+/*****************************************************************************/
+
 MMAtSerialPort *
 mm_at_serial_port_new (const char *name)
 {
@@ -434,6 +473,8 @@ mm_at_serial_port_init (MMAtSerialPort *self)
 
     /* By default, remove echo */
     priv->remove_echo = TRUE;
+    /* By default, run init sequence during first port opening */
+    priv->init_sequence_enabled = TRUE;
 }
 
 static void
@@ -445,6 +486,13 @@ set_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_REMOVE_ECHO:
         priv->remove_echo = g_value_get_boolean (value);
+        break;
+    case PROP_INIT_SEQUENCE_ENABLED:
+        priv->init_sequence_enabled = g_value_get_boolean (value);
+        break;
+    case PROP_INIT_SEQUENCE:
+        g_strfreev (priv->init_sequence);
+        priv->init_sequence = g_value_dup_boxed (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -461,6 +509,12 @@ get_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_REMOVE_ECHO:
         g_value_set_boolean (value, priv->remove_echo);
+        break;
+    case PROP_INIT_SEQUENCE_ENABLED:
+        g_value_set_boolean (value, priv->init_sequence_enabled);
+        break;
+    case PROP_INIT_SEQUENCE:
+        g_value_set_boxed (value, priv->init_sequence);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -509,6 +563,7 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
     port_class->parse_response = parse_response;
     port_class->handle_response = handle_response;
     port_class->debug_log = debug_log;
+    port_class->config = config;
 
     g_object_class_install_property
         (object_class, PROP_REMOVE_ECHO,
@@ -517,4 +572,20 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
                                "Built-in echo removal should be applied",
                                TRUE,
                                G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_INIT_SEQUENCE_ENABLED,
+         g_param_spec_boolean (MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED,
+                               "Init sequence enabled",
+                               "Whether the initialization sequence should be run",
+                               TRUE,
+                               G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_INIT_SEQUENCE,
+         g_param_spec_boxed (MM_AT_SERIAL_PORT_INIT_SEQUENCE,
+                             "Init sequence",
+                             "Initialization sequence",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE));
 }

@@ -65,7 +65,9 @@ typedef void (*MMAtSerialResponseFn)     (MMAtSerialPort *port,
                                           GError *error,
                                           gpointer user_data);
 
-#define MM_AT_SERIAL_PORT_REMOVE_ECHO "remove-echo"
+#define MM_AT_SERIAL_PORT_REMOVE_ECHO           "remove-echo"
+#define MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED "init-sequence-enabled"
+#define MM_AT_SERIAL_PORT_INIT_SEQUENCE         "init-sequence"
 
 struct _MMAtSerialPort {
     MMSerialPort parent;
@@ -119,5 +121,8 @@ void     mm_at_serial_port_set_flags (MMAtSerialPort *self,
                                       MMAtPortFlag flags);
 
 MMAtPortFlag mm_at_serial_port_get_flags (MMAtSerialPort *self);
+
+/* Tell the port to run its init sequence, if any, right away */
+void mm_at_serial_port_run_init_sequence (MMAtSerialPort *self);
 
 #endif /* MM_AT_SERIAL_PORT_H */

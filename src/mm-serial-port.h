@@ -87,10 +87,14 @@ struct _MMSerialPortClass {
                                    GCallback callback,
                                    gpointer callback_data);
 
-    /* Called to configure the serial port after it's opened.  On error, should
+    /* Called to configure the serial port fd after it's opened.  On error, should
      * return FALSE and set 'error' as appropriate.
      */
     gboolean (*config_fd)         (MMSerialPort *self, int fd, GError **error);
+
+    /* Called to configure the serial port after it's opened. Errors, if any,
+     * should get ignored. */
+    void     (*config)            (MMSerialPort *self);
 
     void (*debug_log)             (MMSerialPort *self,
                                    const char *prefix,

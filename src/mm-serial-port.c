@@ -947,6 +947,11 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 success:
     priv->open_count++;
     mm_dbg ("(%s) device open count is %d (open)", device, priv->open_count);
+
+    /* Run additional port config if just opened */
+    if (priv->open_count == 1 && MM_SERIAL_PORT_GET_CLASS (self)->config)
+        MM_SERIAL_PORT_GET_CLASS (self)->config (self);
+
     return TRUE;
 
 error:
