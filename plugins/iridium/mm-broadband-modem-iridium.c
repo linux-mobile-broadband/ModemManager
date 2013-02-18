@@ -44,37 +44,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 /*****************************************************************************/
-/* Initializing the modem (Modem interface) */
-
-static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Init command */
-    { "E0 V1", 3, FALSE, NULL },
-    { "+CMEE=1", 3, FALSE, NULL },
-    { NULL }
-};
-
-static gboolean
-modem_init_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    return !!mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-}
-
-static void
-modem_init (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
-{
-    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                               modem_init_sequence,
-                               NULL,  /* response_processor_context */
-                               NULL,  /* response_processor_context_free */
-                               callback,
-                               user_data);
-}
-
-/*****************************************************************************/
 /* Operator Code and Name loading (3GPP interface) */
 
 static gchar *
@@ -338,6 +307,16 @@ create_bearer (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+static const gchar *primary_init_sequence[] = {
+    /* Disable echo */
+    "E0",
+    /* Get word responses */
+    "V1",
+    /* Extended numeric codes */
+    "+CMEE=1",
+    NULL
+};
+
 static void
 setup_ports (MMBroadbandModem *self)
 {
@@ -354,6 +333,7 @@ setup_ports (MMBroadbandModem *self)
 
     g_object_set (G_OBJECT (primary),
                   MM_SERIAL_PORT_BAUD, 9600,
+                  MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);
 }
 
@@ -387,10 +367,6 @@ mm_broadband_modem_iridium_init (MMBroadbandModemIridium *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    /* Initialization */
-    iface->modem_init = modem_init;
-    iface->modem_init_finish = modem_init_finish;
-
     /* Create Iridium-specific SIM and bearer*/
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;

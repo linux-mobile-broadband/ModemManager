@@ -7474,8 +7474,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state_finish = load_power_state_finish;
 
     /* Enabling/disabling */
-    iface->modem_init = NULL;
-    iface->modem_init_finish = NULL;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_down_finish;
     iface->modem_after_power_up = NULL;

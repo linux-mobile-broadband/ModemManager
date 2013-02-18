@@ -3004,7 +3004,6 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
-    ENABLING_STEP_MODEM_INIT,
     ENABLING_STEP_SET_POWER_STATE,
     ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_SUPPORTED_CHARSETS,
@@ -3058,29 +3057,6 @@ mm_iface_modem_enable_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-#undef VOID_REPLY_READY_FN
-#define VOID_REPLY_READY_FN(NAME)                                       \
-    static void                                                         \
-    NAME##_ready (MMIfaceModem *self,                                   \
-                  GAsyncResult *res,                                    \
-                  EnablingContext *ctx)                                 \
-    {                                                                   \
-        GError *error = NULL;                                           \
-                                                                        \
-        MM_IFACE_MODEM_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
-        if (error) {                                                    \
-            g_simple_async_result_take_error (ctx->result, error);      \
-            enabling_context_complete_and_free (ctx);                   \
-            return;                                                     \
-        }                                                               \
-                                                                        \
-        /* Go on to next step */                                        \
-        ctx->step++;                                                    \
-        interface_enabling_step (ctx);                                  \
-    }
-
-VOID_REPLY_READY_FN (modem_init);
-
 static void
 enabling_set_power_state_ready (MMIfaceModem *self,
                                 GAsyncResult *res,
@@ -3099,7 +3075,24 @@ enabling_set_power_state_ready (MMIfaceModem *self,
     interface_enabling_step (ctx);
 }
 
-VOID_REPLY_READY_FN (setup_flow_control);
+static void
+setup_flow_control_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->setup_flow_control_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
 
 static void
 load_supported_charsets_ready (MMIfaceModem *self,
@@ -3229,18 +3222,6 @@ interface_enabling_step (EnablingContext *ctx)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
-        ctx->step++;
-
-    case ENABLING_STEP_MODEM_INIT:
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init (
-                ctx->self,
-                (GAsyncReadyCallback)modem_init_ready,
-                ctx);
-            return;
-        }
         /* Fall down to next step */
         ctx->step++;
 

@@ -2913,102 +2913,6 @@ modem_command (MMIfaceModem *self,
                               user_data);
 }
 
-
-/*****************************************************************************/
-/* Initializing the modem (Modem interface) */
-
-static gboolean
-modem_init_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-modem_init_sequence_ready (MMBaseModem *self,
-                           GAsyncResult *res,
-                           GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else {
-        MMAtSerialPort *secondary;
-
-        /* Disable echo in secondary port as well, if any */
-        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-        if (secondary)
-            /* No need to wait for the reply */
-            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                           secondary,
-                                           "E0",
-                                           3,
-                                           FALSE,
-                                           FALSE, /* raw */
-                                           NULL, /* cancellable */
-                                           NULL,
-                                           NULL);
-
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Ensure echo is off after the init command */
-    { "E0 V1",      3, FALSE, NULL },
-
-    /* Some phones (like Blackberries) don't support +CMEE=1, so make it
-     * optional.  It completely violates 3GPP TS 27.007 (9.1) but what can we do...
-     */
-    { "+CMEE=1", 3, FALSE, NULL },
-
-    /* Additional OPTIONAL initialization */
-    { "X4 &C1",  3, FALSE, NULL },
-
-    { NULL }
-};
-
-static void
-modem_init (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
-{
-    MMAtSerialPort *primary;
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_init);
-
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    if (!primary) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Need primary AT port to run modem init sequence");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
-    mm_base_modem_at_sequence_full (MM_BASE_MODEM (self),
-                                    primary,
-                                    modem_init_sequence,
-                                    NULL,  /* response_processor_context */
-                                    NULL,  /* response_processor_context_free */
-                                    NULL, /* cancellable */
-                                    (GAsyncReadyCallback)modem_init_sequence_ready,
-                                    result);
-}
-
 /*****************************************************************************/
 /* IMEI loading (3GPP interface) */
 
@@ -7185,6 +7089,26 @@ enable_location_gathering (MMIfaceModemLocation *self,
 
 /*****************************************************************************/
 
+static const gchar *primary_init_sequence[] = {
+    /* Ensure echo is off */
+    "E0",
+    /* Get word responses */
+    "V1",
+    /* Extended numeric codes */
+    "+CMEE=1",
+    /* Report all call status */
+    "X4",
+    /* Assert DCD when carrier detected */
+    "&C1",
+    NULL
+};
+
+static const gchar *secondary_init_sequence[] = {
+    /* Ensure echo is off */
+    "E0",
+    NULL
+};
+
 static void
 setup_ports (MMBroadbandModem *self)
 {
@@ -7195,6 +7119,16 @@ setup_ports (MMBroadbandModem *self)
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    if (ports[0])
+        g_object_set (ports[0],
+                      MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
+                      NULL);
+
+    if (ports[1])
+        g_object_set (ports[1],
+                      MM_AT_SERIAL_PORT_INIT_SEQUENCE, secondary_init_sequence,
+                      NULL);
 
     /* Cleanup all unsolicited message handlers in all AT ports */
 
@@ -7466,6 +7400,7 @@ typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     PortsContext *ports;
+    gboolean modem_init_required;
 } EnablingStartedContext;
 
 static void
@@ -7475,7 +7410,7 @@ enabling_started_context_complete_and_free (EnablingStartedContext *ctx)
     ports_context_unref (ctx->ports);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (EnablingStartedContext, ctx);
 }
 
 static gboolean
@@ -7489,6 +7424,18 @@ enabling_started_finish (MMBroadbandModem *self,
 static gboolean
 enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
 {
+    /* Reset init sequence enabled flags and run them explicitly */
+    g_object_set (ctx->ports->primary,
+                  MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, TRUE,
+                  NULL);
+    mm_at_serial_port_run_init_sequence (ctx->ports->primary);
+    if (ctx->ports->secondary) {
+        g_object_set (ctx->ports->secondary,
+                      MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, TRUE,
+                      NULL);
+        mm_at_serial_port_run_init_sequence (ctx->ports->secondary);
+    }
+
     /* Store enabled ports context and complete */
     ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -7529,18 +7476,8 @@ enabling_flash_done (MMSerialPort *port,
         return;
     }
 
-    /* Skip modem initialization if the device was hotplugged OR if we already
-     * did it (i.e. don't reinitialize if the modem got disabled and enabled
-     * again) */
-    if (ctx->self->priv->modem_init_run)
-        mm_dbg ("Skipping modem initialization: not first enabling");
-    else if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (ctx->self))) {
-        ctx->self->priv->modem_init_run = TRUE;
-        mm_dbg ("Skipping modem initialization: device hotplugged");
-    } else if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init ||
-             !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish)
-        mm_dbg ("Skipping modem initialization: not required");
-    else {
+
+    if (ctx->modem_init_required) {
         mm_dbg ("Running modem initialization sequence...");
         MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init (ctx->self,
                                                                        (GAsyncReadyCallback)enabling_modem_init_ready,
@@ -7557,6 +7494,7 @@ enabling_flash_done (MMSerialPort *port,
 static gboolean
 open_ports_enabling (MMBroadbandModem *self,
                      PortsContext *ctx,
+                     gboolean modem_init_required,
                      GError **error)
 {
     /* Open primary */
@@ -7569,6 +7507,13 @@ open_ports_enabling (MMBroadbandModem *self,
         return FALSE;
     }
 
+    /* If we'll need to run modem initialization, disable port init sequence */
+    if (modem_init_required)
+        g_object_set (ctx->primary,
+                      MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE,
+                      NULL);
+
+
     if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), error)) {
         g_prefix_error (error, "Couldn't open primary port: ");
         return FALSE;
@@ -7579,6 +7524,11 @@ open_ports_enabling (MMBroadbandModem *self,
     /* Open secondary (optional) */
     ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
     if (ctx->secondary) {
+        /* If we'll need to run modem initialization, disable port init sequence */
+        if (modem_init_required)
+            g_object_set (ctx->secondary,
+                          MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE,
+                          NULL);
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->secondary), error)) {
             g_prefix_error (error, "Couldn't open secondary port: ");
             return FALSE;
@@ -7607,7 +7557,7 @@ enabling_started (MMBroadbandModem *self,
     GError *error = NULL;
     EnablingStartedContext *ctx;
 
-    ctx = g_new0 (EnablingStartedContext, 1);
+    ctx = g_slice_new0 (EnablingStartedContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -7616,8 +7566,22 @@ enabling_started (MMBroadbandModem *self,
     ctx->ports = g_new0 (PortsContext, 1);
     ctx->ports->ref_count = 1;
 
+    /* Skip modem initialization if the device was hotplugged OR if we already
+     * did it (i.e. don't reinitialize if the modem got disabled and enabled
+     * again) */
+    if (ctx->self->priv->modem_init_run)
+        mm_dbg ("Skipping modem initialization: not first enabling");
+    else if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (ctx->self))) {
+        ctx->self->priv->modem_init_run = TRUE;
+        mm_dbg ("Skipping modem initialization: device hotplugged");
+    } else if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init ||
+               !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish)
+        mm_dbg ("Skipping modem initialization: not required");
+    else
+        ctx->modem_init_required = TRUE;
+
     /* Enabling */
-    if (!open_ports_enabling (self, ctx->ports, &error)) {
+    if (!open_ports_enabling (self, ctx->ports, ctx->modem_init_required, &error)) {
         g_prefix_error (&error, "Couldn't open ports during modem enabling: ");
         g_simple_async_result_take_error (ctx->result, error);
         enabling_started_context_complete_and_free (ctx);
@@ -9170,8 +9134,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state_finish = load_power_state_finish;
 
     /* Enabling steps */
-    iface->modem_init = modem_init;
-    iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
     iface->setup_flow_control = modem_setup_flow_control;

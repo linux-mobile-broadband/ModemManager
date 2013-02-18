@@ -103,45 +103,6 @@ modem_load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Modem initialization (Modem interface) */
-
-static gboolean
-modem_init_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    return !mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-}
-
-static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Also, when initializing a Nokia phone, first enable the echo,
-     * and then disable it, so that we get it properly disabled.
-     */
-    { "E1 E0 V1", 3, FALSE, NULL },
-
-    /* Setup errors */
-    { "+CMEE=1", 3, FALSE, NULL },
-
-    /* Additional OPTIONAL initialization */
-    { "X4 &C1",  3, FALSE, NULL },
-
-    { NULL }
-};
-
-static void
-modem_init (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
-{
-    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                               modem_init_sequence,
-                               NULL,  /* response_processor_context */
-                               NULL,  /* response_processor_context_free */
-                               callback,
-                               user_data);
-}
-
-/*****************************************************************************/
 /* Initializing the modem (during first enabling) */
 
 typedef struct {
@@ -236,6 +197,39 @@ enabling_modem_init (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static const gchar *primary_init_sequence[] = {
+    /* When initializing a Nokia port, first enable the echo,
+     * and then disable it, so that we get it properly disabled. */
+    "E1 E0",
+    /* Get word responses */
+    "V1",
+    /* Extended numeric codes */
+    "+CMEE=1",
+    /* Report all call status */
+    "X4",
+    /* Assert DCD when carrier detected */
+    "&C1",
+    NULL
+};
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    MMAtSerialPort *primary;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_nokia_parent_class)->setup_ports (self);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+
+    g_object_set (primary,
+                  MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
+                  NULL);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemNokia *
 mm_broadband_modem_nokia_new (const gchar *device,
@@ -269,10 +263,6 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    /* Setup custom modem init */
-    iface->modem_init = modem_init;
-    iface->modem_init_finish = modem_init_finish;
-
     /* Create Nokia-specific SIM*/
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
@@ -302,6 +292,7 @@ mm_broadband_modem_nokia_class_init (MMBroadbandModemNokiaClass *klass)
 {
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
+    broadband_modem_class->setup_ports = setup_ports;
     broadband_modem_class->enabling_modem_init = enabling_modem_init;
     broadband_modem_class->enabling_modem_init_finish = enabling_modem_init_finish;
 }

@@ -305,35 +305,6 @@ set_allowed_modes (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
-/* Initializing the modem (Modem interface) */
-
-static gboolean
-modem_init_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    /* Ignore errors */
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, NULL);
-    return TRUE;
-}
-
-static void
-modem_init (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
-{
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-                                   "E0 V1 X4 &C1 +CMEE=1",
-                                   3,
-                                   FALSE,
-                                   FALSE,
-                                   NULL, /* cancellable */
-                                   callback,
-                                   user_data);
-}
-
-/*****************************************************************************/
 /* Initializing the modem (during first enabling) */
 
 typedef struct {
@@ -1128,8 +1099,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
-    iface->modem_init = modem_init;
-    iface->modem_init_finish = modem_init_finish;
     iface->reset = reset;
     iface->reset_finish = reset_finish;
     iface->factory_reset = factory_reset;
