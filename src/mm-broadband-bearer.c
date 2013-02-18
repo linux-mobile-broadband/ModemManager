@@ -1304,6 +1304,7 @@ disconnect_cdma (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+    GError *error = NULL;
 
     g_assert (primary != NULL);
 
@@ -1317,6 +1318,13 @@ disconnect_cdma (MMBroadbandBearer *self,
                                            data,
                                            callback,
                                            user_data);
+
+    /* Fully reopen the port before flashing */
+    mm_dbg ("Reopening primary port...");
+    if (!mm_serial_port_reopen (MM_SERIAL_PORT (ctx->primary), &error)) {
+        mm_warn ("Disconnecting CDMA: %s", error->message);
+        g_error_free (error);
+    }
 
     /* Just flash the data port */
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
@@ -1404,6 +1412,15 @@ data_flash_3gpp_ready (MMSerialPort *data,
 static void
 data_flash_3gpp (DetailedDisconnectContext *ctx)
 {
+    GError *error = NULL;
+
+    /* Fully reopen the port before flashing */
+    mm_dbg ("Reopening data port...");
+    if (!mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data), &error)) {
+        mm_warn ("Disconnecting 3GPP: %s", error->message);
+        g_error_free (error);
+    }
+
     mm_dbg ("Flash data port...");
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
                           1000,
