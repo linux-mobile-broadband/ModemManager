@@ -28,6 +28,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
                               gpointer user_data)
 {
     GError *error = NULL;
+    gboolean init_sequence_enabled = FALSE;
 
     /* If no port given, probably the port dissapeared */
     if (!port) {
@@ -53,6 +54,11 @@ abort_async_if_port_unusable (MMBaseModem *self,
         return FALSE;
     }
 
+    /* Temporarily disable init sequence if we're just sending a
+     * command to a just opened port */
+    g_object_get (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, &init_sequence_enabled, NULL);
+    g_object_set (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
+
     /* Ensure we have a port open during the sequence */
     if (!mm_serial_port_open (MM_SERIAL_PORT (port), &error)) {
         g_simple_async_report_error_in_idle (
@@ -66,6 +72,9 @@ abort_async_if_port_unusable (MMBaseModem *self,
         g_error_free (error);
         return FALSE;
     }
+
+    /* Reset previous init sequence state */
+    g_object_set (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, init_sequence_enabled, NULL);
 
     return TRUE;
 }
