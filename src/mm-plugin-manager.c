@@ -505,13 +505,13 @@ build_plugins_list (MMPluginManager *self,
     if (self->priv->generic)
         list = g_list_append (list, g_object_ref (self->priv->generic));
 
-    mm_info ("(Plugin Manager) [%s] Found '%u' plugins to try...",
-             g_udev_device_get_name (port),
-             g_list_length (list));
+    mm_dbg ("(Plugin Manager) [%s] Found '%u' plugins to try...",
+            g_udev_device_get_name (port),
+            g_list_length (list));
     for (l = list; l; l = g_list_next (l)) {
-        mm_info ("(Plugin Manager) [%s]   Will try with plugin '%s'",
-                 g_udev_device_get_name (port),
-                 mm_plugin_get_name (MM_PLUGIN (l->data)));
+        mm_dbg ("(Plugin Manager) [%s]   Will try with plugin '%s'",
+                g_udev_device_get_name (port),
+                mm_plugin_get_name (MM_PLUGIN (l->data)));
     }
 
     return list;
@@ -744,7 +744,7 @@ load_plugins (MMPluginManager *self,
         if (!plugin)
             continue;
 
-        mm_info ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
+        mm_dbg ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
 
         if (g_str_equal (mm_plugin_get_name (plugin), MM_PLUGIN_GENERIC_NAME))
             /* Generic plugin */
@@ -768,8 +768,8 @@ load_plugins (MMPluginManager *self,
         goto out;
     }
 
-    mm_info ("Successfully loaded %u plugins",
-             g_list_length (self->priv->plugins) + !!self->priv->generic);
+    mm_dbg ("Successfully loaded %u plugins",
+            g_list_length (self->priv->plugins) + !!self->priv->generic);
 
 out:
     if (dir)

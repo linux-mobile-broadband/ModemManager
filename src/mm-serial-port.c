@@ -412,7 +412,7 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
 
     if (memcmp (&stbuf, &other, sizeof (other)) != 0) {
         mm_warn ("(%s): port attributes not fully set",
-                   mm_port_get_device (MM_PORT (self)));
+                 mm_port_get_device (MM_PORT (self)));
     }
 
     return TRUE;
@@ -879,7 +879,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         goto success;
     }
 
-    mm_info ("(%s) opening serial port...", device);
+    mm_dbg ("(%s) opening serial port...", device);
 
     g_get_current_time (&tv_start);
 
@@ -1007,7 +1007,7 @@ mm_serial_port_close (MMSerialPort *self)
         GTimeVal tv_start, tv_end;
         struct serial_struct sinfo = { 0 };
 
-        mm_info ("(%s) closing serial port...", device);
+        mm_dbg ("(%s) closing serial port...", device);
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
@@ -1038,7 +1038,7 @@ mm_serial_port_close (MMSerialPort *self)
 
         g_get_current_time (&tv_end);
 
-        mm_info ("(%s) serial port closed", device);
+        mm_dbg ("(%s) serial port closed", device);
 
         /* Some ports don't respond to data and when close is called
          * the serial layer waits up to 30 second (closing_wait) for
@@ -1106,8 +1106,7 @@ mm_serial_port_close_force (MMSerialPort *self)
     if (priv->forced_close)
         return;
 
-    mm_info ("(%s) forced to close port",
-             mm_port_get_device (MM_PORT (self)));
+    mm_dbg ("(%s) forced to close port", mm_port_get_device (MM_PORT (self)));
 
     /* If already closed, done */
     if (!priv->open_count)

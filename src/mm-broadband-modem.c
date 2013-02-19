@@ -5103,8 +5103,8 @@ cmgf_set_ready (MMBroadbandModem *self,
         g_error_free (error);
         self->priv->modem_messaging_sms_pdu_mode = FALSE;
     } else
-        mm_info ("Successfully set preferred SMS mode: '%s'",
-                 self->priv->modem_messaging_sms_pdu_mode ? "PDU" : "text");
+        mm_dbg ("Successfully set preferred SMS mode: '%s'",
+                self->priv->modem_messaging_sms_pdu_mode ? "PDU" : "text");
 
     g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
@@ -7646,8 +7646,6 @@ disabling_context_complete_and_free (DisablingContext *ctx)
                                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     else if (ctx->previous_state != MM_MODEM_STATE_DISABLED) {
         /* Fallback to previous state */
-        mm_info ("Falling back to previous state '%s'",
-                 mm_modem_state_get_string (ctx->previous_state));
         mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
                                      ctx->previous_state,
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
@@ -7760,7 +7758,6 @@ disabling_wait_for_final_state_ready (MMIfaceModem *self,
          * Note that we do consider here UNKNOWN and FAILED status on purpose,
          * as the MMManager will try to disable every modem before removing
          * it. */
-        mm_info ("Modem is already fully disabled...");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disabling_context_complete_and_free (ctx);
         return;
@@ -7787,7 +7784,6 @@ disabling_step (DisablingContext *ctx)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        mm_info ("Modem disabling...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -7907,7 +7903,6 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_LAST:
-        mm_info ("Modem fully disabled...");
         ctx->disabled = TRUE;
         /* All disabled without errors! */
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
@@ -7977,8 +7972,6 @@ enabling_context_complete_and_free (EnablingContext *ctx)
                                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     else if (ctx->previous_state != MM_MODEM_STATE_ENABLED) {
         /* Fallback to previous state */
-        mm_info ("Falling back to previous state '%s'",
-                 mm_modem_state_get_string (ctx->previous_state));
         mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
                                      ctx->previous_state,
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
@@ -8084,7 +8077,6 @@ enabling_wait_for_final_state_ready (MMIfaceModem *self,
 
     if (ctx->previous_state >= MM_MODEM_STATE_ENABLED) {
         /* Just return success, don't relaunch enabling */
-        mm_info ("Modem is already fully enabled...");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         enabling_context_complete_and_free (ctx);
         return;
@@ -8109,7 +8101,6 @@ enabling_step (EnablingContext *ctx)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        mm_info ("Modem enabling...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -8229,7 +8220,6 @@ enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_LAST:
-        mm_info ("Modem fully enabled...");
         ctx->enabled = TRUE;
         /* All enabled without errors! */
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
@@ -8525,7 +8515,6 @@ initialize_step (InitializeContext *ctx)
 
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST:
-        mm_info ("Modem initializing...");
         /* Fall down to next step */
         ctx->step++;
 
@@ -8683,8 +8672,6 @@ initialize_step (InitializeContext *ctx)
             initialize_context_complete_and_free (ctx);
             return;
         }
-
-        mm_info ("Modem fully initialized");
 
         /* All initialized without errors!
          * Set as disabled (a.k.a. initialized) */

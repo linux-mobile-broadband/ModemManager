@@ -1148,10 +1148,10 @@ mm_port_probe_run (MMPortProbe *self,
     task->cancellable = g_cancellable_new ();
 
     probe_list_str = mm_port_probe_flag_build_string_from_mask (task->flags);
-    mm_info ("(%s/%s) launching port probing: '%s'",
-             g_udev_device_get_subsystem (self->priv->port),
-             g_udev_device_get_name (self->priv->port),
-             probe_list_str);
+    mm_dbg ("(%s/%s) launching port probing: '%s'",
+            g_udev_device_get_subsystem (self->priv->port),
+            g_udev_device_get_name (self->priv->port),
+            probe_list_str);
     g_free (probe_list_str);
 
     /* If any AT probing is needed, start by opening as AT port */
