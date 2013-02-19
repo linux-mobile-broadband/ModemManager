@@ -561,8 +561,29 @@ min_probing_timeout_cb (FindDeviceSupportContext *ctx)
 
     /* If there are no running probes around, we're free to finish */
     if (ctx->running_probes == NULL) {
-        mm_dbg ("(Plugin Manager) Minimum probing time consumed and no more ports to probe");
+        mm_dbg ("(Plugin Manager) [%s] Minimum probing time consumed and no more ports to probe",
+                mm_device_get_path (ctx->device));
         find_device_support_context_complete_and_free (ctx);
+    } else {
+        GList *l;
+        gboolean not_deferred = FALSE;
+
+        mm_dbg ("(Plugin Manager) [%s] Minimum probing time consumed",
+                mm_device_get_path (ctx->device));
+
+        /* If all we got were probes with 'deferred_until_suggested', just cancel
+         * the probing. May happen e.g. with just 'net' ports */
+        for (l = ctx->running_probes; l; l = g_list_next (l)) {
+            PortProbeContext *port_probe_ctx = l->data;
+
+            if (!port_probe_ctx->defer_until_suggested) {
+                not_deferred = TRUE;
+                break;
+            }
+        }
+
+        if (!not_deferred)
+            suggest_port_probe_result (ctx, NULL, NULL);
     }
 
     return FALSE;
