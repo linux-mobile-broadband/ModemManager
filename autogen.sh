@@ -18,7 +18,7 @@ PKG_NAME=ModemManager
     autopoint --force
     AUTOPOINT='intltoolize --automake --copy' autoreconf --force --install --verbose
     if test -z "$NOCONFIGURE"; then
-        ./configure --enable-maintainer-mode $@
+        ./configure --enable-maintainer-mode "$@"
     fi
 )
 
