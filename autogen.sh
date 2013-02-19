@@ -18,4 +18,5 @@ PKG_NAME=ModemManager
     intltoolize --force &&
     autoreconf &&
     ./configure --enable-maintainer-mode $@
+    ./configure --enable-maintainer-mode "$@"
 )
