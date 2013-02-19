@@ -57,6 +57,7 @@ typedef struct {
     MMPluginManager *self;
     MMDevice *device;
     GSimpleAsyncResult *result;
+    GTimer *timer;
     guint timeout_id;
     gulong grabbed_id;
     gulong released_id;
@@ -100,6 +101,11 @@ static void
 find_device_support_context_complete_and_free (FindDeviceSupportContext *ctx)
 {
     g_assert (ctx->timeout_id == 0);
+
+    mm_dbg ("(Plugin Manager) [%s] device support check finished in '%lf' seconds",
+            mm_device_get_path (ctx->device),
+            g_timer_elapsed (ctx->timer, NULL));
+    g_timer_destroy (ctx->timer);
 
     /* Set async operation result */
     if (!mm_device_peek_plugin (ctx->device)) {
@@ -226,8 +232,10 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
     }
     /* If we didn't use the minimum probing time, wait for it to finish */
     else if (ctx->timeout_id > 0) {
-        mm_dbg ("(Plugin Manager) '%s' port probe finished, last one in device, but minimum probing time not consumed yet",
-                g_udev_device_get_name (port_probe_ctx->port));
+        mm_dbg ("(Plugin Manager) '%s' port probe finished, last one in device, "
+                "but minimum probing time not consumed yet ('%lf' seconds elapsed)",
+                g_udev_device_get_name (port_probe_ctx->port),
+                g_timer_elapsed (ctx->timer, NULL));
     } else {
         mm_dbg ("(Plugin Manager) '%s' port probe finished, last one in device",
                 g_udev_device_get_name (port_probe_ctx->port));
@@ -597,6 +605,9 @@ mm_plugin_manager_find_device_support (MMPluginManager *self,
 {
     FindDeviceSupportContext *ctx;
 
+    mm_dbg ("(Plugin Manager) [%s] Checking device support...",
+            mm_device_get_path (device));
+
     ctx = g_slice_new0 (FindDeviceSupportContext);
     ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
@@ -620,6 +631,7 @@ mm_plugin_manager_find_device_support (MMPluginManager *self,
      * bring up ports. Given that we launch this only when the first port of the
      * device has been exposed in udev, this timeout effectively means that we
      * leave up to 2s to the remaining ports to appear. */
+    ctx->timer = g_timer_new ();
     ctx->timeout_id = g_timeout_add_seconds (MIN_PROBING_TIME_SECS,
                                              (GSourceFunc)min_probing_timeout_cb,
                                              ctx);
