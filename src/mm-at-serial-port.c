@@ -543,6 +543,8 @@ finalize (GObject *object)
     if (priv->response_parser_notify)
         priv->response_parser_notify (priv->response_parser_user_data);
 
+    g_strfreev (priv->init_sequence);
+
     G_OBJECT_CLASS (mm_at_serial_port_parent_class)->finalize (object);
 }
 
