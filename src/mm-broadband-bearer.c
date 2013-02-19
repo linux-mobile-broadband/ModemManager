@@ -183,11 +183,11 @@ common_get_at_data_port (MMBaseModem *modem,
     /* Look for best data port, NULL if none available. */
     data = mm_base_modem_peek_best_data_port (modem, MM_PORT_TYPE_AT);
     if (!data) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_CONNECTED,
-                     "Couldn't connect: no port available");
-        return NULL;
+        /* It may happen that the desired data port grabbed during probing was
+         * actually a 'net' port, which the generic logic cannot handle, so if
+         * that is the case, and we have no AT data ports specified, just
+         fallback to the primary AT port. */
+        data = (MMPort *) mm_base_modem_peek_port_primary (modem);
     }
 
     g_assert (MM_IS_AT_SERIAL_PORT (data));
