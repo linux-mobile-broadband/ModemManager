@@ -3383,6 +3383,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                    cancellable,
                                    callback,
                                    user_data);
+    g_free (command);
 }
 
 /*****************************************************************************/
