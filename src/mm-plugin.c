@@ -750,6 +750,7 @@ mm_plugin_supports_port (MMPlugin *self,
 
 out:
     g_object_unref (async_result);
+    g_object_unref (probe);
 }
 
 /*****************************************************************************/
