@@ -284,8 +284,8 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx->retries = 4;
 
     /* Get a 'net' data port */
-    ctx->data = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem),
-                                                   MM_PORT_TYPE_NET);
+    ctx->data = mm_base_modem_get_best_data_port (MM_BASE_MODEM (modem),
+                                                  MM_PORT_TYPE_NET);
     if (!ctx->data) {
         g_simple_async_result_set_error (
             ctx->result,
