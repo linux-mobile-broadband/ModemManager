@@ -1062,6 +1062,23 @@ finalize (GObject *object)
 
     g_free (self->priv->name);
 
+#define _g_boxed_free0(t,p) if (p) g_boxed_free (t, p)
+
+    _g_boxed_free0 (G_TYPE_STRV, self->priv->subsystems);
+    _g_boxed_free0 (G_TYPE_STRV, self->priv->drivers);
+    _g_boxed_free0 (G_TYPE_STRV, self->priv->forbidden_drivers);
+    _g_boxed_free0 (MM_TYPE_UINT16_ARRAY, self->priv->vendor_ids);
+    _g_boxed_free0 (MM_TYPE_UINT16_PAIR_ARRAY, self->priv->product_ids);
+    _g_boxed_free0 (MM_TYPE_UINT16_PAIR_ARRAY, self->priv->forbidden_product_ids);
+    _g_boxed_free0 (G_TYPE_STRV, self->priv->udev_tags);
+    _g_boxed_free0 (G_TYPE_STRV, self->priv->vendor_strings);
+    _g_boxed_free0 (MM_TYPE_STR_PAIR_ARRAY, self->priv->product_strings);
+    _g_boxed_free0 (MM_TYPE_STR_PAIR_ARRAY, self->priv->forbidden_product_strings);
+    _g_boxed_free0 (MM_TYPE_POINTER_ARRAY, self->priv->custom_at_probe);
+    _g_boxed_free0 (MM_TYPE_ASYNC_METHOD, self->priv->custom_init);
+
+#undef _g_boxed_free0
+
     G_OBJECT_CLASS (mm_plugin_parent_class)->finalize (object);
 }
 
