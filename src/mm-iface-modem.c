@@ -270,7 +270,7 @@ bearer_status_changed (MMBearer *bearer,
             new_state = MM_MODEM_STATE_DISCONNECTING;
             break;
         case MM_BEARER_STATUS_DISCONNECTED:
-            new_state = get_current_consolidated_state (self, state);
+            new_state = get_current_consolidated_state (self, MM_MODEM_STATE_UNKNOWN);
             break;
         }
 
