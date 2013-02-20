@@ -39,7 +39,6 @@
 #define MM_SERIAL_PORT_FD           "fd" /* Construct-only */
 #define MM_SERIAL_PORT_SPEW_CONTROL "spew-control" /* Construct-only */
 #define MM_SERIAL_PORT_FLASH_OK     "flash-ok" /* Construct-only */
-#define MM_SERIAL_PORT_FLASH_REOPEN "flash-reopen" /* Construct-only */
 
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
