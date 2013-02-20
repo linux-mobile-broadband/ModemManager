@@ -202,8 +202,6 @@ MMModem *mm_generic_gsm_new (const char *device,
 
 /* Private, for subclasses */
 
-#define MM_GENERIC_GSM_PREV_STATE_TAG "prev-state"
-
 void mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem);
 
 void mm_generic_gsm_ussd_cleanup (MMGenericGsm *modem);

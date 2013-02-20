@@ -2183,7 +2183,6 @@ disable_flash_done (MMSerialPort *port,
 {
     MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = user_data;
-    MMModemState prev_state;
     char *cmd = NULL;
 
     /* If the modem has already been removed, return without
@@ -2191,19 +2190,7 @@ disable_flash_done (MMSerialPort *port,
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
-        info->error = g_error_copy (error);
-
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-
-        mm_callback_info_schedule (info);
-        return;
-    }
-
+    /* Ignore serial errors */
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
     /* Disable unsolicited messages */
@@ -2270,7 +2257,6 @@ disable (MMModem *modem,
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
-    MMModemState state;
 
     /* First, reset the previously used CID and clean up registration */
     g_warn_if_fail (priv->cid == -1);
@@ -2300,13 +2286,6 @@ disable (MMModem *modem,
     _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
     info = mm_callback_info_new (modem, callback, user_data);
-
-    /* Cache the previous state so we can reset it if the operation fails */
-    state = mm_modem_get_state (modem);
-    mm_callback_info_set_data (info,
-                               MM_GENERIC_GSM_PREV_STATE_TAG,
-                               GUINT_TO_POINTER (state),
-                               NULL);
 
     /* Clean up the secondary port if it's open */
     if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
@@ -3911,7 +3890,6 @@ disconnect_done (MMModem *modem,
                  gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemState prev_state;
     MMGenericGsmPrivate *priv;
 
     /* Do nothing if modem removed */
@@ -3919,18 +3897,12 @@ disconnect_done (MMModem *modem,
         return;
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-    if (error) {
+    if (error)
         info->error = g_error_copy (error);
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-    } else {
-        mm_port_set_connected (priv->data, FALSE);
-        priv->cid = -1;
-        mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
-    }
+
+    mm_port_set_connected (priv->data, FALSE);
+    priv->cid = -1;
+    mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
 
     /* Balance any open from connect(); subclasses may not use the generic
      * class' connect function and so the dial port may not have been
@@ -3995,19 +3967,9 @@ disconnect_flash_done (MMSerialPort *port,
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
-        /* Ignore "NO CARRIER" response when modem disconnects and any flash
-         * failures we might encounter.  Other errors are hard errors.
-         */
-        if (   !g_error_matches (error, MM_MODEM_CONNECT_ERROR, MM_MODEM_CONNECT_ERROR_NO_CARRIER)
-            && !g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_FLASH_FAILED)) {
-            info->error = g_error_copy (error);
-            mm_callback_info_schedule (info);
-            return;
-        }
-    }
-
+    /* Ignore serial errors */
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
     mm_port_set_connected (priv->data, FALSE);
 
     /* Don't bother doing the CGACT again if it was done on a secondary port,
@@ -4098,18 +4060,10 @@ disconnect (MMModem *modem,
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
-    MMModemState state;
 
     priv->roam_allowed = TRUE;
 
     info = mm_callback_info_new (modem, callback, user_data);
-
-    /* Cache the previous state so we can reset it if the operation fails */
-    state = mm_modem_get_state (modem);
-    mm_callback_info_set_data (info,
-                               MM_GENERIC_GSM_PREV_STATE_TAG,
-                               GUINT_TO_POINTER (state),
-                               NULL);
 
     mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, reason);
 

@@ -34,8 +34,6 @@
 #include "mm-log.h"
 #include "mm-utils.h"
 
-#define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
-
 typedef enum {
     RM_PROTO_ASYNC = 0,
     RM_PROTO_RELAY = 1,
@@ -724,38 +722,26 @@ enable (MMModem *modem,
 }
 
 static void
-disable_set_previous_state (MMModem *modem, MMCallbackInfo *info)
-{
-    MMModemState prev_state;
-
-    /* Reset old state since the operation failed */
-    prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
-    mm_modem_set_state (modem, prev_state, MM_MODEM_STATE_REASON_NONE);
-}
-
-static void
 disable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMGenericCdmaPrivate *priv;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (!modem || mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (user_data);
+
+    if (error)
         info->error = g_error_copy (error);
-        disable_set_previous_state (modem, info);
-    } else {
-        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-        mm_serial_port_close_force (MM_SERIAL_PORT (priv->primary));
-        mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
+    mm_serial_port_close_force (MM_SERIAL_PORT (priv->primary));
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
 
-        priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-        priv->evdo_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    }
+    priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    priv->evdo_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
 
     mm_callback_info_schedule (info);
 }
@@ -773,14 +759,7 @@ disable_flash_done (MMSerialPort *port,
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
-        info->error = g_error_copy (error);
-
-        disable_set_previous_state (info->modem, info);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
+    /* Ignore serial errors */
     self = MM_GENERIC_CDMA (info->modem);
 
     if (MM_GENERIC_CDMA_GET_CLASS (self)->post_disable)
@@ -797,19 +776,11 @@ disable (MMModem *modem,
     MMGenericCdma *self = MM_GENERIC_CDMA (modem);
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
-    MMModemState state;
 
     /* Tear down any ongoing registration */
     registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
 
     info = mm_callback_info_new (modem, callback, user_data);
-
-    /* Cache the previous state so we can reset it if the operation fails */
-    state = mm_modem_get_state (modem);
-    mm_callback_info_set_data (info,
-                               MM_GENERIC_CDMA_PREV_STATE_TAG,
-                               GUINT_TO_POINTER (state),
-                               NULL);
 
     /* Close auxiliary serial ports */
     if (priv->secondary)
@@ -902,27 +873,18 @@ disconnect_flash_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericCdma *self;
     MMGenericCdmaPrivate *priv;
-    MMModemState prev_state;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
+    /* Ignore serial errors */
     self = MM_GENERIC_CDMA (info->modem);
     priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
-    if (error) {
-        info->error = g_error_copy (error);
 
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-    } else {
-        mm_port_set_connected (priv->data, FALSE);
-        update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
-    }
+    mm_port_set_connected (priv->data, FALSE);
+    update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
 
     /* Balance any open from connect(); subclasses may not use the generic
      * class' connect function and so the dial port may not have been
@@ -945,19 +907,11 @@ disconnect (MMModem *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMModemState state;
     MMAtSerialPort *dial_port;
 
     g_return_if_fail (priv->primary != NULL);
 
     info = mm_callback_info_new (modem, callback, user_data);
-
-    /* Cache the previous state so we can reset it if the operation fails */
-    state = mm_modem_get_state (modem);
-    mm_callback_info_set_data (info,
-                               MM_GENERIC_CDMA_PREV_STATE_TAG,
-                               GUINT_TO_POINTER (state),
-                               NULL);
 
     mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, reason);
 
