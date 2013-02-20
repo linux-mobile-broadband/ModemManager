@@ -1295,6 +1295,27 @@ data_flash_cdma_ready (MMSerialPort *data,
 }
 
 static void
+data_reopen_cdma_ready (MMSerialPort *data,
+                        GError *error,
+                        DetailedDisconnectContext *ctx)
+{
+    if (error) {
+        /* Fatal */
+        g_simple_async_result_set_from_error (ctx->result, error);
+        detailed_disconnect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Just flash the data port */
+    mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
+                          1000,
+                          TRUE,
+                          (MMSerialFlashFn)data_flash_cdma_ready,
+                          ctx);
+}
+
+static void
 disconnect_cdma (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
                  MMAtSerialPort *primary,
@@ -1304,7 +1325,6 @@ disconnect_cdma (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
-    GError *error = NULL;
 
     g_assert (primary != NULL);
 
@@ -1320,18 +1340,11 @@ disconnect_cdma (MMBroadbandBearer *self,
                                            user_data);
 
     /* Fully reopen the port before flashing */
-    mm_dbg ("Reopening primary port...");
-    if (!mm_serial_port_reopen (MM_SERIAL_PORT (ctx->primary), &error)) {
-        mm_warn ("Disconnecting CDMA: %s", error->message);
-        g_error_free (error);
-    }
-
-    /* Just flash the data port */
-    mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
-                          1000,
-                          TRUE,
-                          (MMSerialFlashFn)data_flash_cdma_ready,
-                          ctx);
+    mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
+    mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data),
+                           1000,
+                           (MMSerialReopenFn)data_reopen_cdma_ready,
+                           ctx);
 }
 
 /*****************************************************************************/
@@ -1410,23 +1423,35 @@ data_flash_3gpp_ready (MMSerialPort *data,
 }
 
 static void
-data_flash_3gpp (DetailedDisconnectContext *ctx)
+data_reopen_3gpp_ready (MMSerialPort *data,
+                        GError *error,
+                        DetailedDisconnectContext *ctx)
 {
-    GError *error = NULL;
-
-    /* Fully reopen the port before flashing */
-    mm_dbg ("Reopening data port...");
-    if (!mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data), &error)) {
-        mm_warn ("Disconnecting 3GPP: %s", error->message);
-        g_error_free (error);
+    if (error) {
+        /* Fatal */
+        g_simple_async_result_set_from_error (ctx->result, error);
+        detailed_disconnect_context_complete_and_free (ctx);
+        return;
     }
 
-    mm_dbg ("Flash data port...");
+    /* Just flash the data port */
+    mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
                           1000,
                           TRUE,
                           (MMSerialFlashFn)data_flash_3gpp_ready,
                           ctx);
+}
+
+static void
+data_reopen_3gpp (DetailedDisconnectContext *ctx)
+{
+    /* Fully reopen the port before flashing */
+    mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
+    mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data),
+                           1000,
+                           (MMSerialReopenFn)data_reopen_3gpp_ready,
+                           ctx);
 }
 
 static void
@@ -1444,7 +1469,7 @@ cgact_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    data_flash_3gpp (ctx);
+    data_reopen_3gpp (ctx);
 }
 
 static void
@@ -1512,8 +1537,8 @@ disconnect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
-    /* If no secondary port, go on to flash the data/primary port */
-    data_flash_3gpp (ctx);
+    /* If no secondary port, go on to reopen & flash the data/primary port */
+    data_reopen_3gpp (ctx);
 }
 
 /*****************************************************************************/

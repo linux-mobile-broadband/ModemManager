@@ -43,6 +43,10 @@
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
 
+typedef void (*MMSerialReopenFn)       (MMSerialPort *port,
+                                        GError *error,
+                                        gpointer user_data);
+
 typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
                                         GError *error,
                                         gpointer user_data);
@@ -123,7 +127,9 @@ gboolean mm_serial_port_open              (MMSerialPort *self,
 void     mm_serial_port_close             (MMSerialPort *self);
 
 gboolean mm_serial_port_reopen            (MMSerialPort *self,
-                                           GError **error);
+                                           guint32 reopen_time,
+                                           MMSerialReopenFn callback,
+                                           gpointer user_data);
 
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
