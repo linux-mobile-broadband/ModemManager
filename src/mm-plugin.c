@@ -546,6 +546,7 @@ port_probe_run_ready (MMPortProbe *probe,
             g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                        GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED),
                                                        NULL);
+            g_error_free (error);
         }
         /* Probing failed but the plugin tells us to retry; so we'll defer the
          * probing a bit */
@@ -555,6 +556,7 @@ port_probe_run_ready (MMPortProbe *probe,
             g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                        GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER),
                                                        NULL);
+            g_error_free (error);
         }
         /* For remaining errors, just propagate them */
         else {
