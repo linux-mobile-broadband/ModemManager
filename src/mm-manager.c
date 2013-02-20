@@ -400,6 +400,33 @@ handle_uevent (GUdevClient *client,
         device_removed (self, device);
 }
 
+typedef struct {
+    MMManager *self;
+    GUdevDevice *device;
+} StartDeviceAdded;
+
+static gboolean
+start_device_added_idle (StartDeviceAdded *ctx)
+{
+    device_added (ctx->self, ctx->device, FALSE);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->device);
+    g_slice_free (StartDeviceAdded, ctx);
+    return FALSE;
+}
+
+static void
+start_device_added (MMManager *self,
+                    GUdevDevice *device)
+{
+    StartDeviceAdded *ctx;
+
+    ctx = g_slice_new (StartDeviceAdded);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    g_idle_add ((GSourceFunc)start_device_added_idle, ctx);
+}
+
 void
 mm_manager_start (MMManager *manager)
 {
@@ -412,14 +439,14 @@ mm_manager_start (MMManager *manager)
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
+        start_device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "net");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
+        start_device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -430,7 +457,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
+            start_device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -442,7 +469,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            device_added (manager, G_UDEV_DEVICE (iter->data), FALSE);
+            start_device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
