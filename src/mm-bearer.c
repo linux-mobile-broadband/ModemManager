@@ -424,6 +424,7 @@ connect_ready (MMBearer *self,
             NULL);
     }
 
+    g_clear_object (&self->priv->connect_cancellable);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
