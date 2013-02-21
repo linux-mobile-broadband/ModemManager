@@ -629,7 +629,7 @@ mm_plugin_supports_port (MMPlugin *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    MMPortProbe *probe;
+    MMPortProbe *probe = NULL;
     GSimpleAsyncResult *async_result;
     PortProbeRunContext *ctx;
     gboolean need_vendor_probing;
@@ -750,7 +750,8 @@ mm_plugin_supports_port (MMPlugin *self,
 
 out:
     g_object_unref (async_result);
-    g_object_unref (probe);
+    if (probe)
+        g_object_unref (probe);
 }
 
 /*****************************************************************************/
