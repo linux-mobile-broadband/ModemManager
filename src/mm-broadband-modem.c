@@ -4100,7 +4100,7 @@ modem_3gpp_ussd_send_context_complete_and_free (Modem3gppUssdSendContext *ctx)
     }
     g_object_unref (ctx->self);
     g_free (ctx->command);
-    g_free (ctx);
+    g_slice_free (Modem3gppUssdSendContext, ctx);
 }
 
 static const gchar *
@@ -4119,20 +4119,36 @@ modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
 
 static void modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx);
 
+static void cusd_process_string (MMBroadbandModem *self,
+                                 const gchar *str);
+
 static void
 ussd_send_command_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
                          Modem3gppUssdSendContext *ctx)
 {
     GError *error = NULL;
+    const gchar *reply;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    g_assert (ctx->result == NULL);
+
+    reply = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         /* Some immediate error happened when sending the USSD request */
         mm_dbg ("Error sending USSD request: '%s'", error->message);
         g_error_free (error);
 
-        modem_3gpp_ussd_context_step (ctx);
+        if (self->priv->pending_ussd_action) {
+            /* Recover result */
+            ctx->result = self->priv->pending_ussd_action;
+            self->priv->pending_ussd_action = NULL;
+            modem_3gpp_ussd_context_step (ctx);
+            return;
+        }
+
+        /* So the USSD action was completed already... */
+        mm_dbg ("USSD action already completed via URCs");
+        modem_3gpp_ussd_send_context_complete_and_free (ctx);
         return;
     }
 
@@ -4147,13 +4163,13 @@ ussd_send_command_ready (MMBroadbandModem *self,
         ctx->self->priv->use_unencoded_ussd = FALSE;
     }
 
-    /* Cache the action, as it will be completed via URCs.
-     * There shouldn't be any previous action pending. */
-    g_warn_if_fail (self->priv->pending_ussd_action == NULL);
-    self->priv->pending_ussd_action = ctx->result;
+    if (!self->priv->pending_ussd_action)
+        mm_dbg ("USSD operation finished already via URCs");
+    else if (reply && reply[0]) {
+        reply = mm_strip_tag (reply, "+CUSD:");
+        cusd_process_string (ctx->self, reply);
+    }
 
-    /* Reset result so that it doesn't get completed */
-    ctx->result = NULL;
     modem_3gpp_ussd_send_context_complete_and_free (ctx);
 }
 
@@ -4184,6 +4200,12 @@ modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
     at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", encoded, scheme);
     g_free (encoded);
 
+    /* Cache the action, as it may be completed via URCs.
+     * There shouldn't be any previous action pending. */
+    g_warn_if_fail (ctx->self->priv->pending_ussd_action == NULL);
+    ctx->self->priv->pending_ussd_action = ctx->result;
+    ctx->result = NULL;
+
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                               at_command,
                               10,
@@ -4204,6 +4226,13 @@ modem_3gpp_ussd_context_send_unencoded (Modem3gppUssdSendContext *ctx)
     at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d",
                                   ctx->command,
                                   MM_MODEM_GSM_USSD_SCHEME_7BIT);
+
+    /* Cache the action, as it may be completed via URCs.
+     * There shouldn't be any previous action pending. */
+    g_warn_if_fail (ctx->self->priv->pending_ussd_action == NULL);
+    ctx->self->priv->pending_ussd_action = ctx->result;
+    ctx->result = NULL;
+
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                               at_command,
                               10,
@@ -4254,16 +4283,16 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
 {
     Modem3gppUssdSendContext *ctx;
 
-    ctx = g_new0 (Modem3gppUssdSendContext, 1);
+    ctx = g_slice_new0 (Modem3gppUssdSendContext);
     /* We're going to steal the string result in finish() so we must have a
      * callback specified. */
     g_assert (callback != NULL);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup (command);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              modem_3gpp_ussd_send);
-    ctx->self = g_object_ref (self);
-    ctx->command = g_strdup (command);
 
     modem_3gpp_ussd_context_step (ctx);
 
@@ -4384,14 +4413,11 @@ decode_ussd_response (MMBroadbandModem *self,
 }
 
 static void
-cusd_received (MMAtSerialPort *port,
-               GMatchInfo *info,
-               MMBroadbandModem *self)
+cusd_process_string (MMBroadbandModem *self,
+                     const gchar *str)
 {
-    gchar *str;
     MMModem3gppUssdSessionState ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
 
-    str = g_match_info_fetch (info, 1);
     if (!str || !isdigit (*str)) {
         if (self->priv->pending_ussd_action)
             g_simple_async_result_set_error (self->priv->pending_ussd_action,
@@ -4502,7 +4528,18 @@ cusd_received (MMAtSerialPort *port,
         g_object_unref (self->priv->pending_ussd_action);
         self->priv->pending_ussd_action = NULL;
     }
+}
 
+static void
+cusd_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               MMBroadbandModem *self)
+{
+    gchar *str;
+
+    mm_dbg ("Unsolicited USSD URC received");
+    str = g_match_info_fetch (info, 1);
+    cusd_process_string (self, str);
     g_free (str);
 }
 
