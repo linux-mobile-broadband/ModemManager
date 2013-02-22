@@ -183,7 +183,7 @@ load_allowed_modes_finish (MMIfaceModem *_self,
     if (!response)
         return FALSE;
 
-    if (mm_get_uint_from_str (mm_strip_tag (response, "CFUN:"), &a)) {
+    if (mm_get_uint_from_str (mm_strip_tag (response, "+CFUN:"), &a)) {
         /* No settings to set preferred */
         *preferred = MM_MODEM_MODE_NONE;
 
@@ -524,7 +524,7 @@ load_power_state_finish (MMIfaceModem *self,
     if (!response)
         return FALSE;
 
-    if (mm_get_uint_from_str (mm_strip_tag (response, "CFUN:"), &a)) {
+    if (mm_get_uint_from_str (mm_strip_tag (response, "+CFUN:"), &a)) {
         switch (a) {
         case MBM_NETWORK_MODE_OFFLINE:
             return MM_MODEM_POWER_STATE_OFF;
