@@ -99,6 +99,7 @@ const gchar *mm_sms_delivery_state_get_string_extended (guint delivery_state);
 gint      mm_utils_hex2byte   (const gchar *hex);
 gchar    *mm_utils_hexstr2bin (const gchar *hex, gsize *out_len);
 gchar    *mm_utils_bin2hexstr (const guint8 *bin, gsize len);
+gboolean  mm_utils_ishexstr   (const gchar *hex);
 
 gboolean  mm_utils_check_for_single_value (guint32 value);
 

@@ -929,6 +929,31 @@ mm_utils_hexstr2bin (const gchar *hex, gsize *out_len)
 
 /* End from hostap */
 
+gboolean
+mm_utils_ishexstr (const gchar *hex)
+{
+    gsize len;
+    gsize i;
+
+    /* Length not multiple of 2? */
+    len = strlen (hex);
+    if (len % 2 != 0)
+        return FALSE;
+
+    for (i = 0; i < len; i++) {
+        /* Non-hex char? */
+        if (hex[i] >= '0' && hex[i] <= '9')
+            continue;
+        if (hex[i] >= 'a' && hex[i] <= 'f')
+            continue;
+        if (hex[i] >= 'A' && hex[i] <= 'F')
+            continue;
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 gchar *
 mm_utils_bin2hexstr (const guint8 *bin, gsize len)
 {

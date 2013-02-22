@@ -4373,8 +4373,13 @@ decode_ussd_response (MMBroadbandModem *self,
     if (p)
         *p = '\0';
 
-    decoded = mm_iface_modem_3gpp_ussd_decode (MM_IFACE_MODEM_3GPP_USSD (self), str, error);
+    /* If reply doesn't seem to be hex; just return itself... */
+    if (!mm_utils_ishexstr (str))
+        decoded = g_strdup (str);
+    else
+        decoded = mm_iface_modem_3gpp_ussd_decode (MM_IFACE_MODEM_3GPP_USSD (self), str, error);
     g_strfreev (items);
+
     return decoded;
 }
 
