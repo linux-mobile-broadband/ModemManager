@@ -50,9 +50,11 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
 
-#define MBM_NETWORK_MODE_ANY  1
-#define MBM_NETWORK_MODE_2G   5
-#define MBM_NETWORK_MODE_3G   6
+#define MBM_NETWORK_MODE_OFFLINE   0
+#define MBM_NETWORK_MODE_ANY       1
+#define MBM_NETWORK_MODE_LOW_POWER 4
+#define MBM_NETWORK_MODE_2G        5
+#define MBM_NETWORK_MODE_3G        6
 
 #define MBM_E2NAP_DISCONNECTED 0
 #define MBM_E2NAP_CONNECTED    1
@@ -183,6 +185,10 @@ load_allowed_modes_finish (MMIfaceModem *self,
         *preferred = MM_MODEM_MODE_NONE;
 
         switch (a) {
+        case MBM_NETWORK_MODE_OFFLINE:
+        case MBM_NETWORK_MODE_LOW_POWER:
+            *allowed = MM_MODEM_MODE_NONE;
+            break;
         case MBM_NETWORK_MODE_2G:
             *allowed = MM_MODEM_MODE_2G;
             break;
@@ -449,6 +455,59 @@ modem_power_up (MMIfaceModem *_self,
                               callback,
                               user_data);
     g_free (command);
+}
+
+/*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+static MMModemPowerState
+load_power_state_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    const gchar *response;
+    guint a;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    if (mm_get_uint_from_str (mm_strip_tag (response, "CFUN:"), &a)) {
+        switch (a) {
+        case MBM_NETWORK_MODE_OFFLINE:
+            return MM_MODEM_POWER_STATE_OFF;
+
+        case MBM_NETWORK_MODE_LOW_POWER:
+            return MM_MODEM_POWER_STATE_LOW;
+
+        case MBM_NETWORK_MODE_ANY:
+        case MBM_NETWORK_MODE_2G:
+        case MBM_NETWORK_MODE_3G:
+            return MM_MODEM_POWER_STATE_ON;
+        default:
+            break;
+        }
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't parse +CFUN response: '%s'",
+                 response);
+    return MM_MODEM_POWER_STATE_UNKNOWN;
+}
+
+static void
+load_power_state (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -1105,13 +1164,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->factory_reset_finish = factory_reset_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
-
-    /* Initially we'll assume power state is unknown; which will force an
-     * initial unconditional power-up during the first enabling.
-     * In these modems CFUN is associated to the allowed/preferred modes,
-     * so don't play with it much. */
-    iface->load_power_state = NULL;
-    iface->load_power_state_finish = NULL;
+    iface->load_power_state = load_power_state;
+    iface->load_power_state_finish = load_power_state_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
 }
