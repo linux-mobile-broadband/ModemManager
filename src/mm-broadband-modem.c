@@ -4356,9 +4356,8 @@ decode_ussd_response (MMBroadbandModem *self,
                       const gchar *reply,
                       GError **error)
 {
-    gchar **items, **iter, *p;
-    gchar *str = NULL;
-    gint encoding = -1;
+    gchar *p;
+    gchar *str;
     gchar *decoded;
 
     /* Look for the first ',' */
@@ -4372,41 +4371,27 @@ decode_ussd_response (MMBroadbandModem *self,
         return NULL;
     }
 
-    items = g_strsplit_set (p + 1, " ,", -1);
-    for (iter = items; iter && *iter; iter++) {
-        if (*iter[0] == '\0')
-            continue;
-        if (str == NULL)
-            str = *iter;
-        else if (encoding == -1) {
-            encoding = atoi (*iter);
-            mm_dbg ("USSD data coding scheme %d", encoding);
-            break;  /* All done */
-        }
+    /* Assume the string is the next field, and strip quotes. While doing this,
+     * we also skip any other additional field we may have afterwards */
+    if (p[1] == '"') {
+        str = g_strdup (&p[2]);
+        p = strchr (str, '"');
+        if (p)
+            *p = '\0';
+    } else {
+        str = g_strdup (&p[1]);
+        p = strchr (str, ',');
+        if (p)
+            *p = '\0';
     }
-
-    if (!str) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Cannot decode USSD response (%s): not enough fields",
-                     reply);
-        return NULL;
-    }
-
-    /* Strip quotes */
-    if (str[0] == '"')
-        str++;
-    p = strchr (str, '"');
-    if (p)
-        *p = '\0';
 
     /* If reply doesn't seem to be hex; just return itself... */
     if (!mm_utils_ishexstr (str))
         decoded = g_strdup (str);
     else
         decoded = mm_iface_modem_3gpp_ussd_decode (MM_IFACE_MODEM_3GPP_USSD (self), str, error);
-    g_strfreev (items);
+
+    g_free (str);
 
     return decoded;
 }
