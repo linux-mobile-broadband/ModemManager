@@ -4187,10 +4187,10 @@ modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
                                                &scheme,
                                                &error);
     if (!encoded) {
-        g_simple_async_result_take_error (ctx->result, error);
-        modem_3gpp_ussd_send_context_complete_and_free (ctx);
         mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
                                                MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+        g_simple_async_result_take_error (ctx->result, error);
+        modem_3gpp_ussd_send_context_complete_and_free (ctx);
         return;
     }
 
@@ -4247,14 +4247,13 @@ modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx)
 {
     if (ctx->encoded_used &&
         ctx->unencoded_used) {
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "Sending USSD command failed");
         modem_3gpp_ussd_send_context_complete_and_free (ctx);
-
-        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
-                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
         return;
     }
 
@@ -4294,10 +4293,10 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                                              user_data,
                                              modem_3gpp_ussd_send);
 
-    modem_3gpp_ussd_context_step (ctx);
-
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
                                            MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
+
+    modem_3gpp_ussd_context_step (ctx);
 }
 
 /*****************************************************************************/
