@@ -4071,7 +4071,7 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *self,
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CUSD=2",
-                              3,
+                              10,
                               TRUE,
                               (GAsyncReadyCallback)cancel_command_ready,
                               result);
@@ -4186,7 +4186,7 @@ modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
 
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                               at_command,
-                              3,
+                              10,
                               FALSE,
                               (GAsyncReadyCallback)ussd_send_command_ready,
                               ctx);
@@ -4206,7 +4206,7 @@ modem_3gpp_ussd_context_send_unencoded (Modem3gppUssdSendContext *ctx)
                                   MM_MODEM_GSM_USSD_SCHEME_7BIT);
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                               at_command,
-                              3,
+                              10,
                               FALSE,
                               (GAsyncReadyCallback)ussd_send_command_ready,
                               ctx);
