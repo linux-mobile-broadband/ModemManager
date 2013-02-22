@@ -357,6 +357,16 @@
     <property name="State" type="i" access="read" />
 
     <!--
+        StateFailedReason:
+
+        Error specifying why the modem is in
+	<link linkend="MM-MODEM-STATE-FAILED:CAPS"><constant>MM_MODEM_STATE_FAILED</constant></link>
+	state, given as a
+	<link linkend="MMModemStateFailedReason">MMModemStateFailedReason</link> value.
+    -->
+    <property name="StateFailedReason" type="u" access="read" />
+
+    <!--
         AccessTechnologies:
 
         Bitmask of <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> values,

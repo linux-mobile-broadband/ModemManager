@@ -20,6 +20,7 @@ MMModemLocationSource
 MMModemLock
 MMModemMode
 MMModemState
+MMModemStateFailedReason
 MMModemStateChangeReason
 MMModemPowerState
 MMSmsPduType

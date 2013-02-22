@@ -129,6 +129,22 @@ typedef enum { /*< underscore_name=mm_modem_state >*/
 } MMModemState;
 
 /**
+ * MMModemStateFailedReason:
+ * @MM_MODEM_STATE_FAILED_REASON_NONE: No error.
+ * @MM_MODEM_STATE_FAILED_REASON_UNKNOWN: Unknown error.
+ * @MM_MODEM_STATE_FAILED_REASON_SIM_MISSING: SIM is required but missing.
+ * @MM_MODEM_STATE_FAILED_REASON_SIM_ERROR: SIM is available, but unusable (e.g. permanently locked).
+ *
+ * Enumeration of possible errors when the modem is in @MM_MODEM_STATE_FAILED.
+ */
+typedef enum { /*< underscore_name=mm_modem_state_failed_reason >*/
+    MM_MODEM_STATE_FAILED_REASON_NONE        = 0,
+    MM_MODEM_STATE_FAILED_REASON_UNKNOWN     = 1,
+    MM_MODEM_STATE_FAILED_REASON_SIM_MISSING = 2,
+    MM_MODEM_STATE_FAILED_REASON_SIM_ERROR   = 3,
+} MMModemStateFailedReason;
+
+/**
  * MMModemPowerState:
  * @MM_MODEM_POWER_STATE_UNKNOWN: Unknown power state.
  * @MM_MODEM_POWER_STATE_OFF: Off.
@@ -149,6 +165,7 @@ typedef enum { /*< underscore_name=mm_modem_power_state >*/
  * @MM_MODEM_STATE_CHANGE_REASON_UNKNOWN: Reason unknown or not reportable.
  * @MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED: State change was requested by an interface user.
  * @MM_MODEM_STATE_CHANGE_REASON_SUSPEND: State change was caused by a system suspend.
+ * @MM_MODEM_STATE_CHANGE_REASON_FAILURE: State change was caused by an unrecoverable error.
  *
  * Enumeration of possible reasons to have changed the modem state.
  */
@@ -156,6 +173,7 @@ typedef enum { /*< underscore_name=mm_modem_state_change_reason >*/
     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN        = 0,
     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED = 1,
     MM_MODEM_STATE_CHANGE_REASON_SUSPEND        = 2,
+    MM_MODEM_STATE_CHANGE_REASON_FAILURE        = 3,
 } MMModemStateChangeReason;
 
 /**

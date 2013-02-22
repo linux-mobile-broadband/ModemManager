@@ -118,6 +118,8 @@ MMUnlockRetries   *mm_modem_peek_unlock_retries      (MMModem *self);
 
 MMModemState       mm_modem_get_state                (MMModem *self);
 
+MMModemStateFailedReason mm_modem_get_state_failed_reason (MMModem *self);
+
 MMModemPowerState  mm_modem_get_power_state          (MMModem *self);
 
 MMModemAccessTechnology mm_modem_get_access_technologies (MMModem *self);

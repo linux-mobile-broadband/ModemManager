@@ -8423,13 +8423,26 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
     /* If the modem interface fails to get initialized, we will move the modem
      * to a FAILED state. Note that in this case we still export the interface. */
     if (!mm_iface_modem_initialize_finish (MM_IFACE_MODEM (self), result, &error)) {
+        MMModemStateFailedReason failed_reason = MM_MODEM_STATE_FAILED_REASON_UNKNOWN;
+
         /* Report the new FAILED state */
         mm_warn ("Modem couldn't be initialized: %s", error->message);
+
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED))
+            failed_reason = MM_MODEM_STATE_FAILED_REASON_SIM_MISSING;
+        else if (g_error_matches (error,
+                                  MM_MOBILE_EQUIPMENT_ERROR,
+                                  MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+                 g_error_matches (error,
+                                  MM_MOBILE_EQUIPMENT_ERROR,
+                                  MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG))
+            failed_reason = MM_MODEM_STATE_FAILED_REASON_SIM_MISSING;
+
         g_error_free (error);
 
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     MM_MODEM_STATE_FAILED,
-                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        mm_iface_modem_update_failed_state (MM_IFACE_MODEM (self), failed_reason);
 
         /* Jump to the firmware step. We allow firmware switching even in failed
          * state */
@@ -8474,9 +8487,8 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                 g_error_free (error);                                   \
                                                                         \
                 /* Report the new FAILED state */                       \
-                mm_iface_modem_update_state (MM_IFACE_MODEM (self),     \
-                                             MM_MODEM_STATE_FAILED,     \
-                                             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN); \
+                mm_iface_modem_update_failed_state (MM_IFACE_MODEM (self), \
+                                                    MM_MODEM_STATE_FAILED_REASON_UNKNOWN); \
                                                                         \
                 /* Just jump to the last step */                        \
                 ctx->step = INITIALIZE_STEP_LAST;                       \

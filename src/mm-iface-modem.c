@@ -1145,10 +1145,11 @@ bearer_list_count_connected (MMBearer *bearer,
         (*count)++;
 }
 
-void
-mm_iface_modem_update_state (MMIfaceModem *self,
-                             MMModemState new_state,
-                             MMModemStateChangeReason reason)
+static void
+__iface_modem_update_state_internal (MMIfaceModem *self,
+                                     MMModemState new_state,
+                                     MMModemStateChangeReason reason,
+                                     MMModemStateFailedReason failed_reason)
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
     MmGdbusModem *skeleton = NULL;
@@ -1207,6 +1208,10 @@ mm_iface_modem_update_state (MMIfaceModem *self,
 
         /* Signal status change */
         if (skeleton) {
+            /* Set failure reason */
+            if (failed_reason != mm_gdbus_modem_get_state_failed_reason (skeleton))
+                mm_gdbus_modem_set_state_failed_reason (skeleton, failed_reason);
+
             /* Flush current change before signaling the state change,
              * so that clients get the proper state already in the
              * state-changed callback */
@@ -1237,6 +1242,23 @@ mm_iface_modem_update_state (MMIfaceModem *self,
         g_object_unref (skeleton);
     if (bearer_list)
         g_object_unref (bearer_list);
+}
+
+void
+mm_iface_modem_update_state (MMIfaceModem *self,
+                             MMModemState new_state,
+                             MMModemStateChangeReason reason)
+{
+    g_assert (new_state != MM_MODEM_STATE_FAILED);
+
+    __iface_modem_update_state_internal (self, new_state, reason, MM_MODEM_STATE_FAILED_REASON_NONE);
+}
+
+void
+mm_iface_modem_update_failed_state (MMIfaceModem *self,
+                                    MMModemStateFailedReason failed_reason)
+{
+    __iface_modem_update_state_internal (self, MM_MODEM_STATE_FAILED, MM_MODEM_STATE_CHANGE_REASON_FAILURE, failed_reason);
 }
 
 /*****************************************************************************/
@@ -4092,6 +4114,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
         mm_gdbus_modem_set_bands (skeleton, mm_common_build_bands_unknown ());
         mm_gdbus_modem_set_power_state (skeleton, MM_MODEM_POWER_STATE_UNKNOWN);
+        mm_gdbus_modem_set_state_failed_reason (skeleton, MM_MODEM_STATE_FAILED_REASON_NONE);
 
         /* Bind our State property */
         g_object_bind_property (self, MM_IFACE_MODEM_STATE,

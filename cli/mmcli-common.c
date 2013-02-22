@@ -1063,6 +1063,8 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
         return "User request";
     case MM_MODEM_STATE_CHANGE_REASON_SUSPEND:
         return "Suspend";
+    case MM_MODEM_STATE_CHANGE_REASON_FAILURE:
+        return "Failure";
     }
 
     g_warn_if_reached ();

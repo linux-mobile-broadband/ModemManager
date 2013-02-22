@@ -817,6 +817,24 @@ mm_modem_get_state (MMModem *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_state_failed_reason:
+ * @self: A #MMModem.
+ *
+ * Gets the reason specifying why the modem is in #MM_MODEM_STATE_FAILED state.
+ *
+ * Returns: A #MMModemStateFailedReason value.
+ */
+MMModemStateFailedReason
+mm_modem_get_state_failed_reason (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_STATE_FAILED_REASON_UNKNOWN);
+
+    return (MMModemStateFailedReason) mm_gdbus_modem_get_state_failed_reason (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_get_power_state:
  * @self: A #MMModem.
  *

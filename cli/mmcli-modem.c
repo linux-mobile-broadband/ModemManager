@@ -351,13 +351,18 @@ print_modem_info (void)
     g_print ("  -------------------------\n"
              "  Status   |           lock: '%s'\n"
              "           | unlock retries: '%s'\n"
-             "           |          state: '%s'\n"
-             "           |    power state: '%s'\n"
-             "           |    access tech: '%s'\n"
-             "           | signal quality: '%u' (%s)\n",
+             "           |          state: '%s'\n",
              mm_modem_lock_get_string (mm_modem_get_unlock_required (ctx->modem)),
              VALIDATE_UNKNOWN (unlock_retries_string),
-             VALIDATE_UNKNOWN (mm_modem_state_get_string (mm_modem_get_state (ctx->modem))),
+             VALIDATE_UNKNOWN (mm_modem_state_get_string (mm_modem_get_state (ctx->modem))));
+
+    if (mm_modem_get_state (ctx->modem) == MM_MODEM_STATE_FAILED)
+        g_print ("           |  failed reason: '%s'\n",
+                 VALIDATE_UNKNOWN (mm_modem_state_failed_reason_get_string (mm_modem_get_state_failed_reason (ctx->modem))));
+
+    g_print ("           |    power state: '%s'\n"
+             "           |    access tech: '%s'\n"
+             "           | signal quality: '%u' (%s)\n",
              VALIDATE_UNKNOWN (mm_modem_power_state_get_string (mm_modem_get_power_state (ctx->modem))),
              VALIDATE_UNKNOWN (access_technologies_string),
              signal_quality, signal_quality_recent ? "recent" : "cached");
