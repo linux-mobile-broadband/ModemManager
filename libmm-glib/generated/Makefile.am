@@ -66,7 +66,7 @@ mm-errors-types.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top
 		--template $(top_srcdir)/build-aux/mm-errors-template.c \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
-mm-errors-quarks.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-quarks-template.c $(top_srcdir)/include/ModemManager-names.h mm-errors-types.h
+mm-errors-quarks.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-quarks-template.c $(top_builddir)/include/ModemManager-names.h mm-errors-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include <ModemManager.h>\n#include \"mm-errors-types.h\"\n" \
 		--template $(top_srcdir)/build-aux/mm-errors-quarks-template.c \
