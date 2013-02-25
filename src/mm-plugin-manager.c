@@ -280,6 +280,10 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
             /* If we got a task deferred until a suggestion comes,
              * complete it */
             if (port_probe_ctx->defer_until_suggested) {
+                /* Reset the defer until suggested flag; we consider this
+                 * cancelled probe completed now. */
+                port_probe_ctx->defer_until_suggested = FALSE;
+
                 if (suggested_plugin) {
                     mm_dbg ("(Plugin Manager) (%s) [%s] deferred task completed, got suggested plugin",
                             mm_plugin_get_name (suggested_plugin),
