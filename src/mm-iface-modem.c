@@ -1249,7 +1249,10 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                              MMModemState new_state,
                              MMModemStateChangeReason reason)
 {
-    g_assert (new_state != MM_MODEM_STATE_FAILED);
+    if (new_state == MM_MODEM_STATE_FAILED) {
+        mm_iface_modem_update_failed_state (self, MM_MODEM_STATE_FAILED_REASON_UNKNOWN);
+        return;
+    }
 
     __iface_modem_update_state_internal (self, new_state, reason, MM_MODEM_STATE_FAILED_REASON_NONE);
 }
