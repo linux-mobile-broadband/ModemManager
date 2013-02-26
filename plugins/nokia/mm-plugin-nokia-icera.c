@@ -70,10 +70,17 @@ grab_port (MMPlugin *self,
 
     /* Look for port type hints */
     if (mm_port_probe_is_at (probe)) {
-        if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))
+        if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM")) {
+            mm_dbg ("Nokia: AT port '%s/%s' flagged as primary",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
             pflags = MM_AT_PORT_FLAG_PRIMARY;
-        else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX"))
+        } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX")) {
+            mm_dbg ("Nokia: AT port '%s/%s' flagged as secondary",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
             pflags = MM_AT_PORT_FLAG_SECONDARY;
+        }
     }
 
     return mm_base_modem_grab_port (modem,

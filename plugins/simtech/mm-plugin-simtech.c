@@ -21,6 +21,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-log.h"
 #include "mm-plugin-simtech.h"
 #include "mm-broadband-modem-simtech.h"
 
@@ -73,10 +74,17 @@ grab_port (MMPlugin *self,
      * be the data/primary port on these devices.  We have to tag them based on
      * what the Windows .INF files say the port layout should be.
      */
-    if (g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_PORT_TYPE_MODEM"))
+    if (g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_PORT_TYPE_MODEM")) {
+        mm_dbg ("Simtech: AT port '%s/%s' flagged as primary",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_AT_PORT_FLAG_PRIMARY;
-    else if (g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_PORT_TYPE_AUX"))
+    } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_PORT_TYPE_AUX")) {
+        mm_dbg ("Simtech: AT port '%s/%s' flagged as secondary",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_AT_PORT_FLAG_SECONDARY;
+    }
 
     /* If the port was tagged by the udev rules but isn't a primary or secondary,
      * then ignore it to guard against race conditions if a device just happens
