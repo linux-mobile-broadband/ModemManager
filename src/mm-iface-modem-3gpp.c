@@ -1325,6 +1325,18 @@ periodic_registration_check_enable (MMIfaceModem3gpp *self)
                              (GDestroyNotify)registration_check_context_free);
 }
 
+static void
+clear_deferred_registration_state_update (MMIfaceModem3gpp *self)
+{
+    RegistrationStateContext *ctx = get_registration_state_context (self);
+
+    ctx->deferred_new_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    if (ctx->deferred_update_id) {
+        g_source_remove (ctx->deferred_update_id);
+        ctx->deferred_update_id = 0;
+    }
+}
+
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
@@ -1405,7 +1417,10 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
+        /* Disable periodic registration checks, if they were set */
         periodic_registration_check_disable (ctx->self);
+        /* Prevent any deferred registration state update from happening after the modem is disabled */
+        clear_deferred_registration_state_update (ctx->self);
         /* Fall down to next step */
         ctx->step++;
 
