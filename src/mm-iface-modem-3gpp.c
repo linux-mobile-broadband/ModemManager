@@ -1347,6 +1347,7 @@ typedef enum {
     DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     DISABLING_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION_EVENTS,
+    DISABLING_STEP_CLEANUP_DEFERRED_REGISTRATION_UPDATE,
     DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
     DISABLING_STEP_REGISTRATION_STATE,
@@ -1419,8 +1420,6 @@ interface_disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
         /* Disable periodic registration checks, if they were set */
         periodic_registration_check_disable (ctx->self);
-        /* Prevent any deferred registration state update from happening after the modem is disabled */
-        clear_deferred_registration_state_update (ctx->self);
         /* Fall down to next step */
         ctx->step++;
 
@@ -1459,6 +1458,12 @@ interface_disabling_step (DisablingContext *ctx)
                 ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_DEFERRED_REGISTRATION_UPDATE:
+        /* Prevent any deferred registration state update from happening after the modem is disabled */
+        clear_deferred_registration_state_update (ctx->self);
         /* Fall down to next step */
         ctx->step++;
 
