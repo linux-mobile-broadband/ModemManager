@@ -5,6 +5,7 @@ udevrules_DATA = \
 	77-mm-usb-device-blacklist.rules \
 	77-mm-pcmcia-device-blacklist.rules \
 	77-mm-platform-serial-whitelist.rules \
+	77-mm-usb-serial-adapters-greylist.rules \
 	80-mm-candidate.rules
 
 noinst_LTLIBRARIES = libmodem-helpers.la libserial.la

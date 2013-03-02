@@ -48,7 +48,8 @@ GType mm_manager_get_type (void);
 MMManager       *mm_manager_new         (GDBusConnection *bus,
                                          GError **error);
 
-void             mm_manager_start       (MMManager *manager);
+void             mm_manager_start       (MMManager *manager,
+                                         gboolean manual_scan);
 
 void             mm_manager_shutdown    (MMManager *manager);
 

@@ -217,7 +217,8 @@ find_physical_device (GUdevDevice *child)
 static void
 device_added (MMManager *manager,
               GUdevDevice *port,
-              gboolean hotplugged)
+              gboolean hotplugged,
+              gboolean manual_scan)
 {
     MMDevice *device;
     const char *subsys, *name, *physdev_path, *physdev_subsys;
@@ -269,6 +270,13 @@ device_added (MMManager *manager,
     /* Is the device blacklisted? */
     if (g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_IGNORE")) {
         mm_dbg ("(%s/%s): port's parent device is blacklisted", subsys, name);
+        goto out;
+    }
+
+    /* Is the device in the manual-only greylist? If so, return if this is an
+     * automatic scan. */
+    if (!manual_scan && g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_MANUAL_SCAN_ONLY")) {
+        mm_dbg ("(%s/%s): port probed only in manual scan", subsys, name);
         goto out;
     }
 
@@ -395,7 +403,7 @@ handle_uevent (GUdevClient *client,
     name = g_udev_device_get_name (device);
     if (   (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change"))
         && (!g_str_has_prefix (subsys, "usb") || (name && g_str_has_prefix (name, "cdc-wdm"))))
-        device_added (self, device, TRUE);
+        device_added (self, device, TRUE, FALSE);
     else if (g_str_equal (action, "remove"))
         device_removed (self, device);
 }
@@ -403,12 +411,13 @@ handle_uevent (GUdevClient *client,
 typedef struct {
     MMManager *self;
     GUdevDevice *device;
+    gboolean manual_scan;
 } StartDeviceAdded;
 
 static gboolean
 start_device_added_idle (StartDeviceAdded *ctx)
 {
-    device_added (ctx->self, ctx->device, FALSE);
+    device_added (ctx->self, ctx->device, FALSE, ctx->manual_scan);
     g_object_unref (ctx->self);
     g_object_unref (ctx->device);
     g_slice_free (StartDeviceAdded, ctx);
@@ -417,36 +426,39 @@ start_device_added_idle (StartDeviceAdded *ctx)
 
 static void
 start_device_added (MMManager *self,
-                    GUdevDevice *device)
+                    GUdevDevice *device,
+                    gboolean manual_scan)
 {
     StartDeviceAdded *ctx;
 
     ctx = g_slice_new (StartDeviceAdded);
     ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
+    ctx->manual_scan = manual_scan;
     g_idle_add ((GSourceFunc)start_device_added_idle, ctx);
 }
 
 void
-mm_manager_start (MMManager *manager)
+mm_manager_start (MMManager *manager,
+                  gboolean manual_scan)
 {
     GList *devices, *iter;
 
     g_return_if_fail (manager != NULL);
     g_return_if_fail (MM_IS_MANAGER (manager));
 
-    mm_dbg ("Starting device scan...");
+    mm_dbg ("Starting %s device scan...", manual_scan ? "manual" : "automatic");
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (manager, G_UDEV_DEVICE (iter->data));
+        start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "net");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (manager, G_UDEV_DEVICE (iter->data));
+        start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -457,7 +469,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            start_device_added (manager, G_UDEV_DEVICE (iter->data));
+            start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -469,7 +481,7 @@ mm_manager_start (MMManager *manager)
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            start_device_added (manager, G_UDEV_DEVICE (iter->data));
+            start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
@@ -629,7 +641,7 @@ scan_devices_auth_ready (MMAuthProvider *authp,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Otherwise relaunch device scan */
-        mm_manager_start (MM_MANAGER (ctx->self));
+        mm_manager_start (MM_MANAGER (ctx->self), TRUE);
         mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
             ctx->invocation);

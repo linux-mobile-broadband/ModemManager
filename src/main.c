@@ -78,9 +78,9 @@ name_acquired_cb (GDBusConnection *connection,
 {
     mm_dbg ("Service name '%s' was acquired", name);
 
-    /* Launch scan for devices */
+    /* Launch automatic scan for devices */
     g_assert (manager);
-    mm_manager_start (manager);
+    mm_manager_start (manager, FALSE);
 }
 
 static void
