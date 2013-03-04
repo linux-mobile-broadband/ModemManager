@@ -98,7 +98,7 @@ gcap_ready (MMAtSerialPort *port,
         g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
 
         /* PPP-on-APP1-port whitelist */
-        if (strstr (response->str, "C885") || strstr (response->str, "USB 306"))
+        if (strstr (response->str, "C885") || strstr (response->str, "USB 306") || strstr (response->str, "MC8790"))
             g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
 
         /* For debugging: let users figure out if their device supports PPP
