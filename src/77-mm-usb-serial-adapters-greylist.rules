@@ -19,4 +19,7 @@ ATTRS{idVendor}=="0557", ATTRS{idProduct}=="2008", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 # Prolific USB to Serial adapter
 ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Magic Control Technology Corp adapters
+ATTRS{idVendor}=="0711", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
 LABEL="mm_usb_serial_adapters_greylist_end"
