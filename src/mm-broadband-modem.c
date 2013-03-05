@@ -3924,7 +3924,7 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (ctx->self),
             mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
-            cs_registration_sequence,
+            ctx->enable ? cs_registration_sequence : cs_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
@@ -3939,7 +3939,7 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (ctx->self),
             mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
-            ps_registration_sequence,
+            ctx->enable ? ps_registration_sequence : ps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
@@ -3954,7 +3954,7 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (ctx->self),
             mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
-            eps_registration_sequence,
+            ctx->enable ? eps_registration_sequence : eps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
