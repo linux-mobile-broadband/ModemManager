@@ -3712,7 +3712,7 @@ unsolicited_registration_events_context_new (MMBroadbandModem *self,
                                              callback,
                                              user_data,
                                              unsolicited_registration_events_context_new);
-    ctx->enable = FALSE;
+    ctx->enable = enable;
     ctx->run_cs = cs_supported;
     ctx->run_ps = ps_supported;
     ctx->run_eps = eps_supported;
