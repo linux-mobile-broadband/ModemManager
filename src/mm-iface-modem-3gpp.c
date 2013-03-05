@@ -1093,7 +1093,8 @@ run_deferred_registration_state_update (MMIfaceModem3gpp *self)
 
 static void
 update_registration_state (MMIfaceModem3gpp *self,
-                           MMModem3gppRegistrationState new_state)
+                           MMModem3gppRegistrationState new_state,
+                           gboolean deferrable)
 {
     MMModem3gppRegistrationState old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     RegistrationStateContext *ctx;
@@ -1109,7 +1110,8 @@ update_registration_state (MMIfaceModem3gpp *self,
         /* If there is already a deferred 'registration loss' state update and the new update
          * is not a registered state, update the deferred state update without extending the
          * timeout. */
-        if (new_state != MM_MODEM_3GPP_REGISTRATION_STATE_HOME &&
+        if (deferrable &&
+            new_state != MM_MODEM_3GPP_REGISTRATION_STATE_HOME &&
             new_state != MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
             mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s), update deferred",
                      g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
@@ -1150,7 +1152,8 @@ update_registration_state (MMIfaceModem3gpp *self,
         return;
     }
 
-    if ((old_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+    if (deferrable &&
+        (old_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
          old_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) &&
         (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
          new_state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)) {
@@ -1191,7 +1194,7 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->cs = state;
-    update_registration_state (self, get_consolidated_reg_state (ctx));
+    update_registration_state (self, get_consolidated_reg_state (ctx), TRUE);
 }
 
 void
@@ -1210,7 +1213,7 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->ps = state;
-    update_registration_state (self, get_consolidated_reg_state (ctx));
+    update_registration_state (self, get_consolidated_reg_state (ctx), TRUE);
 }
 
 void
@@ -1229,7 +1232,7 @@ mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->eps = state;
-    update_registration_state (self, get_consolidated_reg_state (ctx));
+    update_registration_state (self, get_consolidated_reg_state (ctx), TRUE);
 }
 
 /*****************************************************************************/
@@ -1492,7 +1495,7 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_REGISTRATION_STATE:
-        update_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+        update_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, FALSE);
         mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
         /* Fall down to next step */
