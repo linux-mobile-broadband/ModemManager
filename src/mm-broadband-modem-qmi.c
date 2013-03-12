@@ -1118,7 +1118,10 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
          * needs to be fatal so that we mark the modem unusable. */
         if (g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INTERNAL)) {
+                             QMI_PROTOCOL_ERROR_INTERNAL) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_UIM_UNINITIALIZED)) {
             g_simple_async_result_set_error (simple,
                                              MM_MOBILE_EQUIPMENT_ERROR,
                                              MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
