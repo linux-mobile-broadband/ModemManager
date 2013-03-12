@@ -103,6 +103,43 @@ cdma_band_class_to_qcdm (u_int8_t cdma)
     return QCDM_CDMA_BAND_CLASS_UNKNOWN;
 }
 
+static u_int8_t
+nv_mode_pref_from_qcdm (u_int8_t qcdm)
+{
+    switch (qcdm) {
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_DIGITAL:
+        return DIAG_NV_MODE_PREF_DIGITAL;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_DIGITAL_ONLY:
+        return DIAG_NV_MODE_PREF_DIGITAL_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_ANALOG:
+        return DIAG_NV_MODE_PREF_ANALOG;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_ANALOG_ONLY:
+        return DIAG_NV_MODE_PREF_ANALOG_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO:
+        return DIAG_NV_MODE_PREF_AUTO;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_ONLY:
+        return DIAG_NV_MODE_PREF_1X_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY:
+        return DIAG_NV_MODE_PREF_HDR_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GPRS_ONLY:
+        return DIAG_NV_MODE_PREF_GPRS_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_UMTS_ONLY:
+        return DIAG_NV_MODE_PREF_UMTS_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_ONLY:
+        return DIAG_NV_MODE_PREF_GSM_UMTS_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_ONLY:
+        return DIAG_NV_MODE_PREF_1X_HDR_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_LTE_ONLY:
+        return DIAG_NV_MODE_PREF_LTE_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_LTE_ONLY:
+        return DIAG_NV_MODE_PREF_GSM_UMTS_LTE_ONLY;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY:
+        return DIAG_NV_MODE_PREF_1X_HDR_LTE_ONLY;
+    }
+    return DIAG_NV_MODE_PREF_AUTO;
+};
+
+
 /**********************************************************************/
 
 /*
@@ -878,24 +915,6 @@ qcdm_cmd_nv_set_roam_pref_result (const char *buf, size_t len, int *out_error)
 
 /**********************************************************************/
 
-static qcdmbool
-mode_pref_validate (u_int8_t dm)
-{
-    switch (dm) {
-    case DIAG_NV_MODE_PREF_DIGITAL:
-    case DIAG_NV_MODE_PREF_DIGITAL_ONLY:
-    case DIAG_NV_MODE_PREF_AUTO:
-    case DIAG_NV_MODE_PREF_1X_ONLY:
-    case DIAG_NV_MODE_PREF_HDR_ONLY:
-    case DIAG_NV_MODE_PREF_1X_HDR_ONLY:
-    case DIAG_NV_MODE_PREF_LTE_ONLY:
-    case DIAG_NV_MODE_PREF_1X_HDR_LTE_ONLY:
-        return TRUE;
-    default:
-        return FALSE;
-    }
-}
-
 size_t
 qcdm_cmd_nv_get_mode_pref_new (char *buf, size_t len, u_int8_t profile)
 {
@@ -933,9 +952,6 @@ qcdm_cmd_nv_get_mode_pref_result (const char *buf, size_t len, int *out_error)
 
     mode = (DMNVItemModePref *) &rsp->data[0];
 
-    if (!mode_pref_validate (mode->mode_pref))
-        qcdm_warn (0, "Unknown mode preference 0x%X", mode->mode_pref);
-
     result = qcdm_result_new ();
     qcdm_result_add_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_PROFILE, mode->profile);
     qcdm_result_add_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, mode->mode_pref);
@@ -956,18 +972,13 @@ qcdm_cmd_nv_set_mode_pref_new (char *buf,
     qcdm_return_val_if_fail (buf != NULL, 0);
     qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    if (!mode_pref_validate (mode_pref)) {
-        qcdm_err (0, "Invalid mode preference %d", mode_pref);
-        return 0;
-    }
-
     memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_NV_WRITE;
     cmd->nv_item = htole16 (DIAG_NV_MODE_PREF);
 
     req = (DMNVItemModePref *) &cmd->data[0];
     req->profile = profile;
-    req->mode_pref = mode_pref;
+    req->mode_pref = nv_mode_pref_from_qcdm (mode_pref);
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
 }
