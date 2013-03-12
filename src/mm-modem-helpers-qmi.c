@@ -848,7 +848,7 @@ mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
             pref |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
     }
 
-    return mode;
+    return pref;
 }
 
 /*****************************************************************************/
