@@ -4,7 +4,7 @@ INCLUDES = \
 	-I$(top_srcdir)/libqcdm/src \
 	-I$(top_srcdir)/src
 
-noinst_PROGRAMS = test-qcdm
+noinst_PROGRAMS = test-qcdm modepref
 
 test_qcdm_SOURCES = \
 	test-qcdm-crc.c \
@@ -23,10 +23,16 @@ test_qcdm_CPPFLAGS = $(MM_CFLAGS)
 
 test_qcdm_LDADD = $(MM_LIBS)
 
+modepref_SOURCES = modepref.c
+modepref_CPPFLAGS = $(MM_CFLAGS)
+modepref_LDADD = $(MM_LIBS)
+
 if QCDM_STANDALONE
 test_qcdm_LDADD += $(top_builddir)/src/libqcdm.la
+modepref_LDADD += $(top_builddir)/src/libqcdm.la
 else
 test_qcdm_LDADD += $(top_builddir)/libqcdm/src/libqcdm.la
+modepref_LDADD += $(top_builddir)/libqcdm/src/libqcdm.la
 endif
 
 check-local: test-qcdm
