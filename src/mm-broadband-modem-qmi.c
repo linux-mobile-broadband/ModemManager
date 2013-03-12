@@ -2141,7 +2141,7 @@ load_power_state (MMIfaceModem *self,
                                         load_power_state);
 
     mm_dbg ("Getting device operating mode...");
-    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
+    qmi_client_dms_get_operating_mode (QMI_CLIENT_DMS (client),
                                        NULL,
                                        5,
                                        NULL,
