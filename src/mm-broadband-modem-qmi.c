@@ -2607,7 +2607,8 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
 
         /* Only set acquisition order preference if both 2G and 3G given as allowed */
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)) &&
-            (ctx->allowed & (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))) {
+            ctx->allowed & MM_MODEM_MODE_2G &&
+            ctx->allowed & MM_MODEM_MODE_3G) {
             QmiNasGsmWcdmaAcquisitionOrderPreference order;
 
             order = mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
