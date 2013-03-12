@@ -88,6 +88,7 @@ EXTRA_DIST = \
 	$(dbusactivation_in_files) \
 	$(INTLTOOL_FILES) \
 	$(dbusservice_file_polkit) \
-	$(dbusservice_file_nopolkit)
+	$(dbusservice_file_nopolkit) \
+	autogen.sh
 
 ACLOCAL_AMFLAGS = -I m4
