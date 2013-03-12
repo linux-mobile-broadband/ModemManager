@@ -384,6 +384,45 @@ error:
 	return spref;
 }
 
+static int
+qcdm_set_mode (int fd, u_int8_t mode)
+{
+	int err;
+	char buf[512];
+	size_t len;
+	QcdmResult *result;
+	size_t reply_len;
+
+	len = qcdm_cmd_control_new (buf, sizeof (buf), mode);
+	assert (len);
+
+	/* Send the command */
+	if (!qcdm_send (fd, buf, len)) {
+		fprintf (stderr, "E: failed to send QCDM Control command\n");
+		goto error;
+	}
+
+	reply_len = qcdm_wait_reply (fd, buf, sizeof (buf));
+	if (!reply_len) {
+		fprintf (stderr, "E: failed to receive Control command reply\n");
+		goto error;
+	}
+
+	/* Parse the response into a result structure */
+	err = QCDM_SUCCESS;
+	result = qcdm_cmd_control_result (buf, reply_len, &err);
+	if (!result) {
+		fprintf (stderr, "E: failed to parse Control command reply: %d\n", err);
+		goto error;
+	}
+
+	qcdm_result_unref (result);
+	return 0;
+
+error:
+	return -1;
+}
+
 /******************************************************************/
 
 static void
@@ -502,6 +541,12 @@ main (int argc, char *argv[])
 			return 1;
 		if (set_evdo && qcdm_set_hdr_pref (fd, hdrpref))
 			return 1;
+
+		/* Send DM reset command */
+		qcdm_set_mode (fd, QCDM_CMD_CONTROL_MODE_OFFLINE);
+		sleep (2);
+		qcdm_set_mode (fd, QCDM_CMD_CONTROL_MODE_RESET);
+		sleep (2);
 
 		fprintf (stdout, "Success setting mode to '%s': replug your device.\n", smode);
 	} else {
