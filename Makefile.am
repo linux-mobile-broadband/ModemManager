@@ -19,6 +19,7 @@ DISTCLEANFILES = \
 	po/.intltool-merge-cache
 
 EXTRA_DIST = \
-	$(INTLTOOL_FILES)
+	$(INTLTOOL_FILES) \
+	autogen.sh
 
 ACLOCAL_AMFLAGS = -I m4
