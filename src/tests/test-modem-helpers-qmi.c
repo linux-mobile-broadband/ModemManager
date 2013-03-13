@@ -70,7 +70,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_capabilities_expected (&ctx,
+                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                 MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> GSM/UMTS */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM |
@@ -81,7 +83,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_capabilities_expected (&ctx,
+                                (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                 MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0;

@@ -1187,6 +1187,11 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
     else
         tmp &= ctx->dms_capabilities;
 
+    /* Modems which have 'LTE' capability reported by DMS will always have it
+     * reported in 'current capabilities', even if it may not be currently
+     * allowed (i.e. not selected in 'allowed-modes') */
+    if (ctx->dms_capabilities & MM_MODEM_CAPABILITY_LTE)
+        tmp |= MM_MODEM_CAPABILITY_LTE;
 
     /* Log about the logic applied */
     nas_ssp_mode_preference_str = qmi_nas_rat_mode_preference_build_string_from_mask (ctx->nas_ssp_mode_preference_mask);
