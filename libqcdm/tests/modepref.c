@@ -429,7 +429,7 @@ static void
 usage (const char *prog)
 {
 	fprintf (stderr, "Usage: %s <DM port> [<mode>] [--debug]\n", prog);
-	fprintf (stderr, "         <mode> = lte, auto-cdma, auto, cdma, evdo, auto-gsm, gprs, umts\n");
+	fprintf (stderr, "         <mode> = auto, lte, auto-cdma-lte, auto-cdma, cdma, evdo, auto-gsm-lte, auto-gsm, gsm, umts\n");
 	fprintf (stderr, "         If <mode> is missing, current mode will be printed.\n\n");
 }
 
@@ -442,6 +442,13 @@ parse_mode (const char *s,
 	if (strcasecmp (s, "lte") == 0) {
 		*out_mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_LTE_ONLY;
 		*out_hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
+		return TRUE;
+	}
+
+	if (strcasecmp (s, "auto-cdma-lte") == 0) {
+		*out_mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY;
+		*out_hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
+		*out_set_evdo = TRUE;
 		return TRUE;
 	}
 
@@ -473,12 +480,17 @@ parse_mode (const char *s,
 		return TRUE;
 	}
 
+	if (strcasecmp (s, "auto-gsm-lte") == 0) {
+		*out_mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_LTE_ONLY;
+		return TRUE;
+	}
+
 	if (strcasecmp (s, "auto-gsm") == 0) {
 		*out_mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_ONLY;
 		return TRUE;
 	}
 
-	if (strcasecmp (s, "gprs") == 0) {
+	if (strcasecmp (s, "gsm") == 0) {
 		*out_mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GPRS_ONLY;
 		return TRUE;
 	}
