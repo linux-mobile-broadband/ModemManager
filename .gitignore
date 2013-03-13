@@ -52,6 +52,7 @@ src/tests/test-sms-part
 cli/mmcli
 
 libqcdm/tests/test-qcdm
+libqcdm/tests/modepref
 libwmc/tests/test-wmc
 
 data/org.freedesktop.ModemManager1.conf
