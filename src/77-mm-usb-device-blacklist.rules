@@ -74,4 +74,9 @@ ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="fb00" ENV{ID_MM_DEVICE_IGNORE}="1"
 # All devices from the Swiss Federal Institute of Technology
 ATTRS{idVendor}=="0617", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# West Mountain Radio devices
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="814a", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="814b", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="2405", ATTRS{idProduct}=="0003", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
