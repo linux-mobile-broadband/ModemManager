@@ -44,6 +44,7 @@ src/mm-serial-enums-types.c
 src/mm-serial-enums-types.h
 src/mm-marshal.[ch]
 src/tests/test-modem-helpers
+src/tests/test-modem-helpers-qmi
 src/tests/test-charsets
 src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port

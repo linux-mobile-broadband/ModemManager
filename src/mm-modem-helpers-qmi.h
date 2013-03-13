@@ -90,4 +90,20 @@ MMSmsState mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag);
 
 QmiWdsAuthentication mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth);
 
+/*****************************************************************************/
+/* Utility to gather current capabilities from various sources */
+
+typedef struct {
+    /* NAS System Selection Preference */
+    QmiNasRatModePreference nas_ssp_mode_preference_mask;
+    QmiNasBandPreference    nas_ssp_band_preference_mask;
+    QmiNasLteBandPreference nas_ssp_lte_band_preference_mask;
+    /* NAS Technology Preference */
+    QmiNasRadioTechnologyPreference nas_tp_mask;
+    /* DMS Capabilities */
+    MMModemCapability dms_capabilities;
+} MMQmiCapabilitiesContext;
+
+MMModemCapability mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx);
+
 #endif  /* MM_MODEM_HELPERS_QMI_H */

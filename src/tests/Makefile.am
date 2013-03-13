@@ -6,6 +6,12 @@ noinst_PROGRAMS = \
 	test-at-serial-port \
 	test-sms-part
 
+if WITH_QMI
+noinst_PROGRAMS += test-modem-helpers-qmi
+endif
+
+################
+
 test_modem_helpers_SOURCES = \
 	test-modem-helpers.c
 
@@ -28,6 +34,30 @@ test_modem_helpers_CPPFLAGS += $(QMI_CFLAGS)
 test_modem_helpers_LDADD += $(QMI_LIBS)
 endif
 
+################
+
+if WITH_QMI
+test_modem_helpers_qmi_SOURCES = \
+	test-modem-helpers-qmi.c
+
+test_modem_helpers_qmi_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_srcdir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated \
+	$(QMI_CFLAGS)
+
+test_modem_helpers_qmi_LDADD = \
+	$(top_builddir)/src/libmodem-helpers.la \
+	$(MM_LIBS) \
+	$(QMI_LIBS)
+endif
+
+################
 
 test_charsets_SOURCES = \
 	test-charsets.c
@@ -50,6 +80,8 @@ if WITH_QMI
 test_charsets_CPPFLAGS += $(QMI_CFLAGS)
 test_charsets_LDADD += $(QMI_LIBS)
 endif
+
+################
 
 test_qcdm_serial_port_SOURCES = \
 	test-qcdm-serial-port.c
@@ -76,6 +108,8 @@ test_qcdm_serial_port_CPPFLAGS += $(QMI_CFLAGS)
 test_qcdm_serial_port_LDADD += $(QMI_LIBS)
 endif
 
+################
+
 test_at_serial_port_SOURCES = \
 	test-at-serial-port.c
 
@@ -100,6 +134,8 @@ test_at_serial_port_CPPFLAGS += $(QMI_CFLAGS)
 test_at_serial_port_LDADD += $(QMI_LIBS)
 endif
 
+################
+
 test_sms_part_SOURCES = \
 	test-sms-part.c
 
@@ -122,12 +158,17 @@ test_sms_part_CPPFLAGS += $(QMI_CFLAGS)
 test_sms_part_LDADD += $(QMI_LIBS)
 endif
 
+################
+
 if WITH_TESTS
 
-check-local: test-modem-helpers test-charsets test-qcdm-serial-port test-sms-part
+check-local: $(noinst_PROGRAMS)
 	$(abs_builddir)/test-modem-helpers
 	$(abs_builddir)/test-charsets
 	$(abs_builddir)/test-qcdm-serial-port
 	$(abs_builddir)/test-sms-part
+if WITH_QMI
+	$(abs_builddir)/test-modem-helpers-qmi
+endif
 
 endif
