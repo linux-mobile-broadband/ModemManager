@@ -192,8 +192,8 @@ AC_ARG_WITH(newest_qmi_commands, AS_HELP_STRING([--with-newest-qmi-commands], [T
 AM_CONDITIONAL(WITH_NEWEST_QMI_COMMANDS, test "x$with_newest_qmi_commands" = "xyes")
 case $with_newest_qmi_commands in
     yes)
-        if test "$with_qmi" = "xno" ; then
-           AC_ERROR([Cannot enable newest QMI commands if QMI support if disabled])
+        if test "x$with_qmi" = "xno" ; then
+           AC_ERROR([Cannot enable newest QMI commands if QMI support is disabled])
         fi
 
         AC_DEFINE(WITH_NEWEST_QMI_COMMANDS, 1, [Define if we enable new QMI commands support])
