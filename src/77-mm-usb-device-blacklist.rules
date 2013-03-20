@@ -85,4 +85,9 @@ ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="814a", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="814b", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="2405", ATTRS{idProduct}=="0003", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Arduinos
+ATTRS{idVendor}=="2341", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9207", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
