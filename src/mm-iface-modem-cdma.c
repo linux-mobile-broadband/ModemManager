@@ -242,7 +242,7 @@ handle_activate_manual_ready (MMIfaceModemCdma *self,
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self, res,&error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
+        mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton, ctx->invocation);
 
     handle_activate_manual_context_free (ctx);
 }
@@ -261,9 +261,9 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* If activating OTA is not implemented, report an error */
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
-        !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
+    /* If manual activating is not implemented, report an error */
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual ||
+        !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
