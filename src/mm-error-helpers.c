@@ -198,8 +198,7 @@ static ErrorTable msg_errors[] = {
     { MM_MESSAGE_ERROR_NO_NETWORK,             "nonetwork",             "No network" },
     { MM_MESSAGE_ERROR_NETWORK_TIMEOUT,        "networktimeout",        "Network timeout" },
     { MM_MESSAGE_ERROR_NO_CNMA_ACK_EXPECTED,   "nocnmaackexpected",     "No CNMA acknowledgement expected" },
-    { MM_MESSAGE_ERROR_UNKNOWN,                "unknown",               "Unknown" },
-    { -1,                                  NULL,                    NULL }
+    { MM_MESSAGE_ERROR_UNKNOWN,                "unknown",               "Unknown" }
 };
 
 GError *
