@@ -690,28 +690,32 @@ connect_context_step (ConnectContext *ctx)
         return;
     }
 
-    case CONNECT_STEP_GET_CURRENT_SETTINGS: {
-        QmiMessageWdsGetCurrentSettingsInput *input;
-        QmiClientWds *client;
+    case CONNECT_STEP_GET_CURRENT_SETTINGS:
+        /* If one of IPv4 or IPv6 succeeds, get IP configuration */
+        if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
+            QmiMessageWdsGetCurrentSettingsInput *input;
+            QmiClientWds *client;
 
-        if (ctx->running_ipv4)
-            client = ctx->client_ipv4;
-        else if (ctx->running_ipv6)
-            client = ctx->client_ipv6;
-        else
-            g_assert_not_reached ();
+            if (ctx->running_ipv4)
+                client = ctx->client_ipv4;
+            else if (ctx->running_ipv6)
+                client = ctx->client_ipv6;
+            else
+                g_assert_not_reached ();
 
-        mm_dbg ("Getting IP configuration...");
-        input = build_get_current_settings_input (ctx);
-        qmi_client_wds_get_current_settings (client,
-                                             input,
-                                             45,
-                                             ctx->cancellable,
-                                             (GAsyncReadyCallback)get_current_settings_ready,
-                                             ctx);
-        qmi_message_wds_get_current_settings_input_unref (input);
-        return;
-    }
+            mm_dbg ("Getting IP configuration...");
+            input = build_get_current_settings_input (ctx);
+            qmi_client_wds_get_current_settings (client,
+                                                 input,
+                                                 45,
+                                                 ctx->cancellable,
+                                                 (GAsyncReadyCallback)get_current_settings_ready,
+                                                 ctx);
+            qmi_message_wds_get_current_settings_input_unref (input);
+            return;
+        }
+        /* Just fall down */
+        ctx->step++;
 
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
