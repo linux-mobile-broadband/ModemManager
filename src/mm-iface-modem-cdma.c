@@ -1212,7 +1212,7 @@ mm_iface_modem_cdma_update_activation_state (MMIfaceModemCdma *self,
                                              const GError *activation_error)
 {
     MmGdbusModemCdma *skeleton = NULL;
-    MMCdmaActivationError error;
+    MMCdmaActivationError error = MM_CDMA_ACTIVATION_ERROR_NONE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
