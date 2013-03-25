@@ -750,16 +750,29 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
                                         GError **error)
 {
     GVariant *result;
-    gchar *equip_id = NULL, *tmp;
+    gchar *equip_id = NULL, *esn = NULL, *meid = NULL, *imei = NULL;
 
     result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (result) {
         equip_id = sanitize_info_reply (result, "GSN:");
-        /* Some CDMA devices prefix the ESN with "0x" */
-        if (strncmp (equip_id, "0x", 2) == 0 && strlen (equip_id) == 10) {
-            tmp = g_strdup (equip_id + 2);
+
+        /* Modems put all sorts of things into the GSN response; sanitize it */
+        if (mm_parse_gsn (equip_id, &imei, &meid, &esn)) {
             g_free (equip_id);
-            equip_id = tmp;
+
+            if (imei)
+                equip_id = g_strdup (imei);
+            else if (meid)
+                equip_id = g_strdup (meid);
+            else if (esn)
+                equip_id = g_strdup (esn);
+            g_free (esn);
+            g_free (meid);
+            g_free (imei);
+
+            g_assert (equip_id);
+        } else {
+            /* Leave whatever the modem returned alone */
         }
         mm_dbg ("loaded equipment identifier: %s", equip_id);
     }
@@ -2942,12 +2955,15 @@ modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    gchar *imei;
+    const gchar *result;
+    gchar *imei = NULL;
 
-    imei = g_strdup (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error));
-    if (!imei)
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
         return NULL;
 
+    result = mm_strip_tag (result, "+CGSN:");
+    mm_parse_gsn (result, &imei, NULL, NULL);
     mm_dbg ("loaded IMEI: %s", imei);
     return imei;
 }
@@ -3083,6 +3099,8 @@ clck_test_ready (MMBaseModem *self,
         load_enabled_facility_locks_context_complete_and_free (ctx);
         return;
     }
+
+ctx->facilities &= ~MM_MODEM_3GPP_FACILITY_PH_SIM;
 
     /* Go on... */
     get_next_facility_lock_status (ctx);
@@ -5888,12 +5906,15 @@ modem_cdma_load_esn_finish (MMIfaceModemCdma *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *esn;
+    const gchar *result;
+    gchar *esn = NULL;
 
-    esn = g_strdup (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error));
-    if (!esn)
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
         return NULL;
 
+    result = mm_strip_tag (result, "+GSN:");
+    mm_parse_gsn (result, NULL, NULL, &esn);
     mm_dbg ("loaded ESN: %s", esn);
     return esn;
 }
@@ -5904,6 +5925,42 @@ modem_cdma_load_esn (MMIfaceModemCdma *self,
                      gpointer user_data)
 {
     mm_dbg ("loading ESN...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+GSN",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* MEID loading (CDMA interface) */
+
+static gchar *
+modem_cdma_load_meid_finish (MMIfaceModemCdma *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    const gchar *result;
+    gchar *meid = NULL;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return NULL;
+
+    result = mm_strip_tag (result, "+GSN:");
+    mm_parse_gsn (result, NULL, &meid, NULL);
+    mm_dbg ("loaded MEID: %s", meid);
+    return meid;
+}
+
+static void
+modem_cdma_load_meid (MMIfaceModemCdma *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    /* Some devices return both the MEID and the ESN in the +GSN response */
+    mm_dbg ("loading MEID...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+GSN",
                               3,
@@ -9278,6 +9335,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     /* Initialization steps */
     iface->load_esn = modem_cdma_load_esn;
     iface->load_esn_finish = modem_cdma_load_esn_finish;
+    iface->load_meid = modem_cdma_load_meid;
+    iface->load_meid_finish = modem_cdma_load_meid_finish;
 
     /* Registration check steps */
     iface->setup_registration_checks = modem_cdma_setup_registration_checks;

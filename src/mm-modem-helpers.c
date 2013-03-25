@@ -2100,3 +2100,124 @@ mm_cdma_normalize_band (const gchar *long_band,
     /* Unknown/not registered */
     return 'Z';
 }
+
+/*************************************************************************/
+
+/* Caller must strip any "+GSN:" or "+CGSN" from @gsn */
+gboolean
+mm_parse_gsn (const char *gsn,
+              gchar **out_imei,
+              gchar **out_meid,
+              gchar **out_esn)
+{
+    gchar **items, **iter;
+    gchar *meid = NULL, *esn = NULL, *imei = NULL, *p;
+    gboolean success = FALSE;
+
+    if (!gsn || !gsn[0])
+        return FALSE;
+
+    /* IMEI is 15 numeric digits */
+
+    /* ESNs take one of two formats:
+     *  (1) 7 or 8 hexadecimal digits
+     *  (2) 10 or 11 decimal digits
+     *
+     * In addition, leading zeros may be present or absent, and hexadecimal
+     * ESNs may or may not be prefixed with "0x".
+     */
+
+    /* MEIDs take one of two formats:
+     *  (1) 14 hexadecimal digits, sometimes padded to 16 digits with leading zeros
+     *  (2) 18 decimal digits
+     *
+     * As with ESNs, leading zeros may be present or absent, and hexadecimal
+     * MEIDs may or may not be prefixed with "0x".
+     */
+
+    items = g_strsplit_set (gsn, "\r\n\t: ,", 0);
+    for (iter = items; iter && *iter && (!esn || !meid); iter++) {
+        gboolean expect_hex = FALSE, is_hex, is_digit;
+        gchar *s = *iter;
+        guint len = 0;
+
+        if (!s[0])
+            continue;
+
+        if (g_str_has_prefix (s, "0x") || g_str_has_prefix (s, "0X")) {
+            expect_hex = TRUE;
+            s += 2;
+
+            /* Skip any leading zeros */
+            while (*s == '0')
+                s++;
+        }
+
+        /* Check whether all digits are hex or decimal */
+        is_hex = is_digit = TRUE;
+        p = s;
+        while (*p && (is_hex || is_digit)) {
+            if (!g_ascii_isxdigit (*p))
+                is_hex = FALSE;
+            if (!g_ascii_isdigit (*p))
+                is_digit = FALSE;
+            p++, len++;
+        }
+
+        /* Note that some hex strings are also valid digit strings */
+
+        if (is_hex) {
+            if (len == 7 || len == 8) {
+                /* ESN */
+                if (!esn) {
+                    if (len == 7)
+                        esn = g_strdup_printf ("0%s", s);
+                    else
+                        esn = g_strdup (s);
+                }
+            } else if (len == 14) {
+                /* MEID */
+                if (!meid)
+                    meid = g_strdup (s);
+            }
+        }
+
+        if (is_digit) {
+            if (!is_hex)
+                g_warn_if_fail (expect_hex == FALSE);
+
+            if (len == 15) {
+                if (!imei)
+                    imei = g_strdup (s);
+            }
+
+            /* Decimal ESN/MEID unhandled for now; conversion from decimal to
+             * hex isn't a straight dec->hex conversion, as the first 2 digits
+             * of the ESN and first 3 digits of the MEID are the manufacturer
+             * identifier and must be converted separately from serial number
+             * and then concatenated with it.
+             */
+        }
+    }
+    g_strfreev (items);
+
+    success = meid || esn || imei;
+
+    if (out_imei)
+        *out_imei = imei;
+    else
+        g_free (imei);
+
+    if (out_meid)
+        *out_meid = meid;
+    else
+        g_free (meid);
+
+    if (out_esn)
+        *out_esn = esn;
+    else
+        g_free (esn);
+
+    return success;
+}
+

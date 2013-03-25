@@ -1598,6 +1598,71 @@ test_parse_cds (void *f, gpointer d)
                       "07914356060013F1065A098136395339F6219011700463802190117004638030");
 }
 
+typedef struct {
+    const char *gsn;
+    const char *expected_imei;
+    const char *expected_esn;
+    const char *expected_meid;
+    gboolean expect_success;
+} TestGsnItem;
+
+static void
+test_cdma_parse_gsn (void *f, gpointer d)
+{
+    static const TestGsnItem items[] = {
+        { "0x6744775\r\n",  /* leading zeros skipped, no hex digits */
+          NULL,
+          "06744775",
+          NULL,
+          TRUE },
+        { "0x2214A600\r\n",
+          NULL,
+          "2214A600",
+          NULL,
+          TRUE },
+        { "0x80C98A1\r\n",  /* leading zeros skipped, some hex digits */
+          NULL,
+          "080C98A1",
+          NULL,
+          TRUE },
+        { "6030C012\r\n",   /* no leading 0x */
+          NULL,
+          "6030C012",
+          NULL,
+          TRUE },
+        { "45317471585658170:2161753034\r\n0x00A1000013FB653A:0x80D9BBCA\r\n",
+          NULL,
+          "80D9BBCA",
+          "A1000013FB653A",
+          TRUE },
+        { "354237065082227\r\n",  /* GSM IMEI */
+          "354237065082227",
+          NULL, NULL, TRUE },
+        { "356936001568843,NL2A62Z0N5\r\n",  /* IMEI + serial number */
+          "356936001568843",
+          NULL, NULL, TRUE },
+        { "adsfasdfasdfasdf", NULL, NULL, FALSE },
+        { "0x6030Cfgh", NULL, NULL, FALSE },
+        { NULL }
+    };
+
+    const TestGsnItem *iter;
+
+    for (iter = &items[0]; iter && iter->gsn; iter++) {
+        char *imei = NULL, *esn = NULL, *meid = NULL;
+        gboolean success;
+
+        success = mm_parse_gsn (iter->gsn, &imei, &meid, &esn);
+        g_assert_cmpint (success, ==, iter->expect_success);
+        g_assert_cmpstr (iter->expected_imei, ==, imei);
+        g_assert_cmpstr (iter->expected_meid, ==, meid);
+        g_assert_cmpstr (iter->expected_esn, ==, esn);
+        g_free (imei);
+        g_free (meid);
+        g_free (esn);
+    }
+}
+
 /*****************************************************************************/
 
 void
@@ -1715,8 +1780,9 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_parse_operator_id, NULL));
 
-
     g_test_suite_add (suite, TESTCASE (test_parse_cds, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cdma_parse_gsn, NULL));
 
     result = g_test_run ();
 
