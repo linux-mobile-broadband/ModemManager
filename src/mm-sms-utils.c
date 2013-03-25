@@ -362,7 +362,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     variable_length_items = smsc_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
         g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                     "PDU too short (1): %zd vs %d",
+                     "PDU too short (1): %" G_GSIZE_FORMAT "  vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
@@ -380,7 +380,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     variable_length_items += sender_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
         g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                     "PDU too short (2): %zd vs %d",
+                     "PDU too short (2): %" G_GSIZE_FORMAT " vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
@@ -400,7 +400,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
         variable_length_items += user_data_len;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
         g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                     "PDU too short (3): %zd vs %d",
+                     "PDU too short (3): %" G_GSIZE_FORMAT " vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
