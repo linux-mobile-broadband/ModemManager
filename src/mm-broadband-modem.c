@@ -941,9 +941,30 @@ mdn_qcdm_ready (MMQcdmSerialPort *port,
     }
 
     if (qcdm_result_get_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, &numbers[0]) >= 0) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   g_strdupv ((gchar **) numbers),
-                                                   NULL);
+        gboolean valid = TRUE;
+        const char *p = numbers[0];
+
+        /* Returned NV item data is read directly out of NV memory on the card,
+         * so minimally verify it.
+         */
+        if (strlen (numbers[0]) < 6 || strlen (numbers[0]) > 15)
+            valid = FALSE;
+
+        /* MDN is always decimal digits; allow + for good measure */
+        while (p && *p && valid)
+            valid = g_ascii_isdigit (*p++) || (*p == '+');
+
+        if (valid) {
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       g_strdupv ((gchar **) numbers),
+                                                       NULL);
+        } else {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "%s",
+                                             "MDN from NV memory appears invalid");
+        }
     } else {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
