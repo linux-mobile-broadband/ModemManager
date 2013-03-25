@@ -1337,7 +1337,7 @@ modem_time_check_ready (MMBaseModem *self,
     g_simple_async_result_set_op_res_gboolean (simple, FALSE);
 
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
-    if (!error) {
+    if (!error && result) {
         MMBroadbandModemSierra *sierra = MM_BROADBAND_MODEM_SIERRA (self);
 
         sierra->priv->time_method = g_variant_get_uint32 (result);
