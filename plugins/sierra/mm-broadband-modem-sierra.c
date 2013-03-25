@@ -748,6 +748,54 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return FALSE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    guint timeout = 8;
+    const gchar **drivers;
+    guint i;
+
+    /* A short wait is necessary for SIM to become ready, otherwise some older
+     * cards (AC881) crash if asked to connect immediately after sending the
+     * PIN.  Assume sierra_net driven devices are better and don't need as long
+     * a delay.
+     */
+    drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
+    for (i = 0; drivers[i]; i++) {
+        if (g_str_equal (drivers[i], "sierra_net"))
+            timeout = 3;
+    }
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    g_timeout_add_seconds (timeout, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
+
+/*****************************************************************************/
 /* Load own numbers (Modem interface) */
 
 static GStrv
@@ -1463,6 +1511,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->create_sim = mm_common_sierra_create_sim;
     iface->create_sim_finish = mm_common_sierra_create_sim_finish;
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
