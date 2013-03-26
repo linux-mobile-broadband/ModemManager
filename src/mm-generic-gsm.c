@@ -6031,6 +6031,29 @@ typedef enum {
     SIMPLE_STATE_DONE
 } SimpleState;
 
+static const gchar*
+simple_state_to_str (SimpleState state)
+{
+    switch (state) {
+    case SIMPLE_STATE_CHECK_PIN:
+        return "Check PIN";
+    case SIMPLE_STATE_ENABLE:
+        return "Enable";
+    case SIMPLE_STATE_ALLOWED_MODE:
+        return "Allowed Mode";
+    case SIMPLE_STATE_REGISTER:
+        return "Register";
+    case SIMPLE_STATE_SET_APN:
+        return "Set APN";
+    case SIMPLE_STATE_CONNECT:
+        return "Connect";
+    case SIMPLE_STATE_DONE:
+        return "Done";
+    default:
+        return "Unknown state";
+    }
+}
+
 /* Looks a value up in the simple connect properties dictionary.  If the
  * requested key is not present in the dict, NULL is returned.  If the
  * requested key is present but is not a string, an error is returned.
@@ -6166,7 +6189,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
     g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
-    mm_dbg ("(%s): simple connect state %d", data_device, state);
+    mm_dbg ("(%s): simple connect state %d (%s)", data_device, state, simple_state_to_str (state));
     g_free (data_device);
 
     switch (state) {
