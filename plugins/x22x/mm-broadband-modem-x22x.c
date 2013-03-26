@@ -160,6 +160,8 @@ set_allowed_modes (MMIfaceModem *self,
     else if (allowed == MM_MODEM_MODE_ANY &&
              preferred == MM_MODEM_MODE_NONE)
         syssel = 0;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))
+        syssel = 0;
     else {
         gchar *allowed_str;
         gchar *preferred_str;
