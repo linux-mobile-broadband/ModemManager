@@ -280,37 +280,7 @@ modem_create_sim_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMSim *sim;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    sim = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    return (sim ? g_object_ref (sim) : NULL);
-}
-
-static void
-modem_create_sim_ready (GObject *source,
-                        GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
-{
-    MMSim *sim;
-    GError *error = NULL;
-
-    sim = mm_sim_new_finish (res, &error);
-    if (!sim)
-        g_simple_async_result_take_error (simple, error);
-    else {
-        mm_dbg ("New SIM created at DBus path '%s'",
-                mm_sim_get_path (sim));
-        g_simple_async_result_set_op_res_gpointer (
-            simple,
-            sim,
-            (GDestroyNotify)g_object_unref);
-    }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    return mm_sim_new_finish (res, error);
 }
 
 static void
@@ -318,27 +288,11 @@ modem_create_sim (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_sim);
-
-    /* CDMA-only modems don't need this */
-    if (mm_iface_modem_is_cdma_only (self)) {
-        mm_dbg ("Skipping SIM creation in CDMA-only modem...");
-        g_simple_async_result_set_op_res_gpointer (result, NULL, NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
     /* New generic SIM */
     mm_sim_new (MM_BASE_MODEM (self),
                 NULL, /* cancellable */
-                (GAsyncReadyCallback)modem_create_sim_ready,
-                result);
+                callback,
+                user_data);
 }
 
 /*****************************************************************************/

@@ -3961,8 +3961,10 @@ interface_initialization_step (InitializationContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_SIM:
-        /* If the modem doesn't need any SIM, skip */
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
+        /* If the modem doesn't need any SIM (not implemented by plugin, or not
+         * needed in CDMA-only modems) */
+        if (!mm_iface_modem_is_cdma_only (ctx->self) &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
             MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish) {
             MMSim *sim = NULL;
 
