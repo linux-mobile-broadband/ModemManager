@@ -519,17 +519,17 @@ mm_sms_part_new_from_binary_pdu (guint index,
     else
         mm_dbg ("Parsing PDU...");
 
-#define PDU_SIZE_CHECK(required_size, check_descr_str) \
-    if (pdu_len < required_size) {                     \
-        g_set_error (error,                            \
-                     MM_CORE_ERROR,                    \
-                     MM_CORE_ERROR_FAILED,             \
-                     "PDU too short, %s: %zd < %u",    \
-                     check_descr_str,                  \
-                     pdu_len,                          \
-                     required_size);                   \
-        mm_sms_part_free (sms_part);                   \
-        return NULL;                                   \
+#define PDU_SIZE_CHECK(required_size, check_descr_str)                 \
+    if (pdu_len < required_size) {                                     \
+        g_set_error (error,                                            \
+                     MM_CORE_ERROR,                                    \
+                     MM_CORE_ERROR_FAILED,                             \
+                     "PDU too short, %s: %" G_GSIZE_FORMAT " < %u",    \
+                     check_descr_str,                                  \
+                     pdu_len,                                          \
+                     required_size);                                   \
+        mm_sms_part_free (sms_part);                                   \
+        return NULL;                                                   \
     }
 
     offset = 0;
