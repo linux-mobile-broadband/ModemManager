@@ -119,6 +119,7 @@ get_device_ids (GUdevDevice *device,
     GUdevDevice *parent = NULL;
     const gchar *vid = NULL, *pid = NULL, *parent_subsys;
     gboolean success = FALSE;
+    char *pci_vid = NULL, *pci_pid = NULL;
 
     parent = g_udev_device_get_parent (device);
     if (parent) {
@@ -153,6 +154,19 @@ get_device_ids (GUdevDevice *device,
                     vid = g_udev_device_get_property (qmi_parent, "ID_VENDOR_ID");
                     pid = g_udev_device_get_property (qmi_parent, "ID_MODEL_ID");
                     g_object_unref (qmi_parent);
+                }
+            } else if (g_str_equal (parent_subsys, "pci")) {
+                const char *pci_id;
+
+                /* We can't always rely on the model + vendor showing up on
+                 * the PCI device's child, so look at the PCI parent.  PCI_ID
+                 * has the format "1931:000C".
+                 */
+                pci_id = g_udev_device_get_property (parent, "PCI_ID");
+                if (pci_id && strlen (pci_id) == 9 && pci_id[4] == ':') {
+                    vid = pci_vid = g_strdup (pci_id);
+                    pci_vid[4] = '\0';
+                    pid = pci_pid = g_strdup (pci_id + 5);
                 }
             }
         }
@@ -197,6 +211,8 @@ get_device_ids (GUdevDevice *device,
 out:
     if (parent)
         g_object_unref (parent);
+    g_free (pci_vid);
+    g_free (pci_pid);
     return success;
 }
 
