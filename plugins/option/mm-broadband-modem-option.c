@@ -1064,6 +1064,21 @@ setup_ports (MMBroadbandModem *self)
 
 /*****************************************************************************/
 
+static gboolean
+is_nozomi (const gchar **drivers)
+{
+    if (drivers) {
+        guint i;
+
+        for (i = 0; drivers[i]; i++) {
+            if (g_str_equal (drivers[i], "nozomi"))
+                return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 MMBroadbandModemOption *
 mm_broadband_modem_option_new (const gchar *device,
                                const gchar **drivers,
@@ -1071,12 +1086,18 @@ mm_broadband_modem_option_new (const gchar *device,
                                guint16 vendor_id,
                                guint16 product_id)
 {
+    MMModem3gppFacility ignored;
+
+    /* Ignore PH-SIM facility in 'nozomi' managed modems */
+    ignored = is_nozomi (drivers) ? MM_MODEM_3GPP_FACILITY_PH_SIM : MM_MODEM_3GPP_FACILITY_NONE;
+
     return g_object_new (MM_TYPE_BROADBAND_MODEM_OPTION,
                          MM_BASE_MODEM_DEVICE, device,
                          MM_BASE_MODEM_DRIVERS, drivers,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS, ignored,
                          NULL);
 }
 
