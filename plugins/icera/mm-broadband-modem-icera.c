@@ -756,6 +756,58 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem power up (Modem interface) */
+
+static gboolean
+modem_power_up_finish (MMIfaceModem *self,
+                       GAsyncResult *res,
+                       GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cfun_enable_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
+        /* Ignore all errors except NOT_ALLOWED, which means Airplane Mode */
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED))
+            g_simple_async_result_take_error (simple, error);
+        else
+            g_error_free (error);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_power_up (MMIfaceModem *self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_power_up);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=1",
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback)cfun_enable_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Modem power down (Modem interface) */
 
 static gboolean
@@ -1648,6 +1700,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_current_bands = modem_load_current_bands;
     iface->load_current_bands_finish = modem_load_current_bands_finish;
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = modem_power_up_finish;
     /* Note: don't implement modem_init_power_down, as CFUN=4 here may take
      * looong to reply */
     iface->modem_power_down = modem_power_down;
