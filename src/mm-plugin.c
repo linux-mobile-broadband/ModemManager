@@ -76,6 +76,7 @@ struct _MMPluginPrivate {
     gboolean at;
     gboolean single_at;
     gboolean qcdm;
+    gboolean qmi;
     gboolean icera_probe;
     MMPortProbeAtCommand *custom_at_probe;
     guint64 send_delay;
@@ -103,6 +104,7 @@ enum {
     PROP_ALLOWED_AT,
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
+    PROP_ALLOWED_QMI,
     PROP_ICERA_PROBE,
     PROP_ALLOWED_ICERA,
     PROP_FORBIDDEN_ICERA,
@@ -703,10 +705,18 @@ mm_plugin_supports_port (MMPlugin *self,
             probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
     } else {
         /* cdc-wdm ports... */
-        probe_run_flags = MM_PORT_PROBE_QMI;
+        probe_run_flags = self->priv->qmi ? MM_PORT_PROBE_QMI : MM_PORT_PROBE_NONE;
     }
 
-    g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
+    /* If no explicit probing was required, just request to grab it without probing anything.
+     * This may happen, e.g. with cdc-wdm ports which do not need QMI probing. */
+    if (probe_run_flags == MM_PORT_PROBE_NONE) {
+        g_simple_async_result_set_op_res_gpointer (async_result,
+                                                   GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
+                                                   NULL);
+        g_simple_async_result_complete_in_idle (async_result);
+        goto out;
+    }
 
     /* If a modem is already available and the plugin says that only one AT port is
      * expected, check if we alredy got the single AT port. And if so, we know this
@@ -945,6 +955,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->qcdm = g_value_get_boolean (value);
         break;
+    case PROP_ALLOWED_QMI:
+        /* Construct only */
+        self->priv->qmi = g_value_get_boolean (value);
+        break;
     case PROP_ICERA_PROBE:
         /* Construct only */
         self->priv->icera_probe = g_value_get_boolean (value);
@@ -1026,6 +1040,9 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_QCDM:
         g_value_set_boolean (value, self->priv->qcdm);
+        break;
+    case PROP_ALLOWED_QMI:
+        g_value_set_boolean (value, self->priv->qmi);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         g_value_set_boxed (value, self->priv->udev_tags);
@@ -1215,6 +1232,14 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_ALLOWED_QCDM,
                                "Allowed QCDM",
                                "Whether QCDM ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_QMI,
+         g_param_spec_boolean (MM_PLUGIN_ALLOWED_QMI,
+                               "Allowed QMI",
+                               "Whether QMI ports are allowed in this plugin",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 

@@ -52,6 +52,7 @@
 #define MM_PLUGIN_ALLOWED_AT                "allowed-at"
 #define MM_PLUGIN_ALLOWED_SINGLE_AT         "allowed-single-at"
 #define MM_PLUGIN_ALLOWED_QCDM              "allowed-qcdm"
+#define MM_PLUGIN_ALLOWED_QMI               "allowed-qmi"
 #define MM_PLUGIN_ICERA_PROBE               "icera-probe"
 #define MM_PLUGIN_ALLOWED_ICERA             "allowed-icera"
 #define MM_PLUGIN_FORBIDDEN_ICERA           "forbidden-icera"
