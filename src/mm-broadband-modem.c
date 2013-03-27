@@ -3201,7 +3201,14 @@ registration_state_changed (MMAtSerialPort *port,
     else
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
 
-    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
+    /* Only update access technologies from CREG/CGREG response if the modem
+     * doesn't have custom commands for access technology loading, otherwise
+     * we fight with the custom commands.  Plus CREG/CGREG access technologies
+     * don't have fine-grained distinction between HSxPA or GPRS/EDGE, etc.
+     */
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies == modem_load_access_technologies)
+        mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
+
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cell_id);
 }
 
