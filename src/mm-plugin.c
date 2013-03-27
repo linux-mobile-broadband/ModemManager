@@ -81,6 +81,7 @@ struct _MMPluginPrivate {
     MMPortProbeAtCommand *custom_at_probe;
     guint64 send_delay;
     gboolean remove_echo;
+    gboolean send_lf;
 
     /* Probing setup and/or post-probing filter.
      * Plugins may use this method to decide whether they support a given
@@ -112,6 +113,7 @@ enum {
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
     PROP_REMOVE_ECHO,
+    PROP_SEND_LF,
     LAST_PROP
 };
 
@@ -753,6 +755,7 @@ mm_plugin_supports_port (MMPlugin *self,
                        ctx->flags,
                        self->priv->send_delay,
                        self->priv->remove_echo,
+                       self->priv->send_lf,
                        self->priv->custom_at_probe,
                        self->priv->custom_init,
                        (GAsyncReadyCallback)port_probe_run_ready,
@@ -888,6 +891,7 @@ mm_plugin_init (MMPlugin *self)
     /* Defaults */
     self->priv->send_delay = 100000;
     self->priv->remove_echo = TRUE;
+    self->priv->send_lf = FALSE;
 }
 
 static void
@@ -987,6 +991,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->remove_echo = g_value_get_boolean (value);
         break;
+    case PROP_SEND_LF:
+        /* Construct only */
+        self->priv->send_lf = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1067,6 +1075,9 @@ get_property (GObject *object,
         break;
     case PROP_REMOVE_ECHO:
         g_value_set_boolean (value, self->priv->remove_echo);
+        break;
+    case PROP_SEND_LF:
+        g_value_set_boolean (value, self->priv->send_lf);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1301,5 +1312,13 @@ mm_plugin_class_init (MMPluginClass *klass)
                                "Remove echo",
                                "Remove echo out of the AT responses",
                                TRUE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_SEND_LF,
+         g_param_spec_boolean (MM_PLUGIN_SEND_LF,
+                               "Send LF",
+                               "Send line-feed at the end of each AT command sent",
+                               FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

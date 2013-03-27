@@ -69,6 +69,8 @@ typedef void (*MMAtSerialResponseFn)     (MMAtSerialPort *port,
 #define MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED "init-sequence-enabled"
 #define MM_AT_SERIAL_PORT_INIT_SEQUENCE         "init-sequence"
 
+#define MM_AT_SERIAL_PORT_SEND_LF "send-lf"
+
 struct _MMAtSerialPort {
     MMSerialPort parent;
 };

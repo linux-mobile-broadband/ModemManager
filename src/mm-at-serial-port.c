@@ -33,6 +33,7 @@ enum {
     PROP_REMOVE_ECHO,
     PROP_INIT_SEQUENCE_ENABLED,
     PROP_INIT_SEQUENCE,
+    PROP_SEND_LF,
     LAST_PROP
 };
 
@@ -50,6 +51,7 @@ typedef struct {
     gboolean remove_echo;
     guint init_sequence_enabled;
     gchar **init_sequence;
+    gboolean send_lf;
 } MMAtSerialPortPrivate;
 
 /*****************************************************************************/
@@ -286,7 +288,7 @@ parse_unsolicited (MMSerialPort *port, GByteArray *response)
 /*****************************************************************************/
 
 static GByteArray *
-at_command_to_byte_array (const char *command, gboolean is_raw)
+at_command_to_byte_array (const char *command, gboolean is_raw, gboolean send_lf)
 {
     GByteArray *buf;
     int cmdlen;
@@ -294,7 +296,7 @@ at_command_to_byte_array (const char *command, gboolean is_raw)
     g_return_val_if_fail (command != NULL, NULL);
 
     cmdlen = strlen (command);
-    buf = g_byte_array_sized_new (cmdlen + 3);
+    buf = g_byte_array_sized_new (cmdlen + 4);
 
     if (!is_raw) {
         /* Make sure there's an AT in the front */
@@ -306,8 +308,15 @@ at_command_to_byte_array (const char *command, gboolean is_raw)
 
     if (!is_raw) {
         /* Make sure there's a trailing carriage return */
-        if (command[cmdlen - 1] != '\r')
-            g_byte_array_append (buf, (const guint8 *) "\r", 1);
+        if ((cmdlen == 0) ||
+            (command[cmdlen - 1] != '\r' && (cmdlen == 1 || command[cmdlen - 2] != '\r')))
+             g_byte_array_append (buf, (const guint8 *) "\r", 1);
+        if (send_lf) {
+            /* Make sure there's a trailing line-feed */
+            if ((cmdlen == 0) ||
+                (command[cmdlen - 1] != '\n' && (cmdlen == 1 || command[cmdlen - 2] != '\n')))
+                 g_byte_array_append (buf, (const guint8 *) "\n", 1);
+        }
     }
 
     return buf;
@@ -323,12 +332,13 @@ mm_at_serial_port_queue_command (MMAtSerialPort *self,
                                  gpointer user_data)
 {
     GByteArray *buf;
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
     g_return_if_fail (command != NULL);
 
-    buf = at_command_to_byte_array (command, is_raw);
+    buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
     g_return_if_fail (buf != NULL);
 
     mm_serial_port_queue_command (MM_SERIAL_PORT (self),
@@ -350,12 +360,13 @@ mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
                                         gpointer user_data)
 {
     GByteArray *buf;
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
     g_return_if_fail (command != NULL);
 
-    buf = at_command_to_byte_array (command, is_raw);
+    buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
     g_return_if_fail (buf != NULL);
 
     mm_serial_port_queue_command_cached (MM_SERIAL_PORT (self),
@@ -475,6 +486,9 @@ mm_at_serial_port_init (MMAtSerialPort *self)
     priv->remove_echo = TRUE;
     /* By default, run init sequence during first port opening */
     priv->init_sequence_enabled = TRUE;
+
+    /* By default, don't send line feed */
+    priv->send_lf = FALSE;
 }
 
 static void
@@ -493,6 +507,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_INIT_SEQUENCE:
         g_strfreev (priv->init_sequence);
         priv->init_sequence = g_value_dup_boxed (value);
+        break;
+    case PROP_SEND_LF:
+        priv->send_lf = g_value_get_boolean (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -515,6 +532,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_INIT_SEQUENCE:
         g_value_set_boxed (value, priv->init_sequence);
+        break;
+    case PROP_SEND_LF:
+        g_value_set_boolean (value, priv->send_lf);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -590,4 +610,12 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
                              "Initialization sequence",
                              G_TYPE_STRV,
                              G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_SEND_LF,
+         g_param_spec_boolean (MM_AT_SERIAL_PORT_SEND_LF,
+                               "Send LF",
+                               "Send line-feed at the end of each AT command sent",
+                               FALSE,
+                               G_PARAM_READWRITE));
 }

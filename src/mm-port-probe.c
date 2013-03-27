@@ -85,6 +85,8 @@ typedef struct {
     guint64 at_send_delay;
     /* Flag to leave/remove echo in AT responses */
     gboolean at_remove_echo;
+    /* Flag to send line-feed at the end of AT commands */
+    gboolean at_send_lf;
     /* Number of times we tried to open the AT port */
     guint at_open_tries;
     /* Custom initialization setup */
@@ -975,6 +977,7 @@ serial_open_at (MMPortProbe *self)
         g_object_set (task->serial,
                       MM_SERIAL_PORT_SEND_DELAY,     task->at_send_delay,
                       MM_AT_SERIAL_PORT_REMOVE_ECHO, task->at_remove_echo,
+                      MM_AT_SERIAL_PORT_SEND_LF,     task->at_send_lf,
                       MM_PORT_CARRIER_DETECT,        FALSE,
                       MM_SERIAL_PORT_SPEW_CONTROL,   TRUE,
                       NULL);
@@ -1096,6 +1099,7 @@ mm_port_probe_run (MMPortProbe *self,
                    MMPortProbeFlag flags,
                    guint64 at_send_delay,
                    gboolean at_remove_echo,
+                   gboolean at_send_lf,
                    const MMPortProbeAtCommand *at_custom_probe,
                    const MMAsyncMethod *at_custom_init,
                    GAsyncReadyCallback callback,
@@ -1115,6 +1119,7 @@ mm_port_probe_run (MMPortProbe *self,
     task = g_new0 (PortProbeRunTask, 1);
     task->at_send_delay = at_send_delay;
     task->at_remove_echo = at_remove_echo;
+    task->at_send_lf = at_send_lf;
     task->flags = MM_PORT_PROBE_NONE;
     task->at_custom_probe = at_custom_probe;
     task->at_custom_init = at_custom_init ? (MMPortProbeAtCustomInit)at_custom_init->async : NULL;

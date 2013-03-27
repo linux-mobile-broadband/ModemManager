@@ -60,6 +60,7 @@
 #define MM_PLUGIN_CUSTOM_AT_PROBE           "custom-at-probe"
 #define MM_PLUGIN_SEND_DELAY                "send-delay"
 #define MM_PLUGIN_REMOVE_ECHO               "remove-echo"
+#define MM_PLUGIN_SEND_LF                   "send-lf"
 
 typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
