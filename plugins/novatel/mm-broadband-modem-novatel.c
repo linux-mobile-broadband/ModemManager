@@ -963,26 +963,6 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
-/* Setup ports (Broadband modem class) */
-
-static const MMBaseModemAtCommand nwdmat_sequence[] = {
-    { "$NWDMAT=1", 3, FALSE, mm_base_modem_response_processor_continue_on_error },
-    { "$NWDMAT=1", 3, FALSE, mm_base_modem_response_processor_continue_on_error },
-    { "$NWDMAT=1", 3, FALSE, NULL },
-    { NULL }
-};
-
-static void
-setup_ports (MMBroadbandModem *self)
-{
-    /* Call parent's setup ports first always */
-    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_novatel_parent_class)->setup_ports (self);
-
-    /* Flip secondary ports to AT mode */
-    mm_base_modem_at_sequence (MM_BASE_MODEM (self), nwdmat_sequence, NULL, NULL, NULL, NULL);
-}
-
-/*****************************************************************************/
 
 MMBroadbandModemNovatel *
 mm_broadband_modem_novatel_new (const gchar *device,
@@ -1037,7 +1017,4 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 static void
 mm_broadband_modem_novatel_class_init (MMBroadbandModemNovatelClass *klass)
 {
-    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
-
-    broadband_modem_class->setup_ports = setup_ports;
 }

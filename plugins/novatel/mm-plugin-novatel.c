@@ -34,6 +34,21 @@ G_DEFINE_TYPE (MMPluginNovatel, mm_plugin_novatel, MM_TYPE_PLUGIN)
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
+/*****************************************************************************/
+/* Custom commands for AT probing */
+
+/* We need to explicitly flip secondary ports to AT mode.
+ * We also use this command also for checking AT support in the current port.
+ */
+static const MMPortProbeAtCommand custom_at_probe[] = {
+    { "$NWDMAT=1", 3, mm_port_probe_response_processor_is_at },
+    { "$NWDMAT=1", 3, mm_port_probe_response_processor_is_at },
+    { "$NWDMAT=1", 3, mm_port_probe_response_processor_is_at },
+    { NULL }
+};
+
+/*****************************************************************************/
+
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
@@ -71,6 +86,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,    vendors,
                       MM_PLUGIN_FORBIDDEN_PRODUCT_IDS, forbidden_products,
                       MM_PLUGIN_ALLOWED_AT,            TRUE,
+                      MM_PLUGIN_CUSTOM_AT_PROBE,       custom_at_probe,
                       MM_PLUGIN_ALLOWED_QCDM,          TRUE,
                       NULL));
 }
