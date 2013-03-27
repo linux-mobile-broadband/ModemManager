@@ -28,11 +28,12 @@
 #define MM_IS_IFACE_MODEM_3GPP(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP))
 #define MM_IFACE_MODEM_3GPP_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP, MMIfaceModem3gpp))
 
-#define MM_IFACE_MODEM_3GPP_DBUS_SKELETON        "iface-modem-3gpp-dbus-skeleton"
-#define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE   "iface-modem-3gpp-registration-state"
-#define MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED "iface-modem-3gpp-cs-network-supported"
-#define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED "iface-modem-3gpp-ps-network-supported"
-#define MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED "iface-modem-3gpp-eps-network-supported"
+#define MM_IFACE_MODEM_3GPP_DBUS_SKELETON           "iface-modem-3gpp-dbus-skeleton"
+#define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE      "iface-modem-3gpp-registration-state"
+#define MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED    "iface-modem-3gpp-cs-network-supported"
+#define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED    "iface-modem-3gpp-ps-network-supported"
+#define MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED   "iface-modem-3gpp-eps-network-supported"
+#define MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS  "iface-modem-3gpp-ignored-facility-locks"
 
 #define MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK    \
     (MM_MODEM_ACCESS_TECHNOLOGY_GSM |                       \

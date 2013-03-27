@@ -2148,6 +2148,15 @@ iface_modem_3gpp_init (gpointer g_iface)
                                FALSE,
                                G_PARAM_READWRITE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_flags (MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
+                             "Ignored locks",
+                             "Ignored facility locks",
+                             MM_TYPE_MODEM_3GPP_FACILITY,
+                             MM_MODEM_3GPP_FACILITY_NONE,
+                             G_PARAM_READWRITE));
+
     initialized = TRUE;
 }
 

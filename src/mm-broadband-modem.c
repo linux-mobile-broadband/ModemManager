@@ -87,6 +87,7 @@ enum {
     PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
+    PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
     PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
     PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
     PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
@@ -134,6 +135,7 @@ struct _MMBroadbandModemPrivate {
     gboolean modem_3gpp_eps_network_supported;
     /* Implementation helpers */
     GPtrArray *modem_3gpp_registration_regex;
+    MMModem3gppFacility modem_3gpp_ignored_facility_locks;
 
     /*<--- Modem 3GPP USSD interface --->*/
     /* Properties */
@@ -3052,6 +3054,17 @@ clck_test_ready (MMBaseModem *self,
                                          response);
         load_enabled_facility_locks_context_complete_and_free (ctx);
         return;
+    }
+
+    /* Ignore facility locks specified by the plugins */
+    if (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_ignored_facility_locks) {
+        gchar *str;
+
+        str = mm_modem_3gpp_facility_build_string_from_mask (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_ignored_facility_locks);
+        mm_dbg ("Ignoring facility locks: '%s'", str);
+        g_free (str);
+
+        ctx->facilities &= ~MM_BROADBAND_MODEM (self)->priv->modem_3gpp_ignored_facility_locks;
     }
 
     /* Go on... */
@@ -8960,6 +8973,9 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED:
         self->priv->modem_3gpp_eps_network_supported = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
+        self->priv->modem_3gpp_ignored_facility_locks = g_value_get_flags (value);
+        break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
         break;
@@ -9049,6 +9065,9 @@ get_property (GObject *object,
     case PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED:
         g_value_set_boolean (value, self->priv->modem_3gpp_eps_network_supported);
         break;
+    case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
+        g_value_set_flags (value, self->priv->modem_3gpp_ignored_facility_locks);
+        break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
         break;
@@ -9093,6 +9112,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_3gpp_cs_network_supported = TRUE;
     self->priv->modem_3gpp_ps_network_supported = TRUE;
     self->priv->modem_3gpp_eps_network_supported = FALSE;
+    self->priv->modem_3gpp_ignored_facility_locks = MM_MODEM_3GPP_FACILITY_NONE;
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_network_supported = TRUE;
@@ -9456,6 +9476,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
                                       MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
+                                      MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
