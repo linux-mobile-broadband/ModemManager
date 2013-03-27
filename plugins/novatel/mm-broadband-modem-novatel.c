@@ -28,6 +28,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
+#include "mm-iface-modem-time.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-novatel.h"
 #include "mm-errors-types.h"
@@ -39,13 +40,15 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 static MMIfaceModem *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
 /*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
@@ -963,6 +966,159 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Load network time (Time interface) */
+
+static gboolean
+parse_nwltime_reply (const char *response,
+                     gchar **out_iso_8601,
+                     MMNetworkTimezone **out_tz,
+                     GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+    guint year, month, day, hour, minute, second;
+    gchar *result = NULL;
+    gint utc_offset = 0;
+    gboolean success = FALSE;
+
+    /* Sample reply: 2013.3.27.15.47.19.2.-5 */
+    r = g_regex_new ("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.([\\-\\+\\d]+)$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse $NWLTIME results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match $NWLTIME reply");
+        }
+    } else {
+        /* Remember that g_match_info_get_match_count() includes match #0 */
+        g_assert (g_match_info_get_match_count (match_info) >= 9);
+
+        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+            mm_get_uint_from_match_info (match_info, 2, &month) &&
+            mm_get_uint_from_match_info (match_info, 3, &day) &&
+            mm_get_uint_from_match_info (match_info, 4, &hour) &&
+            mm_get_uint_from_match_info (match_info, 5, &minute) &&
+            mm_get_uint_from_match_info (match_info, 6, &second) &&
+            mm_get_int_from_match_info (match_info, 8, &utc_offset)) {
+
+            /* Return ISO-8601 format date/time string */
+            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
+                                      year, month, day, hour, minute, second);
+            if (out_tz) {
+                *out_tz = mm_network_timezone_new ();
+                mm_network_timezone_set_offset (*out_tz, utc_offset * 60);
+            }
+
+            success = TRUE;
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse $NWLTIME reply");
+        }
+    }
+
+    if (out_iso_8601)
+        *out_iso_8601 = result;
+    else
+        g_free (result);
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+    return success;
+}
+
+static gchar *
+modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    const gchar *response;
+    gchar *result = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (response)
+        parse_nwltime_reply (response, &result, NULL, error);
+    return result;
+}
+
+static void
+modem_time_load_network_time (MMIfaceModemTime *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$NWLTIME",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Load network timezone (Time interface) */
+
+static MMNetworkTimezone *
+modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    const gchar *response;
+    MMNetworkTimezone *tz = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    if (response)
+        parse_nwltime_reply (response, NULL, &tz, error);
+    return tz;
+}
+
+static void
+modem_time_load_network_timezone (MMIfaceModemTime *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$NWLTIME",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Check support (Time interface) */
+
+static gboolean
+modem_time_check_support_finish (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_time_check_support (MMIfaceModemTime *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    /* Only CDMA devices support this at the moment */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$NWLTIME",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemNovatel *
 mm_broadband_modem_novatel_new (const gchar *device,
@@ -1012,6 +1168,17 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
     iface->get_detailed_registration_state = modem_cdma_get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = modem_cdma_get_detailed_registration_state_finish;
+}
+
+static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+    iface->check_support = modem_time_check_support;
+    iface->check_support_finish = modem_time_check_support_finish;
+    iface->load_network_time = modem_time_load_network_time;
+    iface->load_network_time_finish = modem_time_load_network_time_finish;
+    iface->load_network_timezone = modem_time_load_network_timezone;
+    iface->load_network_timezone_finish = modem_time_load_network_timezone_finish;
 }
 
 static void
