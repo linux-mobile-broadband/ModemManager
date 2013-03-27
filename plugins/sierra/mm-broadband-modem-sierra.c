@@ -1027,7 +1027,7 @@ modem_power_down (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        mm_common_sierra_modem_power_up);
+                                        modem_power_down);
 
     /* For CDMA modems, run !pcstate */
     if (mm_iface_modem_is_cdma_only (self)) {
