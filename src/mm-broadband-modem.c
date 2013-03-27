@@ -3054,8 +3054,6 @@ clck_test_ready (MMBaseModem *self,
         return;
     }
 
-ctx->facilities &= ~MM_MODEM_3GPP_FACILITY_PH_SIM;
-
     /* Go on... */
     get_next_facility_lock_status (ctx);
 }
