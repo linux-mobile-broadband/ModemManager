@@ -91,10 +91,9 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
-    static const guint16 vendor_ids[] = { 0x0af0, 0 }; /* Option USB devices */
-    static const mm_uint16_pair product_ids[] = { { 0x1931, 0x000c }, /* Nozomi CardBus devices */
-                                                  { 0, 0 }
-    };
+    static const guint16 vendor_ids[] = { 0x0af0, /* Option USB devices */
+                                          0x1931, /* Nozomi CardBus devices */
+                                          0 };
     static const gchar *drivers[] = { "option1", "option", "nozomi", NULL };
 
     return MM_PLUGIN (
@@ -103,7 +102,6 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
                       MM_PLUGIN_ALLOWED_DRIVERS,     drivers,
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,  vendor_ids,
-                      MM_PLUGIN_ALLOWED_PRODUCT_IDS, product_ids,
                       MM_PLUGIN_ALLOWED_AT,          TRUE,
                       NULL));
 }
