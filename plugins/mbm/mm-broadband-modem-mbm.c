@@ -37,6 +37,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-broadband-modem-mbm.h"
 #include "mm-broadband-bearer-mbm.h"
+#include "mm-sim-mbm.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -128,6 +129,29 @@ modem_create_bearer (MMIfaceModem *self,
                                  NULL, /* cancellable */
                                  (GAsyncReadyCallback)broadband_bearer_mbm_new_ready,
                                  result);
+}
+
+/*****************************************************************************/
+/* Create SIM (Modem interface) */
+
+static MMSim *
+create_sim_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return mm_sim_mbm_new_finish (res, error);
+}
+
+static void
+create_sim (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    /* New MBM SIM */
+    mm_sim_mbm_new (MM_BASE_MODEM (self),
+                    NULL, /* cancellable */
+                    callback,
+                    user_data);
 }
 
 /*****************************************************************************/
@@ -1206,6 +1230,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->create_sim = create_sim;
+    iface->create_sim_finish = create_sim_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_allowed_modes = load_allowed_modes;
