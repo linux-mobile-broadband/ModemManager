@@ -107,10 +107,7 @@ longcheer_custom_init_step (LongcheerCustomInitContext *ctx)
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
         mm_dbg ("(Longcheer) no need to keep on running custom init in (%s)",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Custom initialization cancelled");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         longcheer_custom_init_context_complete_and_free (ctx);
         return;
     }

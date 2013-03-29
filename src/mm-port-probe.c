@@ -940,10 +940,16 @@ serial_buffer_full (MMSerialPort *serial,
                     GByteArray *buffer,
                     MMPortProbe *self)
 {
+    PortProbeRunTask *task = self->priv->task;
+
     if (is_non_at_response (buffer->data, buffer->len)) {
-        mm_serial_port_close (serial);
+        mm_dbg ("(%s/%s) serial buffer full",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+        /* Don't explicitly close the AT port, just end the AT probing
+         * (or custom init probing) */
         mm_port_probe_set_result_at (self, FALSE);
-        serial_probe_schedule (self);
+        g_cancellable_cancel (task->at_probing_cancellable);
     }
 }
 

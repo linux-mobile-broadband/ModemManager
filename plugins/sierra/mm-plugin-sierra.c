@@ -126,18 +126,16 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
 {
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        mm_dbg ("(Sierra) no need to keep on running custom init in (%s)",
+        mm_dbg ("(Sierra) no need to keep on running custom init in '%s'",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Custom initialization cancelled");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         sierra_custom_init_context_complete_and_free (ctx);
         return;
     }
 
     if (ctx->retries == 0) {
-        mm_dbg ("(Sierra) Couldn't get port type hints");
+        mm_dbg ("(Sierra) Couldn't get port type hints from '%s'",
+                mm_port_get_device (MM_PORT (ctx->port)));
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         sierra_custom_init_context_complete_and_free (ctx);
         return;
