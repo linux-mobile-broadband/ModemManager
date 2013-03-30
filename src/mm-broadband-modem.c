@@ -5748,6 +5748,8 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
 {
     const gchar *response;
     GError *error = NULL;
+    GList *info_list;
+    GList *l;
 
     /* Always always always unlock mem1 storage. Warned you've been. */
     mm_broadband_modem_unlock_sms_storages (self, TRUE, FALSE);
@@ -5759,45 +5761,32 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
         return;
     }
 
-    while (*response) {
+    info_list = mm_3gpp_parse_pdu_cmgl_response (response, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        list_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    for (l = info_list; l; l = g_list_next (l)) {
+        MM3gppPduInfo *info = l->data;
         MMSmsPart *part;
-        gint idx;
-        gint status;
-        gint tpdu_len;
-        gchar pdu[SMS_MAX_PDU_LEN + 1];
-        gint offset;
-        gint rv;
 
-        rv = sscanf (response,
-                     "+CMGL: %d,%d,,%d %" G_STRINGIFY (SMS_MAX_PDU_LEN) "s %n",
-                     &idx, &status, &tpdu_len, pdu, &offset);
-        if (4 != rv) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_INVALID_ARGS,
-                                             "Couldn't parse SMS list response: "
-                                             "only %d fields parsed",
-                                             rv);
-            list_parts_context_complete_and_free (ctx);
-            return;
-        }
-
-        /* Will try to keep on the loop */
-        response += offset;
-
-        part = mm_sms_part_new_from_pdu (idx, pdu, &error);
+        part = mm_sms_part_new_from_pdu (info->index, info->pdu, &error);
         if (part) {
-            mm_dbg ("Correctly parsed PDU (%d)", idx);
+            mm_dbg ("Correctly parsed PDU (%d)", info->index);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                                 part,
-                                                sms_state_from_index (status),
+                                                sms_state_from_index (info->status),
                                                 ctx->list_storage);
         } else {
             /* Don't treat the error as critical */
-            mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
+            mm_dbg ("Error parsing PDU (%d): %s", info->index, error->message);
             g_clear_error (&error);
         }
     }
+
+    mm_3gpp_pdu_info_list_free (info_list);
 
     /* We consider all done */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);

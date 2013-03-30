@@ -150,6 +150,17 @@ gint         mm_3gpp_cind_response_get_max       (MM3gppCindResponse *r);
 GByteArray *mm_3gpp_parse_cind_read_response (const gchar *reply,
                                               GError **error);
 
+/* AT+CMGL=4 (list sms parts) response parser */
+typedef struct {
+    gint index;
+    gint status;
+    gchar *pdu;
+} MM3gppPduInfo;
+void   mm_3gpp_pdu_info_list_free      (GList *info_list);
+GList *mm_3gpp_parse_pdu_cmgl_response (const gchar *str,
+                                        GError **error);
+
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);

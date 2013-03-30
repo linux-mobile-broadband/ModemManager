@@ -28,6 +28,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-sms-part.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
@@ -1433,6 +1434,72 @@ done:
 
 /*************************************************************************/
 
+static void
+mm_3gpp_pdu_info_free (MM3gppPduInfo *info)
+{
+    g_free (info->pdu);
+    g_free (info);
+}
+
+void
+mm_3gpp_pdu_info_list_free (GList *info_list)
+{
+    g_list_free_full (info_list, (GDestroyNotify)mm_3gpp_pdu_info_free);
+}
+
+GList *
+mm_3gpp_parse_pdu_cmgl_response (const gchar *str,
+                                 GError **error)
+{
+    GError *inner_error = NULL;
+    GList *list = NULL;
+    GMatchInfo *match_info;
+    GRegex *r;
+
+    /*
+     * +CMGL: <index>, <status>, [<alpha>], <length>
+     *   or
+     * +CMGL: <index>, <status>, <length>
+     *
+     * We just read <index>, <stat> and the PDU itself.
+     */
+    r = g_regex_new ("\\+CMGL:\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,(.*)\\r\\n([^\\r\\n]*)(\\r\\n)?",
+                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    while (!inner_error && g_match_info_matches (match_info)) {
+        MM3gppPduInfo *info;
+
+        info = g_new0 (MM3gppPduInfo, 1);
+        if (mm_get_int_from_match_info (match_info, 1, &info->index) &&
+            mm_get_int_from_match_info (match_info, 2, &info->status) &&
+            (info->pdu = mm_get_string_unquoted_from_match_info (match_info, 4)) != NULL) {
+            /* Append to our list of results and keep on */
+            list = g_list_append (list, info);
+            g_match_info_next (match_info, &inner_error);
+        } else {
+            inner_error = g_error_new (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_FAILED,
+                                       "Error parsing +CMGL response: '%s'",
+                                       str);
+        }
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        mm_3gpp_pdu_info_list_free (list);
+        return NULL;
+    }
+
+    return list;
+}
+
+/*************************************************************************/
+
 /* Map two letter facility codes into flag values. There are
  * many more facilities defined (for various flavors of call
  * barring); we only map the ones we care about. */
@@ -2102,8 +2169,8 @@ mm_cdma_normalize_band (const gchar *long_band,
 }
 
 /*************************************************************************/
-
 /* Caller must strip any "+GSN:" or "+CGSN" from @gsn */
+
 gboolean
 mm_parse_gsn (const char *gsn,
               gchar **out_imei,
@@ -2220,4 +2287,3 @@ mm_parse_gsn (const char *gsn,
 
     return success;
 }
-

@@ -22,6 +22,173 @@
 #include "mm-log.h"
 
 /*****************************************************************************/
+/* Test CMGL responses */
+
+static void
+test_cmgl_response (const gchar *str,
+                    const MM3gppPduInfo *expected,
+                    guint n_expected)
+{
+    guint i;
+    GList *list;
+    GError *error = NULL;
+
+    list = mm_3gpp_parse_pdu_cmgl_response (str, &error);
+    g_assert_no_error (error);
+    g_assert (list != NULL);
+    g_assert_cmpuint (g_list_length (list), ==, n_expected);
+
+    for (i = 0; i < n_expected; i++) {
+        GList *l;
+
+        /* Look for the pdu with the expected index */
+        for (l = list; l; l = g_list_next (l)) {
+            MM3gppPduInfo *info = l->data;
+
+            /* Found */
+            if (info->index == expected[i].index) {
+                g_assert_cmpint (info->status, ==, expected[i].status);
+                g_assert_cmpstr (info->pdu, ==, expected[i].pdu);
+                break;
+            }
+        }
+        g_assert (l != NULL);
+    }
+
+    mm_3gpp_pdu_info_list_free (list);
+}
+
+static void
+test_cmgl_response_generic (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGL: 0,1,,147\r\n07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07";
+
+    const MM3gppPduInfo expected [] = {
+        {
+            .index = 0,
+            .status = 1,
+            .pdu = "07914306073011F00405812261F700003130916191314095C27"
+            "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+            "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+            "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+            "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07"
+        }
+    };
+
+    test_cmgl_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_cmgl_response_generic_multiple (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGL: 0,1,,147\r\n07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07\r\n"
+        "+CMGL: 1,1,,147\r\n07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07\r\n"
+        "+CMGL: 2,1,,147\r\n07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07";
+
+    const MM3gppPduInfo expected [] = {
+        {
+            .index = 0,
+            .status = 1,
+            .pdu = "07914306073011F00405812261F700003130916191314095C27"
+            "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+            "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+            "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+            "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07"
+        },
+        {
+            .index = 1,
+            .status = 1,
+            .pdu = "07914306073011F00405812261F700003130916191314095C27"
+            "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+            "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+            "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+            "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07"
+        },
+        {
+            .index = 2,
+            .status = 1,
+            .pdu = "07914306073011F00405812261F700003130916191314095C27"
+            "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+            "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+            "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+            "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07"
+        }
+    };
+
+    test_cmgl_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_cmgl_response_pantech (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGL: 17,3,35\r\n079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020";
+
+    const MM3gppPduInfo expected [] = {
+        {
+            .index = 17,
+            .status = 3,
+            .pdu = "079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020"
+        }
+    };
+
+    test_cmgl_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_cmgl_response_pantech_multiple (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGL: 17,3,35\r\n079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020\r\n"
+        "+CMGL: 15,3,35\r\n079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020\r\n"
+        "+CMGL: 13,3,35\r\n079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020\r\n"
+        "+CMGL: 11,3,35\r\n079100F40D1101000F001000B917118336058F300";
+
+    const MM3gppPduInfo expected [] = {
+        {
+            .index = 17,
+            .status = 3,
+            .pdu = "079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020"
+        },
+        {
+            .index = 15,
+            .status = 3,
+            .pdu = "079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020"
+        },
+        {
+            .index = 13,
+            .status = 3,
+            .pdu = "079100F40D1101000F001000B917118336058F300001954747A0E4ACF41F27298CDCE83C6EF371B0402814020"
+        },
+        {
+            .index = 11,
+            .status = 3,
+            .pdu = "079100F40D1101000F001000B917118336058F300"
+        }
+    };
+
+    test_cmgl_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+/*****************************************************************************/
 /* Test COPS responses */
 
 static void
@@ -1783,6 +1950,11 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_parse_cds, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cdma_parse_gsn, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cmgl_response_generic, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmgl_response_generic_multiple, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech_multiple, NULL));
 
     result = g_test_run ();
 
