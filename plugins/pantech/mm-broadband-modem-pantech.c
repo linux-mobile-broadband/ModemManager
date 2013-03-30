@@ -23,15 +23,65 @@
 
 #include "ModemManager.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-broadband-modem-pantech.h"
 #include "mm-sim-pantech.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+
+static MMIfaceModemMessaging *iface_modem_messaging_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemPantech, mm_broadband_modem_pantech, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init))
+
+/*****************************************************************************/
+/* Load supported SMS storages (Messaging interface) */
+
+static void
+skip_sm_sr_storage (GArray *mem)
+{
+    guint i = mem->len;
+
+    if (!mem)
+        return;
+
+    /* Remove SM and SR from the list of supported storages */
+    while (i-- > 0) {
+        if (g_array_index (mem, MMSmsStorage, i) == MM_SMS_STORAGE_SR ||
+            g_array_index (mem, MMSmsStorage, i) == MM_SMS_STORAGE_SM)
+            g_array_remove_index (mem, i);
+    }
+}
+
+static gboolean
+load_supported_storages_finish (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                GArray **mem1,
+                                GArray **mem2,
+                                GArray **mem3,
+                                GError **error)
+{
+    if (!iface_modem_messaging_parent->load_supported_storages_finish (self, res, mem1, mem2, mem3, error))
+        return FALSE;
+
+    skip_sm_sr_storage (*mem1);
+    skip_sm_sr_storage (*mem2);
+    skip_sm_sr_storage (*mem3);
+    return TRUE;
+}
+
+static void
+load_supported_storages (MMIfaceModemMessaging *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    /* Chain up parent's loading */
+    iface_modem_messaging_parent->load_supported_storages (self, callback, user_data);
+}
 
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
@@ -123,6 +173,15 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    iface_modem_messaging_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_supported_storages = load_supported_storages;
+    iface->load_supported_storages_finish = load_supported_storages_finish;
 }
 
 static void
