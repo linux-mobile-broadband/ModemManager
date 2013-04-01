@@ -2,6 +2,7 @@
 
 ACTION!="add|change", GOTO="mm_mbm_end"
 SUBSYSTEMS=="usb", GOTO="mm_mbm_check"
+GOTO="mm_mbm_end"
 
 LABEL="mm_mbm_check"
 
