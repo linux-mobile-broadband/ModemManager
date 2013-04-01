@@ -22,4 +22,10 @@ ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 # Magic Control Technology Corp adapters
 ATTRS{idVendor}=="0711", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Cygnal Integrated Products, Inc. CP210x
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
+# QinHeng Electronics HL-340
+ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
 LABEL="mm_usb_serial_adapters_greylist_end"
