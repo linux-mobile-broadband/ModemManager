@@ -242,17 +242,20 @@ mm_base_modem_grab_port (MMBaseModem *self,
     else if (g_str_has_prefix (subsys, "usb") &&
              g_str_has_prefix (name, "cdc-wdm")) {
 #if defined WITH_QMI
-        port = MM_PORT (mm_qmi_port_new (name));
-#else
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Cannot add port '%s/%s', QMI support not available",
-                     subsys,
-                     name);
-        g_free (key);
-        return FALSE;
+        if (ptype == MM_PORT_TYPE_QMI)
+            port = MM_PORT (mm_qmi_port_new (name));
+        else
 #endif
+        {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_UNSUPPORTED,
+                         "Cannot add port '%s/%s', unsupported",
+                         subsys,
+                         name);
+            g_free (key);
+            return FALSE;
+        }
     }
     else
         /* We already filter out before all non-tty, non-net, non-qmi ports */
