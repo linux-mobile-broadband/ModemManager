@@ -33,6 +33,46 @@ int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 /*****************************************************************************/
+/* Custom commands for AT probing
+ * There's currently no WMC probing plugged in the logic, so We need to detect
+ * WMC ports ourselves somehow. Just assume that the WMC port will reply "ERROR"
+ * to the "ATE0" command.
+ */
+static gboolean
+port_probe_response_processor_is_pantech_at (const gchar *command,
+                                             const gchar *response,
+                                             gboolean last_command,
+                                             const GError *error,
+                                             GVariant **result,
+                                             GError **result_error)
+{
+    if (error) {
+        /* Timeout errors are the only ones not fatal;
+         * they will just go on to the next command. */
+        if (g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
+            return FALSE;
+        }
+
+        /* All other errors indicate NOT an AT port */
+        *result = g_variant_new_boolean (FALSE);
+        return TRUE;
+    }
+
+    /* No error reported, valid AT port! */
+    *result = g_variant_new_boolean (TRUE);
+    return TRUE;
+}
+
+static const MMPortProbeAtCommand custom_at_probe[] = {
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { NULL }
+};
+
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
@@ -102,6 +142,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                       NULL));
 }
 
