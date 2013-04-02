@@ -1863,7 +1863,7 @@ imxi_bcd_to_string (u_int8_t bytes[8], size_t len, char *buf, size_t buflen)
 
     qcdm_return_val_if_fail (len == 8, FALSE);
     qcdm_return_val_if_fail (buf != NULL, FALSE);
-    qcdm_return_val_if_fail (buflen > len, FALSE);
+    qcdm_return_val_if_fail (buflen > (len * 2), FALSE);
 
     p = buf;
     for (i = 0 ; i < len; i++) {
@@ -1907,7 +1907,7 @@ qcdm_cmd_wcdma_subsys_state_info_result (const char *buf, size_t len, int *out_e
 {
     QcdmResult *result = NULL;
     DMCmdSubsysWcdmaStateInfoRsp *rsp = (DMCmdSubsysWcdmaStateInfoRsp *) buf;
-    char imxi[10];
+    char imxi[18];
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -1953,7 +1953,7 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
 {
     QcdmResult *result = NULL;
     DMCmdSubsysGsmStateInfoRsp *rsp = (DMCmdSubsysGsmStateInfoRsp *) buf;
-    char imxi[10];
+    char imxi[18];
     u_int32_t mcc = 0, mnc = 0;
     u_int8_t mnc3;
 
