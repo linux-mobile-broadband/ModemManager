@@ -5530,17 +5530,17 @@ cnmi_response_processor (MMBaseModem *self,
     return TRUE;
 }
 
-/*
- * Many devices based on Qualcomm chipsets don't support a <ds> value
- * of '1', despite saying they do in the AT+CNMI=? response.  But they
- * do accept '2'.  Since we're not doing much with delivery status
- * reports yet, if we get a CME 303 (not supported) error when setting
- * the message indication parameters via CNMI, fall back to the
- * Qualcomm-compatible CNMI parameters.
- */
 static const MMBaseModemAtCommand cnmi_sequence[] = {
-    { "+CNMI=2,1,2,1,0", 3, TRUE, cnmi_response_processor },
-    { "+CNMI=2,1,2,2,0", 3, TRUE, cnmi_response_processor },
+    { "+CNMI=2,1,2,1,0", 3, FALSE, cnmi_response_processor },
+
+    /* Many Qualcomm-based devices don't support <ds> of '1', despite
+     * reporting they support it in the +CNMI=? response.  But they do
+     * accept '2'.
+     */
+    { "+CNMI=2,1,2,2,0", 3, FALSE, cnmi_response_processor },
+
+    /* Last resort: turn off delivery status reports altogether */
+    { "+CNMI=2,1,2,0,0", 3, FALSE, cnmi_response_processor },
     { NULL }
 };
 
