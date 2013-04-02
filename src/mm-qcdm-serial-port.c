@@ -81,6 +81,7 @@ handle_response (MMSerialPort *port,
 {
     MMQcdmSerialResponseFn response_callback = (MMQcdmSerialResponseFn) callback;
     GByteArray *unescaped = NULL;
+    guint8 *unescaped_buffer;
     GError *dm_error = NULL;
     gsize used = 0;
     gsize start = 0;
@@ -101,11 +102,10 @@ handle_response (MMSerialPort *port,
         goto callback;
     }
 
-    /* FIXME: don't munge around with byte array internals */
-    unescaped = g_byte_array_sized_new (1024);
+    unescaped_buffer = g_malloc (1024);
     success = dm_decapsulate_buffer ((const char *) (response->data + start),
                                      response->len - start,
-                                     (char *) unescaped->data,
+                                     (char *) unescaped_buffer,
                                      1024,
                                      &unescaped_len,
                                      &used,
@@ -114,16 +114,19 @@ handle_response (MMSerialPort *port,
         g_set_error_literal (&dm_error,
                              MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Failed to unescape QCDM packet.");
-        g_byte_array_free (unescaped, TRUE);
-        unescaped = NULL;
+        g_free (unescaped_buffer);
+        unescaped_buffer = NULL;
     } else if (more) {
         /* Need more data; we shouldn't have gotten here since the parse
          * function checks for the end-of-frame marker, but whatever.
          */
+        g_free (unescaped_buffer);
         return 0;
     } else {
         /* Successfully decapsulated the DM command */
-        unescaped->len = (guint) unescaped_len;
+        g_assert (unescaped_len <= 1024);
+        unescaped_buffer = g_realloc (unescaped_buffer, unescaped_len);
+        unescaped = g_byte_array_new_take (unescaped_buffer, unescaped_len);
     }
 
 callback:
@@ -133,7 +136,7 @@ callback:
                        callback_data);
 
     if (unescaped)
-        g_byte_array_free (unescaped, TRUE);
+        g_byte_array_unref (unescaped);
     g_clear_error (&dm_error);
 
     return start + used;
