@@ -657,20 +657,24 @@ mm_sms_part_new_from_binary_pdu (guint index,
                 mm_dbg ("  validity available, format relative");
                 mm_sms_part_set_validity (sms_part,
                                           relative_to_validity (pdu[offset]));
+                offset++;
                 break;
             case 0x08:
                 /* TODO: support enhanced format; GSM 03.40 */
                 mm_dbg ("  validity available, format enhanced (not implemented)");
+                /* 7 bytes for enhanced validity */
+                offset += 7;
                 break;
             case 0x18:
                 /* TODO: support absolute format; GSM 03.40 */
                 mm_dbg ("  validity available, format absolute (not implemented)");
+                /* 7 bytes for absolute validity */
+                offset += 7;
                 break;
             default:
                 /* Cannot happen as we AND with the 0x18 mask */
                 g_assert_not_reached();
             }
-            offset++;
         }
 
         tp_user_data_len_offset = offset;
