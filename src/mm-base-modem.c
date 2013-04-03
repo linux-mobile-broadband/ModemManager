@@ -891,8 +891,12 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                 }
             }
 
-            if (!data_primary && (flags & MM_AT_PORT_FLAG_PPP))
-                data_primary = candidate;
+            if (flags & MM_AT_PORT_FLAG_PPP) {
+                if (!data_primary)
+                    data_primary = candidate;
+                else
+                    data = g_list_append (data, candidate);
+            }
 
             /* Explicitly flagged secondary ports trump NONE ports for secondary */
             if (flags & MM_AT_PORT_FLAG_SECONDARY) {
@@ -921,9 +925,13 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 
         case MM_PORT_TYPE_NET:
-            /* Net device (if any) is the preferred data port */
-            if (!data_primary || MM_IS_AT_SERIAL_PORT (data_primary))
+            if (!data_primary)
                 data_primary = candidate;
+            else if (MM_IS_AT_SERIAL_PORT (data_primary)) {
+                /* Net device (if any) is the preferred data port */
+                data = g_list_append (data, data_primary);
+                data_primary = candidate;
+            }
             else
                 /* All non-primary net ports get added to the list of data ports */
                 data = g_list_append (data, candidate);
