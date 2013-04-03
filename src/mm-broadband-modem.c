@@ -995,7 +995,6 @@ modem_load_own_numbers (MMIfaceModem *self,
     OwnNumbersContext *ctx;
     GError *error = NULL;
 
-    mm_dbg ("loading signal quality...");
     ctx = g_new0 (OwnNumbersContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
