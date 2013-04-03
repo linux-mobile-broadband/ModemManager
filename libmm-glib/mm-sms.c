@@ -375,19 +375,66 @@ mm_sms_dup_discharge_timestamp (MMSms *self)
 /*****************************************************************************/
 
 /**
- * mm_sms_get_validity:
+ * mm_sms_get_validity_type:
  * @self: A #MMSms.
  *
- * Gets the validity time of the SMS.
+ * Gets the type of validity information in the SMS.
  *
- * Returns: the validity time or 0 if unknown.
+ * Returns: the validity type or #MM_SMS_VALIDITY_TYPE_UNKNOWN.
+ */
+MMSmsValidityType
+mm_sms_get_validity_type (MMSms *self)
+{
+    GVariant *variant;
+    guint type;
+    GVariant *value;
+
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_VALIDITY_TYPE_UNKNOWN);
+
+    variant = mm_gdbus_sms_dup_validity (MM_GDBUS_SMS (self));
+    if (!variant)
+        return MM_SMS_VALIDITY_TYPE_UNKNOWN;
+
+    g_variant_get (variant, "(uv)", &type, &value);
+    g_variant_unref (variant);
+    g_variant_unref (value);
+
+    return (MMSmsValidityType)type;
+}
+
+/**
+ * mm_sms_get_validity_relative:
+ * @self: A #MMSms.
+ *
+ * Gets the length of the validity period, in minutes.
+ *
+ * Only applicable if the type of validity is #MM_SMS_VALIDITY_TYPE_RELATIVE.
+ *
+ * Returns: the length of the validity period, or 0 if unknown.
  */
 guint
-mm_sms_get_validity (MMSms *self)
+mm_sms_get_validity_relative (MMSms *self)
 {
-    g_return_val_if_fail (MM_IS_SMS (self), 0);
+    GVariant *variant;
+    guint type;
+    GVariant *value;
+    guint value_integer = 0;
 
-    return mm_gdbus_sms_get_validity (MM_GDBUS_SMS (self));
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_VALIDITY_TYPE_UNKNOWN);
+
+    variant = mm_gdbus_sms_dup_validity (MM_GDBUS_SMS (self));
+    if (!variant)
+        return 0;
+
+    g_variant_get (variant, "(uv)", &type, &value);
+
+    if (type == MM_SMS_VALIDITY_TYPE_RELATIVE)
+        value_integer = g_variant_get_uint32 (value);
+
+    g_variant_unref (variant);
+    g_variant_unref (value);
+
+    return value_integer;
 }
 
 /*****************************************************************************/

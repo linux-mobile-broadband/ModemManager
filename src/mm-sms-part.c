@@ -326,7 +326,7 @@ struct _MMSmsPart {
     MMSmsEncoding encoding;
     GByteArray *data;
     guint class;
-    guint validity;
+    guint validity_relative;
     gboolean delivery_report_request;
     guint message_reference;
     /* NOT a MMSmsDeliveryState, which just includes the known values */
@@ -405,8 +405,8 @@ PART_GET_FUNC (MMSmsEncoding, encoding)
 PART_SET_FUNC (MMSmsEncoding, encoding)
 PART_GET_FUNC (guint, class)
 PART_SET_FUNC (guint, class)
-PART_GET_FUNC (guint, validity)
-PART_SET_FUNC (guint, validity)
+PART_GET_FUNC (guint, validity_relative)
+PART_SET_FUNC (guint, validity_relative)
 PART_GET_FUNC (gboolean, delivery_report_request)
 PART_SET_FUNC (gboolean, delivery_report_request)
 PART_GET_FUNC (guint, message_reference)
@@ -655,8 +655,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
             switch (validity_format) {
             case 0x10:
                 mm_dbg ("  validity available, format relative");
-                mm_sms_part_set_validity (sms_part,
-                                          relative_to_validity (pdu[offset]));
+                mm_sms_part_set_validity_relative (sms_part,
+                                                   relative_to_validity (pdu[offset]));
                 offset++;
                 break;
             case 0x08:
@@ -972,7 +972,7 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     pdu[offset] = 0;
 
     /* TP-VP present; format RELATIVE */
-    if (part->validity > 0) {
+    if (part->validity_relative > 0) {
         mm_dbg ("  adding validity to PDU...");
         pdu[offset] |= 0x10;
     }
@@ -1034,8 +1034,8 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
     /* ----------- TP-Validity-Period (1 byte): 4 days ----------- */
     /* Only if TP-VPF was set in first byte */
 
-    if (part->validity > 0)
-        pdu[offset++] = validity_to_relative (part->validity);
+    if (part->validity_relative > 0)
+        pdu[offset++] = validity_to_relative (part->validity_relative);
 
     /* ----------- TP-User-Data-Length ----------- */
     /* Set to zero initially, and keep a ptr for easy access later */

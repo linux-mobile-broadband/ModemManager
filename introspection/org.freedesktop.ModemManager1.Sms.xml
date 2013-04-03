@@ -99,11 +99,25 @@
     <!--
         Validity:
 
-        Specifies when the SMS expires in the SMSC.
+        Indicates when the SMS expires in the SMSC.
 
-        Always 0 for 3GPP2/CDMA.
+        This value is composed of a
+	<link linkend="MMSmsValidityType">MMSmsValidityType</link>
+	key, with an associated data which contains type-specific validity
+	information:
+
+	<variablelist>
+	  <varlistentry><term><link linkend="MM-SMS-VALIDITY-TYPE-RELATIVE:CAPS">MM_SMS_VALIDITY_TYPE_RELATIVE</link></term>
+          <listitem>
+            <para>
+	      The value is the length of the validity period in minutes, given
+	      as an unsigned integer (D-Bus signature <literal>'u'</literal>).
+            </para>
+          </listitem>
+          </varlistentry>
+        </variablelist>
     -->
-    <property name="Validity" type="u" access="read" />
+    <property name="Validity" type="(uv)" access="read" />
 
     <!--
         Class:

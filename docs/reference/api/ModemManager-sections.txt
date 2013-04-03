@@ -27,6 +27,7 @@ MMSmsPduType
 MMSmsState
 MMSmsDeliveryState
 MMSmsStorage
+MMSmsValidityType
 </SECTION>
 
 <SECTION>

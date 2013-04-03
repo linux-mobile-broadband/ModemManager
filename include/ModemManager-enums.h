@@ -522,6 +522,22 @@ typedef enum { /*< underscore_name=mm_sms_storage >*/
 } MMSmsStorage;
 
 /**
+ * MMSmsValidityType:
+ * @MM_SMS_VALIDITY_TYPE_UNKNOWN: Validity type unknown.
+ * @MM_SMS_VALIDITY_TYPE_RELATIVE: Relative validity.
+ * @MM_SMS_VALIDITY_TYPE_ABSOLUTE: Absolute validity.
+ * @MM_SMS_VALIDITY_TYPE_ENHANCED: Enhanced validity.
+ *
+ * Type of SMS validity value.
+ */
+typedef enum { /*< underscore_name=mm_sms_validity_type >*/
+    MM_SMS_VALIDITY_TYPE_UNKNOWN  = 0,
+    MM_SMS_VALIDITY_TYPE_RELATIVE = 1,
+    MM_SMS_VALIDITY_TYPE_ABSOLUTE = 2,
+    MM_SMS_VALIDITY_TYPE_ENHANCED = 3,
+} MMSmsValidityType;
+
+/**
  * MMModemLocationSource:
  * @MM_MODEM_LOCATION_SOURCE_NONE: None.
  * @MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI: Location Area Code and Cell ID.

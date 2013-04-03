@@ -73,6 +73,29 @@ struct _MMSmsPrivate {
 
 /*****************************************************************************/
 
+static guint
+get_validity_relative (GVariant *tuple)
+{
+    guint type;
+    GVariant *value;
+    guint value_integer = 0;
+
+    if (!tuple)
+        return 0;
+
+    g_variant_get (tuple, "(ub)", &type, &value);
+
+    if (type == MM_SMS_VALIDITY_TYPE_RELATIVE)
+        value_integer = g_variant_get_uint32 (value);
+    else
+        /* Currently not supported other than relative */
+        g_warn_if_reached ();
+
+    g_variant_unref (value);
+
+    return value_integer;
+}
+
 static gboolean
 generate_submit_pdus (MMSms *self,
                       GError **error)
@@ -172,7 +195,7 @@ generate_submit_pdus (MMSms *self,
         mm_sms_part_set_encoding (part, encoding);
         mm_sms_part_set_number (part, mm_gdbus_sms_get_number (MM_GDBUS_SMS (self)));
         mm_sms_part_set_smsc (part, mm_gdbus_sms_get_smsc (MM_GDBUS_SMS (self)));
-        mm_sms_part_set_validity (part, mm_gdbus_sms_get_validity (MM_GDBUS_SMS (self)));
+        mm_sms_part_set_validity_relative (part, get_validity_relative (mm_gdbus_sms_get_validity (MM_GDBUS_SMS (self))));
         mm_sms_part_set_class (part, mm_gdbus_sms_get_class (MM_GDBUS_SMS (self)));
         mm_sms_part_set_delivery_report_request (part, mm_gdbus_sms_get_delivery_report_request (MM_GDBUS_SMS (self)));
 
@@ -1376,6 +1399,7 @@ assemble_sms (MMSms *self,
     MMSmsPart **sorted_parts;
     GString *fulltext;
     GByteArray *fulldata;
+    guint validity_relative;
 
     sorted_parts = g_new0 (MMSmsPart *, self->priv->max_parts);
 
@@ -1463,6 +1487,9 @@ assemble_sms (MMSms *self,
     /* If we got all parts, we also have the first one always */
     g_assert (sorted_parts[0] != NULL);
 
+    /* Prepare for validity tuple */
+    validity_relative = mm_sms_part_get_validity_relative (sorted_parts[0]);
+
     /* If we got everything, assemble the text! */
     g_object_set (self,
                   "pdu-type",  mm_sms_part_get_pdu_type (sorted_parts[0]),
@@ -1476,7 +1503,9 @@ assemble_sms (MMSms *self,
                   "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
                   "class",     mm_sms_part_get_class (sorted_parts[0]),
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
-                  "validity",  mm_sms_part_get_validity (sorted_parts[0]),
+                  "validity",                (validity_relative ?
+                                              g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (validity_relative)) :
+                                              g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
                   "timestamp",               mm_sms_part_get_timestamp (sorted_parts[0]),
                   "discharge-timestamp",     mm_sms_part_get_discharge_timestamp (sorted_parts[0]),
                   "delivery-state",          mm_sms_part_get_delivery_state (sorted_parts[0]),

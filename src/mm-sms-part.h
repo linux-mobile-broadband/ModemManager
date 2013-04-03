@@ -100,8 +100,8 @@ guint             mm_sms_part_get_class              (MMSmsPart *part);
 void              mm_sms_part_set_class              (MMSmsPart *part,
                                                       guint class);
 
-guint             mm_sms_part_get_validity           (MMSmsPart *part);
-void              mm_sms_part_set_validity           (MMSmsPart *part,
+guint             mm_sms_part_get_validity_relative  (MMSmsPart *part);
+void              mm_sms_part_set_validity_relative  (MMSmsPart *part,
                                                       guint validity);
 
 guint             mm_sms_part_get_delivery_state (MMSmsPart *part);

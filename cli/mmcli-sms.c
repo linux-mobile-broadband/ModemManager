@@ -181,16 +181,17 @@ print_sms_info (MMSms *sms)
     g_print ("  -----------------------------------\n"
              "  Properties |            PDU type: '%s'\n"
              "             |               state: '%s'\n"
-             "             |                smsc: '%s'\n"
-             "             |            validity: '%u'\n"
-             "             |               class: '%u'\n"
-             "             |             storage: '%s'\n",
-
-
+             "             |                smsc: '%s'\n",
              mm_sms_pdu_type_get_string (pdu_type),
              mm_sms_state_get_string (mm_sms_get_state (sms)),
-             VALIDATE (mm_sms_get_smsc (sms)),
-             mm_sms_get_validity (sms),
+             VALIDATE (mm_sms_get_smsc (sms)));
+
+    if (mm_sms_get_validity_type (sms) == MM_SMS_VALIDITY_TYPE_RELATIVE)
+        g_print ("             | validity (relative): '%u'\n",
+                 mm_sms_get_validity_relative (sms));
+
+    g_print ("             |               class: '%u'\n"
+             "             |             storage: '%s'\n",
              mm_sms_get_class (sms),
              mm_sms_storage_get_string (mm_sms_get_storage (sms)));
 

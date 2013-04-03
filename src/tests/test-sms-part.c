@@ -536,7 +536,7 @@ common_test_create_pdu (const gchar *smsc,
         mm_sms_part_set_encoding (part, encoding);
     }
     if (validity > 0)
-        mm_sms_part_set_validity (part, validity);
+        mm_sms_part_set_validity_relative (part, validity);
     if (class > 0)
         mm_sms_part_set_class (part, class);
 
