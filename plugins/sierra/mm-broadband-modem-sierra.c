@@ -566,6 +566,10 @@ selrat_query_ready (MMBaseModem *self,
                                  response);
     }
 
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
     if (error)
         g_simple_async_result_take_error (simple, error);
     else
