@@ -84,4 +84,7 @@ ATTRS{idVendor}=="2341", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9207", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Altair U-Boot device
+ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051" ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"

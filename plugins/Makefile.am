@@ -53,6 +53,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-novatel-lte.la \
+	libmm-plugin-altair-lte.la \
 	libmm-plugin-samsung.la \
 	libmm-plugin-option.la \
 	libmm-plugin-hso.la \
@@ -316,6 +317,17 @@ libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-broadband-modem-novatel.h
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Altair LTE modem
+libmm_plugin_altair_lte_la_SOURCES = \
+	altair/mm-plugin-altair-lte.c \
+	altair/mm-plugin-altair-lte.h \
+	altair/mm-broadband-modem-altair-lte.c \
+	altair/mm-broadband-modem-altair-lte.h \
+	altair/mm-broadband-bearer-altair-lte.c \
+	altair/mm-broadband-bearer-altair-lte.h
+libmm_plugin_altair_lte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_altair_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # VIA modem
 libmm_plugin_via_la_SOURCES = \
