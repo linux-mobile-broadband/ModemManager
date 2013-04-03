@@ -465,16 +465,31 @@ grab_port (MMPlugin *self,
            MMPortProbe *probe,
            GError **error)
 {
-    gchar *str;
     MMAtPortFlag pflags;
+    GUdevDevice *port;
 
-    pflags = (MMAtPortFlag) GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS));
-    str = mm_at_port_flag_build_string_from_mask (pflags);
-    mm_dbg ("(%s/%s) Port will have AT flags '%s'",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name (probe),
-            str);
-    g_free (str);
+    port = mm_port_probe_peek_port (probe);
+    if (g_udev_device_get_property_as_boolean (port, "ID_MM_HUAWEI_AT_PORT")) {
+        mm_dbg ("(%s/%s)' Port flagged as primary",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
+    } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_HUAWEI_MODEM_PORT")) {
+        mm_dbg ("(%s/%s) Port flagged as PPP",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
+        pflags = MM_AT_PORT_FLAG_PPP;
+    } else {
+        gchar *str;
+
+        pflags = (MMAtPortFlag) GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS));
+        str = mm_at_port_flag_build_string_from_mask (pflags);
+        mm_dbg ("(%s/%s) Port will have AT flags '%s'",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe),
+                str);
+        g_free (str);
+    }
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_get_port_subsys (probe),
