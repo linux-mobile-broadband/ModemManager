@@ -716,16 +716,6 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
         return;
     }
 
-    /* Early-abort AT probing if we get a response that indicates this is
-     * certainly not an AT-capable port.
-     */
-    if (response && is_non_at_response ((const guint8 *) response->str, response->len)) {
-        task->at_result_processor (self, NULL);
-        mm_port_probe_set_result_at (self, FALSE);
-        serial_probe_schedule (self);
-        return;
-    }
-
     if (!task->at_commands->response_processor (task->at_commands->command,
                                                 response ? response->str : NULL,
                                                 !!task->at_commands[1].command,
