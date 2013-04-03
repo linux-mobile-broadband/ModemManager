@@ -597,15 +597,16 @@ static gboolean
 is_non_at_response (const guint8 *data, gsize len)
 {
     const gchar **iter;
-    size_t iter_len;
-    int i;
+    gsize iter_len;
+    gsize i;
 
     /* Some devices (observed on a ZTE branded "QUALCOMM INCORPORATED" model
      * "154") spew NULLs from some ports.
      */
-    if (   (len >= sizeof (zerobuf))
-        && (memcmp (data, zerobuf, sizeof (zerobuf)) == 0))
-        return TRUE;
+    for (i = 0; (len >= sizeof (zerobuf)) && (i < len - sizeof (zerobuf)); i++) {
+        if (!memcmp (&data[i], zerobuf, sizeof (zerobuf)))
+            return TRUE;
+    }
 
     /* Check for a well-known non-AT response.  There are some ports (eg many
      * Icera-based chipsets, Qualcomm Gobi devices before their firmware is
