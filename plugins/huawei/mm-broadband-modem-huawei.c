@@ -1411,7 +1411,10 @@ huawei_modem_create_bearer (MMIfaceModem *self,
             mm_dbg ("This device can not support ndisdup feature");
             ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
         }
+
         create_bearer_for_net_port (ctx);
+
+        g_object_unref (client);
         return;
     }
 
