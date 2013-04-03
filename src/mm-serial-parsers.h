@@ -18,14 +18,24 @@
 
 #include <glib.h>
 
-gpointer mm_serial_parser_v1_new              (void);
-void     mm_serial_parser_v1_set_custom_regex (gpointer data,
-                                               GRegex *successful,
-                                               GRegex *error);
-gboolean mm_serial_parser_v1_parse            (gpointer parser,
-                                               GString *response,
-                                               GError **error);
-void     mm_serial_parser_v1_destroy          (gpointer parser);
-gboolean mm_serial_parser_v1_is_known_error   (const GError *error);
+gpointer mm_serial_parser_v1_new                  (void);
+void     mm_serial_parser_v1_set_custom_regex     (gpointer data,
+                                                   GRegex *successful,
+                                                   GRegex *error);
+gboolean mm_serial_parser_v1_parse                (gpointer parser,
+                                                   GString *response,
+                                                   GError **error);
+void     mm_serial_parser_v1_destroy              (gpointer parser);
+gboolean mm_serial_parser_v1_is_known_error       (const GError *error);
+
+/* Parser filter: when FALSE returned, error should be set. This error will be
+ * reported to the response listener right away. */
+typedef gboolean (* mm_serial_parser_v1_filter_fn) (gpointer data,
+                                                    gpointer user_data,
+                                                    GString *response,
+                                                    GError **error);
+void     mm_serial_parser_v1_add_filter (gpointer data,
+                                         mm_serial_parser_v1_filter_fn callback,
+                                         gpointer user_data);
 
 #endif /* MM_SERIAL_PARSERS_H */

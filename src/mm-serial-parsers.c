@@ -94,6 +94,9 @@ typedef struct {
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
     GRegex *regex_custom_error;
+    /* User-provided parser filter */
+    mm_serial_parser_v1_filter_fn filter_callback;
+    gpointer                      filter_user_data;
 } MMSerialParserV1;
 
 gpointer
@@ -117,6 +120,8 @@ mm_serial_parser_v1_new (void)
 
     parser->regex_custom_successful = NULL;
     parser->regex_custom_error = NULL;
+    parser->filter_callback = NULL;
+    parser->filter_user_data = NULL;
 
     return parser;
 }
@@ -137,6 +142,19 @@ mm_serial_parser_v1_set_custom_regex (gpointer data,
 
     parser->regex_custom_successful = successful ? g_regex_ref (successful) : NULL;
     parser->regex_custom_error = error ? g_regex_ref (error) : NULL;
+}
+
+void
+mm_serial_parser_v1_add_filter (gpointer data,
+                                mm_serial_parser_v1_filter_fn callback,
+                                gpointer user_data)
+{
+    MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
+
+    g_return_if_fail (parser != NULL);
+
+    parser->filter_callback = callback;
+    parser->filter_user_data = user_data;
 }
 
 gboolean
@@ -160,7 +178,20 @@ mm_serial_parser_v1_parse (gpointer data,
     if (G_UNLIKELY (!response->len))
         return FALSE;
 
-    /* First, check for successful responses */
+    /* First, apply custom filter if any */
+    if (parser->filter_callback &&
+        !parser->filter_callback (parser,
+                                  parser->filter_user_data,
+                                  response,
+                                  &local_error)) {
+        g_assert (local_error != NULL);
+        mm_dbg ("Got response filtered in serial port: %s", local_error->message);
+        g_propagate_error (error, local_error);
+        response_clean (response);
+        return TRUE;
+    }
+
+    /* Then, check for successful responses */
 
     /* Custom successful replies first, if any */
     if (parser->regex_custom_successful) {
@@ -326,7 +357,8 @@ mm_serial_parser_v1_is_known_error (const GError *error)
     /* Need to return TRUE for the kind of errors that this parser may set */
     return (error->domain == MM_MOBILE_EQUIPMENT_ERROR ||
             error->domain == MM_CONNECTION_ERROR ||
-            error->domain == MM_MESSAGE_ERROR);
+            error->domain == MM_MESSAGE_ERROR ||
+            g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_PARSE_FAILED));
 }
 
 void
