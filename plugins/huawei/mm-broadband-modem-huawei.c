@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
+#include <gudev/gudev.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -1375,18 +1376,6 @@ create_bearer_for_net_port (CreateBearerContext *ctx)
     }
 }
 
-static void
-ndisdup_check_ready (MMIfaceModem *self,
-                     GAsyncResult *res,
-                     CreateBearerContext *ctx)
-{
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL))
-        ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
-    else
-        ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
-
-    create_bearer_for_net_port (ctx);
-}
 
 static void
 huawei_modem_create_bearer (MMIfaceModem *self,
@@ -1395,6 +1384,7 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                             gpointer user_data)
 {
     CreateBearerContext *ctx;
+    MMPort *port;
 
     ctx = g_slice_new0 (CreateBearerContext);
     ctx->self = g_object_ref (self);
@@ -1404,30 +1394,25 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                                              user_data,
                                              huawei_modem_create_bearer);
 
-    if (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
-        /* If we get a 'net' port, check if driver is 'cdc_ether' or 'cdc_ncm' */
-        const gchar **drivers;
-        guint i;
+    port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET);
+    if (port) {
+        GUdevDevice *net_port;
+        GUdevClient *client;
 
-        drivers = mm_base_modem_get_drivers (MM_BASE_MODEM (self));
-        for (i = 0; drivers[i]; i++) {
-            if (g_str_equal (drivers[i], "cdc_ether") || g_str_equal (drivers[i], "cdc_ncm")) {
-                /* If never checked yet, check NDISDUP support */
-                if (ctx->self->priv->ndisdup_support == NDISDUP_SUPPORT_UNKNOWN) {
-                    mm_dbg ("Checking ^NDISDUP support...");
-                    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                              "^NDISDUP?",
-                                              3,
-                                              FALSE,
-                                              (GAsyncReadyCallback)ndisdup_check_ready,
-                                              ctx);
-                } else {
-                    /* Already checked, create bearer */
-                    create_bearer_for_net_port (ctx);
-                }
-                return;
-            }
+        client = g_udev_client_new (NULL);
+        net_port = (g_udev_client_query_by_subsystem_and_name (
+                            client,
+                            "net",
+                            mm_port_get_device (port)));
+        if (g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+            mm_dbg ("This device can support ndisdup feature");
+            ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
+        } else {
+            mm_dbg ("This device can not support ndisdup feature");
+            ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
         }
+        create_bearer_for_net_port (ctx);
+        return;
     }
 
     mm_dbg ("Creating default bearer...");
