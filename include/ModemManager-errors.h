@@ -209,6 +209,7 @@ typedef enum { /*< underscore_name=mm_connection_error >*/
  * @MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE: Could not open the serial port, no device.
  * @MM_SERIAL_ERROR_FLASH_FAILED: Could not flash the device.
  * @MM_SERIAL_ERROR_NOT_OPEN: The serial port is not open.
+ * @MM_SERIAL_ERROR_PARSE_FAILED: The serial port specific parsing failed.
  *
  * Serial errors that may be reported by ModemManager.
  */
@@ -220,6 +221,7 @@ typedef enum { /*< underscore_name=mm_serial_error >*/
     MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE = 4, /*< nick=OpenFailedNoDevice >*/
     MM_SERIAL_ERROR_FLASH_FAILED          = 5, /*< nick=FlashFailed        >*/
     MM_SERIAL_ERROR_NOT_OPEN              = 6, /*< nick=NotOpen            >*/
+    MM_SERIAL_ERROR_PARSE_FAILED          = 7, /*< nick=ParseFailed        >*/
 } MMSerialError;
 
 /**

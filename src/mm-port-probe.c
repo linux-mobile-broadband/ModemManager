@@ -955,6 +955,23 @@ serial_buffer_full (MMSerialPort *serial,
 }
 
 static gboolean
+serial_parser_filter_cb (gpointer filter,
+                         gpointer user_data,
+                         GString *response,
+                         GError **error)
+{
+    if (is_non_at_response ((const guint8 *) response->str, response->len)) {
+        g_set_error (error,
+                     MM_SERIAL_ERROR,
+                     MM_SERIAL_ERROR_PARSE_FAILED,
+                     "Not an AT response");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
 serial_open_at (MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
@@ -968,6 +985,8 @@ serial_open_at (MMPortProbe *self)
 
     /* Create AT serial port if not done before */
     if (!task->serial) {
+        gpointer parser;
+
         task->serial = MM_SERIAL_PORT (mm_at_serial_port_new (g_udev_device_get_name (self->priv->port)));
         if (!task->serial) {
             port_probe_run_task_complete (
@@ -989,9 +1008,13 @@ serial_open_at (MMPortProbe *self)
                       MM_SERIAL_PORT_SPEW_CONTROL,   TRUE,
                       NULL);
 
+        parser = mm_serial_parser_v1_new ();
+        mm_serial_parser_v1_add_filter (parser,
+                                        serial_parser_filter_cb,
+                                        NULL);
         mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (task->serial),
                                                mm_serial_parser_v1_parse,
-                                               mm_serial_parser_v1_new (),
+                                               parser,
                                                mm_serial_parser_v1_destroy);
     }
 

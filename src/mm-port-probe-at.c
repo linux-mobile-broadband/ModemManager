@@ -50,11 +50,15 @@ mm_port_probe_response_processor_is_at (const gchar *command,
             return FALSE;
         }
 
-        /* If error is NOT known by the parser, request to abort */
-        if (!mm_serial_parser_v1_is_known_error (error)) {
+        /* If error is NOT known by the parser, or if the error is actually
+         * the generic parsing filter error, request to abort */
+        if (!mm_serial_parser_v1_is_known_error (error) ||
+            g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_PARSE_FAILED)) {
             *result_error = g_error_copy (error);
             g_prefix_error (result_error,
-                            "Fatal error parsing AT reply. ");
+                            "Fatal error parsing AT reply: ");
             return FALSE;
         }
 
@@ -91,4 +95,3 @@ mm_port_probe_response_processor_string (const gchar *command,
 
     return TRUE;
 }
-
