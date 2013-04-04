@@ -198,7 +198,7 @@ parse_bands_response (const gchar *response)
     for (i = 0; split[i]; i++) {
         bandval = (guint32)strtoul (split[i], NULL, 10);
         band = MM_MODEM_BAND_EUTRAN_I - 1 + bandval;
-        g_array_append_val(bands, band);
+        g_array_append_val (bands, band);
     }
 
     g_strfreev (split);
@@ -439,8 +439,8 @@ typedef enum {
 } MMStatcmAltair;
 
 static void
-bearer_list_report_diconnect_status_foreach (MMBearer *bearer,
-                                             gpointer *user_data)
+bearer_list_report_disconnect_status_foreach (MMBearer *bearer,
+                                              gpointer *user_data)
 {
     mm_bearer_report_disconnection (bearer);
 }
@@ -468,7 +468,7 @@ altair_statcm_changed (MMAtSerialPort *port,
             return;
 
         mm_bearer_list_foreach (list,
-                                (MMBearerListForeachFunc)bearer_list_report_diconnect_status_foreach,
+                                (MMBearerListForeachFunc)bearer_list_report_disconnect_status_foreach,
                                 NULL);
 
         g_object_unref (list);
