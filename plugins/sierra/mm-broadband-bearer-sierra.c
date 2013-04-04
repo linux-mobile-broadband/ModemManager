@@ -62,7 +62,8 @@ dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->data);
+    if (ctx->data)
+        g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
