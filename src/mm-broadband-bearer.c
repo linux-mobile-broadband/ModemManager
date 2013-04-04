@@ -501,6 +501,9 @@ extended_error_ready (MMBaseModem *modem,
 {
     const gchar *result;
 
+    /* Close the dialling port as we got an error */
+    mm_serial_port_close (MM_SERIAL_PORT (ctx->dial_port));
+
     /* If cancelled, complete */
     if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
         return;
@@ -519,9 +522,6 @@ extended_error_ready (MMBaseModem *modem,
                                           ctx->saved_error);
 
     ctx->saved_error = NULL;
-
-    /* Close the dialling port as we got an error */
-    mm_serial_port_close (MM_SERIAL_PORT (ctx->dial_port));
 
     /* Done with errors */
     dial_3gpp_context_complete_and_free (ctx);
