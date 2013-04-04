@@ -674,9 +674,13 @@ mbm_do_connect_done (MMModemMbm *self, gboolean success)
     if (!priv->pending_connect_info)
         return;
 
-    if (success)
+    if (success) {
+        /* Explicitly remove the AT*ENAP? callback, or we may end up scheduling
+         * it with an already disposed MMCallbackInfo. */
+        mm_dbg ("disabled periodic connect attempt polling");
+        mm_callback_info_set_data (priv->pending_connect_info, "mbm-enap-poll-id", NULL, NULL);
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), NULL, priv->pending_connect_info);
-    else {
+    } else {
         GError *connect_error;
 
         connect_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
