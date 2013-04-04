@@ -753,7 +753,7 @@ find_cid_ready (MMBaseModem *modem,
                 DetailedConnectContext *ctx)
 {
     GVariant *result;
-    gchar *command;
+    gchar *apn, *command;
     GError *error = NULL;
     const gchar *pdp_type;
 
@@ -783,10 +783,12 @@ find_cid_ready (MMBaseModem *modem,
     }
 
     ctx->cid = g_variant_get_uint32 (result);
-    command = g_strdup_printf ("+CGDCONT=%u,\"%s\",\"%s\"",
+    apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
+    command = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
                                ctx->cid,
                                pdp_type,
-                               mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
+                               apn);
+    g_free (apn);
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    command,
