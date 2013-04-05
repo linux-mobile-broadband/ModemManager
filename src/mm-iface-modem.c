@@ -36,11 +36,13 @@
 #define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG     "signal-quality-update-context-tag"
 #define SIGNAL_QUALITY_CHECK_CONTEXT_TAG      "signal-quality-check-context-tag"
 #define ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG "access-technologies-check-context-tag"
+#define RESTART_INITIALIZE_IDLE_TAG           "restart-initialize-tag"
 
 static GQuark state_update_context_quark;
 static GQuark signal_quality_update_context_quark;
 static GQuark signal_quality_check_context_quark;
 static GQuark access_technologies_check_context_quark;
+static GQuark restart_initialize_idle_quark;
 
 /*****************************************************************************/
 
@@ -2391,11 +2393,19 @@ reinitialize_ready (MMBaseModem *self,
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
+    g_object_set_qdata (G_OBJECT (self), restart_initialize_idle_quark, NULL);
+
     /* If no wait needed, just go on */
     mm_base_modem_initialize (MM_BASE_MODEM (self),
                               (GAsyncReadyCallback) reinitialize_ready,
                               NULL);
     return FALSE;
+}
+
+static void
+restart_initialize_idle_cancel (gpointer idp)
+{
+    g_source_remove (GPOINTER_TO_UINT (idp));
 }
 
 static void
@@ -2420,8 +2430,18 @@ set_lock_status (MMIfaceModem *self,
             /* Only restart initialization if leaving LOCKED.
              * If this is the case, we do NOT update the state yet, we wait
              * to be completely re-initialized to do so. */
-            if (old_lock != MM_MODEM_LOCK_UNKNOWN)
-                g_idle_add ((GSourceFunc)restart_initialize_idle, self);
+            if (old_lock != MM_MODEM_LOCK_UNKNOWN) {
+                guint id;
+
+                if (G_UNLIKELY (!restart_initialize_idle_quark))
+                    restart_initialize_idle_quark = (g_quark_from_static_string (RESTART_INITIALIZE_IDLE_TAG));
+
+                id = g_idle_add ((GSourceFunc)restart_initialize_idle, self);
+                g_object_set_qdata_full (G_OBJECT (self),
+                                         restart_initialize_idle_quark,
+                                         GUINT_TO_POINTER (id),
+                                         (GDestroyNotify)restart_initialize_idle_cancel);
+            }
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
@@ -4171,6 +4191,12 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
     if (G_LIKELY (access_technologies_check_context_quark))
         g_object_set_qdata (G_OBJECT (self),
                             access_technologies_check_context_quark,
+                            NULL);
+
+    /* Remove running restart initialization idle, if any */
+    if (G_LIKELY (restart_initialize_idle_quark))
+        g_object_set_qdata (G_OBJECT (self),
+                            restart_initialize_idle_quark,
                             NULL);
 
     /* Remove SIM object */
