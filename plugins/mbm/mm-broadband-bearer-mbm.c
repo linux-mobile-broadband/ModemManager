@@ -394,8 +394,8 @@ authenticate (Dial3gppContext *ctx)
 
 		command = g_strdup_printf ("AT*EIAAUW=%d,1,\"%s\",\"%s\"",
                                    ctx->cid,
-                                   encoded_user,
-                                   encoded_password);
+                                   encoded_user ? encoded_user : "",
+                                   encoded_password ? encoded_password : "");
 
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
@@ -410,6 +410,7 @@ authenticate (Dial3gppContext *ctx)
         return;
     }
 
+    mm_dbg ("Authentication not needed");
     activate (ctx);
 }
 
