@@ -396,6 +396,8 @@ authenticate (Dial3gppContext *ctx)
                                    ctx->cid,
                                    encoded_user ? encoded_user : "",
                                    encoded_password ? encoded_password : "");
+        g_free (encoded_user);
+        g_free (encoded_password);
 
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
