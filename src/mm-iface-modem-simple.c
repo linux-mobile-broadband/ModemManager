@@ -778,6 +778,69 @@ connect_auth_ready (MMBaseModem *self,
 
     mm_info ("Simple connect started...");
 
+    /* Log about all the parameters being used for the simple connect */
+    {
+        const MMModemBand *bands;
+        guint n_bands;
+        MMModemMode allowed;
+        MMModemMode preferred;
+        MMBearerAllowedAuth allowed_auth;
+        gchar *str;
+        MMBearerIpFamily ip_family;
+
+#define VALIDATE_UNSPECIFIED(str) (str ? str : "unspecified")
+
+        mm_dbg ("   PIN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_pin (ctx->properties)));
+
+        if (mm_simple_connect_properties_get_allowed_modes (ctx->properties, &allowed, &preferred)) {
+            str = mm_modem_mode_build_string_from_mask (allowed);
+            mm_dbg ("   Allowed mode: %s", str);
+            g_free (str);
+            str = mm_modem_mode_build_string_from_mask (preferred);
+            mm_dbg ("   Preferred mode: %s", str);
+            g_free (str);
+        } else {
+            mm_dbg ("   Allowed mode: %s", VALIDATE_UNSPECIFIED (NULL));
+            mm_dbg ("   Preferred mode: %s", VALIDATE_UNSPECIFIED (NULL));
+        }
+
+        if (mm_simple_connect_properties_get_bands (ctx->properties, &bands, &n_bands)) {
+            str = mm_common_build_bands_string (bands, n_bands);
+            mm_dbg ("   Bands: %s", str);
+            g_free (str);
+        } else
+            mm_dbg ("   Bands: %s", VALIDATE_UNSPECIFIED (NULL));
+
+        mm_dbg ("   Operator ID: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_operator_id (ctx->properties)));
+
+        mm_dbg ("   Allowed roaming: %s", mm_simple_connect_properties_get_allow_roaming (ctx->properties) ? "yes" : "no");
+
+        mm_dbg ("   APN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_apn (ctx->properties)));
+
+        ip_family = mm_simple_connect_properties_get_ip_type (ctx->properties);
+        if (ip_family != MM_BEARER_IP_FAMILY_UNKNOWN) {
+            mm_dbg ("   IP family: %s", mm_bearer_ip_family_get_string (ip_family));
+        } else
+            mm_dbg ("   IP family: %s", VALIDATE_UNSPECIFIED (NULL));
+
+        allowed_auth = mm_simple_connect_properties_get_allowed_auth (ctx->properties);
+        if (allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+            str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+            mm_dbg ("   Allowed authentication: %s", str);
+            g_free (str);
+        } else
+            mm_dbg ("   Allowed authentication: %s", VALIDATE_UNSPECIFIED (NULL));
+
+
+        mm_dbg ("   User: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_user (ctx->properties)));
+
+        mm_dbg ("   Password: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_password (ctx->properties)));
+
+        mm_dbg ("   Number: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_number (ctx->properties)));
+
+#undef VALIDATE_UNSPECIFIED
+    }
+
     switch (current) {
     case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_UNKNOWN:
