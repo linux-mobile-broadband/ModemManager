@@ -93,6 +93,7 @@ typedef struct {
     GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
+    GRegex *regex_na;
     GRegex *regex_custom_error;
     /* User-provided parser filter */
     mm_serial_parser_v1_filter_fn filter_callback;
@@ -117,6 +118,8 @@ mm_serial_parser_v1_new (void)
     parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
+    /* Samsung Z810 may reply "NA" to report a not-available error */
+    parser->regex_na = g_regex_new ("\\r\\nNA\\r\\n", flags, 0, NULL);
 
     parser->regex_custom_successful = NULL;
     parser->regex_custom_error = NULL;
@@ -335,6 +338,19 @@ mm_serial_parser_v1_parse (gpointer data,
         }
 
         local_error = mm_connection_error_for_code (code);
+        goto done;
+    }
+
+    /* NA error */
+    found = g_regex_match_full (parser->regex_na,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        /* Assume NA means 'Not Allowed' :) */
+        local_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                   MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED,
+                                   "Not Allowed");
+        goto done;
     }
 
 done:
@@ -378,6 +394,7 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
     g_regex_unref (parser->regex_connect_failed);
+    g_regex_unref (parser->regex_na);
 
     if (parser->regex_custom_successful)
         g_regex_unref (parser->regex_custom_successful);
