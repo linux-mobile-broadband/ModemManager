@@ -115,7 +115,8 @@ enum {
     DIAG_CMD_EXT_BUILD_ID      = 124,
     DIAG_CMD_EXT_MESSAGE_CONFIG= 125,
     DIAG_CMD_EVENT_GET_MASK    = 129,
-    DIAG_CMD_EVENT_SET_MASK    = 130
+    DIAG_CMD_EVENT_SET_MASK    = 130,
+    DIAG_CMD_SAMSUNG_IND       = 217, /* Unsolicited message seen on Samsung Z810 */
 };
 
 /* Subsystem IDs used with DIAG_CMD_SUBSYS; these often obsolete many of
@@ -589,6 +590,20 @@ struct DMCmdSubsysGsmStateInfoRsp {
     u_int8_t cm_sysmode;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysGsmStateInfoRsp DMCmdSubsysGsmStateInfoRsp;
+
+/* DIAG_CMD_SAMSUNG_IND response */
+struct DMCmdSamsungIndRsp {
+    DMCmdHeader hdr;
+    u_int8_t _unknown1;  /* always zero */
+    u_int8_t _unknown2;  /* 0x0c */
+    u_int8_t  _unknown3[4];  /* always zero */
+    u_int8_t _unknown4;  /* 0x05 */
+    u_int8_t _unknown5;  /* always zero */
+    u_int8_t _unknown6;  /* 0x01 */
+    u_int8_t _unknown7;  /* always zero */
+    u_int8_t signal;  /* 0 - 5 */
+} __attribute__ ((packed));
+typedef struct DMCmdSamsungIndRsp DMCmdSamsungIndRsp;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 
