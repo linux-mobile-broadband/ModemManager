@@ -43,7 +43,8 @@ typedef enum { /*< underscore_name=mm_port_probe_flag >*/
     MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
     MM_PORT_PROBE_AT_ICERA   = 1 << 3,
     MM_PORT_PROBE_QCDM       = 1 << 4,
-    MM_PORT_PROBE_QMI        = 1 << 5
+    MM_PORT_PROBE_QMI        = 1 << 5,
+    MM_PORT_PROBE_MBIM       = 1 << 6
 } MMPortProbeFlag;
 
 typedef struct _MMPortProbe MMPortProbe;
@@ -100,6 +101,8 @@ void mm_port_probe_set_result_qcdm       (MMPortProbe *self,
                                           gboolean qcdm);
 void mm_port_probe_set_result_qmi        (MMPortProbe *self,
                                           gboolean qmi);
+void mm_port_probe_set_result_mbim       (MMPortProbe *self,
+                                          gboolean mbim);
 
 /* Run probing */
 void     mm_port_probe_run        (MMPortProbe *self,
@@ -123,13 +126,15 @@ MMPortType    mm_port_probe_get_port_type    (MMPortProbe *self);
 gboolean      mm_port_probe_is_at            (MMPortProbe *self);
 gboolean      mm_port_probe_is_qcdm          (MMPortProbe *self);
 gboolean      mm_port_probe_is_qmi           (MMPortProbe *self);
+gboolean      mm_port_probe_is_mbim          (MMPortProbe *self);
 const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
 gboolean      mm_port_probe_is_icera         (MMPortProbe *self);
 
 /* Additional helpers */
-gboolean mm_port_probe_list_has_at_port  (GList *list);
-gboolean mm_port_probe_list_has_qmi_port (GList *list);
-gboolean mm_port_probe_list_is_icera     (GList *list);
+gboolean mm_port_probe_list_has_at_port   (GList *list);
+gboolean mm_port_probe_list_has_qmi_port  (GList *list);
+gboolean mm_port_probe_list_has_mbim_port (GList *list);
+gboolean mm_port_probe_list_is_icera      (GList *list);
 
 #endif /* MM_PORT_PROBE_H */
