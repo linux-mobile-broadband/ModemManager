@@ -249,6 +249,13 @@ endif
 
 # Additional MBIM support in ModemManager
 if WITH_MBIM
+ModemManager_SOURCES += \
+	mm-sim-mbim.h \
+	mm-sim-mbim.c \
+	mm-bearer-mbim.h \
+	mm-bearer-mbim.c \
+	mm-broadband-modem-mbim.h \
+	mm-broadband-modem-mbim.c
 ModemManager_CPPFLAGS += $(MBIM_CFLAGS)
 ModemManager_LDADD += $(MBIM_LIBS)
 endif
