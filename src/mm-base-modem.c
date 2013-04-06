@@ -998,7 +998,8 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     if (MM_IS_AT_SERIAL_PORT (data_primary))
         mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data_primary), MM_AT_PORT_FLAG_NONE);
 
-    mm_at_serial_port_set_flags (primary, MM_AT_PORT_FLAG_PRIMARY);
+    if (primary)
+        mm_at_serial_port_set_flags (primary, MM_AT_PORT_FLAG_PRIMARY);
     if (secondary)
         mm_at_serial_port_set_flags (secondary, MM_AT_PORT_FLAG_SECONDARY);
 
@@ -1022,7 +1023,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 #endif
 
     /* We keep new refs to the objects here */
-    self->priv->primary = g_object_ref (primary);
+    self->priv->primary = (primary ? g_object_ref (primary) : NULL);
     self->priv->secondary = (secondary ? g_object_ref (secondary) : NULL);
     self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
     self->priv->gps_control = (gps_control ? g_object_ref (gps_control) : NULL);
