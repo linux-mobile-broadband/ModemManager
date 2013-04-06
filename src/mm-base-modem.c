@@ -91,6 +91,11 @@ struct _MMBaseModemPrivate {
     /* QMI ports */
     GList *qmi;
 #endif
+
+#if defined WITH_MBIM
+    /* MBIM ports */
+    GList *mbim;
+#endif
 };
 
 static gchar *
@@ -238,15 +243,18 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                       MM_PORT_TYPE, MM_PORT_TYPE_NET,
                                       NULL));
     }
-    /* QMI ports... */
+    /* cdc-wdm ports... */
     else if (g_str_has_prefix (subsys, "usb") &&
              g_str_has_prefix (name, "cdc-wdm")) {
 #if defined WITH_QMI
         if (ptype == MM_PORT_TYPE_QMI)
             port = MM_PORT (mm_qmi_port_new (name));
-        else
 #endif
-        {
+#if defined WITH_MBIM
+        if (!port && ptype == MM_PORT_TYPE_MBIM)
+            port = MM_PORT (mm_mbim_port_new (name));
+#endif
+        if (!port) {
             g_set_error (error,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_UNSUPPORTED,
@@ -258,7 +266,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
         }
     }
     else
-        /* We already filter out before all non-tty, non-net, non-qmi ports */
+        /* We already filter out before all non-tty, non-net, non-cdc-wdm ports */
         g_assert_not_reached();
 
     mm_dbg ("(%s) type '%s' claimed by %s",
@@ -332,6 +340,14 @@ mm_base_modem_release_port (MMBaseModem *self,
     if (l) {
         g_object_unref (l->data);
         self->priv->qmi = g_list_delete_link (self->priv->qmi, l);
+    }
+#endif
+
+#if defined WITH_MBIM
+    l = g_list_find (self->priv->mbim, port);
+    if (l) {
+        g_object_unref (l->data);
+        self->priv->mbim = g_list_delete_link (self->priv->mbim, l);
     }
 #endif
 
@@ -701,6 +717,157 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 
 #endif /* WITH_QMI */
 
+#if defined WITH_MBIM
+
+MMMbimPort *
+mm_base_modem_get_port_mbim (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    /* First MBIM port in the list is the primary one always */
+    return (self->priv->mbim ? ((MMMbimPort *)g_object_ref (self->priv->mbim->data)) : NULL);
+}
+
+MMMbimPort *
+mm_base_modem_peek_port_mbim (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    /* First MBIM port in the list is the primary one always */
+    return (self->priv->mbim ? (MMMbimPort *)self->priv->mbim->data : NULL);
+}
+
+MMMbimPort *
+mm_base_modem_get_port_mbim_for_data (MMBaseModem *self,
+                                      MMPort *data,
+                                      GError **error)
+{
+    MMMbimPort *mbim;
+
+    mbim = mm_base_modem_peek_port_mbim_for_data (self, data, error);
+    return (mbim ? (MMMbimPort *)g_object_ref (mbim) : NULL);
+}
+
+MMMbimPort *
+mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
+                                       MMPort *data,
+                                       GError **error)
+{
+    MMMbimPort *found;
+    GUdevClient *client;
+    GUdevDevice *data_device;
+    GUdevDevice *data_device_parent;
+    GList *l;
+
+    if (mm_port_get_subsys (data) != MM_PORT_SUBSYS_NET) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot look for MBIM port associated to a non-net data port");
+        return NULL;
+    }
+
+    /* don't listen for uevents */
+    client = g_udev_client_new (NULL);
+
+    /* Get udev device for the data port */
+    data_device = (g_udev_client_query_by_subsystem_and_name (
+                       client,
+                       "net",
+                       mm_port_get_device (data)));
+    if (!data_device) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't find udev device for port 'net/%s'",
+                     mm_port_get_device (data));
+        g_object_unref (client);
+        return NULL;
+    }
+
+    /* Get parent of the data device */
+    data_device_parent = g_udev_device_get_parent (data_device);
+    if (!data_device_parent) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get udev device parent for port 'net/%s'",
+                     mm_port_get_device (data));
+        g_object_unref (data_device);
+        g_object_unref (client);
+        return NULL;
+    }
+
+    /* Now walk the list of MBIM ports looking for a match */
+    found = NULL;
+    for (l = self->priv->mbim; l && !found; l = g_list_next (l)) {
+        GUdevDevice *mbim_device;
+        GUdevDevice *mbim_device_parent;
+
+        /* Get udev device for the MBIM port */
+        mbim_device = (g_udev_client_query_by_subsystem_and_name (
+                          client,
+                          "usb",
+                          mm_port_get_device (MM_PORT (l->data))));
+        if (!mbim_device) {
+            mbim_device = (g_udev_client_query_by_subsystem_and_name (
+                              client,
+                              "usbmisc",
+                              mm_port_get_device (MM_PORT (l->data))));
+            if (!mbim_device) {
+                mm_warn ("Couldn't get udev device for MBIM port '%s'",
+                         mm_port_get_device (MM_PORT (l->data)));
+                continue;
+            }
+        }
+
+        /* Get parent of the MBIM device */
+        mbim_device_parent = g_udev_device_get_parent (mbim_device);
+        g_object_unref (mbim_device);
+
+        if (!data_device_parent) {
+            mm_warn ("Couldn't get udev device parent for MBIM port '%s'",
+                     mm_port_get_device (MM_PORT (l->data)));
+            continue;
+        }
+
+        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
+                         g_udev_device_get_sysfs_path (mbim_device_parent)))
+            found = MM_MBIM_PORT (l->data);
+
+        g_object_unref (mbim_device_parent);
+    }
+
+    g_object_unref (data_device_parent);
+    g_object_unref (data_device);
+    g_object_unref (client);
+
+    if (!found) {
+        /* For the case where we have only 1 data port and 1 MBIM port and they
+         * don't match with the previous rules (e.g. in some Huawei modems),
+         * just return the found one */
+        if (g_list_length (self->priv->data) == 1 &&
+            g_list_length (self->priv->mbim) == 1 &&
+            self->priv->data->data == data) {
+            mm_info ("Assuming MBIM port '%s' is associated to net/%s",
+                     mm_port_get_device (MM_PORT (self->priv->mbim->data)),
+                     mm_port_get_device (data));
+            found = MM_MBIM_PORT (self->priv->mbim->data);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_NOT_FOUND,
+                         "Couldn't find associated MBIM port for 'net/%s'",
+                         mm_port_get_device (data));
+            return NULL;
+        }
+    }
+
+    return found;
+}
+
+#endif /* WITH_MBIM */
+
 MMPort *
 mm_base_modem_get_best_data_port (MMBaseModem *self,
                                   MMPortType type)
@@ -863,6 +1030,10 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMPort *qmi_primary = NULL;
     GList *qmi = NULL;
 #endif
+#if defined WITH_MBIM
+    MMPort *mbim_primary = NULL;
+    GList *mbim = NULL;
+#endif
     GList *l;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
@@ -953,6 +1124,16 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 #endif
 
+#if defined WITH_MBIM
+        case MM_PORT_TYPE_MBIM:
+            if (!mbim_primary)
+                mbim_primary = candidate;
+            else
+                /* All non-primary MBIM ports get added to the list of MBIM ports */
+                mbim = g_list_append (mbim, candidate);
+            break;
+#endif
+
         default:
             /* Ignore port */
             break;
@@ -961,18 +1142,27 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
     /* Fall back to a secondary port if we didn't find a primary port */
     if (!primary) {
-#if defined WITH_QMI
-        /* On QMI-based modems we do allow not having a primary AT port */
-        if (!secondary && !qmi_primary) {
-#else
         if (!secondary) {
+            gboolean allow_modem_without_at_port = FALSE;
+
+#if defined WITH_QMI
+            if (qmi_primary)
+                allow_modem_without_at_port = TRUE;
 #endif
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to find primary AT port");
-            return FALSE;
-        } else {
+
+#if defined WITH_MBIM
+            if (mbim_primary)
+                allow_modem_without_at_port = TRUE;
+#endif
+
+            if (!allow_modem_without_at_port) {
+                g_set_error_literal (error,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Failed to find primary AT port");
+                return FALSE;
+            }
+        } else  {
             primary = secondary;
             secondary = NULL;
         }
@@ -991,6 +1181,17 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
                              "Failed to find a net port in the QMI modem");
+        return FALSE;
+    }
+#endif
+
+#if defined WITH_MBIM
+    /* On MBIM-based modems, we need to have at least a net port */
+    if (mbim_primary && !data_primary) {
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to find a net port in the MBIM modem");
         return FALSE;
     }
 #endif
@@ -1029,6 +1230,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     for (l = qmi; l; l = g_list_next (l))
         log_port (self, MM_PORT (l->data),  "qmi (secondary)");
 #endif
+#if defined WITH_MBIM
+    log_port (self, MM_PORT (mbim_primary),  "mbim (primary)");
+    for (l = mbim; l; l = g_list_next (l))
+        log_port (self, MM_PORT (l->data),   "mbim (secondary)");
+#endif
 
     /* We keep new refs to the objects here */
     self->priv->primary = (primary ? g_object_ref (primary) : NULL);
@@ -1048,6 +1254,15 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         self->priv->qmi = g_list_append (self->priv->qmi, g_object_ref (qmi_primary));
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
         self->priv->qmi = g_list_concat (self->priv->qmi, qmi);
+    }
+#endif
+
+#if defined WITH_MBIM
+    /* Build the final list of MBIM ports, primary port first */
+    if (mbim_primary) {
+        self->priv->mbim = g_list_append (self->priv->mbim, g_object_ref (mbim_primary));
+        g_list_foreach (mbim, (GFunc)g_object_ref, NULL);
+        self->priv->mbim = g_list_concat (self->priv->mbim, mbim);
     }
 #endif
 
@@ -1333,6 +1548,12 @@ dispose (GObject *object)
     g_list_foreach (self->priv->qmi, (GFunc)mm_qmi_port_close, NULL);
     g_list_free_full (self->priv->qmi, g_object_unref);
     self->priv->qmi = NULL;
+#endif
+#if defined WITH_MBIM
+    /* We need to close the MBIM port cleanly when disposing the modem object */
+    g_list_foreach (self->priv->mbim, (GFunc)mm_mbim_port_close, NULL);
+    g_list_free_full (self->priv->mbim, g_object_unref);
+    self->priv->mbim = NULL;
 #endif
 
     if (self->priv->ports) {
