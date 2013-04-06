@@ -170,7 +170,26 @@ case $with_tests in
         ;;
 esac
 
+dnl
+dnl MBIM support (enabled by default)
+dnl
+AC_ARG_WITH(mbim, AS_HELP_STRING([--without-mbim], [Build without MBIM support]), [], [with_mbim=yes])
+AM_CONDITIONAL(WITH_MBIM, test "x$with_mbim" = "xyes")
+case $with_mbim in
+    yes)
+        PKG_CHECK_MODULES(MBIM, mbim-glib)
+        AC_DEFINE(WITH_MBIM, 1, [Define if you want MBIM support])
+        AC_SUBST(MBIM_CFLAGS)
+        AC_SUBST(MBIM_LIBS)
+        ;;
+    *)
+        with_mbim=no
+        ;;
+esac
+
+dnl
 dnl QMI support (enabled by default)
+dnl
 AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
 AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
 case $with_qmi in
@@ -269,6 +288,7 @@ echo "
     PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}
     Documentation:           ${with_docs}
+    MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}
     Newest QMI commands:     ${with_newest_qmi_commands}
 "
