@@ -31,6 +31,10 @@
 #include <libqmi-glib.h>
 #endif
 
+#if defined WITH_MBIM
+#include <libmbim-glib.h>
+#endif
+
 #include "mm-log.h"
 
 enum {
@@ -192,6 +196,10 @@ mm_log_set_level (const char *level, GError **error)
     qmi_utils_set_traces_enabled (log_level & LOGL_DEBUG ? TRUE : FALSE);
 #endif
 
+#if defined WITH_MBIM
+    mbim_utils_set_traces_enabled (log_level & LOGL_DEBUG ? TRUE : FALSE);
+#endif
+
     return found;
 }
 
@@ -238,6 +246,13 @@ mm_log_setup (const char *level,
 
 #if defined WITH_QMI
     g_log_set_handler ("Qmi",
+                       G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+                       log_handler,
+                       NULL);
+#endif
+
+#if defined WITH_MBIM
+    g_log_set_handler ("Mbim",
                        G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
                        log_handler,
                        NULL);
