@@ -22,6 +22,10 @@ if WITH_QMI
 PLUGIN_COMMON_COMPILER_FLAGS += $(QMI_CFLAGS)
 endif
 
+if WITH_MBIM
+PLUGIN_COMMON_COMPILER_FLAGS += $(MBIM_CFLAGS)
+endif
+
 # UDev rules
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA =

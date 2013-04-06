@@ -77,6 +77,7 @@ struct _MMPluginPrivate {
     gboolean single_at;
     gboolean qcdm;
     gboolean qmi;
+    gboolean mbim;
     gboolean icera_probe;
     MMPortProbeAtCommand *custom_at_probe;
     guint64 send_delay;
@@ -106,6 +107,7 @@ enum {
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
     PROP_ALLOWED_QMI,
+    PROP_ALLOWED_MBIM,
     PROP_ICERA_PROBE,
     PROP_ALLOWED_ICERA,
     PROP_FORBIDDEN_ICERA,
@@ -707,11 +709,15 @@ mm_plugin_supports_port (MMPlugin *self,
             probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
     } else {
         /* cdc-wdm ports... */
-        probe_run_flags = self->priv->qmi ? MM_PORT_PROBE_QMI : MM_PORT_PROBE_NONE;
+        probe_run_flags = MM_PORT_PROBE_NONE;
+        if (self->priv->qmi)
+            probe_run_flags |= MM_PORT_PROBE_QMI;
+        if (self->priv->mbim)
+            probe_run_flags |= MM_PORT_PROBE_MBIM;
     }
 
     /* If no explicit probing was required, just request to grab it without probing anything.
-     * This may happen, e.g. with cdc-wdm ports which do not need QMI probing. */
+     * This may happen, e.g. with cdc-wdm ports which do not need QMI/MBIM probing. */
     if (probe_run_flags == MM_PORT_PROBE_NONE) {
         g_simple_async_result_set_op_res_gpointer (async_result,
                                                    GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
@@ -850,6 +856,16 @@ mm_plugin_create_modem (MMPlugin  *self,
                                            "ignoring QMI net port");
             }
 #endif
+#if !defined WITH_MBIM
+            else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
+                     g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
+                                  "cdc_mbim")) {
+                grabbed = FALSE;
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_UNSUPPORTED,
+                                           "ignoring MBIM net port");
+            }
+#endif
             else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
                 grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
                                                                  modem,
@@ -963,6 +979,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->qmi = g_value_get_boolean (value);
         break;
+    case PROP_ALLOWED_MBIM:
+        /* Construct only */
+        self->priv->mbim = g_value_get_boolean (value);
+        break;
     case PROP_ICERA_PROBE:
         /* Construct only */
         self->priv->icera_probe = g_value_get_boolean (value);
@@ -1051,6 +1071,9 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_QMI:
         g_value_set_boolean (value, self->priv->qmi);
+        break;
+    case PROP_ALLOWED_MBIM:
+        g_value_set_boolean (value, self->priv->mbim);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         g_value_set_boxed (value, self->priv->udev_tags);
@@ -1251,6 +1274,14 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_ALLOWED_QMI,
                                "Allowed QMI",
                                "Whether QMI ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_MBIM,
+         g_param_spec_boolean (MM_PLUGIN_ALLOWED_MBIM,
+                               "Allowed MBIM",
+                               "Whether MBIM ports are allowed in this plugin",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
