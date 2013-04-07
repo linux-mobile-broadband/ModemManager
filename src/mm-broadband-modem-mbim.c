@@ -154,6 +154,40 @@ modem_load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Revision loading (Modem interface) */
+
+static gchar *
+modem_load_revision_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info)
+        return g_strdup (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Firmware revision information not given in device capabilities");
+    return NULL;
+}
+
+static void
+modem_load_revision (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just complete */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_revision);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -440,6 +474,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
     iface->load_modem_capabilities = NULL;
     iface->load_modem_capabilities_finish = NULL;
+    iface->load_manufacturer = NULL; /* TODO */
+    iface->load_manufacturer_finish = NULL;
+    iface->load_model = NULL; /* TODO */
+    iface->load_model_finish = NULL;
+    iface->load_revision = modem_load_revision;
+    iface->load_revision_finish = modem_load_revision_finish;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
