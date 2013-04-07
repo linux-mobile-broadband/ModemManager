@@ -40,6 +40,14 @@ libmodem_helpers_la_SOURCES += \
 libmodem_helpers_la_CPPFLAGS += $(QMI_CFLAGS)
 endif
 
+# Additional MBIM support in libmodem-helpers
+if WITH_MBIM
+libmodem_helpers_la_SOURCES += \
+	mm-modem-helpers-mbim.c \
+	mm-modem-helpers-mbim.h
+libmodem_helpers_la_CPPFLAGS += $(MBIM_CFLAGS)
+endif
+
 # libserial specific enum types
 SERIAL_ENUMS = \
 	$(srcdir)/mm-port.h \

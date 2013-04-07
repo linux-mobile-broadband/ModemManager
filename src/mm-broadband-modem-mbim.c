@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <ctype.h>
 
+#include "mm-modem-helpers-mbim.h"
 #include "mm-broadband-modem-mbim.h"
 #include "mm-bearer-mbim.h"
 #include "mm-sim-mbim.h"
@@ -44,6 +45,10 @@ struct _MMBroadbandModemMbimPrivate {
     guint caps_max_sessions;
     gchar *caps_device_id;
     gchar *caps_firmware_info;
+
+    /* Queried and cached lock info */
+    MMModemLock current_lock;
+    guint current_lock_retries;
 };
 
 /*****************************************************************************/
@@ -325,6 +330,137 @@ modem_load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Unlock required loading (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemMbim *self;
+    GSimpleAsyncResult *result;
+} LoadUnlockRequiredContext;
+
+static void
+load_unlock_required_context_complete_and_free (LoadUnlockRequiredContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadUnlockRequiredContext, ctx);
+}
+
+static MMModemLock
+modem_load_unlock_required_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCK_UNKNOWN;
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+pin_query_ready (MbimDevice *device,
+                 GAsyncResult *res,
+                 LoadUnlockRequiredContext *ctx)
+{
+    MMModemLock unlock_required;
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (ctx->result, error);
+        load_unlock_required_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Gather and store the results we want */
+    ctx->self->priv->current_lock = (mm_modem_lock_from_mbim_pin_type (
+                                         mbim_message_basic_connect_pin_set_response_get_pin_type (response)));
+    ctx->self->priv->current_lock_retries = mbim_message_basic_connect_pin_set_response_get_remaining_attempts (response);
+    mbim_message_unref (response);
+
+    if (mbim_message_basic_connect_pin_set_response_get_pin_state (response) == MBIM_PIN_STATE_UNLOCKED)
+        unlock_required = MM_MODEM_LOCK_NONE;
+    else
+        unlock_required = ctx->self->priv->current_lock;
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (unlock_required),
+                                               NULL);
+    load_unlock_required_context_complete_and_free (ctx);
+}
+
+static void
+modem_load_unlock_required (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    LoadUnlockRequiredContext *ctx;
+    MMMbimPort *port;
+    MbimMessage *message;
+
+    ctx = g_slice_new (LoadUnlockRequiredContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_unlock_required);
+
+    mm_dbg ("loading unlock required...");
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    message = (mbim_message_basic_connect_pin_query_request_new (
+                   mm_mbim_port_get_next_transaction_id (port)));
+    mbim_device_command (mm_mbim_port_peek_device (port),
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)pin_query_ready,
+                         ctx);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+/* Unlock retries loading (Modem interface) */
+
+static MMUnlockRetries *
+modem_load_unlock_retries_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    MMUnlockRetries *retries;
+
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->current_lock == MM_MODEM_LOCK_UNKNOWN) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Current lock is unknown");
+        return NULL;
+    }
+
+    retries = mm_unlock_retries_new ();
+    mm_unlock_retries_set (retries,
+                           MM_BROADBAND_MODEM_MBIM (self)->priv->current_lock,
+                           MM_BROADBAND_MODEM_MBIM (self)->priv->current_lock_retries);
+    return retries;
+}
+
+static void
+modem_load_unlock_retries (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just complete */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_unlock_retries);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -582,6 +718,8 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_MODEM_MBIM,
                                               MMBroadbandModemMbimPrivate);
+
+    self->priv->current_lock = MM_MODEM_LOCK_UNKNOWN;
 }
 
 static void
@@ -633,6 +771,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = NULL;
     iface->setup_charset = NULL;
     iface->setup_charset_finish = NULL;
+    iface->load_unlock_required = modem_load_unlock_required;
+    iface->load_unlock_required_finish = modem_load_unlock_required_finish;
+    iface->load_unlock_retries = modem_load_unlock_retries;
+    iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
