@@ -624,6 +624,16 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
 
+    /* Unneeded things */
+    iface->modem_after_power_up = NULL;
+    iface->modem_after_power_up_finish = NULL;
+    iface->load_supported_charsets = NULL;
+    iface->load_supported_charsets_finish = NULL;
+    iface->setup_flow_control = NULL;
+    iface->setup_flow_control_finish = NULL;
+    iface->setup_charset = NULL;
+    iface->setup_charset_finish = NULL;
+
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
