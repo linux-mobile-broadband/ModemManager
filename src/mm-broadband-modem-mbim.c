@@ -461,6 +461,92 @@ modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Initial power state loading */
+
+typedef struct {
+    MMBroadbandModemMbim *self;
+    GSimpleAsyncResult *result;
+} LoadPowerStateContext;
+
+static void
+load_power_state_context_complete_and_free (LoadPowerStateContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadPowerStateContext, ctx);
+}
+
+static MMModemPowerState
+modem_load_power_state_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    return (MMModemPowerState) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+radio_state_query_ready (MbimDevice *device,
+                         GAsyncResult *res,
+                         LoadPowerStateContext *ctx)
+{
+    MMModemPowerState state;
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (ctx->result, error);
+        load_power_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (mbim_message_basic_connect_radio_state_query_response_get_hardware_radio_state (response) == MBIM_RADIO_SWITCH_STATE_OFF ||
+        mbim_message_basic_connect_radio_state_query_response_get_software_radio_state (response) == MBIM_RADIO_SWITCH_STATE_OFF)
+        state = MM_MODEM_POWER_STATE_LOW;
+    else
+        state = MM_MODEM_POWER_STATE_ON;
+
+    mbim_message_unref (response);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (state),
+                                               NULL);
+    load_power_state_context_complete_and_free (ctx);
+}
+
+static void
+modem_load_power_state (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    LoadPowerStateContext *ctx;
+    MMMbimPort *port;
+    MbimMessage *message;
+
+    ctx = g_slice_new (LoadPowerStateContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_power_state);
+
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    message = (mbim_message_basic_connect_radio_state_query_request_new (
+                   mm_mbim_port_get_next_transaction_id (port)));
+    mbim_device_command (mm_mbim_port_peek_device (port),
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)radio_state_query_ready,
+                         ctx);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -761,6 +847,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = modem_load_device_identifier_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
+    iface->load_unlock_required = modem_load_unlock_required;
+    iface->load_unlock_required_finish = modem_load_unlock_required_finish;
+    iface->load_unlock_retries = modem_load_unlock_retries;
+    iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
+    iface->load_power_state = modem_load_power_state;
+    iface->load_power_state_finish = modem_load_power_state_finish;
 
     /* Unneeded things */
     iface->modem_after_power_up = NULL;
@@ -771,10 +863,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = NULL;
     iface->setup_charset = NULL;
     iface->setup_charset_finish = NULL;
-    iface->load_unlock_required = modem_load_unlock_required;
-    iface->load_unlock_required_finish = modem_load_unlock_required_finish;
-    iface->load_unlock_retries = modem_load_unlock_retries;
-    iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
