@@ -262,6 +262,69 @@ modem_load_device_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Supported modes loading (Modem interface) */
+
+static MMModemMode
+modem_load_supported_modes_finish (MMIfaceModem *_self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    MMModemMode mask;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    if (self->priv->caps_data_class == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Data class not given in device capabilities");
+        return MM_MODEM_MODE_NONE;
+    }
+
+    mask = 0;
+
+    /* 3GPP... */
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_GPRS |
+                                       MBIM_DATA_CLASS_EDGE))
+        mask |= MM_MODEM_MODE_2G;
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_UMTS |
+                                       MBIM_DATA_CLASS_HSDPA |
+                                       MBIM_DATA_CLASS_HSUPA))
+        mask |= MM_MODEM_MODE_3G;
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
+        mask |= MM_MODEM_MODE_4G;
+
+    /* 3GPP2... */
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
+        mask |= MM_MODEM_MODE_2G;
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_1XEVDO |
+                                       MBIM_DATA_CLASS_1XEVDO_REVA |
+                                       MBIM_DATA_CLASS_1XEVDV |
+                                       MBIM_DATA_CLASS_3XRTT |
+                                       MBIM_DATA_CLASS_1XEVDO_REVB))
+        mask |= MM_MODEM_MODE_3G;
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_UMB)
+        mask |= MM_MODEM_MODE_4G;
+
+    return mask;
+}
+
+static void
+modem_load_supported_modes (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just complete */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_supported_modes);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -558,6 +621,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_equipment_identifier_finish = modem_load_equipment_identifier_finish;
     iface->load_device_identifier = modem_load_device_identifier;
     iface->load_device_identifier_finish = modem_load_device_identifier_finish;
+    iface->load_supported_modes = modem_load_supported_modes;
+    iface->load_supported_modes_finish = modem_load_supported_modes_finish;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
