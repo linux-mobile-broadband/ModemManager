@@ -346,6 +346,42 @@ load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* After SIM unlock (Modem interface) */
+
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return FALSE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    /* A 3-second wait is necessary for SIM to become ready, or the firmware may
+     * fail miserably and reboot itself */
+    g_timeout_add_seconds (3, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
+
+/*****************************************************************************/
 /* Common band/mode handling code */
 
 typedef struct {
@@ -2237,6 +2273,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_bands = set_bands;
