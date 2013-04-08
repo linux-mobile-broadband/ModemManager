@@ -90,4 +90,10 @@ ATTRS{idVendor}=="2341", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9207", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# FT232 USB-Serial (UART) IC (Arduino)
+ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Atmel Corp. LUFA USB to Serial Adapter Project (Arduino)
+ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="204b", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
