@@ -28,4 +28,7 @@ ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 # QinHeng Electronics HL-340
 ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Atmel Corp. LUFA USB to Serial Adapter Project (Arduino)
+ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="204b", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_serial_adapters_greylist_end"
