@@ -1824,6 +1824,22 @@ modem_load_supported_modes (MMIfaceModem *self,
 #define STRENGTH_TO_QUALITY(strength)                                   \
     (guint8)(100 - ((CLAMP (strength, -113, -51) + 51) * 100 / (-113 + 51)))
 
+static gboolean
+qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
+{
+    /* Different radio interfaces have different signal quality bounds */
+    switch (radio_interface) {
+    case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
+    case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
+        return (dbm > -125 && dbm < -30);
+    case QMI_NAS_RADIO_INTERFACE_UMTS:
+        return (dbm > -125 && dbm < -30);
+    default:
+        break;
+    }
+    return TRUE;
+}
+
 typedef struct {
     MMBroadbandModemQmi *self;
     QmiClient *client;
@@ -1854,47 +1870,55 @@ load_signal_quality_finish (MMIfaceModem *self,
 
 #if defined WITH_NEWEST_QMI_COMMANDS
 
-static gint8
+static gboolean
 signal_info_get_quality (MMBroadbandModemQmi *self,
-                         QmiMessageNasGetSignalInfoOutput *output)
+                         QmiMessageNasGetSignalInfoOutput *output,
+                         gint8 *out_quality)
 {
     gint8 rssi_max = 0;
     gint8 rssi;
-    guint8 quality;
+
+    g_assert (out_quality != NULL);
 
     /* We do not report per-technology signal quality, so just get the highest
      * one of the ones reported. */
 
     if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (CDMA): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (HDR): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
         mm_dbg ("RSSI (GSM): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (LTE): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
+            rssi = MAX (rssi, rssi_max);
     }
 
     /* This RSSI comes as negative dBms */
-    quality = STRENGTH_TO_QUALITY (rssi_max);
+    *out_quality = STRENGTH_TO_QUALITY (rssi_max);
 
-    mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, quality);
-    return quality;
+    mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
+
+    return (rssi_max < 0);
 }
 
 static void
@@ -1904,7 +1928,7 @@ get_signal_info_ready (QmiClientNas *client,
 {
     QmiMessageNasGetSignalInfoOutput *output;
     GError *error = NULL;
-    guint quality;
+    guint quality = 0;
 
     output = qmi_client_nas_get_signal_info_finish (client, res, &error);
     if (!output) {
@@ -1920,7 +1944,15 @@ get_signal_info_ready (QmiClientNas *client,
         return;
     }
 
-    quality = signal_info_get_quality (ctx->self, output);
+    if (!signal_info_get_quality (ctx->self, output, &quality)) {
+        qmi_message_nas_get_signal_info_output_unref (output);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Signal info reported invalid signal strength.");
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
@@ -1933,17 +1965,16 @@ get_signal_info_ready (QmiClientNas *client,
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-static void
+static gboolean
 signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
                                              QmiMessageNasGetSignalStrengthOutput *output,
                                              guint8 *o_quality,
                                              MMModemAccessTechnology *o_act)
 {
     GArray *array = NULL;
-    gint8 signal_max;
+    gint8 signal_max = 0;
     QmiNasRadioInterface main_interface;
     MMModemAccessTechnology act;
-    guint8 quality;
 
     /* We do not report per-technology signal quality, so just get the highest
      * one of the ones reported. */
@@ -1953,6 +1984,10 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
     mm_dbg ("Signal strength (%s): %d dBm",
             qmi_nas_radio_interface_get_string (main_interface),
             signal_max);
+
+    /* Treat results as invalid if main signal strength is invalid */
+    if (!qmi_dbm_valid (signal_max, main_interface))
+        return FALSE;
 
     act = mm_modem_access_technology_from_qmi_radio_interface (main_interface);
 
@@ -1969,19 +2004,22 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
                     qmi_nas_radio_interface_get_string (element->radio_interface),
                     element->strength);
 
-            signal_max = MAX (element->strength, signal_max);
-
-            act |= mm_modem_access_technology_from_qmi_radio_interface (element->radio_interface);
+            if (qmi_dbm_valid (element->strength, element->radio_interface)) {
+                signal_max = MAX (element->strength, signal_max);
+                act |= mm_modem_access_technology_from_qmi_radio_interface (element->radio_interface);
+            }
         }
     }
 
-    /* This signal strength comes as negative dBms */
-    quality = STRENGTH_TO_QUALITY (signal_max);
+    if (signal_max < 0) {
+        /* This signal strength comes as negative dBms */
+        *o_quality = STRENGTH_TO_QUALITY (signal_max);
+        *o_act = act;
 
-    mm_dbg ("Signal strength: %d dBm --> %u%%", signal_max, quality);
+        mm_dbg ("Signal strength: %d dBm --> %u%%", signal_max, *o_quality);
+    }
 
-    *o_quality = quality;
-    *o_act = act;
+    return (signal_max < 0);
 }
 
 static void
@@ -2008,7 +2046,15 @@ get_signal_strength_ready (QmiClientNas *client,
         return;
     }
 
-    signal_strength_get_quality_and_access_tech (ctx->self, output, &quality, &act);
+    if (!signal_strength_get_quality_and_access_tech (ctx->self, output, &quality, &act)) {
+        qmi_message_nas_get_signal_strength_output_unref (output);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "GetSignalStrength signal strength invalid.");
+        load_signal_quality_context_complete_and_free (ctx);
+        return;
+    }
 
     /* We update the access technologies directly here when loading signal
      * quality. It goes a bit out of context, but we can do it nicely */
@@ -5607,21 +5653,27 @@ event_report_indication_cb (QmiClientNas *client,
             &signal_strength,
             &signal_strength_radio_interface,
             NULL)) {
-        guint8 quality;
+        if (qmi_dbm_valid (signal_strength, signal_strength_radio_interface)) {
+            guint8 quality;
 
-        /* This signal strength comes as negative dBms */
-        quality = STRENGTH_TO_QUALITY (signal_strength);
+            /* This signal strength comes as negative dBms */
+            quality = STRENGTH_TO_QUALITY (signal_strength);
 
-        mm_dbg ("Signal strength indication (%s): %d dBm --> %u%%",
-                qmi_nas_radio_interface_get_string (signal_strength_radio_interface),
-                signal_strength,
-                quality);
+            mm_dbg ("Signal strength indication (%s): %d dBm --> %u%%",
+                    qmi_nas_radio_interface_get_string (signal_strength_radio_interface),
+                    signal_strength,
+                    quality);
 
-        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
-        mm_iface_modem_update_access_technologies (
-            MM_IFACE_MODEM (self),
-            mm_modem_access_technology_from_qmi_radio_interface (signal_strength_radio_interface),
-            (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
+            mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+            mm_iface_modem_update_access_technologies (
+                MM_IFACE_MODEM (self),
+                mm_modem_access_technology_from_qmi_radio_interface (signal_strength_radio_interface),
+                (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
+        } else {
+            mm_dbg ("Ignoring invalid signal strength (%s): %d dBm",
+                    qmi_nas_radio_interface_get_string (signal_strength_radio_interface),
+                    signal_strength);
+        }
     }
 }
 
@@ -5644,35 +5696,43 @@ signal_info_indication_cb (QmiClientNas *client,
 
     if (qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (CDMA): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (HDR): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
         mm_dbg ("RSSI (GSM): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
+            rssi = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (LTE): %d dBm", rssi);
-        rssi = MAX (rssi, rssi_max);
+        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
+            rssi = MAX (rssi, rssi_max);
     }
 
-    /* This RSSI comes as negative dBms */
-    quality = STRENGTH_TO_QUALITY (rssi_max);
+    if (rssi_max < 0) {
+        /* This RSSI comes as negative dBms */
+        quality = STRENGTH_TO_QUALITY (rssi_max);
 
-    mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, quality);
+        mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, quality);
 
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+    } else
+        mm_dbg ("Ignoring invalid signal strength: %d dBm", rssi_max);
 }
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
