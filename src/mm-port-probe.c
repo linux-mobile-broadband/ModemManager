@@ -280,10 +280,9 @@ port_probe_run_task_free (PortProbeRunTask *task)
     if (task->source_id)
         g_source_remove (task->source_id);
 
-    if (task->buffer_full_id)
-        g_source_remove (task->buffer_full_id);
-
     if (task->serial) {
+        if (task->buffer_full_id)
+            g_signal_handler_disconnect (task->serial, task->buffer_full_id);
         if (mm_serial_port_is_open (task->serial))
             mm_serial_port_close (task->serial);
         g_object_unref (task->serial);
