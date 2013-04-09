@@ -277,8 +277,11 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
     }
 
     case CONNECT_3GPP_CONTEXT_STEP_DHCP:
-        /* If too many retries (1s of wait between the retries), failed */
-        if (ctx->check_count > 30) {
+        /* Wait for dial up timeout, retries for 60 times
+         * (1s between the retries, so it means 1 minute).
+         * If too many retries, failed
+         */
+        if (ctx->check_count > 60) {
             /* Clear context */
             ctx->self->priv->connect_pending = NULL;
             g_simple_async_result_set_error (ctx->result,
