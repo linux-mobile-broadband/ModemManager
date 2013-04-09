@@ -392,12 +392,13 @@ supports_task_dispose (GObject *object)
 
     if (priv->open_id)
         g_source_remove (priv->open_id);
-    if (priv->full_id)
-        g_source_remove (priv->full_id);
 
     if (priv->probe_id)
         g_source_remove (priv->probe_id);
     if (priv->probe_port) {
+        if (priv->full_id)
+            g_signal_handler_disconnect (priv->probe_port, priv->full_id);
+
         mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
         g_object_unref (priv->probe_port);
     }
@@ -602,6 +603,10 @@ emit_probe_result (gpointer user_data)
 
     /* Close the serial ports */
     if (task_priv->probe_port) {
+        if (task_priv->full_id) {
+            g_signal_handler_disconnect (task_priv->probe_port, task_priv->full_id);
+            task_priv->full_id = 0;
+        }
         g_object_unref (task_priv->probe_port);
         task_priv->probe_port = NULL;
     }
@@ -695,6 +700,10 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
 
     /* Close the AT port */
     if (priv->probe_port) {
+        if (priv->full_id) {
+            g_signal_handler_disconnect (priv->probe_port, priv->full_id);
+            priv->full_id = 0;
+        }
         mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
         g_object_unref (priv->probe_port);
         priv->probe_port = NULL;
