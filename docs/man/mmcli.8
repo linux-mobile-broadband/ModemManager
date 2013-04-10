@@ -289,7 +289,8 @@ All simple options must be used with \fB\-\-modem\fR or \fB\-m\fR.
 .TP
 .B \-\-simple\-connect=['KEY1=VALUE1,KEY2=VALUE2,...']
 Run a full connection sequence using \fBKEY\fR / \fBVALUE\fR pairs.
-The possible \fBKEY\fRs you can use include:
+You can use the \fB\-\-create\-bearer\fR options, plus any of the
+following ones:
 .RS 9
 .TP
 \fB'pin'\fR
@@ -305,8 +306,7 @@ List of MMModemBand values, to specify all the bands allowed in the modem.
 Bitmask of MMModemMode values, to specify all the modes allowed in the modem.
 .TP
 \fB'preferred-mode'\fR
-Specific MMModemMode preferred among the ones allowed, if any. You can
-also use the \fB\-\-create\-bearer\fR options as key/value pairs here.
+Specific MMModemMode preferred among the ones allowed, if any.
 .RE
 .TP
 .B \-\-simple\-disconnect
