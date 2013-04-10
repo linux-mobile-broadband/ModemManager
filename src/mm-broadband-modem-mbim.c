@@ -52,6 +52,31 @@ struct _MMBroadbandModemMbimPrivate {
 };
 
 /*****************************************************************************/
+
+static gboolean
+peek_device (gpointer self,
+             MbimDevice **o_device,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
+{
+    MMMbimPort *port;
+
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (!port) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't peek MBIM port");
+        return FALSE;
+    }
+
+    *o_device = mm_mbim_port_peek_device (port);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Current Capabilities loading (Modem interface) */
 
 typedef struct {
@@ -98,34 +123,38 @@ device_caps_query_ready (MbimDevice *device,
     GError *error = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response) {
+    if (response &&
+        mbim_message_basic_connect_device_caps_query_response_parse (
+            response,
+            NULL, /* device_type */
+            &ctx->self->priv->caps_cellular_class,
+            NULL, /* voice_class */
+            NULL, /* sim_class */
+            &ctx->self->priv->caps_data_class,
+            &ctx->self->priv->caps_sms,
+            NULL, /* ctrl_caps */
+            &ctx->self->priv->caps_max_sessions,
+            NULL, /* custom_data_class */
+            &ctx->self->priv->caps_device_id,
+            &ctx->self->priv->caps_firmware_info,
+            NULL, /* hardware_info */
+            &error)) {
+        /* Build mask of modem capabilities */
+        mask = 0;
+        if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
+            mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
+        if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
+            mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+        if (ctx->self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
+            mask |= MM_MODEM_CAPABILITY_LTE;
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (mask),
+                                                   NULL);
+    } else
         g_simple_async_result_take_error (ctx->result, error);
-        load_capabilities_context_complete_and_free (ctx);
-        return;
-    }
 
-    /* Gather and store the results we want */
-    ctx->self->priv->caps_cellular_class = mbim_message_basic_connect_device_caps_query_response_get_cellular_class (response);
-    ctx->self->priv->caps_data_class = mbim_message_basic_connect_device_caps_query_response_get_data_class (response);
-    ctx->self->priv->caps_sms = mbim_message_basic_connect_device_caps_query_response_get_sms_caps (response);
-    ctx->self->priv->caps_max_sessions = mbim_message_basic_connect_device_caps_query_response_get_max_sessions (response);
-    ctx->self->priv->caps_device_id = mbim_message_basic_connect_device_caps_query_response_get_device_id (response);
-    ctx->self->priv->caps_firmware_info = mbim_message_basic_connect_device_caps_query_response_get_firmware_info (response);
-    mbim_message_unref (response);
-
-    /* Build mask of modem capabilities */
-    mask = 0;
-    if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
-        mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
-    if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
-        mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
-    if (ctx->self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
-        mask |= MM_MODEM_CAPABILITY_LTE;
-
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (mask),
-                                               NULL);
+    if (response)
+        mbim_message_unref (response);
     load_capabilities_context_complete_and_free (ctx);
 }
 
@@ -135,8 +164,11 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                  gpointer user_data)
 {
     LoadCapabilitiesContext *ctx;
-    MMMbimPort *port;
+    MbimDevice *device;
     MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
 
     ctx = g_slice_new (LoadCapabilitiesContext);
     ctx->self = g_object_ref (self);
@@ -146,10 +178,10 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                              modem_load_current_capabilities);
 
     mm_dbg ("loading current capabilities...");
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     message = (mbim_message_basic_connect_device_caps_query_request_new (
-                   mm_mbim_port_get_next_transaction_id (port)));
-    mbim_device_command (mm_mbim_port_peek_device (port),
+                   mbim_device_get_next_transaction_id (device),
+                   NULL));
+    mbim_device_command (device,
                          message,
                          10,
                          NULL,
@@ -362,31 +394,38 @@ pin_query_ready (MbimDevice *device,
                  GAsyncResult *res,
                  LoadUnlockRequiredContext *ctx)
 {
-    MMModemLock unlock_required;
     MbimMessage *response;
     GError *error = NULL;
+    MbimPinType pin_type;
+    MbimPinState pin_state;
+    guint32 remaining_attempts;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response) {
+    if (response &&
+        mbim_message_basic_connect_pin_query_response_parse (
+            response,
+            &pin_type,
+            &pin_state,
+            &remaining_attempts,
+            &error)) {
+        MMModemLock unlock_required;
+
+        /* Gather and store the results we want */
+        ctx->self->priv->current_lock = pin_type;
+        ctx->self->priv->current_lock_retries = remaining_attempts;
+
+        if (pin_state == MBIM_PIN_STATE_UNLOCKED)
+            unlock_required = MM_MODEM_LOCK_NONE;
+        else
+            unlock_required = ctx->self->priv->current_lock;
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (unlock_required),
+                                                   NULL);
+    } else
         g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
-    }
 
-    /* Gather and store the results we want */
-    ctx->self->priv->current_lock = (mm_modem_lock_from_mbim_pin_type (
-                                         mbim_message_basic_connect_pin_set_response_get_pin_type (response)));
-    ctx->self->priv->current_lock_retries = mbim_message_basic_connect_pin_set_response_get_remaining_attempts (response);
-    mbim_message_unref (response);
-
-    if (mbim_message_basic_connect_pin_set_response_get_pin_state (response) == MBIM_PIN_STATE_UNLOCKED)
-        unlock_required = MM_MODEM_LOCK_NONE;
-    else
-        unlock_required = ctx->self->priv->current_lock;
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (unlock_required),
-                                               NULL);
+    if (response)
+        mbim_message_unref (response);
     load_unlock_required_context_complete_and_free (ctx);
 }
 
@@ -396,8 +435,11 @@ modem_load_unlock_required (MMIfaceModem *self,
                             gpointer user_data)
 {
     LoadUnlockRequiredContext *ctx;
-    MMMbimPort *port;
+    MbimDevice *device;
     MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
 
     ctx = g_slice_new (LoadUnlockRequiredContext);
     ctx->self = g_object_ref (self);
@@ -407,10 +449,10 @@ modem_load_unlock_required (MMIfaceModem *self,
                                              modem_load_unlock_required);
 
     mm_dbg ("loading unlock required...");
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     message = (mbim_message_basic_connect_pin_query_request_new (
-                   mm_mbim_port_get_next_transaction_id (port)));
-    mbim_device_command (mm_mbim_port_peek_device (port),
+                   mbim_device_get_next_transaction_id (device),
+                   NULL));
+    mbim_device_command (device,
                          message,
                          10,
                          NULL,
@@ -493,28 +535,33 @@ radio_state_query_ready (MbimDevice *device,
                          GAsyncResult *res,
                          LoadPowerStateContext *ctx)
 {
-    MMModemPowerState state;
     MbimMessage *response;
     GError *error = NULL;
+    MbimRadioSwitchState hardware_radio_state;
+    MbimRadioSwitchState software_radio_state;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response) {
+    if (response &&
+        mbim_message_basic_connect_radio_state_query_response_parse (
+            response,
+            &hardware_radio_state,
+            &software_radio_state,
+            &error)) {
+        MMModemPowerState state;
+
+        if (hardware_radio_state == MBIM_RADIO_SWITCH_STATE_OFF ||
+            software_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
+            state = MM_MODEM_POWER_STATE_LOW;
+        else
+            state = MM_MODEM_POWER_STATE_ON;
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (state),
+                                                   NULL);
+    } else
         g_simple_async_result_take_error (ctx->result, error);
-        load_power_state_context_complete_and_free (ctx);
-        return;
-    }
 
-    if (mbim_message_basic_connect_radio_state_query_response_get_hardware_radio_state (response) == MBIM_RADIO_SWITCH_STATE_OFF ||
-        mbim_message_basic_connect_radio_state_query_response_get_software_radio_state (response) == MBIM_RADIO_SWITCH_STATE_OFF)
-        state = MM_MODEM_POWER_STATE_LOW;
-    else
-        state = MM_MODEM_POWER_STATE_ON;
-
-    mbim_message_unref (response);
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (state),
-                                               NULL);
+    if (response)
+        mbim_message_unref (response);
     load_power_state_context_complete_and_free (ctx);
 }
 
@@ -524,8 +571,11 @@ modem_load_power_state (MMIfaceModem *self,
                         gpointer user_data)
 {
     LoadPowerStateContext *ctx;
-    MMMbimPort *port;
+    MbimDevice *device;
     MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
 
     ctx = g_slice_new (LoadPowerStateContext);
     ctx->self = g_object_ref (self);
@@ -534,10 +584,10 @@ modem_load_power_state (MMIfaceModem *self,
                                              user_data,
                                              modem_load_power_state);
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     message = (mbim_message_basic_connect_radio_state_query_request_new (
-                   mm_mbim_port_get_next_transaction_id (port)));
-    mbim_device_command (mm_mbim_port_peek_device (port),
+                   mbim_device_get_next_transaction_id (device),
+                   NULL));
+    mbim_device_command (device,
                          message,
                          10,
                          NULL,
