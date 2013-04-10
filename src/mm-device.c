@@ -145,7 +145,7 @@ get_device_ids (GUdevDevice *device,
                 success = TRUE;
                 goto out;
             } else if (g_str_has_prefix (parent_subsys, "usb") &&
-                       g_str_equal (g_udev_device_get_driver (parent), "qmi_wwan")) {
+                       !g_strcmp0 (g_udev_device_get_driver (parent), "qmi_wwan")) {
                 /* Need to look for vendor/product in the parent of the QMI device */
                 GUdevDevice *qmi_parent;
 
