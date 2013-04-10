@@ -495,6 +495,22 @@ mbim_port_open_ready (MMMbimPort *mbim_port,
     task->source_id = g_idle_add ((GSourceFunc)wdm_probe, self);
 }
 
+static gboolean
+mbim_sleep_ready (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    task->source_id = 0;
+
+    /* Create a port and try to open it */
+    task->mbim_port = mm_mbim_port_new (g_udev_device_get_name (self->priv->port));
+    mm_mbim_port_open (task->mbim_port,
+                       NULL,
+                       (GAsyncReadyCallback)mbim_port_open_ready,
+                       self);
+    return FALSE;
+}
+
 #endif /* WITH_MBIM */
 
 static void
@@ -507,12 +523,7 @@ wdm_probe_mbim (MMPortProbe *self)
             g_udev_device_get_subsystem (self->priv->port),
             g_udev_device_get_name (self->priv->port));
 
-    /* Create a port and try to open it */
-    task->mbim_port = mm_mbim_port_new (g_udev_device_get_name (self->priv->port));
-    mm_mbim_port_open (task->mbim_port,
-                       NULL,
-                       (GAsyncReadyCallback)mbim_port_open_ready,
-                       self);
+    task->source_id = g_timeout_add_seconds (3, (GSourceFunc)mbim_sleep_ready, self);
 #else
     /* If not compiled with MBIM support, just assume we won't have any MBIM port */
     mm_port_probe_set_result_mbim (self, FALSE);
