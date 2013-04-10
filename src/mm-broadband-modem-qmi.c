@@ -4187,7 +4187,7 @@ unsolicited_registration_events_context_new (MMBroadbandModemQmi *self,
                                              callback,
                                              user_data,
                                              unsolicited_registration_events_context_new);
-    ctx->enable = FALSE;
+    ctx->enable = enable;
     return ctx;
 }
 
