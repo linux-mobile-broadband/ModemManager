@@ -628,6 +628,78 @@ modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Own numbers loading */
+
+static GStrv
+modem_load_own_numbers_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+own_numbers_subscriber_ready_state_ready (MbimDevice *device,
+                                          GAsyncResult *res,
+                                          GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    gchar **telephone_numbers;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+            response,
+            NULL, /* ready_state */
+            NULL, /* subscriber_id */
+            NULL, /* sim_iccid */
+            NULL, /* ready_info */
+            NULL, /* telephone_numbers_count */
+            &telephone_numbers,
+            &error)) {
+        g_simple_async_result_set_op_res_gpointer (simple, telephone_numbers, NULL);
+    } else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_own_numbers (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_own_numbers);
+
+    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)own_numbers_subscriber_ready_state_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Initial power state loading */
 
 typedef struct {
@@ -1022,6 +1094,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
+    iface->load_own_numbers = modem_load_own_numbers;
+    iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->load_power_state = modem_load_power_state;
     iface->load_power_state_finish = modem_load_power_state_finish;
 
