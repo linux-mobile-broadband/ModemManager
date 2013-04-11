@@ -272,9 +272,16 @@ pin_set_enable_ready (MbimDevice *device,
         mbim_message_unref (response);
     }
 
-    if (error)
+    if (error) {
+        if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_PIN_REQUIRED)) {
+            g_error_free (error);
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Need to be unlocked to allow enabling/disabling PIN");
+        }
+
         g_simple_async_result_take_error (simple, error);
-    else
+    } else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -345,9 +352,16 @@ pin_set_change_ready (MbimDevice *device,
         mbim_message_unref (response);
     }
 
-    if (error)
+    if (error) {
+        if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_PIN_REQUIRED)) {
+            g_error_free (error);
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Need to be unlocked to allow changing PIN");
+        }
+
         g_simple_async_result_take_error (simple, error);
-    else
+    } else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
