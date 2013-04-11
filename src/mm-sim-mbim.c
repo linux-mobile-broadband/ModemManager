@@ -149,6 +149,95 @@ send_pin (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Send PUK */
+
+static gboolean
+send_puk_finish (MMSim *self,
+                 GAsyncResult *res,
+                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+puk_set_enter_ready (MbimDevice *device,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MbimMessage *response;
+    MbimPinType pin_type;
+    MbimPinState pin_state;
+    guint32 remaining_attempts;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_basic_connect_pin_set_response_parse (
+            response,
+            &pin_type,
+            &pin_state,
+            &remaining_attempts,
+            &error)) {
+        /* Create the errors ourselves */
+        if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+            if (remaining_attempts == 0)
+                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
+            else
+                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+        }
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+send_puk (MMSim *self,
+          const gchar *puk,
+          const gchar *new_pin,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    MbimDevice *device;
+    MbimMessage *message;
+    GSimpleAsyncResult *result;
+    GError *error = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_puk);
+
+    mm_dbg ("Sending PUK...");
+    message = (mbim_message_basic_connect_pin_set_request_new (
+                   MBIM_PIN_TYPE_PUK1,
+                   MBIM_PIN_OPERATION_ENTER,
+                   puk,
+                   new_pin,
+                   &error));
+    if (!message) {
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)puk_set_enter_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 MMSim *
 mm_sim_mbim_new_finish (GAsyncResult  *res,
@@ -197,4 +286,6 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
 
     sim_class->send_pin = send_pin;
     sim_class->send_pin_finish = send_pin_finish;
+    sim_class->send_puk = send_puk;
+    sim_class->send_puk_finish = send_puk_finish;
 }
