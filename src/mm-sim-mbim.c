@@ -127,7 +127,6 @@ send_pin (MMSim *self,
 
     mm_dbg ("Sending PIN...");
     message = (mbim_message_basic_connect_pin_set_request_new (
-                   mbim_device_get_next_transaction_id (device),
                    MBIM_PIN_TYPE_PIN1,
                    MBIM_PIN_OPERATION_ENTER,
                    pin,

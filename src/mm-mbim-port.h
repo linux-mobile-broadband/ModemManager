@@ -58,8 +58,6 @@ gboolean mm_mbim_port_open_finish (MMMbimPort *self,
 gboolean mm_mbim_port_is_open     (MMMbimPort *self);
 void     mm_mbim_port_close       (MMMbimPort *self);
 
-guint32  mm_mbim_port_get_next_transaction_id (MMMbimPort *self);
-
 MbimDevice *mm_mbim_port_peek_device (MMMbimPort *self);
 
 #endif /* MM_MBIM_PORT_H */

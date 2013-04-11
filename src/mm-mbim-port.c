@@ -31,16 +31,6 @@ struct _MMMbimPortPrivate {
 
 /*****************************************************************************/
 
-guint32
-mm_mbim_port_get_next_transaction_id (MMMbimPort *self)
-{
-    return (self->priv->mbim_device ?
-            mbim_device_get_next_transaction_id (self->priv->mbim_device) :
-            0);
-}
-
-/*****************************************************************************/
-
 typedef struct {
     MMMbimPort *self;
     GSimpleAsyncResult *result;

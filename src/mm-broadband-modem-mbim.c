@@ -178,9 +178,7 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                              modem_load_current_capabilities);
 
     mm_dbg ("loading current capabilities...");
-    message = (mbim_message_basic_connect_device_caps_query_request_new (
-                   mbim_device_get_next_transaction_id (device),
-                   NULL));
+    message = (mbim_message_basic_connect_device_caps_query_request_new (NULL));
     mbim_device_command (device,
                          message,
                          10,
@@ -449,9 +447,7 @@ modem_load_unlock_required (MMIfaceModem *self,
                                              modem_load_unlock_required);
 
     mm_dbg ("loading unlock required...");
-    message = (mbim_message_basic_connect_pin_query_request_new (
-                   mbim_device_get_next_transaction_id (device),
-                   NULL));
+    message = (mbim_message_basic_connect_pin_query_request_new (NULL));
     mbim_device_command (device,
                          message,
                          10,
@@ -584,9 +580,7 @@ modem_load_power_state (MMIfaceModem *self,
                                              user_data,
                                              modem_load_power_state);
 
-    message = (mbim_message_basic_connect_radio_state_query_request_new (
-                   mbim_device_get_next_transaction_id (device),
-                   NULL));
+    message = (mbim_message_basic_connect_radio_state_query_request_new (NULL));
     mbim_device_command (device,
                          message,
                          10,
