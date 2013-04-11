@@ -321,6 +321,79 @@ enable_pin (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Change PIN */
+
+static gboolean
+change_pin_finish (MMSim *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+pin_set_change_ready (MbimDevice *device,
+                      GAsyncResult *res,
+                      GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MbimMessage *response;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response) {
+        mbim_message_command_done_get_result (response, &error);
+        mbim_message_unref (response);
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+change_pin (MMSim *self,
+            const gchar *old_pin,
+            const gchar *new_pin,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    MbimDevice *device;
+    MbimMessage *message;
+    GSimpleAsyncResult *result;
+    GError *error = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_puk);
+
+    mm_dbg ("Changing PIN");
+    message = (mbim_message_basic_connect_pin_set_request_new (
+                   MBIM_PIN_TYPE_PIN1,
+                   MBIM_PIN_OPERATION_CHANGE,
+                   old_pin,
+                   new_pin,
+                   &error));
+    if (!message) {
+        g_simple_async_result_take_error (result, error);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)pin_set_change_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 MMSim *
 mm_sim_mbim_new_finish (GAsyncResult  *res,
@@ -373,4 +446,6 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
     sim_class->send_puk_finish = send_puk_finish;
     sim_class->enable_pin = enable_pin;
     sim_class->enable_pin_finish = enable_pin_finish;
+    sim_class->change_pin = change_pin;
+    sim_class->change_pin_finish = change_pin_finish;
 }
