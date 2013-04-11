@@ -330,20 +330,20 @@ handle_enable_pin_context_free (HandleEnablePinContext *ctx)
 }
 
 static void
-after_enable_update_lock_info_ready (MMIfaceModem *self,
+after_enable_update_lock_info_ready (MMIfaceModem *modem,
                                      GAsyncResult *res,
                                      HandleEnablePinContext *ctx)
 {
     /* We just want to ensure that we tried to update the unlock
      * retries, no big issue if it failed */
-    mm_iface_modem_update_lock_info_finish (self, res, NULL);
+    mm_iface_modem_update_lock_info_finish (modem, res, NULL);
 
     if (ctx->save_error) {
         g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
         ctx->save_error = NULL;
     } else {
         /* Signal about the new lock state */
-        g_signal_emit (self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
+        g_signal_emit (ctx->self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
         mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
     }
 
