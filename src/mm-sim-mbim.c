@@ -86,17 +86,23 @@ pin_set_enter_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_basic_connect_pin_set_response_parse (
-            response,
-            &pin_type,
-            &pin_state,
-            NULL,
-            &error)) {
-        /* Create the errors ourselves */
-        if (pin_type == MBIM_PIN_TYPE_PIN1 && pin_state == MBIM_PIN_STATE_LOCKED)
-            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
-        else if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED)
-            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK);
+        !mbim_message_command_done_get_result (response, &error)) {
+        /* Sending PIN failed, build a better error to report */
+        if (mbim_message_basic_connect_pin_set_response_parse (
+                response,
+                &pin_type,
+                &pin_state,
+                NULL,
+                NULL)) {
+            /* Create the errors ourselves */
+            if (pin_type == MBIM_PIN_TYPE_PIN1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                g_error_free (error);
+                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+            } else if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                g_error_free (error);
+                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK);
+            }
+        }
     }
 
     if (error)
@@ -172,18 +178,22 @@ puk_set_enter_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_basic_connect_pin_set_response_parse (
-            response,
-            &pin_type,
-            &pin_state,
-            &remaining_attempts,
-            &error)) {
-        /* Create the errors ourselves */
-        if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
-            if (remaining_attempts == 0)
-                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
-            else
-                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+        !mbim_message_command_done_get_result (response, &error)) {
+        /* Sending PUK failed, build a better error to report */
+        if (mbim_message_basic_connect_pin_set_response_parse (
+                response,
+                &pin_type,
+                &pin_state,
+                &remaining_attempts,
+                NULL)) {
+            /* Create the errors ourselves */
+            if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                g_error_free (error);
+                if (remaining_attempts == 0)
+                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
+                else
+                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+            }
         }
     }
 

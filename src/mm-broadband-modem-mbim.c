@@ -120,6 +120,7 @@ device_caps_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
         mbim_message_basic_connect_device_caps_query_response_parse (
             response,
             NULL, /* device_type */
@@ -381,6 +382,7 @@ pin_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
         mbim_message_basic_connect_pin_query_response_parse (
             response,
             &pin_type,
@@ -459,6 +461,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
         mbim_message_basic_connect_pin_query_response_parse (
             response,
             &pin_type,
@@ -549,6 +552,7 @@ radio_state_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
         mbim_message_basic_connect_radio_state_query_response_parse (
             response,
             &hardware_radio_state,
