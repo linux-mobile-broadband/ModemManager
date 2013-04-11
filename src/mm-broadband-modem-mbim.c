@@ -29,6 +29,7 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-error-helpers.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 
@@ -359,6 +360,23 @@ modem_load_supported_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Unlock required loading (Modem interface) */
 
+typedef struct {
+    MMBroadbandModemMbim *self;
+    GSimpleAsyncResult *result;
+    guint n_ready_status_checks;
+    MbimDevice *device;
+} LoadUnlockRequiredContext;
+
+static void
+load_unlock_required_context_complete_and_free (LoadUnlockRequiredContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->device);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadUnlockRequiredContext, ctx);
+}
+
 static MMModemLock
 modem_load_unlock_required_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
@@ -373,7 +391,7 @@ modem_load_unlock_required_finish (MMIfaceModem *self,
 static void
 pin_query_ready (MbimDevice *device,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 LoadUnlockRequiredContext *ctx)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -395,16 +413,119 @@ pin_query_ready (MbimDevice *device,
             unlock_required = MM_MODEM_LOCK_NONE;
         else
             unlock_required = mm_modem_lock_from_mbim_pin_type (pin_type);
-        g_simple_async_result_set_op_res_gpointer (simple,
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (unlock_required),
                                                    NULL);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (ctx->result, error);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    load_unlock_required_context_complete_and_free (ctx);
+}
+
+static gboolean wait_for_sim_ready (LoadUnlockRequiredContext *ctx);
+
+static void
+unlock_required_subscriber_ready_state_ready (MbimDevice *device,
+                                              GAsyncResult *res,
+                                              LoadUnlockRequiredContext *ctx)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+            response,
+            &ready_state,
+            NULL, /* subscriber_id */
+            NULL, /* sim_iccid */
+            NULL, /* ready_info */
+            NULL, /* telephone_numbers_count */
+            NULL, /* telephone_numbers */
+            &error)) {
+        switch (ready_state) {
+        case MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED:
+        case MBIM_SUBSCRIBER_READY_STATE_INITIALIZED:
+        case MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED:
+            /* Don't set error */
+            break;
+        case MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED:
+            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED);
+            break;
+        case MBIM_SUBSCRIBER_READY_STATE_BAD_SIM:
+            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
+            break;
+        case MBIM_SUBSCRIBER_READY_STATE_FAILURE:
+        case MBIM_SUBSCRIBER_READY_STATE_NOT_ACTIVATED:
+        default:
+            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE);
+            break;
+        }
+    }
+
+    /* Fatal errors are reported right away */
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        load_unlock_required_context_complete_and_free (ctx);
+    }
+    /* Need to retry? */
+    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
+        if (--ctx->n_ready_status_checks == 0) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Error waiting for SIM to get initialized");
+            load_unlock_required_context_complete_and_free (ctx);
+        } else {
+            /* Retry */
+            g_timeout_add_seconds (1, (GSourceFunc)wait_for_sim_ready, ctx);
+        }
+    }
+    /* Initialized but locked? */
+    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) {
+        MbimMessage *message;
+
+        /* Query which lock is to unlock */
+        message = (mbim_message_basic_connect_pin_query_request_new (NULL));
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)pin_query_ready,
+                             ctx);
+        mbim_message_unref (message);
+    }
+    /* Initialized but locked? */
+    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
+                                                   NULL);
+        load_unlock_required_context_complete_and_free (ctx);
+    } else
+        g_assert_not_reached ();
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static gboolean
+wait_for_sim_ready (LoadUnlockRequiredContext *ctx)
+{
+    MbimMessage *message;
+
+    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    mbim_device_command (ctx->device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)unlock_required_subscriber_ready_state_ready,
+                         ctx);
+    mbim_message_unref (message);
+    return FALSE;
 }
 
 static void
@@ -412,27 +533,22 @@ modem_load_unlock_required (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    LoadUnlockRequiredContext *ctx;
     MbimDevice *device;
-    MbimMessage *message;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
+    ctx = g_slice_new (LoadUnlockRequiredContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_load_unlock_required);
+    ctx->n_ready_status_checks = 10;
 
-    mm_dbg ("loading unlock required...");
-    message = (mbim_message_basic_connect_pin_query_request_new (NULL));
-    mbim_device_command (device,
-                         message,
-                         10,
-                         NULL,
-                         (GAsyncReadyCallback)pin_query_ready,
-                         result);
-    mbim_message_unref (message);
+    wait_for_sim_ready (ctx);
 }
 
 /*****************************************************************************/
@@ -501,7 +617,6 @@ modem_load_unlock_retries (MMIfaceModem *self,
                                         user_data,
                                         modem_load_unlock_retries);
 
-    mm_dbg ("loading unlock retries...");
     message = (mbim_message_basic_connect_pin_query_request_new (NULL));
     mbim_device_command (device,
                          message,
