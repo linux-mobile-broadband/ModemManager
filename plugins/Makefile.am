@@ -106,7 +106,7 @@ libmm_plugin_huawei_la_SOURCES = \
 
 libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-udevrules_DATA += huawei/77-mm-huawei_net_port_types.rules
+udevrules_DATA += huawei/77-mm-huawei-net-port-types.rules
 
 # MBM
 libmm_plugin_mbm_la_SOURCES = \
