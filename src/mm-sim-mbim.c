@@ -64,6 +64,142 @@ peek_device (gpointer self,
 }
 
 /*****************************************************************************/
+/* Load SIM identifier */
+
+static gchar *
+load_sim_identifier_finish (MMSim *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+simid_subscriber_ready_state_ready (MbimDevice *device,
+                                    GAsyncResult *res,
+                                    GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    gchar *sim_iccid;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+            response,
+            NULL, /* ready_state */
+            NULL, /* subscriber_id */
+            &sim_iccid,
+            NULL, /* ready_info */
+            NULL, /* telephone_numbers_count */
+            NULL, /* telephone_numbers */
+            &error))
+        g_simple_async_result_set_op_res_gpointer (simple, sim_iccid, NULL);
+    else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_sim_identifier (MMSim *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MbimDevice *device;
+    MbimMessage *message;
+    GSimpleAsyncResult *result;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, load_sim_identifier);
+
+    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)simid_subscriber_ready_state_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+/* Load IMSI */
+
+static gchar *
+load_imsi_finish (MMSim *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+imsi_subscriber_ready_state_ready (MbimDevice *device,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    gchar *subscriber_id;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+            response,
+            NULL, /* ready_state */
+            &subscriber_id,
+            NULL, /* sim_iccid */
+            NULL, /* ready_info */
+            NULL, /* telephone_numbers_count */
+            NULL, /* telephone_numbers */
+            &error))
+        g_simple_async_result_set_op_res_gpointer (simple, subscriber_id, NULL);
+    else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_imsi (MMSim *self,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    MbimDevice *device;
+    MbimMessage *message;
+    GSimpleAsyncResult *result;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, load_imsi);
+
+    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)imsi_subscriber_ready_state_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Send PIN */
 
 static gboolean
@@ -454,6 +590,10 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
 {
     MMSimClass *sim_class = MM_SIM_CLASS (klass);
 
+    sim_class->load_sim_identifier = load_sim_identifier;
+    sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
+    sim_class->load_imsi = load_imsi;
+    sim_class->load_imsi_finish = load_imsi_finish;
     sim_class->send_pin = send_pin;
     sim_class->send_pin_finish = send_pin_finish;
     sim_class->send_puk = send_puk;
