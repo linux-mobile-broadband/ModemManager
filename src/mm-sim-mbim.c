@@ -88,7 +88,7 @@ simid_subscriber_ready_state_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+        mbim_message_subscriber_ready_status_response_parse (
             response,
             NULL, /* ready_state */
             NULL, /* subscriber_id */
@@ -121,7 +121,7 @@ load_sim_identifier (MMSim *self,
 
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, load_sim_identifier);
 
-    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
@@ -156,7 +156,7 @@ imsi_subscriber_ready_state_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+        mbim_message_subscriber_ready_status_response_parse (
             response,
             NULL, /* ready_state */
             &subscriber_id,
@@ -189,7 +189,7 @@ load_imsi (MMSim *self,
 
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, load_imsi);
 
-    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
@@ -224,7 +224,7 @@ pin_set_enter_ready (MbimDevice *device,
     if (response &&
         !mbim_message_command_done_get_result (response, &error)) {
         /* Sending PIN failed, build a better error to report */
-        if (mbim_message_basic_connect_pin_set_response_parse (
+        if (mbim_message_pin_response_parse (
                 response,
                 &pin_type,
                 &pin_state,
@@ -268,7 +268,7 @@ send_pin (MMSim *self,
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_pin);
 
     mm_dbg ("Sending PIN...");
-    message = (mbim_message_basic_connect_pin_set_request_new (
+    message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    MBIM_PIN_OPERATION_ENTER,
                    pin,
@@ -316,7 +316,7 @@ puk_set_enter_ready (MbimDevice *device,
     if (response &&
         !mbim_message_command_done_get_result (response, &error)) {
         /* Sending PUK failed, build a better error to report */
-        if (mbim_message_basic_connect_pin_set_response_parse (
+        if (mbim_message_pin_response_parse (
                 response,
                 &pin_type,
                 &pin_state,
@@ -361,7 +361,7 @@ send_puk (MMSim *self,
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_puk);
 
     mm_dbg ("Sending PUK...");
-    message = (mbim_message_basic_connect_pin_set_request_new (
+    message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PUK1,
                    MBIM_PIN_OPERATION_ENTER,
                    puk,
@@ -441,7 +441,7 @@ enable_pin (MMSim *self,
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_puk);
 
     mm_dbg ("%s PIN ...", enabled ? "Enabling" : "Disabling");
-    message = (mbim_message_basic_connect_pin_set_request_new (
+    message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    enabled ? MBIM_PIN_OPERATION_ENABLE : MBIM_PIN_OPERATION_DISABLE,
                    pin,
@@ -521,7 +521,7 @@ change_pin (MMSim *self,
     result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, send_puk);
 
     mm_dbg ("Changing PIN");
-    message = (mbim_message_basic_connect_pin_set_request_new (
+    message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    MBIM_PIN_OPERATION_CHANGE,
                    old_pin,

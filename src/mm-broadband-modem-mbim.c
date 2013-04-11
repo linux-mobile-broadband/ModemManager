@@ -122,7 +122,7 @@ device_caps_query_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_device_caps_query_response_parse (
+        mbim_message_device_caps_response_parse (
             response,
             NULL, /* device_type */
             &ctx->self->priv->caps_cellular_class,
@@ -176,7 +176,7 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                              modem_load_current_capabilities);
 
     mm_dbg ("loading current capabilities...");
-    message = (mbim_message_basic_connect_device_caps_query_request_new (NULL));
+    message = mbim_message_device_caps_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
@@ -401,7 +401,7 @@ pin_query_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_pin_query_response_parse (
+        mbim_message_pin_response_parse (
             response,
             &pin_type,
             &pin_state,
@@ -438,7 +438,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+        mbim_message_subscriber_ready_status_response_parse (
             response,
             &ready_state,
             NULL, /* subscriber_id */
@@ -490,7 +490,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
         MbimMessage *message;
 
         /* Query which lock is to unlock */
-        message = (mbim_message_basic_connect_pin_query_request_new (NULL));
+        message = mbim_message_pin_query_new (NULL);
         mbim_device_command (device,
                              message,
                              10,
@@ -517,7 +517,7 @@ wait_for_sim_ready (LoadUnlockRequiredContext *ctx)
 {
     MbimMessage *message;
 
-    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (ctx->device,
                          message,
                          10,
@@ -578,7 +578,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_pin_query_response_parse (
+        mbim_message_pin_response_parse (
             response,
             &pin_type,
             NULL,
@@ -617,7 +617,7 @@ modem_load_unlock_retries (MMIfaceModem *self,
                                         user_data,
                                         modem_load_unlock_retries);
 
-    message = (mbim_message_basic_connect_pin_query_request_new (NULL));
+    message = mbim_message_pin_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
@@ -653,7 +653,7 @@ own_numbers_subscriber_ready_state_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_subscriber_ready_status_query_response_parse (
+        mbim_message_subscriber_ready_status_response_parse (
             response,
             NULL, /* ready_state */
             NULL, /* subscriber_id */
@@ -689,7 +689,7 @@ modem_load_own_numbers (MMIfaceModem *self,
                                         user_data,
                                         modem_load_own_numbers);
 
-    message = mbim_message_basic_connect_subscriber_ready_status_query_request_new (NULL);
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
@@ -740,7 +740,7 @@ radio_state_query_ready (MbimDevice *device,
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_basic_connect_radio_state_query_response_parse (
+        mbim_message_radio_state_response_parse (
             response,
             &hardware_radio_state,
             &software_radio_state,
@@ -782,7 +782,7 @@ modem_load_power_state (MMIfaceModem *self,
                                              user_data,
                                              modem_load_power_state);
 
-    message = (mbim_message_basic_connect_radio_state_query_request_new (NULL));
+    message = mbim_message_radio_state_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
