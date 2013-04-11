@@ -48,15 +48,20 @@ GType mm_mbim_port_get_type (void);
 
 MMMbimPort *mm_mbim_port_new (const gchar *name);
 
-void     mm_mbim_port_open        (MMMbimPort *self,
-                                   GCancellable *cancellable,
-                                   GAsyncReadyCallback callback,
-                                   gpointer user_data);
-gboolean mm_mbim_port_open_finish (MMMbimPort *self,
-                                   GAsyncResult *res,
-                                   GError **error);
-gboolean mm_mbim_port_is_open     (MMMbimPort *self);
-void     mm_mbim_port_close       (MMMbimPort *self);
+void     mm_mbim_port_open         (MMMbimPort *self,
+                                    GCancellable *cancellable,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+gboolean mm_mbim_port_open_finish  (MMMbimPort *self,
+                                    GAsyncResult *res,
+                                    GError **error);
+gboolean mm_mbim_port_is_open      (MMMbimPort *self);
+void     mm_mbim_port_close        (MMMbimPort *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+gboolean mm_mbim_port_close_finish (MMMbimPort *self,
+                                    GAsyncResult *res,
+                                    GError **error);
 
 MbimDevice *mm_mbim_port_peek_device (MMMbimPort *self);
 

@@ -876,9 +876,8 @@ finalize (GObject *object)
 
     mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     /* If we did open the MBIM port during initialization, close it now */
-    if (mbim &&
-        mm_mbim_port_is_open (mbim)) {
-        mm_mbim_port_close (mbim);
+    if (mbim && mm_mbim_port_is_open (mbim)) {
+        mm_mbim_port_close (mbim, NULL, NULL);
     }
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->finalize (object);

@@ -345,8 +345,8 @@ port_probe_run_task_free (PortProbeRunTask *task)
 
 #if defined WITH_MBIM
     if (task->mbim_port) {
-        if (mm_mbim_port_is_open (task->mbim_port))
-            mm_mbim_port_close (task->mbim_port);
+        /* We should have closed it cleanly before */
+        g_assert (!mm_mbim_port_is_open (task->mbim_port));
         g_object_unref (task->mbim_port);
     }
 #endif
@@ -469,9 +469,22 @@ wdm_probe_qmi (MMPortProbe *self)
 #if defined WITH_MBIM
 
 static void
+mbim_port_close_ready (MMMbimPort *mbim_port,
+                       GAsyncResult *res,
+                       MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    mm_mbim_port_close_finish (mbim_port, res, NULL);
+
+    /* Keep on */
+    task->source_id = g_idle_add ((GSourceFunc)wdm_probe, self);
+}
+
+static void
 mbim_port_open_ready (MMMbimPort *mbim_port,
-                     GAsyncResult *res,
-                     MMPortProbe *self)
+                      GAsyncResult *res,
+                      MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
     GError *error = NULL;
@@ -489,10 +502,9 @@ mbim_port_open_ready (MMMbimPort *mbim_port,
     /* Set probing result */
     mm_port_probe_set_result_mbim (self, is_mbim);
 
-    mm_mbim_port_close (mbim_port);
-
-    /* Keep on */
-    task->source_id = g_idle_add ((GSourceFunc)wdm_probe, self);
+    mm_mbim_port_close (task->mbim_port,
+                        (GAsyncReadyCallback)mbim_port_close_ready,
+                        self);
 }
 
 static gboolean
