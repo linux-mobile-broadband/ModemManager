@@ -778,6 +778,131 @@ modem_load_power_state (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Power up/down (Modem interface) */
+
+static gboolean
+common_power_up_down_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+radio_state_set_down_ready (MbimDevice *device,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response)
+        mbim_message_command_done_get_result (response, &error);
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+radio_state_set_up_ready (MbimDevice *device,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimRadioSwitchState hardware_radio_state;
+    MbimRadioSwitchState software_radio_state;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_radio_state_response_parse (
+            response,
+            &hardware_radio_state,
+            &software_radio_state,
+            &error)) {
+        if (hardware_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot power-up: hardware radio switch is OFF");
+        else if (software_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
+            g_warn_if_reached ();
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+common_power_up_down (MMIfaceModem *self,
+                      gboolean up,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice *device;
+    MbimMessage *message;
+    MbimRadioSwitchState state;
+    GAsyncReadyCallback ready_cb;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_power_up_down);
+
+    if (up) {
+        ready_cb = (GAsyncReadyCallback)radio_state_set_up_ready;
+        state = MBIM_RADIO_SWITCH_STATE_ON;
+    } else {
+        ready_cb = (GAsyncReadyCallback)radio_state_set_down_ready;
+        state = MBIM_RADIO_SWITCH_STATE_OFF;
+    }
+
+    message = mbim_message_radio_state_set_new (state, NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         ready_cb,
+                         result);
+    mbim_message_unref (message);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    common_power_up_down (self, FALSE, callback, user_data);
+}
+
+static void
+modem_power_up (MMIfaceModem *self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    common_power_up_down (self, TRUE, callback, user_data);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBearer *
@@ -1083,6 +1208,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->load_power_state = modem_load_power_state;
     iface->load_power_state_finish = modem_load_power_state_finish;
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = common_power_up_down_finish;
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = common_power_up_down_finish;
 
     /* Unneeded things */
     iface->modem_after_power_up = NULL;
