@@ -602,4 +602,10 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
     sim_class->enable_pin_finish = enable_pin_finish;
     sim_class->change_pin = change_pin;
     sim_class->change_pin_finish = change_pin_finish;
+
+    /* TODO: use MBIM_CID_HOME_PROVIDER */
+    sim_class->load_operator_identifier = NULL;
+    sim_class->load_operator_identifier_finish = NULL;
+    sim_class->load_operator_name = NULL;
+    sim_class->load_operator_name_finish = NULL;
 }
