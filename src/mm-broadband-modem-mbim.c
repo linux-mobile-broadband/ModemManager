@@ -41,6 +41,12 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_B
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
 
+typedef enum {
+    PROCESS_NOTIFICATION_FLAG_NONE                 = 0,
+    PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY       = 1 << 0,
+    PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES = 1 << 1,
+} ProcessNotificationFlag;
+
 struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
     MbimCellularClass caps_cellular_class;
@@ -52,6 +58,11 @@ struct _MMBroadbandModemMbimPrivate {
 
     /* Process unsolicited notifications */
     guint notification_id;
+    ProcessNotificationFlag notification_flags;
+
+    /* 3GPP registration helpers */
+    gchar *current_operator_id;
+    gchar *current_operator_name;
 };
 
 /*****************************************************************************/
@@ -1357,7 +1368,7 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Setup/cleanup unsolicited events */
+/* Common unsolicited events setup and cleanup */
 
 static void
 basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
@@ -1384,12 +1395,89 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
 }
 
 static void
+update_registration_info (MMBroadbandModemMbim *self,
+                          MbimRegisterState state,
+                          gchar *operator_id_take,
+                          gchar *operator_name_take)
+{
+    MMModem3gppRegistrationState reg_state;
+
+    reg_state = mm_modem_3gpp_registration_state_from_mbim_register_state (state);
+
+    if (reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        if (self->priv->current_operator_id &&
+            g_str_equal (self->priv->current_operator_id, operator_id_take)) {
+            g_free (operator_id_take);
+        } else {
+            g_free (self->priv->current_operator_id);
+            self->priv->current_operator_id = operator_id_take;
+        }
+
+        if (self->priv->current_operator_name &&
+            g_str_equal (self->priv->current_operator_name, operator_name_take)) {
+            g_free (operator_name_take);
+        } else {
+            g_free (self->priv->current_operator_name);
+            self->priv->current_operator_name = operator_name_take;
+        }
+    } else {
+        if (self->priv->current_operator_id) {
+            g_free (self->priv->current_operator_id);
+            self->priv->current_operator_id = 0;
+        }
+        if (self->priv->current_operator_name) {
+            g_free (self->priv->current_operator_name);
+            self->priv->current_operator_name = 0;
+        }
+        g_free (operator_id_take);
+        g_free (operator_name_take);
+    }
+
+    mm_iface_modem_3gpp_update_ps_registration_state (
+        MM_IFACE_MODEM_3GPP (self),
+        reg_state);
+}
+
+static void
+basic_connect_notification_register_state (MMBroadbandModemMbim *self,
+                                           MbimMessage *notification)
+{
+    MbimRegisterState register_state;
+    gchar *provider_id;
+    gchar *provider_name;
+
+    if (mbim_message_register_state_notification_parse (
+            notification,
+            NULL, /* nw_error */
+            &register_state,
+            NULL, /* register_mode */
+            NULL, /* available_data_classes */
+            NULL, /* current_cellular_class */
+            &provider_id,
+            &provider_name,
+            NULL, /* roaming_text */
+            NULL, /* registration_flag */
+            NULL)) {
+        update_registration_info (self,
+                                  register_state,
+                                  provider_id,
+                                  provider_name);
+    }
+}
+
+static void
 basic_connect_notification (MMBroadbandModemMbim *self,
                             MbimMessage *notification)
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_BASIC_CONNECT_SIGNAL_STATE:
-        basic_connect_notification_signal_state (self, notification);
+        if (self->priv->notification_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
+            basic_connect_notification_signal_state (self, notification);
+        break;
+    case MBIM_CID_BASIC_CONNECT_REGISTER_STATE:
+        if (self->priv->notification_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
+            basic_connect_notification_register_state (self, notification);
         break;
     default:
         /* Ignore */
@@ -1439,6 +1527,7 @@ common_setup_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
                                         common_setup_cleanup_unsolicited_events);
 
     if (setup) {
+        /* Don't re-enable it if already there */
         if (!self->priv->notification_id)
             self->priv->notification_id =
                 g_signal_connect (device,
@@ -1446,7 +1535,9 @@ common_setup_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
                                   G_CALLBACK (device_notification_cb),
                                   self);
     } else {
-        if (self->priv->notification_id &&
+        /* Don't remove the signal if there are still listeners interested */
+        if (self->priv->notification_flags == PROCESS_NOTIFICATION_FLAG_NONE &&
+            self->priv->notification_id &&
             g_signal_handler_is_connected (device, self->priv->notification_id))
             g_signal_handler_disconnect (device, self->priv->notification_id);
         self->priv->notification_id = 0;
@@ -1456,11 +1547,15 @@ common_setup_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
     g_object_unref (result);
 }
 
+/*****************************************************************************/
+/* Setup/cleanup unsolicited events */
+
 static void
 cleanup_unsolicited_events (MMIfaceModem3gpp *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
 }
 
@@ -1469,6 +1564,28 @@ setup_unsolicited_events (MMIfaceModem3gpp *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
+    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
+    common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Cleanup/Setup unsolicited registration events */
+
+static void
+cleanup_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags &= ~PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
+    common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
+}
+
+static void
+setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags |= PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
     common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
 }
 
@@ -1615,6 +1732,166 @@ enable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Load operator name (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *_self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    if (self->priv->current_operator_name)
+        return g_strdup (self->priv->current_operator_name);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Current operator name is still unknown");
+    return NULL;
+}
+
+static void
+modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just finish the async operation */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_operator_name);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Load operator code (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *_self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    if (self->priv->current_operator_id)
+        return g_strdup (self->priv->current_operator_id);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Current operator MCC/MNC is still unknown");
+    return NULL;
+}
+
+static void
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* Just finish the async operation */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_operator_code);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Registration checks (3GPP interface) */
+
+static gboolean
+modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
+                                           GAsyncResult *res,
+                                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+register_state_query_ready (MbimDevice *device,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimRegisterState register_state;
+    gchar *provider_id;
+    gchar *provider_name;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_register_state_response_parse (
+            response,
+            NULL, /* nw_error */
+            &register_state,
+            NULL, /* register_mode */
+            NULL, /* available_data_classes */
+            NULL, /* current_cellular_class */
+            &provider_id,
+            &provider_name,
+            NULL, /* roaming_text */
+            NULL, /* registration_flag */
+            NULL)) {
+        MMBroadbandModemMbim *self;
+
+        self = MM_BROADBAND_MODEM_MBIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
+        update_registration_info (self,
+                                  register_state,
+                                  provider_id,
+                                  provider_name);
+        g_object_unref (self);
+
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    } else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
+                                    gboolean cs_supported,
+                                    gboolean ps_supported,
+                                    gboolean eps_supported,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_run_registration_checks);
+
+    message = mbim_message_register_state_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)register_state_query_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -1649,6 +1926,8 @@ finalize (GObject *object)
 
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
+    g_free (self->priv->current_operator_id);
+    g_free (self->priv->current_operator_name);
 
     mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     /* If we did open the MBIM port during initialization, close it now */
@@ -1730,6 +2009,22 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
+    iface->setup_unsolicited_registration_events = setup_unsolicited_registration_events;
+    iface->setup_unsolicited_registration_events_finish = common_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_registration_events = cleanup_unsolicited_registration_events;
+    iface->cleanup_unsolicited_registration_events_finish = common_setup_cleanup_unsolicited_events_finish;
+    iface->load_operator_code = modem_3gpp_load_operator_code;
+    iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
+    iface->load_operator_name = modem_3gpp_load_operator_name;
+    iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
+    iface->run_registration_checks = modem_3gpp_run_registration_checks;
+    iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
+
+    /* Unneeded things */
+    iface->enable_unsolicited_registration_events = NULL;
+    iface->enable_unsolicited_registration_events_finish = NULL;
+    iface->disable_unsolicited_registration_events = NULL;
+    iface->disable_unsolicited_registration_events_finish = NULL;
 }
 
 static void

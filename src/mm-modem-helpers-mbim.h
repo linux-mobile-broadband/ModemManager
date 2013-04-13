@@ -26,4 +26,6 @@
 
 MMModemLock mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type);
 
+MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState state);
+
 #endif  /* MM_MODEM_HELPERS_MBIM_H */

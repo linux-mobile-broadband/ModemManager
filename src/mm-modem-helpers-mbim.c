@@ -61,3 +61,24 @@ mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
 
     return MM_MODEM_LOCK_UNKNOWN;
 }
+
+MMModem3gppRegistrationState
+mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState state)
+{
+    switch (state) {
+    case MBIM_REGISTER_STATE_DEREGISTERED:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    case MBIM_REGISTER_STATE_SEARCHING:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
+    case MBIM_REGISTER_STATE_HOME:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_HOME;
+    case MBIM_REGISTER_STATE_ROAMING:
+    case MBIM_REGISTER_STATE_PARTNER:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING;
+    case MBIM_REGISTER_STATE_DENIED:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_DENIED;
+    case MBIM_REGISTER_STATE_UNKNOWN:
+    default:
+        return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    }
+}
