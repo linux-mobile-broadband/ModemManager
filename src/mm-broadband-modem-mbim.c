@@ -1893,6 +1893,95 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+static gboolean
+modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+register_state_set_ready (MbimDevice *device,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimNwError nw_error;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_register_state_response_parse (
+            response,
+            &nw_error,
+            NULL, /* &register_state */
+            NULL, /* register_mode */
+            NULL, /* available_data_classes */
+            NULL, /* current_cellular_class */
+            NULL, /* provider_id */
+            NULL, /* provider_name */
+            NULL, /* roaming_text */
+            NULL, /* registration_flag */
+            NULL)) {
+        if (nw_error)
+            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
+                                const gchar *operator_id,
+                                GCancellable *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_run_registration_checks);
+
+    if (operator_id && operator_id[0])
+        message = (mbim_message_register_state_set_new (
+                       operator_id,
+                       MBIM_REGISTER_ACTION_MANUAL,
+                       0, /* data_class, none preferred */
+                       NULL));
+    else
+        message = (mbim_message_register_state_set_new (
+                       "",
+                       MBIM_REGISTER_ACTION_AUTOMATIC,
+                       0, /* data_class, none preferred */
+                       NULL));
+    mbim_device_command (device,
+                         message,
+                         60,
+                         NULL,
+                         (GAsyncReadyCallback)register_state_set_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
                              const gchar **drivers,
@@ -2019,6 +2108,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
+    iface->register_in_network = modem_3gpp_register_in_network;
+    iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
 
     /* Unneeded things */
     iface->enable_unsolicited_registration_events = NULL;

@@ -15,6 +15,7 @@
 
 #include "mm-modem-helpers-mbim.h"
 #include "mm-enums-types.h"
+#include "mm-errors-types.h"
 #include "mm-log.h"
 
 /*****************************************************************************/
@@ -80,5 +81,65 @@ mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState sta
     case MBIM_REGISTER_STATE_UNKNOWN:
     default:
         return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    }
+}
+
+GError *
+mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
+{
+    switch (nw_error) {
+    case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_HLR:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR,
+                            "IMSI unknown in HLR");
+    case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_VLR:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR,
+                            "IMSI unknown in VLR");
+    case MBIM_NW_ERROR_ILLEGAL_ME:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME,
+                            "Illegal ME");
+    case MBIM_NW_ERROR_GPRS_NOT_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
+                            "GPRS not allowed");
+    case MBIM_NW_ERROR_GPRS_AND_NON_GPRS_NOT_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
+                            "GPRS and non-GPRS not allowed");
+    case MBIM_NW_ERROR_PLMN_NOT_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED,
+                            "PLMN not allowed");
+    case MBIM_NW_ERROR_LOCATION_AREA_NOT_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED,
+                            "Location area not allowed");
+    case MBIM_NW_ERROR_ROAMING_NOT_ALLOWED_IN_LOCATION_AREA:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED,
+                            "Roaming not allowed in location area");
+    case MBIM_NW_ERROR_GPRS_NOT_ALLOWED_IN_PLMN:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
+                            "GPRS not allowed in PLMN");
+    case MBIM_NW_ERROR_NO_CELLS_IN_LOCATION_AREA:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA,
+                            "No cells in location area");
+    case MBIM_NW_ERROR_NETWORK_FAILURE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE,
+                            "Network failure");
+    case MBIM_NW_ERROR_CONGESTION:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION,
+                            "Congestion");
+    default:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
+                            "Unknown error (%u)",
+                            nw_error);
     }
 }
