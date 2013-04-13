@@ -1473,6 +1473,148 @@ setup_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable unsolicited events */
+
+static gboolean
+common_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                 GAsyncResult *res,
+                                                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+disable_signal_state_set_ready_cb (MbimDevice *device,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response)
+        mbim_message_command_done_get_result (response, &error);
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+enable_signal_state_set_ready_cb (MbimDevice *device,
+                                  GAsyncResult *res,
+                                  GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    guint32 rssi;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_signal_state_response_parse (
+            response,
+            &rssi,
+            NULL, /* error_rate */
+            NULL, /* signal_strength_interval */
+            NULL, /* rssi_threshold */
+            NULL, /* error_rate_threshold */
+            &error)) {
+        guint32 quality;
+        GObject *self;
+
+        /* Normalize the quality. 99 means unknown, we default it to 0 */
+        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
+        mm_dbg ("Initial signal state: %u --> %u%%", rssi, quality);
+
+        self = g_async_result_get_source_object (G_ASYNC_RESULT (simple));
+        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+        g_object_unref (self);
+
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    } else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+common_enable_disable_unsolicited_events (MMIfaceModem3gpp *_self,
+                                          gboolean enable,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice *device;
+    GSimpleAsyncResult *result;
+    MbimMessage *message;
+    GAsyncReadyCallback ready_cb;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_enable_disable_unsolicited_events);
+
+#define DISABLE_FEATURE G_MAXUINT32
+#define AUTO_FEATURE    0
+
+    if (enable) {
+        ready_cb = (GAsyncReadyCallback)enable_signal_state_set_ready_cb;
+        message = (mbim_message_signal_state_set_new (
+                       30, /* signal_strength_interval */
+                       DISABLE_FEATURE, /* rssi_threshold */
+                       DISABLE_FEATURE, /* error_rate_threshold */
+                       NULL));
+    } else {
+        ready_cb = (GAsyncReadyCallback)disable_signal_state_set_ready_cb;
+        message = (mbim_message_signal_state_set_new (
+                       DISABLE_FEATURE, /* signal_strength_interval */
+                       DISABLE_FEATURE, /* rssi_threshold */
+                       DISABLE_FEATURE, /* error_rate_threshold */
+                       NULL));
+    }
+
+#undef DISABLE_FEATURE
+#undef AUTO_FEATURE
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         ready_cb,
+                         result);
+    mbim_message_unref (message);
+}
+
+static void
+disable_unsolicited_events (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (self, FALSE, callback, user_data);
+}
+
+static void
+enable_unsolicited_events (MMIfaceModem3gpp *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    common_enable_disable_unsolicited_events (self, TRUE, callback, user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -1559,6 +1701,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = NULL;
     iface->setup_charset = NULL;
     iface->setup_charset_finish = NULL;
+    iface->load_signal_quality = NULL;
+    iface->load_signal_quality_finish = NULL;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
@@ -1582,6 +1726,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
 }
 
 static void
