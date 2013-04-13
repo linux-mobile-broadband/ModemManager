@@ -1360,10 +1360,56 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 /* Setup/cleanup unsolicited events */
 
 static void
+basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
+                                         MbimMessage *notification)
+{
+    guint32 rssi;
+
+    if (mbim_message_signal_state_notification_parse (
+            notification,
+            &rssi,
+            NULL, /* error_rate */
+            NULL, /* signal_strength_interval */
+            NULL, /* rssi_threshold */
+            NULL, /* error_rate_threshold */
+            NULL)) {
+        guint32 quality;
+
+        /* Normalize the quality. 99 means unknown, we default it to 0 */
+        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
+
+        mm_dbg ("Signal state indication: %u --> %u%%", rssi, quality);
+        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+    }
+}
+
+static void
+basic_connect_notification (MMBroadbandModemMbim *self,
+                            MbimMessage *notification)
+{
+    switch (mbim_message_indicate_status_get_cid (notification)) {
+    case MBIM_CID_BASIC_CONNECT_SIGNAL_STATE:
+        basic_connect_notification_signal_state (self, notification);
+        break;
+    default:
+        /* Ignore */
+        break;
+    }
+}
+
+static void
 device_notification_cb (MbimDevice *device,
                         MbimMessage *notification,
                         MMBroadbandModemMbim *self)
 {
+    switch (mbim_message_indicate_status_get_service (notification)) {
+    case MBIM_SERVICE_BASIC_CONNECT:
+        basic_connect_notification (self, notification);
+        break;
+    default:
+        /* Ignore */
+        break;
+    }
 }
 
 static gboolean
