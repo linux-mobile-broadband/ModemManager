@@ -32,11 +32,14 @@
 #include "mm-error-helpers.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
 
 struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
@@ -1285,6 +1288,11 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create MBIM-specific bearer */
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
 }
 
 static void
