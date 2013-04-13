@@ -49,6 +49,9 @@ struct _MMBroadbandModemMbimPrivate {
     guint caps_max_sessions;
     gchar *caps_device_id;
     gchar *caps_firmware_info;
+
+    /* Process unsolicited notifications */
+    guint notification_id;
 };
 
 /*****************************************************************************/
@@ -1354,6 +1357,76 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Setup/cleanup unsolicited events */
+
+static void
+device_notification_cb (MbimDevice *device,
+                        MbimMessage *notification,
+                        MMBroadbandModemMbim *self)
+{
+}
+
+static gboolean
+common_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                GAsyncResult *res,
+                                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+common_setup_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
+                                         gboolean setup,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice *device;
+    GSimpleAsyncResult *result;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_setup_cleanup_unsolicited_events);
+
+    if (setup) {
+        if (!self->priv->notification_id)
+            self->priv->notification_id =
+                g_signal_connect (device,
+                                  MBIM_DEVICE_SIGNAL_INDICATE_STATUS,
+                                  G_CALLBACK (device_notification_cb),
+                                  self);
+    } else {
+        if (self->priv->notification_id &&
+            g_signal_handler_is_connected (device, self->priv->notification_id))
+            g_signal_handler_disconnect (device, self->priv->notification_id);
+        self->priv->notification_id = 0;
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+static void
+cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
+}
+
+static void
+setup_unsolicited_events (MMIfaceModem3gpp *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -1458,6 +1531,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_imei_finish = modem_3gpp_load_imei_finish;
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
+
+    iface->setup_unsolicited_events = setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
