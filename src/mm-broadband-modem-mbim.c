@@ -187,6 +187,61 @@ modem_load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Manufacturer loading (Modem interface) */
+
+static gchar *
+modem_load_manufacturer_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+}
+
+static void
+modem_load_manufacturer (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_manufacturer);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Model loading (Modem interface) */
+
+static gchar *
+modem_load_model_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return g_strdup_printf ("MBIM [%04X:%04X]",
+                            (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
+                            (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+
+}
+
+static void
+modem_load_model (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_manufacturer);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Revision loading (Modem interface) */
 
 static gchar *
@@ -1188,10 +1243,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
     iface->load_modem_capabilities = NULL;
     iface->load_modem_capabilities_finish = NULL;
-    iface->load_manufacturer = NULL; /* TODO */
-    iface->load_manufacturer_finish = NULL;
-    iface->load_model = NULL; /* TODO */
-    iface->load_model_finish = NULL;
+    iface->load_manufacturer = modem_load_manufacturer;
+    iface->load_manufacturer_finish = modem_load_manufacturer_finish;
+    iface->load_model = modem_load_model;
+    iface->load_model_finish = modem_load_model_finish;
     iface->load_revision = modem_load_revision;
     iface->load_revision_finish = modem_load_revision_finish;
     iface->load_equipment_identifier = modem_load_equipment_identifier;
