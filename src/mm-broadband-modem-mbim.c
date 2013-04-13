@@ -1194,6 +1194,46 @@ initialization_started (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
+/* IMEI loading (3GPP interface) */
+
+static gchar *
+modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_imei);
+
+    if (self->priv->caps_device_id)
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   self->priv->caps_device_id,
+                                                   NULL);
+    else
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Device doesn't report a valid IMEI");
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -1293,6 +1333,9 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    /* Initialization steps */
+    iface->load_imei = modem_3gpp_load_imei;
+    iface->load_imei_finish = modem_3gpp_load_imei_finish;
 }
 
 static void
