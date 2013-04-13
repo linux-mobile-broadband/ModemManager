@@ -1234,6 +1234,126 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
 }
 
 /*****************************************************************************/
+/* Facility locks status loading (3GPP interface) */
+
+static MMModem3gppFacility
+modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_3GPP_FACILITY_NONE;
+
+    return ((MMModem3gppFacility) GPOINTER_TO_UINT (
+                g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+static void
+pin_list_query_ready (MbimDevice *device,
+                      GAsyncResult *res,
+                      GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimPinDesc *pin_desc_pin1;
+    MbimPinDesc *pin_desc_pin2;
+    MbimPinDesc *pin_desc_device_sim_pin;
+    MbimPinDesc *pin_desc_device_first_sim_pin;
+    MbimPinDesc *pin_desc_network_pin;
+    MbimPinDesc *pin_desc_network_subset_pin;
+    MbimPinDesc *pin_desc_service_provider_pin;
+    MbimPinDesc *pin_desc_corporate_pin;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_pin_list_response_parse (
+            response,
+            &pin_desc_pin1,
+            &pin_desc_pin2,
+            &pin_desc_device_sim_pin,
+            &pin_desc_device_first_sim_pin,
+            &pin_desc_network_pin,
+            &pin_desc_network_subset_pin,
+            &pin_desc_service_provider_pin,
+            &pin_desc_corporate_pin,
+            NULL, /* pin_desc_subsidy_lock */
+            NULL, /* pin_desc_custom */
+            &error)) {
+        MMModem3gppFacility mask = MM_MODEM_3GPP_FACILITY_NONE;
+
+        if (pin_desc_pin1->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_SIM;
+        mbim_pin_desc_free (pin_desc_pin1);
+
+        if (pin_desc_pin2->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_FIXED_DIALING;
+        mbim_pin_desc_free (pin_desc_pin2);
+
+        if (pin_desc_device_sim_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_PH_SIM;
+        mbim_pin_desc_free (pin_desc_device_sim_pin);
+
+        if (pin_desc_device_first_sim_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_PH_FSIM;
+        mbim_pin_desc_free (pin_desc_device_first_sim_pin);
+
+        if (pin_desc_network_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_NET_PERS;
+        mbim_pin_desc_free (pin_desc_network_pin);
+
+        if (pin_desc_network_subset_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_NET_SUB_PERS;
+        mbim_pin_desc_free (pin_desc_network_subset_pin);
+
+        if (pin_desc_service_provider_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_PROVIDER_PERS;
+        mbim_pin_desc_free (pin_desc_service_provider_pin);
+
+        if (pin_desc_corporate_pin->pin_mode == MBIM_PIN_MODE_ENABLED)
+            mask |= MM_MODEM_3GPP_FACILITY_CORP_PERS;
+        mbim_pin_desc_free (pin_desc_corporate_pin);
+
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (mask),
+                                                   NULL);
+    } else
+        g_simple_async_result_take_error (simple, error);
+
+    if (response)
+        mbim_message_unref (response);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_unlock_retries);
+
+    message = mbim_message_pin_list_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)pin_list_query_ready,
+                         result);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -1336,6 +1456,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* Initialization steps */
     iface->load_imei = modem_3gpp_load_imei;
     iface->load_imei_finish = modem_3gpp_load_imei_finish;
+    iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
+    iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
 }
 
 static void
