@@ -2116,6 +2116,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_registration_events_finish = NULL;
     iface->disable_unsolicited_registration_events = NULL;
     iface->disable_unsolicited_registration_events_finish = NULL;
+
+    /* TODO: use MBIM_CID_VISIBLE_PROVIDERS */
+    iface->scan_networks = NULL;
+    iface->scan_networks_finish = NULL;
 }
 
 static void
