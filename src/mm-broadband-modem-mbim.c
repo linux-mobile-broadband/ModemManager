@@ -702,20 +702,6 @@ modem_load_own_numbers (MMIfaceModem *self,
 /*****************************************************************************/
 /* Initial power state loading */
 
-typedef struct {
-    MMBroadbandModemMbim *self;
-    GSimpleAsyncResult *result;
-} LoadPowerStateContext;
-
-static void
-load_power_state_context_complete_and_free (LoadPowerStateContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadPowerStateContext, ctx);
-}
-
 static MMModemPowerState
 modem_load_power_state_finish (MMIfaceModem *self,
                                GAsyncResult *res,
@@ -730,7 +716,7 @@ modem_load_power_state_finish (MMIfaceModem *self,
 static void
 radio_state_query_ready (MbimDevice *device,
                          GAsyncResult *res,
-                         LoadPowerStateContext *ctx)
+                         GSimpleAsyncResult *simple)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -752,15 +738,16 @@ radio_state_query_ready (MbimDevice *device,
             state = MM_MODEM_POWER_STATE_LOW;
         else
             state = MM_MODEM_POWER_STATE_ON;
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
+        g_simple_async_result_set_op_res_gpointer (simple,
                                                    GUINT_TO_POINTER (state),
                                                    NULL);
     } else
-        g_simple_async_result_take_error (ctx->result, error);
+        g_simple_async_result_take_error (simple, error);
 
     if (response)
         mbim_message_unref (response);
-    load_power_state_context_complete_and_free (ctx);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -768,19 +755,17 @@ modem_load_power_state (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    LoadPowerStateContext *ctx;
+    GSimpleAsyncResult *result;
     MbimDevice *device;
     MbimMessage *message;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    ctx = g_slice_new (LoadPowerStateContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_power_state);
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_power_state);
 
     message = mbim_message_radio_state_query_new (NULL);
     mbim_device_command (device,
@@ -788,7 +773,7 @@ modem_load_power_state (MMIfaceModem *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)radio_state_query_ready,
-                         ctx);
+                         result);
     mbim_message_unref (message);
 }
 
