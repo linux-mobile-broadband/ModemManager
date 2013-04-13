@@ -113,12 +113,17 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN: Corporate personalisation PIN required.
  * @MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK: Corporate personalisation PUK required.
  * @MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN: Unknown.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR: IMSI unknown in HLR.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR: IMSI unknown in VLR.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS: Illegal MS.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME: Illegal ME.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED: GPRS service not allowed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED: PLMN not allowed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED: Location area not allowed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED: Roaming not allowed in this location area.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA: No cells in this location area.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE: Network failure.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION: Congestion.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED: Requested service option not subscribed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER: Service option temporarily out of order.
@@ -168,12 +173,17 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK             = 47,  /*< nick=CorpPuk >*/
     MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN              = 100, /*< nick=Unknown >*/
     /* GPRS related errors */
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR           = 102, /*< nick=Gprs.ImsiUnknownInHlr           >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS                    = 103, /*< nick=Gprs.IllegalMs                  >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR           = 104, /*< nick=Gprs.ImsiUnknownInVlr           >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME                    = 106, /*< nick=Gprs.IllegalMe                  >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED           = 107, /*< nick=Gprs.ServiceNotAllowed          >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED              = 111, /*< nick=Gprs.PlmnNotAllowed             >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED          = 112, /*< nick=Gprs.LocationNotAllowed         >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED           = 113, /*< nick=Gprs.RomaingNotAllowed          >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA     = 115, /*< nick=Gprs.NoCellsInLocationArea      >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE               = 117, /*< nick=Gprs.NetworkFailure             >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION                    = 122, /*< nick=Gprs.Congestion                 >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED  = 132, /*< nick=Gprs.ServiceOptionNotSupported  >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED = 133, /*< nick=Gprs.ServiceOptionNotSubscribed >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER   = 134, /*< nick=Gprs.ServiceOptionOutOfOrder    >*/
