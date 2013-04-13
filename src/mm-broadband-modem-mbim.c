@@ -1397,12 +1397,15 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
 static void
 update_registration_info (MMBroadbandModemMbim *self,
                           MbimRegisterState state,
+                          MbimDataClass available_data_classes,
                           gchar *operator_id_take,
                           gchar *operator_name_take)
 {
     MMModem3gppRegistrationState reg_state;
+    MMModemAccessTechnology act;
 
     reg_state = mm_modem_3gpp_registration_state_from_mbim_register_state (state);
+    act = mm_modem_access_technology_from_mbim_data_class (available_data_classes);
 
     if (reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
@@ -1437,6 +1440,10 @@ update_registration_info (MMBroadbandModemMbim *self,
     mm_iface_modem_3gpp_update_ps_registration_state (
         MM_IFACE_MODEM_3GPP (self),
         reg_state);
+
+    mm_iface_modem_3gpp_update_access_technologies (
+        MM_IFACE_MODEM_3GPP (self),
+        act);
 }
 
 static void
@@ -1444,6 +1451,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
                                            MbimMessage *notification)
 {
     MbimRegisterState register_state;
+    MbimDataClass available_data_classes;
     gchar *provider_id;
     gchar *provider_name;
 
@@ -1452,7 +1460,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
             NULL, /* nw_error */
             &register_state,
             NULL, /* register_mode */
-            NULL, /* available_data_classes */
+            &available_data_classes,
             NULL, /* current_cellular_class */
             &provider_id,
             &provider_name,
@@ -1461,6 +1469,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
             NULL)) {
         update_registration_info (self,
                                   register_state,
+                                  available_data_classes,
                                   provider_id,
                                   provider_name);
     }
@@ -1824,6 +1833,7 @@ register_state_query_ready (MbimDevice *device,
     MbimMessage *response;
     GError *error = NULL;
     MbimRegisterState register_state;
+    MbimDataClass available_data_classes;
     gchar *provider_id;
     gchar *provider_name;
 
@@ -1835,7 +1845,7 @@ register_state_query_ready (MbimDevice *device,
             NULL, /* nw_error */
             &register_state,
             NULL, /* register_mode */
-            NULL, /* available_data_classes */
+            &available_data_classes,
             NULL, /* current_cellular_class */
             &provider_id,
             &provider_name,
@@ -1847,6 +1857,7 @@ register_state_query_ready (MbimDevice *device,
         self = MM_BROADBAND_MODEM_MBIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
         update_registration_info (self,
                                   register_state,
+                                  available_data_classes,
                                   provider_id,
                                   provider_name);
         g_object_unref (self);

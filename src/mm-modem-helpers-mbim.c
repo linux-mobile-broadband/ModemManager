@@ -63,6 +63,8 @@ mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
     return MM_MODEM_LOCK_UNKNOWN;
 }
 
+/*****************************************************************************/
+
 MMModem3gppRegistrationState
 mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState state)
 {
@@ -83,6 +85,46 @@ mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState sta
         return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
 }
+
+/*****************************************************************************/
+
+MMModemAccessTechnology
+mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
+{
+    MMModemAccessTechnology mask = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    if (data_class & MBIM_DATA_CLASS_GPRS)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    if (data_class & MBIM_DATA_CLASS_EDGE)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    if (data_class & MBIM_DATA_CLASS_UMTS)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    if (data_class & MBIM_DATA_CLASS_HSDPA)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    if (data_class & MBIM_DATA_CLASS_HSUPA)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    if (data_class & MBIM_DATA_CLASS_LTE)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    if (data_class & MBIM_DATA_CLASS_1XRTT)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    if (data_class & MBIM_DATA_CLASS_1XEVDO)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    if (data_class & MBIM_DATA_CLASS_1XEVDO_REVA)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    if (data_class & MBIM_DATA_CLASS_1XEVDO_REVB)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+
+    /* Skip:
+     *  MBIM_DATA_CLASS_1XEVDV
+     *  MBIM_DATA_CLASS_3XRTT
+     *  MBIM_DATA_CLASS_UMB
+     *  MBIM_DATA_CLASS_CUSTOM
+     */
+
+    return mask;
+}
+
+/*****************************************************************************/
 
 GError *
 mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
