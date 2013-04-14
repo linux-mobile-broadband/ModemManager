@@ -446,6 +446,176 @@ _connect (MMBearer *self,
 }
 
 /*****************************************************************************/
+/* Disconnect */
+
+typedef enum {
+    DISCONNECT_STEP_FIRST,
+    DISCONNECT_STEP_DISCONNECT,
+    DISCONNECT_STEP_LAST
+} DisconnectStep;
+
+typedef struct {
+    MMBearerMbim *self;
+    MbimDevice *device;
+    GSimpleAsyncResult *result;
+    MMPort *data;
+    DisconnectStep step;
+} DisconnectContext;
+
+static void
+disconnect_context_complete_and_free (DisconnectContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->self);
+    g_slice_free (DisconnectContext, ctx);
+}
+
+static gboolean
+disconnect_finish (MMBearer *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void disconnect_context_step (DisconnectContext *ctx);
+
+static void
+disconnect_set_ready (MbimDevice *device,
+                      GAsyncResult *res,
+                      DisconnectContext *ctx)
+{
+    GError *error = NULL;
+    MbimMessage *response;
+    guint32 session_id;
+    MbimActivationState activation_state;
+    guint32 nw_error;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_connect_response_parse (
+            response,
+            &session_id,
+            &activation_state,
+            NULL, /* voice_call_state */
+            NULL, /* ip_type */
+            NULL, /* context_type */
+            &nw_error,
+            &error)) {
+        if (nw_error)
+            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+        else
+            mm_dbg ("Session ID '%u': %s",
+                    session_id,
+                    mbim_activation_state_get_string (activation_state));
+    }
+
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    disconnect_context_step (ctx);
+}
+
+static void
+disconnect_context_step (DisconnectContext *ctx)
+{
+    switch (ctx->step) {
+    case DISCONNECT_STEP_FIRST:
+        /* Fall down */
+        ctx->step++;
+
+    case DISCONNECT_STEP_DISCONNECT: {
+        MbimMessage *message;
+        GError *error = NULL;
+
+        message = (mbim_message_connect_set_new (
+                       ctx->self->priv->session_id,
+                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                       "",
+                       "",
+                       "",
+                       MBIM_COMPRESSION_NONE,
+                       MBIM_AUTH_PROTOCOL_NONE,
+                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                       &error));
+        if (!message) {
+            g_simple_async_result_take_error (ctx->result, error);
+            disconnect_context_complete_and_free (ctx);
+            return;
+        }
+
+        mbim_device_command (ctx->device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)disconnect_set_ready,
+                             ctx);
+        mbim_message_unref (message);
+        return;
+    }
+
+    case DISCONNECT_STEP_LAST:
+        /* Port is disconnected; update the state */
+        mm_port_set_connected (ctx->self->priv->data, FALSE);
+        g_clear_object (&ctx->self->priv->data);
+
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_context_complete_and_free (ctx);
+        return;
+    }
+}
+
+static void
+disconnect (MMBearer *_self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    MMBearerMbim *self = MM_BEARER_MBIM (_self);
+    MbimDevice *device;
+    DisconnectContext *ctx;
+
+    if (!self->priv->data) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Couldn't disconnect MBIM bearer: this bearer is not connected");
+        return;
+    }
+
+    if (!peek_ports (self, &device, NULL, callback, user_data))
+        return;
+
+    mm_dbg ("Launching disconnection on data port (%s/%s)",
+            mm_port_subsys_get_string (mm_port_get_subsys (self->priv->data)),
+            mm_port_get_device (self->priv->data));
+
+    ctx = g_slice_new0 (DisconnectContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    ctx->data = g_object_ref (self->priv->data);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disconnect);
+    ctx->step = DISCONNECT_STEP_FIRST;
+
+    /* Run! */
+    disconnect_context_step (ctx);
+}
+
+/*****************************************************************************/
 
 guint32
 mm_bearer_mbim_get_session_id (MMBearerMbim *self)
@@ -550,6 +720,8 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
 
     bearer_class->connect = _connect;
     bearer_class->connect_finish = connect_finish;
+    bearer_class->disconnect = disconnect;
+    bearer_class->disconnect_finish = disconnect_finish;
 
     properties[PROP_SESSION_ID] =
         g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,
