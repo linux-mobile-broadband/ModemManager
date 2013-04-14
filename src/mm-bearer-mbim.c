@@ -307,7 +307,6 @@ connect_context_step (ConnectContext *ctx)
         const gchar *user;
         const gchar *password;
         MbimAuthProtocol auth;
-        MMBearerAllowedAuth bearer_auth;
         MbimContextIpType ip_type;
         GError *error = NULL;
 
@@ -317,31 +316,36 @@ connect_context_step (ConnectContext *ctx)
         user = mm_bearer_properties_get_user (ctx->properties);
         password = mm_bearer_properties_get_password (ctx->properties);
 
-        bearer_auth = mm_bearer_properties_get_allowed_auth (ctx->properties);
-        if (bearer_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            mm_dbg ("Using default (PAP) authentication method");
-            auth = MBIM_AUTH_PROTOCOL_PAP;
-        } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-            auth = MBIM_AUTH_PROTOCOL_PAP;
-        } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-            auth = MBIM_AUTH_PROTOCOL_CHAP;
-        } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_MSCHAPV2) {
-            auth = MBIM_AUTH_PROTOCOL_MSCHAPV2;
-        } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_NONE) {
+        if (!user && !password) {
             auth = MBIM_AUTH_PROTOCOL_NONE;
         } else {
-            gchar *str;
+            MMBearerAllowedAuth bearer_auth;
+            bearer_auth = mm_bearer_properties_get_allowed_auth (ctx->properties);
+            if (bearer_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+                mm_dbg ("Using default (PAP) authentication method");
+                auth = MBIM_AUTH_PROTOCOL_PAP;
+            } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
+                auth = MBIM_AUTH_PROTOCOL_PAP;
+            } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
+                auth = MBIM_AUTH_PROTOCOL_CHAP;
+            } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_MSCHAPV2) {
+                auth = MBIM_AUTH_PROTOCOL_MSCHAPV2;
+            } else if (bearer_auth & MM_BEARER_ALLOWED_AUTH_NONE) {
+                auth = MBIM_AUTH_PROTOCOL_NONE;
+            } else {
+                gchar *str;
 
-            str = mm_bearer_allowed_auth_build_string_from_mask (bearer_auth);
-            g_simple_async_result_set_error (
-                ctx->result,
-                MM_CORE_ERROR,
-                MM_CORE_ERROR_UNSUPPORTED,
-                "Cannot use any of the specified authentication methods (%s)",
-                str);
-            g_free (str);
-            connect_context_complete_and_free (ctx);
-            return;
+                str = mm_bearer_allowed_auth_build_string_from_mask (bearer_auth);
+                g_simple_async_result_set_error (
+                    ctx->result,
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_UNSUPPORTED,
+                    "Cannot use any of the specified authentication methods (%s)",
+                    str);
+                g_free (str);
+                connect_context_complete_and_free (ctx);
+                return;
+            }
         }
 
         switch (mm_bearer_properties_get_ip_type (ctx->properties)) {
