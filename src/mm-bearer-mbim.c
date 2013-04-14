@@ -110,6 +110,7 @@ peek_ports (gpointer self,
 
 typedef enum {
     CONNECT_STEP_FIRST,
+    CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_PROVISIONED_CONTEXTS,
     CONNECT_STEP_CONNECT,
     CONNECT_STEP_LAST
@@ -271,6 +272,56 @@ provisioned_contexts_query_ready (MbimDevice *device,
 }
 
 static void
+packet_service_set_ready (MbimDevice *device,
+                          GAsyncResult *res,
+                          ConnectContext *ctx)
+{
+    GError *error = NULL;
+    MbimMessage *response;
+    guint32 nw_error;
+    MbimPacketServiceState packet_service_state;
+    MbimDataClass highest_available_data_class;
+    guint64 uplink_speed;
+    guint64 downlink_speed;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_packet_service_response_parse (
+            response,
+            &nw_error,
+            &packet_service_state,
+            &highest_available_data_class,
+            &uplink_speed,
+            &downlink_speed,
+            &error)) {
+        if (nw_error)
+            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+        else {
+            gchar *str;
+
+            str = mbim_data_class_build_string_from_mask (highest_available_data_class);
+            mm_dbg ("Packet service update:");
+            mm_dbg ("         state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
+            mm_dbg ("    data class: '%s'", str);
+            mm_dbg ("        uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
+            mm_dbg ("      downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
+            g_free (str);
+        }
+    }
+
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (ctx);
+}
+
+static void
 connect_context_step (ConnectContext *ctx)
 {
     MbimMessage *message;
@@ -289,6 +340,29 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_FIRST:
         /* Fall down */
         ctx->step++;
+
+    case CONNECT_STEP_PACKET_SERVICE: {
+        GError *error = NULL;
+
+        mm_dbg ("Activating packet service...");
+        message = (mbim_message_packet_service_set_new (
+                       MBIM_PACKET_SERVICE_ACTION_ATTACH,
+                       &error));
+        if (!message) {
+            g_simple_async_result_take_error (ctx->result, error);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
+
+        mbim_device_command (ctx->device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)packet_service_set_ready,
+                             ctx);
+        mbim_message_unref (message);
+        return;
+    }
 
     case CONNECT_STEP_PROVISIONED_CONTEXTS:
         mm_dbg ("Listing provisioned contexts...");
