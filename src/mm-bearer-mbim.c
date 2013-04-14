@@ -31,10 +31,20 @@
 #include "mm-bearer-mbim.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BEARER);
+G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BEARER)
+
+enum {
+    PROP_0,
+    PROP_SESSION_ID,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
 
 struct _MMBearerMbimPrivate {
+    /* The session ID for this bearer */
     guint32 session_id;
+
     MMPort *data;
 };
 
@@ -353,8 +363,7 @@ connect_context_step (ConnectContext *ctx)
 
         mm_dbg ("Launching connection with APN '%s'...", apn);
         message = (mbim_message_connect_set_new (
-                       /* use bearer ptr value as session ID */
-                       (guint32)GPOINTER_TO_UINT (ctx->self),
+                       ctx->self->priv->session_id,
                        MBIM_ACTIVATION_COMMAND_ACTIVATE,
                        apn ? apn : "",
                        user ? user : "",
@@ -387,10 +396,6 @@ connect_context_step (ConnectContext *ctx)
         /* Keep the data port */
         g_assert (ctx->self->priv->data == NULL);
         ctx->self->priv->data = g_object_ref (ctx->data);
-
-        /* Keep the session id */
-        g_assert (ctx->self->priv->session_id == 0);
-        ctx->self->priv->session_id = (guint32)GPOINTER_TO_UINT (ctx->self);
 
         /* Set operation result */
         g_simple_async_result_set_op_res_gpointer (
@@ -442,9 +447,20 @@ _connect (MMBearer *self,
 
 /*****************************************************************************/
 
+guint32
+mm_bearer_mbim_get_session_id (MMBearerMbim *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_MBIM (self), 0);
+
+    return self->priv->session_id;
+}
+
+/*****************************************************************************/
+
 MMBearer *
 mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
-                    MMBearerProperties *config)
+                    MMBearerProperties *config,
+                    guint32 session_id)
 {
     MMBearer *bearer;
 
@@ -452,8 +468,9 @@ mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
      * and that means that the object is not async-initable, so we just use
      * g_object_new() here */
     bearer = g_object_new (MM_TYPE_BEARER_MBIM,
-                           MM_BEARER_MODEM, modem,
-                           MM_BEARER_CONFIG, config,
+                           MM_BEARER_MODEM,           modem,
+                           MM_BEARER_CONFIG,          config,
+                           MM_BEARER_MBIM_SESSION_ID, (guint)session_id,
                            NULL);
 
     /* Only export valid bearers */
@@ -461,6 +478,43 @@ mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
 
     return bearer;
 }
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBearerMbim *self = MM_BEARER_MBIM (object);
+
+    switch (prop_id) {
+    case PROP_SESSION_ID:
+        self->priv->session_id = g_value_get_uint (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBearerMbim *self = MM_BEARER_MBIM (object);
+
+    switch (prop_id) {
+    case PROP_SESSION_ID:
+        g_value_set_uint (value, self->priv->session_id);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
 
 static void
 mm_bearer_mbim_init (MMBearerMbim *self)
@@ -491,7 +545,19 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
 
     /* Virtual methods */
     object_class->dispose = dispose;
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
 
     bearer_class->connect = _connect;
     bearer_class->connect_finish = connect_finish;
+
+    properties[PROP_SESSION_ID] =
+        g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,
+                           "Session ID",
+                           "Session ID to use with this bearer",
+                           0,
+                           255,
+                           0,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SESSION_ID, properties[PROP_SESSION_ID]);
 }
