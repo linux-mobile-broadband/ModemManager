@@ -113,6 +113,7 @@ typedef enum {
     CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_PROVISIONED_CONTEXTS,
     CONNECT_STEP_CONNECT,
+    CONNECT_STEP_IP_CONFIGURATION,
     CONNECT_STEP_LAST
 } ConnectStep;
 
@@ -124,6 +125,7 @@ typedef struct {
     MMBearerProperties *properties;
     ConnectStep step;
     MMPort *data;
+    MbimContextIpType ip_type;
     MMBearerConnectResult *connect_result;
 } ConnectContext;
 
@@ -155,6 +157,264 @@ connect_finish (MMBearer *self,
 static void connect_context_step (ConnectContext *ctx);
 
 static void
+ip_configuration_query_ready (MbimDevice *device,
+                              GAsyncResult *res,
+                              ConnectContext *ctx)
+{
+    GError *error = NULL;
+    MbimMessage *response;
+    MbimIPConfigurationAvailableFlag ipv4configurationavailable;
+    MbimIPConfigurationAvailableFlag ipv6configurationavailable;
+    guint32 ipv4addresscount;
+    MbimIPv4Element **ipv4address;
+    guint32 ipv6addresscount;
+    MbimIPv6Element **ipv6address;
+    const MbimIPv4 *ipv4gateway;
+    const MbimIPv6 *ipv6gateway;
+    guint32 ipv4dnsservercount;
+    MbimIPv4 *ipv4dnsserver;
+    guint32 ipv6dnsservercount;
+    MbimIPv6 *ipv6dnsserver;
+    guint32 ipv4mtu;
+    guint32 ipv6mtu;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_ip_configuration_response_parse (
+            response,
+            NULL, /* sessionid */
+            &ipv4configurationavailable,
+            &ipv6configurationavailable,
+            &ipv4addresscount,
+            &ipv4address,
+            &ipv6addresscount,
+            &ipv6address,
+            &ipv4gateway,
+            &ipv6gateway,
+            &ipv4dnsservercount,
+            &ipv4dnsserver,
+            &ipv6dnsservercount,
+            &ipv6dnsserver,
+            &ipv4mtu,
+            &ipv6mtu,
+            &error)) {
+        gchar *str;
+        GInetAddress *addr;
+        MMBearerIpConfig *ipv4_config;
+        MMBearerIpConfig *ipv6_config;
+
+        /* IPv4 info */
+
+        str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
+        mm_dbg ("IPv4 configuration available: '%s'", str);
+        g_free (str);
+
+        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) {
+            guint i;
+
+            mm_dbg ("  IP addresses (%u)", ipv4addresscount);
+            for (i = 0; i < ipv4addresscount; i++) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[i]->ipv4_address, G_SOCKET_FAMILY_IPV4);
+                str = g_inet_address_to_string (addr);
+                mm_dbg ("    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
+                g_free (str);
+                g_object_unref (addr);
+            }
+        }
+
+        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+            addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
+            str = g_inet_address_to_string (addr);
+            mm_dbg ("  Gateway: '%s'", str);
+            g_free (str);
+            g_object_unref (addr);
+        }
+
+        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) {
+            guint i;
+
+            mm_dbg ("  DNS addresses (%u)", ipv4dnsservercount);
+            for (i = 0; i < ipv4dnsservercount; i++) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
+                str = g_inet_address_to_string (addr);
+                mm_dbg ("    DNS [%u]: '%s'", i, str);
+                g_free (str);
+                g_object_unref (addr);
+            }
+        }
+
+        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) {
+            mm_dbg ("  MTU: '%u'", ipv4mtu);
+        }
+
+        /* IPv6 info */
+
+        str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
+        mm_dbg ("IPv6 configuration available: '%s'", str);
+        g_free (str);
+
+        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) {
+            guint i;
+
+            mm_dbg ("  IP addresses (%u)", ipv6addresscount);
+            for (i = 0; i < ipv6addresscount; i++) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[i]->ipv6_address, G_SOCKET_FAMILY_IPV6);
+                str = g_inet_address_to_string (addr);
+                mm_dbg ("    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
+                g_free (str);
+                g_object_unref (addr);
+            }
+        }
+
+        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+            addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
+            str = g_inet_address_to_string (addr);
+            mm_dbg ("  Gateway: '%s'", str);
+            g_free (str);
+            g_object_unref (addr);
+        }
+
+        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) {
+            guint i;
+
+            mm_dbg ("  DNS addresses (%u)", ipv6dnsservercount);
+            for (i = 0; i < ipv6dnsservercount; i++) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
+                str = g_inet_address_to_string (addr);
+                mm_dbg ("    DNS [%u]: '%s'", i, str);
+                g_free (str);
+                g_object_unref (addr);
+            }
+        }
+
+        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) {
+            mm_dbg ("  MTU: '%u'", ipv6mtu);
+        }
+
+        /* Build connection results */
+
+        /* Build IPv4 config */
+        if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
+            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            ipv4_config = mm_bearer_ip_config_new ();
+
+            /* We assume that if we have IP and DNS, we can setup static */
+            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
+                ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
+                ipv4addresscount > 0 &&
+                ipv4dnsservercount > 0) {
+                gchar **strarr;
+                guint i;
+
+                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
+
+                /* IP address, pick the first one */
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[0]->ipv4_address, G_SOCKET_FAMILY_IPV4);
+                str = g_inet_address_to_string (addr);
+                mm_bearer_ip_config_set_address (ipv4_config, str);
+                g_free (str);
+                g_object_unref (addr);
+
+                /* Netmask */
+                mm_bearer_ip_config_set_prefix (ipv4_config, ipv4address[0]->on_link_prefix_length);
+
+                /* Gateway */
+                if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+                    addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
+                    str = g_inet_address_to_string (addr);
+                    mm_bearer_ip_config_set_gateway (ipv4_config, str);
+                    g_free (str);
+                    g_object_unref (addr);
+                }
+
+                /* DNS */
+                strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
+                for (i = 0; i < ipv4dnsservercount; i++) {
+                    addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
+                    strarr[i] = g_inet_address_to_string (addr);
+                    g_object_unref (addr);
+                }
+                mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
+                g_strfreev (strarr);
+            } else
+                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+        } else
+            ipv4_config = NULL;
+
+        /* Build IPv6 config; always DHCP based */
+        if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
+            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            ipv6_config = mm_bearer_ip_config_new ();
+
+            /* We assume that if we have IP and DNS, we can setup static */
+            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
+                ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
+                ipv6addresscount > 0 &&
+                ipv6dnsservercount > 0) {
+                gchar **strarr;
+                guint i;
+
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
+
+                /* IP address, pick the first one */
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[0]->ipv6_address, G_SOCKET_FAMILY_IPV6);
+                str = g_inet_address_to_string (addr);
+                mm_bearer_ip_config_set_address (ipv6_config, str);
+                g_free (str);
+                g_object_unref (addr);
+
+                /* Netmask */
+                mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
+
+                /* Gateway */
+                if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+                    addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
+                    str = g_inet_address_to_string (addr);
+                    mm_bearer_ip_config_set_gateway (ipv6_config, str);
+                    g_free (str);
+                    g_object_unref (addr);
+                }
+
+                /* DNS */
+                strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
+                for (i = 0; i < ipv6dnsservercount; i++) {
+                    addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
+                    strarr[i] = g_inet_address_to_string (addr);
+                    g_object_unref (addr);
+                }
+                mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
+                g_strfreev (strarr);
+            } else
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+        } else
+            ipv6_config = NULL;
+
+        /* Store result */
+        ctx->connect_result = mm_bearer_connect_result_new (ctx->data,
+                                                            ipv4_config,
+                                                            ipv6_config);
+
+        mbim_ipv4_element_array_free (ipv4address);
+        mbim_ipv6_element_array_free (ipv6address);
+        g_free (ipv4dnsserver);
+        g_free (ipv6dnsserver);
+    }
+
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (ctx);
+}
+
+static void
 connect_set_ready (MbimDevice *device,
                    GAsyncResult *res,
                    ConnectContext *ctx)
@@ -181,35 +441,11 @@ connect_set_ready (MbimDevice *device,
         if (nw_error)
             error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
         else {
-            MMBearerIpConfig *ipv4_config = NULL;
-            MMBearerIpConfig *ipv6_config = NULL;
-
+            ctx->ip_type = ip_type;
             mm_dbg ("Session ID '%u': %s (IP type: %s)",
                     session_id,
                     mbim_activation_state_get_string (activation_state),
                     mbim_context_ip_type_get_string (ip_type));
-
-            /* Build IPv4 config; always DHCP based */
-            if (ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
-                ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-                ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-                ipv4_config = mm_bearer_ip_config_new ();
-                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
-            }
-
-            /* Build IPv6 config; always DHCP based */
-            if (ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
-                ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-                ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-                ipv6_config = mm_bearer_ip_config_new ();
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
-            }
-
-            /* Store result */
-            ctx->connect_result = (mm_bearer_connect_result_new (
-                                       ctx->data,
-                                       ipv4_config,
-                                       ipv6_config));
         }
     }
 
@@ -462,6 +698,43 @@ connect_context_step (ConnectContext *ctx)
                              60,
                              NULL,
                              (GAsyncReadyCallback)connect_set_ready,
+                             ctx);
+        mbim_message_unref (message);
+        return;
+    }
+
+    case CONNECT_STEP_IP_CONFIGURATION: {
+        GError *error = NULL;
+
+        mm_dbg ("Querying IP configuration...");
+        message = (mbim_message_ip_configuration_query_new (
+                       ctx->self->priv->session_id,
+                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv4configurationavailable */
+                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv6configurationavailable */
+                       0, /* ipv4addresscount */
+                       NULL, /* ipv4address */
+                       0, /* ipv6addresscount */
+                       NULL, /* ipv6address */
+                       NULL, /* ipv4gateway */
+                       NULL, /* ipv6gateway */
+                       0, /* ipv4dnsservercount */
+                       NULL, /* ipv4dnsserver */
+                       0, /* ipv6dnsservercount */
+                       NULL, /* ipv6dnsserver */
+                       0, /* ipv4mtu */
+                       0, /* ipv6mtu */
+                       &error));
+        if (!message) {
+            g_simple_async_result_take_error (ctx->result, error);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
+
+        mbim_device_command (ctx->device,
+                             message,
+                             60,
+                             NULL,
+                             (GAsyncReadyCallback)ip_configuration_query_ready,
                              ctx);
         mbim_message_unref (message);
         return;
