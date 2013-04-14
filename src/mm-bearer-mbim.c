@@ -356,7 +356,7 @@ connect_context_step (ConnectContext *ctx)
 
         mbim_device_command (ctx->device,
                              message,
-                             10,
+                             30,
                              NULL,
                              (GAsyncReadyCallback)packet_service_set_ready,
                              ctx);
@@ -459,7 +459,7 @@ connect_context_step (ConnectContext *ctx)
 
         mbim_device_command (ctx->device,
                              message,
-                             10,
+                             60,
                              NULL,
                              (GAsyncReadyCallback)connect_set_ready,
                              ctx);
