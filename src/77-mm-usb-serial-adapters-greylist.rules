@@ -31,4 +31,7 @@ ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 # Atmel Corp. LUFA USB to Serial Adapter Project (Arduino)
 ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="204b", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Netchip Technology, Inc. Linux-USB Serial Gadget (CDC ACM mode)
+ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
 LABEL="mm_usb_serial_adapters_greylist_end"
