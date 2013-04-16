@@ -31,6 +31,10 @@
 #include "mm-broadband-modem-qmi.h"
 #endif
 
+#if defined WITH_MBIM
+#include "mm-broadband-modem-mbim.h"
+#endif
+
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -226,6 +230,17 @@ create_modem (MMPlugin *self,
     }
 #endif
 
+#if defined WITH_MBIM
+    if (mm_port_probe_list_has_mbim_port (probes)) {
+        mm_dbg ("MBIM-powered Sierra modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (sysfs_path,
+                                                           drivers,
+                                                           mm_plugin_get_name (self),
+                                                           vendor,
+                                                           product));
+    }
+#endif
+
     if (sierra_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
                                                                    drivers,
@@ -288,6 +303,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,       TRUE,
                       MM_PLUGIN_CUSTOM_INIT,        &custom_init,
                       MM_PLUGIN_ICERA_PROBE,        TRUE,
                       MM_PLUGIN_REMOVE_ECHO,        FALSE,
