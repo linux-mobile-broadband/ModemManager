@@ -719,7 +719,7 @@ qcdm_cmd_pilot_sets_result_get_num (QcdmResult *result,
     set_name = set_num_to_str (set_type);
     qcdm_return_val_if_fail (set_name != NULL, FALSE);
 
-    if (!qcdm_result_get_u8_array (result, set_name, &array, &array_len))
+    if (qcdm_result_get_u8_array (result, set_name, &array, &array_len))
         return FALSE;
 
     *out_num = array_len / sizeof (DMCmdPilotSetsSet);
@@ -744,7 +744,7 @@ qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
     set_name = set_num_to_str (set_type);
     qcdm_return_val_if_fail (set_name != NULL, FALSE);
 
-    if (!qcdm_result_get_u8_array (result, set_name, &array, &array_len))
+    if (qcdm_result_get_u8_array (result, set_name, &array, &array_len))
         return FALSE;
 
     qcdm_return_val_if_fail (num < array_len / sizeof (DMCmdPilotSetsSet), FALSE);
