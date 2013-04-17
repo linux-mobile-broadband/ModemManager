@@ -27,6 +27,10 @@
 #include "mm-plugin-mbm.h"
 #include "mm-broadband-modem-mbm.h"
 
+#if defined WITH_MBIM
+#include "mm-broadband-modem-mbim.h"
+#endif
+
 G_DEFINE_TYPE (MMPluginMbm, mm_plugin_mbm, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -43,6 +47,17 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_MBIM
+    if (mm_port_probe_list_has_mbim_port (probes)) {
+        mm_dbg ("MBIM-powered Ericsson modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (sysfs_path,
+                                                           drivers,
+                                                           mm_plugin_get_name (self),
+                                                           vendor,
+                                                           product));
+    }
+#endif
+
     return MM_BASE_MODEM (mm_broadband_modem_mbm_new (sysfs_path,
                                                       drivers,
                                                       mm_plugin_get_name (self),
@@ -67,6 +82,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_UDEV_TAGS,  udev_tags,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,       TRUE,
                       NULL));
 }
 
