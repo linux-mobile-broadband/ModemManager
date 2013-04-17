@@ -304,12 +304,17 @@ typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     MMModemCapability caps;
+    MMQcdmSerialPort *qcdm_port;
 } LoadCapabilitiesContext;
 
 static void
 load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
+    if (ctx->qcdm_port) {
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm_port));
+        g_object_unref (ctx->qcdm_port);
+    }
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     g_slice_free (LoadCapabilitiesContext, ctx);
@@ -537,6 +542,122 @@ capabilities_sequence_ready (MMBaseModem *self,
 }
 
 static void
+load_current_capabilities_at (LoadCapabilitiesContext *ctx)
+{
+    /* Launch sequence, we will expect a "u" GVariant */
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (ctx->self),
+        capabilities,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        (GAsyncReadyCallback)capabilities_sequence_ready,
+        ctx);
+}
+
+static void
+mode_pref_qcdm_ready (MMQcdmSerialPort *port,
+                      GByteArray *response,
+                      GError *error,
+                      LoadCapabilitiesContext *ctx)
+{
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    u_int8_t pref = 0;
+
+    if (error) {
+        /* Fall back to AT checking */
+        mm_dbg ("Failed to load NV ModePref: %s", error->message);
+        goto at_caps;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_nv_get_mode_pref_result ((const gchar *) response->data,
+                                               response->len,
+                                               &err);
+    if (!result) {
+        mm_dbg ("Failed to parse NV ModePref result: %d", err);
+        goto at_caps;
+    }
+
+    err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, &pref);
+    if (err) {
+        mm_dbg ("Failed to read NV ModePref: %d", err);
+        goto at_caps;
+    }
+
+    /* Only parse explicit modes; for 'auto' just fall back to whatever
+     * the AT current capabilities probing figures out.
+     */
+    switch (pref) {
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY:
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+        /* Fall through */
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_ONLY:
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY:
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_ONLY:
+        ctx->caps |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_LTE_ONLY:
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+        /* Fall through */
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GPRS_ONLY:
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_UMTS_ONLY:
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_ONLY:
+        ctx->caps |= MM_MODEM_CAPABILITY_GSM_UMTS;
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_LTE_ONLY:
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+        break;
+    default:
+        break;
+    }
+
+    if (ctx->caps != MM_MODEM_CAPABILITY_NONE) {
+        g_simple_async_result_set_op_res_gpointer (
+            ctx->result,
+            GUINT_TO_POINTER (ctx->caps),
+            NULL);
+        load_capabilities_context_complete_and_free (ctx);
+        return;
+    }
+
+at_caps:
+    load_current_capabilities_at (ctx);
+}
+
+static void
+load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
+{
+    GByteArray *cmd;
+    GError *error = NULL;
+
+    ctx->qcdm_port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (ctx->self));
+    g_assert (ctx->qcdm_port);
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm_port), &error)) {
+        mm_dbg ("Failed to open QCDM port for NV ModePref request: %s",
+                error->message);
+        g_error_free (error);
+        ctx->qcdm_port = NULL;
+        load_current_capabilities_at (ctx);
+        return;
+    }
+
+    g_object_ref (ctx->qcdm_port);
+
+    cmd = g_byte_array_sized_new (300);
+    cmd->len = qcdm_cmd_nv_get_mode_pref_new ((char *) cmd->data, 300, 0);
+    g_assert (cmd->len);
+
+    mm_qcdm_serial_port_queue_command (ctx->qcdm_port,
+                                       cmd,
+                                       3,
+                                       NULL,
+                                       (MMQcdmSerialResponseFn) mode_pref_qcdm_ready,
+                                       ctx);
+}
+
+static void
 modem_load_current_capabilities (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -552,14 +673,10 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                              user_data,
                                              modem_load_current_capabilities);
 
-    /* Launch sequence, we will expect a "u" GVariant */
-    mm_base_modem_at_sequence (
-        MM_BASE_MODEM (self),
-        capabilities,
-        NULL, /* response_processor_context */
-        NULL, /* response_processor_context_free */
-        (GAsyncReadyCallback)capabilities_sequence_ready,
-        ctx);
+    if (mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self)))
+        load_current_capabilities_qcdm (ctx);
+    else
+        load_current_capabilities_at (ctx);
 }
 
 /*****************************************************************************/
