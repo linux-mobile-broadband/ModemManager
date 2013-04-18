@@ -779,6 +779,8 @@ mm_sms_part_new_from_binary_pdu (guint index,
             udhl = pdu[tp_user_data_offset] + 1;
             end = tp_user_data_offset + udhl;
 
+            PDU_SIZE_CHECK (tp_user_data_offset + udhl, "cannot read UDH");
+
             for (offset = tp_user_data_offset + 1; (offset + 1) < end;) {
                 guint8 ie_id, ie_len;
 
@@ -853,7 +855,9 @@ mm_sms_part_new_from_binary_pdu (guint index,
             {
                 GByteArray *raw;
 
-                mm_dbg ("Skipping SMS text: Unknown encoding");
+                mm_dbg ("Skipping SMS text: Unknown encoding (0x%02X)", user_data_encoding);
+
+                PDU_SIZE_CHECK (tp_user_data_offset + tp_user_data_size_bytes, "cannot read user data");
 
                 /* 8-bit encoding is usually binary data, and we have no idea what
                  * actual encoding the data is in so we can't convert it.
