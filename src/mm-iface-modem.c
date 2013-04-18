@@ -2598,40 +2598,51 @@ load_unlock_required_ready (MMIfaceModem *self,
         if (error->domain == MM_SERIAL_ERROR ||
             g_error_matches (error,
                              MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+                             MM_CORE_ERROR_CANCELLED)) {
             ctx->saved_error = error;
             ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
             update_lock_info_context_step (ctx);
             return;
+        } else if (g_error_matches (error,
+                                    MM_MOBILE_EQUIPMENT_ERROR,
+                                    MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+                   g_error_matches (error,
+                                    MM_MOBILE_EQUIPMENT_ERROR,
+                                    MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+                   g_error_matches (error,
+                                    MM_MOBILE_EQUIPMENT_ERROR,
+                                    MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+            if (mm_iface_modem_is_cdma (self)) {
+                /* For mixed 3GPP+3GPP2 devices, skip SIM errors */
+                mm_dbg ("Skipping SIM error in 3GPP2-capable device, assuming no lock is needed");
+                g_error_free (error);
+                ctx->lock = MM_MODEM_LOCK_NONE;
+            } else {
+                /* SIM errors are only critical in 3GPP-only devices */
+                ctx->saved_error = error;
+                ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
+                update_lock_info_context_step (ctx);
+                return;
+            }
+        } else {
+            mm_dbg ("Couldn't check if unlock required: '%s'", error->message);
+            g_error_free (error);
+
+            /* Retry up to 6 times */
+            if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
+                ++ctx->pin_check_tries < 6) {
+                mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
+                if (ctx->pin_check_timeout_id)
+                    g_source_remove (ctx->pin_check_timeout_id);
+                ctx->pin_check_timeout_id = g_timeout_add_seconds (2,
+                                                                   (GSourceFunc)load_unlock_required_again,
+                                                                   ctx);
+                return;
+            }
+
+            /* If reached max retries and still reporting error, set UNKNOWN */
+            ctx->lock = MM_MODEM_LOCK_UNKNOWN;
         }
-
-        mm_dbg ("Couldn't check if unlock required: '%s'", error->message);
-        g_error_free (error);
-
-        /* Retry up to 6 times */
-        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
-            ++ctx->pin_check_tries < 6) {
-            mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
-            if (ctx->pin_check_timeout_id)
-                g_source_remove (ctx->pin_check_timeout_id);
-            ctx->pin_check_timeout_id = g_timeout_add_seconds (
-                2,
-                (GSourceFunc)load_unlock_required_again,
-                ctx);
-            return;
-        }
-
-        /* If reached max retries and still reporting error, set UNKNOWN */
-        ctx->lock = MM_MODEM_LOCK_UNKNOWN;
     }
 
     /* Go on to next step */
