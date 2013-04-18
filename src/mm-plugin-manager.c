@@ -142,40 +142,49 @@ static void
 port_probe_context_finished (PortProbeContext *port_probe_ctx)
 {
     FindDeviceSupportContext *ctx = port_probe_ctx->parent_ctx;
+    MMPlugin *device_plugin;
+
+    /* Get info about the currently scheduled plugin in the device */
+    device_plugin = (MMPlugin *)mm_device_peek_plugin (ctx->device);
 
     if (!port_probe_ctx->best_plugin) {
-        gboolean cancel_remaining;
-        GList *l;
+        /* If the port appeared after an already probed port, which decided that
+         * the Generic plugin was the best one (which is by default not initially
+         * suggested), we'll end up arriving here. Don't ignore it, it may well
+         * be a wwan port that we do need to grab. */
+        if (device_plugin) {
+            mm_dbg ("(Plugin Manager) [%s] assuming port can be handled by the '%s' plugin",
+                    g_udev_device_get_name (port_probe_ctx->port),
+                    mm_plugin_get_name (device_plugin));
+        } else {
+            gboolean cancel_remaining;
+            GList *l;
 
-        mm_dbg ("(Plugin Manager) [%s] not supported by any plugin",
-                g_udev_device_get_name (port_probe_ctx->port));
+            mm_dbg ("(Plugin Manager) [%s] not supported by any plugin",
+                    g_udev_device_get_name (port_probe_ctx->port));
 
-        /* Tell the device to ignore this port */
-        mm_device_ignore_port (ctx->device, port_probe_ctx->port);
+            /* Tell the device to ignore this port */
+            mm_device_ignore_port (ctx->device, port_probe_ctx->port);
 
-        /* If this is the last valid probe which was running (i.e. the last one
-         * not being deferred-until-suggested), cancel all remaining ones. */
-        cancel_remaining = TRUE;
-        for (l = ctx->running_probes; l; l = g_list_next (l)) {
-            PortProbeContext *other = l->data;
+            /* If this is the last valid probe which was running (i.e. the last one
+             * not being deferred-until-suggested), cancel all remaining ones. */
+            cancel_remaining = TRUE;
+            for (l = ctx->running_probes; l; l = g_list_next (l)) {
+                PortProbeContext *other = l->data;
 
-            /* Do not cancel anything if we find at least one probe which is not
-             * waiting for the suggested plugin */
-            if (other != port_probe_ctx && !other->defer_until_suggested) {
-                cancel_remaining = FALSE;
-                break;
+                /* Do not cancel anything if we find at least one probe which is not
+                 * waiting for the suggested plugin */
+                if (other != port_probe_ctx && !other->defer_until_suggested) {
+                    cancel_remaining = FALSE;
+                    break;
+                }
             }
+
+            if (cancel_remaining)
+                /* Set a NULL suggested plugin, will cancel the probes */
+                suggest_port_probe_result (ctx, port_probe_ctx, NULL);
         }
-
-        if (cancel_remaining)
-            /* Set a NULL suggested plugin, will cancel the probes */
-            suggest_port_probe_result (ctx, port_probe_ctx, NULL);
-
     } else {
-        MMPlugin *device_plugin;
-
-        device_plugin = (MMPlugin *)mm_device_peek_plugin (ctx->device);
-
         /* Notify the plugin to the device, if this is the first port probing
          * result we got.
          * Also, if the previously suggested plugin was the GENERIC one and now
