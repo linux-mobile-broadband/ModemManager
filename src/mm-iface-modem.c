@@ -3510,7 +3510,7 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
     }
 
 #undef UINT_REPLY_READY_FN
-#define UINT_REPLY_READY_FN(NAME,DISPLAY,FATAL)                         \
+#define UINT_REPLY_READY_FN(NAME,DISPLAY)                               \
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
@@ -3523,27 +3523,97 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error)); \
                                                                         \
         if (error) {                                                    \
-            if (FATAL) {                                                \
-                g_propagate_error (&ctx->fatal_error, error);           \
-                g_prefix_error (&ctx->fatal_error, "couldn't load %s: ", DISPLAY); \
-                /* Jump to the last step */                             \
-                ctx->step = INITIALIZATION_STEP_LAST;                   \
-            } else {                                                    \
-                mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
-                g_error_free (error);                                   \
-                /* Go on to next step */                                \
-                ctx->step++;                                            \
-            }                                                           \
-        } else {                                                        \
-            /* Go on to next step */                                    \
-            ctx->step++;                                                \
+            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
         }                                                               \
                                                                         \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
         interface_initialization_step (ctx);                            \
     }
 
-UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities", TRUE)
-UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities", FALSE)
+static void
+current_capabilities_load_unlock_required_ready (MMIfaceModem *self,
+                                                 GAsyncResult *res,
+                                                 InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error);
+    if (error) {
+        /* These SIM errors indicate that there is NO valid SIM available. So,
+         * remove all 3GPP caps from the current capabilities */
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+            MMModemCapability caps;
+
+            mm_dbg ("Multimode device without SIM, no 3GPP capabilities");
+            caps = mm_gdbus_modem_get_current_capabilities (ctx->skeleton);
+            caps &= ~MM_MODEM_CAPABILITY_GSM_UMTS;
+            caps &= ~MM_MODEM_CAPABILITY_LTE;
+
+            /* CDMA-EVDO must still be around */
+            g_assert (caps & MM_MODEM_CAPABILITY_CDMA_EVDO);
+            mm_gdbus_modem_set_current_capabilities (ctx->skeleton, caps);
+        }
+
+        g_error_free (error);
+    }
+
+    /* Keep on */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
+load_current_capabilities_ready (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 InitializationContext *ctx)
+{
+    MMModemCapability caps;
+    GError *error = NULL;
+
+    caps = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self, res, &error);
+    if (error) {
+        g_propagate_error (&ctx->fatal_error, error);
+        g_prefix_error (&ctx->fatal_error, "couldn't load current capabilities: ");
+        /* Jump to the last step */
+        ctx->step = INITIALIZATION_STEP_LAST;
+        interface_initialization_step (ctx);
+        return;
+    }
+
+    /* Update current caps right away, even if we may fix them during the
+     * multimode device check. No big deal in updating them twice, as we're not
+     * exposed in DBus yet. */
+    mm_gdbus_modem_set_current_capabilities (ctx->skeleton, caps);
+
+    /* If the device is a multimode device (3GPP+3GPP2) check whether we have a
+     * SIM or not. */
+    if (caps & MM_MODEM_CAPABILITY_CDMA_EVDO &&
+        (caps & MM_MODEM_CAPABILITY_GSM_UMTS || caps & MM_MODEM_CAPABILITY_LTE) &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
+        mm_dbg ("Checking if multimode device has a SIM...");
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
+            ctx->self,
+            (GAsyncReadyCallback)current_capabilities_load_unlock_required_ready,
+            ctx);
+        return;
+    }
+
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
@@ -3625,7 +3695,7 @@ load_supported_bands_ready (MMIfaceModem *self,
     interface_initialization_step (ctx);
 }
 
-UINT_REPLY_READY_FN (power_state, "Power State", FALSE)
+UINT_REPLY_READY_FN (power_state, "Power State")
 
 static void
 modem_update_lock_info_ready (MMIfaceModem *self,
