@@ -62,6 +62,9 @@ static const LogDesc level_descs[] = {
     { 0, NULL }
 };
 
+static GString *msgbuf = NULL;
+static volatile gsize msgbuf_once = 0;
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -70,24 +73,35 @@ _mm_log (const char *loc,
          ...)
 {
     va_list args;
-    char *msg;
     GTimeVal tv;
-    char tsbuf[100] = { 0 };
-    char msgbuf[512] = { 0 };
     int syslog_priority = LOG_INFO;
-    const char *prefix = NULL;
     ssize_t ign;
 
     if (!(log_level & level))
         return;
 
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
+    if (g_once_init_enter (&msgbuf_once)) {
+        msgbuf = g_string_sized_new (512);
+        g_once_init_leave (&msgbuf_once, 1);
+    } else
+        g_string_truncate (msgbuf, 0);
+
+    if ((log_level & LOGL_DEBUG) && (level == LOGL_DEBUG))
+        g_string_append (msgbuf, "<debug> ");
+    else if ((log_level & LOGL_INFO) && (level == LOGL_INFO))
+        g_string_append (msgbuf, "<info>  ");
+    else if ((log_level & LOGL_WARN) && (level == LOGL_WARN)) {
+        g_string_append (msgbuf, "<warn>  ");
+        syslog_priority = LOG_WARNING;
+    } else if ((log_level & LOGL_ERR) && (level == LOGL_ERR)) {
+        g_string_append (msgbuf, "<error> ");
+        syslog_priority = LOG_ERR;
+    } else
+        return;
 
     if (ts_flags == TS_FLAG_WALL) {
         g_get_current_time (&tv);
-        snprintf (&tsbuf[0], sizeof (tsbuf), " [%09ld.%06ld]", tv.tv_sec, tv.tv_usec);
+        g_string_append_printf (msgbuf, "[%09ld.%06ld] ", tv.tv_sec, tv.tv_usec);
     } else if (ts_flags == TS_FLAG_REL) {
         glong secs;
         glong usecs;
@@ -100,39 +114,26 @@ _mm_log (const char *loc,
             usecs += 1000000;
         }
 
-        snprintf (&tsbuf[0], sizeof (tsbuf), " [%06ld.%06ld]", secs, usecs);
+        g_string_append_printf (msgbuf, "[%06ld.%06ld] ", secs, usecs);
     }
 
-    if ((log_level & LOGL_DEBUG) && (level == LOGL_DEBUG))
-        prefix = "<debug>";
-    else if ((log_level & LOGL_INFO) && (level == LOGL_INFO))
-        prefix = "<info> ";
-    else if ((log_level & LOGL_WARN) && (level == LOGL_WARN)) {
-        prefix = "<warn> ";
-        syslog_priority = LOG_WARNING;
-    } else if ((log_level & LOGL_ERR) && (level == LOGL_ERR)) {
-        prefix = "<error>";
-        syslog_priority = LOG_ERR;
-    } else
-        g_warn_if_reached ();
+    if (func_loc && log_level & LOGL_DEBUG)
+        g_string_append_printf (msgbuf, "[%s] %s(): ", loc, func);
 
-    if (prefix) {
-        if (func_loc && log_level & LOGL_DEBUG)
-            snprintf (msgbuf, sizeof (msgbuf), "%s%s [%s] %s(): %s\n", prefix, tsbuf, loc, func, msg);
-        else
-            snprintf (msgbuf, sizeof (msgbuf), "%s%s %s\n", prefix, tsbuf, msg);
+    va_start (args, fmt);
+    g_string_append_vprintf (msgbuf, fmt, args);
+    va_end (args);
 
-        if (logfd < 0)
-            syslog (syslog_priority, "%s", msgbuf);
-        else {
-            ign = write (logfd, msgbuf, strlen (msgbuf));
-            if (ign) {} /* whatever; really shut up about unused result */
+    g_string_append_c (msgbuf, '\n');
 
-            fsync (logfd);  /* Make sure output is dumped to disk immediately */
-        }
+    if (logfd < 0)
+        syslog (syslog_priority, "%s", msgbuf->str);
+    else {
+        ign = write (logfd, msgbuf->str, msgbuf->len);
+        if (ign) {} /* whatever; really shut up about unused result */
+
+        fsync (logfd);  /* Make sure output is dumped to disk immediately */
     }
-
-    g_free (msg);
 }
 
 static void
