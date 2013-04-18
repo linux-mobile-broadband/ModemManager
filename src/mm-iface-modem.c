@@ -2705,10 +2705,12 @@ update_lock_info_context_step (UpdateLockInfoContext *ctx)
 
     case UPDATE_LOCK_INFO_CONTEXT_STEP_AFTER_UNLOCK:
         /* If we get that no lock is required, run the after SIM unlock step
-         * in order to wait for the SIM to get ready */
-        if (ctx->lock == MM_MODEM_LOCK_NONE ||
-            ctx->lock == MM_MODEM_LOCK_SIM_PIN2 ||
-            ctx->lock == MM_MODEM_LOCK_SIM_PUK2) {
+         * in order to wait for the SIM to get ready.  Skip waiting on
+         * CDMA-only modems where we don't support a SIM. */
+        if (!mm_iface_modem_is_cdma_only (ctx->self) &&
+            (ctx->lock == MM_MODEM_LOCK_NONE ||
+             ctx->lock == MM_MODEM_LOCK_SIM_PIN2 ||
+             ctx->lock == MM_MODEM_LOCK_SIM_PUK2)) {
             if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_sim_unlock != NULL &&
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_sim_unlock_finish != NULL) {
                 mm_dbg ("SIM is ready, running after SIM unlock step...");
