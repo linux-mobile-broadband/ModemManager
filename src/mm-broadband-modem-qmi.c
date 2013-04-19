@@ -7806,6 +7806,23 @@ allocate_next_client (InitializationStartedContext *ctx)
                                  ctx);
 }
 
+
+static void
+qmi_port_open_ready_no_data_format (MMQmiPort *qmi,
+                                    GAsyncResult *res,
+                                    InitializationStartedContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_qmi_port_open_finish (qmi, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        initialization_started_context_complete_and_free (ctx);
+        return;
+    }
+
+    allocate_next_client (ctx);
+}
+
 static void
 qmi_port_open_ready (MMQmiPort *qmi,
                      GAsyncResult *res,
@@ -7814,8 +7831,16 @@ qmi_port_open_ready (MMQmiPort *qmi,
     GError *error = NULL;
 
     if (!mm_qmi_port_open_finish (qmi, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_started_context_complete_and_free (ctx);
+        /* Really, really old devices (Gobi 1K, 2008-era firmware) may not
+         * support SetDataFormat, so if we get an error opening the port
+         * try without it.  The qmi_wwan driver will fix up any issues that
+         * the device might have between raw-ip and 802.3 mode anyway.
+         */
+        mm_qmi_port_open (ctx->qmi,
+                          FALSE,
+                          NULL,
+                          (GAsyncReadyCallback)qmi_port_open_ready_no_data_format,
+                          ctx);
         return;
     }
 
