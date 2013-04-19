@@ -527,7 +527,8 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
             /* Don't set error */
             break;
         case MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED:
-            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED);
+            /* This is an error, but we still want to retry.
+             * The MC7710 may use this while the SIM is not ready yet. */
             break;
         case MBIM_SUBSCRIBER_READY_STATE_BAD_SIM:
             error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
@@ -546,12 +547,19 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
         load_unlock_required_context_complete_and_free (ctx);
     }
     /* Need to retry? */
-    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
+    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED ||
+             ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) {
         if (--ctx->n_ready_status_checks == 0) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Error waiting for SIM to get initialized");
+            /* All retries consumed, issue error */
+            if (ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)
+                g_simple_async_result_take_error (
+                    ctx->result,
+                    mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED));
+            else
+                g_simple_async_result_set_error (ctx->result,
+                                                 MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_FAILED,
+                                                 "Error waiting for SIM to get initialized");
             load_unlock_required_context_complete_and_free (ctx);
         } else {
             /* Retry */
