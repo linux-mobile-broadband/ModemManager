@@ -72,7 +72,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-zte.la \
 	libmm-plugin-sierra.la \
 	libmm-plugin-mbm.la \
-	libmm-plugin-via.la
+	libmm-plugin-via.la \
+	libmm-plugin-telit.la
 
 # Generic
 libmm_plugin_generic_la_SOURCES = \
@@ -342,6 +343,15 @@ libmm_plugin_via_la_SOURCES = \
 	via/mm-broadband-modem-via.h
 libmm_plugin_via_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_via_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Telit modem
+libmm_plugin_telit_la_SOURCES = \
+	telit/mm-plugin-telit.c \
+	telit/mm-plugin-telit.h \
+	telit/mm-broadband-modem-telit.c \
+	telit/mm-broadband-modem-telit.h
+libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Additional files to include in the distribution
 EXTRA_DIST = \
