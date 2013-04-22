@@ -58,6 +58,7 @@ typedef struct _MMBearerPrivate MMBearerPrivate;
 #define MM_BEARER_MODEM      "bearer-modem"
 #define MM_BEARER_STATUS     "bearer-status"
 #define MM_BEARER_CONFIG     "bearer-config"
+#define MM_BEARER_DEFAULT_IP_FAMILY "bearer-deafult-ip-family"
 
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
@@ -103,6 +104,7 @@ const gchar        *mm_bearer_get_path    (MMBearer *bearer);
 MMBearerStatus      mm_bearer_get_status  (MMBearer *bearer);
 MMBearerProperties *mm_bearer_peek_config (MMBearer *self);
 MMBearerProperties *mm_bearer_get_config  (MMBearer *self);
+MMBearerIpFamily mm_bearer_get_default_ip_family (MMBearer *self);
 
 
 void     mm_bearer_connect        (MMBearer *self,

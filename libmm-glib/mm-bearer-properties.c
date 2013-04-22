@@ -674,13 +674,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     self->priv->allow_roaming = TRUE;
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-
-    /* At some point in the future, this default should probably be changed
-     * to IPV4V6. However, presently support for this PDP type is rare. An
-     * even better approach would likely be to query which PDP types the
-     * modem supports (using AT+CGDCONT=?), and set the default accordingly
-     */
-    self->priv->ip_type = MM_BEARER_IP_FAMILY_IPV4;
+    self->priv->ip_type = MM_BEARER_IP_FAMILY_UNKNOWN;
 }
 
 static void

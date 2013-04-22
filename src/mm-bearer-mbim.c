@@ -618,6 +618,7 @@ connect_context_step (ConnectContext *ctx)
         const gchar *password;
         MbimAuthProtocol auth;
         MbimContextIpType ip_type;
+        MMBearerIpFamily ip_family;
         GError *error = NULL;
 
         /* Setup parameters to use */
@@ -658,7 +659,14 @@ connect_context_step (ConnectContext *ctx)
             }
         }
 
-        switch (mm_bearer_properties_get_ip_type (ctx->properties)) {
+        ip_family = mm_bearer_properties_get_ip_type (ctx->properties);
+        if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+            ip_family = mm_bearer_get_default_ip_family (MM_BEARER (ctx->self));
+            mm_dbg ("No specific IP family requested, defaulting to %s",
+                    mm_bearer_ip_family_get_string (ip_family));
+        }
+
+        switch (ip_family) {
         case MM_BEARER_IP_FAMILY_IPV4:
             ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
             break;
@@ -670,8 +678,8 @@ connect_context_step (ConnectContext *ctx)
             break;
         case MM_BEARER_IP_FAMILY_UNKNOWN:
         default:
-            mm_dbg ("No specific IP family requested, defaulting to IPv4");
-            ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
+            /* A valid default IP family should have been specified */
+            g_assert_not_reached ();
             break;
         }
 

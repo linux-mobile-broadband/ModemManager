@@ -85,6 +85,7 @@ typedef struct {
     /* 3GPP-specific */
     guint cid;
     guint max_cid;
+    MMBearerIpFamily ip_family;
 } DetailedConnectContext;
 
 static MMBearerConnectResult *
@@ -164,6 +165,14 @@ detailed_connect_context_new (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              detailed_connect_context_new);
+
+    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (self)));
+    if (ctx->ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+        ctx->ip_family = mm_bearer_get_default_ip_family (MM_BEARER (self));
+        mm_dbg ("No specific IP family requested, defaulting to %s",
+                mm_bearer_ip_family_get_string (ctx->ip_family));
+    }
+
     /* NOTE:
      * We don't currently support cancelling AT commands, so we'll just check
      * whether the operation is to be cancelled at each step. */
@@ -772,7 +781,7 @@ find_cid_ready (MMBaseModem *modem,
         return;
 
     /* Initialize PDP context with our APN */
-    pdp_type = mm_3gpp_get_pdp_type_from_ip_family (mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self))));
+    pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
     if (!pdp_type) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
@@ -847,8 +856,7 @@ parse_cid_range (MMBaseModem *modem,
 
             pdp_type = g_match_info_fetch (match_info, 3);
 
-            if (mm_3gpp_get_ip_family_from_pdp_type (pdp_type) ==
-                mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)))) {
+            if (mm_3gpp_get_ip_family_from_pdp_type (pdp_type) == ctx->ip_family) {
                 gchar *max_cid_range_str;
                 guint max_cid_range;
 
@@ -942,7 +950,7 @@ parse_pdp_list (MMBaseModem *modem,
     for (l = pdp_list; l; l = g_list_next (l)) {
         MM3gppPdpContext *pdp = l->data;
 
-        if (pdp->pdp_type == mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)))) {
+        if (pdp->pdp_type == ctx->ip_family) {
             /* PDP with no APN set? we may use that one if not exact match found */
             if (!pdp->apn || !pdp->apn[0]) {
                 mm_dbg ("Found PDP context with CID %u and no APN",

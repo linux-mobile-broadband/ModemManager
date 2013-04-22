@@ -846,11 +846,21 @@ _connect (MMBearer *self,
 
     if (properties) {
         MMBearerAllowedAuth auth;
+        MMBearerIpFamily ip_family;
 
         ctx->apn = g_strdup (mm_bearer_properties_get_apn (properties));
         ctx->user = g_strdup (mm_bearer_properties_get_user (properties));
         ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
-        switch (mm_bearer_properties_get_ip_type (properties)) {
+
+        ip_family = mm_bearer_properties_get_ip_type (properties);
+        if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+            ip_family = mm_bearer_get_default_ip_family (self);
+            mm_dbg ("No specific IP family requested, defaulting to %s",
+                    mm_bearer_ip_family_get_string (ip_family));
+            ctx->no_ip_family_preference = TRUE;
+        }
+
+        switch (ip_family) {
         case MM_BEARER_IP_FAMILY_IPV4:
             ctx->ipv4 = TRUE;
             ctx->ipv6 = FALSE;
@@ -865,10 +875,8 @@ _connect (MMBearer *self,
             break;
         case MM_BEARER_IP_FAMILY_UNKNOWN:
         default:
-            mm_dbg ("No specific IP family requested, defaulting to IPv4");
-            ctx->no_ip_family_preference = TRUE;
-            ctx->ipv4 = TRUE;
-            ctx->ipv6 = FALSE;
+            /* A valid default IP family should have been specified */
+            g_assert_not_reached ();
             break;
         }
 
