@@ -623,7 +623,11 @@ selrat_query_ready (MMBaseModem *self,
                                  MM_CORE_ERROR_FAILED,
                                  "Failed to parse the allowed mode response: '%s'",
                                  response);
-    }
+    } else if (!error)
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Could not parse allowed mode response: Response didn't match: '%s'",
+                             response);
 
     if (match_info)
         g_match_info_free (match_info);
