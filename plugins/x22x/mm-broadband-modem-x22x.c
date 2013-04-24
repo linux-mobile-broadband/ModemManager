@@ -51,6 +51,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     const gchar *response;
     gchar *str;
     gint mode = -1;
+    GError *match_error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
@@ -59,9 +60,16 @@ load_allowed_modes_finish (MMIfaceModem *self,
     r = g_regex_new ("\\+SYSSEL:\\s*(\\d+),(\\d+),(\\d+),(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, error)) {
-        g_prefix_error (error,
-                        "Failed to parse mode/tech response: ");
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Couldn't match +SYSSEL reply: %s", response);
+        }
+
         g_regex_unref (r);
         return FALSE;
     }
