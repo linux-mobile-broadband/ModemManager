@@ -31,6 +31,14 @@ ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="0017", ENV{.MM_USBIFNUM}=="02", ENV{
 ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="0017", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_X22X_PORT_TYPE_AUX}="1"
 ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="0017", ENV{ID_MM_X22X_TAGGED}="1"
 
+# Archos G9
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_X22X_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_X22X_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_X22X_PORT_TYPE_NMEA}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_X22X_PORT_TYPE_VOICE}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_X22X_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{ID_MM_X22X_TAGGED}="1"
+
 GOTO="mm_x22x_port_types_end"
 
 
