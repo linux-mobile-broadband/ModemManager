@@ -2021,7 +2021,8 @@ mm_cdma_parse_crm_test_response (const gchar *reply,
 {
     gboolean result = FALSE;
     GRegex *r;
-
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
 
     /* Expected reply format is:
      *   ---> AT+CRM=?
@@ -2031,45 +2032,51 @@ mm_cdma_parse_crm_test_response (const gchar *reply,
     r = g_regex_new ("\\+CRM:\\s*\\((\\d+)-(\\d+)\\)",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, error);
-    if (r) {
-        GMatchInfo *match_info = NULL;
+    g_assert (r != NULL);
 
-        if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, error)) {
-            gchar *aux;
-            guint min_val = 0;
-            guint max_val = 0;
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, &match_error)) {
+        gchar *aux;
+        guint min_val = 0;
+        guint max_val = 0;
 
-            aux = g_match_info_fetch (match_info, 1);
-            min_val = (guint) atoi (aux);
-            g_free (aux);
+        aux = g_match_info_fetch (match_info, 1);
+        min_val = (guint) atoi (aux);
+        g_free (aux);
 
-            aux = g_match_info_fetch (match_info, 2);
-            max_val = (guint) atoi (aux);
-            g_free (aux);
+        aux = g_match_info_fetch (match_info, 2);
+        max_val = (guint) atoi (aux);
+        g_free (aux);
 
-            if (min_val == 0 ||
-                max_val == 0 ||
-                min_val >= max_val) {
-                g_set_error (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Couldn't parse CRM range: "
-                             "Unexpected range of RM protocols (%u,%u)",
-                             min_val,
-                             max_val);
-            } else {
-                *min = mm_cdma_get_rm_protocol_from_index (min_val, error);
-                if (*min != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
-                    *max = mm_cdma_get_rm_protocol_from_index (max_val, error);
-                    if (*max != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN)
-                        result = TRUE;
-                }
+        if (min_val == 0 ||
+            max_val == 0 ||
+            min_val >= max_val) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Couldn't parse CRM range: "
+                         "Unexpected range of RM protocols (%u,%u)",
+                         min_val,
+                         max_val);
+        } else {
+            *min = mm_cdma_get_rm_protocol_from_index (min_val, error);
+            if (*min != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+                *max = mm_cdma_get_rm_protocol_from_index (max_val, error);
+                if (*max != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN)
+                    result = TRUE;
             }
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
+    } else if (match_error) {
+        g_propagate_error (error, match_error);
+    } else {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse CRM range: response didn't match (%s)",
+                     reply);
     }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
 
     return result;
 }
