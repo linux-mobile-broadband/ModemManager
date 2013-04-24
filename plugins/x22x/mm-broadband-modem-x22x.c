@@ -56,7 +56,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     if (!response)
         return FALSE;
 
-    r = g_regex_new ("\\+SYSSEL:\\s*(\\d),(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+    r = g_regex_new ("\\+SYSSEL:\\s*(\\d+),(\\d+),(\\d+),(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, error)) {
