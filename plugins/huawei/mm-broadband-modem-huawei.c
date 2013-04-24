@@ -283,6 +283,7 @@ load_unlock_retries_finish (MMIfaceModem *self,
     const gchar *result;
     GRegex *r;
     GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
     guint i;
     MMModemLock locks[4] = {
         MM_MODEM_LOCK_SIM_PUK,
@@ -299,9 +300,15 @@ load_unlock_retries_finish (MMIfaceModem *self,
                      G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, error)) {
-        g_prefix_error (error,
-                        "Could not parse ^CPIN results: ");
+    if (!g_regex_match_full (r, result, strlen (result), 0, 0, &match_info, &match_error)) {
+        if (match_error)
+            g_propagate_error (error, match_error);
+        else
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Could not parse ^CPIN results: Response didn't match (%s)",
+                         result);
         g_regex_unref (r);
         return NULL;
     }
