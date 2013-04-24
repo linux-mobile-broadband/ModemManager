@@ -86,7 +86,7 @@ nwrat_query_ready (MMBaseModem *self,
     GError *error = NULL;
     const gchar *response;
     GRegex *r;
-    GMatchInfo *match_info;
+    GMatchInfo *match_info = NULL;
     gint a = -1;
     gint b = -1;
 
@@ -103,13 +103,17 @@ nwrat_query_ready (MMBaseModem *self,
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &error)) {
-        g_prefix_error (&error,
-                        "Failed to parse mode/tech response '%s': ",
-                        response);
-        g_regex_unref (r);
-        g_simple_async_result_take_error (simple, error);
+        if (error)
+            g_simple_async_result_take_error (simple, error);
+        else
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't match NWRAT reply: %s",
+                                             response);
         g_simple_async_result_complete (simple);
         g_object_unref (simple);
+        g_regex_unref (r);
         return;
     }
 
