@@ -209,23 +209,29 @@ try_next_usbif (MMDevice *device)
      * and enable that one as being first */
     closest = G_MAXINT;
     for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
-        gint usbif;
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
-        usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
-        if (usbif == fi_ctx->first_usbif) {
-            g_warn_if_reached ();
-        } else if (usbif > fi_ctx->first_usbif &&
-                   usbif < closest) {
-            closest = usbif;
+        /* Only expect ttys for next probing attempt */
+        if (g_str_equal (mm_port_probe_get_port_subsys (probe), "tty")) {
+            gint usbif;
+
+            usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
+            if (usbif == fi_ctx->first_usbif) {
+                /* This is the one we just probed, which wasn't yet removed, so just skip it */
+            } else if (usbif > fi_ctx->first_usbif &&
+                       usbif < closest) {
+                closest = usbif;
+            }
         }
     }
 
     if (closest == G_MAXINT) {
-        /* Retry with interface 0... */
+        /* No more ttys to try! Just return something */
         closest = 0;
+        mm_dbg ("(Huawei) No more ports to run initial probing");
+    } else {
+        mm_dbg ("(Huawei) Will try initial probing with interface '%d' instead", closest);
     }
-
-    mm_dbg ("(Huawei) Will try initial probing with interface '%d' instead", closest);
 
     fi_ctx->first_usbif = closest;
 }
