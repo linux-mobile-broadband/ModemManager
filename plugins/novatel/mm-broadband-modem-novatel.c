@@ -1012,9 +1012,8 @@ parse_nwltime_reply (const char *response,
             mm_get_uint_from_match_info (match_info, 6, &second) &&
             mm_get_int_from_match_info (match_info, 8, &utc_offset)) {
 
-            /* Return ISO-8601 format date/time string */
-            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
-                                      year, month, day, hour, minute, second);
+            result = mm_new_iso8601_time (year, month, day, hour, minute, second,
+                                          TRUE, utc_offset * 60);
             if (out_tz) {
                 *out_tz = mm_network_timezone_new ();
                 mm_network_timezone_set_offset (*out_tz, utc_offset * 60);

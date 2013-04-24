@@ -20,9 +20,11 @@
 
     <!--
         GetNetworkTime:
-        @time: If the network time is known, a string containing date and time in ISO 8601 format. If the network time is unknown, the empty string.
+        @time: If the network time is known, a string containing local date,
+        time, and (if available) UTC offset in ISO 8601 format. If the network
+        time is unknown, the empty string.
 
-        Gets the current network time.
+        Gets the current network time in local time.
 
         This method will only work if the modem tracks, or can request, the
         current network time; it will not attempt to use previously-received

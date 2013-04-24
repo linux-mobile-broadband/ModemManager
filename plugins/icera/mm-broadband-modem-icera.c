@@ -1493,7 +1493,9 @@ parse_tlts_query_reply (const gchar *response,
     gint second;
     gchar sign;
     gint offset;
+    GDateTime *utc, *adjusted;
 
+    /* TLTS reports UTC time with the TZ offset to *local* time */
     response = mm_strip_tag (response, "*TLTS: ");
     if (sscanf (response,
                 "\"%02d/%02d/%02d,%02d:%02d:%02d%c%02d\"",
@@ -1504,42 +1506,70 @@ parse_tlts_query_reply (const gchar *response,
                 &minute,
                 &second,
                 &sign,
-                &offset) == 8) {
-        /* Offset comes in 15-min intervals */
-        offset *= 15;
-        /* Apply sign to offset */
-        if (sign == '-')
-            offset *= -1;
-
-        /* If asked for it, build timezone information */
-        if (tz) {
-            *tz = mm_network_timezone_new ();
-            mm_network_timezone_set_offset (*tz, offset);
-        }
-
-        if (iso8601) {
-            /* Icera modems only report a 2-digit year, while ISO-8601 requires
-             * a 4-digit year.  Assume 2000.
-             */
-            if (year < 100)
-                year += 2000;
-
-            /* don't give tz info in the date/time string, we have another
-             * property for that */
-            *iso8601 = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
-                                        year, month, day,
-                                        hour, minute, second);
-        }
-
-        return TRUE;
+                &offset) != 8) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unknown *TLTS response: %s",
+                     response);
+        return FALSE;
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Unknown *TLTS response: %s",
-                 response);
-    return FALSE;
+    /* Icera modems only report a 2-digit year, while ISO-8601 requires
+     * a 4-digit year.  Assume 2000.
+     */
+    if (year < 100)
+        year += 2000;
+
+    /* Offset comes in 15-min units */
+    offset *= 15;
+    /* Apply sign to offset;  */
+    if (sign == '-')
+        offset *= -1;
+
+    utc = g_date_time_new_utc (year, month, day, hour, minute, second);
+    if (!utc) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Invalid *TLTS date/time: %s",
+                     response);
+        return FALSE;
+    }
+
+    /* Convert UTC time to local time by adjusting by the timezone offset */
+    adjusted = g_date_time_add_minutes (utc, offset);
+    g_date_time_unref (utc);
+    if (!adjusted) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to convert modem time to local time (offset %d)",
+                     offset);
+        return FALSE;
+    }
+
+    /* Convert offset from minutes-to-UTC to minutes-from-UTC */
+    offset *= -1;
+
+    if (tz) {
+        *tz = mm_network_timezone_new ();
+        mm_network_timezone_set_offset (*tz, offset);
+    }
+
+    if (iso8601) {
+        *iso8601 = mm_new_iso8601_time (g_date_time_get_year (adjusted),
+                                        g_date_time_get_month (adjusted),
+                                        g_date_time_get_day_of_month (adjusted),
+                                        g_date_time_get_hour (adjusted),
+                                        g_date_time_get_minute (adjusted),
+                                        g_date_time_get_second (adjusted),
+                                        TRUE,
+                                        offset);
+    }
+
+    g_date_time_unref (adjusted);
+    return TRUE;
 }
 
 static MMNetworkTimezone *

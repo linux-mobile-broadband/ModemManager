@@ -1337,9 +1337,7 @@ parse_time (const gchar *response,
             mm_get_uint_from_match_info (match_info, 4, &hour) &&
             mm_get_uint_from_match_info (match_info, 5, &minute) &&
             mm_get_uint_from_match_info (match_info, 6, &second)) {
-            /* Return ISO-8601 format date/time string */
-            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
-                                      year, month, day, hour, minute, second);
+            result = mm_new_iso8601_time (year, month, day, hour, minute, second, FALSE, 0);
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
