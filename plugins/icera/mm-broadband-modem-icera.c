@@ -1064,7 +1064,8 @@ parse_bands (const gchar *response, guint32 *out_len)
 
 typedef struct {
     MMBaseModemAtCommand *cmds;
-    GSList *bands;
+    GSList *check_bands;
+    GSList *enabled_bands;
     guint32 idx;
 } SupportedBandsContext;
 
@@ -1076,7 +1077,8 @@ supported_bands_context_free (SupportedBandsContext *ctx)
     for (i = 0; ctx->cmds[i].command; i++)
         g_free (ctx->cmds[i].command);
     g_free (ctx->cmds);
-    g_slist_free_full (ctx->bands, (GDestroyNotify) band_free);
+    g_slist_free_full (ctx->check_bands, (GDestroyNotify) band_free);
+    g_slist_free_full (ctx->enabled_bands, (GDestroyNotify) band_free);
     g_free (ctx);
 }
 
@@ -1107,12 +1109,21 @@ load_supported_bands_ready (MMBaseModem *self,
         g_simple_async_result_take_error (simple, error);
     else {
         bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), ctx->idx);
-        for (iter = ctx->bands; iter; iter = g_slist_next (iter)) {
+
+        /* Add already enabled bands */
+        for (iter = ctx->enabled_bands; iter; iter = g_slist_next (iter)) {
+            Band *b = iter->data;
+
+            g_array_prepend_val (bands, b->band);
+        }
+
+        /* Add any checked bands that are supported */
+        for (iter = ctx->check_bands; iter; iter = g_slist_next (iter)) {
             Band *b = iter->data;
 
             /* 'enabled' here really means supported/unsupported */
             if (b->enabled)
-                g_array_append_val (bands, b->band);
+                g_array_prepend_val (bands, b->band);
         }
 
         g_simple_async_result_set_op_res_gpointer (simple,
@@ -1134,7 +1145,7 @@ load_supported_bands_response_processor (MMBaseModem *self,
                                          GError **result_error)
 {
     SupportedBandsContext *ctx = context;
-    Band *b = g_slist_nth_data (ctx->bands, ctx->idx++);
+    Band *b = g_slist_nth_data (ctx->check_bands, ctx->idx++);
 
     /* If there was no error setting the band, that band is supported.  We
      * abuse the 'enabled' item to mean supported/unsupported.
@@ -1153,8 +1164,8 @@ load_supported_bands_get_bands_ready (MMIfaceModem *self,
     SupportedBandsContext *ctx;
     const gchar *response;
     GError *error = NULL;
-    GSList *iter;
-    guint32 len = 0, i;
+    GSList *iter, *new;
+    guint32 len = 0, i = 0;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -1170,18 +1181,28 @@ load_supported_bands_get_bands_ready (MMIfaceModem *self,
     /* For each reported band, build up an AT command to set that band
      * to its current enabled/disabled state.
      */
-    ctx->bands = parse_bands (response, &len);
+    iter = ctx->check_bands = parse_bands (response, &len);
     ctx->cmds = g_new0 (MMBaseModemAtCommand, len + 1);
 
-    for (iter = ctx->bands, i = 0; iter; iter = g_slist_next (iter), i++) {
+    while (iter) {
         Band *b = iter->data;
 
-        ctx->cmds[i].command = g_strdup_printf ("%%IPBM=\"%s\",%c",
-                                                b->name,
-                                                b->enabled ? '1' : '0');
-        ctx->cmds[i].timeout = 3;
-        ctx->cmds[i].allow_cached = FALSE;
-        ctx->cmds[i].response_processor = load_supported_bands_response_processor;
+        if (b->enabled || b->band == MM_MODEM_BAND_ANY) {
+            /* Move known-supported band to the enabled list */
+            new = g_slist_next (iter);
+            ctx->check_bands = g_slist_remove_link (ctx->check_bands, iter);
+            ctx->enabled_bands = g_slist_prepend (ctx->enabled_bands, iter->data);
+            g_slist_free (iter);
+            iter = new;
+        } else {
+            /* Check support for disabled band */
+            ctx->cmds[i].command = g_strdup_printf ("%%IPBM=\"%s\",0", b->name);
+            ctx->cmds[i].timeout = 10;
+            ctx->cmds[i].allow_cached = FALSE;
+            ctx->cmds[i].response_processor = load_supported_bands_response_processor;
+            i++;
+            iter = g_slist_next (iter);
+        }
     }
 
     mm_base_modem_at_sequence (MM_BASE_MODEM (self),
