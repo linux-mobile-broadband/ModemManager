@@ -96,6 +96,13 @@ gcap_ready (MMAtSerialPort *port,
             mm_port_probe_set_result_at (ctx->probe, FALSE);
             ctx->retries = 0;
         }
+        /* Some Icera-based devices (eg, USB305) have an AT-style port that
+         * replies to everything with ERROR, so tag as unsupported; sometimes
+         * the real AT ports do this too, so let a retry tag the port as
+         * supported if it responds correctly later. */
+        else if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
+            mm_port_probe_set_result_at (ctx->probe, FALSE);
+        }
 
         /* Just retry... */
         sierra_custom_init_step (ctx);
