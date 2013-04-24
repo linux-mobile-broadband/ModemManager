@@ -160,7 +160,7 @@ load_unlock_retries_ready (MMBaseModem *self,
 {
     const gchar *response;
     GError *error = NULL;
-    int pin1, puk1,pin2, puk2;
+    gint pin1, puk1, pin2, puk2;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -172,8 +172,9 @@ load_unlock_retries_ready (MMBaseModem *self,
     }
 
     response = mm_strip_tag (response, "%CPININFO:");
-    if (sscanf (response, " %d, %d, %d, %d", &pin1, &puk1,&pin2, &puk2) == 4) {
+    if (sscanf (response, " %d, %d, %d, %d", &pin1, &puk1, &pin2, &puk2) == 4) {
         MMUnlockRetries *retries;
+
         retries = mm_unlock_retries_new ();
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, pin1);
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, puk1);
