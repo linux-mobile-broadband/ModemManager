@@ -264,6 +264,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     gint cm_mode = -1;
     gint pref_acq = -1;
     gboolean result;
+    GError *match_error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
@@ -273,8 +274,17 @@ load_allowed_modes_finish (MMIfaceModem *self,
     g_assert (r != NULL);
 
     result = FALSE;
-    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, error))
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
+        if (match_error)
+            g_propagate_error (error, match_error);
+        else
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Couldn't parse +ZSNT response: '%s'",
+                         response);
         goto done;
+    }
 
     if (!mm_get_int_from_match_info (match_info, 1, &cm_mode) ||
         cm_mode < 0 || (cm_mode > 2 && cm_mode != 6) ||
