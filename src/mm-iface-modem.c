@@ -1976,8 +1976,7 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
                                                           FALSE,
                                                           sizeof (MMModemBand),
                                                           supported_bands_array->len);
-
-                g_array_insert_val (ctx->bands_array, i, band);
+                g_array_append_val (ctx->bands_array, band);
             }
         }
     }
