@@ -502,7 +502,15 @@ capabilities_sequence_ready (MMBaseModem *self,
 
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (!result) {
-        g_simple_async_result_take_error (ctx->result, error);
+        if (error)
+            g_simple_async_result_take_error (ctx->result, error);
+        else {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "%s",
+                                             "Failed to determine modem capabilities.");
+        }
         load_capabilities_context_complete_and_free (ctx);
         return;
     }
