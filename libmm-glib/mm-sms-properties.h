@@ -68,7 +68,7 @@ void mm_sms_properties_set_number                  (MMSmsProperties *self,
                                                     const gchar *number);
 void mm_sms_properties_set_smsc                    (MMSmsProperties *self,
                                                     const gchar *smsc);
-void mm_sms_properties_set_validity                (MMSmsProperties *self,
+void mm_sms_properties_set_validity_relative       (MMSmsProperties *self,
                                                     guint validity);
 void mm_sms_properties_set_class                   (MMSmsProperties *self,
                                                     guint class);
@@ -82,7 +82,8 @@ GByteArray   *mm_sms_properties_peek_data_bytearray         (MMSmsProperties *se
 GByteArray   *mm_sms_properties_get_data_bytearray          (MMSmsProperties *self);
 const gchar  *mm_sms_properties_get_number                  (MMSmsProperties *self);
 const gchar  *mm_sms_properties_get_smsc                    (MMSmsProperties *self);
-guint         mm_sms_properties_get_validity                (MMSmsProperties *self);
+MMSmsValidityType mm_sms_properties_get_validity_type       (MMSmsProperties *self);
+guint         mm_sms_properties_get_validity_relative       (MMSmsProperties *self);
 guint         mm_sms_properties_get_class                   (MMSmsProperties *self);
 gboolean      mm_sms_properties_get_delivery_report_request (MMSmsProperties *self);
 

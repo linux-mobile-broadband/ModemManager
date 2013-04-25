@@ -18,6 +18,7 @@
 #include <stdlib.h>
 
 #include "mm-errors-types.h"
+#include "mm-enums-types.h"
 #include "mm-common-helpers.h"
 #include "mm-sms-properties.h"
 
@@ -48,8 +49,8 @@ struct _MMSmsPropertiesPrivate {
     GByteArray *data;
     gchar *number;
     gchar *smsc;
-    gboolean validity_set;
-    guint validity;
+    MMSmsValidityType validity_type;
+    guint validity_relative;
     gboolean class_set;
     guint class;
     gboolean delivery_report_request_set;
@@ -264,36 +265,53 @@ mm_sms_properties_get_smsc (MMSmsProperties *self)
 /*****************************************************************************/
 
 /**
- * mm_sms_properties_set_validity:
+ * mm_sms_properties_set_validity_relative:
  * @self: A #MMSmsProperties.
- * @validity: The validity.
+ * @validity: The validity of %MM_SMS_VALIDITY_TYPE_RELATIVE type.
  *
- * Sets the validity time of the SMS.
+ * Sets the relative validity time of the SMS.
  */
 void
-mm_sms_properties_set_validity (MMSmsProperties *self,
-                                guint validity)
+mm_sms_properties_set_validity_relative (MMSmsProperties *self,
+                                         guint validity)
 {
     g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
 
-    self->priv->validity_set = TRUE;
-    self->priv->validity = validity;
+    self->priv->validity_type = MM_SMS_VALIDITY_TYPE_RELATIVE;
+    self->priv->validity_relative = validity;
 }
 
 /**
- * mm_sms_properties_get_validity:
+ * mm_sms_properties_get_validity_type:
  * @self: A #MMSmsProperties.
  *
- * Gets the validity time of the SMS.
+ * Gets the relative validity type the SMS.
+ *
+ * Returns: a #MMSmsValidityType.
+ */
+MMSmsValidityType
+mm_sms_properties_get_validity_type (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), 0);
+
+    return self->priv->validity_type;
+}
+
+/**
+ * mm_sms_properties_get_validity_relative:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the relative validity time of the SMS.
  *
  * Returns: the validity time or 0 if unknown.
  */
 guint
-mm_sms_properties_get_validity (MMSmsProperties *self)
+mm_sms_properties_get_validity_relative (MMSmsProperties *self)
 {
     g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), 0);
+    g_return_val_if_fail (self->priv->validity_type == MM_SMS_VALIDITY_TYPE_RELATIVE, 0);
 
-    return self->priv->validity;
+    return self->priv->validity_relative;
 }
 
 /*****************************************************************************/
@@ -411,11 +429,11 @@ mm_sms_properties_get_dictionary (MMSmsProperties *self)
                                PROPERTY_SMSC,
                                g_variant_new_string (self->priv->smsc));
 
-    if (self->priv->validity_set)
+    if (self->priv->validity_type == MM_SMS_VALIDITY_TYPE_RELATIVE)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_VALIDITY,
-                               g_variant_new_uint32 (self->priv->validity));
+                               g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (self->priv->validity_relative)));
 
     if (self->priv->class_set)
         g_variant_builder_add (&builder,
@@ -497,7 +515,7 @@ consume_string (MMSmsProperties *self,
             return FALSE;
         }
 
-        mm_sms_properties_set_validity (self, n);
+        mm_sms_properties_set_validity_relative (self, n);
     } else if (g_str_equal (key, PROPERTY_CLASS)) {
         GError *inner_error = NULL;
         guint n;
@@ -608,11 +626,20 @@ consume_variant (MMSmsProperties *properties,
         mm_sms_properties_set_smsc (
             properties,
             g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_VALIDITY))
-        mm_sms_properties_set_validity (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_CLASS))
+    else if (g_str_equal (key, PROPERTY_VALIDITY)) {
+        guint type;
+        GVariant *val;
+
+        g_variant_get (value, "(uv)", &type, &val);
+        if (type == MM_SMS_VALIDITY_TYPE_RELATIVE) {
+            mm_sms_properties_set_validity_relative (
+                properties,
+                g_variant_get_uint32 (val));
+        } else if (type != MM_SMS_VALIDITY_TYPE_UNKNOWN)
+            g_warning ("SMS validity type '%s' not supported yet", 
+                       mm_sms_validity_type_get_string (type));
+        g_variant_unref (val);
+    } else if (g_str_equal (key, PROPERTY_CLASS))
         mm_sms_properties_set_class (
             properties,
             g_variant_get_uint32 (value));
@@ -718,6 +745,7 @@ mm_sms_properties_init (MMSmsProperties *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_SMS_PROPERTIES,
                                               MMSmsPropertiesPrivate);
+    self->priv->validity_type = MM_SMS_VALIDITY_TYPE_UNKNOWN;
 }
 
 static void
