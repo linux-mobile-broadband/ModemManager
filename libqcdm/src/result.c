@@ -53,14 +53,11 @@ static void
 val_free (Val *v)
 {
     if (v->type == VAL_TYPE_STRING) {
-        if (v->u.s)
-            free (v->u.s);
+        free (v->u.s);
     } else if (v->type == VAL_TYPE_U8_ARRAY) {
-        if (v->u.u8_array);
-            free (v->u.u8_array);
+        free (v->u.u8_array);
     } else if (v->type == VAL_TYPE_U16_ARRAY) {
-        if (v->u.u16_array);
-            free (v->u.u16_array);
+        free (v->u.u16_array);
     }
     free (v->key);
     memset (v, 0, sizeof (*v));
