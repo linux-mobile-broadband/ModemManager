@@ -36,6 +36,7 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
+static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemZte, mm_broadband_modem_zte, MM_TYPE_BROADBAND_MODEM, 0,
@@ -464,6 +465,16 @@ load_access_technologies_finish (MMIfaceModem *self,
 {
     const gchar *response;
 
+    /* CDMA-only devices run parent access technology checks */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        return iface_modem_parent->load_access_technologies_finish (self,
+                                                                    res,
+                                                                    access_technologies,
+                                                                    mask,
+                                                                    error);
+    }
+
+    /* Otherwise process and handle +ZPAS response from 3GPP devices */
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
         return FALSE;
@@ -477,12 +488,19 @@ load_access_technologies_finish (MMIfaceModem *self,
     return TRUE;
 }
 
-
 static void
 load_access_technologies (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
+
+    /* CDMA modems don't support ZPAS and thus run parent's access technology
+     * loading. */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        iface_modem_parent->load_access_technologies (self, callback, user_data);
+        return;
+    }
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+ZPAS?",
                               3,
@@ -653,6 +671,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->modem_power_down = modem_power_down;
