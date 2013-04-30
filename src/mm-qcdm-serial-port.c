@@ -231,6 +231,7 @@ mm_qcdm_serial_port_new (const char *name)
                                               MM_PORT_DEVICE, name,
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
                                               MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
+                                              MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
                                               NULL));
 }
 
@@ -246,6 +247,7 @@ mm_qcdm_serial_port_new_fd (int fd)
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
                                               MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
                                               MM_SERIAL_PORT_FD, fd,
+                                              MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
                                               NULL));
     g_free (name);
     return port;
