@@ -5828,7 +5828,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         mm_sms_part_take_timestamp (part, timestamp);
         mm_sms_part_take_text (part, text);
         mm_sms_part_take_data (part, raw);
-        mm_sms_part_set_class (part, 0);
+        mm_sms_part_set_class (part, -1);
 
         mm_dbg ("Correctly parsed SMS list entry (%d)", idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),

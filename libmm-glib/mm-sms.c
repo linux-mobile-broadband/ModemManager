@@ -445,12 +445,12 @@ mm_sms_get_validity_relative (MMSms *self)
  *
  * Gets the 3GPP message class of the SMS.
  *
- * Returns: the message class.
+ * Returns: the message class, or -1 for invalid/unset class.
  */
-guint
+gint
 mm_sms_get_class (MMSms *self)
 {
-    g_return_val_if_fail (MM_IS_SMS (self), 0);
+    g_return_val_if_fail (MM_IS_SMS (self), -1);
 
     return mm_gdbus_sms_get_class (MM_GDBUS_SMS (self));
 }

@@ -51,8 +51,7 @@ struct _MMSmsPropertiesPrivate {
     gchar *smsc;
     MMSmsValidityType validity_type;
     guint validity_relative;
-    gboolean class_set;
-    guint class;
+    gint class;
     gboolean delivery_report_request_set;
     gboolean delivery_report_request;
 };
@@ -319,17 +318,16 @@ mm_sms_properties_get_validity_relative (MMSmsProperties *self)
 /**
  * mm_sms_properties_set_class:
  * @self: A #MMSmsProperties.
- * @class: The message class.
+ * @class: The message class, or -1 for invalid/unset class.
  *
  * Sets the 3GPP message class of the SMS.
  */
 void
 mm_sms_properties_set_class (MMSmsProperties *self,
-                             guint class)
+                             gint class)
 {
     g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
 
-    self->priv->class_set = TRUE;
     self->priv->class = class;
 }
 
@@ -339,12 +337,12 @@ mm_sms_properties_set_class (MMSmsProperties *self,
  *
  * Gets the 3GPP message class of the SMS.
  *
- * Returns: the message class.
+ * Returns: the message class, or -1 for invalid/unset class.
  */
-guint
+gint
 mm_sms_properties_get_class (MMSmsProperties *self)
 {
-    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), 0);
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), -1);
 
     return self->priv->class;
 }
@@ -435,11 +433,11 @@ mm_sms_properties_get_dictionary (MMSmsProperties *self)
                                PROPERTY_VALIDITY,
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (self->priv->validity_relative)));
 
-    if (self->priv->class_set)
+    if (self->priv->class >= 0)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_CLASS,
-                               g_variant_new_uint32 (self->priv->class));
+                               g_variant_new_int32 (self->priv->class));
 
     if (self->priv->delivery_report_request_set)
         g_variant_builder_add (&builder,
@@ -517,12 +515,14 @@ consume_string (MMSmsProperties *self,
 
         mm_sms_properties_set_validity_relative (self, n);
     } else if (g_str_equal (key, PROPERTY_CLASS)) {
-        GError *inner_error = NULL;
-        guint n;
+        gint n = 0;
 
-        n = parse_uint (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
+        if (!mm_get_int_from_str (value, &n)) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid properties string, cannot parse '%s' as int",
+                         value);
             return FALSE;
         }
 
@@ -642,7 +642,7 @@ consume_variant (MMSmsProperties *properties,
     } else if (g_str_equal (key, PROPERTY_CLASS))
         mm_sms_properties_set_class (
             properties,
-            g_variant_get_uint32 (value));
+            g_variant_get_int32 (value));
     else if (g_str_equal (key, PROPERTY_DELIVERY_REPORT_REQUEST))
         mm_sms_properties_set_delivery_report_request (
             properties,
@@ -746,6 +746,7 @@ mm_sms_properties_init (MMSmsProperties *self)
                                               MM_TYPE_SMS_PROPERTIES,
                                               MMSmsPropertiesPrivate);
     self->priv->validity_type = MM_SMS_VALIDITY_TYPE_UNKNOWN;
+    self->priv->class = -1;
 }
 
 static void

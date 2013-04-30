@@ -512,7 +512,7 @@ common_test_create_pdu (const gchar *smsc,
                         const gchar *number,
                         const gchar *text,
                         guint validity,
-                        guint class,
+                        gint  class,
                         const guint8 *expected,
                         gsize expected_size,
                         guint expected_msgstart)
@@ -537,7 +537,7 @@ common_test_create_pdu (const gchar *smsc,
     }
     if (validity > 0)
         mm_sms_part_set_validity_relative (part, validity);
-    if (class > 0)
+    if (class >= 0)
         mm_sms_part_set_class (part, class);
 
     pdu = mm_sms_part_get_submit_pdu (part,
@@ -576,7 +576,7 @@ test_create_pdu_ucs2_with_smsc (void)
                             number,
                             text,
                             5, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             8); /* expected_msgstart */
@@ -601,7 +601,7 @@ test_create_pdu_ucs2_no_smsc (void)
                             number,
                             text,
                             5, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             1); /* expected_msgstart */
@@ -626,7 +626,7 @@ test_create_pdu_gsm_with_smsc (void)
                             number,
                             text,
                             5, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             8); /* expected_msgstart */
@@ -650,7 +650,7 @@ test_create_pdu_gsm_no_smsc (void)
                             number,
                             text,
                             5, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             1); /* expected_msgstart */
@@ -678,7 +678,7 @@ test_create_pdu_gsm_3 (void)
                             number,
                             text,
                             5, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             1); /* expected_msgstart */
@@ -699,7 +699,7 @@ test_create_pdu_gsm_no_validity (void)
                             number,
                             text,
                             0, /* validity */
-                            0, /* class */
+                            -1, /* class */
                             expected,
                             sizeof (expected),
                             1); /* expected_msgstart */

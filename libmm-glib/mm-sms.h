@@ -89,7 +89,7 @@ gchar        *mm_sms_dup_discharge_timestamp     (MMSms *self);
 MMSmsValidityType mm_sms_get_validity_type       (MMSms *self);
 guint             mm_sms_get_validity_relative   (MMSms *self);
 
-guint         mm_sms_get_class                   (MMSms *self);
+gint          mm_sms_get_class                   (MMSms *self);
 
 guint         mm_sms_get_message_reference       (MMSms *self);
 

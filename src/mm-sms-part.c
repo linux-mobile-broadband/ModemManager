@@ -325,7 +325,7 @@ struct _MMSmsPart {
     gchar *text;
     MMSmsEncoding encoding;
     GByteArray *data;
-    guint class;
+    gint  class;
     guint validity_relative;
     gboolean delivery_report_request;
     guint message_reference;
@@ -403,8 +403,8 @@ PART_GET_FUNC (const gchar *, text)
 PART_SET_TAKE_STR_FUNC (text)
 PART_GET_FUNC (MMSmsEncoding, encoding)
 PART_SET_FUNC (MMSmsEncoding, encoding)
-PART_GET_FUNC (guint, class)
-PART_SET_FUNC (guint, class)
+PART_GET_FUNC (gint,  class)
+PART_SET_FUNC (gint,  class)
 PART_GET_FUNC (guint, validity_relative)
 PART_SET_FUNC (guint, validity_relative)
 PART_GET_FUNC (gboolean, delivery_report_request)
@@ -461,6 +461,7 @@ mm_sms_part_new (guint index,
     sms_part->pdu_type = pdu_type;
     sms_part->encoding = MM_SMS_ENCODING_UNKNOWN;
     sms_part->delivery_state = MM_SMS_DELIVERY_STATE_UNKNOWN;
+    sms_part->class = -1;
 
     return sms_part;
 }
@@ -917,12 +918,7 @@ mm_sms_part_encode_address (const gchar *address,
 /**
  * mm_sms_part_get_submit_pdu:
  *
- * @number: the subscriber number to send this message to
- * @text: the body of this SMS
- * @smsc: if given, the SMSC address
- * @validity: minutes until the SMS should expire in the SMSC, or 0 for a
- *  suitable default
- * @class: unused
+ * @part: the SMS message part
  * @out_pdulen: on success, the size of the returned PDU in bytes
  * @out_msgstart: on success, the byte index in the returned PDU where the
  *  message starts (ie, skipping the SMSC length byte and address, if present)
@@ -1022,6 +1018,12 @@ mm_sms_part_get_submit_pdu (MMSmsPart *part,
 
     /* ----------- TP-DCS (1 byte) ----------- */
     pdu[offset] = 0x00;
+
+    if (part->class >= 0 && part->class <= 3) {
+        mm_dbg ("  using class %d...", part->class);
+        pdu[offset] |= SMS_DCS_CLASS_VALID;
+        pdu[offset] |= part->class;
+    }
 
     if (part->encoding == MM_SMS_ENCODING_UCS2) {
         mm_dbg ("  using UCS2 encoding...");

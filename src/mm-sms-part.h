@@ -96,9 +96,9 @@ MMSmsEncoding     mm_sms_part_get_encoding           (MMSmsPart *part);
 void              mm_sms_part_set_encoding           (MMSmsPart *part,
                                                       MMSmsEncoding encoding);
 
-guint             mm_sms_part_get_class              (MMSmsPart *part);
+gint              mm_sms_part_get_class              (MMSmsPart *part);
 void              mm_sms_part_set_class              (MMSmsPart *part,
-                                                      guint class);
+                                                      gint class);
 
 guint             mm_sms_part_get_validity_relative  (MMSmsPart *part);
 void              mm_sms_part_set_validity_relative  (MMSmsPart *part,
