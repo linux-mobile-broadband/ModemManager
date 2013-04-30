@@ -1651,11 +1651,10 @@ normalize_ciev_cind_signal_quality (guint quality,
                                     guint min,
                                     guint max)
 {
-    if (!max &&
-        quality >= 0) {
+    if (!max) {
         /* If we didn't get a max, assume it was 5. Note that we do allow
          * 0, meaning no signal at all. */
-        return (quality * 20);
+        return (quality <= 5) ? (quality * 20) : 100;
     }
 
     if (quality >= min &&
