@@ -1508,7 +1508,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                            user_data);
 
     /* If no specific CID was used, disable all PDP contexts */
-    ctx->cgact_command = (cid >= 0 ?
+    ctx->cgact_command = (cid > 0 ?
                           g_strdup_printf ("+CGACT=0,%d", cid) :
                           g_strdup_printf ("+CGACT=0"));
 
