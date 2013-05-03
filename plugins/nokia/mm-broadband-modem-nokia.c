@@ -29,12 +29,16 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
+#include "mm-iface-modem-3gpp.h"
+#include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-nokia.h"
 #include "mm-sim-nokia.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+
+static MMIfaceModem *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNokia, mm_broadband_modem_nokia, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -100,6 +104,122 @@ modem_load_supported_modes (MMIfaceModem *self,
                                                NULL);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+typedef struct {
+    MMModemAccessTechnology act;
+    guint mask;
+} AccessTechInfo;
+
+static void
+access_tech_set_result (GSimpleAsyncResult *simple,
+                        MMModemAccessTechnology act,
+                        guint mask)
+{
+    AccessTechInfo *info;
+
+    info = g_new (AccessTechInfo, 1);
+    info->act = act;
+    info->mask = mask;
+
+    g_simple_async_result_set_op_res_gpointer (simple, info, g_free);
+}
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    AccessTechInfo *info;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    info = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_assert (info);
+    *access_technologies = info->act;
+    *mask = info->mask;
+    return TRUE;
+}
+
+static void
+parent_load_access_technologies_ready (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+   MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+   guint mask = 0;
+   GError *error = NULL;
+
+    if (!iface_modem_parent->load_access_technologies_finish (self, res, &act, &mask, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        access_tech_set_result (simple, act, MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+access_tech_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    const gchar *response, *p;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    if (!response) {
+        /* Chain up to parent */
+        iface_modem_parent->load_access_technologies (
+                                    MM_IFACE_MODEM (self),
+                                    (GAsyncReadyCallback)parent_load_access_technologies_ready,
+                                    simple);
+        return;
+    }
+
+    p = mm_strip_tag (response, "*CNTI:");
+    p = strchr (p, ',');
+    if (p)
+        act = mm_string_to_access_tech (p + 1);
+
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+        g_simple_async_result_set_error (
+            simple,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Couldn't parse access technologies result: '%s'",
+            response);
+    else
+        access_tech_set_result (simple, act, MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_access_technologies);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "*CNTI=0",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)access_tech_ready,
+                              result);
 }
 
 /*****************************************************************************/
@@ -265,6 +385,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     /* Create Nokia-specific SIM*/
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
@@ -287,6 +409,8 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
