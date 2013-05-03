@@ -203,6 +203,8 @@ static const gchar *primary_init_sequence[] = {
     /* When initializing a Nokia port, first enable the echo,
      * and then disable it, so that we get it properly disabled. */
     "E1 E0",
+    /* The N900 ignores the E0 when it's on the same line as the E1, so try again */
+    "E0",
     /* Get word responses */
     "V1",
     /* Extended numeric codes */
