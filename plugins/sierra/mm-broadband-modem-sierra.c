@@ -566,9 +566,7 @@ selrat_query_ready (MMBaseModem *self,
     if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &error)) {
         guint mode;
 
-        if (mm_get_uint_from_match_info (match_info, 1, &mode) &&
-            mode >= 0 &&
-            mode <= 7) {
+        if (mm_get_uint_from_match_info (match_info, 1, &mode) && mode <= 7) {
             switch (mode) {
             case 0:
                 result.allowed = MM_MODEM_MODE_ANY;
