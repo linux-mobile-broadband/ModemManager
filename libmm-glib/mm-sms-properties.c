@@ -318,7 +318,7 @@ mm_sms_properties_get_validity_relative (MMSmsProperties *self)
 /**
  * mm_sms_properties_set_class:
  * @self: A #MMSmsProperties.
- * @class: The message class, or -1 for invalid/unset class.
+ * @class: The message class (0..3), or -1 for invalid/unset class.
  *
  * Sets the 3GPP message class of the SMS.
  */
@@ -327,6 +327,7 @@ mm_sms_properties_set_class (MMSmsProperties *self,
                              gint class)
 {
     g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+    g_return_if_fail (class >= -1 && class <= 3);
 
     self->priv->class = class;
 }
