@@ -29,7 +29,6 @@
 #include "mm-log.h"
 
 #define REGISTRATION_CHECK_TIMEOUT_SEC 30
-#define DEFERRED_REGISTRATION_STATE_UPDATE_TIMEOUT_SEC 15
 
 #define SUBSYSTEM_3GPP "3gpp"
 
@@ -74,8 +73,6 @@ typedef struct {
     MMModem3gppRegistrationState cs;
     MMModem3gppRegistrationState ps;
     MMModem3gppRegistrationState eps;
-    MMModem3gppRegistrationState deferred_new_state;
-    guint deferred_update_id;
     gboolean manual_registration;
     GCancellable *pending_registration_cancellable;
     gboolean reloading_operator;
@@ -87,9 +84,6 @@ registration_state_context_free (RegistrationStateContext *ctx)
     if (ctx->pending_registration_cancellable) {
         g_cancellable_cancel (ctx->pending_registration_cancellable);
         g_object_unref (ctx->pending_registration_cancellable);
-    }
-    if (ctx->deferred_update_id) {
-        g_source_remove (ctx->deferred_update_id);
     }
     g_slice_free (RegistrationStateContext, ctx);
 }
@@ -110,7 +104,6 @@ get_registration_state_context (MMIfaceModem3gpp *self)
         ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
         ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
         ctx->eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-        ctx->deferred_new_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
         g_object_set_qdata_full (
             G_OBJECT (self),
@@ -1067,35 +1060,6 @@ update_non_registered_state (MMIfaceModem3gpp *self,
         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 }
 
-static gboolean
-run_deferred_registration_state_update (MMIfaceModem3gpp *self)
-{
-    MMModem3gppRegistrationState old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    MMModem3gppRegistrationState new_state;
-    RegistrationStateContext *ctx;
-
-    ctx = get_registration_state_context (self);
-    ctx->deferred_update_id = 0;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
-                  NULL);
-    new_state = ctx->deferred_new_state;
-
-    /* Only set new state if different */
-    if (new_state == old_state)
-        return FALSE;
-
-    mm_info ("Modem %s: (deferred) 3GPP Registration state changed (%s -> %s)",
-             g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
-             mm_modem_3gpp_registration_state_get_string (old_state),
-             mm_modem_3gpp_registration_state_get_string (new_state));
-
-    update_non_registered_state (self, old_state, new_state);
-
-    return FALSE;
-}
-
 static void
 update_registration_state (MMIfaceModem3gpp *self,
                            MMModem3gppRegistrationState new_state,
@@ -1110,28 +1074,6 @@ update_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     g_assert (ctx);
-
-    if (ctx->deferred_update_id != 0) {
-        /* If there is already a deferred 'registration loss' state update and the new update
-         * is not a registered state, update the deferred state update without extending the
-         * timeout. */
-        if (deferrable &&
-            new_state != MM_MODEM_3GPP_REGISTRATION_STATE_HOME &&
-            new_state != MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-            mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s), update deferred",
-                     g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
-                     mm_modem_3gpp_registration_state_get_string (old_state),
-                     mm_modem_3gpp_registration_state_get_string (new_state));
-
-            ctx->deferred_new_state = new_state;
-            return;
-        }
-
-        /* Otherwise, cancel any deferred registration state update */
-        g_source_remove (ctx->deferred_update_id);
-        ctx->deferred_update_id = 0;
-        ctx->deferred_new_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    }
 
     /* Only set new state if different */
     if (new_state == old_state)
@@ -1154,24 +1096,6 @@ update_registration_state (MMIfaceModem3gpp *self,
             self,
             (GAsyncReadyCallback)update_registration_reload_current_operator_ready,
             GUINT_TO_POINTER (new_state));
-        return;
-    }
-
-    if (deferrable &&
-        (old_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-         old_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) &&
-        (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
-         new_state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)) {
-        mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s), update deferred",
-                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
-                 mm_modem_3gpp_registration_state_get_string (old_state),
-                 mm_modem_3gpp_registration_state_get_string (new_state));
-
-        ctx->deferred_new_state = new_state;
-        ctx->deferred_update_id = g_timeout_add_seconds (
-            DEFERRED_REGISTRATION_STATE_UPDATE_TIMEOUT_SEC,
-            (GSourceFunc)run_deferred_registration_state_update,
-            self);
         return;
     }
 
@@ -1333,18 +1257,6 @@ periodic_registration_check_enable (MMIfaceModem3gpp *self)
                              (GDestroyNotify)registration_check_context_free);
 }
 
-static void
-clear_deferred_registration_state_update (MMIfaceModem3gpp *self)
-{
-    RegistrationStateContext *ctx = get_registration_state_context (self);
-
-    ctx->deferred_new_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    if (ctx->deferred_update_id) {
-        g_source_remove (ctx->deferred_update_id);
-        ctx->deferred_update_id = 0;
-    }
-}
-
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
@@ -1355,7 +1267,6 @@ typedef enum {
     DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     DISABLING_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION_EVENTS,
-    DISABLING_STEP_CLEANUP_DEFERRED_REGISTRATION_UPDATE,
     DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
     DISABLING_STEP_REGISTRATION_STATE,
@@ -1466,12 +1377,6 @@ interface_disabling_step (DisablingContext *ctx)
                 ctx);
             return;
         }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case DISABLING_STEP_CLEANUP_DEFERRED_REGISTRATION_UPDATE:
-        /* Prevent any deferred registration state update from happening after the modem is disabled */
-        clear_deferred_registration_state_update (ctx->self);
         /* Fall down to next step */
         ctx->step++;
 
