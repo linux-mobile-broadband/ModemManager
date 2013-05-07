@@ -75,8 +75,7 @@ mm_plugin_create (void)
                                        0x413c, /* Dell */
                                        0 };
     static const mm_uint16_pair forbidden_products[] = { { 0x1410, 0x9010 }, /* Novatel E362 */
-                                                         { 0x1410, 0xb001 }, /* Novatel USB551L */
-                                                         {0, 0} };
+                                                         { 0, 0 } };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOVATEL,
