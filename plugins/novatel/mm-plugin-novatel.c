@@ -77,13 +77,11 @@ mm_plugin_create (void)
     static const mm_uint16_pair forbidden_products[] = { { 0x1410, 0x9010 }, /* Novatel E362 */
                                                          { 0x1410, 0xb001 }, /* Novatel USB551L */
                                                          {0, 0} };
-    static const gchar *drivers[] = { "option1", "option", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOVATEL,
                       MM_PLUGIN_NAME,                  "Novatel",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,    subsystems,
-                      MM_PLUGIN_ALLOWED_DRIVERS,       drivers,
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,    vendors,
                       MM_PLUGIN_FORBIDDEN_PRODUCT_IDS, forbidden_products,
                       MM_PLUGIN_ALLOWED_AT,            TRUE,
