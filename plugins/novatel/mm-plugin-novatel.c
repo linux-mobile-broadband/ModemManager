@@ -29,6 +29,10 @@
 #include "mm-broadband-modem-novatel.h"
 #include "mm-log.h"
 
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
+#endif
+
 G_DEFINE_TYPE (MMPluginNovatel, mm_plugin_novatel, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -58,6 +62,17 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+#if defined WITH_QMI
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_dbg ("QMI-powered Novatel modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+#endif
+
     return MM_BASE_MODEM (mm_broadband_modem_novatel_new (sysfs_path,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -70,7 +85,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const guint16 vendors[] = { 0x1410, /* Novatel */
                                        0x413c, /* Dell */
                                        0 };
@@ -86,6 +101,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_AT,            TRUE,
                       MM_PLUGIN_CUSTOM_AT_PROBE,       custom_at_probe,
                       MM_PLUGIN_ALLOWED_QCDM,          TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,           TRUE,
                       NULL));
 }
 
