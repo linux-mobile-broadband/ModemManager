@@ -85,6 +85,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *simst_regex;
     GRegex *srvst_regex;
     GRegex *stin_regex;
+    GRegex *hcsq_regex;
 
     NdisdupSupport ndisdup_support;
 };
@@ -2168,6 +2169,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             ports[i],
             self->priv->stin_regex,
             NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->hcsq_regex,
+            NULL, NULL, NULL);
     }
 }
 
@@ -2223,7 +2228,6 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
      */
     self->priv->mode_regex = g_regex_new ("\\r\\n\\^MODE:\\s*(\\d*),?(\\d*)\\r+\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-
     self->priv->dsflowrpt_regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n",
                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->boot_regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n",
@@ -2235,6 +2239,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->srvst_regex = g_regex_new ("\\r\\n\\^SRVST:.+\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->stin_regex = g_regex_new ("\\r\\n\\^STIN:.+\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->hcsq_regex = g_regex_new ("\\r\\n\\^HCSQ:.+\\r+\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
@@ -2255,6 +2261,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->simst_regex);
     g_regex_unref (self->priv->srvst_regex);
     g_regex_unref (self->priv->stin_regex);
+    g_regex_unref (self->priv->hcsq_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
 }
