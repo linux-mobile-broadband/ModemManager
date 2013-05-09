@@ -40,6 +40,8 @@
 /* We require up to 20s to get a proper IP when using PPP */
 #define MM_BEARER_IP_TIMEOUT_DEFAULT 20
 
+#define MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT 15
+
 G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
 
 
@@ -83,12 +85,14 @@ struct _MMBearerPrivate {
     gulong disconnect_signal_handler;
 
     /*-- 3GPP specific --*/
+    guint deferred_3gpp_unregistration_id;
     /* Reason if 3GPP connection is forbidden */
     ConnectionForbiddenReason reason_3gpp;
     /* Handler ID for the registration state change signals */
     guint id_3gpp_registration_change;
 
     /*-- CDMA specific --*/
+    guint deferred_cdma_unregistration_id;
     /* Reason if CDMA connection is forbidden */
     ConnectionForbiddenReason reason_cdma;
     /* Handler IDs for the registration state change signals */
@@ -176,6 +180,31 @@ bearer_update_status_connected (MMBearer *self,
 /*****************************************************************************/
 
 static void
+reset_deferred_unregistration (MMBearer *self)
+{
+    if (self->priv->deferred_cdma_unregistration_id) {
+        g_source_remove (self->priv->deferred_cdma_unregistration_id);
+        self->priv->deferred_cdma_unregistration_id = 0;
+    }
+
+    if (self->priv->deferred_3gpp_unregistration_id) {
+        g_source_remove (self->priv->deferred_3gpp_unregistration_id);
+        self->priv->deferred_3gpp_unregistration_id = 0;
+    }
+}
+
+static gboolean
+deferred_3gpp_unregistration_cb (MMBearer *self)
+{
+    g_warn_if_fail (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
+    self->priv->deferred_3gpp_unregistration_id = 0;
+
+    mm_dbg ("Forcing bearer disconnection, not registered in 3GPP network");
+    mm_bearer_disconnect_force (MM_BEARER (self));
+    return FALSE;
+}
+
+static void
 modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
                                        GParamSpec *pspec,
                                        MMBearer *self)
@@ -204,29 +233,57 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         break;
     }
 
-    /* close connection if some reason found */
-
-    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE)
+    /* If no reason to disconnect, or if it's a mixed CDMA+LTE modem without a CDMA reason,
+     * just don't do anything. */
+    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE ||
+        (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) &&
+         self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE)) {
+        reset_deferred_unregistration (self);
         return;
-
-    /* For mixed CDMA+LTE modems, don't close the connection if there is no
-     * CDMA reason to do so. */
-    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) &&
-        self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE)
-        return;
-
-    switch (self->priv->reason_3gpp) {
-    case CONNECTION_FORBIDDEN_REASON_UNREGISTERED:
-        mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
-        break;
-    case CONNECTION_FORBIDDEN_REASON_ROAMING:
-        mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
-        break;
-    default:
-        break;
     }
 
+    /* Modem is roaming and roaming not allowed, report right away */
+    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
+        mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
+        reset_deferred_unregistration (self);
+        mm_bearer_disconnect_force (MM_BEARER (self));
+        return;
+    }
+
+    /* Modem reports being unregistered */
+    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_UNREGISTERED) {
+        /* If there is already a notification pending, just return */
+        if (self->priv->deferred_3gpp_unregistration_id)
+            return;
+
+        /* If the bearer is not connected, report right away */
+        if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
+            mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
+            mm_bearer_disconnect_force (MM_BEARER (self));
+            return;
+        }
+
+        /* Otherwise, setup the new timeout */
+        mm_dbg ("Connected bearer not registered in 3GPP network");
+        self->priv->deferred_3gpp_unregistration_id =
+            g_timeout_add_seconds (MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
+                                   (GSourceFunc) deferred_3gpp_unregistration_cb,
+                                   self);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static gboolean
+deferred_cdma_unregistration_cb (MMBearer *self)
+{
+    g_warn_if_fail (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
+    self->priv->deferred_cdma_unregistration_id = 0;
+
+    mm_dbg ("Forcing bearer disconnection, not registered in CDMA network");
     mm_bearer_disconnect_force (MM_BEARER (self));
+    return FALSE;
 }
 
 static void
@@ -255,29 +312,46 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
         self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
     }
 
-    /* close connection if some reason found */
-
-    if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE)
+    /* If no reason to disconnect, or if it's a mixed CDMA+LTE modem without a 3GPP reason,
+     * just don't do anything. */
+    if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_NONE ||
+        (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) &&
+         self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE)) {
+        reset_deferred_unregistration (self);
         return;
-
-    /* For mixed CDMA+LTE modems, don't close the connection if there is no
-     * 3GPP reason to do so. */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) &&
-        self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_NONE)
-        return;
-
-    switch (self->priv->reason_cdma) {
-    case CONNECTION_FORBIDDEN_REASON_UNREGISTERED:
-        mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
-        break;
-    case CONNECTION_FORBIDDEN_REASON_ROAMING:
-        mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
-        break;
-    default:
-        break;
     }
 
-    mm_bearer_disconnect_force (MM_BEARER (self));
+    /* Modem is roaming and roaming not allowed, report right away */
+    if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_ROAMING) {
+        mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
+        reset_deferred_unregistration (self);
+        mm_bearer_disconnect_force (MM_BEARER (self));
+        return;
+    }
+
+    /* Modem reports being unregistered */
+    if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_UNREGISTERED) {
+        /* If there is already a notification pending, just return */
+        if (self->priv->deferred_cdma_unregistration_id)
+            return;
+
+        /* If the bearer is not connected, report right away */
+        if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
+            mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
+            mm_bearer_disconnect_force (MM_BEARER (self));
+            return;
+        }
+
+        /* Otherwise, setup the new timeout */
+        mm_dbg ("Connected bearer not registered in CDMA network");
+        self->priv->deferred_cdma_unregistration_id =
+            g_timeout_add_seconds (MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
+                                   (GSourceFunc) deferred_cdma_unregistration_cb,
+                                   self);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -1065,6 +1139,7 @@ dispose (GObject *object)
     }
 
     reset_signal_handlers (self);
+    reset_deferred_unregistration (self);
 
     g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->config);
