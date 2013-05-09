@@ -89,6 +89,9 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ndisstat_regex;
 
     NdisdupSupport ndisdup_support;
+
+    gboolean sysinfoex_supported;
+    gboolean sysinfoex_support_checked;
 };
 
 /*****************************************************************************/
@@ -109,6 +112,19 @@ sysinfo_parse (const char *reply,
     GMatchInfo *match_info = NULL;
     GError *match_error = NULL;
 
+    g_assert (out_srv_status != NULL);
+    g_assert (out_srv_domain != NULL);
+    g_assert (out_roam_status != NULL);
+    g_assert (out_sys_mode != NULL);
+    g_assert (out_sim_state != NULL);
+    g_assert (out_sys_submode_valid != NULL);
+    g_assert (out_sys_submode != NULL);
+
+    /* Format:
+     *
+     * ^SYSINFO: <srv_status>,<srv_domain>,<roam_status>,<sys_mode>,<sim_state>[,<reserved>,<sys_submode>]
+     */
+
     /* Can't just use \d here since sometimes you get "^SYSINFO:2,1,0,3,1,,3" */
     r = g_regex_new ("\\^SYSINFO:\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),?(\\d*),?(\\d*)$", 0, 0, NULL);
     g_assert (r != NULL);
@@ -125,23 +141,16 @@ sysinfo_parse (const char *reply,
                                  "Couldn't match ^SYSINFO reply");
         }
     } else {
-        if (out_srv_status)
-            mm_get_uint_from_match_info (match_info, 1, out_srv_status);
-        if (out_srv_domain)
-            mm_get_uint_from_match_info (match_info, 2, out_srv_domain);
-        if (out_roam_status)
-            mm_get_uint_from_match_info (match_info, 3, out_roam_status);
-        if (out_sys_mode)
-            mm_get_uint_from_match_info (match_info, 4, out_sys_mode);
-        if (out_sim_state)
-            mm_get_uint_from_match_info (match_info, 5, out_sim_state);
+        mm_get_uint_from_match_info (match_info, 1, out_srv_status);
+        mm_get_uint_from_match_info (match_info, 2, out_srv_domain);
+        mm_get_uint_from_match_info (match_info, 3, out_roam_status);
+        mm_get_uint_from_match_info (match_info, 4, out_sys_mode);
+        mm_get_uint_from_match_info (match_info, 5, out_sim_state);
 
         /* Remember that g_match_info_get_match_count() includes match #0 */
         if (g_match_info_get_match_count (match_info) >= 8) {
-            if (out_sys_submode_valid) {
-                *out_sys_submode_valid = TRUE;
-                mm_get_uint_from_match_info (match_info, 7, out_sys_submode);
-            }
+            *out_sys_submode_valid = TRUE;
+            mm_get_uint_from_match_info (match_info, 7, out_sys_submode);
         }
     }
 
@@ -151,14 +160,267 @@ sysinfo_parse (const char *reply,
     return matched;
 }
 
+static gboolean
+sysinfoex_parse (const char *reply,
+                 guint *out_srv_status,
+                 guint *out_srv_domain,
+                 guint *out_roam_status,
+                 guint *out_sim_state,
+                 guint *out_sys_mode,
+                 guint *out_sys_submode,
+                 GError **error)
+{
+    gboolean matched;
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+
+    g_assert (out_srv_status != NULL);
+    g_assert (out_srv_domain != NULL);
+    g_assert (out_roam_status != NULL);
+    g_assert (out_sim_state != NULL);
+    g_assert (out_sys_mode != NULL);
+    g_assert (out_sys_submode != NULL);
+
+    /* Format:
+     *
+     * ^SYSINFOEX: <srv_status>,<srv_domain>,<roam_status>,<sim_state>,<reserved>,<sysmode>,<sysmode_name>,<submode>,<submode_name>
+     */
+
+    /* ^SYSINFOEX:2,3,0,1,,3,"WCDMA",41,"HSPA+" */
+
+    r = g_regex_new ("\\^SYSINFOEX:\\s*(\\d+),(\\d+),(\\d+),(\\d+),?(\\d*),(\\d+),\"(.*)\",(\\d+),\"(.*)\"$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    matched = g_regex_match_full (r, reply, -1, 0, 0, &match_info, &match_error);
+    if (!matched) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse ^SYSINFOEX results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match ^SYSINFOEX reply");
+        }
+    } else {
+        mm_get_uint_from_match_info (match_info, 1, out_srv_status);
+        mm_get_uint_from_match_info (match_info, 2, out_srv_domain);
+        mm_get_uint_from_match_info (match_info, 3, out_roam_status);
+        mm_get_uint_from_match_info (match_info, 4, out_sim_state);
+
+        /* We just ignore the sysmode and submode name strings */
+        mm_get_uint_from_match_info (match_info, 6, out_sys_mode);
+        mm_get_uint_from_match_info (match_info, 8, out_sys_submode);
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+    return matched;
+}
+
+typedef struct {
+    gboolean extended;
+    guint srv_status;
+    guint srv_domain;
+    guint roam_status;
+    guint sim_state;
+    guint sys_mode;
+    gboolean sys_submode_valid;
+    guint sys_submode;
+} SysinfoResult;
+
+static gboolean
+sysinfo_finish (MMBroadbandModemHuawei *self,
+                GAsyncResult *res,
+                gboolean *extended,
+                guint *srv_status,
+                guint *srv_domain,
+                guint *roam_status,
+                guint *sim_state,
+                guint *sys_mode,
+                gboolean *sys_submode_valid,
+                guint *sys_submode,
+                GError **error)
+{
+    SysinfoResult *result;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    result = (SysinfoResult *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    if (extended)
+        *extended = result->extended;
+    if (srv_status)
+        *srv_status = result->srv_status;
+    if (srv_domain)
+        *srv_domain = result->srv_domain;
+    if (roam_status)
+        *roam_status = result->roam_status;
+    if (sim_state)
+        *sim_state = result->sim_state;
+    if (sys_mode)
+        *sys_mode = result->sys_mode;
+    if (sys_submode_valid)
+        *sys_submode_valid = result->sys_submode_valid;
+    if (sys_submode)
+        *sys_submode = result->sys_submode;
+
+    return TRUE;
+}
+
+static void
+run_sysinfo_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *response;
+    SysinfoResult *result;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        mm_dbg ("^SYSINFO failed: %s", error->message);
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    result = g_new0 (SysinfoResult, 1);
+    result->extended = FALSE;
+    if (!sysinfo_parse (response,
+                          &result->srv_status,
+                          &result->srv_domain,
+                          &result->roam_status,
+                          &result->sys_mode,
+                          &result->sim_state,
+                          &result->sys_submode_valid,
+                          &result->sys_submode,
+                          &error)) {
+        mm_dbg ("^SYSINFO parsing failed: %s", error->message);
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        g_free (result);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (simple, result, g_free);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+run_sysinfo (MMBroadbandModemHuawei *self,
+             GSimpleAsyncResult *result)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSINFO",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)run_sysinfo_ready,
+                              result);
+}
+
+static void
+run_sysinfoex_ready (MMBaseModem *_self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GError *error = NULL;
+    const gchar *response;
+    SysinfoResult *result;
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
+    if (!response) {
+        /* First time we try, we fallback to ^SYSINFO */
+        if (!self->priv->sysinfoex_support_checked) {
+            self->priv->sysinfoex_support_checked = TRUE;
+            self->priv->sysinfoex_supported = FALSE;
+            mm_dbg ("^SYSINFOEX failed: %s, assuming unsupported", error->message);
+            g_error_free (error);
+            run_sysinfo (self, simple);
+            return;
+        }
+
+        /* Otherwise, propagate error */
+        mm_dbg ("^SYSINFOEX failed: %s", error->message);
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    self->priv->sysinfoex_supported = TRUE;
+    if (!self->priv->sysinfoex_support_checked)
+        self->priv->sysinfoex_support_checked = TRUE;
+
+    result = g_new0 (SysinfoResult, 1);
+    result->extended = TRUE;
+    if (!sysinfoex_parse (response,
+                          &result->srv_status,
+                          &result->srv_domain,
+                          &result->roam_status,
+                          &result->sim_state,
+                          &result->sys_mode,
+                          &result->sys_submode,
+                          &error)) {
+        mm_dbg ("^SYSINFOEX parsing failed: %s", error->message);
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        g_free (result);
+        return;
+    }
+
+    /* Submode from SYSINFOEX always valid */
+    result->sys_submode_valid = TRUE;
+    g_simple_async_result_set_op_res_gpointer (simple, result, g_free);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+run_sysinfoex (MMBroadbandModemHuawei *self,
+               GSimpleAsyncResult *result)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSINFOEX",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)run_sysinfoex_ready,
+                              result);
+}
+
+static void
+sysinfo (MMBroadbandModemHuawei *self,
+         GAsyncReadyCallback callback,
+         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        sysinfo);
+    if (!self->priv->sysinfoex_support_checked || self->priv->sysinfoex_supported)
+        run_sysinfoex (self, result);
+    else
+        run_sysinfo (self, result);
+}
+
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static MMModemAccessTechnology
-huawei_sysinfo_submode_to_act (gint huawei)
+huawei_sysinfo_submode_to_act (guint submode)
 {
     /* new more detailed system mode/access technology */
-    switch (huawei) {
+    switch (submode) {
     case 1:
         return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
     case 2:
@@ -173,9 +435,9 @@ huawei_sysinfo_submode_to_act (gint huawei)
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 7:
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    case 8: /* TD-SCDMA */
+        break;
     case 9:  /* HSPA+ */
-    case 17: /* HSPA+ (64QAM) */
-    case 18: /* HSPA+ (MIMO) */
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
     case 10:
         return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
@@ -184,10 +446,13 @@ huawei_sysinfo_submode_to_act (gint huawei)
     case 12:
         return MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
     case 13:  /* 1xRTT */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
     case 16:  /* 3xRTT */
         return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
-    case 8:
-        /* TD-SCDMA */
+    case 17: /* HSPA+ (64QAM) */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    case 18: /* HSPA+ (MIMO) */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
     default:
         break;
     }
@@ -196,22 +461,113 @@ huawei_sysinfo_submode_to_act (gint huawei)
 }
 
 static MMModemAccessTechnology
-huawei_sysinfo_sysmode_to_act (gint huawei)
+huawei_sysinfo_mode_to_act (guint mode)
 {
     /* Older, less detailed system mode/access technology */
-    switch (huawei) {
+    switch (mode) {
+    case 1:  /* AMPS */
+        break;
     case 2:  /* CDMA */
         return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
     case 3:  /* GSM/GPRS */
         return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
     case 4:  /* HDR */
-    case 8:  /* CDMA/HDR hybrid */
         return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
     case 5:  /* WCDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 6:  /* GPS */
+        break;
     case 7:  /* GSM/WCDMA */
         return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    case 15:
-        /* TD-SCDMA */
+    case 8:  /* CDMA/HDR hybrid */
+        return (MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 | MM_MODEM_ACCESS_TECHNOLOGY_1XRTT);
+    case 15: /* TD-SCDMA */
+        break;
+    default:
+        break;
+    }
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static MMModemAccessTechnology
+huawei_sysinfoex_submode_to_act (guint submode)
+{
+    switch (submode) {
+    case 1: /* GSM */
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    case 2: /* GPRS */
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    case 3: /* EDGE */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+
+    case 21: /* IS95A */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 22: /* IS95B */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 23: /* CDMA2000 1x */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 24: /* EVDO rel0 */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case 25: /* EVDO relA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    case 26: /* EVDO relB */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+    case 27: /* Hybrid CDMA2000 1x */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 28: /* Hybrid EVDO rel0 */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    case 29: /* Hybrid EVDO relA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    case 30: /* Hybrid EVDO relB */
+        return MM_MODEM_ACCESS_TECHNOLOGY_EVDOB;
+
+    case 41: /* WCDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 42: /* HSDPA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    case 43: /* HSUPA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    case 44: /* HSPA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    case 45: /* HSPA+ */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    case 46: /* DC-HSPA+ */
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+
+    case 61: /* TD-SCDMA */
+        break;
+
+    case 81: /* 802.16e (WiMAX) */
+        break;
+
+    case 101: /* LTE */
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+
+    default:
+        break;
+    }
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static MMModemAccessTechnology
+huawei_sysinfoex_mode_to_act (guint mode)
+{
+    /* Older, less detailed system mode/access technology */
+    switch (mode) {
+    case 1:  /* GSM */
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    case 2:  /* CDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    case 3: /* WCDMA */
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 4: /* TD-SCDMA */
+        break;
+    case 5: /* WIMAX */
+        break;
+    case 6:  /* LTE */
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     default:
         break;
     }
@@ -226,28 +582,38 @@ load_access_technologies_finish (MMIfaceModem *self,
                                  guint *mask,
                                  GError **error)
 {
+    gchar *str;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    const gchar *result;
-    char *str;
-    guint srv_stat = 0;
-    gboolean submode_valid = FALSE;
-    guint submode = 0;
-    guint sysmode = 0;
+    gboolean extended = FALSE;
+    guint srv_status = 0;
+    gboolean sys_submode_valid = FALSE;
+    guint sys_submode = 0;
+    guint sys_mode = 0;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!result)
+    if (!sysinfo_finish (MM_BROADBAND_MODEM_HUAWEI (self),
+                         res,
+                         &extended,
+                         &srv_status,
+                         NULL, /* srv_domain */
+                         NULL, /* roam_status */
+                         NULL, /* sim_state */
+                         &sys_mode,
+                         &sys_submode_valid,
+                         &sys_submode,
+                         error))
         return FALSE;
 
-    if (!sysinfo_parse (result, &srv_stat, NULL, NULL, &sysmode, NULL, &submode_valid, &submode, error))
-        return FALSE;
-
-    if (srv_stat != 0) {
+    if (srv_status != 0) {
         /* Valid service */
-        if (submode_valid)
-            act = huawei_sysinfo_submode_to_act (submode);
+        if (sys_submode_valid)
+            act = (extended ?
+                   huawei_sysinfoex_submode_to_act (sys_submode) :
+                   huawei_sysinfo_submode_to_act (sys_submode));
 
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
-            act = huawei_sysinfo_sysmode_to_act (sysmode);
+            act = (extended ?
+                   huawei_sysinfoex_mode_to_act (sys_mode) :
+                   huawei_sysinfo_mode_to_act (sys_mode));
     }
 
     str = mm_modem_access_technology_build_string_from_mask (act);
@@ -265,12 +631,7 @@ load_access_technologies (MMIfaceModem *self,
                           gpointer user_data)
 {
     mm_dbg ("loading access technology (huawei)...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^SYSINFO",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
+    sysinfo (MM_BROADBAND_MODEM_HUAWEI (self), callback, user_data);
 }
 
 /*****************************************************************************/
@@ -1928,55 +2289,65 @@ get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-sysinfo_ready (MMIfaceModemCdma *self,
-               GAsyncResult *res,
-               DetailedRegistrationStateContext *ctx)
+registration_state_sysinfo_ready (MMBroadbandModemHuawei *self,
+                                  GAsyncResult *res,
+                                  DetailedRegistrationStateContext *ctx)
 {
-    GError *error = NULL;
-    const gchar *response;
-    guint srv_stat = 0;
-    guint sysmode = 0;
-    guint roaming = 0;
+    gboolean extended = FALSE;
+    guint srv_status = 0;
+    guint sys_mode = 0;
+    guint roam_status = 0;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-
-    /* If error, leave superclass' reg state alone if AT^SYSINFO isn't supported. */
-    if (error) {
-        g_error_free (error);
-
-        /* NOTE: always complete NOT in idle here */
+    if (!sysinfo_finish (self,
+                         res,
+                         &extended,
+                         &srv_status,
+                         NULL, /* srv_domain */
+                         &roam_status,
+                         NULL, /* sim_state */
+                         &sys_mode,
+                         NULL, /* sys_submode_valid */
+                         NULL, /* sys_submode */
+                         NULL)) {
+        /* If error, leave superclass' reg state alone if ^SYSINFO isn't supported.
+         * NOTE: always complete NOT in idle here */
         g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
         detailed_registration_state_context_complete_and_free (ctx);
         return;
     }
 
-    if (!sysinfo_parse (response, &srv_stat, NULL, &roaming, &sysmode, NULL, NULL, NULL, NULL)) {
-        /* NOTE: always complete NOT in idle here */
-        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
-        detailed_registration_state_context_complete_and_free (ctx);
-        return;
-    }
-
-    if (srv_stat == 2) {
+    if (srv_status == 2) {
         MMModemCdmaRegistrationState reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+        MMModemAccessTechnology act;
+        gboolean cdma1x = FALSE;
+        gboolean evdo = FALSE;
 
         /* Service available, check roaming state */
-        if (roaming == 0)
+        if (roam_status == 0)
             reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
-        else if (roaming == 1)
+        else if (roam_status == 1)
             reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
 
         /* Check service type */
-        if (sysmode == 2)
+        act = (extended ?
+               huawei_sysinfoex_mode_to_act (sys_mode):
+               huawei_sysinfo_mode_to_act (sys_mode));
+
+        if (act & MM_MODEM_ACCESS_TECHNOLOGY_1XRTT) {
+            cdma1x = TRUE;
             ctx->state.detailed_cdma1x_state = reg_state;
-        else if (sysmode == 4)
+        }
+
+        if (act & MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 ||
+            act & MM_MODEM_ACCESS_TECHNOLOGY_EVDOA ||
+            act & MM_MODEM_ACCESS_TECHNOLOGY_EVDOB) {
+            evdo = TRUE;
             ctx->state.detailed_evdo_state = reg_state;
-        else if (sysmode == 8) {
-            ctx->state.detailed_cdma1x_state = reg_state;
-            ctx->state.detailed_evdo_state = reg_state;
-        } else {
+        }
+
+        if (!cdma1x && !evdo) {
             /* Say we're registered to something even though sysmode parsing failed */
-            mm_dbg ("SYSMODE parsing failed: assuming registered at least in CDMA1x");
+            mm_dbg ("Assuming registered at least in CDMA1x");
             ctx->state.detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
         }
     }
@@ -2005,12 +2376,9 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
     ctx->state.detailed_cdma1x_state = cdma1x_state;
     ctx->state.detailed_evdo_state = evdo_state;
 
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^SYSINFO",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)sysinfo_ready,
-                              ctx);
+    sysinfo (MM_BROADBAND_MODEM_HUAWEI (self),
+             (GAsyncReadyCallback)registration_state_sysinfo_ready,
+             ctx);
 }
 
 /*****************************************************************************/
@@ -2251,6 +2619,9 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
+
+    self->priv->sysinfoex_supported = FALSE;
+    self->priv->sysinfoex_support_checked = FALSE;
 }
 
 static void
