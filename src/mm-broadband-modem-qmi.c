@@ -6127,6 +6127,11 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
         mm_sms_storage_to_qmi_storage_type (ctx->storage),
         message->memory_index,
         NULL);
+    /* Only reading 3GPP SMS for now */
+    qmi_message_wms_raw_read_input_set_message_mode (
+        input,
+        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        NULL);
     qmi_client_wms_raw_read (QMI_CLIENT_WMS (ctx->client),
                              input,
                              3,
@@ -6230,6 +6235,7 @@ typedef struct {
     QmiClientWms *client;
     QmiWmsStorageType storage;
     guint32 memory_index;
+    QmiWmsMessageMode message_mode;
 } IndicationRawReadContext;
 
 static void
@@ -6312,6 +6318,18 @@ messaging_event_report_indication_cb (QmiClientNas *client,
             storage,
             memory_index,
             NULL);
+
+        /* Default to 3GPP message mode if none given */
+        if (!qmi_indication_wms_event_report_output_get_message_mode (
+                output,
+                &ctx->message_mode,
+                NULL))
+            ctx->message_mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
+        qmi_message_wms_raw_read_input_set_message_mode (
+            input,
+            ctx->message_mode,
+            NULL);
+
         qmi_client_wms_raw_read (QMI_CLIENT_WMS (client),
                                  input,
                                  3,
