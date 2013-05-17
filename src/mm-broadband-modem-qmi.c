@@ -5975,11 +5975,24 @@ messaging_set_default_storage (MMIfaceModemMessaging *self,
 /*****************************************************************************/
 /* Load initial SMS parts */
 
+typedef enum {
+    LOAD_INITIAL_SMS_PARTS_STEP_FIRST,
+    LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL,
+    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_NOT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_NOT_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_LAST
+} LoadInitialSmsPartsStep;
+
 typedef struct {
     MMBroadbandModemQmi *self;
     GSimpleAsyncResult *result;
     QmiClientWms *client;
     MMSmsStorage storage;
+    LoadInitialSmsPartsStep step;
+
+    /* For each step */
     GArray *message_array;
     guint i;
 } LoadInitialSmsPartsContext;
@@ -6104,6 +6117,8 @@ wms_raw_read_ready (QmiClientWms *client,
     read_next_sms_part (ctx);
 }
 
+static void load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx);
+
 static void
 read_next_sms_part (LoadInitialSmsPartsContext *ctx)
 {
@@ -6112,8 +6127,12 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
 
     if (ctx->i >= ctx->message_array->len ||
         !ctx->message_array) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        load_initial_sms_parts_context_complete_and_free (ctx);
+        /* If we just listed all SMS, we're done. Otherwise go to next tag. */
+        if (ctx->step == LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL)
+            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_LAST;
+        else
+            ctx->step++;
+        load_initial_sms_parts_step (ctx);
         return;
     }
 
@@ -6159,10 +6178,11 @@ wms_list_messages_ready (QmiClientWms *client,
     }
 
     if (!qmi_message_wms_list_messages_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't list messages: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_initial_sms_parts_context_complete_and_free (ctx);
-        qmi_message_wms_list_messages_output_unref (output);
+        /* Ignore error, keep on */
+        g_debug ("Couldn't read SMS messages: %s", error->message);
+        g_error_free (error);
+        ctx->step++;
+        load_initial_sms_parts_step (ctx);
         return;
     }
 
@@ -6182,6 +6202,77 @@ wms_list_messages_ready (QmiClientWms *client,
 }
 
 static void
+load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
+{
+    QmiMessageWmsListMessagesInput *input;
+
+    /* Request to list messages in a given storage */
+    input = qmi_message_wms_list_messages_input_new ();
+    qmi_message_wms_list_messages_input_set_storage_type (
+        input,
+        mm_sms_storage_to_qmi_storage_type (ctx->storage),
+        NULL);
+    qmi_message_wms_list_messages_input_set_message_mode (input,
+                                                          QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+                                                          NULL);
+
+    switch (ctx->step) {
+    case LOAD_INITIAL_SMS_PARTS_STEP_FIRST:
+        ctx->step++;
+        /* Fall down */
+    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL:
+        mm_dbg ("loading all messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_READ:
+        mm_dbg ("loading MT-read messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        qmi_message_wms_list_messages_input_set_message_tag (
+            input,
+            QMI_WMS_MESSAGE_TAG_TYPE_MT_READ,
+            NULL);
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_NOT_READ:
+        mm_dbg ("loading MT-not-read messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        qmi_message_wms_list_messages_input_set_message_tag (
+            input,
+            QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ,
+            NULL);
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_SENT:
+        mm_dbg ("loading MO-sent messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        qmi_message_wms_list_messages_input_set_message_tag (
+            input,
+            QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT,
+            NULL);
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_NOT_SENT:
+        mm_dbg ("loading MO-not-sent messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        qmi_message_wms_list_messages_input_set_message_tag (
+            input,
+            QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT,
+            NULL);
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_LAST:
+        /* All steps done */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        load_initial_sms_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    qmi_client_wms_list_messages (QMI_CLIENT_WMS (ctx->client),
+                                  input,
+                                  5,
+                                  NULL,
+                                  (GAsyncReadyCallback)wms_list_messages_ready,
+                                  ctx);
+    qmi_message_wms_list_messages_input_unref (input);
+}
+
+static void
 load_initial_sms_parts (MMIfaceModemMessaging *self,
                         MMSmsStorage storage,
                         GAsyncReadyCallback callback,
@@ -6189,7 +6280,6 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
 {
     LoadInitialSmsPartsContext *ctx;
     QmiClient *client = NULL;
-    QmiMessageWmsListMessagesInput *input;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
@@ -6204,27 +6294,9 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
                                              callback,
                                              user_data,
                                              load_initial_sms_parts);
+    ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_FIRST;
 
-    mm_dbg ("loading messages from storage '%s'...",
-            mm_sms_storage_get_string (storage));
-
-    /* Request to list messages in a given storage */
-    input = qmi_message_wms_list_messages_input_new ();
-    qmi_message_wms_list_messages_input_set_storage_type (
-        input,
-        mm_sms_storage_to_qmi_storage_type (storage),
-        NULL);
-    qmi_message_wms_list_messages_input_set_message_mode (
-        input,
-        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
-        NULL);
-    qmi_client_wms_list_messages (QMI_CLIENT_WMS (ctx->client),
-                                  input,
-                                  5,
-                                  NULL,
-                                  (GAsyncReadyCallback)wms_list_messages_ready,
-                                  ctx);
-    qmi_message_wms_list_messages_input_unref (input);
+    load_initial_sms_parts_step (ctx);
 }
 
 /*****************************************************************************/
