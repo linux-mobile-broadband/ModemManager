@@ -83,7 +83,7 @@ get_validity_relative (GVariant *tuple)
     if (!tuple)
         return 0;
 
-    g_variant_get (tuple, "(ub)", &type, &value);
+    g_variant_get (tuple, "(uv)", &type, &value);
 
     if (type == MM_SMS_VALIDITY_TYPE_RELATIVE)
         value_integer = g_variant_get_uint32 (value);
