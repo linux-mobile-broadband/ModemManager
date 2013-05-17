@@ -610,6 +610,10 @@ delete_next_part (SmsDeletePartsContext *ctx)
         input,
         (guint32)mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
         NULL);
+    qmi_message_wms_delete_input_set_message_mode (
+        input,
+        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        NULL);
     qmi_client_wms_delete (ctx->client,
                            input,
                            5,
