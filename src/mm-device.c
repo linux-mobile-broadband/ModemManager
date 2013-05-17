@@ -255,6 +255,8 @@ add_port_driver (MMDevice *self,
     guint i;
 
     driver = mm_device_utils_get_port_driver (udev_port);
+    if (!driver)
+        return;
 
     n_items = (self->priv->drivers ? g_strv_length (self->priv->drivers) : 0);
     if (n_items > 0) {
