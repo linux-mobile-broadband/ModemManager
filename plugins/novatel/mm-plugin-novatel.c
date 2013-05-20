@@ -145,7 +145,7 @@ custom_init_step (CustomInitContext *ctx)
         return;
     }
 
-    if (ctx->nwdmat_retries >= 0) {
+    if (ctx->nwdmat_retries > 0) {
         ctx->nwdmat_retries--;
         mm_at_serial_port_queue_command (ctx->port,
                                          "$NWDMAT=1",
