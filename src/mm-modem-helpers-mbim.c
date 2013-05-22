@@ -24,6 +24,7 @@ MMModemLock
 mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
 {
     switch (pin_type) {
+    case MBIM_PIN_TYPE_UNKNOWN:
     case MBIM_PIN_TYPE_CUSTOM:
         break;
     case MBIM_PIN_TYPE_PIN1:
