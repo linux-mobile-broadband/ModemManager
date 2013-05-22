@@ -818,8 +818,10 @@ connect_auth_ready (MMBaseModem *self,
         mm_dbg ("   APN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_apn (ctx->properties)));
 
         ip_family = mm_simple_connect_properties_get_ip_type (ctx->properties);
-        if (ip_family != MM_BEARER_IP_FAMILY_UNKNOWN) {
-            mm_dbg ("   IP family: %s", mm_bearer_ip_family_get_string (ip_family));
+        if (ip_family != MM_BEARER_IP_FAMILY_NONE) {
+            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            mm_dbg ("   IP family: %s", str);
+            g_free (str);
         } else
             mm_dbg ("   IP family: %s", VALIDATE_UNSPECIFIED (NULL));
 

@@ -230,7 +230,7 @@ mm_bearer_properties_set_ip_type (MMBearerProperties *self,
 MMBearerIpFamily
 mm_bearer_properties_get_ip_type (MMBearerProperties *self)
 {
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_NONE);
 
     return self->priv->ip_type;
 }
@@ -379,7 +379,7 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_PASSWORD,
                                g_variant_new_string (self->priv->password));
 
-    if (self->priv->ip_type != MM_BEARER_IP_FAMILY_UNKNOWN)
+    if (self->priv->ip_type != MM_BEARER_IP_FAMILY_NONE)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_IP_TYPE,
@@ -674,7 +674,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     self->priv->allow_roaming = TRUE;
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-    self->priv->ip_type = MM_BEARER_IP_FAMILY_UNKNOWN;
+    self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
 }
 
 static void

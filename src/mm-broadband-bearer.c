@@ -168,10 +168,14 @@ detailed_connect_context_new (MMBroadbandBearer *self,
                                              detailed_connect_context_new);
 
     ctx->ip_family = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (self)));
-    if (ctx->ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+    if (ctx->ip_family == MM_BEARER_IP_FAMILY_NONE ||
+        ctx->ip_family == MM_BEARER_IP_FAMILY_ANY) {
+        gchar *default_family;
+
         ctx->ip_family = mm_bearer_get_default_ip_family (MM_BEARER (self));
-        mm_dbg ("No specific IP family requested, defaulting to %s",
-                mm_bearer_ip_family_get_string (ctx->ip_family));
+        default_family = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
+        mm_dbg ("No specific IP family requested, defaulting to %s", default_family);
+        g_free (default_family);
     }
 
     /* NOTE:
@@ -789,10 +793,15 @@ find_cid_ready (MMBaseModem *modem,
 
     pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
     if (!pdp_type) {
+        gchar * str;
+
+        str = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_INVALID_ARGS,
-                                         "Invalid PDP type requested");
+                                         "Unsupported IP type requested: '%s'",
+                                         str);
+        g_free (str);
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
@@ -952,11 +961,14 @@ parse_pdp_list (MMBaseModem *modem,
     mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
     for (l = pdp_list; l; l = g_list_next (l)) {
         MM3gppPdpContext *pdp = l->data;
+        gchar *ip_family_str;
 
+        ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
         mm_dbg ("  PDP context [cid=%u] [type='%s'] [apn='%s']",
                 pdp->cid,
-                mm_bearer_ip_family_get_string (pdp->pdp_type),
+                ip_family_str,
                 pdp->apn ? pdp->apn : "");
+        g_free (ip_family_str);
     }
 
     /* Look for the exact PDP context we want */
@@ -973,13 +985,16 @@ parse_pdp_list (MMBaseModem *modem,
                 const gchar *apn;
 
                 apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-                if (apn &&
-                    g_str_equal (pdp->apn, apn)) {
+                if (apn && g_str_equal (pdp->apn, apn)) {
+                    gchar *ip_family_str;
+
                     /* Found a PDP context with the same CID and PDP type, we'll use it. */
+                    ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
                     mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
-                            pdp->cid, mm_bearer_ip_family_get_string (pdp->pdp_type), pdp->apn);
+                            pdp->cid, ip_family_str, pdp->apn);
                     cid = pdp->cid;
                     ctx->use_existing_cid = TRUE;
+                    g_free (ip_family_str);
                     /* In this case, stop searching */
                     break;
                 }

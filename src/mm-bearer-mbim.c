@@ -661,27 +661,41 @@ connect_context_step (ConnectContext *ctx)
         }
 
         ip_family = mm_bearer_properties_get_ip_type (ctx->properties);
-        if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+        if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
+            ip_family == MM_BEARER_IP_FAMILY_ANY) {
+            gchar * str;
+
             ip_family = mm_bearer_get_default_ip_family (MM_BEARER (ctx->self));
-            mm_dbg ("No specific IP family requested, defaulting to %s",
-                    mm_bearer_ip_family_get_string (ip_family));
+            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            mm_dbg ("No specific IP family requested, defaulting to %s", str);
+            g_free (str);
         }
 
-        switch (ip_family) {
-        case MM_BEARER_IP_FAMILY_IPV4:
+        if (ip_family == MM_BEARER_IP_FAMILY_IPV4)
             ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
-            break;
-        case MM_BEARER_IP_FAMILY_IPV6:
+        else if (ip_family == MM_BEARER_IP_FAMILY_IPV6)
             ip_type = MBIM_CONTEXT_IP_TYPE_IPV6;
-            break;
-        case MM_BEARER_IP_FAMILY_IPV4V6:
+        else if (ip_family == MM_BEARER_IP_FAMILY_IPV4V6)
             ip_type = MBIM_CONTEXT_IP_TYPE_IPV4V6;
-            break;
-        case MM_BEARER_IP_FAMILY_UNKNOWN:
-        default:
+        else if (ip_family == (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6))
+            ip_type = MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6;
+        else if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
+                 ip_family == MM_BEARER_IP_FAMILY_ANY)
             /* A valid default IP family should have been specified */
             g_assert_not_reached ();
-            break;
+        else  {
+            gchar * str;
+
+            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_UNSUPPORTED,
+                "Unsupported IP type configuration: '%s'",
+                str);
+            g_free (str);
+            connect_context_complete_and_free (ctx);
+            return;
         }
 
         mm_dbg ("Launching connection with APN '%s'...", apn);

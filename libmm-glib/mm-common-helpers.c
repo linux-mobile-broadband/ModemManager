@@ -399,14 +399,14 @@ MMBearerIpFamily
 mm_common_get_ip_type_from_string (const gchar *str,
                                    GError **error)
 {
-	GEnumClass *enum_class;
+    GFlagsClass *flags_class;
     guint i;
 
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_IP_FAMILY));
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_BEARER_IP_FAMILY));
 
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+    for (i = 0; flags_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick))
+            return flags_class->values[i].value;
     }
 
     g_set_error (error,
@@ -414,7 +414,7 @@ mm_common_get_ip_type_from_string (const gchar *str,
                  MM_CORE_ERROR_INVALID_ARGS,
                  "Couldn't match '%s' with a valid MMBearerIpFamily value",
                  str);
-    return MM_BEARER_IP_FAMILY_UNKNOWN;
+    return MM_BEARER_IP_FAMILY_NONE;
 }
 
 MMBearerAllowedAuth

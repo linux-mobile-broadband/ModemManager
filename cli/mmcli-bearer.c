@@ -160,6 +160,10 @@ print_bearer_info (MMBearer *bearer)
              mm_bearer_get_ip_timeout (bearer));
 
     if (properties) {
+        gchar *ip_family_str;
+
+        ip_family_str = (mm_bearer_ip_family_build_string_from_mask (
+                             mm_bearer_properties_get_ip_type (properties)));
         g_print ("  -------------------------\n"
                  "  Properties         |         apn: '%s'\n"
                  "                     |     roaming: '%s'\n"
@@ -170,13 +174,13 @@ print_bearer_info (MMBearer *bearer)
                  "                     | Rm protocol: '%s'\n",
                  VALIDATE_NONE (mm_bearer_properties_get_apn (properties)),
                  mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden",
-                 VALIDATE_UNKNOWN (mm_bearer_ip_family_get_string (
-                                       mm_bearer_properties_get_ip_type (properties))),
+                 VALIDATE_UNKNOWN (ip_family_str),
                  VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
                  VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
                  VALIDATE_NONE (mm_bearer_properties_get_number (properties)),
                  VALIDATE_UNKNOWN (mm_modem_cdma_rm_protocol_get_string (
                                        mm_bearer_properties_get_rm_protocol (properties))));
+        g_free (ip_family_str);
     }
 
     /* IPv4 */

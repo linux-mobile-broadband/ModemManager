@@ -691,7 +691,7 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
 
             str = mm_get_string_unquoted_from_match_info (match_info, 2);
             ip_family = mm_3gpp_get_ip_family_from_pdp_type (str);
-            if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN)
+            if (ip_family == MM_BEARER_IP_FAMILY_NONE)
                 mm_dbg ("Ignoring PDP context type: '%s'", str);
             else {
                 MM3gppPdpContext *pdp;
@@ -1711,7 +1711,7 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
         return MM_BEARER_IP_FAMILY_IPV6;
     if (g_str_equal (pdp_type, "IPV4V6"))
         return MM_BEARER_IP_FAMILY_IPV4V6;
-    return MM_BEARER_IP_FAMILY_UNKNOWN;
+    return MM_BEARER_IP_FAMILY_NONE;
 }
 
 /*************************************************************************/

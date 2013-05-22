@@ -399,7 +399,7 @@ mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
 MMBearerIpFamily
 mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
 {
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_IP_FAMILY_UNKNOWN);
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_IP_FAMILY_NONE);
 
     return mm_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }

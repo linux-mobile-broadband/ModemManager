@@ -884,31 +884,40 @@ _connect (MMBearer *self,
         ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
 
         ip_family = mm_bearer_properties_get_ip_type (properties);
-        if (ip_family == MM_BEARER_IP_FAMILY_UNKNOWN) {
+        if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
+            ip_family == MM_BEARER_IP_FAMILY_ANY) {
+            gchar *ip_family_str;
+
             ip_family = mm_bearer_get_default_ip_family (self);
+            ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
             mm_dbg ("No specific IP family requested, defaulting to %s",
-                    mm_bearer_ip_family_get_string (ip_family));
+                    ip_family_str);
             ctx->no_ip_family_preference = TRUE;
+            g_free (ip_family_str);
         }
 
-        switch (ip_family) {
-        case MM_BEARER_IP_FAMILY_IPV4:
+        if (ip_family & MM_BEARER_IP_FAMILY_IPV4)
             ctx->ipv4 = TRUE;
-            ctx->ipv6 = FALSE;
-            break;
-        case MM_BEARER_IP_FAMILY_IPV6:
-            ctx->ipv4 = FALSE;
+        if (ip_family & MM_BEARER_IP_FAMILY_IPV6)
             ctx->ipv6 = TRUE;
-            break;
-        case MM_BEARER_IP_FAMILY_IPV4V6:
+        if (ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
             ctx->ipv4 = TRUE;
             ctx->ipv6 = TRUE;
-            break;
-        case MM_BEARER_IP_FAMILY_UNKNOWN:
-        default:
-            /* A valid default IP family should have been specified */
-            g_assert_not_reached ();
-            break;
+        }
+
+        if (!ctx->ipv4 && !ctx->ipv6) {
+            gchar *str;
+
+            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_UNSUPPORTED,
+                "Unsupported IP type requested: '%s'",
+                str);
+            g_free (str);
+            connect_context_complete_and_free (ctx);
+            return;
         }
 
         auth = mm_bearer_properties_get_allowed_auth (properties);
