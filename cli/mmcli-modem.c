@@ -243,6 +243,7 @@ print_modem_info (void)
     gchar *preferred_mode_string;
     gchar *supported_bands_string;
     gchar *bands_string;
+    gchar *supported_ip_families_string;
     gchar *unlock_retries_string;
     gchar *own_numbers_string;
     MMModemBand *bands = NULL;
@@ -277,6 +278,8 @@ print_modem_info (void)
         mm_modem_get_preferred_mode (ctx->modem));
     supported_modes_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_supported_modes (ctx->modem));
+    supported_ip_families_string = mm_bearer_ip_family_build_string_from_mask (
+        mm_modem_get_supported_ip_families (ctx->modem));
 
     unlock_retries = mm_modem_get_unlock_retries (ctx->modem);
     unlock_retries_string = mm_unlock_retries_build_string (unlock_retries);
@@ -383,6 +386,11 @@ print_modem_info (void)
              VALIDATE_UNKNOWN (supported_bands_string),
              VALIDATE_UNKNOWN (bands_string));
 
+    /* IP families */
+    g_print ("  -------------------------\n"
+             "  IP       |      supported: '%s'\n",
+             VALIDATE_UNKNOWN (supported_ip_families_string));
+
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
         gchar *facility_locks;
@@ -450,6 +458,7 @@ print_modem_info (void)
              VALIDATE_PATH (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
+    g_free (supported_ip_families_string);
     g_free (bands_string);
     g_free (supported_bands_string);
     g_free (access_technologies_string);
