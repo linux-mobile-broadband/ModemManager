@@ -644,6 +644,88 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
 
 /*************************************************************************/
 
+
+static void
+mm_3gpp_pdp_context_format_free (MM3gppPdpContextFormat *format)
+{
+    g_slice_free (MM3gppPdpContextFormat, format);
+}
+
+void
+mm_3gpp_pdp_context_format_list_free (GList *pdp_format_list)
+{
+    g_list_free_full (pdp_format_list, (GDestroyNotify) mm_3gpp_pdp_context_format_free);
+}
+
+GList *
+mm_3gpp_parse_cgdcont_test_response (const gchar *response,
+                                     GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    GError *inner_error = NULL;
+    GList *list = NULL;
+
+    if (!response || !g_str_has_prefix (response, "+CGDCONT:")) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing +CGDCONT prefix");
+        return NULL;
+    }
+
+    r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                     0, &inner_error);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    while (!inner_error && g_match_info_matches (match_info)) {
+        gchar *pdp_type_str;
+        guint min_cid;
+        guint max_cid;
+        MMBearerIpFamily pdp_type;
+
+        /* Read PDP type */
+        pdp_type_str = mm_get_string_unquoted_from_match_info (match_info, 3);
+        pdp_type = mm_3gpp_get_ip_family_from_pdp_type (pdp_type_str);
+        if (pdp_type == MM_BEARER_IP_FAMILY_NONE)
+            mm_dbg ("Unhandled PDP type in CGDCONT=? reply: '%s'", pdp_type_str);
+        else {
+            /* Read min CID */
+            if (!mm_get_uint_from_match_info (match_info, 1, &min_cid))
+                mm_warn ("Invalid min CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
+            else {
+                /* Read max CID */
+                if (!mm_get_uint_from_match_info (match_info, 2, &max_cid))
+                    mm_warn ("Invalid max CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
+                else {
+                    MM3gppPdpContextFormat *format;
+
+                    format = g_slice_new (MM3gppPdpContextFormat);
+                    format->pdp_type = pdp_type;
+                    format->min_cid = min_cid;
+                    format->max_cid = max_cid;
+
+                    list = g_list_prepend (list, format);
+                }
+            }
+        }
+
+        g_free (pdp_type_str);
+        g_match_info_next (match_info, &inner_error);
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        mm_warn ("Unexpected error matching +CGDCONT response: '%s'", inner_error->message);
+        g_error_free (inner_error);
+    }
+
+    return list;
+}
+
+/*************************************************************************/
+
 static void
 mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
 {

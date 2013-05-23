@@ -1456,6 +1456,92 @@ test_cind_response_moto_v3m (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CGDCONT test responses */
+
+static void
+test_cgdcont_test_results (const gchar *desc,
+                           const gchar *reply,
+                           MM3gppPdpContextFormat *expected_results,
+                           guint32 expected_results_len)
+{
+    GList *l;
+    GError *error = NULL;
+    GList *results;
+
+    g_print ("\nTesting %s +CGDCONT test response...\n", desc);
+
+    results = mm_3gpp_parse_cgdcont_test_response (reply, &error);
+    g_assert (results);
+    g_assert_no_error (error);
+    g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
+
+    for (l = results; l; l = g_list_next (l)) {
+        MM3gppPdpContextFormat *format = l->data;
+        gboolean found = FALSE;
+        guint i;
+
+        for (i = 0; !found && i < expected_results_len; i++) {
+            MM3gppPdpContextFormat *expected;
+
+            expected = &expected_results[i];
+            if (format->pdp_type == expected->pdp_type) {
+                found = TRUE;
+
+                g_assert_cmpuint (format->min_cid, ==, expected->min_cid);
+                g_assert_cmpuint (format->max_cid, ==, expected->max_cid);
+            }
+        }
+
+        g_assert (found == TRUE);
+    }
+
+    mm_3gpp_pdp_context_format_list_free (results);
+}
+
+static void
+test_cgdcont_test_response_single (void *f, gpointer d)
+{
+    const gchar *reply = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)";
+    static MM3gppPdpContextFormat expected[] = {
+        { 1, 10, MM_BEARER_IP_FAMILY_IPV4 }
+    };
+
+    test_cgdcont_test_results ("Single", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
+test_cgdcont_test_response_multiple (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+        "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+        "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n";
+    static MM3gppPdpContextFormat expected[] = {
+        { 1, 10, MM_BEARER_IP_FAMILY_IPV4 },
+        { 1, 10, MM_BEARER_IP_FAMILY_IPV6 },
+        { 1, 10, MM_BEARER_IP_FAMILY_IPV4V6 }
+    };
+
+    test_cgdcont_test_results ("Multiple", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
+test_cgdcont_test_response_multiple_and_ignore (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CGDCONT: (1-16),\"IP\",,,(0-2),(0-4)\r\n"
+        "+CGDCONT: (1-16),\"PPP\",,,(0-2),(0-4)\r\n"
+        "+CGDCONT: (1-16),\"IPV6\",,,(0-2),(0-4)\r\n";
+    static MM3gppPdpContextFormat expected[] = {
+        { 1, 16, MM_BEARER_IP_FAMILY_IPV4 },
+        /* PPP is ignored */
+        { 1, 16, MM_BEARER_IP_FAMILY_IPV6 }
+    };
+
+    test_cgdcont_test_results ("Multiple and Ignore", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+/*****************************************************************************/
 /* Test CGDCONT read responses */
 
 static void
@@ -1949,6 +2035,10 @@ int main (int argc, char **argv)
     }
 
     g_test_suite_add (suite, TESTCASE (test_cpms_response_cinterion, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_single, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple_and_ignore, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));
