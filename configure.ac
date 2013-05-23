@@ -24,18 +24,6 @@ LT_INIT
 dnl
 dnl Documentation
 dnl
-
-AC_ARG_WITH(docs, AS_HELP_STRING([--with-docs], [Build ModemManager documentation]))
-AM_CONDITIONAL(WITH_DOCS, test "x$with_docs" = "xyes")
-case $with_docs in
-    yes)
-        enable_gtk_doc=yes
-        ;;
-    *)
-        with_docs=no
-        ;;
-esac
-
 GTK_DOC_CHECK(1.0)
 
 dnl
@@ -290,7 +278,7 @@ echo "
 
     PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}
-    Documentation:           ${with_docs}
+    Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}
     Newest QMI commands:     ${with_newest_qmi_commands}
