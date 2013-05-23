@@ -1217,6 +1217,24 @@ mm_modem_peek_bands (MMModem *self,
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_supported_ip_families:
+ * @self: A #MMModem.
+ *
+ * Gets the list of supported IP families.
+ *
+ * Returns: A bitmask of #MMBearerIpFamily values.
+ */
+MMBearerIpFamily
+mm_modem_get_supported_ip_families (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), MM_BEARER_IP_FAMILY_NONE);
+
+    return (MMBearerIpFamily) mm_gdbus_modem_get_supported_ip_families (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_enable_finish:
  * @self: A #MMModem.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_enable().

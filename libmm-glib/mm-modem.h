@@ -147,6 +147,8 @@ gboolean           mm_modem_get_bands                (MMModem *self,
                                                       MMModemBand **bands,
                                                       guint *n_bands);
 
+MMBearerIpFamily   mm_modem_get_supported_ip_families (MMModem *self);
+
 void     mm_modem_enable        (MMModem *self,
                                  GCancellable *cancellable,
                                  GAsyncReadyCallback callback,
