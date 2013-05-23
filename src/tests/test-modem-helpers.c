@@ -1456,13 +1456,13 @@ test_cind_response_moto_v3m (void *f, gpointer d)
 }
 
 /*****************************************************************************/
-/* Test CGDCONT responses */
+/* Test CGDCONT read responses */
 
 static void
-test_cgdcont_results (const gchar *desc,
-                      const gchar *reply,
-                      MM3gppPdpContext *expected_results,
-                      guint32 expected_results_len)
+test_cgdcont_read_results (const gchar *desc,
+                           const gchar *reply,
+                           MM3gppPdpContext *expected_results,
+                           guint32 expected_results_len)
 {
     GList *l;
     GError *error = NULL;
@@ -1499,18 +1499,18 @@ test_cgdcont_results (const gchar *desc,
 }
 
 static void
-test_cgdcont_response_nokia (void *f, gpointer d)
+test_cgdcont_read_response_nokia (void *f, gpointer d)
 {
     const gchar *reply = "+CGDCONT: 1,\"IP\",,,0,0";
     static MM3gppPdpContext expected[] = {
         { 1, MM_BEARER_IP_FAMILY_IPV4, NULL }
     };
 
-    test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cgdcont_read_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
-test_cgdcont_response_samsung (void *f, gpointer d)
+test_cgdcont_read_response_samsung (void *f, gpointer d)
 {
     const gchar *reply =
         "+CGDCONT: 1,\"IP\",\"nate.sktelecom.com\",\"\",0,0\r\n"
@@ -1522,7 +1522,7 @@ test_cgdcont_response_samsung (void *f, gpointer d)
         { 3, MM_BEARER_IP_FAMILY_IPV4, "MAXROAM.com"        }
     };
 
-    test_cgdcont_results ("Samsung", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cgdcont_read_results ("Samsung", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 /*****************************************************************************/
@@ -1950,8 +1950,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cpms_response_cinterion, NULL));
 
-	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_nokia, NULL));
-	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_samsung, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic, NULL));
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_without_detail, NULL));
