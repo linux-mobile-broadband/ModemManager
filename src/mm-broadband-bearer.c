@@ -843,9 +843,8 @@ parse_cid_range (MMBaseModem *modem,
                  GError **result_error)
 {
     GError *inner_error = NULL;
-    GRegex *r;
-    GMatchInfo *match_info;
-    guint cid = 0;
+    GList *formats, *l;
+    guint cid;
 
     /* If cancelled, set result error */
     if (detailed_connect_context_set_error_if_cancelled (ctx, result_error))
@@ -858,53 +857,30 @@ parse_cid_range (MMBaseModem *modem,
         return TRUE;
     }
 
-    if (!g_str_has_prefix (response, "+CGDCONT:")) {
-        mm_dbg ("Unexpected +CGDCONT response: '%s'", response);
+    formats = mm_3gpp_parse_cgdcont_test_response (response, &inner_error);
+    if (inner_error) {
+        mm_dbg ("Error parsing +CGDCONT test response: '%s'", inner_error->message);
         mm_dbg ("Defaulting to CID=1");
+        g_error_free (inner_error);
         *result = g_variant_new_uint32 (1);
         return TRUE;
     }
 
-    r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
-                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
-                     0, &inner_error);
-    if (r) {
-        g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
-        cid = 0;
-        while (!inner_error &&
-               cid == 0 &&
-               g_match_info_matches (match_info)) {
-            gchar *pdp_type;
+    cid = 0;
+    for (l = formats; l; l = g_list_next (l)) {
+        MM3gppPdpContextFormat *format = l->data;
 
-            pdp_type = g_match_info_fetch (match_info, 3);
-
-            if (mm_3gpp_get_ip_family_from_pdp_type (pdp_type) == ctx->ip_family) {
-                gchar *max_cid_range_str;
-                guint max_cid_range;
-
-                max_cid_range_str = g_match_info_fetch (match_info, 2);
-                max_cid_range = (guint)atoi (max_cid_range_str);
-
-                if (ctx->max_cid < max_cid_range)
-                    cid = ctx->max_cid + 1;
-                else
-                    cid = ctx->max_cid;
-
-                g_free (max_cid_range_str);
-            }
-
-            g_free (pdp_type);
-            g_match_info_next (match_info, &inner_error);
+        /* Found exact PDP type? */
+        if (format->pdp_type == ctx->ip_family) {
+            if (ctx->max_cid < format->max_cid)
+                cid = ctx->max_cid + 1;
+            else
+                cid = ctx->max_cid;
+            break;
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
     }
 
-    if (inner_error) {
-        mm_dbg ("Unexpected error matching +CGDCONT response: '%s'", inner_error->message);
-        g_error_free (inner_error);
-    }
+    mm_3gpp_pdp_context_format_list_free (formats);
 
     if (cid == 0) {
         mm_dbg ("Defaulting to CID=1");
