@@ -431,6 +431,44 @@ modem_load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported IP families (Modem interface) */
+
+static MMBearerIpFamily
+modem_load_supported_ip_families_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_BEARER_IP_FAMILY_NONE;
+
+    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                                    G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+modem_load_supported_ip_families (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_supported_ip_families);
+
+    /* Assume IPv4 + IPv6 + IPv4v6 supported */
+    g_simple_async_result_set_op_res_gpointer (
+        result,
+        GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4 |
+                          MM_BEARER_IP_FAMILY_IPV6 |
+                          MM_BEARER_IP_FAMILY_IPV4V6),
+        NULL);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Unlock required loading (Modem interface) */
 
 typedef struct {
@@ -2145,6 +2183,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = common_power_up_down_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = common_power_up_down_finish;
+    iface->load_supported_ip_families = modem_load_supported_ip_families;
+    iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
     /* Unneeded things */
     iface->modem_after_power_up = NULL;
