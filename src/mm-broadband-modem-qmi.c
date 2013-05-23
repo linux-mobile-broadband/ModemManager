@@ -1747,6 +1747,50 @@ modem_load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported IP families (Modem interface) */
+
+static MMBearerIpFamily
+modem_load_supported_ip_families_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_BEARER_IP_FAMILY_NONE;
+
+    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                                    G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+modem_load_supported_ip_families (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_supported_ip_families);
+
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self)))
+        /* CDMA-only: IPv4 */
+        g_simple_async_result_set_op_res_gpointer (
+            result,
+            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
+            NULL);
+    else
+        /* Assume IPv4 + IPv6 supported */
+        g_simple_async_result_set_op_res_gpointer (
+            result,
+            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6),
+            NULL);
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Load signal quality (Modem interface) */
 
 /* Limit the value betweeen [-113,-51] and scale it to a percentage */
@@ -8077,6 +8121,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
     iface->load_power_state = load_power_state;
     iface->load_power_state_finish = load_power_state_finish;
+    iface->load_supported_ip_families = modem_load_supported_ip_families;
+    iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
     /* Enabling/disabling */
     iface->modem_power_up = modem_power_up;
