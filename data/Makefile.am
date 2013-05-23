@@ -57,6 +57,13 @@ logos = \
 	ModemManager-logo-wide-text.svg ModemManager-logo-wide-text.png
 
 
+# Diagrams
+diagrams = \
+	ModemManager-states.png \
+	ModemManager-interface-initialization-sequence.png \
+	ModemManager-interface-initialization-sequence-subclassed.png
+
+
 # Polkit
 dist_polkit_policy_in_files = org.freedesktop.ModemManager1.policy.in
 if WITH_POLKIT
@@ -90,4 +97,5 @@ EXTRA_DIST = \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
 	$(dist_polkit_policy_in_files) \
-	$(logos)
+	$(logos) \
+	$(diagrams)
