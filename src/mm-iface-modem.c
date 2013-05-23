@@ -3444,6 +3444,7 @@ typedef enum {
     INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_SUPPORTED_MODES,
     INITIALIZATION_STEP_SUPPORTED_BANDS,
+    INITIALIZATION_STEP_SUPPORTED_IP_FAMILIES,
     INITIALIZATION_STEP_POWER_STATE,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_SIM,
@@ -3688,6 +3689,29 @@ load_supported_bands_ready (MMIfaceModem *self,
 
     if (error) {
         mm_warn ("couldn't load Supported Bands: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
+load_supported_ip_families_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  InitializationContext *ctx)
+{
+    GError *error = NULL;
+    MMBearerIpFamily ip_families;
+
+    ip_families = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_ip_families_finish (self, res, &error);
+
+    if (ip_families != MM_BEARER_IP_FAMILY_NONE)
+        mm_gdbus_modem_set_supported_ip_families (ctx->skeleton, ip_families);
+
+    if (error) {
+        mm_warn ("couldn't load Supported IP families: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -4033,6 +4057,22 @@ interface_initialization_step (InitializationContext *ctx)
         ctx->step++;
     }
 
+    case INITIALIZATION_STEP_SUPPORTED_IP_FAMILIES:
+        /* Supported ip_families are meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families != NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families_finish != NULL &&
+            mm_gdbus_modem_get_supported_ip_families (ctx->skeleton) == MM_BEARER_IP_FAMILY_NONE) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families (
+                ctx->self,
+                (GAsyncReadyCallback)load_supported_ip_families_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZATION_STEP_POWER_STATE:
         /* Initial power state is meant to be loaded only once. Therefore, if we
          * already have it loaded, don't try to load it again. */
@@ -4222,6 +4262,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
         mm_gdbus_modem_set_bands (skeleton, mm_common_build_bands_unknown ());
+        mm_gdbus_modem_set_supported_ip_families (skeleton, MM_BEARER_IP_FAMILY_NONE);
         mm_gdbus_modem_set_power_state (skeleton, MM_MODEM_POWER_STATE_UNKNOWN);
         mm_gdbus_modem_set_state_failed_reason (skeleton, MM_MODEM_STATE_FAILED_REASON_NONE);
 

@@ -470,5 +470,13 @@
     -->
     <property name="Bands" type="au" access="read" />
 
+    <!--
+        SupportedIpFamilies:
+
+        Bitmask of <link linkend="MMBearerIpFamily">MMBearerIpFamily</link> values,
+        specifying the IP families supported by the device.
+    -->
+    <property name="SupportedIpFamilies" type="u" access="read" />
+
   </interface>
 </node>

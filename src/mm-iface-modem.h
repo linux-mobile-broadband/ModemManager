@@ -156,6 +156,14 @@ struct _MMIfaceModem {
                                            GAsyncResult *res,
                                            GError **error);
 
+    /* Loading of the SupportedIpFamilies property */
+    void (* load_supported_ip_families) (MMIfaceModem *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    MMBearerIpFamily (* load_supported_ip_families_finish) (MMIfaceModem *self,
+                                                           GAsyncResult *res,
+                                                           GError **error);
+
     /* Loading of the PowerState property */
     void (* load_power_state) (MMIfaceModem *self,
                                GAsyncReadyCallback callback,
