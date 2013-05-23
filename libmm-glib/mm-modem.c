@@ -22,6 +22,7 @@
  */
 
 #include <gio/gio.h>
+#include <string.h>
 
 #include "mm-common-helpers.h"
 #include "mm-errors-types.h"
@@ -988,10 +989,13 @@ supported_bands_updated (MMModem *self,
     g_mutex_unlock (&self->priv->supported_bands_mutex);
 }
 
-static void
+static gboolean
 ensure_internal_supported_bands (MMModem *self,
-                                 GArray **dup)
+                                 MMModemBand **dup_bands,
+                                 guint *dup_bands_n)
 {
+    gboolean ret;
+
     g_mutex_lock (&self->priv->supported_bands_mutex);
     {
         /* If this is the first time ever asking for the array, setup the
@@ -1013,10 +1017,24 @@ ensure_internal_supported_bands (MMModem *self,
                                   NULL);
         }
 
-        if (dup && self->priv->supported_bands)
-            *dup = g_array_ref (self->priv->supported_bands);
+        if (!self->priv->supported_bands)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_bands && dup_bands_n) {
+                *dup_bands_n = self->priv->supported_bands->len;
+                if (self->priv->supported_bands->len > 0) {
+                    *dup_bands = g_malloc (sizeof (MMModemBand) * self->priv->supported_bands->len);
+                    memcpy (*dup_bands, self->priv->supported_bands->data, sizeof (MMModemBand) * self->priv->supported_bands->len);
+                } else
+                    *dup_bands = NULL;
+            }
+        }
     }
     g_mutex_unlock (&self->priv->supported_bands_mutex);
+
+    return ret;
 }
 
 /**
@@ -1036,19 +1054,11 @@ mm_modem_get_supported_bands (MMModem *self,
                               MMModemBand **bands,
                               guint *n_bands)
 {
-    GArray *array = NULL;
-
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    ensure_internal_supported_bands (self, &array);
-    if (!array)
-        return FALSE;
-
-    *n_bands = array->len;
-    *bands = (MMModemBand *)g_array_free (array, FALSE);
-    return TRUE;
+    return ensure_internal_supported_bands (self, bands, n_bands);
 }
 
 /**
@@ -1072,8 +1082,7 @@ mm_modem_peek_supported_bands (MMModem *self,
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    ensure_internal_supported_bands (self, NULL);
-    if (!self->priv->supported_bands)
+    if (!ensure_internal_supported_bands (self, NULL, NULL))
         return FALSE;
 
     *n_bands = self->priv->supported_bands->len;
@@ -1102,10 +1111,13 @@ bands_updated (MMModem *self,
     g_mutex_unlock (&self->priv->bands_mutex);
 }
 
-static void
+static gboolean
 ensure_internal_bands (MMModem *self,
-                       GArray **dup)
+                       MMModemBand **dup_bands,
+                       guint *dup_bands_n)
 {
+    gboolean ret;
+
     g_mutex_lock (&self->priv->bands_mutex);
     {
         /* If this is the first time ever asking for the array, setup the
@@ -1127,10 +1139,24 @@ ensure_internal_bands (MMModem *self,
                                   NULL);
         }
 
-        if (dup && self->priv->bands)
-            *dup = g_array_ref (self->priv->bands);
+        if (!self->priv->bands)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_bands && dup_bands_n) {
+                *dup_bands_n = self->priv->bands->len;
+                if (self->priv->bands->len > 0) {
+                    *dup_bands = g_malloc (sizeof (MMModemBand) * self->priv->bands->len);
+                    memcpy (*dup_bands, self->priv->bands->data, sizeof (MMModemBand) * self->priv->bands->len);
+                } else
+                    *dup_bands = NULL;
+            }
+        }
     }
     g_mutex_unlock (&self->priv->bands_mutex);
+
+    return ret;
 }
 
 /**
@@ -1151,19 +1177,11 @@ mm_modem_get_bands (MMModem *self,
                     MMModemBand **bands,
                     guint *n_bands)
 {
-    GArray *array = NULL;
-
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    ensure_internal_bands (self, &array);
-    if (!array)
-        return FALSE;
-
-    *n_bands = array->len;
-    *bands = (MMModemBand *)g_array_free (array, FALSE);
-    return TRUE;
+    return ensure_internal_bands (self, bands, n_bands);
 }
 
 /**
@@ -1188,8 +1206,7 @@ mm_modem_peek_bands (MMModem *self,
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    ensure_internal_bands (self, NULL);
-    if (!self->priv->bands)
+    if (!ensure_internal_bands (self, NULL, NULL))
         return FALSE;
 
     *n_bands = self->priv->bands->len;
