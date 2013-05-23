@@ -1542,6 +1542,83 @@ modem_load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Supported IP families loading (Modem interface) */
+
+static MMBearerIpFamily
+modem_load_supported_ip_families_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_BEARER_IP_FAMILY_NONE;
+
+    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                                    G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+supported_ip_families_cgdcont_test_ready (MMBaseModem *self,
+                                          GAsyncResult *res,
+                                          GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    MMBearerIpFamily mask = MM_BEARER_IP_FAMILY_NONE;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (response) {
+        GList *formats, *l;
+
+        formats = mm_3gpp_parse_cgdcont_test_response (response, &error);
+        for (l = formats; l; l = g_list_next (l))
+            mask |= ((MM3gppPdpContextFormat *)(l->data))->pdp_type;
+
+        mm_3gpp_pdp_context_format_list_free (formats);
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (mask), NULL);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_supported_ip_families (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    mm_dbg ("loading supported IP families...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_supported_ip_families);
+
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
+        g_simple_async_result_set_op_res_gpointer (
+            result,
+            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
+            NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Query with CGDCONT=? */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CGDCONT=?",
+        3,
+        TRUE, /* allow caching, it's a test command */
+        (GAsyncReadyCallback)supported_ip_families_cgdcont_test_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Signal quality loading (Modem interface) */
 
 typedef struct {
@@ -9328,6 +9405,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
     iface->load_power_state = load_power_state;
     iface->load_power_state_finish = load_power_state_finish;
+    iface->load_supported_ip_families = modem_load_supported_ip_families;
+    iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
     /* Enabling steps */
     iface->modem_power_up = modem_power_up;
