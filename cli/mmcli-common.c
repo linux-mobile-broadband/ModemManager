@@ -1145,10 +1145,15 @@ mmcli_prefix_newlines (const gchar *prefix,
     const gchar *line_start = str;
     const gchar *line_end;
 
-    while ((line_end = strchr (line_start, '\n'))) {
+    do {
         gssize line_length;
 
-        line_length = line_end - line_start;
+        line_end = strchr (line_start, '\n');
+        if (line_end)
+            line_length = line_end - line_start;
+        else
+            line_length = strlen (line_start);
+
         if (line_start[line_length - 1] == '\r')
             line_length--;
 
@@ -1166,8 +1171,8 @@ mmcli_prefix_newlines (const gchar *prefix,
                                  line_length);
         }
 
-        line_start = line_end + 1;
-    }
+        line_start = (line_end ? line_end + 1 : NULL);
+    } while (line_start != NULL);
 
     return (prefixed_string ?
             g_string_free (prefixed_string, FALSE) :
