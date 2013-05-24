@@ -54,6 +54,11 @@ struct _MMModemPrivate {
     guint supported_modes_id;
     GArray *supported_modes;
 
+    /* Supported Capabilities */
+    GMutex supported_capabilities_mutex;
+    guint supported_capabilities_id;
+    GArray *supported_capabilities;
+
     /* Supported Bands */
     GMutex supported_bands_mutex;
     guint supported_bands_id;
@@ -148,24 +153,118 @@ mm_modem_dup_sim_path (MMModem *self)
 
 /*****************************************************************************/
 
-/**
- * mm_modem_get_modem_capabilities:
- * @self: A #MMModem.
- *
- * Gets the list of generic families of access technologies supported by this #MMModem.
- *
- * Not all capabilities are available at the same time however; some
- * modems require a firmware reload or other reinitialization to switch
- * between e.g. CDMA/EVDO and GSM/UMTS.
- *
- * Returns: A bitmask of #MMModemCapability flags.
- */
-MMModemCapability
-mm_modem_get_modem_capabilities (MMModem *self)
+static void
+supported_capabilities_updated (MMModem *self,
+                                GParamSpec *pspec)
 {
-    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_CAPABILITY_NONE);
+    g_mutex_lock (&self->priv->supported_capabilities_mutex);
+    {
+        GVariant *dictionary;
 
-    return (MMModemCapability) mm_gdbus_modem_get_modem_capabilities (MM_GDBUS_MODEM (self));
+        if (self->priv->supported_capabilities)
+            g_array_unref (self->priv->supported_capabilities);
+
+        dictionary = mm_gdbus_modem_get_supported_capabilities (MM_GDBUS_MODEM (self));
+        self->priv->supported_capabilities = (dictionary ?
+                                              mm_common_capability_combinations_variant_to_garray (dictionary) :
+                                              NULL);
+    }
+    g_mutex_unlock (&self->priv->supported_capabilities_mutex);
+}
+
+static gboolean
+ensure_internal_supported_capabilities (MMModem *self,
+                                        MMModemCapability **dup_capabilities,
+                                        guint *dup_capabilities_n)
+{
+    gboolean ret;
+
+    g_mutex_lock (&self->priv->supported_capabilities_mutex);
+    {
+        /* If this is the first time ever asking for the array, setup the
+         * update listener and the initial array, if any. */
+        if (!self->priv->supported_capabilities_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_modem_dup_supported_capabilities (MM_GDBUS_MODEM (self));
+            if (dictionary) {
+                self->priv->supported_capabilities = mm_common_capability_combinations_variant_to_garray (dictionary);
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->supported_capabilities_id =
+                g_signal_connect (self,
+                                  "notify::supported-capabilities",
+                                  G_CALLBACK (supported_capabilities_updated),
+                                  NULL);
+        }
+
+        if (!self->priv->supported_capabilities)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_capabilities && dup_capabilities_n) {
+                *dup_capabilities_n = self->priv->supported_capabilities->len;
+                if (self->priv->supported_capabilities->len > 0) {
+                    *dup_capabilities = g_malloc (sizeof (MMModemCapability) * self->priv->supported_capabilities->len);
+                    memcpy (*dup_capabilities, self->priv->supported_capabilities->data, sizeof (MMModemCapability) * self->priv->supported_capabilities->len);
+                } else
+                    *dup_capabilities = NULL;
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->supported_capabilities_mutex);
+
+    return ret;
+}
+
+/**
+ * mm_modem_get_supported_capabilities:
+ * @self: A #MMModem.
+ * @capabilities: (out) (array length=n_capabilities): Return location for the array of #MMModemCapability values. The returned array should be freed with g_free() when no longer needed.
+ * @n_capabilities: (out): Return location for the number of values in @capabilities.
+ *
+ * Gets the list of combinations of generic families of access technologies supported by this #MMModem.
+ *
+ * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE otherwise.
+ */
+gboolean
+mm_modem_get_supported_capabilities (MMModem *self,
+                                     MMModemCapability **capabilities,
+                                     guint *n_capabilities)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return ensure_internal_supported_capabilities (self, capabilities, n_capabilities);
+}
+
+/**
+ * mm_modem_peek_supported_capabilities:
+ * @self: A #MMModem.
+ * @capabilities: (out) (array length=n_capabilities): Return location for the array of #MMModemCapability values. Do not free the returned array, it is owned by @self.
+ * @n_capabilities: (out): Return location for the number of values in @capabilities.
+ *
+ * Gets the list of combinations of generic families of access technologies supported by this #MMModem.
+ *
+ * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE otherwise.
+ */
+gboolean
+mm_modem_peek_supported_capabilities (MMModem *self,
+                                      const MMModemCapability **capabilities,
+                                      guint *n_capabilities)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (capabilities != NULL, FALSE);
+    g_return_val_if_fail (n_capabilities != NULL, FALSE);
+
+    if (!ensure_internal_supported_capabilities (self, NULL, NULL))
+        return FALSE;
+
+    *n_capabilities = self->priv->supported_capabilities->len;
+    *capabilities = (MMModemCapability *)self->priv->supported_capabilities->data;
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -2642,6 +2741,7 @@ mm_modem_init (MMModem *self)
                                               MMModemPrivate);
     g_mutex_init (&self->priv->unlock_retries_mutex);
     g_mutex_init (&self->priv->supported_modes_mutex);
+    g_mutex_init (&self->priv->supported_capabilities_mutex);
     g_mutex_init (&self->priv->supported_bands_mutex);
     g_mutex_init (&self->priv->current_bands_mutex);
 }
@@ -2658,6 +2758,8 @@ finalize (GObject *object)
 
     if (self->priv->supported_modes)
         g_array_unref (self->priv->supported_modes);
+    if (self->priv->supported_capabilities)
+        g_array_unref (self->priv->supported_capabilities);
     if (self->priv->supported_bands)
         g_array_unref (self->priv->supported_bands);
     if (self->priv->current_bands)

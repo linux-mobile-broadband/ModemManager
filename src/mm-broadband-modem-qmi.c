@@ -555,46 +555,37 @@ modem_load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Modem Capabilities loading (Modem interface) */
+/* Supported capabilities loading (Modem interface) */
 
 typedef struct {
     MMBroadbandModemQmi *self;
     GSimpleAsyncResult *result;
-} LoadModemCapabilitiesContext;
+} LoadSupportedCapabilitiesContext;
 
 static void
-load_modem_capabilities_context_complete_and_free (LoadModemCapabilitiesContext *ctx)
+load_supported_capabilities_context_complete_and_free (LoadSupportedCapabilitiesContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_slice_free (LoadModemCapabilitiesContext, ctx);
+    g_slice_free (LoadSupportedCapabilitiesContext, ctx);
 }
 
-static MMModemCapability
-modem_load_modem_capabilities_finish (MMIfaceModem *self,
-                                      GAsyncResult *res,
-                                      GError **error)
+static GArray *
+modem_load_supported_capabilities_finish (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error)
 {
-    MMModemCapability caps;
-    gchar *caps_str;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_CAPABILITY_NONE;
+        return NULL;
 
-    caps = ((MMModemCapability) GPOINTER_TO_UINT (
-                g_simple_async_result_get_op_res_gpointer (
-                    G_SIMPLE_ASYNC_RESULT (res))));
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("loaded modem capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
 dms_get_capabilities_ready (QmiClientDms *client,
                             GAsyncResult *res,
-                            LoadModemCapabilitiesContext *ctx)
+                            LoadSupportedCapabilitiesContext *ctx)
 {
     QmiMessageDmsGetCapabilitiesOutput *output = NULL;
     GError *error = NULL;
@@ -604,12 +595,15 @@ dms_get_capabilities_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (ctx->result, error);
     } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't get modem capabilities: ");
+        g_prefix_error (&error, "Couldn't get supported capabilities: ");
         g_simple_async_result_take_error (ctx->result, error);
     } else {
         guint i;
-        guint mask = MM_MODEM_CAPABILITY_NONE;
+        MMModemCapability mask = MM_MODEM_CAPABILITY_NONE;
+        MMModemCapability single;
         GArray *radio_interface_list;
+        GArray *supported_combinations;
+        GArray *filtered_combinations;
 
         qmi_message_dms_get_capabilities_output_get_info (
             output,
@@ -631,23 +625,55 @@ dms_get_capabilities_ready (QmiClientDms *client,
             g_array_unref (ctx->self->priv->supported_radio_interfaces);
         ctx->self->priv->supported_radio_interfaces = g_array_ref (radio_interface_list);
 
+        supported_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 7);
+
+        /* Add all possible supported capability combinations, we will filter
+         * them out afterwards */
+
+        /* GSM/UMTS */
+        single = MM_MODEM_CAPABILITY_GSM_UMTS;
+        g_array_append_val (supported_combinations, single);
+        /* CDMA/EVDO */
+        single = MM_MODEM_CAPABILITY_CDMA_EVDO;
+        g_array_append_val (supported_combinations, single);
+        /* LTE only */
+        single = MM_MODEM_CAPABILITY_LTE;
+        g_array_append_val (supported_combinations, single);
+        /* GSM/UMTS + CDMA/EVDO */
+        single = (MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_GSM_UMTS);
+        g_array_append_val (supported_combinations, single);
+        /* GSM/UMTS + LTE */
+        single = (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE);
+        g_array_append_val (supported_combinations, single);
+        /* CDMA/EVDO + LTE */
+        single = (MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE);
+        g_array_append_val (supported_combinations, single);
+        /* GSM/UMTS + CDMA/EVDO + LTE */
+        single = (MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE);
+        g_array_append_val (supported_combinations, single);
+
+        /* Now filter out based on the real capabilities of the modem */
+        filtered_combinations = mm_filter_supported_capabilities (mask,
+                                                                  supported_combinations);
+        g_array_unref (supported_combinations);
+
         g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (mask),
-                                                   NULL);
+                                                   filtered_combinations,
+                                                   (GDestroyNotify) g_array_unref);
     }
 
     if (output)
         qmi_message_dms_get_capabilities_output_unref (output);
 
-    load_modem_capabilities_context_complete_and_free (ctx);
+    load_supported_capabilities_context_complete_and_free (ctx);
 }
 
 static void
-modem_load_modem_capabilities (MMIfaceModem *self,
-                               GAsyncReadyCallback callback,
-                               gpointer user_data)
+modem_load_supported_capabilities (MMIfaceModem *self,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
 {
-    LoadModemCapabilitiesContext *ctx;
+    LoadSupportedCapabilitiesContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -655,14 +681,14 @@ modem_load_modem_capabilities (MMIfaceModem *self,
                             callback, user_data))
         return;
 
-    ctx = g_slice_new (LoadModemCapabilitiesContext);
+    ctx = g_slice_new (LoadSupportedCapabilitiesContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             modem_load_modem_capabilities);
+                                             modem_load_supported_capabilities);
 
-    mm_dbg ("loading modem capabilities...");
+    mm_dbg ("loading supported capabilities...");
     qmi_client_dms_get_capabilities (QMI_CLIENT_DMS (client),
                                      NULL,
                                      5,
@@ -8182,8 +8208,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Initialization steps */
     iface->load_current_capabilities = modem_load_current_capabilities;
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
-    iface->load_modem_capabilities = modem_load_modem_capabilities;
-    iface->load_modem_capabilities_finish = modem_load_modem_capabilities_finish;
+    iface->load_supported_capabilities = modem_load_supported_capabilities;
+    iface->load_supported_capabilities_finish = modem_load_supported_capabilities_finish;
     iface->load_manufacturer = modem_load_manufacturer;
     iface->load_manufacturer_finish = modem_load_manufacturer_finish;
     iface->load_model = modem_load_model;

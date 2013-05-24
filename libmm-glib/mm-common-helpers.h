@@ -26,6 +26,9 @@
 #ifndef MM_COMMON_HELPERS_H
 #define MM_COMMON_HELPERS_H
 
+gchar *mm_common_build_capabilities_string (const MMModemCapability *capabilities,
+                                            guint n_capabilities);
+
 gchar *mm_common_build_bands_string (const MMModemBand *bands,
                                      guint n_bands);
 
@@ -78,6 +81,15 @@ GVariant               *mm_common_mode_combinations_array_to_variant  (const MMM
                                                                        guint n_modes);
 GVariant               *mm_common_mode_combinations_garray_to_variant (GArray *array);
 GVariant               *mm_common_build_mode_combinations_default     (void);
+
+GArray            *mm_common_capability_combinations_variant_to_garray (GVariant *variant);
+MMModemCapability *mm_common_capability_combinations_variant_to_array  (GVariant *variant,
+                                                                        guint *n_capabilities);
+GVariant          *mm_common_capability_combinations_array_to_variant  (const MMModemCapability *capabilities,
+                                                                        guint n_capabilities);
+GVariant          *mm_common_capability_combinations_garray_to_variant (GArray *array);
+GVariant          *mm_common_build_capability_combinations_any         (void);
+GVariant          *mm_common_build_capability_combinations_none        (void);
 
 typedef gboolean (*MMParseKeyValueForeachFn) (const gchar *key,
                                               const gchar *value,

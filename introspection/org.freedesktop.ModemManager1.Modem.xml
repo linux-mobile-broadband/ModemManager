@@ -200,17 +200,17 @@
     <property name="Sim" type="o" access="read" />
 
     <!--
-        ModemCapabilities:
+        SupportedCapabilities:
 
-        Bitmask of <link linkend="MMModemCapability">MMModemCapability</link>
-        values, specifying the generic family of access technologies the modem
-        supports.
+        List of <link linkend="MMModemCapability">MMModemCapability</link>
+        values, specifying the combinations of generic family of access
+        technologies the modem supports.
 
-        Not all capabilities are available at the same time however; some
-        modems require a firmware reload or other reinitialization to switch
-        between e.g. CDMA/EVDO and GSM/UMTS.
+        If the modem doesn't allow changing the current capabilities, a single entry with
+        <link linkend="MM-MODEM-CAPABILITY-ANY:CAPS"><constant>MM_MODEM_CAPABILITY_ANY</constant></link>
+        will be given.
     -->
-    <property name="ModemCapabilities" type="u" access="read" />
+    <property name="SupportedCapabilities" type="au" access="read" />
 
     <!--
         CurrentCapabilities:

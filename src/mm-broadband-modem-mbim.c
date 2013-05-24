@@ -2169,8 +2169,6 @@ iface_modem_init (MMIfaceModem *iface)
     /* Initialization steps */
     iface->load_current_capabilities = modem_load_current_capabilities;
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
-    iface->load_modem_capabilities = NULL;
-    iface->load_modem_capabilities_finish = NULL;
     iface->load_manufacturer = modem_load_manufacturer;
     iface->load_manufacturer_finish = modem_load_manufacturer_finish;
     iface->load_model = modem_load_model;

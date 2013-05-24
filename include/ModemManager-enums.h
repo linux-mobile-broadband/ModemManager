@@ -38,6 +38,7 @@
  * @MM_MODEM_CAPABILITY_LTE: Modem has LTE data capability.
  * @MM_MODEM_CAPABILITY_LTE_ADVANCED: Modem has LTE Advanced data capability.
  * @MM_MODEM_CAPABILITY_IRIDIUM: Modem has Iridium capabilities.
+ * @MM_MODEM_CAPABILITY_ANY: Mask specifying all capabilities.
  *
  * Flags describing one or more of the general access technology families that a
  * modem supports.
@@ -50,6 +51,7 @@ typedef enum { /*< underscore_name=mm_modem_capability >*/
     MM_MODEM_CAPABILITY_LTE          = 1 << 3,
     MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 4,
     MM_MODEM_CAPABILITY_IRIDIUM      = 1 << 5,
+    MM_MODEM_CAPABILITY_ANY          = 0xFFFFFFFF
 } MMModemCapability;
 
 /**

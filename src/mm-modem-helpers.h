@@ -76,6 +76,9 @@ gchar *mm_new_iso8601_time (guint year,
 GArray *mm_filter_supported_modes (const GArray *all,
                                    const GArray *supported_combinations);
 
+GArray *mm_filter_supported_capabilities (MMModemCapability all,
+                                          const GArray *supported_combinations);
+
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/

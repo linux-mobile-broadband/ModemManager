@@ -26,6 +26,34 @@
 #include "mm-common-helpers.h"
 
 gchar *
+mm_common_build_capabilities_string (const MMModemCapability *capabilities,
+                                     guint n_capabilities)
+{
+    gboolean first = TRUE;
+    GString *str;
+    guint i;
+
+    if (!capabilities || !n_capabilities)
+        return g_strdup ("none");
+
+    str = g_string_new ("");
+    for (i = 0; i < n_capabilities; i++) {
+        gchar *tmp;
+
+        tmp = mm_modem_capability_build_string_from_mask (capabilities[i]);
+        g_string_append_printf (str, "%s%s",
+                                first ? "" : "\n",
+                                tmp);
+        g_free (tmp);
+
+        if (first)
+            first = FALSE;
+    }
+
+    return g_string_free (str, FALSE);
+}
+
+gchar *
 mm_common_build_bands_string (const MMModemBand *bands,
                               guint n_bands)
 {
@@ -214,6 +242,103 @@ mm_common_get_modes_from_string (const gchar *str,
     g_type_class_unref (flags_class);
     g_strfreev (mode_strings);
     return modes;
+}
+
+GArray *
+mm_common_capability_combinations_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            guint32 capability;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), n);
+            while (g_variant_iter_loop (&iter, "u", &capability))
+                g_array_append_val (array, capability);
+        }
+    }
+
+    /* If nothing set, fallback to default */
+    if (!array) {
+        guint32 capability = MM_MODEM_CAPABILITY_NONE;
+
+        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 1);
+        g_array_append_val (array, capability);
+    }
+
+    return array;
+}
+
+MMModemCapability *
+mm_common_capability_combinations_variant_to_array (GVariant *variant,
+                                                    guint *n_capabilities)
+{
+    GArray *array;
+
+    array = mm_common_capability_combinations_variant_to_garray (variant);
+    if (n_capabilities)
+        *n_capabilities = array->len;
+    return (MMModemCapability *) g_array_free (array, FALSE);
+}
+
+GVariant *
+mm_common_capability_combinations_array_to_variant (const MMModemCapability *capabilities,
+                                                    guint n_capabilities)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+
+    if (n_capabilities > 0) {
+        guint i;
+
+        for (i = 0; i < n_capabilities; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new_uint32 ((guint32)capabilities[i]));
+    } else
+        g_variant_builder_add_value (&builder,
+                                     g_variant_new_uint32 (MM_MODEM_CAPABILITY_NONE));
+
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_capability_combinations_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_capability_combinations_array_to_variant ((const MMModemCapability *)array->data,
+                                                                   array->len);
+
+    return mm_common_capability_combinations_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_capability_combinations_none (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_CAPABILITY_NONE));
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_build_capability_combinations_any (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_CAPABILITY_ANY));
+    return g_variant_builder_end (&builder);
 }
 
 void

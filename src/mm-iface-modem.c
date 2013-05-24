@@ -3501,7 +3501,7 @@ static void interface_initialization_step (InitializationContext *ctx);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
-    INITIALIZATION_STEP_MODEM_CAPABILITIES,
+    INITIALIZATION_STEP_SUPPORTED_CAPABILITIES,
     INITIALIZATION_STEP_BEARERS,
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
@@ -3681,7 +3681,33 @@ load_current_capabilities_ready (MMIfaceModem *self,
     interface_initialization_step (ctx);
 }
 
-UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
+static void
+load_supported_capabilities_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   InitializationContext *ctx)
+{
+    GArray *supported_capabilities;
+    GError *error = NULL;
+
+    supported_capabilities = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities_finish (self, res, &error);
+    if (error) {
+        g_propagate_error (&ctx->fatal_error, error);
+        g_prefix_error (&ctx->fatal_error, "couldn't load supported capabilities: ");
+        /* Jump to the last step */
+        ctx->step = INITIALIZATION_STEP_LAST;
+        interface_initialization_step (ctx);
+        return;
+    }
+
+    /* Update supported caps */
+    mm_gdbus_modem_set_supported_capabilities (ctx->skeleton,
+                                               mm_common_capability_combinations_garray_to_variant (supported_capabilities));
+    g_array_unref (supported_capabilities);
+
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
@@ -3935,26 +3961,42 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_MODEM_CAPABILITIES:
-        /* Modem capabilities are meant to be loaded only once during the whole
+    case INITIALIZATION_STEP_SUPPORTED_CAPABILITIES: {
+        GArray *supported_capabilities;
+
+        supported_capabilities = (mm_common_capability_combinations_variant_to_garray (
+                                      mm_gdbus_modem_get_supported_capabilities (ctx->skeleton)));
+
+        /* Supported capabilities are meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_modem_get_modem_capabilities (ctx->skeleton) == MM_MODEM_CAPABILITY_NONE &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities (
-                ctx->self,
-                (GAsyncReadyCallback)load_modem_capabilities_ready,
-                ctx);
-            return;
+        if (supported_capabilities->len == 0 ||
+            g_array_index (supported_capabilities, MMModemCapability, 0) == MM_MODEM_CAPABILITY_NONE) {
+            MMModemCapability current;
+
+            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_supported_capabilities_ready,
+                    ctx);
+                return;
+            }
+
+            /* If no specific way of getting modem capabilities, default to the current ones */
+            g_array_unref (supported_capabilities);
+            supported_capabilities = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 1);
+            current = mm_gdbus_modem_get_current_capabilities (ctx->skeleton);
+            g_array_append_val (supported_capabilities, current);
+            mm_gdbus_modem_set_supported_capabilities (
+                ctx->skeleton,
+                mm_common_capability_combinations_garray_to_variant (supported_capabilities));
         }
-       /* If no specific way of getting modem capabilities, assume they are
-        * equal to the current capabilities */
-        mm_gdbus_modem_set_modem_capabilities (
-            ctx->skeleton,
-            mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
+        g_array_unref (supported_capabilities);
+
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case INITIALIZATION_STEP_BEARERS: {
         MMBearerList *list = NULL;
@@ -4318,8 +4360,8 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 
         /* Set all initial property defaults */
         mm_gdbus_modem_set_sim (skeleton, NULL);
+        mm_gdbus_modem_set_supported_capabilities (skeleton, mm_common_build_capability_combinations_none ());
         mm_gdbus_modem_set_current_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
-        mm_gdbus_modem_set_modem_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
         mm_gdbus_modem_set_max_bearers (skeleton, 0);
         mm_gdbus_modem_set_max_active_bearers (skeleton, 0);
         mm_gdbus_modem_set_manufacturer (skeleton, NULL);

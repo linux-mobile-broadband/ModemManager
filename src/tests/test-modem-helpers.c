@@ -2053,6 +2053,98 @@ test_supported_mode_filter (void *f, gpointer d)
 
 /*****************************************************************************/
 
+static gboolean
+find_capability_combination (GArray *capabilities,
+                             MMModemCapability capability)
+{
+    guint i;
+
+    for (i = 0; i < capabilities->len; i++) {
+        MMModemCapability capability_i;
+
+        capability_i = g_array_index (capabilities, MMModemCapability, i);
+        if (capability_i == capability)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void
+test_supported_capability_filter (void *f, gpointer d)
+{
+    MMModemCapability capability;
+    GArray *combinations;
+    GArray *filtered;
+
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 6);
+
+    /* GSM/UMTS only */
+    capability = MM_MODEM_CAPABILITY_GSM_UMTS;
+    g_array_append_val (combinations, capability);
+    /* CDMA/EVDO only */
+    capability = MM_MODEM_CAPABILITY_CDMA_EVDO;
+    g_array_append_val (combinations, capability);
+    /* GSM/UMTS and CDMA/EVDO */
+    capability = (MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_GSM_UMTS);
+    g_array_append_val (combinations, capability);
+    /* GSM/UMTS+LTE */
+    capability = (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE);
+    g_array_append_val (combinations, capability);
+    /* CDMA/EVDO+LTE */
+    capability = (MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE);
+    g_array_append_val (combinations, capability);
+    /* GSM/UMTS+CDMA/EVDO+LTE */
+    capability = (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE);
+    g_array_append_val (combinations, capability);
+
+    /* Only GSM-UMTS supported */
+    filtered = mm_filter_supported_capabilities (MM_MODEM_CAPABILITY_GSM_UMTS, combinations);
+    g_assert_cmpuint (filtered->len, ==, 1);
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_GSM_UMTS));
+    g_array_unref (filtered);
+
+    /* Only CDMA-EVDO supported */
+    filtered = mm_filter_supported_capabilities (MM_MODEM_CAPABILITY_CDMA_EVDO, combinations);
+    g_assert_cmpuint (filtered->len, ==, 1);
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_CDMA_EVDO));
+    g_array_unref (filtered);
+
+    /* GSM-UMTS and CDMA-EVDO supported */
+    filtered = mm_filter_supported_capabilities ((MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                                  MM_MODEM_CAPABILITY_GSM_UMTS),
+                                                 combinations);
+    g_assert_cmpuint (filtered->len, ==, 3);
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_CDMA_EVDO));
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_GSM_UMTS));
+    g_assert (find_capability_combination (filtered, (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                                      MM_MODEM_CAPABILITY_CDMA_EVDO)));
+    g_array_unref (filtered);
+
+    /* GSM-UMTS, CDMA-EVDO and LTE supported */
+    filtered = mm_filter_supported_capabilities ((MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                                  MM_MODEM_CAPABILITY_GSM_UMTS |
+                                                  MM_MODEM_CAPABILITY_LTE),
+                                                 combinations);
+    g_assert_cmpuint (filtered->len, ==, 6);
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_CDMA_EVDO));
+    g_assert (find_capability_combination (filtered, MM_MODEM_CAPABILITY_GSM_UMTS));
+    g_assert (find_capability_combination (filtered, (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                                      MM_MODEM_CAPABILITY_CDMA_EVDO)));
+    g_assert (find_capability_combination (filtered, (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                                      MM_MODEM_CAPABILITY_LTE)));
+    g_assert (find_capability_combination (filtered, (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                                      MM_MODEM_CAPABILITY_LTE)));
+    g_assert (find_capability_combination (filtered, (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                                      MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                                      MM_MODEM_CAPABILITY_LTE)));
+    g_array_unref (filtered);
+
+    g_array_unref (combinations);
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -2183,6 +2275,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech_multiple, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_supported_mode_filter, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_supported_capability_filter, NULL));
 
     result = g_test_run ();
 

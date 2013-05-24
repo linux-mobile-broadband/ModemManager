@@ -74,7 +74,12 @@ gchar       *mm_modem_dup_path (MMModem *self);
 const gchar       *mm_modem_get_sim_path             (MMModem *self);
 gchar             *mm_modem_dup_sim_path             (MMModem *self);
 
-MMModemCapability  mm_modem_get_modem_capabilities   (MMModem *self);
+gboolean           mm_modem_peek_supported_capabilities (MMModem *self,
+                                                         const MMModemCapability **capabilities,
+                                                         guint *n_capabilities);
+gboolean           mm_modem_get_supported_capabilities (MMModem *self,
+                                                        MMModemCapability **capabilities,
+                                                        guint *n_capabilities);
 
 MMModemCapability  mm_modem_get_current_capabilities (MMModem *self);
 
