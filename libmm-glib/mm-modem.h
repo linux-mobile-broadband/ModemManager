@@ -271,6 +271,19 @@ gboolean mm_modem_set_power_state_sync   (MMModem *self,
                                           GCancellable *cancellable,
                                           GError **error);
 
+void     mm_modem_set_current_capabilities        (MMModem *self,
+                                                   MMModemCapability capabilities,
+                                                   GCancellable *cancellable,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data);
+gboolean mm_modem_set_current_capabilities_finish (MMModem *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+gboolean mm_modem_set_current_capabilities_sync   (MMModem *self,
+                                                   MMModemCapability capabilities,
+                                                   GCancellable *cancellable,
+                                                   GError **error);
+
 void     mm_modem_set_current_modes        (MMModem *self,
                                             MMModemMode modes,
                                             MMModemMode preferred,

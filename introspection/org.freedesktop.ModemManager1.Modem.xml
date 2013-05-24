@@ -137,6 +137,16 @@
     </method>
 
     <!--
+        SetCurrentCapabilities:
+        @capabilities: Bitmask of <link linkend="MMModemCapability">MMModemCapability</link> values, to specify the capabilities to use.
+
+        Set the capabilities of the device. A restart of the modem may be required.
+    -->
+    <method name="SetCurrentCapabilities">
+      <arg name="capabilities" type="u" direction="in" />
+    </method>
+
+    <!--
         SetCurrentModes:
         @modes: A pair of <link linkend="MMModemMode">MMModemMode</link> values, where the first one is a bitmask of allowed modes, and the second one the preferred mode, if any.
 

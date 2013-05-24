@@ -217,6 +217,15 @@ struct _MMIfaceModem {
                                      GAsyncResult *res,
                                      GError **error);
 
+    /* Asynchronous capabilities setting operation */
+    void (*set_current_capabilities) (MMIfaceModem *self,
+                                      MMModemCapability,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*set_current_capabilities_finish) (MMIfaceModem *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
     /* Asynchronous current band setting operation */
     void (*set_current_bands) (MMIfaceModem *self,
                                GArray *bands_array,

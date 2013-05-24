@@ -2415,6 +2415,88 @@ mm_modem_set_power_state_sync (MMModem *self,
 /*****************************************************************************/
 
 /**
+ * mm_modem_set_current_capabilities_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_capabilities().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_set_current_capabilities().
+ *
+ * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_set_current_capabilities_finish (MMModem *self,
+                                          GAsyncResult *res,
+                                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_current_capabilities_finish (MM_GDBUS_MODEM (self), res, error);
+}
+
+/**
+ * mm_modem_set_current_capabilities:
+ * @self: A #MMModem.
+ * @capabilities: A #MMModemCapability mask.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously sets the capabilities of the device. A restart of the modem may be required.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_set_current_capabilities_finish() to get the result of the operation.
+ *
+ * See mm_modem_set_current_capabilities_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_set_current_capabilities (MMModem *self,
+                                   MMModemCapability capabilities,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+
+    mm_gdbus_modem_call_set_current_capabilities (MM_GDBUS_MODEM (self),
+                                                  capabilities,
+                                                  cancellable,
+                                                  callback,
+                                                  user_data);
+}
+
+/**
+ * mm_modem_set_current_capabilities_sync:
+ * @self: A #MMModem.
+ * @capabilities: A #MMModemCapability mask.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously sets the capabilities of the device. A restart of the modem may be required.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_set_current_capabilities()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_set_current_capabilities_sync (MMModem *self,
+                                        MMModemCapability capabilities,
+                                        GCancellable *cancellable,
+                                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return (mm_gdbus_modem_call_set_current_capabilities_sync (
+                MM_GDBUS_MODEM (self),
+                capabilities,
+                cancellable,
+                error));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_set_current_modes_finish:
  * @self: A #MMModem.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_modes().

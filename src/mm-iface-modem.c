@@ -1791,6 +1791,142 @@ handle_factory_reset (MmGdbusModem *skeleton,
 }
 
 /*****************************************************************************/
+/* Current capabilities setting */
+
+typedef struct {
+    MmGdbusModem *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem *self;
+    MMModemCapability capabilities;
+} HandleSetCurrentCapabilitiesContext;
+
+static void
+handle_set_current_capabilities_context_free (HandleSetCurrentCapabilitiesContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleSetCurrentCapabilitiesContext, ctx);
+}
+
+static void
+set_current_capabilities_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                HandleSetCurrentCapabilitiesContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
+    handle_set_current_capabilities_context_free (ctx);
+}
+
+static void
+handle_set_current_capabilities_auth_ready (MMBaseModem *self,
+                                            GAsyncResult *res,
+                                            HandleSetCurrentCapabilitiesContext *ctx)
+{
+    GError *error = NULL;
+    gchar *capabilities_string;
+    GArray *supported;
+    gboolean matched = FALSE;
+    guint i;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
+    /* Get list of supported capabilities */
+    supported = mm_common_capability_combinations_variant_to_garray (
+        mm_gdbus_modem_get_supported_capabilities (ctx->skeleton));
+
+    /* Don't allow capability switching if only one item given in the supported list */
+    if (supported->len == 1) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot change capabilities: only one combination supported");
+        handle_set_current_capabilities_context_free (ctx);
+        g_array_unref (supported);
+        return;
+    }
+
+    /* Check if the given combination is supported */
+    for (i = 0; !matched && i < supported->len; i++) {
+        MMModemCapability supported_capability;
+
+        supported_capability = g_array_index (supported, MMModemCapability, i);
+        if (supported_capability == ctx->capabilities)
+                matched = TRUE;
+    }
+    g_array_unref (supported);
+
+    if (!matched) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "The given combination of capabilities is not supported");
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
+    /* Check if we already are in the requested setup */
+    if (mm_gdbus_modem_get_current_capabilities (ctx->skeleton) == ctx->capabilities) {
+        /* Nothing to do */
+        mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
+    /* If setting current capabilities is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Setting current capabilities not supported");
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
+    capabilities_string = mm_modem_capability_build_string_from_mask (ctx->capabilities);
+    mm_dbg ("Setting new list of capabilities: '%s'", capabilities_string);
+    g_free (capabilities_string);
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities (
+        MM_IFACE_MODEM (self),
+        ctx->capabilities,
+        (GAsyncReadyCallback)set_current_capabilities_ready,
+        ctx);
+}
+
+static gboolean
+handle_set_current_capabilities (MmGdbusModem *skeleton,
+                                 GDBusMethodInvocation *invocation,
+                                 guint capabilities,
+                                 MMIfaceModem *self)
+{
+    HandleSetCurrentCapabilitiesContext *ctx;
+
+    ctx = g_slice_new (HandleSetCurrentCapabilitiesContext);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->capabilities = capabilities;
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_current_capabilities_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Current bands setting */
 
 typedef struct {
@@ -4310,6 +4446,10 @@ interface_initialization_step (InitializationContext *ctx)
             g_signal_connect (ctx->skeleton,
                               "handle-factory-reset",
                               G_CALLBACK (handle_factory_reset),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-set-current-capabilities",
+                              G_CALLBACK (handle_set_current_capabilities),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-bands",
