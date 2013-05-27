@@ -61,12 +61,14 @@ mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x114f, 0 };
+    static const gchar *forbidden_drivers[] = { "qcserial", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_WAVECOM,
                       MM_PLUGIN_NAME,               "Wavecom",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_FORBIDDEN_DRIVERS,  forbidden_drivers,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       NULL));
 }
