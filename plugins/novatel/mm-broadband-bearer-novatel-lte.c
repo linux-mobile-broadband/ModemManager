@@ -42,6 +42,22 @@ struct _MMBroadbandBearerNovatelLtePrivate {
     guint connection_poller;
 };
 
+static gchar *
+normalize_qmistatus (const gchar *status)
+{
+    gchar *normalized_status, *iter;
+
+    if (!status)
+        return NULL;
+
+    normalized_status = g_strdup (status);
+    for (iter = normalized_status; *iter; iter++)
+        if (g_ascii_isspace (*iter))
+            *iter = ' ';
+
+    return normalized_status;
+}
+
 /*****************************************************************************/
 /* 3GPP Connection sequence */
 
@@ -146,6 +162,7 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                               DetailedConnectContext *ctx)
 {
     const gchar *result;
+    gchar *normalized_result;
     GError *error = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (ctx->modem),
@@ -188,10 +205,13 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
     }
 
     /* Already exhausted all retries */
+    normalized_result = normalize_qmistatus (result);
     g_simple_async_result_set_error (ctx->result,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
-                                     "%s", result);
+                                     "QMI connect failed: %s",
+                                     normalized_result);
+    g_free (normalized_result);
     detailed_connect_context_complete_and_free (ctx);
 }
 
@@ -385,6 +405,7 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
     } else {
         mm_dbg ("QMI connection status failed: %s", error->message);
         g_error_free (error);
+        result = "Unknown error";
     }
 
     if (ctx->retries > 0) {
@@ -398,13 +419,17 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
     /* If $NWQMISTATUS reports a CONNECTED QMI state, returns an error such that
      * the modem state remains 'connected'. Otherwise, assumes the modem is
      * disconnected from the network successfully. */
-    if (is_connected)
+    if (is_connected) {
+        gchar *normalized_result;
+
+        normalized_result = normalize_qmistatus (result);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "QMI disconnect failed: %s",
-                                         result);
-    else
+                                         normalized_result);
+        g_free (normalized_result);
+    } else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
     detailed_disconnect_context_complete_and_free (ctx);
