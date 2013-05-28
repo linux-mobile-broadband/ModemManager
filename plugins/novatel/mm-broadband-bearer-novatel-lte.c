@@ -301,7 +301,7 @@ connect_3gpp (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              connect_3gpp);
-    ctx->retries = 4;
+    ctx->retries = 60;
 
     /* Get a 'net' data port */
     ctx->data = mm_base_modem_get_best_data_port (MM_BASE_MODEM (modem),
@@ -353,7 +353,7 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              detailed_disconnect_context_new);
-    ctx->retries = 4;
+    ctx->retries = 60;
     return ctx;
 }
 
