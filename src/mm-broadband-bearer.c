@@ -85,6 +85,7 @@ typedef struct {
     /* 3GPP-specific */
     guint cid;
     guint max_cid;
+    gboolean use_existing_cid;
     MMBearerIpFamily ip_family;
 } DetailedConnectContext;
 
@@ -725,6 +726,21 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
+start_3gpp_dial (DetailedConnectContext *ctx)
+{
+    /* Keep CID around after initializing the PDP context in order to
+     * handle corresponding unsolicited PDP activation responses. */
+    ctx->self->priv->cid = ctx->cid;
+    MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
+                                                          ctx->modem,
+                                                          ctx->primary,
+                                                          ctx->cid,
+                                                          ctx->cancellable,
+                                                          (GAsyncReadyCallback)dial_3gpp_ready,
+                                                          ctx);
+}
+
+static void
 initialize_pdp_context_ready (MMBaseModem *modem,
                               GAsyncResult *res,
                               DetailedConnectContext *ctx)
@@ -744,16 +760,7 @@ initialize_pdp_context_ready (MMBaseModem *modem,
         return;
     }
 
-    /* Keep CID around after initializing the PDP context in order to
-     * handle corresponding unsolicited PDP activation responses. */
-    ctx->self->priv->cid = ctx->cid;
-    MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
-                                                          ctx->modem,
-                                                          ctx->primary,
-                                                          ctx->cid,
-                                                          ctx->cancellable,
-                                                          (GAsyncReadyCallback)dial_3gpp_ready,
-                                                          ctx);
+    start_3gpp_dial (ctx);
 }
 
 static void
@@ -780,7 +787,6 @@ find_cid_ready (MMBaseModem *modem,
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    /* Initialize PDP context with our APN */
     pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
     if (!pdp_type) {
         g_simple_async_result_set_error (ctx->result,
@@ -790,8 +796,15 @@ find_cid_ready (MMBaseModem *modem,
         detailed_connect_context_complete_and_free (ctx);
         return;
     }
-
     ctx->cid = g_variant_get_uint32 (result);
+
+    /* If there's already a PDP context defined, just use it */
+    if (ctx->use_existing_cid) {
+        start_3gpp_dial (ctx);
+        return;
+    }
+
+    /* Otherwise, initialize a new PDP context with our APN */
     apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
     command = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
                                ctx->cid,
@@ -966,6 +979,7 @@ parse_pdp_list (MMBaseModem *modem,
                     mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
                             pdp->cid, mm_bearer_ip_family_get_string (pdp->pdp_type), pdp->apn);
                     cid = pdp->cid;
+                    ctx->use_existing_cid = TRUE;
                     /* In this case, stop searching */
                     break;
                 }
