@@ -901,6 +901,27 @@ mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
     return caps;
 }
 
+QmiNasRatModePreference
+mm_modem_capability_to_qmi_rat_mode_preference (MMModemCapability caps)
+{
+    QmiNasRatModePreference qmi = 0;
+
+    if (caps & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X;
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO;
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_GSM_UMTS) {
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_GSM;
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_UMTS;
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_LTE)
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
+
+    return qmi;
+}
+
 /*****************************************************************************/
 
 MMModemCapability
@@ -929,6 +950,34 @@ mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyP
     /* FIXME: LTE Advanced? */
 
     return caps;
+}
+
+QmiNasRadioTechnologyPreference
+mm_modem_capability_to_qmi_radio_technology_preference (MMModemCapability caps)
+{
+    QmiNasRatModePreference qmi = 0;
+
+    /* It is not expected to have a modem supporting 3GPP and 3GPP2 at the same
+     * time but not supporting SSP. */
+    g_warn_if_fail (caps & MM_MODEM_CAPABILITY_GSM_UMTS &&
+                    caps & MM_MODEM_CAPABILITY_CDMA_EVDO);
+
+    if (caps & MM_MODEM_CAPABILITY_GSM_UMTS) {
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP;
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM;
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA;
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2;
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA;
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR;
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_LTE)
+        qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE;
+
+    return qmi;
 }
 
 /*****************************************************************************/
