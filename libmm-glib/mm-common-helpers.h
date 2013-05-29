@@ -38,6 +38,8 @@ gchar *mm_common_build_sms_storages_string (const MMSmsStorage *storages,
 gchar *mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
                                                  guint n_modes);
 
+MMModemCapability     mm_common_get_capabilities_from_string (const gchar *str,
+                                                              GError **error);
 MMModemMode           mm_common_get_modes_from_string        (const gchar *str,
                                                               GError **error);
 void                  mm_common_get_bands_from_string        (const gchar *str,

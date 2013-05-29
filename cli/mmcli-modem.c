@@ -57,6 +57,7 @@ static gchar *command_str;
 static gboolean list_bearers_flag;
 static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
+static gchar *set_current_capabilities_str;
 static gchar *set_allowed_modes_str;
 static gchar *set_preferred_mode_str;
 static gchar *set_current_bands_str;
@@ -105,6 +106,10 @@ static GOptionEntry entries[] = {
     { "delete-bearer", 0, 0, G_OPTION_ARG_STRING, &delete_bearer_str,
       "Delete a data bearer from a given modem",
       "[PATH]"
+    },
+    { "set-current-capabilities", 0, 0, G_OPTION_ARG_STRING, &set_current_capabilities_str,
+      "Set current modem capabilities.",
+      "[CAPABILITY1|CAPABILITY2...]"
     },
     { "set-allowed-modes", 0, 0, G_OPTION_ARG_STRING, &set_allowed_modes_str,
       "Set allowed modes in a given modem.",
@@ -157,6 +162,7 @@ mmcli_modem_options_enabled (void)
                  !!delete_bearer_str +
                  !!factory_reset_str +
                  !!command_str +
+                 !!set_current_capabilities_str +
                  !!set_allowed_modes_str +
                  !!set_preferred_mode_str +
                  !!set_current_bands_str);
@@ -776,6 +782,47 @@ delete_bearer_ready (MMModem      *modem,
 }
 
 static void
+set_current_capabilities_process_reply (gboolean      result,
+                                        const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set current capabilities: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set current capabilities in the modem\n");
+}
+
+static void
+set_current_capabilities_ready (MMModem      *modem,
+                                GAsyncResult *result,
+                                gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_set_current_capabilities_finish (modem, result, &error);
+    set_current_capabilities_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+parse_current_capabilities (MMModemCapability *capabilities)
+{
+    GError *error = NULL;
+
+    *capabilities = mm_common_get_capabilities_from_string (set_current_capabilities_str,
+                                                            &error);
+    if (error) {
+        g_printerr ("error: couldn't parse list of capabilities: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+}
+
+static void
 set_current_modes_process_reply (gboolean      result,
                                  const GError *error)
 {
@@ -1048,6 +1095,19 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to set current capabilities in a given modem? */
+    if (set_current_capabilities_str) {
+        MMModemCapability current_capabilities;
+
+        parse_current_capabilities (&current_capabilities);
+        mm_modem_set_current_capabilities (ctx->modem,
+                                           current_capabilities,
+                                           ctx->cancellable,
+                                           (GAsyncReadyCallback)set_current_capabilities_ready,
+                                           NULL);
+        return;
+    }
+
     /* Request to set allowed modes in a given modem? */
     if (set_allowed_modes_str) {
         MMModemMode allowed;
@@ -1257,6 +1317,20 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                               &error);
 
         delete_bearer_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set capabilities in a given modem? */
+    if (set_current_capabilities_str) {
+        gboolean result;
+        MMModemCapability current_capabilities;
+
+        parse_current_capabilities (&current_capabilities);
+        result = mm_modem_set_current_capabilities_sync (ctx->modem,
+                                                         current_capabilities,
+                                                         NULL,
+                                                         &error);
+        set_current_capabilities_process_reply (result, error);
         return;
     }
 

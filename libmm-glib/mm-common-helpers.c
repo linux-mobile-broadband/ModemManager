@@ -194,6 +194,56 @@ mm_common_sms_storages_garray_to_variant (GArray *array)
     return mm_common_sms_storages_array_to_variant (NULL, 0);
 }
 
+MMModemCapability
+mm_common_get_capabilities_from_string (const gchar *str,
+                                        GError **error)
+{
+    GError *inner_error = NULL;
+    MMModemCapability capabilities;
+    gchar **capability_strings;
+	GFlagsClass *flags_class;
+
+    capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_CAPABILITY));
+    capability_strings = g_strsplit (str, "|", -1);
+
+    if (capability_strings) {
+        guint i;
+
+        for (i = 0; capability_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (capability_strings[i], flags_class->values[j].value_nick)) {
+                    capabilities |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMModemCapability value",
+                    capability_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        capabilities = MM_MODEM_CAPABILITY_NONE;
+    }
+
+    g_type_class_unref (flags_class);
+    g_strfreev (capability_strings);
+    return capabilities;
+}
+
 MMModemMode
 mm_common_get_modes_from_string (const gchar *str,
                                  GError **error)
