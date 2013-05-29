@@ -1610,12 +1610,12 @@ modem_load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Set bands (Modem interface) */
+/* Set current bands (Modem interface) */
 
 static gboolean
-set_bands_finish (MMIfaceModem *self,
-                  GAsyncResult *res,
-                  GError **error)
+set_current_bands_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -1648,10 +1648,10 @@ bands_set_system_selection_preference_ready (QmiClientNas *client,
 }
 
 static void
-set_bands (MMIfaceModem *_self,
-           GArray *bands_array,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
+set_current_bands (MMIfaceModem *_self,
+                   GArray *bands_array,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
@@ -1668,7 +1668,7 @@ set_bands (MMIfaceModem *_self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_bands);
+                                        set_current_bands);
 
     /* Handle ANY separately */
     if (bands_array->len == 1 &&
@@ -8145,8 +8145,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_signal_quality_finish = load_signal_quality_finish;
     iface->load_current_bands = modem_load_current_bands;
     iface->load_current_bands_finish = modem_load_current_bands_finish;
-    iface->set_bands = set_bands;
-    iface->set_bands_finish = set_bands_finish;
+    iface->set_current_bands = set_current_bands;
+    iface->set_current_bands_finish = set_current_bands_finish;
 
     /* Don't try to load access technologies, as we would be using parent's
      * generic method (QCDM based). Access technologies are already reported via

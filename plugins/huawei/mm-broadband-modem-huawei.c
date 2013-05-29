@@ -1005,12 +1005,12 @@ load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Set bands (Modem interface) */
+/* Set current bands (Modem interface) */
 
 static gboolean
-set_bands_finish (MMIfaceModem *self,
-                  GAsyncResult *res,
-                  GError **error)
+set_current_bands_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -1033,10 +1033,10 @@ syscfg_set_ready (MMBaseModem *self,
 }
 
 static void
-set_bands (MMIfaceModem *self,
-           GArray *bands_array,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
+set_current_bands (MMIfaceModem *self,
+                   GArray *bands_array,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
     GSimpleAsyncResult *result;
     gchar *cmd;
@@ -1046,7 +1046,7 @@ set_bands (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_bands);
+                                        set_current_bands);
 
     bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
                                                  bands_array->len);
@@ -2658,8 +2658,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
-    iface->set_bands = set_bands;
-    iface->set_bands_finish = set_bands_finish;
+    iface->set_current_bands = set_current_bands;
+    iface->set_current_bands_finish = set_current_bands_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;

@@ -745,12 +745,12 @@ load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Set bands (Modem interface) */
+/* Set current_bands (Modem interface) */
 
 static gboolean
-set_bands_finish (MMIfaceModem *self,
-                  GAsyncResult *res,
-                  GError **error)
+set_current_bands_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -908,10 +908,10 @@ set_bands_2g (MMIfaceModem *self,
 }
 
 static void
-set_bands (MMIfaceModem *self,
-           GArray *bands_array,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
+set_current_bands (MMIfaceModem *self,
+                   GArray *bands_array,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -924,7 +924,7 @@ set_bands (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_bands);
+                                        set_current_bands);
 
     if (mm_iface_modem_is_3g (self))
         set_bands_3g (self, bands_array, result);
@@ -1154,8 +1154,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
-    iface->set_bands = set_bands;
-    iface->set_bands_finish = set_bands_finish;
+    iface->set_current_bands = set_current_bands;
+    iface->set_current_bands_finish = set_current_bands_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;

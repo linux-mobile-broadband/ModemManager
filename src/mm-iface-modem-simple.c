@@ -175,7 +175,7 @@ typedef enum {
     CONNECTION_STEP_ENABLE,
     CONNECTION_STEP_WAIT_FOR_ENABLED,
     CONNECTION_STEP_ALLOWED_MODES,
-    CONNECTION_STEP_BANDS,
+    CONNECTION_STEP_CURRENT_BANDS,
     CONNECTION_STEP_REGISTER,
     CONNECTION_STEP_BEARER,
     CONNECTION_STEP_CONNECT,
@@ -313,7 +313,7 @@ set_allowed_modes_ready (MMBaseModem *self,
 }
 
 static gboolean
-after_set_bands_timeout_cb (ConnectionContext *ctx)
+after_set_current_bands_timeout_cb (ConnectionContext *ctx)
 {
     /* Bands set... almost there! */
     ctx->step++;
@@ -322,13 +322,13 @@ after_set_bands_timeout_cb (ConnectionContext *ctx)
 }
 
 static void
-set_bands_ready (MMBaseModem *self,
-                 GAsyncResult *res,
-                 ConnectionContext *ctx)
+set_current_bands_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
+    if (!mm_iface_modem_set_current_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
         if (g_error_matches (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED)) {
@@ -347,7 +347,7 @@ set_bands_ready (MMBaseModem *self,
      * of seconds to settle down. This sleep time just makes sure that the modem
      * has enough time to report being unregistered. */
     mm_dbg ("Will wait to settle down after updating bands");
-    g_timeout_add_seconds (2, (GSourceFunc)after_set_bands_timeout_cb, ctx);
+    g_timeout_add_seconds (2, (GSourceFunc)after_set_current_bands_timeout_cb, ctx);
 }
 
 static void
@@ -579,17 +579,15 @@ connection_step (ConnectionContext *ctx)
         ctx->step++;
     }
 
-    case CONNECTION_STEP_BANDS: {
+    case CONNECTION_STEP_CURRENT_BANDS: {
         const MMModemBand *bands = NULL;
         guint n_bands = 0;
 
-        mm_info ("Simple connect state (%d/%d): Bands",
+        mm_info ("Simple connect state (%d/%d): Current Bands",
                  ctx->step, CONNECTION_STEP_LAST);
 
         /* Don't set bands unless explicitly requested to do so */
-        if (mm_simple_connect_properties_get_bands (ctx->properties,
-                                                    &bands,
-                                                    &n_bands)) {
+        if (mm_simple_connect_properties_get_current_bands (ctx->properties, &bands, &n_bands)) {
             GArray *array;
             guint i;
 
@@ -598,10 +596,10 @@ connection_step (ConnectionContext *ctx)
                 for (i = 0; i < n_bands; i++)
                     g_array_insert_val (array, i, bands[i]);
 
-                mm_iface_modem_set_bands (MM_IFACE_MODEM (ctx->self),
-                                          array,
-                                          (GAsyncReadyCallback)set_bands_ready,
-                                          ctx);
+                mm_iface_modem_set_current_bands (MM_IFACE_MODEM (ctx->self),
+                                                  array,
+                                                  (GAsyncReadyCallback)set_current_bands_ready,
+                                                  ctx);
                 g_array_unref (array);
                 return;
             }
@@ -804,7 +802,7 @@ connect_auth_ready (MMBaseModem *self,
             mm_dbg ("   Preferred mode: %s", VALIDATE_UNSPECIFIED (NULL));
         }
 
-        if (mm_simple_connect_properties_get_bands (ctx->properties, &bands, &n_bands)) {
+        if (mm_simple_connect_properties_get_current_bands (ctx->properties, &bands, &n_bands)) {
             str = mm_common_build_bands_string (bands, n_bands);
             mm_dbg ("   Bands: %s", str);
             g_free (str);

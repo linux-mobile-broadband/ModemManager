@@ -39,7 +39,7 @@ enum {
     PROP_0,
     PROP_STATE,
     PROP_SIGNAL_QUALITY,
-    PROP_BANDS,
+    PROP_CURRENT_BANDS,
     PROP_ACCESS_TECHNOLOGIES,
     PROP_3GPP_REGISTRATION_STATE,
     PROP_3GPP_OPERATOR_CODE,
@@ -60,8 +60,8 @@ struct _MMSimpleStatusPrivate {
     /* Signal quality, given only when registered, signature '(ub)' */
     GVariant *signal_quality;
     /* List of bands, given only when registered, signature: au */
-    GVariant *bands;
-    GArray *bands_array;
+    GVariant *current_bands;
+    GArray *current_bands_array;
     /* Access technologies, given only when registered, signature: u */
     MMModemAccessTechnology access_technologies;
 
@@ -137,7 +137,7 @@ mm_simple_status_get_signal_quality (MMSimpleStatus *self,
 /*****************************************************************************/
 
 /**
- * mm_simple_status_get_bands:
+ * mm_simple_status_get_current_bands:
  * @self: a #MMSimpleStatus.
  * @bands: (out): location for an array of #MMModemBand values. Do not free the returned value, it is owned by @self.
  * @n_bands: (out): number of elements in @bands.
@@ -145,17 +145,17 @@ mm_simple_status_get_signal_quality (MMSimpleStatus *self,
  * Gets the currently used frequency bands.
  */
 void
-mm_simple_status_get_bands (MMSimpleStatus *self,
-                            const MMModemBand **bands,
-                            guint *n_bands)
+mm_simple_status_get_current_bands (MMSimpleStatus *self,
+                                    const MMModemBand **bands,
+                                    guint *n_bands)
 {
     g_return_if_fail (MM_IS_SIMPLE_STATUS (self));
 
-    if (!self->priv->bands_array)
-        self->priv->bands_array = mm_common_bands_variant_to_garray (self->priv->bands);
+    if (!self->priv->current_bands_array)
+        self->priv->current_bands_array = mm_common_bands_variant_to_garray (self->priv->current_bands);
 
-    *n_bands = self->priv->bands_array->len;
-    *bands = (const MMModemBand *)self->priv->bands_array->data;
+    *n_bands = self->priv->current_bands_array->len;
+    *bands = (const MMModemBand *)self->priv->current_bands_array->data;
 }
 
 /*****************************************************************************/
@@ -329,8 +329,8 @@ mm_simple_status_get_dictionary (MMSimpleStatus *self)
                                self->priv->signal_quality);
         g_variant_builder_add (&builder,
                                "{sv}",
-                               MM_SIMPLE_PROPERTY_BANDS,
-                               self->priv->bands);
+                               MM_SIMPLE_PROPERTY_CURRENT_BANDS,
+                               self->priv->current_bands);
         g_variant_builder_add (&builder,
                                "{sv}",
                                MM_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,
@@ -428,7 +428,7 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
             g_object_set (properties,
                           key, g_variant_get_string (value, NULL),
                           NULL);
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_BANDS) ||
+        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_CURRENT_BANDS) ||
                    g_str_equal (key, MM_SIMPLE_PROPERTY_SIGNAL_QUALITY)) {
             /* remaining complex types, as variant */
             g_object_set (properties,
@@ -482,14 +482,14 @@ set_property (GObject *object,
             g_variant_unref (self->priv->signal_quality);
         self->priv->signal_quality = g_value_dup_variant (value);
         break;
-    case PROP_BANDS:
-        if (self->priv->bands)
-            g_variant_unref (self->priv->bands);
-        if (self->priv->bands_array) {
-            g_array_unref (self->priv->bands_array);
-            self->priv->bands_array = NULL;
+    case PROP_CURRENT_BANDS:
+        if (self->priv->current_bands)
+            g_variant_unref (self->priv->current_bands);
+        if (self->priv->current_bands_array) {
+            g_array_unref (self->priv->current_bands_array);
+            self->priv->current_bands_array = NULL;
         }
-        self->priv->bands = g_value_dup_variant (value);
+        self->priv->current_bands = g_value_dup_variant (value);
         break;
     case PROP_ACCESS_TECHNOLOGIES:
         self->priv->access_technologies = g_value_get_flags (value);
@@ -538,8 +538,8 @@ get_property (GObject *object,
     case PROP_SIGNAL_QUALITY:
         g_value_set_variant (value, self->priv->signal_quality);
         break;
-    case PROP_BANDS:
-        g_value_set_variant (value, self->priv->bands);
+    case PROP_CURRENT_BANDS:
+        g_value_set_variant (value, self->priv->current_bands);
         break;
     case PROP_ACCESS_TECHNOLOGIES:
         g_value_set_flags (value, self->priv->access_technologies);
@@ -582,7 +582,7 @@ mm_simple_status_init (MMSimpleStatus *self)
     self->priv->state = MM_MODEM_STATE_UNKNOWN;
     self->priv->access_technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->bands = g_variant_ref_sink (mm_common_build_bands_unknown ());
+    self->priv->current_bands = g_variant_ref_sink (mm_common_build_bands_unknown ());
     self->priv->signal_quality = g_variant_ref_sink (g_variant_new ("(ub)", 0, 0));
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -596,9 +596,9 @@ finalize (GObject *object)
     MMSimpleStatus *self = MM_SIMPLE_STATUS (object);
 
     g_variant_unref (self->priv->signal_quality);
-    g_variant_unref (self->priv->bands);
-    if (self->priv->bands_array)
-        g_array_unref (self->priv->bands_array);
+    g_variant_unref (self->priv->current_bands);
+    if (self->priv->current_bands_array)
+        g_array_unref (self->priv->current_bands_array);
     g_free (self->priv->modem_3gpp_operator_code);
     g_free (self->priv->modem_3gpp_operator_name);
 
@@ -635,14 +635,14 @@ mm_simple_status_class_init (MMSimpleStatusClass *klass)
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_SIGNAL_QUALITY, properties[PROP_SIGNAL_QUALITY]);
 
-    properties[PROP_BANDS] =
-        g_param_spec_variant (MM_SIMPLE_PROPERTY_BANDS,
-                              "Bands",
+    properties[PROP_CURRENT_BANDS] =
+        g_param_spec_variant (MM_SIMPLE_PROPERTY_CURRENT_BANDS,
+                              "Current Bands",
                               "Frequency bands used by the modem",
                               G_VARIANT_TYPE ("au"),
                               NULL,
                               G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_BANDS, properties[PROP_BANDS]);
+    g_object_class_install_property (object_class, PROP_CURRENT_BANDS, properties[PROP_CURRENT_BANDS]);
 
     properties[PROP_ACCESS_TECHNOLOGIES] =
         g_param_spec_flags (MM_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,

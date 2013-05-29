@@ -66,8 +66,8 @@ mm_iface_modem_bind_simple_status (MMIfaceModem *self,
                             status, MM_SIMPLE_PROPERTY_SIGNAL_QUALITY,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
-    g_object_bind_property (skeleton, "bands",
-                            status, MM_SIMPLE_PROPERTY_BANDS,
+    g_object_bind_property (skeleton, "current-bands",
+                            status, MM_SIMPLE_PROPERTY_CURRENT_BANDS,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "access-technologies",
@@ -1791,17 +1791,17 @@ handle_factory_reset (MmGdbusModem *skeleton,
 }
 
 /*****************************************************************************/
-/* BANDS */
+/* Current bands setting */
 
 typedef struct {
     MMIfaceModem *self;
     MmGdbusModem *skeleton;
     GSimpleAsyncResult *result;
     GArray *bands_array;
-} SetBandsContext;
+} SetCurrentBandsContext;
 
 static void
-set_bands_context_complete_and_free (SetBandsContext *ctx)
+set_current_bands_context_complete_and_free (SetCurrentBandsContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -1810,25 +1810,25 @@ set_bands_context_complete_and_free (SetBandsContext *ctx)
         g_object_unref (ctx->skeleton);
     if (ctx->bands_array)
         g_array_unref (ctx->bands_array);
-    g_free (ctx);
+    g_slice_free (SetCurrentBandsContext, ctx);
 }
 
 gboolean
-mm_iface_modem_set_bands_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 GError **error)
+mm_iface_modem_set_current_bands_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-set_bands_ready (MMIfaceModem *self,
-                 GAsyncResult *res,
-                 SetBandsContext *ctx)
+set_current_bands_ready (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         SetCurrentBandsContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish (self, res, &error))
         g_simple_async_result_take_error (ctx->result, error);
     else {
         /* Never show just 'any' in the interface */
@@ -1838,17 +1838,17 @@ set_bands_ready (MMIfaceModem *self,
 
             supported_bands = (mm_common_bands_variant_to_garray (
                                    mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
-            mm_gdbus_modem_set_bands (ctx->skeleton,
-                                      mm_common_bands_garray_to_variant (supported_bands));
+            mm_gdbus_modem_set_current_bands (ctx->skeleton,
+                                              mm_common_bands_garray_to_variant (supported_bands));
             g_array_unref (supported_bands);
         } else
-            mm_gdbus_modem_set_bands (ctx->skeleton,
-                                      mm_common_bands_garray_to_variant (ctx->bands_array));
+            mm_gdbus_modem_set_current_bands (ctx->skeleton,
+                                              mm_common_bands_garray_to_variant (ctx->bands_array));
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     }
 
-    set_bands_context_complete_and_free (ctx);
+    set_current_bands_context_complete_and_free (ctx);
 }
 
 static gboolean
@@ -1910,20 +1910,20 @@ validate_bands (const GArray *supported_bands_array,
 }
 
 void
-mm_iface_modem_set_bands (MMIfaceModem *self,
-                          GArray *bands_array,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+mm_iface_modem_set_current_bands (MMIfaceModem *self,
+                                  GArray *bands_array,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
 {
-    SetBandsContext *ctx;
+    SetCurrentBandsContext *ctx;
     GArray *supported_bands_array;
     GArray *current_bands_array;
     GError *error = NULL;
     gchar *bands_string;
 
     /* If setting allowed bands is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands_finish) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1934,12 +1934,12 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
     }
 
     /* Setup context */
-    ctx = g_new0 (SetBandsContext, 1);
+    ctx = g_slice_new0 (SetCurrentBandsContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_iface_modem_set_bands);
+                                             mm_iface_modem_set_current_bands);
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
@@ -1948,7 +1948,7 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "Couldn't get interface skeleton");
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
@@ -1986,7 +1986,7 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
 
     /* Simply return if target list of bands equals to current list of bands */
     current_bands_array = (mm_common_bands_variant_to_garray (
-                              mm_gdbus_modem_get_bands (ctx->skeleton)));
+                              mm_gdbus_modem_get_current_bands (ctx->skeleton)));
     if (mm_common_bands_garray_cmp (ctx->bands_array, current_bands_array)) {
         mm_dbg ("Requested list of bands (%s) is equal to the current ones, skipping re-set",
                 bands_string);
@@ -1994,7 +1994,7 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
         g_array_unref (supported_bands_array);
         g_array_unref (current_bands_array);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
@@ -2015,15 +2015,15 @@ mm_iface_modem_set_bands (MMIfaceModem *self,
         g_array_unref (supported_bands_array);
         g_array_unref (current_bands_array);
         g_simple_async_result_take_error (ctx->result, error);
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
     mm_dbg ("Setting new list of bands: '%s'", bands_string);
-    MM_IFACE_MODEM_GET_INTERFACE (self)->set_bands (
+    MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands (
         self,
         ctx->bands_array,
-        (GAsyncReadyCallback)set_bands_ready,
+        (GAsyncReadyCallback)set_current_bands_ready,
         ctx);
 
     g_array_unref (supported_bands_array);
@@ -2036,37 +2036,37 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     MMIfaceModem *self;
     GVariant *bands;
-} HandleSetBandsContext;
+} HandleSetCurrentBandsContext;
 
 static void
-handle_set_bands_context_free (HandleSetBandsContext *ctx)
+handle_set_current_bands_context_free (HandleSetCurrentBandsContext *ctx)
 {
     g_variant_unref (ctx->bands);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleSetCurrentBandsContext, ctx);
 }
 
 static void
-handle_set_bands_ready (MMIfaceModem *self,
-                        GAsyncResult *res,
-                        HandleSetBandsContext *ctx)
+handle_set_current_bands_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                HandleSetCurrentBandsContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_bands_finish (self, res, &error))
+    if (!mm_iface_modem_set_current_bands_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem_complete_set_bands (ctx->skeleton, ctx->invocation);
+        mm_gdbus_modem_complete_set_current_bands (ctx->skeleton, ctx->invocation);
 
-    handle_set_bands_context_free (ctx);
+    handle_set_current_bands_context_free (ctx);
 }
 
 static void
-handle_set_bands_auth_ready (MMBaseModem *self,
-                             GAsyncResult *res,
-                             HandleSetBandsContext *ctx)
+handle_set_current_bands_auth_ready (MMBaseModem *self,
+                                     GAsyncResult *res,
+                                     HandleSetCurrentBandsContext *ctx)
 {
     GArray *bands_array;
     MMModemState modem_state;
@@ -2074,7 +2074,7 @@ handle_set_bands_auth_ready (MMBaseModem *self,
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_set_bands_context_free (ctx);
+        handle_set_current_bands_context_free (ctx);
         return;
     }
 
@@ -2087,29 +2087,29 @@ handle_set_bands_auth_ready (MMBaseModem *self,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set allowed bands: "
+                                               "Cannot set current bands: "
                                                "not initialized/unlocked yet");
-        handle_set_bands_context_free (ctx);
+        handle_set_current_bands_context_free (ctx);
         return;
     }
 
     bands_array = mm_common_bands_variant_to_garray (ctx->bands);
-    mm_iface_modem_set_bands (MM_IFACE_MODEM (self),
-                              bands_array,
-                              (GAsyncReadyCallback)handle_set_bands_ready,
-                              ctx);
+    mm_iface_modem_set_current_bands (MM_IFACE_MODEM (self),
+                                      bands_array,
+                                      (GAsyncReadyCallback)handle_set_current_bands_ready,
+                                      ctx);
     g_array_unref (bands_array);
 }
 
 static gboolean
-handle_set_bands (MmGdbusModem *skeleton,
-                  GDBusMethodInvocation *invocation,
-                  GVariant *bands_variant,
-                  MMIfaceModem *self)
+handle_set_current_bands (MmGdbusModem *skeleton,
+                          GDBusMethodInvocation *invocation,
+                          GVariant *bands_variant,
+                          MMIfaceModem *self)
 {
-    HandleSetBandsContext *ctx;
+    HandleSetCurrentBandsContext *ctx;
 
-    ctx = g_new (HandleSetBandsContext, 1);
+    ctx = g_slice_new (HandleSetCurrentBandsContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
@@ -2118,7 +2118,7 @@ handle_set_bands (MmGdbusModem *skeleton,
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_set_bands_auth_ready,
+                             (GAsyncReadyCallback)handle_set_current_bands_auth_ready,
                              ctx);
     return TRUE;
 }
@@ -3002,7 +3002,7 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_CURRENT_BANDS:
         /* Clear current bands */
-        mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+        mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_build_bands_unknown ());
         /* Fall down to next step */
         ctx->step++;
 
@@ -3244,11 +3244,11 @@ load_current_bands_ready (MMIfaceModem *self,
         g_array_unref (supported_bands);
 
     if (filtered_bands) {
-        mm_gdbus_modem_set_bands (ctx->skeleton,
-                                  mm_common_bands_garray_to_variant (filtered_bands));
+        mm_gdbus_modem_set_current_bands (ctx->skeleton,
+                                          mm_common_bands_garray_to_variant (filtered_bands));
         g_array_unref (filtered_bands);
     } else
-        mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+        mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_build_bands_unknown ());
 
     /* Errors when getting current bands won't be critical */
     if (error) {
@@ -3381,7 +3381,7 @@ interface_enabling_step (EnablingContext *ctx)
                     ctx);
                 return;
         } else
-            mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+            mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_build_bands_unknown ());
         /* Fall down to next step */
         ctx->step++;
 
@@ -4049,7 +4049,7 @@ interface_initialization_step (InitializationContext *ctx)
 
             /* Loading supported bands not implemented, default to UNKNOWN */
             mm_gdbus_modem_set_supported_bands (ctx->skeleton, mm_common_build_bands_unknown ());
-            mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+            mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_build_bands_unknown ());
         }
         g_array_unref (supported_bands);
 
@@ -4192,8 +4192,8 @@ interface_initialization_step (InitializationContext *ctx)
                               G_CALLBACK (handle_factory_reset),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
-                              "handle-set-bands",
-                              G_CALLBACK (handle_set_bands),
+                              "handle-set-current-bands",
+                              G_CALLBACK (handle_set_current_bands),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-allowed-modes",
@@ -4261,7 +4261,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
-        mm_gdbus_modem_set_bands (skeleton, mm_common_build_bands_unknown ());
+        mm_gdbus_modem_set_current_bands (skeleton, mm_common_build_bands_unknown ());
         mm_gdbus_modem_set_supported_ip_families (skeleton, MM_BEARER_IP_FAMILY_NONE);
         mm_gdbus_modem_set_power_state (skeleton, MM_MODEM_POWER_STATE_UNKNOWN);
         mm_gdbus_modem_set_state_failed_reason (skeleton, MM_MODEM_STATE_FAILED_REASON_NONE);

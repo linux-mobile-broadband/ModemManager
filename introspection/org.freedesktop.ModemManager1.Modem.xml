@@ -150,13 +150,13 @@
     </method>
 
     <!--
-        SetBands:
+        SetCurrentBands:
         @bands: List of <link linkend="MMModemBand">MMModemBand</link> values, to specify the bands to be used.
 
         Set the radio frequency and technology bands the device is currently
         allowed to use when connecting to a network.
     -->
-    <method name="SetBands">
+    <method name="SetCurrentBands">
       <arg name="bands" type="au" direction="in" />
     </method>
 
@@ -460,7 +460,7 @@
     <property name="SupportedBands" type="au" access="read" />
 
     <!--
-        Bands:
+        CurrentBands:
 
         List of <link linkend="MMModemBand">MMModemBand</link> values,
         specifying the radio frequency and technology bands the device is
@@ -468,7 +468,7 @@
 
         It must be a subset of #org.freedesktop.ModemManager1.Modem:SupportedBands.
     -->
-    <property name="Bands" type="au" access="read" />
+    <property name="CurrentBands" type="au" access="read" />
 
     <!--
         SupportedIpFamilies:

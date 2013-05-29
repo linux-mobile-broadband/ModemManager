@@ -58,10 +58,10 @@ GType mm_simple_status_get_type (void);
 
 MMModemState                  mm_simple_status_get_state               (MMSimpleStatus *self);
 guint32                       mm_simple_status_get_signal_quality      (MMSimpleStatus *self,
-                                                                            gboolean *recent);
-void                          mm_simple_status_get_bands               (MMSimpleStatus *self,
-                                                                            const MMModemBand **bands,
-                                                                            guint *n_bands);
+                                                                        gboolean *recent);
+void                          mm_simple_status_get_current_bands       (MMSimpleStatus *self,
+                                                                        const MMModemBand **bands,
+                                                                        guint *n_bands);
 MMModemAccessTechnology       mm_simple_status_get_access_technologies (MMSimpleStatus *self);
 
 MMModem3gppRegistrationState  mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self);
@@ -82,7 +82,7 @@ guint                        mm_simple_status_get_cdma_nid                      
 
 #define MM_SIMPLE_PROPERTY_STATE                   "state"
 #define MM_SIMPLE_PROPERTY_SIGNAL_QUALITY          "signal-quality"
-#define MM_SIMPLE_PROPERTY_BANDS                   "bands"
+#define MM_SIMPLE_PROPERTY_CURRENT_BANDS           "current-bands"
 #define MM_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES     "access-technologies"
 
 #define MM_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE "m3gpp-registration-state"

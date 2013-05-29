@@ -54,10 +54,10 @@ struct _MMModemPrivate {
     guint supported_bands_id;
     GArray *supported_bands;
 
-    /* Bands */
-    GMutex bands_mutex;
-    guint bands_id;
-    GArray *bands;
+    /* Current Bands */
+    GMutex current_bands_mutex;
+    guint current_bands_id;
+    GArray *current_bands;
 };
 
 /*****************************************************************************/
@@ -1093,74 +1093,74 @@ mm_modem_peek_supported_bands (MMModem *self,
 /*****************************************************************************/
 
 static void
-bands_updated (MMModem *self,
-               GParamSpec *pspec)
+current_bands_updated (MMModem *self,
+                       GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->bands_mutex);
+    g_mutex_lock (&self->priv->current_bands_mutex);
     {
         GVariant *dictionary;
 
-        if (self->priv->bands)
-            g_array_unref (self->priv->bands);
+        if (self->priv->current_bands)
+            g_array_unref (self->priv->current_bands);
 
-        dictionary = mm_gdbus_modem_get_bands (MM_GDBUS_MODEM (self));
-        self->priv->bands = (dictionary ?
-                             mm_common_bands_variant_to_garray (dictionary) :
-                             NULL);
+        dictionary = mm_gdbus_modem_get_current_bands (MM_GDBUS_MODEM (self));
+        self->priv->current_bands = (dictionary ?
+                                     mm_common_bands_variant_to_garray (dictionary) :
+                                     NULL);
     }
-    g_mutex_unlock (&self->priv->bands_mutex);
+    g_mutex_unlock (&self->priv->current_bands_mutex);
 }
 
 static gboolean
-ensure_internal_bands (MMModem *self,
-                       MMModemBand **dup_bands,
-                       guint *dup_bands_n)
+ensure_internal_current_bands (MMModem *self,
+                               MMModemBand **dup_bands,
+                               guint *dup_bands_n)
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->bands_mutex);
+    g_mutex_lock (&self->priv->current_bands_mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
-        if (!self->priv->bands_id) {
+        if (!self->priv->current_bands_id) {
             GVariant *dictionary;
 
-            dictionary = mm_gdbus_modem_dup_bands (MM_GDBUS_MODEM (self));
+            dictionary = mm_gdbus_modem_dup_current_bands (MM_GDBUS_MODEM (self));
             if (dictionary) {
-                self->priv->bands = mm_common_bands_variant_to_garray (dictionary);
+                self->priv->current_bands = mm_common_bands_variant_to_garray (dictionary);
                 g_variant_unref (dictionary);
             }
 
             /* No need to clear this signal connection when freeing self */
-            self->priv->bands_id =
+            self->priv->current_bands_id =
                 g_signal_connect (self,
-                                  "notify::bands",
-                                  G_CALLBACK (bands_updated),
+                                  "notify::current-bands",
+                                  G_CALLBACK (current_bands_updated),
                                   NULL);
         }
 
-        if (!self->priv->bands)
+        if (!self->priv->current_bands)
             ret = FALSE;
         else {
             ret = TRUE;
 
             if (dup_bands && dup_bands_n) {
-                *dup_bands_n = self->priv->bands->len;
-                if (self->priv->bands->len > 0) {
-                    *dup_bands = g_malloc (sizeof (MMModemBand) * self->priv->bands->len);
-                    memcpy (*dup_bands, self->priv->bands->data, sizeof (MMModemBand) * self->priv->bands->len);
+                *dup_bands_n = self->priv->current_bands->len;
+                if (self->priv->current_bands->len > 0) {
+                    *dup_bands = g_malloc (sizeof (MMModemBand) * self->priv->current_bands->len);
+                    memcpy (*dup_bands, self->priv->current_bands->data, sizeof (MMModemBand) * self->priv->current_bands->len);
                 } else
                     *dup_bands = NULL;
             }
         }
     }
-    g_mutex_unlock (&self->priv->bands_mutex);
+    g_mutex_unlock (&self->priv->current_bands_mutex);
 
     return ret;
 }
 
 /**
- * mm_modem_get_bands:
+ * mm_modem_get_current_bands:
  * @self: A #MMModem.
  * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. The returned array should be freed with g_free() when no longer needed.
  * @n_bands: (out): Return location for the number of values in @bands.
@@ -1173,19 +1173,19 @@ ensure_internal_bands (MMModem *self,
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
  */
 gboolean
-mm_modem_get_bands (MMModem *self,
-                    MMModemBand **bands,
-                    guint *n_bands)
+mm_modem_get_current_bands (MMModem *self,
+                            MMModemBand **bands,
+                            guint *n_bands)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    return ensure_internal_bands (self, bands, n_bands);
+    return ensure_internal_current_bands (self, bands, n_bands);
 }
 
 /**
- * mm_modem_peek_bands:
+ * mm_modem_peek_current_bands:
  * @self: A #MMModem.
  * @bands: (out) (array length=n_storages): Return location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
  * @n_bands: (out): Return location for the number of values in @bands.
@@ -1198,19 +1198,19 @@ mm_modem_get_bands (MMModem *self,
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
  */
 gboolean
-mm_modem_peek_bands (MMModem *self,
-                     const MMModemBand **bands,
-                     guint *n_bands)
+mm_modem_peek_current_bands (MMModem *self,
+                             const MMModemBand **bands,
+                             guint *n_bands)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
     g_return_val_if_fail (bands != NULL, FALSE);
     g_return_val_if_fail (n_bands != NULL, FALSE);
 
-    if (!ensure_internal_bands (self, NULL, NULL))
+    if (!ensure_internal_current_bands (self, NULL, NULL))
         return FALSE;
 
-    *n_bands = self->priv->bands->len;
-    *bands = (MMModemBand *)self->priv->bands->data;
+    *n_bands = self->priv->current_bands->len;
+    *bands = (MMModemBand *)self->priv->current_bands->data;
     return TRUE;
 }
 
@@ -2295,27 +2295,27 @@ mm_modem_set_allowed_modes_sync (MMModem *self,
 /*****************************************************************************/
 
 /**
- * mm_modem_set_bands_finish:
+ * mm_modem_set_current_bands_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_bands().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_bands().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_set_bands().
+ * Finishes an operation started with mm_modem_set_current_bands().
  *
  * Returns: %TRUE if the bands were successfully set, %FALSE if @error is set.
  */
 gboolean
-mm_modem_set_bands_finish (MMModem *self,
-                           GAsyncResult *res,
-                           GError **error)
+mm_modem_set_current_bands_finish (MMModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
 
-    return mm_gdbus_modem_call_set_bands_finish (MM_GDBUS_MODEM (self), res, error);
+    return mm_gdbus_modem_call_set_current_bands_finish (MM_GDBUS_MODEM (self), res, error);
 }
 
 /**
- * mm_modem_set_bands:
+ * mm_modem_set_current_bands:
  * @self: A #MMModem.
  * @bands: An array of #MMModemBand values specifying which bands are allowed.
  * @n_bands: Number of elements in @bands.
@@ -2327,29 +2327,29 @@ mm_modem_set_bands_finish (MMModem *self,
  * allowed to use when connecting to a network.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_bands_finish() to get the result of the operation.
+ * You can then call mm_modem_set_current_bands_finish() to get the result of the operation.
  *
- * See mm_modem_set_bands_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_current_bands_sync() for the synchronous, blocking version of this method.
  */
 void
-mm_modem_set_bands (MMModem *self,
-                    const MMModemBand *bands,
-                    guint n_bands,
-                    GCancellable *cancellable,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+mm_modem_set_current_bands (MMModem *self,
+                            const MMModemBand *bands,
+                            guint n_bands,
+                            GCancellable *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM (self));
 
-    mm_gdbus_modem_call_set_bands (MM_GDBUS_MODEM (self),
-                                   mm_common_bands_array_to_variant (bands, n_bands),
-                                   cancellable,
-                                   callback,
-                                   user_data);
+    mm_gdbus_modem_call_set_current_bands (MM_GDBUS_MODEM (self),
+                                           mm_common_bands_array_to_variant (bands, n_bands),
+                                           cancellable,
+                                           callback,
+                                           user_data);
 }
 
 /**
- * mm_modem_set_bands_sync:
+ * mm_modem_set_current_bands_sync:
  * @self: A #MMModem.
  * @bands: An array of #MMModemBand values specifying which bands are allowed.
  * @n_bands: Number of elements in @bands.
@@ -2359,21 +2359,21 @@ mm_modem_set_bands (MMModem *self,
  * Synchronously sets the radio frequency and technology bands the device is currently
  * allowed to use when connecting to a network.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_bands()
+ * The calling thread is blocked until a reply is received. See mm_modem_set_current_bands()
  * for the asynchronous version of this method.
  *
  * Returns: %TRUE if the bands were successfully set, %FALSE if @error is set.
  */
 gboolean
-mm_modem_set_bands_sync (MMModem *self,
-                         const MMModemBand *bands,
-                         guint n_bands,
-                         GCancellable *cancellable,
-                         GError **error)
+mm_modem_set_current_bands_sync (MMModem *self,
+                                 const MMModemBand *bands,
+                                 guint n_bands,
+                                 GCancellable *cancellable,
+                                 GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
 
-    return (mm_gdbus_modem_call_set_bands_sync (
+    return (mm_gdbus_modem_call_set_current_bands_sync (
                 MM_GDBUS_MODEM (self),
                 mm_common_bands_array_to_variant (bands, n_bands),
                 cancellable,
@@ -2534,7 +2534,7 @@ mm_modem_init (MMModem *self)
                                               MMModemPrivate);
     g_mutex_init (&self->priv->unlock_retries_mutex);
     g_mutex_init (&self->priv->supported_bands_mutex);
-    g_mutex_init (&self->priv->bands_mutex);
+    g_mutex_init (&self->priv->current_bands_mutex);
 }
 
 static void
@@ -2544,12 +2544,12 @@ finalize (GObject *object)
 
     g_mutex_clear (&self->priv->unlock_retries_mutex);
     g_mutex_clear (&self->priv->supported_bands_mutex);
-    g_mutex_clear (&self->priv->bands_mutex);
+    g_mutex_clear (&self->priv->current_bands_mutex);
 
     if (self->priv->supported_bands)
         g_array_unref (self->priv->supported_bands);
-    if (self->priv->bands)
-        g_array_unref (self->priv->bands);
+    if (self->priv->current_bands)
+        g_array_unref (self->priv->current_bands);
 
     G_OBJECT_CLASS (mm_modem_parent_class)->finalize (object);
 }

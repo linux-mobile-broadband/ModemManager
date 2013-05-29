@@ -1157,9 +1157,9 @@ load_supported_bands_response_processor (MMBaseModem *self,
 }
 
 static void
-load_supported_bands_get_bands_ready (MMIfaceModem *self,
-                                      GAsyncResult *res,
-                                      GSimpleAsyncResult *operation_result)
+load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
+                                              GAsyncResult *res,
+                                              GSimpleAsyncResult *operation_result)
 {
     SupportedBandsContext *ctx;
     const gchar *response;
@@ -1228,7 +1228,7 @@ modem_load_supported_bands (MMIfaceModem *self,
         "%IPBM?",
         3,
         FALSE,
-        (GAsyncReadyCallback)load_supported_bands_get_bands_ready,
+        (GAsyncReadyCallback)load_supported_bands_get_current_bands_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
                                    user_data,
@@ -1305,14 +1305,14 @@ modem_load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Set bands (Modem interface) */
+/* Set current bands (Modem interface) */
 
 typedef struct {
     GSimpleAsyncResult *result;
     guint bandbits;
     guint enablebits;
     guint disablebits;
-} SetBandsContext;
+} SetCurrentBandsContext;
 
 /*
  * The modem's band-setting command (%IPBM=) enables or disables one
@@ -1322,34 +1322,34 @@ typedef struct {
  * disable any removed bands.
  */
 static gboolean
-modem_set_bands_finish (MMIfaceModem *self,
+modem_set_current_bands_finish (MMIfaceModem *self,
                         GAsyncResult *res,
                         GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void set_one_band (MMIfaceModem *self, SetBandsContext *ctx);
+static void set_one_band (MMIfaceModem *self, SetCurrentBandsContext *ctx);
 
 static void
-set_bands_context_complete_and_free (SetBandsContext *ctx)
+set_current_bands_context_complete_and_free (SetCurrentBandsContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    g_free (ctx);
+    g_slice_free (SetCurrentBandsContext, ctx);
 }
 
 static void
-set_bands_next (MMIfaceModem *self,
-                GAsyncResult *res,
-                SetBandsContext *ctx)
+set_current_bands_next (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        SetCurrentBandsContext *ctx)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        mm_dbg ("Couldn't set bands: '%s'", error->message);
+        mm_dbg ("Couldn't set current bands: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
@@ -1358,7 +1358,7 @@ set_bands_next (MMIfaceModem *self,
 
 static void
 set_one_band (MMIfaceModem *self,
-              SetBandsContext *ctx)
+              SetCurrentBandsContext *ctx)
 {
     guint enable, band;
     gchar *command;
@@ -1373,7 +1373,7 @@ set_one_band (MMIfaceModem *self,
     if (band == 0) {
         /* Both enabling and disabling are done */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
@@ -1397,7 +1397,7 @@ set_one_band (MMIfaceModem *self,
         command,
         10,
         FALSE,
-        (GAsyncReadyCallback)set_bands_next,
+        (GAsyncReadyCallback)set_current_bands_next,
         ctx);
     g_free (command);
 }
@@ -1424,9 +1424,9 @@ band_array_to_bandbits (GArray *bands)
 }
 
 static void
-set_bands_got_current_bands (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             SetBandsContext *ctx)
+set_current_bands_got_current_bands (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     SetCurrentBandsContext *ctx)
 {
     GArray *bands;
     GError *error = NULL;
@@ -1435,7 +1435,7 @@ set_bands_got_current_bands (MMIfaceModem *self,
     bands = modem_load_current_bands_finish (self, res, &error);
     if (!bands) {
         g_simple_async_result_take_error (ctx->result, error);
-        set_bands_context_complete_and_free (ctx);
+        set_current_bands_context_complete_and_free (ctx);
         return;
     }
 
@@ -1447,18 +1447,18 @@ set_bands_got_current_bands (MMIfaceModem *self,
 }
 
 static void
-modem_set_bands (MMIfaceModem *self,
-                 GArray *bands_array,
-                 GAsyncReadyCallback callback,
-                 gpointer user_data)
+modem_set_current_bands (MMIfaceModem *self,
+                         GArray *bands_array,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
 {
-    SetBandsContext *ctx;
+    SetCurrentBandsContext *ctx;
 
-    ctx = g_new0 (SetBandsContext, 1);
+    ctx = g_slice_new0 (SetCurrentBandsContext);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             modem_set_bands);
+                                             modem_set_current_bands);
     ctx->bandbits = band_array_to_bandbits (bands_array);
 
     /*
@@ -1472,7 +1472,7 @@ modem_set_bands (MMIfaceModem *self,
     }
 
     modem_load_current_bands (self,
-                              (GAsyncReadyCallback)set_bands_got_current_bands,
+                              (GAsyncReadyCallback)set_current_bands_got_current_bands,
                               ctx);
 }
 
@@ -1789,8 +1789,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
-    iface->set_bands = modem_set_bands;
-    iface->set_bands_finish = modem_set_bands_finish;
+    iface->set_current_bands = modem_set_current_bands;
+    iface->set_current_bands_finish = modem_set_current_bands_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }

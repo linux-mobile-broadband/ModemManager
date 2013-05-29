@@ -52,7 +52,7 @@
               given as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"bands"</literal></term>
+          <varlistentry><term><literal>"current-bands"</literal></term>
             <listitem>
               List of <link linkend="MMModemBand">MMModemBand</link> values,
               to specify all the bands allowed in the modem, given as a list of
@@ -165,7 +165,7 @@
               (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"bands"</literal></term>
+          <varlistentry><term><literal>"current-bands"</literal></term>
             <listitem>
               List of <link linkend="MMModemBand">MMModemBand</link> values,
               given only when registered, as a list of

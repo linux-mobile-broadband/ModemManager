@@ -140,10 +140,10 @@ gboolean           mm_modem_get_supported_bands      (MMModem *self,
                                                       MMModemBand **bands,
                                                       guint *n_bands);
 
-gboolean           mm_modem_peek_bands               (MMModem *self,
+gboolean           mm_modem_peek_current_bands       (MMModem *self,
                                                       const MMModemBand **bands,
                                                       guint *n_bands);
-gboolean           mm_modem_get_bands                (MMModem *self,
+gboolean           mm_modem_get_current_bands        (MMModem *self,
                                                       MMModemBand **bands,
                                                       guint *n_bands);
 
@@ -275,20 +275,20 @@ gboolean mm_modem_set_allowed_modes_sync   (MMModem *self,
                                             GCancellable *cancellable,
                                             GError **error);
 
-void     mm_modem_set_bands        (MMModem *self,
-                                    const MMModemBand *bands,
-                                    guint n_bands,
-                                    GCancellable *cancellable,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-gboolean mm_modem_set_bands_finish (MMModem *self,
-                                    GAsyncResult *res,
-                                    GError **error);
-gboolean mm_modem_set_bands_sync   (MMModem *self,
-                                    const MMModemBand *bands,
-                                    guint n_bands,
-                                    GCancellable *cancellable,
-                                    GError **error);
+void     mm_modem_set_current_bands        (MMModem *self,
+                                            const MMModemBand *bands,
+                                            guint n_bands,
+                                            GCancellable *cancellable,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+gboolean mm_modem_set_current_bands_finish (MMModem *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+gboolean mm_modem_set_current_bands_sync   (MMModem *self,
+                                            const MMModemBand *bands,
+                                            guint n_bands,
+                                            GCancellable *cancellable,
+                                            GError **error);
 
 void   mm_modem_get_sim        (MMModem *self,
                                 GCancellable *cancellable,

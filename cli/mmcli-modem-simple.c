@@ -234,7 +234,7 @@ status_process_reply (MMSimpleStatus *result,
         signal_quality = (mm_simple_status_get_signal_quality (
                               result,
                               &signal_quality_recent));
-        mm_simple_status_get_bands (result, &bands, &n_bands);
+        mm_simple_status_get_current_bands (result, &bands, &n_bands);
         bands_str = mm_common_build_bands_string (bands, n_bands);
         access_tech_str = (mm_modem_access_technology_build_string_from_mask (
                                mm_simple_status_get_access_technologies (result)));
