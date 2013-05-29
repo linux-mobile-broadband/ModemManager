@@ -48,7 +48,89 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init))
+
+/*****************************************************************************/
+/* Load supported modes (Modem interface) */
+
+static GArray *
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_supported_modes_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
+    MMModemModeCombination mode;
+
+    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
+    if (!all) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Build list of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 2G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_2G;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 3G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_3G;
+    g_array_append_val (combinations, mode);
+
+    /* Filter out those unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    /* Run parent's loading */
+    iface_modem_parent->load_supported_modes (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_supported_modes_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_supported_modes));
+}
 
 /*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
@@ -275,6 +357,10 @@ set_allowed_modes (MMIfaceModem *self,
             a = 1;
         else if (preferred == MM_MODEM_MODE_3G)
             a = 2;
+    } else if (allowed == MM_MODEM_MODE_ANY &&
+               preferred == MM_MODEM_MODE_NONE) {
+        b = 2;
+        a = 0;
     }
 
     if (a < 0 || b < 0) {
@@ -1149,6 +1235,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;

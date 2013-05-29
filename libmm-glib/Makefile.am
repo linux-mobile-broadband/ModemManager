@@ -5,6 +5,7 @@ lib_LTLIBRARIES = libmm-glib.la
 libmm_glib_la_SOURCES = \
 	libmm-glib.h \
 	mm-helpers.h \
+	mm-helper-types.h \
 	mm-manager.h \
 	mm-manager.c \
 	mm-object.h \
@@ -77,6 +78,7 @@ libmm_glib_la_LIBADD = \
 includedir = @includedir@/libmm-glib
 include_HEADERS = \
 	libmm-glib.h \
+	mm-helper-types.h \
 	mm-manager.h \
 	mm-object.h \
 	mm-modem.h \

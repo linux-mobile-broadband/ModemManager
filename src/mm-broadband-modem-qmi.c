@@ -65,6 +65,9 @@ struct _MMBroadbandModemQmiPrivate {
     gchar *meid;
     gchar *esn;
 
+    /* Cached supported radio interfaces; in order to load supported modes */
+    GArray *supported_radio_interfaces;
+
     /* Cached supported frequency bands; in order to handle ANY */
     GArray *supported_bands;
 
@@ -554,6 +557,20 @@ modem_load_current_capabilities (MMIfaceModem *self,
 /*****************************************************************************/
 /* Modem Capabilities loading (Modem interface) */
 
+typedef struct {
+    MMBroadbandModemQmi *self;
+    GSimpleAsyncResult *result;
+} LoadModemCapabilitiesContext;
+
+static void
+load_modem_capabilities_context_complete_and_free (LoadModemCapabilitiesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadModemCapabilitiesContext, ctx);
+}
+
 static MMModemCapability
 modem_load_modem_capabilities_finish (MMIfaceModem *self,
                                       GAsyncResult *res,
@@ -577,7 +594,7 @@ modem_load_modem_capabilities_finish (MMIfaceModem *self,
 static void
 dms_get_capabilities_ready (QmiClientDms *client,
                             GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+                            LoadModemCapabilitiesContext *ctx)
 {
     QmiMessageDmsGetCapabilitiesOutput *output = NULL;
     GError *error = NULL;
@@ -585,10 +602,10 @@ dms_get_capabilities_ready (QmiClientDms *client,
     output = qmi_client_dms_get_capabilities_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (ctx->result, error);
     } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get modem capabilities: ");
-        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_take_error (ctx->result, error);
     } else {
         guint i;
         guint mask = MM_MODEM_CAPABILITY_NONE;
@@ -609,7 +626,12 @@ dms_get_capabilities_ready (QmiClientDms *client,
                                                                                  i));
         }
 
-        g_simple_async_result_set_op_res_gpointer (simple,
+        /* Cache supported radio interfaces */
+        if (ctx->self->priv->supported_radio_interfaces)
+            g_array_unref (ctx->self->priv->supported_radio_interfaces);
+        ctx->self->priv->supported_radio_interfaces = g_array_ref (radio_interface_list);
+
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (mask),
                                                    NULL);
     }
@@ -617,8 +639,7 @@ dms_get_capabilities_ready (QmiClientDms *client,
     if (output)
         qmi_message_dms_get_capabilities_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    load_modem_capabilities_context_complete_and_free (ctx);
 }
 
 static void
@@ -626,7 +647,7 @@ modem_load_modem_capabilities (MMIfaceModem *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    LoadModemCapabilitiesContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -634,10 +655,12 @@ modem_load_modem_capabilities (MMIfaceModem *self,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_modem_capabilities);
+    ctx = g_slice_new (LoadModemCapabilitiesContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_modem_capabilities);
 
     mm_dbg ("loading modem capabilities...");
     qmi_client_dms_get_capabilities (QMI_CLIENT_DMS (client),
@@ -645,7 +668,7 @@ modem_load_modem_capabilities (MMIfaceModem *self,
                                      5,
                                      NULL,
                                      (GAsyncReadyCallback)dms_get_capabilities_ready,
-                                     result);
+                                     ctx);
 }
 
 /*****************************************************************************/
@@ -1711,37 +1734,89 @@ set_current_bands (MMIfaceModem *_self,
 /*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
-static MMModemMode
+static GArray *
 modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return (MMModemMode)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                              G_SIMPLE_ASYNC_RESULT (res)));
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
-modem_load_supported_modes (MMIfaceModem *self,
+modem_load_supported_modes (MMIfaceModem *_self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     GSimpleAsyncResult *result;
-    MMModemMode mode;
-
-    /* For QMI-powered modems, it is safe to assume they do 2G and 3G */
-    mode = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-
-    /* Then, if the modem has LTE caps, it does 4G */
-    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-            mode |= MM_MODEM_MODE_4G;
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
+    MMModemModeCombination mode;
+    guint i;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_load_supported_modes);
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               GUINT_TO_POINTER (mode),
-                                               NULL);
+
+    if (!self->priv->supported_radio_interfaces) {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Cannot load supported modes, no radio interface list");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Build all, based on the supported radio interfaces */
+    mode.allowed = MM_MODEM_MODE_NONE;
+    for (i = 0; i < self->priv->supported_radio_interfaces->len; i++)
+        mode.allowed |= mm_modem_mode_from_qmi_radio_interface (g_array_index (self->priv->supported_radio_interfaces,
+                                                                               QmiDmsRadioInterface,
+                                                                               i));
+    mode.preferred = MM_MODEM_MODE_NONE;
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    g_array_append_val (all, mode);
+
+    /* Build combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 7);
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 2G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_2G;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 3G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_3G;
+    g_array_append_val (combinations, mode);
+    /* 4G only */
+    mode.allowed = MM_MODEM_MODE_4G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G, 3G and 4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    /* Filter out those unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_simple_async_result_set_op_res_gpointer (result, filtered, (GDestroyNotify) g_array_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -2842,8 +2917,16 @@ set_allowed_modes (MMIfaceModem *self,
                                              callback,
                                              user_data,
                                              set_allowed_modes);
-    ctx->allowed = allowed;
-    ctx->preferred = preferred;
+
+    if (allowed == MM_MODEM_MODE_ANY && ctx->preferred == MM_MODEM_MODE_NONE) {
+        ctx->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        ctx->preferred = MM_MODEM_MODE_NONE;
+        if (mm_iface_modem_is_3gpp_lte (self))
+            ctx->allowed |= MM_MODEM_MODE_4G;
+    } else {
+        ctx->allowed = allowed;
+        ctx->preferred = preferred;
+    }
 
     /* System selection preference introduced in NAS 1.1 */
     ctx->run_set_system_selection_preference = qmi_client_check_version (client, 1, 1);
@@ -8074,6 +8157,8 @@ finalize (GObject *object)
     g_free (self->priv->current_operator_description);
     if (self->priv->supported_bands)
         g_array_unref (self->priv->supported_bands);
+    if (self->priv->supported_radio_interfaces)
+        g_array_unref (self->priv->supported_radio_interfaces);
 
     G_OBJECT_CLASS (mm_broadband_modem_qmi_parent_class)->finalize (object);
 }

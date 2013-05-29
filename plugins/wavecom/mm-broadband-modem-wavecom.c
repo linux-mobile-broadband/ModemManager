@@ -37,6 +37,8 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 
+static MMIfaceModem *iface_modem_parent;
+
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemWavecom, mm_broadband_modem_wavecom, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
@@ -82,18 +84,17 @@ static const WavecomBand3G bands_3g[] = {
 };
 
 /*****************************************************************************/
-/* Supported modes (Modem interface) */
+/* Load supported modes (Modem interface) */
 
-static MMModemMode
+static GArray *
 load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_MODE_NONE;
+        return NULL;
 
-    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
@@ -101,9 +102,13 @@ supported_ms_classes_query_ready (MMBaseModem *self,
                                   GAsyncResult *res,
                                   GSimpleAsyncResult *simple)
 {
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
     const gchar *response;
     GError *error = NULL;
-    MMModemMode mode;
+    MMModemModeCombination mode;
+    MMModemMode mode_all;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -115,40 +120,71 @@ supported_ms_classes_query_ready (MMBaseModem *self,
     }
 
     response = mm_strip_tag (response, "+CGCLASS:");
-    mode = MM_MODEM_MODE_NONE;
-
-    if (strstr (response, WAVECOM_MS_CLASS_A_IDSTR)) {
-        mm_dbg ("Modem supports Class A mobile station");
-        mode |= MM_MODEM_MODE_3G;
-    }
-
-    if (strstr (response, WAVECOM_MS_CLASS_B_IDSTR)) {
-        mm_dbg ("Modem supports Class B mobile station");
-        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
-    }
-
-    if (strstr (response, WAVECOM_MS_CLASS_CG_IDSTR)) {
-        mm_dbg ("Modem supports Class CG mobile station");
-        mode |= MM_MODEM_MODE_2G;
-    }
-
-    if (strstr (response, WAVECOM_MS_CLASS_CC_IDSTR)) {
-        mm_dbg ("Modem supports Class CC mobile station");
-        mode |= MM_MODEM_MODE_CS;
-    }
+    mode_all = MM_MODEM_MODE_NONE;
+    if (strstr (response, WAVECOM_MS_CLASS_A_IDSTR))
+        mode_all |= MM_MODEM_MODE_3G;
+    if (strstr (response, WAVECOM_MS_CLASS_B_IDSTR))
+        mode_all |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
+    if (strstr (response, WAVECOM_MS_CLASS_CG_IDSTR))
+        mode_all |= MM_MODEM_MODE_2G;
+    if (strstr (response, WAVECOM_MS_CLASS_CC_IDSTR))
+        mode_all |= MM_MODEM_MODE_CS;
 
     /* If none received, error */
-    if (mode == MM_MODEM_MODE_NONE)
+    if (mode_all == MM_MODEM_MODE_NONE) {
         g_simple_async_result_set_error (simple,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "Couldn't get supported mobile station classes: '%s'",
                                          response);
-    else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (mode),
-                                                   NULL);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
 
+    /* Build ALL mask */
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    mode.allowed = mode_all;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (all, mode);
+
+    /* Build list of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 7);
+    /* CS only */
+    mode.allowed = MM_MODEM_MODE_CS;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* CS and 2G */
+    mode.allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G);
+    mode.preferred = MM_MODEM_MODE_2G;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 2G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_2G;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G, 3G preferred */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_3G;
+    g_array_append_val (combinations, mode);
+
+    /* Filter out those unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
@@ -158,20 +194,16 @@ load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
-
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "+CGCLASS=?",
         3,
         FALSE,
         (GAsyncReadyCallback)supported_ms_classes_query_ready,
-        result);
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_supported_modes));
 }
 
 /*****************************************************************************/
@@ -387,8 +419,6 @@ load_allowed_modes (MMIfaceModem *self,
 typedef struct {
     MMBroadbandModemWavecom *self;
     GSimpleAsyncResult *result;
-    MMModemMode allowed;
-    MMModemMode preferred;
     gchar *cgclass_command;
     gchar *wwsm_command;
 } SetAllowedModesContext;
@@ -473,19 +503,27 @@ set_allowed_modes (MMIfaceModem *self,
                                              callback,
                                              user_data,
                                              set_allowed_modes);
-    ctx->allowed = allowed;
-    ctx->preferred = preferred;
+
+    /* Handle ANY/NONE */
+    if (allowed == MM_MODEM_MODE_ANY && preferred == MM_MODEM_MODE_NONE) {
+        if (mm_iface_modem_is_3g (self)) {
+            allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            preferred = MM_MODEM_MODE_NONE;
+        } else {
+            allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G);
+            preferred = MM_MODEM_MODE_2G;
+        }
+    }
 
     if (allowed == MM_MODEM_MODE_CS)
         ctx->cgclass_command = g_strdup ("+CGCLASS=" WAVECOM_MS_CLASS_CC_IDSTR);
     else if (allowed == MM_MODEM_MODE_2G)
         ctx->cgclass_command = g_strdup ("+CGCLASS=" WAVECOM_MS_CLASS_CG_IDSTR);
     else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS) &&
-             preferred == MM_MODEM_MODE_NONE)
+             preferred == MM_MODEM_MODE_2G)
         ctx->cgclass_command = g_strdup ("+CGCLASS=" WAVECOM_MS_CLASS_B_IDSTR);
     else if (allowed & MM_MODEM_MODE_3G) {
-        if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G) ||
-            allowed == (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
             if (preferred == MM_MODEM_MODE_2G)
                 ctx->wwsm_command = g_strdup ("+WWSM=2,1");
             else if (preferred == MM_MODEM_MODE_3G)
@@ -1144,6 +1182,8 @@ mm_broadband_modem_wavecom_init (MMBroadbandModemWavecom *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_allowed_modes = load_allowed_modes;

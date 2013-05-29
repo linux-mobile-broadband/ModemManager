@@ -248,6 +248,53 @@ mm_new_iso8601_time (guint year,
 
 /*****************************************************************************/
 
+GArray *
+mm_filter_supported_modes (const GArray *all,
+                           const GArray *supported_combinations)
+{
+    MMModemModeCombination all_item;
+    guint i;
+    GArray *filtered_combinations;
+    gboolean all_item_added = FALSE;
+
+    g_return_val_if_fail (all != NULL, NULL);
+    g_return_val_if_fail (all->len == 1, NULL);
+    g_return_val_if_fail (supported_combinations != NULL, NULL);
+
+    all_item = g_array_index (all, MMModemModeCombination, 0);
+    g_return_val_if_fail (all_item.allowed != MM_MODEM_MODE_NONE, NULL);
+
+    /* We will filter out all combinations which have modes not listed in 'all' */
+    filtered_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), supported_combinations->len);
+    for (i = 0; i < supported_combinations->len; i++) {
+        MMModemModeCombination *mode;
+
+        mode = &g_array_index (supported_combinations, MMModemModeCombination, i);
+        if (!(mode->allowed & ~all_item.allowed)) {
+            /* Compare only 'allowed', *not* preferred. If there is at least one item with allowed
+             * containing all supported modes, we're already good to go. This allows us to have a
+             * default with preferred != NONE (e.g. Wavecom 2G modem with allowed=CS+2G and
+             * preferred=2G */
+            if (all_item.allowed == mode->allowed)
+                all_item_added = TRUE;
+            g_array_append_val (filtered_combinations, *mode);
+        }
+    }
+
+    if (filtered_combinations->len == 0)
+        mm_warn ("All supported mode combinations were filtered out.");
+
+    /* Add default entry with the generic mask including all items */
+    if (!all_item_added) {
+        mm_dbg ("Adding an explicit item with all supported modes allowed");
+        g_array_append_val (filtered_combinations, all_item);
+    }
+
+    return filtered_combinations;
+}
+
+/*****************************************************************************/
+
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
 #define CREG1 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])"
 

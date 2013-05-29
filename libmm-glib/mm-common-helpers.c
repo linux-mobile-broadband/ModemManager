@@ -73,6 +73,38 @@ mm_common_build_sms_storages_string (const MMSmsStorage *storages,
     return g_string_free (str, FALSE);
 }
 
+gchar *
+mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
+                                          guint n_modes)
+{
+    gboolean first = TRUE;
+    GString *str;
+    guint i;
+
+    if (!modes || !n_modes)
+        return g_strdup ("none");
+
+    str = g_string_new ("");
+    for (i = 0; i < n_modes; i++) {
+        gchar *allowed;
+        gchar *preferred;
+
+        allowed = mm_modem_mode_build_string_from_mask (modes[i].allowed);
+        preferred = mm_modem_mode_build_string_from_mask (modes[i].preferred);
+        g_string_append_printf (str, "%sallowed: %s; preferred: %s",
+                                first ? "" : "\n",
+                                allowed,
+                                preferred);
+        g_free (allowed);
+        g_free (preferred);
+
+        if (first)
+            first = FALSE;
+    }
+
+    return g_string_free (str, FALSE);
+}
+
 GArray *
 mm_common_sms_storages_variant_to_garray (GVariant *variant)
 {
@@ -355,6 +387,96 @@ mm_common_bands_garray_cmp (GArray *a, GArray *b)
     g_array_unref (dup_b);
 
     return !different;
+}
+
+GArray *
+mm_common_mode_combinations_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            MMModemModeCombination mode;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), n);
+            while (g_variant_iter_loop (&iter, "(uu)", &mode.allowed, &mode.preferred))
+                g_array_append_val (array, mode);
+        }
+    }
+
+    /* If nothing set, fallback to default */
+    if (!array) {
+        MMModemModeCombination default_mode;
+
+        default_mode.allowed = MM_MODEM_MODE_ANY;
+        default_mode.preferred = MM_MODEM_MODE_NONE;
+        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+        g_array_append_val (array, default_mode);
+    }
+
+    return array;
+}
+
+MMModemModeCombination *
+mm_common_mode_combinations_variant_to_array (GVariant *variant,
+                                              guint *n_modes)
+{
+    GArray *array;
+
+    array = mm_common_mode_combinations_variant_to_garray (variant);
+    if (n_modes)
+        *n_modes = array->len;
+    return (MMModemModeCombination *) g_array_free (array, FALSE);
+}
+
+GVariant *
+mm_common_mode_combinations_array_to_variant (const MMModemModeCombination *modes,
+                                              guint n_modes)
+{
+    if (n_modes > 0) {
+        GVariantBuilder builder;
+        guint i;
+
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+
+        for (i = 0; i < n_modes; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new ("(uu)",
+                                                        ((guint32)modes[i].allowed),
+                                                        ((guint32)modes[i].preferred)));
+        return g_variant_builder_end (&builder);
+    }
+
+    return mm_common_build_mode_combinations_default ();
+}
+
+GVariant *
+mm_common_mode_combinations_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_mode_combinations_array_to_variant ((const MMModemModeCombination *)array->data,
+                                                             array->len);
+
+    return mm_common_mode_combinations_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_mode_combinations_default (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new ("(uu)",
+                                                MM_MODEM_MODE_ANY,
+                                                MM_MODEM_MODE_NONE));
+    return g_variant_builder_end (&builder);
 }
 
 gboolean

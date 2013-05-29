@@ -238,6 +238,8 @@ print_modem_info (void)
     gchar *modem_capabilities_string;
     gchar *current_capabilities_string;
     gchar *access_technologies_string;
+    MMModemModeCombination *modes = NULL;
+    guint n_modes = 0;
     gchar *supported_modes_string;
     gchar *allowed_modes_string;
     gchar *preferred_mode_string;
@@ -266,6 +268,9 @@ print_modem_info (void)
         mm_modem_get_current_capabilities (ctx->modem));
     access_technologies_string = mm_modem_access_technology_build_string_from_mask (
         mm_modem_get_access_technologies (ctx->modem));
+    mm_modem_get_supported_modes (ctx->modem, &modes, &n_modes);
+    supported_modes_string = mm_common_build_mode_combinations_string (modes, n_modes);
+    g_free (modes);
     mm_modem_get_current_bands (ctx->modem, &bands, &n_bands);
     current_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
@@ -276,8 +281,6 @@ print_modem_info (void)
         mm_modem_get_allowed_modes (ctx->modem));
     preferred_mode_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_preferred_mode (ctx->modem));
-    supported_modes_string = mm_modem_mode_build_string_from_mask (
-        mm_modem_get_supported_modes (ctx->modem));
     supported_ip_families_string = mm_bearer_ip_family_build_string_from_mask (
         mm_modem_get_supported_ip_families (ctx->modem));
 
@@ -309,6 +312,15 @@ print_modem_info (void)
                                                    mm_modem_get_revision (ctx->modem));
     else
         prefixed_revision = NULL;
+
+    if (supported_modes_string) {
+        gchar *prefixed;
+
+        prefixed = mmcli_prefix_newlines ("           |                  ",
+                                          supported_modes_string);
+        g_free (supported_modes_string);
+        supported_modes_string = prefixed;
+    }
 
     /* Get signal quality info */
     signal_quality = mm_modem_get_signal_quality (ctx->modem, &signal_quality_recent);

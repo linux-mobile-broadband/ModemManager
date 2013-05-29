@@ -410,14 +410,25 @@
     <!--
         SupportedModes:
 
-        Bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
-        specifying the access technologies supported by the device.
+        This property exposes the supported mode combinations, given as an array of unsigned
+        integer pairs, where:
 
-        For POTS devices, only the
-        <link linkend="MM-MODEM-MODE-ANY:CAPS"><constant>MM_MODEM_MODE_ANY</constant></link>
-        mode will be returned.
+        <variablelist>
+          <varlistentry>
+            <listitem>
+              The first integer is a bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
+              specifying the allowed modes.
+            </listitem>
+          </varlistentry>
+          <varlistentry>
+            <listitem>
+              The second integer is a single <link linkend="MMModemMode">MMModemMode</link>, which
+              specifies the preferred access technology, among the ones defined in the allowed modes.
+            </listitem>
+          </varlistentry>
+        </variablelist>
     -->
-    <property name="SupportedModes" type="u" access="read" />
+    <property name="SupportedModes" type="a(uu)" access="read" />
 
     <!--
         AllowedModes:

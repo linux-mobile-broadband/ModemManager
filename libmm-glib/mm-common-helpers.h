@@ -17,6 +17,7 @@
 
 #include <glib.h>
 #include <ModemManager.h>
+#include "mm-helper-types.h"
 
 #if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
 #error "Only <libmm-glib.h> can be included directly."
@@ -30,6 +31,9 @@ gchar *mm_common_build_bands_string (const MMModemBand *bands,
 
 gchar *mm_common_build_sms_storages_string (const MMSmsStorage *storages,
                                             guint n_storages);
+
+gchar *mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
+                                                 guint n_modes);
 
 MMModemMode           mm_common_get_modes_from_string        (const gchar *str,
                                                               GError **error);
@@ -66,6 +70,14 @@ GVariant    *mm_common_build_bands_any     (void);
 GVariant    *mm_common_build_bands_unknown (void);
 
 gboolean     mm_common_bands_garray_cmp (GArray *a, GArray *b);
+
+GArray                 *mm_common_mode_combinations_variant_to_garray (GVariant *variant);
+MMModemModeCombination *mm_common_mode_combinations_variant_to_array  (GVariant *variant,
+                                                                       guint *n_modes);
+GVariant               *mm_common_mode_combinations_array_to_variant  (const MMModemModeCombination *modes,
+                                                                       guint n_modes);
+GVariant               *mm_common_mode_combinations_garray_to_variant (GArray *array);
+GVariant               *mm_common_build_mode_combinations_default     (void);
 
 typedef gboolean (*MMParseKeyValueForeachFn) (const gchar *key,
                                               const gchar *value,

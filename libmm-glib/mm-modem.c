@@ -49,6 +49,11 @@ struct _MMModemPrivate {
     guint unlock_retries_id;
     MMUnlockRetries *unlock_retries;
 
+    /* Supported Modes */
+    GMutex supported_modes_mutex;
+    guint supported_modes_id;
+    GArray *supported_modes;
+
     /* Supported Bands */
     GMutex supported_bands_mutex;
     guint supported_bands_id;
@@ -910,22 +915,120 @@ mm_modem_get_signal_quality (MMModem *self,
 
 /*****************************************************************************/
 
+static void
+supported_modes_updated (MMModem *self,
+                         GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->supported_modes_mutex);
+    {
+        GVariant *dictionary;
+
+        if (self->priv->supported_modes)
+            g_array_unref (self->priv->supported_modes);
+
+        dictionary = mm_gdbus_modem_get_supported_modes (MM_GDBUS_MODEM (self));
+        self->priv->supported_modes = (dictionary ?
+                                       mm_common_mode_combinations_variant_to_garray (dictionary) :
+                                       NULL);
+    }
+    g_mutex_unlock (&self->priv->supported_modes_mutex);
+}
+
+static gboolean
+ensure_internal_supported_modes (MMModem *self,
+                                 MMModemModeCombination **dup_modes,
+                                 guint *dup_modes_n)
+{
+    gboolean ret;
+
+    g_mutex_lock (&self->priv->supported_modes_mutex);
+    {
+        /* If this is the first time ever asking for the array, setup the
+         * update listener and the initial array, if any. */
+        if (!self->priv->supported_modes_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_modem_dup_supported_modes (MM_GDBUS_MODEM (self));
+            if (dictionary) {
+                self->priv->supported_modes = mm_common_mode_combinations_variant_to_garray (dictionary);
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->supported_modes_id =
+                g_signal_connect (self,
+                                  "notify::supported-modes",
+                                  G_CALLBACK (supported_modes_updated),
+                                  NULL);
+        }
+
+        if (!self->priv->supported_modes)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_modes && dup_modes_n) {
+                *dup_modes_n = self->priv->supported_modes->len;
+                if (self->priv->supported_modes->len > 0) {
+                    *dup_modes = g_malloc (sizeof (MMModemModeCombination) * self->priv->supported_modes->len);
+                    memcpy (*dup_modes, self->priv->supported_modes->data, sizeof (MMModemModeCombination) * self->priv->supported_modes->len);
+                } else
+                    *dup_modes = NULL;
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->supported_modes_mutex);
+
+    return ret;
+}
+
 /**
  * mm_modem_get_supported_modes:
  * @self: A #MMModem.
+ * @modes: (out) (array length=n_modes): Return location for the array of #MMModemModeCombination structs. The returned array should be freed with g_free() when no longer needed.
+ * @n_modes: (out): Return location for the number of values in @modes.
  *
- * Gets the list of modes specifying the access technologies supported by the #MMModem.
+ * Gets the list of supported mode combinations.
  *
- * For POTS devices, only #MM_MODEM_MODE_ANY will be returned.
- *
- * Returns: A bitmask of #MMModemMode values.
+ * Returns: %TRUE if @modes and @n_modes are set, %FALSE otherwise.
  */
-MMModemMode
-mm_modem_get_supported_modes (MMModem *self)
+gboolean
+mm_modem_get_supported_modes (MMModem *self,
+                              MMModemModeCombination **modes,
+                              guint *n_modes)
 {
-    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (modes != NULL, FALSE);
+    g_return_val_if_fail (n_modes != NULL, FALSE);
 
-    return (MMModemMode) mm_gdbus_modem_get_supported_modes (MM_GDBUS_MODEM (self));
+    return ensure_internal_supported_modes (self, modes, n_modes);
+}
+
+/**
+ * mm_modem_peek_supported_modes:
+ * @self: A #MMModem.
+ * @modes: (out) (array length=n_modes): Return location for the array of #MMModemModeCombination values. Do not free the returned array, it is owned by @self.
+ * @n_modes: (out): Return location for the number of values in @modes.
+ *
+ * Gets the list of supported mode combinations.
+ *
+ * Returns: %TRUE if @modes and @n_modes are set, %FALSE otherwise.
+ */
+gboolean
+mm_modem_peek_supported_modes (MMModem *self,
+                               const MMModemModeCombination **modes,
+                               guint *n_modes)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (modes != NULL, FALSE);
+    g_return_val_if_fail (n_modes != NULL, FALSE);
+
+    if (!ensure_internal_supported_modes (self, NULL, NULL))
+        return FALSE;
+
+    *n_modes = self->priv->supported_modes->len;
+    *modes = (MMModemModeCombination *)self->priv->supported_modes->data;
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -2533,6 +2636,7 @@ mm_modem_init (MMModem *self)
                                               MM_TYPE_MODEM,
                                               MMModemPrivate);
     g_mutex_init (&self->priv->unlock_retries_mutex);
+    g_mutex_init (&self->priv->supported_modes_mutex);
     g_mutex_init (&self->priv->supported_bands_mutex);
     g_mutex_init (&self->priv->current_bands_mutex);
 }
@@ -2543,9 +2647,12 @@ finalize (GObject *object)
     MMModem *self = MM_MODEM (object);
 
     g_mutex_clear (&self->priv->unlock_retries_mutex);
+    g_mutex_clear (&self->priv->supported_modes_mutex);
     g_mutex_clear (&self->priv->supported_bands_mutex);
     g_mutex_clear (&self->priv->current_bands_mutex);
 
+    if (self->priv->supported_modes)
+        g_array_unref (self->priv->supported_modes);
     if (self->priv->supported_bands)
         g_array_unref (self->priv->supported_bands);
     if (self->priv->current_bands)

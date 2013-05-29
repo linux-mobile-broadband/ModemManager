@@ -370,62 +370,74 @@ modem_load_device_identifier (MMIfaceModem *self,
 /*****************************************************************************/
 /* Supported modes loading (Modem interface) */
 
-static MMModemMode
-modem_load_supported_modes_finish (MMIfaceModem *_self,
+static GArray *
+modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    MMModemMode mask;
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-
-    if (self->priv->caps_data_class == 0) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Data class not given in device capabilities");
-        return MM_MODEM_MODE_NONE;
-    }
-
-    mask = 0;
-
-    /* 3GPP... */
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_GPRS |
-                                       MBIM_DATA_CLASS_EDGE))
-        mask |= MM_MODEM_MODE_2G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_UMTS |
-                                       MBIM_DATA_CLASS_HSDPA |
-                                       MBIM_DATA_CLASS_HSUPA))
-        mask |= MM_MODEM_MODE_3G;
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
-        mask |= MM_MODEM_MODE_4G;
-
-    /* 3GPP2... */
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
-        mask |= MM_MODEM_MODE_2G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_1XEVDO |
-                                       MBIM_DATA_CLASS_1XEVDO_REVA |
-                                       MBIM_DATA_CLASS_1XEVDV |
-                                       MBIM_DATA_CLASS_3XRTT |
-                                       MBIM_DATA_CLASS_1XEVDO_REVB))
-        mask |= MM_MODEM_MODE_3G;
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_UMB)
-        mask |= MM_MODEM_MODE_4G;
-
-    return mask;
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
-modem_load_supported_modes (MMIfaceModem *self,
+modem_load_supported_modes (MMIfaceModem *_self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GArray *combinations;
+    MMModemModeCombination mode;
     GSimpleAsyncResult *result;
+    MMModemMode all;
 
     /* Just complete */
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_load_supported_modes);
+
+
+    if (self->priv->caps_data_class == 0) {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Data class not given in device capabilities");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    all = 0;
+
+    /* 3GPP... */
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_GPRS |
+                                       MBIM_DATA_CLASS_EDGE))
+        all |= MM_MODEM_MODE_2G;
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_UMTS |
+                                       MBIM_DATA_CLASS_HSDPA |
+                                       MBIM_DATA_CLASS_HSUPA))
+        all |= MM_MODEM_MODE_3G;
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
+        all |= MM_MODEM_MODE_4G;
+
+    /* 3GPP2... */
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
+        all |= MM_MODEM_MODE_2G;
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_1XEVDO |
+                                       MBIM_DATA_CLASS_1XEVDO_REVA |
+                                       MBIM_DATA_CLASS_1XEVDV |
+                                       MBIM_DATA_CLASS_3XRTT |
+                                       MBIM_DATA_CLASS_1XEVDO_REVB))
+        all |= MM_MODEM_MODE_3G;
+    if (self->priv->caps_data_class & MBIM_DATA_CLASS_UMB)
+        all |= MM_MODEM_MODE_4G;
+
+    /* Build a mask with all supported modes */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    mode.allowed = all;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }

@@ -1286,19 +1286,28 @@ load_supported_modes_context_complete_and_free (LoadSupportedModesContext *ctx)
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (LoadSupportedModesContext, ctx);
 }
 
-static MMModemMode
+static GArray *
 modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_MODE_NONE;
+    GArray *modes;
+    MMModemModeCombination mode;
 
-    return (MMModemMode)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                              G_SIMPLE_ASYNC_RESULT (res)));
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    /* Build a mask with all supported modes */
+    modes = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    mode.allowed = (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                                       G_SIMPLE_ASYNC_RESULT (res)));
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (modes, mode);
+
+    return modes;
 }
 
 static void load_supported_modes_step (LoadSupportedModesContext *ctx);
@@ -1515,8 +1524,8 @@ modem_load_supported_modes (MMIfaceModem *self,
 {
     LoadSupportedModesContext *ctx;
 
-    mm_dbg ("loading initial supported modes...");
-    ctx = g_new0 (LoadSupportedModesContext, 1);
+    mm_dbg ("loading supported modes...");
+    ctx = g_slice_new0 (LoadSupportedModesContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,

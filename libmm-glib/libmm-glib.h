@@ -52,6 +52,7 @@
 # include <mm-common-helpers.h>
 #endif
 
+#include <mm-helper-types.h>
 #include <mm-simple-status.h>
 #include <mm-simple-connect-properties.h>
 #include <mm-sms-properties.h>

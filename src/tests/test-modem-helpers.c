@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <libmm-glib.h>
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
@@ -1931,6 +1932,127 @@ test_cdma_parse_gsn (void *f, gpointer d)
 
 /*****************************************************************************/
 
+static gboolean
+find_mode_combination (GArray *modes,
+                       MMModemMode allowed,
+                       MMModemMode preferred)
+{
+    guint i;
+
+    for (i = 0; i < modes->len; i++) {
+        MMModemModeCombination *mode;
+
+        mode = &g_array_index (modes, MMModemModeCombination, i);
+        if (mode->allowed == allowed && mode->preferred == preferred)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static GArray *
+build_mode_all (MMModemMode all_mask)
+{
+    MMModemModeCombination all_item;
+    GArray *all;
+
+    all_item.allowed = all_mask;
+    all_item.preferred = MM_MODEM_MODE_NONE;
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    g_array_append_val (all, all_item);
+    return all;
+}
+
+static void
+test_supported_mode_filter (void *f, gpointer d)
+{
+    MMModemModeCombination mode;
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
+
+    /* Build array of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 4G only */
+    mode.allowed = MM_MODEM_MODE_4G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G and 4G */
+    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G, 3G and 4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    /* Only 2G supported */
+    all = build_mode_all (MM_MODEM_MODE_2G);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_assert_cmpuint (filtered->len, ==, 1);
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
+    g_array_unref (filtered);
+    g_array_unref (all);
+
+    /* Only 3G supported */
+    all = build_mode_all (MM_MODEM_MODE_3G);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_assert_cmpuint (filtered->len, ==, 1);
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
+    g_array_unref (filtered);
+    g_array_unref (all);
+
+    /* 2G and 3G supported */
+    all = build_mode_all (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_assert_cmpuint (filtered->len, ==, 3);
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G), MM_MODEM_MODE_NONE));
+    g_array_unref (filtered);
+    g_array_unref (all);
+
+    /* 3G and 4G supported */
+    all = build_mode_all (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_assert_cmpuint (filtered->len, ==, 3);
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G), MM_MODEM_MODE_NONE));
+    g_array_unref (filtered);
+    g_array_unref (all);
+
+    /* 2G, 3G and 4G supported */
+    all = build_mode_all (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_assert_cmpuint (filtered->len, ==, 6);
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G), MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G), MM_MODEM_MODE_NONE));
+    g_assert (find_mode_combination (filtered, (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G), MM_MODEM_MODE_NONE));
+    g_array_unref (filtered);
+    g_array_unref (all);
+
+    g_array_unref (combinations);
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -2059,6 +2181,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_generic_multiple, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech_multiple, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_supported_mode_filter, NULL));
 
     result = g_test_run ();
 

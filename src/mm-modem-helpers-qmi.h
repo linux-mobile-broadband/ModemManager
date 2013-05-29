@@ -26,6 +26,8 @@
 
 MMModemCapability mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network);
 
+MMModemMode mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network);
+
 MMModemLock mm_modem_lock_from_qmi_uim_pin_status (QmiDmsUimPinStatus status,
                                                        gboolean pin1);
 

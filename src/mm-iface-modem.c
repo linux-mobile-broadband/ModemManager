@@ -2178,9 +2178,11 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
+    GArray *supported;
     SetAllowedModesContext *ctx;
-    MMModemMode supported;
-    MMModemMode not_supported;
+    MMModemMode current_allowed;
+    MMModemMode current_preferred;
+    guint i;
 
     /* If setting allowed modes is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes ||
@@ -2201,6 +2203,8 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
                                              callback,
                                              user_data,
                                              mm_iface_modem_set_allowed_modes);
+    ctx->allowed = allowed;
+    ctx->preferred = preferred;
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
@@ -2214,43 +2218,58 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
     }
 
     /* Get list of supported modes */
-    supported = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
+    supported = mm_common_mode_combinations_variant_to_garray (
+        mm_gdbus_modem_get_supported_modes (ctx->skeleton));
 
-    /* Whenever we get 'any', just reset to be equal to the list of supported modes */
-    if (allowed == MM_MODEM_MODE_ANY)
-        allowed = supported;
-
-    ctx->allowed = allowed;
-    ctx->preferred = preferred;
-
-    /* Check if we already are in the requested setup */
-    if (mm_gdbus_modem_get_allowed_modes (ctx->skeleton) == allowed &&
-        mm_gdbus_modem_get_preferred_mode (ctx->skeleton) == preferred) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    /* Don't allow mode switchin if only one item given in the supported list */
+    if (supported->len == 1) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Cannot change modes: only one combination supported");
+        g_array_unref (supported);
         set_allowed_modes_context_complete_and_free (ctx);
         return;
     }
 
-    /* Check if any of the modes being allowed is not supported */
-    not_supported = ((supported ^ allowed) & allowed);
+    if (allowed == MM_MODEM_MODE_ANY &&
+        preferred == MM_MODEM_MODE_NONE) {
+        /* Allow allowed=ANY & preferred=NONE, all plugins should support it */
+    } else {
+        gboolean matched = FALSE;
 
-    /* Ensure allowed is a subset of supported */
-    if (not_supported) {
-        gchar *not_supported_str;
-        gchar *supported_str;
+        /* Check if the given combination is supported */
+        for (i = 0; !matched && i < supported->len; i++) {
+            MMModemModeCombination *supported_mode;
 
-        not_supported_str = mm_modem_mode_build_string_from_mask (not_supported);
-        supported_str = mm_modem_mode_build_string_from_mask (supported);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Some of the allowed modes (%s) are not "
-                                         "supported (%s)",
-                                         not_supported_str,
-                                         supported_str);
-        g_free (supported_str);
-        g_free (not_supported_str);
+            supported_mode = &g_array_index (supported, MMModemModeCombination, i);
+            if ((supported_mode->allowed == MM_MODEM_MODE_ANY &&
+                 supported_mode->preferred == MM_MODEM_MODE_NONE) ||
+                (supported_mode->allowed == allowed &&
+                 supported_mode->preferred == preferred)) {
+                matched = TRUE;
+            }
+        }
 
+        if (!matched) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "The given combination of allowed and preferred modes is not supported");
+            g_array_unref (supported);
+            set_allowed_modes_context_complete_and_free (ctx);
+            return;
+        }
+    }
+
+    g_array_unref (supported);
+
+    /* Check if we already are in the requested setup */
+    current_allowed = mm_gdbus_modem_get_allowed_modes (ctx->skeleton);
+    current_preferred = mm_gdbus_modem_get_preferred_mode (ctx->skeleton);
+    if (current_allowed == allowed &&
+        current_preferred == preferred) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         set_allowed_modes_context_complete_and_free (ctx);
         return;
     }
@@ -2275,6 +2294,8 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
         return;
     }
 
+    ctx->allowed = allowed;
+    ctx->preferred = preferred;
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes (self,
                                                             allowed,
                                                             preferred,
@@ -3209,9 +3230,8 @@ load_allowed_modes_ready (MMIfaceModem *self,
         mm_warn ("couldn't load current allowed/preferred modes: '%s'", error->message);
         g_error_free (error);
 
-        /* If errors getting allowed modes, assume allowed=supported,
-         * and none preferred */
-        allowed = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
+        /* If errors getting allowed modes, assume ANY/NONE */
+        allowed = MM_MODEM_MODE_ANY;
         preferred = MM_MODEM_MODE_NONE;
     }
 
@@ -3364,10 +3384,9 @@ interface_enabling_step (EnablingContext *ctx)
                 return;
         }
 
-        /* If no way to get allowed modes, assume allowed=supported,
+        /* If no way to get allowed modes, assume allowed=any,
          * and none preferred */
-        mm_gdbus_modem_set_allowed_modes (ctx->skeleton,
-                                          mm_gdbus_modem_get_supported_modes (ctx->skeleton));
+        mm_gdbus_modem_set_allowed_modes (ctx->skeleton, MM_MODEM_MODE_ANY);
         mm_gdbus_modem_set_preferred_mode (ctx->skeleton, MM_MODEM_MODE_NONE);
         /* Fall down to next step */
         ctx->step++;
@@ -3652,13 +3671,13 @@ load_supported_modes_ready (MMIfaceModem *self,
                             InitializationContext *ctx)
 {
     GError *error = NULL;
-    MMModemMode modes;
+    GArray *modes_array;
 
-    modes = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes_finish (self, res, &error);
-
-    if (modes != MM_MODEM_MODE_NONE) {
-        mm_gdbus_modem_set_supported_modes (ctx->skeleton, modes);
-        mm_gdbus_modem_set_allowed_modes (ctx->skeleton, modes);
+    modes_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes_finish (self, res, &error);
+    if (modes_array != NULL) {
+        mm_gdbus_modem_set_supported_modes (ctx->skeleton,
+                                            mm_common_mode_combinations_garray_to_variant (modes_array));
+        g_array_unref (modes_array);
     }
 
     if (error) {
@@ -4010,18 +4029,30 @@ interface_initialization_step (InitializationContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
-        g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL);
-        g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish != NULL);
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish != NULL) {
+            GArray *supported_modes;
+            MMModemModeCombination *mode = NULL;
 
-        /* Supported modes are meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
-        if (mm_gdbus_modem_get_supported_modes (ctx->skeleton) == MM_MODEM_MODE_NONE) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes (
-                ctx->self,
-                (GAsyncReadyCallback)load_supported_modes_ready,
-                ctx);
-            return;
+            supported_modes = (mm_common_mode_combinations_variant_to_garray (
+                                   mm_gdbus_modem_get_supported_modes (ctx->skeleton)));
+
+            /* Supported modes are meant to be loaded only once during the whole
+             * lifetime of the modem. Therefore, if we already have them loaded,
+             * don't try to load them again. */
+            if (supported_modes->len == 1)
+                mode = &g_array_index (supported_modes, MMModemModeCombination, 0);
+            if (supported_modes->len == 0 ||
+                (mode && mode->allowed == MM_MODEM_MODE_ANY && mode->preferred == MM_MODEM_MODE_NONE)) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_supported_modes_ready,
+                    ctx);
+                g_array_unref (supported_modes);
+                return;
+            }
+
+            g_array_unref (supported_modes);
         }
         /* Fall down to next step */
         ctx->step++;
@@ -4257,7 +4288,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_unlock_retries (skeleton, 0);
         mm_gdbus_modem_set_access_technologies (skeleton, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_gdbus_modem_set_signal_quality (skeleton, g_variant_new ("(ub)", 0, FALSE));
-        mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
+        mm_gdbus_modem_set_supported_modes (skeleton, mm_common_build_mode_combinations_default ());
         mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
@@ -4357,10 +4388,12 @@ mm_iface_modem_get_access_technologies (MMIfaceModem *self)
 
 /*****************************************************************************/
 
-MMModemMode
-mm_iface_modem_get_supported_modes (MMIfaceModem *self)
+static gboolean
+find_supported_mode (MMIfaceModem *self,
+                     MMModemMode mode,
+                     gboolean *only)
 {
-    MMModemMode supported = MM_MODEM_MODE_NONE;
+    gboolean matched = FALSE;
     MmGdbusModem *skeleton;
 
     g_object_get (self,
@@ -4368,56 +4401,85 @@ mm_iface_modem_get_supported_modes (MMIfaceModem *self)
                   NULL);
 
     if (skeleton) {
-        supported = mm_gdbus_modem_get_supported_modes (skeleton);
+        GArray *supported;
+        guint i;
+        guint n_unmatched = 0;
+
+        supported = mm_common_mode_combinations_variant_to_garray (
+            mm_gdbus_modem_get_supported_modes (skeleton));
+
+        /* Check if the given mode is supported */
+        for (i = 0; i < supported->len; i++) {
+            MMModemModeCombination *supported_mode;
+
+            supported_mode = &g_array_index (supported, MMModemModeCombination, i);
+            if (supported_mode->allowed & mode) {
+                matched = TRUE;
+                if (supported_mode->allowed != mode)
+                    n_unmatched++;
+            } else
+                n_unmatched++;
+
+            if (matched && (only == NULL || n_unmatched > 0))
+                break;
+        }
+
+        if (only)
+            *only = (n_unmatched == 0);
+
+        g_array_unref (supported);
         g_object_unref (skeleton);
     }
 
-    return supported;
+    return matched;
 }
 
 gboolean
 mm_iface_modem_is_2g (MMIfaceModem *self)
 {
-    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_2G);
+    return find_supported_mode (self, MM_MODEM_MODE_2G, NULL);
 }
 
 gboolean
 mm_iface_modem_is_2g_only (MMIfaceModem *self)
 {
-    MMModemMode supported;
+    gboolean only;
 
-    supported = mm_iface_modem_get_supported_modes (self);
-    return !((MM_MODEM_MODE_2G ^ supported) & supported);
+    return (find_supported_mode (self, MM_MODEM_MODE_2G, &only) ?
+            only :
+            FALSE);
 }
 
 gboolean
 mm_iface_modem_is_3g (MMIfaceModem *self)
 {
-    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_3G);
+    return find_supported_mode (self, MM_MODEM_MODE_3G, NULL);
 }
 
 gboolean
 mm_iface_modem_is_3g_only (MMIfaceModem *self)
 {
-    MMModemMode supported;
+    gboolean only;
 
-    supported = mm_iface_modem_get_supported_modes (self);
-    return !((MM_MODEM_MODE_3G ^ supported) & supported);
+    return (find_supported_mode (self, MM_MODEM_MODE_3G, &only) ?
+            only :
+            FALSE);
 }
 
 gboolean
 mm_iface_modem_is_4g (MMIfaceModem *self)
 {
-    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_4G);
+    return find_supported_mode (self, MM_MODEM_MODE_4G, NULL);
 }
 
 gboolean
 mm_iface_modem_is_4g_only (MMIfaceModem *self)
 {
-    MMModemMode supported;
+    gboolean only;
 
-    supported = mm_iface_modem_get_supported_modes (self);
-    return !((MM_MODEM_MODE_4G ^ supported) & supported);
+    return (find_supported_mode (self, MM_MODEM_MODE_4G, &only) ?
+            only :
+            FALSE);
 }
 
 /*****************************************************************************/

@@ -73,6 +73,9 @@ gchar *mm_new_iso8601_time (guint year,
                             gboolean have_offset,
                             gint offset_minutes);
 
+GArray *mm_filter_supported_modes (const GArray *all,
+                                   const GArray *supported_combinations);
+
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/

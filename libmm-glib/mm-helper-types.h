@@ -1,0 +1,44 @@
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * libmm -- Access modem status & information from glib applications
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301 USA.
+ *
+ * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ */
+
+#include <ModemManager.h>
+
+#if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
+#error "Only <libmm-glib.h> can be included directly."
+#endif
+
+#ifndef _MM_HELPER_TYPES_H_
+#define _MM_HELPER_TYPES_H_
+
+/**
+ * MMModemModeCombination:
+ * @allowed: Mask of #MMModemMode values specifying allowed modes.
+ * @preferred: A single #MMModemMode value specifying the preferred mode.
+ *
+ * #MMModemModeCombination is a simple struct holding a pair of #MMModemMode values.
+ */
+typedef struct _MMModemModeCombination {
+    MMModemMode allowed;
+    MMModemMode preferred;
+} MMModemModeCombination;
+
+#endif /* _MM_HELPER_TYPES_H_ */

@@ -34,6 +34,7 @@
 #include "mm-unlock-retries.h"
 #include "mm-sim.h"
 #include "mm-bearer.h"
+#include "mm-helper-types.h"
 
 G_BEGIN_DECLS
 
@@ -127,7 +128,12 @@ MMModemAccessTechnology mm_modem_get_access_technologies (MMModem *self);
 guint              mm_modem_get_signal_quality       (MMModem *self,
                                                       gboolean *recent);
 
-MMModemMode        mm_modem_get_supported_modes      (MMModem *self);
+gboolean           mm_modem_peek_supported_modes     (MMModem *self,
+                                                      const MMModemModeCombination **modes,
+                                                      guint *n_modes);
+gboolean           mm_modem_get_supported_modes      (MMModem *self,
+                                                      MMModemModeCombination **modes,
+                                                      guint *n_modes);
 
 MMModemMode        mm_modem_get_allowed_modes        (MMModem *self);
 

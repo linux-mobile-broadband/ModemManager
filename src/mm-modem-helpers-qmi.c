@@ -42,6 +42,29 @@ mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network)
 
 /*****************************************************************************/
 
+MMModemMode
+mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network)
+{
+    switch (network) {
+    case QMI_DMS_RADIO_INTERFACE_CDMA20001X:
+        return MM_MODEM_MODE_2G;
+    case QMI_DMS_RADIO_INTERFACE_EVDO:
+        return MM_MODEM_MODE_3G;
+    case QMI_DMS_RADIO_INTERFACE_GSM:
+        return MM_MODEM_MODE_2G;
+    case QMI_DMS_RADIO_INTERFACE_UMTS:
+        return MM_MODEM_MODE_3G;
+    case QMI_DMS_RADIO_INTERFACE_LTE:
+        return MM_MODEM_MODE_4G;
+    default:
+        mm_warn ("Unhandled QMI radio interface (%u)",
+                 (guint)network);
+        return MM_MODEM_MODE_NONE;
+    }
+}
+
+/*****************************************************************************/
+
 /* pin1 TRUE for PIN1, FALSE for PIN2 */
 MMModemLock
 mm_modem_lock_from_qmi_uim_pin_status (QmiDmsUimPinStatus status,

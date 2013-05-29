@@ -68,45 +68,6 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load supported modes (Modem interface) */
-
-static MMModemMode
-modem_load_supported_modes_finish (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GError **error)
-{
-    return (MMModemMode)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                              G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-modem_load_supported_modes (MMIfaceModem *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-    MMModemMode mode;
-
-    /* Nokia phones don't seem to like AT+WS46?, they just report 2G even if
-     * 3G is supported, so we'll just assume they actually do 3G. */
-    mode = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-
-    /* Then, if the modem has LTE caps, it does 4G */
-    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-            mode |= MM_MODEM_MODE_4G;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_modes);
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               GUINT_TO_POINTER (mode),
-                                               NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
-}
-
-/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 typedef struct {
@@ -407,8 +368,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down = NULL;
     iface->modem_power_down_finish = NULL;
 
-    iface->load_supported_modes = modem_load_supported_modes;
-    iface->load_supported_modes_finish = modem_load_supported_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
 }

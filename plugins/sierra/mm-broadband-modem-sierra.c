@@ -514,6 +514,109 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported modes (Modem interface) */
+
+static GArray *
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_supported_modes_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
+    MMModemModeCombination mode;
+
+    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
+    if (!all) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* CDMA-only modems don't support changing modes, default to parent's */
+    if (!mm_iface_modem_is_3gpp (self)) {
+        g_simple_async_result_set_op_res_gpointer (simple, all, (GDestroyNotify) g_array_unref);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Build list of combinations for 3GPP devices */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    /* Non-LTE devices allow 2G/3G preferred modes */
+    if (!mm_iface_modem_is_3gpp_lte (self)) {
+        /* 2G and 3G, 2G preferred */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        mode.preferred = MM_MODEM_MODE_2G;
+        g_array_append_val (combinations, mode);
+        /* 2G and 3G, 3G preferred */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        mode.preferred = MM_MODEM_MODE_3G;
+        g_array_append_val (combinations, mode);
+    } else {
+        /* 4G only */
+        mode.allowed = MM_MODEM_MODE_4G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+        /* 2G, 3G and 4G */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* Filter out those unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    /* Run parent's loading */
+    iface_modem_parent->load_supported_modes (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_supported_modes_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_supported_modes));
+}
+
+/*****************************************************************************/
 /* Load initial allowed/preferred modes (Modem interface) */
 
 typedef struct {
@@ -569,7 +672,10 @@ selrat_query_ready (MMBaseModem *self,
         if (mm_get_uint_from_match_info (match_info, 1, &mode) && mode <= 7) {
             switch (mode) {
             case 0:
-                result.allowed = MM_MODEM_MODE_ANY;
+                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                result.preferred = MM_MODEM_MODE_NONE;
+                if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+                    result.allowed |=  MM_MODEM_MODE_4G;
                 result.preferred = MM_MODEM_MODE_NONE;
                 break;
             case 1:
@@ -583,7 +689,7 @@ selrat_query_ready (MMBaseModem *self,
             case 3:
                 /* in Sierra LTE devices, mode 3 is automatic, including LTE, no preference */
                 if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-                    result.allowed = MM_MODEM_MODE_ANY;
+                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
                     result.preferred = MM_MODEM_MODE_NONE;
                 } else {
                     result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
@@ -593,7 +699,7 @@ selrat_query_ready (MMBaseModem *self,
             case 4:
                 /* in Sierra LTE devices, mode 4 is automatic, including LTE, no preference */
                 if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-                    result.allowed = MM_MODEM_MODE_ANY;
+                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
                     result.preferred = MM_MODEM_MODE_NONE;
                 } else {
                     result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
@@ -773,9 +879,10 @@ set_allowed_modes (MMIfaceModem *self,
             idx = 0;
     } else if (allowed == MM_MODEM_MODE_4G)
         idx = 6;
-    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G) &&
+             preferred == MM_MODEM_MODE_NONE)
         idx = 7;
-    else if (allowed == MM_MODEM_MODE_ANY)
+    else if (allowed == MM_MODEM_MODE_ANY && preferred == MM_MODEM_MODE_NONE)
         idx = 0;
 
     if (idx < 0) {
@@ -1556,6 +1663,8 @@ iface_modem_init (MMIfaceModem *iface)
 
     mm_common_sierra_peek_parent_interfaces (iface);
 
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;

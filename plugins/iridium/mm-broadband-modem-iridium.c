@@ -219,13 +219,12 @@ setup_flow_control (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load supported modes (Modem inteface) */
 
-static MMModemMode
+static GArray *
 load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    /* Report CS only, Iridium connections are circuit-switched */
-    return MM_MODEM_MODE_CS;
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
@@ -234,11 +233,23 @@ load_supported_modes (MMIfaceModem *self,
                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
+    GArray *combinations;
+    MMModemModeCombination mode;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         load_supported_modes);
+
+    /* Build list of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+
+    /* Report CS only, Iridium connections are circuit-switched */
+    mode.allowed = MM_MODEM_MODE_CS;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }

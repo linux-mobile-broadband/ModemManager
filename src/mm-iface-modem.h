@@ -126,9 +126,9 @@ struct _MMIfaceModem {
     void (*load_supported_modes) (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
-    MMModemMode (*load_supported_modes_finish) (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error);
+    GArray * (*load_supported_modes_finish) (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 
     /* Loading of the AllowedModes and PreferredMode properties */
     void (*load_allowed_modes) (MMIfaceModem *self,
@@ -328,13 +328,12 @@ gboolean          mm_iface_modem_is_cdma                  (MMIfaceModem *self);
 gboolean          mm_iface_modem_is_cdma_only             (MMIfaceModem *self);
 
 /* Helpers to query supported modes */
-MMModemMode mm_iface_modem_get_supported_modes (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_2g               (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_2g_only          (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_3g               (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_3g_only          (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_4g               (MMIfaceModem *self);
-gboolean    mm_iface_modem_is_4g_only          (MMIfaceModem *self);
+gboolean mm_iface_modem_is_2g      (MMIfaceModem *self);
+gboolean mm_iface_modem_is_2g_only (MMIfaceModem *self);
+gboolean mm_iface_modem_is_3g      (MMIfaceModem *self);
+gboolean mm_iface_modem_is_3g_only (MMIfaceModem *self);
+gboolean mm_iface_modem_is_4g      (MMIfaceModem *self);
+gboolean mm_iface_modem_is_4g_only (MMIfaceModem *self);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,

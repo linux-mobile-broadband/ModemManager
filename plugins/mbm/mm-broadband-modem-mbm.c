@@ -45,6 +45,7 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
+static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BROADBAND_MODEM, 0,
@@ -188,6 +189,80 @@ modem_after_sim_unlock (MMIfaceModem *self,
 
     /* wait so sim pin is done */
     g_timeout_add (500, (GSourceFunc)after_sim_unlock_wait_cb, result);
+}
+
+/*****************************************************************************/
+/* Load supported modes (Modem interface) */
+
+static GArray *
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_supported_modes_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    GArray *all;
+    GArray *combinations;
+    GArray *filtered;
+    MMModemModeCombination mode;
+
+    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
+    if (!all) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Build list of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 3);
+
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    /* Filter out those unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    /* Run parent's loading */
+    iface_modem_parent->load_supported_modes (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_supported_modes_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_supported_modes));
 }
 
 /*****************************************************************************/
@@ -1237,12 +1312,16 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
