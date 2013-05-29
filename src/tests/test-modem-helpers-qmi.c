@@ -64,33 +64,23 @@ test_uml290 (void)
     /* QCDM -> CDMA/EVDO */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
                                         QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> GSM/UMTS */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM |
                                         QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0;
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
@@ -117,8 +107,6 @@ test_adu960s (void)
     MMQmiCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0;
-    ctx.nas_ssp_band_preference_mask = 0;
-    ctx.nas_ssp_lte_band_preference_mask = 0;
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
@@ -144,10 +132,8 @@ test_gobi1k_gsm (void)
     MMQmiCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
@@ -166,10 +152,8 @@ test_gobi1k_cdma (void)
     MMQmiCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
@@ -191,26 +175,20 @@ test_gobi2k_gsm (void)
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> UMTS only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> GPRS only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
@@ -232,26 +210,20 @@ test_gobi2k_cdma (void)
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> CDMA only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> EVDO only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_band_preference_mask = 0; /* Unsupported */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
@@ -278,26 +250,20 @@ test_gobi3k_gsm (void)
                                         QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO |
                                         QMI_NAS_RAT_MODE_PREFERENCE_GSM |
                                         QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> GSM only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> UMTS only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
@@ -324,26 +290,20 @@ test_gobi3k_cdma (void)
                                         QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO |
                                         QMI_NAS_RAT_MODE_PREFERENCE_GSM |
                                         QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> CDMA only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> EVDO only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
-    ctx.nas_ssp_band_preference_mask = 0;     /* TODO: Add proper value */
-    ctx.nas_ssp_lte_band_preference_mask = 0; /* TODO: Add proper value */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
-    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO);
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 

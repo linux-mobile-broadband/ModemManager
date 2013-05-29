@@ -444,20 +444,9 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
         mm_dbg ("Couldn't get system selection preference: %s", error->message);
         g_error_free (error);
     } else {
-        /* Get Mode Preference */
         qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
             output,
             &ctx->capabilities_context.nas_ssp_mode_preference_mask,
-            NULL);
-        /* Get Band Preference */
-        qmi_message_nas_get_system_selection_preference_output_get_band_preference (
-            output,
-            &ctx->capabilities_context.nas_ssp_band_preference_mask,
-            NULL);
-        /* Get LTE Band Preference */
-        qmi_message_nas_get_system_selection_preference_output_get_lte_band_preference (
-            output,
-            &ctx->capabilities_context.nas_ssp_lte_band_preference_mask,
             NULL);
     }
 
