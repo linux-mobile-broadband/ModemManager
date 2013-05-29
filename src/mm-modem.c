@@ -210,7 +210,6 @@ mm_modem_connect (MMModem *self,
 
     g_return_if_fail (MM_IS_MODEM (self));
     g_return_if_fail (callback != NULL);
-    g_return_if_fail (number != NULL);
 
     state = mm_modem_get_state (self);
     if (state >= MM_MODEM_STATE_CONNECTING) {
@@ -228,6 +227,19 @@ mm_modem_connect (MMModem *self,
 
         mm_callback_info_schedule (info);
         return;
+    }
+
+    /* If no number given, fake it */
+    if (!number) {
+        guint32 mtype = MM_MODEM_TYPE_UNKNOWN;
+
+        g_object_get (G_OBJECT (self), MM_MODEM_TYPE, &mtype, NULL);
+        if (mtype == MM_MODEM_TYPE_CDMA)
+            number = "#777";
+        else if (mtype == MM_MODEM_TYPE_GSM)
+            number = "*99#";
+        else
+            g_assert_not_reached ();
     }
 
     if (MM_MODEM_GET_INTERFACE (self)->connect)
