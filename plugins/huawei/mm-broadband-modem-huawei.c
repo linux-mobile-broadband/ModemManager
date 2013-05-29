@@ -1187,7 +1187,7 @@ parse_prefmode (const gchar *response, MMModemMode *preferred, GError **error)
 }
 
 static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
+load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
@@ -1208,7 +1208,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
 }
 
 static void
-load_allowed_modes (MMIfaceModem *self,
+load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -1226,7 +1226,7 @@ load_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Set allowed modes (Modem interface) */
+/* Set current modes (Modem interface) */
 
 static gboolean
 allowed_mode_to_prefmode (MMModemMode allowed, guint *huawei_mode, GError **error)
@@ -1256,7 +1256,7 @@ allowed_mode_to_prefmode (MMModemMode allowed, guint *huawei_mode, GError **erro
 }
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -1281,7 +1281,7 @@ allowed_mode_update_ready (MMBroadbandModemHuawei *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
@@ -1296,7 +1296,7 @@ set_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_allowed_modes);
+                                        set_current_modes);
 
     if (mm_iface_modem_is_cdma_only (self)) {
         if (allowed_mode_to_prefmode (allowed, &mode, &error))
@@ -2743,10 +2743,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_bands_finish = set_current_bands_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_signal_quality = modem_load_signal_quality;
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
     iface->create_bearer = huawei_modem_create_bearer;

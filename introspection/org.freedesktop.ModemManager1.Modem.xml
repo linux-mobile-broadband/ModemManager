@@ -137,16 +137,17 @@
     </method>
 
     <!--
-        SetAllowedModes:
-        @modes: Bitmask of <link linkend="MMModemMode">MMModemMode</link> values, to specify all the modes allowed in the modem.
-        @preferred: Specific <link linkend="MMModemMode">MMModemMode</link> preferred among the ones allowed, if any.
+        SetCurrentModes:
+        @modes: A pair of <link linkend="MMModemMode">MMModemMode</link> values, where the first one is a bitmask of allowed modes, and the second one the preferred mode, if any.
 
-        Set the access technologies (eg 2G/3G/4G preference) the device is
+        Set the access technologies (e.g. 2G/3G/4G preference) the device is
         currently allowed to use when connecting to a network.
+
+        The given combination should be supported by the modem, as specified in the
+        #org.freedesktop.ModemManager1.Modem:SupportedModes property.
     -->
-    <method name="SetAllowedModes">
-      <arg name="modes"     type="u" direction="in" />
-      <arg name="preferred" type="u" direction="in" />
+    <method name="SetCurrentModes">
+      <arg name="modes" type="(uu)" direction="in" />
     </method>
 
     <!--
@@ -431,31 +432,17 @@
     <property name="SupportedModes" type="a(uu)" access="read" />
 
     <!--
-        AllowedModes:
+        CurrentModes:
 
-        Bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
-        specifying the access technologies (eg 2G/3G/4G preference) the device
-        is currently allowed to use when connecting to a network.
+        A pair of <link linkend="MMModemMode">MMModemMode</link> values, where the first one
+        is a bitmask specifying the access technologies (eg 2G/3G/4G) the device
+        is currently allowed to use when connecting to a network, and the second one is the
+        preferred mode of those specified as allowed.
 
-        It must be a subset of #org.freedesktop.ModemManager1.Modem:SupportedModes.
-
-        For POTS devices, only the
-        <link linkend="MM-MODEM-MODE-ANY:CAPS"><constant>MM_MODEM_MODE_ANY</constant></link>
-        mode is supported.
+        The pair must be one of those specified in
+        #org.freedesktop.ModemManager1.Modem:SupportedModes.
     -->
-    <property name="AllowedModes" type="u" access="read" />
-
-    <!--
-        PreferredMode:
-
-        A single <link linkend="MMModemMode">MMModemMode</link> value,
-        specifying the preferred access technology (eg 2G/3G/4G), among the
-        ones defined in the allowed modes.
-
-        It must be one of the modes configured in
-        #org.freedesktop.ModemManager1.Modem:AllowedModes.
-    -->
-    <property name="PreferredMode" type="u" access="read" />
+    <property name="CurrentModes" type="(uu)" access="read" />
 
     <!--
         SupportedBands:

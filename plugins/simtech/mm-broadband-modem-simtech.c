@@ -532,17 +532,17 @@ load_supported_modes (MMIfaceModem *self,
 typedef struct {
     MMModemMode allowed;
     MMModemMode preferred;
-} LoadAllowedModesResult;
+} LoadCurrentModesResult;
 
 typedef struct {
     MMBroadbandModemSimtech *self;
     GSimpleAsyncResult *result;
     gint acqord;
     gint modepref;
-} LoadAllowedModesContext;
+} LoadCurrentModesContext;
 
 static void
-load_allowed_modes_context_complete_and_free (LoadAllowedModesContext *ctx)
+load_current_modes_context_complete_and_free (LoadCurrentModesContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
@@ -551,13 +551,13 @@ load_allowed_modes_context_complete_and_free (LoadAllowedModesContext *ctx)
 }
 
 static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
+load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
                            GError **error)
 {
-    LoadAllowedModesResult *result;
+    LoadCurrentModesResult *result;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -571,9 +571,9 @@ load_allowed_modes_finish (MMIfaceModem *self,
 static void
 cnmp_query_ready (MMBroadbandModemSimtech *self,
                   GAsyncResult *res,
-                  LoadAllowedModesContext *ctx)
+                  LoadCurrentModesContext *ctx)
 {
-    LoadAllowedModesResult *result;
+    LoadCurrentModesResult *result;
     const gchar *response, *p;
     GError *error = NULL;
 
@@ -581,7 +581,7 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
     if (!response) {
         /* Let the error be critical. */
         g_simple_async_result_take_error (ctx->result, error);
-        load_allowed_modes_context_complete_and_free (ctx);
+        load_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -593,11 +593,11 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
             MM_CORE_ERROR_FAILED,
             "Failed to parse the mode preference response: '%s'",
             response);
-        load_allowed_modes_context_complete_and_free (ctx);
+        load_current_modes_context_complete_and_free (ctx);
         return;
     }
 
-    result = g_new (LoadAllowedModesResult, 1);
+    result = g_new (LoadCurrentModesResult, 1);
     result->allowed = MM_MODEM_MODE_NONE;
     result->preferred = MM_MODEM_MODE_NONE;
 
@@ -625,7 +625,7 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
                 MM_CORE_ERROR_FAILED,
                 "Unknown acquisition order preference: '%d'",
                 ctx->acqord);
-            load_allowed_modes_context_complete_and_free (ctx);
+            load_current_modes_context_complete_and_free (ctx);
             return;
         }
         break;
@@ -649,7 +649,7 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
             MM_CORE_ERROR_FAILED,
             "Unknown mode preference: '%d'",
             ctx->modepref);
-        load_allowed_modes_context_complete_and_free (ctx);
+        load_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -657,13 +657,13 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                result,
                                                g_free);
-    load_allowed_modes_context_complete_and_free (ctx);
+    load_current_modes_context_complete_and_free (ctx);
 }
 
 static void
 cnaop_query_ready (MMBroadbandModemSimtech *self,
                    GAsyncResult *res,
-                   LoadAllowedModesContext *ctx)
+                   LoadCurrentModesContext *ctx)
 {
     const gchar *response, *p;
     GError *error = NULL;
@@ -672,7 +672,7 @@ cnaop_query_ready (MMBroadbandModemSimtech *self,
     if (!response) {
         /* Let the error be critical. */
         g_simple_async_result_take_error (ctx->result, error);
-        load_allowed_modes_context_complete_and_free (ctx);
+        load_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -687,7 +687,7 @@ cnaop_query_ready (MMBroadbandModemSimtech *self,
             MM_CORE_ERROR_FAILED,
             "Failed to parse the acquisition order response: '%s'",
             response);
-        load_allowed_modes_context_complete_and_free (ctx);
+        load_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -701,18 +701,18 @@ cnaop_query_ready (MMBroadbandModemSimtech *self,
 }
 
 static void
-load_allowed_modes (MMIfaceModem *self,
+load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    LoadAllowedModesContext *ctx;
+    LoadCurrentModesContext *ctx;
 
-    ctx = g_new (LoadAllowedModesContext, 1);
+    ctx = g_new (LoadCurrentModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             load_allowed_modes);
+                                             load_current_modes);
     ctx->acqord = -1;
     ctx->modepref = -1;
 
@@ -733,10 +733,10 @@ typedef struct {
     GSimpleAsyncResult *result;
     guint nmp;   /* mode preference */
     guint naop;  /* acquisition order */
-} SetAllowedModesContext;
+} SetCurrentModesContext;
 
 static void
-set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+set_current_modes_context_complete_and_free (SetCurrentModesContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -745,7 +745,7 @@ set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
 }
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -755,7 +755,7 @@ set_allowed_modes_finish (MMIfaceModem *self,
 static void
 cnaop_set_ready (MMBaseModem *self,
                  GAsyncResult *res,
-                 SetAllowedModesContext *ctx)
+                 SetCurrentModesContext *ctx)
 {
     GError *error = NULL;
 
@@ -766,13 +766,13 @@ cnaop_set_ready (MMBaseModem *self,
     else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
-    set_allowed_modes_context_complete_and_free (ctx);
+    set_current_modes_context_complete_and_free (ctx);
 }
 
 static void
 cnmp_set_ready (MMBaseModem *self,
                 GAsyncResult *res,
-                SetAllowedModesContext *ctx)
+                SetCurrentModesContext *ctx)
 {
     GError *error = NULL;
     gchar *command;
@@ -781,7 +781,7 @@ cnmp_set_ready (MMBaseModem *self,
     if (error) {
         /* Let the error be critical. */
         g_simple_async_result_take_error (ctx->result, error);
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -797,21 +797,21 @@ cnmp_set_ready (MMBaseModem *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    SetAllowedModesContext *ctx;
+    SetCurrentModesContext *ctx;
     gchar *command;
 
-    ctx = g_new (SetAllowedModesContext, 1);
+    ctx = g_new (SetCurrentModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             set_allowed_modes);
+                                             set_current_modes);
 
     /* Defaults: automatic search */
     ctx->nmp = 2;
@@ -851,7 +851,7 @@ set_allowed_modes (MMIfaceModem *self,
         g_free (allowed_str);
         g_free (preferred_str);
 
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -927,10 +927,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
 }
 
 static void

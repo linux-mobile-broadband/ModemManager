@@ -138,16 +138,16 @@ load_supported_modes (MMIfaceModem *self,
 typedef struct {
     MMModemMode allowed;
     MMModemMode preferred;
-} LoadAllowedModesResult;
+} LoadCurrentModesResult;
 
 static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
+load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
                            GError **error)
 {
-    LoadAllowedModesResult *result;
+    LoadCurrentModesResult *result;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -164,7 +164,7 @@ nwrat_query_ready (MMBaseModem *self,
                    GAsyncResult *res,
                    GSimpleAsyncResult *simple)
 {
-    LoadAllowedModesResult result;
+    LoadCurrentModesResult result;
     GError *error = NULL;
     const gchar *response;
     GRegex *r;
@@ -255,7 +255,7 @@ nwrat_query_ready (MMBaseModem *self,
 }
 
 static void
-load_allowed_modes (MMIfaceModem *self,
+load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -264,7 +264,7 @@ load_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_allowed_modes);
+                                        load_current_modes);
 
     /* Load allowed modes only in 3GPP modems */
     if (!mm_iface_modem_is_3gpp (self)) {
@@ -290,7 +290,7 @@ load_allowed_modes (MMIfaceModem *self,
 /* Set allowed modes (Modem interface) */
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -315,7 +315,7 @@ allowed_mode_update_ready (MMBroadbandModemNovatel *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
@@ -329,7 +329,7 @@ set_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_allowed_modes);
+                                        set_current_modes);
 
     /* Setting allowed modes only in 3GPP modems */
     if (!mm_iface_modem_is_3gpp (self)) {
@@ -1237,10 +1237,10 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_access_technologies_finish = modem_load_access_technologies_finish;
     iface->load_access_technologies = modem_load_access_technologies;
     iface->load_signal_quality = modem_load_signal_quality;

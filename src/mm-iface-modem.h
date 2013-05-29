@@ -130,11 +130,11 @@ struct _MMIfaceModem {
                                              GAsyncResult *res,
                                              GError **error);
 
-    /* Loading of the AllowedModes and PreferredMode properties */
-    void (*load_allowed_modes) (MMIfaceModem *self,
+    /* Loading of the Modes property */
+    void (*load_current_modes) (MMIfaceModem *self,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data);
-    gboolean (*load_allowed_modes_finish) (MMIfaceModem *self,
+    gboolean (*load_current_modes_finish) (MMIfaceModem *self,
                                            GAsyncResult *res,
                                            MMModemMode *allowed,
                                            MMModemMode *preferred,
@@ -226,13 +226,13 @@ struct _MMIfaceModem {
                                           GAsyncResult *res,
                                           GError **error);
 
-    /* Asynchronous allowed mode setting operation */
-    void (*set_allowed_modes) (MMIfaceModem *self,
+    /* Asynchronous current mode setting operation */
+    void (*set_current_modes) (MMIfaceModem *self,
                                MMModemMode modes,
                                MMModemMode preferred,
                                GAsyncReadyCallback callback,
                                gpointer user_data);
-    gboolean (*set_allowed_modes_finish) (MMIfaceModem *self,
+    gboolean (*set_current_modes_finish) (MMIfaceModem *self,
                                           GAsyncResult *res,
                                           GError **error);
 
@@ -417,12 +417,12 @@ void mm_iface_modem_update_signal_quality (MMIfaceModem *self,
                                            guint signal_quality);
 
 /* Allow setting allowed modes */
-void     mm_iface_modem_set_allowed_modes        (MMIfaceModem *self,
+void     mm_iface_modem_set_current_modes        (MMIfaceModem *self,
                                                   MMModemMode allowed,
                                                   MMModemMode preferred,
                                                   GAsyncReadyCallback callback,
                                                   gpointer user_data);
-gboolean mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
+gboolean mm_iface_modem_set_current_modes_finish (MMIfaceModem *self,
                                                   GAsyncResult *res,
                                                   GError **error);
 

@@ -153,7 +153,7 @@ load_supported_modes (MMIfaceModem *self,
 /* Load initial allowed/preferred modes (Modem interface) */
 
 static gboolean
-modem_load_allowed_modes_finish (MMIfaceModem *self,
+modem_load_current_modes_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  MMModemMode *allowed,
                                  MMModemMode *preferred,
@@ -212,7 +212,7 @@ modem_load_allowed_modes_finish (MMIfaceModem *self,
 }
 
 static void
-modem_load_allowed_modes (MMIfaceModem *self,
+modem_load_current_modes (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
@@ -228,7 +228,7 @@ modem_load_allowed_modes (MMIfaceModem *self,
 /* Set allowed modes (Modem interface) */
 
 static gboolean
-modem_set_allowed_modes_finish (MMIfaceModem *self,
+modem_set_current_modes_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
@@ -253,7 +253,7 @@ allowed_mode_update_ready (MMBaseModem *self,
 }
 
 static void
-modem_set_allowed_modes (MMIfaceModem *self,
+modem_set_current_modes (MMIfaceModem *self,
                          MMModemMode allowed,
                          MMModemMode preferred,
                          GAsyncReadyCallback callback,
@@ -266,7 +266,7 @@ modem_set_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_set_allowed_modes);
+                                        modem_set_current_modes);
 
     /*
      * The core has checked the following:
@@ -1857,10 +1857,10 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = modem_load_allowed_modes;
-    iface->load_allowed_modes_finish = modem_load_allowed_modes_finish;
-    iface->set_allowed_modes = modem_set_allowed_modes;
-    iface->set_allowed_modes_finish = modem_set_allowed_modes_finish;
+    iface->load_current_modes = modem_load_current_modes;
+    iface->load_current_modes_finish = modem_load_current_modes_finish;
+    iface->set_current_modes = modem_set_current_modes;
+    iface->set_current_modes_finish = modem_set_current_modes_finish;
     iface->load_access_technologies = modem_load_access_technologies;
     iface->load_access_technologies_finish = modem_load_access_technologies_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;

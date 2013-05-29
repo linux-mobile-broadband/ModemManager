@@ -590,10 +590,10 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* ALLOWED MODES */
+/* Set current modes (Modem interface) */
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -618,7 +618,7 @@ allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
@@ -629,7 +629,7 @@ set_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        set_allowed_modes);
+                                        set_current_modes);
 
     /* For dual 2G/3G devices... */
     if (mm_iface_modem_is_2g (self) &&
@@ -646,11 +646,9 @@ set_allowed_modes (MMIfaceModem *self,
          *   which is based on the quality of the connection.
          */
         cmd = g_string_new ("+COPS=,,,");
-        if (allowed == MM_MODEM_MODE_3G &&
-            preferred == MM_MODEM_MODE_NONE) {
+        if (allowed == MM_MODEM_MODE_3G) {
             g_string_append (cmd, "2");
-        } else if (allowed == MM_MODEM_MODE_2G &&
-                   preferred == MM_MODEM_MODE_NONE) {
+        } else if (allowed == MM_MODEM_MODE_2G) {
             g_string_append (cmd, "0");
         } else {
             gchar *allowed_str;
@@ -1271,8 +1269,8 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;

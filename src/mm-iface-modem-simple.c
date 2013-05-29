@@ -174,7 +174,7 @@ typedef enum {
     CONNECTION_STEP_WAIT_FOR_INITIALIZED,
     CONNECTION_STEP_ENABLE,
     CONNECTION_STEP_WAIT_FOR_ENABLED,
-    CONNECTION_STEP_ALLOWED_MODES,
+    CONNECTION_STEP_CURRENT_MODES,
     CONNECTION_STEP_CURRENT_BANDS,
     CONNECTION_STEP_REGISTER,
     CONNECTION_STEP_BEARER,
@@ -275,7 +275,7 @@ register_in_3gpp_or_cdma_network_ready (MMIfaceModemSimple *self,
 }
 
 static gboolean
-after_set_allowed_modes_timeout_cb (ConnectionContext *ctx)
+after_set_current_modes_timeout_cb (ConnectionContext *ctx)
 {
     /* Allowed modes set... almost there! */
     ctx->step++;
@@ -284,13 +284,13 @@ after_set_allowed_modes_timeout_cb (ConnectionContext *ctx)
 }
 
 static void
-set_allowed_modes_ready (MMBaseModem *self,
+set_current_modes_ready (MMBaseModem *self,
                          GAsyncResult *res,
                          ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_allowed_modes_finish (MM_IFACE_MODEM (self), res, &error)) {
+    if (!mm_iface_modem_set_current_modes_finish (MM_IFACE_MODEM (self), res, &error)) {
         if (g_error_matches (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED)) {
@@ -309,7 +309,7 @@ set_allowed_modes_ready (MMBaseModem *self,
      * a couple of seconds to settle down. This sleep time just makes sure that
      * the modem has enough time to report being unregistered. */
     mm_dbg ("Will wait to settle down after updating allowed modes");
-    g_timeout_add_seconds (2, (GSourceFunc)after_set_allowed_modes_timeout_cb, ctx);
+    g_timeout_add_seconds (2, (GSourceFunc)after_set_current_modes_timeout_cb, ctx);
 }
 
 static gboolean
@@ -556,21 +556,21 @@ connection_step (ConnectionContext *ctx)
                                              ctx);
         return;
 
-    case CONNECTION_STEP_ALLOWED_MODES: {
+    case CONNECTION_STEP_CURRENT_MODES: {
         MMModemMode allowed_modes = MM_MODEM_MODE_ANY;
         MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
 
-        mm_info ("Simple connect state (%d/%d): Allowed mode",
+        mm_info ("Simple connect state (%d/%d): Current modes",
                  ctx->step, CONNECTION_STEP_LAST);
 
         /* Don't set modes unless explicitly requested to do so */
-        if (mm_simple_connect_properties_get_allowed_modes (ctx->properties,
+        if (mm_simple_connect_properties_get_current_modes (ctx->properties,
                                                             &allowed_modes,
                                                             &preferred_mode)) {
-            mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
+            mm_iface_modem_set_current_modes (MM_IFACE_MODEM (ctx->self),
                                               allowed_modes,
                                               preferred_mode,
-                                              (GAsyncReadyCallback)set_allowed_modes_ready,
+                                              (GAsyncReadyCallback)set_current_modes_ready,
                                               ctx);
             return;
         }
@@ -790,7 +790,7 @@ connect_auth_ready (MMBaseModem *self,
 
         mm_dbg ("   PIN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_pin (ctx->properties)));
 
-        if (mm_simple_connect_properties_get_allowed_modes (ctx->properties, &allowed, &preferred)) {
+        if (mm_simple_connect_properties_get_current_modes (ctx->properties, &allowed, &preferred)) {
             str = mm_modem_mode_build_string_from_mask (allowed);
             mm_dbg ("   Allowed mode: %s", str);
             g_free (str);

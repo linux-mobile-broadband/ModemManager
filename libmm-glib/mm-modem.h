@@ -135,9 +135,9 @@ gboolean           mm_modem_get_supported_modes      (MMModem *self,
                                                       MMModemModeCombination **modes,
                                                       guint *n_modes);
 
-MMModemMode        mm_modem_get_allowed_modes        (MMModem *self);
-
-MMModemMode        mm_modem_get_preferred_mode       (MMModem *self);
+gboolean           mm_modem_get_current_modes        (MMModem *self,
+                                                      MMModemMode *allowed,
+                                                      MMModemMode *preferred);
 
 gboolean           mm_modem_peek_supported_bands     (MMModem *self,
                                                       const MMModemBand **bands,
@@ -266,16 +266,16 @@ gboolean mm_modem_set_power_state_sync   (MMModem *self,
                                           GCancellable *cancellable,
                                           GError **error);
 
-void     mm_modem_set_allowed_modes        (MMModem *self,
+void     mm_modem_set_current_modes        (MMModem *self,
                                             MMModemMode modes,
                                             MMModemMode preferred,
                                             GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data);
-gboolean mm_modem_set_allowed_modes_finish (MMModem *self,
+gboolean mm_modem_set_current_modes_finish (MMModem *self,
                                             GAsyncResult *res,
                                             GError **error);
-gboolean mm_modem_set_allowed_modes_sync   (MMModem *self,
+gboolean mm_modem_set_current_modes_sync   (MMModem *self,
                                             MMModemMode modes,
                                             MMModemMode preferred,
                                             GCancellable *cancellable,

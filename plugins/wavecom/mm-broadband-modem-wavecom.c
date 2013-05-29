@@ -212,16 +212,16 @@ load_supported_modes (MMIfaceModem *self,
 typedef struct {
     MMModemMode allowed;
     MMModemMode preferred;
-} LoadAllowedModesResult;
+} LoadCurrentModesResult;
 
 static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
+load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
                            GError **error)
 {
-    LoadAllowedModesResult *result;
+    LoadCurrentModesResult *result;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -240,7 +240,7 @@ wwsm_read_ready (MMBaseModem *self,
 {
     GRegex *r;
     GMatchInfo *match_info = NULL;
-    LoadAllowedModesResult result;
+    LoadCurrentModesResult result;
     const gchar *response;
     GError *error = NULL;
 
@@ -330,7 +330,7 @@ current_ms_class_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GSimpleAsyncResult *simple)
 {
-    LoadAllowedModesResult result;
+    LoadCurrentModesResult result;
     const gchar *response;
     GError *error = NULL;
 
@@ -394,7 +394,7 @@ current_ms_class_ready (MMBaseModem *self,
 }
 
 static void
-load_allowed_modes (MMIfaceModem *self,
+load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -403,7 +403,7 @@ load_allowed_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_allowed_modes);
+                                        load_current_modes);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CGCLASS?",
@@ -421,10 +421,10 @@ typedef struct {
     GSimpleAsyncResult *result;
     gchar *cgclass_command;
     gchar *wwsm_command;
-} SetAllowedModesContext;
+} SetCurrentModesContext;
 
 static void
-set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+set_current_modes_context_complete_and_free (SetCurrentModesContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -435,7 +435,7 @@ set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
 }
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -445,7 +445,7 @@ set_allowed_modes_finish (MMIfaceModem *self,
 static void
 wwsm_update_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   SetAllowedModesContext *ctx)
+                   SetCurrentModesContext *ctx)
 {
     GError *error = NULL;
 
@@ -456,13 +456,13 @@ wwsm_update_ready (MMBaseModem *self,
     else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
-    set_allowed_modes_context_complete_and_free (ctx);
+    set_current_modes_context_complete_and_free (ctx);
 }
 
 static void
 cgclass_update_ready (MMBaseModem *self,
                       GAsyncResult *res,
-                      SetAllowedModesContext *ctx)
+                      SetCurrentModesContext *ctx)
 {
     GError *error = NULL;
 
@@ -470,13 +470,13 @@ cgclass_update_ready (MMBaseModem *self,
     if (error) {
         /* Let the error be critical. */
         g_simple_async_result_take_error (ctx->result, error);
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
     if (!ctx->wwsm_command) {
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -489,20 +489,20 @@ cgclass_update_ready (MMBaseModem *self,
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    SetAllowedModesContext *ctx;
+    SetCurrentModesContext *ctx;
 
-    ctx = g_new0 (SetAllowedModesContext, 1);
+    ctx = g_new0 (SetCurrentModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             set_allowed_modes);
+                                             set_current_modes);
 
     /* Handle ANY/NONE */
     if (allowed == MM_MODEM_MODE_ANY && preferred == MM_MODEM_MODE_NONE) {
@@ -553,7 +553,7 @@ set_allowed_modes (MMIfaceModem *self,
         g_free (allowed_str);
         g_free (preferred_str);
 
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -1186,10 +1186,10 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;

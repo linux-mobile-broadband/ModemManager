@@ -1034,41 +1034,39 @@ mm_modem_peek_supported_modes (MMModem *self,
 /*****************************************************************************/
 
 /**
- * mm_modem_get_allowed_modes:
+ * mm_modem_get_current_modes:
  * @self: A #MMModem.
+ * @allowed: (out): Return location for a bitmask of #MMModemMode values.
+ * @preferred: (out): Return location for a #MMModemMode value.
  *
- * Gets the list of modes specifying the access technologies (eg 2G/3G/4G preference)
- * the #MMModem is currently allowed to use when connecting to a network.
+ * Gets the list of modes specifying the access technologies (eg 2G/3G/4G)
+ * the #MMModem is currently allowed to use when connecting to a network, as
+ * well as the preferred one, if any.
  *
- * For POTS devices, only the #MM_MODEM_MODE_ANY is supported.
- *
- * Returns: A bitmask of #MMModemMode values.
+ * Returns: %TRUE if @allowed and @preferred are set, %FALSE otherwise.
  */
-MMModemMode
-mm_modem_get_allowed_modes (MMModem *self)
+gboolean
+mm_modem_get_current_modes (MMModem *self,
+                            MMModemMode *allowed,
+                            MMModemMode *preferred)
 {
-    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_MODE_NONE);
+    GVariant *variant;
 
-    return (MMModemMode) mm_gdbus_modem_get_allowed_modes (MM_GDBUS_MODEM (self));
-}
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (allowed != NULL, FALSE);
+    g_return_val_if_fail (preferred != NULL, FALSE);
 
-/*****************************************************************************/
+    variant = mm_gdbus_modem_dup_current_modes (MM_GDBUS_MODEM (self));
+    if (variant) {
+        g_variant_get (variant,
+                       "(uu)",
+                       allowed,
+                       preferred);
+        g_variant_unref (variant);
+        return TRUE;
+    }
 
-/**
- * mm_modem_get_preferred_mode:
- * @self: A #MMModem.
- *
- * Get the preferred access technology (eg 2G/3G/4G preference), among
- * the ones defined in the allowed modes.
- *
- * Returns: A single #MMModemMode value.
- */
-MMModemMode
-mm_modem_get_preferred_mode (MMModem *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM (self), MM_MODEM_MODE_NONE);
-
-    return (MMModemMode) mm_gdbus_modem_get_preferred_mode (MM_GDBUS_MODEM (self));
+    return FALSE;
 }
 
 /*****************************************************************************/
@@ -2318,27 +2316,27 @@ mm_modem_set_power_state_sync (MMModem *self,
 /*****************************************************************************/
 
 /**
- * mm_modem_set_allowed_modes_finish:
+ * mm_modem_set_current_modes_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_allowed_modes().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_modes().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_set_allowed_modes().
+ * Finishes an operation started with mm_modem_set_current_modes().
  *
  * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error is set.
  */
 gboolean
-mm_modem_set_allowed_modes_finish (MMModem *self,
+mm_modem_set_current_modes_finish (MMModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
 
-    return mm_gdbus_modem_call_set_allowed_modes_finish (MM_GDBUS_MODEM (self), res, error);
+    return mm_gdbus_modem_call_set_current_modes_finish (MM_GDBUS_MODEM (self), res, error);
 }
 
 /**
- * mm_modem_set_allowed_modes:
+ * mm_modem_set_current_modes:
  * @self: A #MMModem.
  * @modes: Mask of #MMModemMode values specifying which modes are allowed.
  * @preferred: A #MMModemMode value specifying which of the modes given in @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
@@ -2350,12 +2348,12 @@ mm_modem_set_allowed_modes_finish (MMModem *self,
  * currently allowed to use when connecting to a network.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_allowed_modes_finish() to get the result of the operation.
+ * You can then call mm_modem_set_current_modes_finish() to get the result of the operation.
  *
- * See mm_modem_set_allowed_modes_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_current_modes_sync() for the synchronous, blocking version of this method.
  */
 void
-mm_modem_set_allowed_modes (MMModem *self,
+mm_modem_set_current_modes (MMModem *self,
                             MMModemMode modes,
                             MMModemMode preferred,
                             GCancellable *cancellable,
@@ -2364,11 +2362,15 @@ mm_modem_set_allowed_modes (MMModem *self,
 {
     g_return_if_fail (MM_IS_MODEM (self));
 
-    mm_gdbus_modem_call_set_allowed_modes (MM_GDBUS_MODEM (self), modes, preferred, cancellable, callback, user_data);
+    mm_gdbus_modem_call_set_current_modes (MM_GDBUS_MODEM (self),
+                                           g_variant_new ("(uu)", modes, preferred),
+                                           cancellable,
+                                           callback,
+                                           user_data);
 }
 
 /**
- * mm_modem_set_allowed_modes_sync:
+ * mm_modem_set_current_modes_sync:
  * @self: A #MMModem.
  * @modes: Mask of #MMModemMode values specifying which modes are allowed.
  * @preferred: A #MMModemMode value specifying which of the modes given in @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
@@ -2378,13 +2380,13 @@ mm_modem_set_allowed_modes (MMModem *self,
  * Synchronously sets the access technologies (e.g. 2G/3G/4G preference) the device is
  * currently allowed to use when connecting to a network.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_allowed_modes()
+ * The calling thread is blocked until a reply is received. See mm_modem_set_current_modes()
  * for the asynchronous version of this method.
  *
  * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error is set.
  */
 gboolean
-mm_modem_set_allowed_modes_sync (MMModem *self,
+mm_modem_set_current_modes_sync (MMModem *self,
                                  MMModemMode modes,
                                  MMModemMode preferred,
                                  GCancellable *cancellable,
@@ -2392,7 +2394,10 @@ mm_modem_set_allowed_modes_sync (MMModem *self,
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
 
-    return mm_gdbus_modem_call_set_allowed_modes_sync (MM_GDBUS_MODEM (self), modes, preferred, cancellable, error);
+    return mm_gdbus_modem_call_set_current_modes_sync (MM_GDBUS_MODEM (self),
+                                                       g_variant_new ("(uu)", modes, preferred),
+                                                       cancellable,
+                                                       error);
 }
 
 /*****************************************************************************/

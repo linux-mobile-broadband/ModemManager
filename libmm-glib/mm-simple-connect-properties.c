@@ -49,7 +49,7 @@ struct _MMSimpleConnectPropertiesPrivate {
     MMModemBand *current_bands;
     guint n_current_bands;
     /* Modes */
-    gboolean allowed_modes_set;
+    gboolean current_modes_set;
     MMModemMode allowed_modes;
     MMModemMode preferred_mode;
     /* Bearer properties */
@@ -183,7 +183,7 @@ mm_simple_connect_properties_get_current_bands (MMSimpleConnectProperties *self,
 /*****************************************************************************/
 
 /**
- * mm_simple_connect_properties_set_allowed_modes:
+ * mm_simple_connect_properties_set_current_modes:
  * @self: a #MMSimpleConnectProperties.
  * @allowed: bitmask of #MMModemMode values specifying which are allowed.
  * @preferred: a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
@@ -191,7 +191,7 @@ mm_simple_connect_properties_get_current_bands (MMSimpleConnectProperties *self,
  * Sets the modes allowed to use, and which of them is preferred.
  */
 void
-mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
+mm_simple_connect_properties_set_current_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode allowed,
                                                 MMModemMode preferred)
 {
@@ -199,11 +199,11 @@ mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
 
     self->priv->allowed_modes = allowed;
     self->priv->preferred_mode = preferred;
-    self->priv->allowed_modes_set = TRUE;
+    self->priv->current_modes_set = TRUE;
 }
 
 /**
- * mm_simple_connect_properties_get_allowed_modes:
+ * mm_simple_connect_properties_get_current_modes:
  * @self: a #MMSimpleConnectProperties.
  * @allowed: (out): location for the bitmask of #MMModemMode values specifying which are allowed.
  * @preferred: (out): loction for a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
@@ -213,7 +213,7 @@ mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
  * Returns: %TRUE if @allowed and @preferred are set, %FALSE otherwise.
  */
 gboolean
-mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
+mm_simple_connect_properties_get_current_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode *allowed,
                                                 MMModemMode *preferred)
 {
@@ -221,7 +221,7 @@ mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
     g_return_val_if_fail (allowed != NULL, FALSE);
     g_return_val_if_fail (preferred != NULL, FALSE);
 
-    if (self->priv->allowed_modes_set) {
+    if (self->priv->current_modes_set) {
         *allowed = self->priv->allowed_modes;
         *preferred = self->priv->preferred_mode;
         return TRUE;
@@ -524,7 +524,7 @@ mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self)
                                mm_common_bands_array_to_variant (self->priv->current_bands,
                                                                  self->priv->n_current_bands));
 
-    if (self->priv->allowed_modes_set) {
+    if (self->priv->current_modes_set) {
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_ALLOWED_MODES,
@@ -639,7 +639,7 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
             g_object_unref (ctx.self);
             ctx.self = NULL;
         } else {
-            mm_simple_connect_properties_set_allowed_modes (
+            mm_simple_connect_properties_set_current_modes (
                 ctx.self,
                 allowed_modes,
                 preferred_mode);
@@ -730,7 +730,7 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     }
     /* If we got allowed modes variant, check if we got preferred mode */
     else if (allowed_modes_variant) {
-        mm_simple_connect_properties_set_allowed_modes (
+        mm_simple_connect_properties_set_current_modes (
             self,
             g_variant_get_uint32 (allowed_modes_variant),
             (preferred_mode_variant ?
@@ -739,7 +739,7 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     }
     /* If we only got preferred mode, assume allowed is ANY */
     else if (preferred_mode_variant) {
-        mm_simple_connect_properties_set_allowed_modes (
+        mm_simple_connect_properties_set_current_modes (
             self,
             MM_MODEM_MODE_ANY,
             g_variant_get_uint32 (preferred_mode_variant));

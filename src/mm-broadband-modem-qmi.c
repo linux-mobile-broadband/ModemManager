@@ -2468,7 +2468,7 @@ modem_factory_reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load allowed modes (Modem interface) */
+/* Load current modes (Modem interface) */
 
 typedef struct {
     MMBroadbandModemQmi *self;
@@ -2476,15 +2476,15 @@ typedef struct {
     GSimpleAsyncResult *result;
     gboolean run_get_system_selection_preference;
     gboolean run_get_technology_preference;
-} LoadAllowedModesContext;
+} LoadCurrentModesContext;
 
 typedef struct {
     MMModemMode allowed;
     MMModemMode preferred;
-} LoadAllowedModesResult;
+} LoadCurrentModesResult;
 
 static void
-load_allowed_modes_context_complete_and_free (LoadAllowedModesContext *ctx)
+load_current_modes_context_complete_and_free (LoadCurrentModesContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -2494,13 +2494,13 @@ load_allowed_modes_context_complete_and_free (LoadAllowedModesContext *ctx)
 }
 
 static gboolean
-load_allowed_modes_finish (MMIfaceModem *self,
+load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
                            GError **error)
 {
-    LoadAllowedModesResult *result;
+    LoadCurrentModesResult *result;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -2511,14 +2511,14 @@ load_allowed_modes_finish (MMIfaceModem *self,
     return TRUE;
 }
 
-static void load_allowed_modes_context_step (LoadAllowedModesContext *ctx);
+static void load_current_modes_context_step (LoadCurrentModesContext *ctx);
 
 static void
 get_technology_preference_ready (QmiClientNas *client,
                                  GAsyncResult *res,
-                                 LoadAllowedModesContext *ctx)
+                                 LoadCurrentModesContext *ctx)
 {
-    LoadAllowedModesResult *result = NULL;
+    LoadCurrentModesResult *result = NULL;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
 
@@ -2547,7 +2547,7 @@ get_technology_preference_ready (QmiClientNas *client,
             g_free (str);
         } else {
             /* We got a valid value from here */
-            result = g_new (LoadAllowedModesResult, 1);
+            result = g_new (LoadCurrentModesResult, 1);
             result->allowed = allowed;
             result->preferred = MM_MODEM_MODE_NONE;
         }
@@ -2558,7 +2558,7 @@ get_technology_preference_ready (QmiClientNas *client,
 
     if (!result) {
         ctx->run_get_technology_preference = FALSE;
-        load_allowed_modes_context_step (ctx);
+        load_current_modes_context_step (ctx);
         return;
     }
 
@@ -2566,15 +2566,15 @@ get_technology_preference_ready (QmiClientNas *client,
         ctx->result,
         result,
         (GDestroyNotify)g_free);
-    load_allowed_modes_context_complete_and_free (ctx);
+    load_current_modes_context_complete_and_free (ctx);
 }
 
 static void
-allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
+current_modes_get_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
-                                                     LoadAllowedModesContext *ctx)
+                                                     LoadCurrentModesContext *ctx)
 {
-    LoadAllowedModesResult *result = NULL;
+    LoadCurrentModesResult *result = NULL;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
     QmiNasRatModePreference mode_preference_mask = 0;
@@ -2605,7 +2605,7 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
             QmiNasGsmWcdmaAcquisitionOrderPreference gsm_or_wcdma;
 
             /* We got a valid value from here */
-            result = g_new (LoadAllowedModesResult, 1);
+            result = g_new (LoadCurrentModesResult, 1);
             result->allowed = allowed;
             result->preferred = MM_MODEM_MODE_NONE;
 
@@ -2626,7 +2626,7 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
     if (!result) {
         /* Try with the deprecated command */
         ctx->run_get_system_selection_preference = FALSE;
-        load_allowed_modes_context_step (ctx);
+        load_current_modes_context_step (ctx);
         return;
     }
 
@@ -2634,11 +2634,11 @@ allowed_modes_get_system_selection_preference_ready (QmiClientNas *client,
         ctx->result,
         result,
         (GDestroyNotify)g_free);
-    load_allowed_modes_context_complete_and_free (ctx);
+    load_current_modes_context_complete_and_free (ctx);
 }
 
 static void
-load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
+load_current_modes_context_step (LoadCurrentModesContext *ctx)
 {
     if (ctx->run_get_system_selection_preference) {
         qmi_client_nas_get_system_selection_preference (
@@ -2646,7 +2646,7 @@ load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
             NULL, /* no input */
             5,
             NULL, /* cancellable */
-            (GAsyncReadyCallback)allowed_modes_get_system_selection_preference_ready,
+            (GAsyncReadyCallback)current_modes_get_system_selection_preference_ready,
             ctx);
         return;
     }
@@ -2666,16 +2666,16 @@ load_allowed_modes_context_step (LoadAllowedModesContext *ctx)
         ctx->result,
         MM_CORE_ERROR,
         MM_CORE_ERROR_UNSUPPORTED,
-        "Loading allowed modes is not supported by this device");
-    load_allowed_modes_context_complete_and_free (ctx);
+        "Loading current modes is not supported by this device");
+    load_current_modes_context_complete_and_free (ctx);
 }
 
 static void
-load_allowed_modes (MMIfaceModem *self,
+load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    LoadAllowedModesContext *ctx;
+    LoadCurrentModesContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -2683,13 +2683,13 @@ load_allowed_modes (MMIfaceModem *self,
                             callback, user_data))
         return;
 
-    ctx = g_new0 (LoadAllowedModesContext, 1);
+    ctx = g_new0 (LoadCurrentModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             load_allowed_modes);
+                                             load_current_modes);
 
     /* System selection preference introduced in NAS 1.1 */
     ctx->run_get_system_selection_preference = qmi_client_check_version (client, 1, 1);
@@ -2697,7 +2697,7 @@ load_allowed_modes (MMIfaceModem *self,
     /* Technology preference introduced in NAS 1.0, so always available */
     ctx->run_get_technology_preference = TRUE;
 
-    load_allowed_modes_context_step (ctx);
+    load_current_modes_context_step (ctx);
 }
 
 /*****************************************************************************/
@@ -2711,10 +2711,10 @@ typedef struct {
     MMModemMode preferred;
     gboolean run_set_system_selection_preference;
     gboolean run_set_technology_preference;
-} SetAllowedModesContext;
+} SetCurrentModesContext;
 
 static void
-set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+set_current_modes_context_complete_and_free (SetCurrentModesContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -2724,19 +2724,19 @@ set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
 }
 
 static gboolean
-set_allowed_modes_finish (MMIfaceModem *self,
+set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void set_allowed_modes_context_step (SetAllowedModesContext *ctx);
+static void set_current_modes_context_step (SetCurrentModesContext *ctx);
 
 static void
 set_technology_preference_ready (QmiClientNas *client,
                                  GAsyncResult *res,
-                                 SetAllowedModesContext *ctx)
+                                 SetCurrentModesContext *ctx)
 {
     QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
@@ -2756,19 +2756,19 @@ set_technology_preference_ready (QmiClientNas *client,
         if (error)
             g_error_free (error);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         qmi_message_nas_set_technology_preference_output_unref (output);
         return;
     }
 
     ctx->run_set_technology_preference = FALSE;
-    set_allowed_modes_context_step (ctx);
+    set_current_modes_context_step (ctx);
 }
 
 static void
 allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
-                                                     SetAllowedModesContext *ctx)
+                                                     SetCurrentModesContext *ctx)
 {
     QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
@@ -2784,18 +2784,18 @@ allowed_modes_set_system_selection_preference_ready (QmiClientNas *client,
     } else {
         /* Good! TODO: do we really need to wait for the indication? */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_allowed_modes_context_complete_and_free (ctx);
+        set_current_modes_context_complete_and_free (ctx);
         qmi_message_nas_set_system_selection_preference_output_unref (output);
         return;
     }
 
     /* Try with the deprecated command */
     ctx->run_set_system_selection_preference = FALSE;
-    set_allowed_modes_context_step (ctx);
+    set_current_modes_context_step (ctx);
 }
 
 static void
-set_allowed_modes_context_step (SetAllowedModesContext *ctx)
+set_current_modes_context_step (SetCurrentModesContext *ctx)
 {
     if (ctx->run_set_system_selection_preference) {
         QmiMessageNasSetSystemSelectionPreferenceInput *input;
@@ -2814,7 +2814,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
                                              "Unhandled allowed mode setting: '%s'",
                                              str);
             g_free (str);
-            set_allowed_modes_context_complete_and_free (ctx);
+            set_current_modes_context_complete_and_free (ctx);
             return;
         }
 
@@ -2853,7 +2853,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
                                              "Cannot set specific preferred mode");
-            set_allowed_modes_context_complete_and_free (ctx);
+            set_current_modes_context_complete_and_free (ctx);
             return;
         }
 
@@ -2869,7 +2869,7 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
                                              "Unhandled allowed mode setting: '%s'",
                                              str);
             g_free (str);
-            set_allowed_modes_context_complete_and_free (ctx);
+            set_current_modes_context_complete_and_free (ctx);
             return;
         }
 
@@ -2892,17 +2892,17 @@ set_allowed_modes_context_step (SetAllowedModesContext *ctx)
         MM_CORE_ERROR,
         MM_CORE_ERROR_UNSUPPORTED,
         "Setting allowed modes is not supported by this device");
-    set_allowed_modes_context_complete_and_free (ctx);
+    set_current_modes_context_complete_and_free (ctx);
 }
 
 static void
-set_allowed_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    SetAllowedModesContext *ctx;
+    SetCurrentModesContext *ctx;
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
@@ -2910,13 +2910,13 @@ set_allowed_modes (MMIfaceModem *self,
                             callback, user_data))
         return;
 
-    ctx = g_new0 (SetAllowedModesContext, 1);
+    ctx = g_new0 (SetCurrentModesContext, 1);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             set_allowed_modes);
+                                             set_current_modes);
 
     if (allowed == MM_MODEM_MODE_ANY && ctx->preferred == MM_MODEM_MODE_NONE) {
         ctx->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
@@ -2934,7 +2934,7 @@ set_allowed_modes (MMIfaceModem *self,
     /* Technology preference introduced in NAS 1.0, so always available */
     ctx->run_set_technology_preference = TRUE;
 
-    set_allowed_modes_context_step (ctx);
+    set_current_modes_context_step (ctx);
 }
 
 /*****************************************************************************/
@@ -8222,10 +8222,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_charsets_finish = NULL;
     iface->setup_charset = NULL;
     iface->setup_charset_finish = NULL;
-    iface->load_allowed_modes = load_allowed_modes;
-    iface->load_allowed_modes_finish = load_allowed_modes_finish;
-    iface->set_allowed_modes = set_allowed_modes;
-    iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
     iface->load_current_bands = modem_load_current_bands;

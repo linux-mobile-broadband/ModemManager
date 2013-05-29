@@ -241,8 +241,10 @@ print_modem_info (void)
     MMModemModeCombination *modes = NULL;
     guint n_modes = 0;
     gchar *supported_modes_string;
-    gchar *allowed_modes_string;
-    gchar *preferred_mode_string;
+    MMModemMode allowed_modes;
+    gchar *allowed_modes_string = NULL;
+    MMModemMode preferred_mode;
+    gchar *preferred_mode_string = NULL;
     gchar *supported_bands_string;
     gchar *current_bands_string;
     gchar *supported_ip_families_string;
@@ -277,10 +279,10 @@ print_modem_info (void)
     mm_modem_get_supported_bands (ctx->modem, &bands, &n_bands);
     supported_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
-    allowed_modes_string = mm_modem_mode_build_string_from_mask (
-        mm_modem_get_allowed_modes (ctx->modem));
-    preferred_mode_string = mm_modem_mode_build_string_from_mask (
-        mm_modem_get_preferred_mode (ctx->modem));
+    if (mm_modem_get_current_modes (ctx->modem, &allowed_modes, &preferred_mode)) {
+        allowed_modes_string = mm_modem_mode_build_string_from_mask (allowed_modes);
+        preferred_mode_string = mm_modem_mode_build_string_from_mask (preferred_mode);
+    }
     supported_ip_families_string = mm_bearer_ip_family_build_string_from_mask (
         mm_modem_get_supported_ip_families (ctx->modem));
 
@@ -385,8 +387,7 @@ print_modem_info (void)
     /* Modes */
     g_print ("  -------------------------\n"
              "  Modes    |      supported: '%s'\n"
-             "           |        allowed: '%s'\n"
-             "           |      preferred: '%s'\n",
+             "           |        current: 'allowed: %s; preferred: %s'\n",
              VALIDATE_UNKNOWN (supported_modes_string),
              VALIDATE_UNKNOWN (allowed_modes_string),
              VALIDATE_UNKNOWN (preferred_mode_string));
@@ -763,28 +764,28 @@ delete_bearer_ready (MMModem      *modem,
 }
 
 static void
-set_allowed_modes_process_reply (gboolean      result,
+set_current_modes_process_reply (gboolean      result,
                                  const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't set allowed modes: '%s'\n",
+        g_printerr ("error: couldn't set current modes: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully set allowed modes in the modem\n");
+    g_print ("successfully set current modes in the modem\n");
 }
 
 static void
-set_allowed_modes_ready (MMModem      *modem,
+set_current_modes_ready (MMModem      *modem,
                          GAsyncResult *result,
                          gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_set_allowed_modes_finish (modem, result, &error);
-    set_allowed_modes_process_reply (operation_result, error);
+    operation_result = mm_modem_set_current_modes_finish (modem, result, &error);
+    set_current_modes_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -1041,11 +1042,11 @@ get_modem_ready (GObject      *source,
         MMModemMode preferred;
 
         parse_modes (&allowed, &preferred);
-        mm_modem_set_allowed_modes (ctx->modem,
+        mm_modem_set_current_modes (ctx->modem,
                                     allowed,
                                     preferred,
                                     ctx->cancellable,
-                                    (GAsyncReadyCallback)set_allowed_modes_ready,
+                                    (GAsyncReadyCallback)set_current_modes_ready,
                                     NULL);
         return;
     }
@@ -1254,13 +1255,13 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         gboolean result;
 
         parse_modes (&allowed, &preferred);
-        result = mm_modem_set_allowed_modes_sync (ctx->modem,
+        result = mm_modem_set_current_modes_sync (ctx->modem,
                                                   allowed,
                                                   preferred,
                                                   NULL,
                                                   &error);
 
-        set_allowed_modes_process_reply (result, error);
+        set_current_modes_process_reply (result, error);
         return;
     }
 
