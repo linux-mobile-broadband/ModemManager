@@ -956,7 +956,7 @@ mbm_get_unlock_retries (MMModemGsmCard *modem,
     g_free (command);
 
     command = g_strdup_printf ("*EPIN?");
-    mm_at_serial_port_queue_command (port, command, 3, send_epin_done, info);
+    mm_at_serial_port_queue_command (port, command, 10, send_epin_done, info);
     g_free (command);
 }
 
