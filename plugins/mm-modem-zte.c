@@ -32,9 +32,11 @@ static void modem_init (MMModem *modem_class);
 static void modem_icera_init (MMModemIcera *icera_class);
 static void modem_simple_init (MMModemSimple *simple_class);
 static void modem_gsm_ussd_init (MMModemGsmUssd *ussd_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_USSD, modem_gsm_ussd_init)
@@ -349,6 +351,58 @@ do_disconnect (MMGenericGsm *gsm,
         mm_modem_icera_do_disconnect (gsm, cid, callback, user_data);
     else
         MM_GENERIC_GSM_CLASS (mm_modem_zte_parent_class)->do_disconnect (gsm, cid, callback, user_data);
+}
+
+static void
+set_band (MMModemGsmNetwork *modem,
+          MMModemGsmBand band,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_ZTE_GET_PRIVATE (modem)->is_icera)
+        mm_modem_icera_set_band (MM_MODEM_ICERA (modem), band, callback, user_data);
+    else {
+        info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_band (MMModemGsmNetwork *modem,
+          MMModemUIntFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_ZTE_GET_PRIVATE (modem)->is_icera)
+        mm_modem_icera_get_current_bands (MM_MODEM_ICERA (modem), callback, user_data);
+    else {
+        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_supported_bands (MMGenericGsm *gsm,
+                     MMModemUIntFn callback,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (MM_MODEM_ZTE_GET_PRIVATE (gsm)->is_icera)
+        mm_modem_icera_get_supported_bands (MM_MODEM_ICERA (gsm), callback, user_data);
+    else {
+        info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
 }
 
 /*****************************************************************************/
@@ -748,6 +802,13 @@ modem_icera_init (MMModemIcera *icera)
 }
 
 static void
+modem_gsm_network_init (MMModemGsmNetwork *class)
+{
+    class->set_band = set_band;
+    class->get_band = get_band;
+}
+
+static void
 modem_simple_init (MMModemSimple *class)
 {
     class->connect = simple_connect;
@@ -805,4 +866,5 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
+    gsm_class->get_supported_bands = get_supported_bands;
 }
