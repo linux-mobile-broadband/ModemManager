@@ -582,6 +582,19 @@ test_cops_response_sek600i (void *f, gpointer d)
 }
 
 static void
+test_cops_response_samsung_z810 (void *f, gpointer d)
+{
+    /* Ensure commas within quotes don't trip up the parser */
+    const char *reply = "+COPS: (1,\"T-Mobile USA, In\",\"T-Mobile\",\"310260\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile USA, In", "T-Mobile", "310260", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+    };
+
+    test_cops_results ("Samsung Z810", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const gchar *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -1883,6 +1896,7 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_samsung_z810, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));

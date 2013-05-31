@@ -530,7 +530,7 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
      *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
      */
 
-    r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &inner_error);
+    r = g_regex_new ("\\((\\d),\"([^\"\\)]*)\",([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &inner_error);
     if (inner_error) {
         mm_err ("Invalid regular expression: %s", inner_error->message);
         g_error_free (inner_error);
