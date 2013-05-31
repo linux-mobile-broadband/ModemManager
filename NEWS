@@ -1,3 +1,30 @@
+Overview of changes in ModemManager 0.6.2
+------------------------------------------
+
+This is a new stable release of ModemManager 0.6.x.  Changes include:
+
+- Support added for LTE access technology reporting and preference on 3GPP modems
+- Report EVDO signal quality for CDMA/EVDO modems when using EVDO
+- Fix crashes reading operator name in different character sets
+- Fix a segfault in the GSM facility lock handling
+- Add a plugin for Via-based CDMA devices
+- Better handling of signal quality on GSM modems and Huawei CDMA modems
+- Better access technology reporting on Icera-based and Ericsson modems
+- Increase connect timeout for newer Sierra devices
+- Better detection of the data port on newer Huawei modems
+- Ensure failed connect actually fails on Ericsson modems
+- Fix roaming detection on Novatel CDMA devices
+- Fix detection of existing PDP contexts when an IPv6 context is defined
+- Fix an error parsing GSM scan results
+- Allow longer response time for Ericsson PIN status response
+- Implement band handling for ZTE Icera-based modems
+- Update udev rules for some newer devices
+
+While this is a stable release of ModemManager 0.6, all users are encouraged to
+upgrade to the much more capable ModemManager 0.8.  After the 0.8 release, the
+0.6 series will only receive maintenance updates.
+
+
 Overview of changes in ModemManager 0.6
 ----------------------------------------
 
