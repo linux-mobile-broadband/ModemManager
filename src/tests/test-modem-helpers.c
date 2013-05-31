@@ -56,7 +56,7 @@ test_cops_results (const char *desc,
     g_assert (results);
     g_assert (error == NULL);
 
-    g_assert (results->len == expected_results_len);
+    g_assert_cmpint (results->len, ==, expected_results_len);
 
     for (i = 0; i < results->len; i++) {
         GHashTable *entry = g_ptr_array_index (results, i);
@@ -65,31 +65,31 @@ test_cops_results (const char *desc,
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_STATUS);
         g_assert (value);
-        g_assert (strcmp (value, expected->status) == 0);
+        g_assert_cmpstr (value, ==, expected->status);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_LONG);
         if (expected->oper_long) {
             g_assert (value);
-            g_assert (strcmp (value, expected->oper_long) == 0);
+            g_assert_cmpstr (value, ==, expected->oper_long);
         } else
             g_assert (value == NULL);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_SHORT);
         if (expected->oper_short) {
             g_assert (value);
-            g_assert (strcmp (value, expected->oper_short) == 0);
+            g_assert_cmpstr (value, ==, expected->oper_short);
         } else
             g_assert (value == NULL);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_NUM);
         g_assert (expected->oper_num);
         g_assert (value);
-        g_assert (strcmp (value, expected->oper_num) == 0);
+        g_assert_cmpstr (value, ==, expected->oper_num);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_ACCESS_TECH);
         if (expected->tech) {
             g_assert (value);
-            g_assert (strcmp (value, expected->tech) == 0);
+            g_assert_cmpstr (value, ==, expected->tech);
         } else
             g_assert (value == NULL);
     }
@@ -433,6 +433,19 @@ test_cops_response_sek600i (void *f, gpointer d)
     };
 
     test_cops_results ("Sony-Ericsson K600i", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
+test_cops_response_samsung_z810 (void *f, gpointer d)
+{
+    /* Ensure commas within quotes don't trip up the parser */
+    const char *reply = "+COPS: (1,\"T-Mobile USA, In\",\"T-Mobile\",\"310260\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
+    static OperEntry expected[] = {
+        { "1", "T-Mobile USA, In", "T-Mobile", "310260", "0" },
+        { "1", "AT&T", "AT&T", "310410", "0" },
+    };
+
+    test_cops_results ("Samsung Z810", reply, &expected[0], ARRAY_LEN (expected));
 }
 
 static void
@@ -1273,6 +1286,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_samsung_z810, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
