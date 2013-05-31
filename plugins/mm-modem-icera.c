@@ -1122,7 +1122,8 @@ get_supported_bands_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GSList *bands, *iter;
     Band *b;
-    guint i;
+    guint i, num_commands;
+    MMModemGsmBand mm_bands = MM_MODEM_GSM_BAND_UNKNOWN;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -1142,15 +1143,39 @@ get_supported_bands_done (MMAtSerialPort *port,
         return;
     }
 
-    for (iter = bands, i = 0; iter; iter = g_slist_next (iter), i++) {
+    for (iter = bands, i = 0, num_commands = 0; iter; iter = g_slist_next (iter), i++) {
         b = iter->data;
         b->data = info;
-        mm_at_serial_port_queue_command (port, b->name, 10, get_one_supported_band_done, b);
-    }
-    /* Free list, but not items; they are freed when the AT response comes back */
-    g_slist_free (bands);
 
-    mm_callback_info_set_data (info, NUM_BANDS_TAG, GUINT_TO_POINTER (i), NULL);
+        /* If the band is already enabled, assume it's supported by the modem,
+         * otherwise we try to disable the band (which should be a NOP since it's
+         * not currently enabled) and see if the modem reports an error.
+         */
+        if (b->enabled)
+            mm_bands |= b->band;
+        else {
+            mm_at_serial_port_queue_command (port, b->name, 10, get_one_supported_band_done, b);
+            num_commands++;
+        }
+    }
+
+    if (num_commands == 0) {
+        /* All bands enabled or no band supported; schedule callback handler */
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_bands), NULL);
+        mm_callback_info_schedule (info);
+
+        g_slist_foreach (bands, (GFunc) band_free, NULL);
+    } else {
+        /* Callback will be scheduled by the AT command response handler */
+        mm_callback_info_set_data (info, BAND_RESULT_TAG, GUINT_TO_POINTER (mm_bands), NULL);
+        mm_callback_info_set_data (info, NUM_BANDS_TAG, GUINT_TO_POINTER (num_commands), NULL);
+
+        /* Band list *items* are freed when the AT response comes back, but let
+         * the list itself be freed here.
+         */
+    }
+
+    g_slist_free (bands);
 }
 
 void
