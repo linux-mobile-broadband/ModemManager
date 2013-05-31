@@ -821,6 +821,14 @@ port_grabbed (MMGenericGsm *gsm,
         regex = g_regex_new ("\\r\\n\\^CSNR:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, gsm, NULL);
         g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\^SIMST:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, gsm, NULL);
+        g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\^SRVST:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, gsm, NULL);
+        g_regex_unref (regex);
     }
 }
 
