@@ -732,7 +732,7 @@ disable_all_done (MMModem *modem, GError *error, gpointer user_data)
     if (!modem || mm_callback_info_check_modem_removed (info))
         return;
 
-    priv = MM_GENERIC_CDMA_GET_PRIVATE (user_data);
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
     if (error)
         info->error = g_error_copy (error);
