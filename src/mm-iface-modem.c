@@ -4370,6 +4370,14 @@ interface_initialization_step (InitializationContext *ctx)
     }
 
     case INITIALIZATION_STEP_LAST:
+        /* Setting capabilities allowed also in FAILED state. Just imagine a
+         * 3GPP+3GPP2 modem in 3GPP-only mode without SIM, we should allow
+         * changing caps to 3GPP2, which doesn't require SIM */
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-current-capabilities",
+                          G_CALLBACK (handle_set_current_capabilities),
+                          ctx->self);
+
         if (ctx->fatal_error) {
             g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
             ctx->fatal_error = NULL;
@@ -4407,10 +4415,6 @@ interface_initialization_step (InitializationContext *ctx)
             g_signal_connect (ctx->skeleton,
                               "handle-factory-reset",
                               G_CALLBACK (handle_factory_reset),
-                              ctx->self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-set-current-capabilities",
-                              G_CALLBACK (handle_set_current_capabilities),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-bands",
