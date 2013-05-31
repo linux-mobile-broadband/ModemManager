@@ -712,7 +712,7 @@ load_unlock_retries (MMIfaceModem *self,
     mm_dbg ("loading unlock retries (mbm)...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "*EPIN?",
-                              3,
+                              10,
                               FALSE,
                               callback,
                               user_data);
