@@ -145,7 +145,9 @@ mm_act =     { 0: "unknown",
                5: "UMTS",
                6: "HSDPA",
                7: "HSUPA",
-               8: "HSPA"
+               8: "HSPA",
+               9: "HSPA+",
+               10: "LTE"
              }
 
 mm_reg = { 0: "idle",
