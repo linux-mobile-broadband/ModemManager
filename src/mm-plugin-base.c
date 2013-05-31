@@ -1203,6 +1203,7 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     GUdevDevice *device = NULL, *parent = NULL;
     const char *vid = NULL, *pid = NULL, *parent_subsys;
     gboolean success = FALSE;
+    char *pci_vid = NULL, *pci_pid = NULL;
 
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (MM_IS_PLUGIN_BASE (self), FALSE);
@@ -1242,6 +1243,19 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
                 /* Platform devices don't usually have a VID/PID */
                 success = TRUE;
                 goto out;
+            } else if (g_str_equal (parent_subsys, "pci")) {
+                const char *pci_id;
+
+                /* We can't always rely on the model + vendor showing up on
+                 * the PCI device's child, so look at the PCI parent. PCI_ID
+                 * has the format "1931:000C".
+                 */
+                pci_id = g_udev_device_get_property (parent, "PCI_ID");
+                if (pci_id && strlen (pci_id) == 9 && pci_id[4] == ':') {
+                    vid = pci_vid = g_strdup (pci_id);
+                    pci_vid[4] = '\0';
+                    pid = pci_pid = g_strdup (pci_id + 5);
+                }
             }
         }
     }
@@ -1287,6 +1301,8 @@ out:
         g_object_unref (device);
     if (parent)
         g_object_unref (parent);
+    g_free (pci_vid);
+    g_free (pci_pid);
     return success;
 }
 
