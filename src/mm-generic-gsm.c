@@ -4271,7 +4271,7 @@ existing_apns_read (MMAtSerialPort *port,
             pdp_type = g_match_info_fetch (match_info, 2);
             apn = g_match_info_fetch (match_info, 3);
 
-            if (!strcmp (apn, new_apn)) {
+            if (!strcmp (pdp_type, "IP") && !strcmp (apn, new_apn)) {
                 MM_GENERIC_GSM_GET_PRIVATE (info->modem)->cid = num_cid;
                 found = TRUE;
             }
