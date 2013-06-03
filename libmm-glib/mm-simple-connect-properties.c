@@ -35,23 +35,12 @@ G_DEFINE_TYPE (MMSimpleConnectProperties, mm_simple_connect_properties, G_TYPE_O
 
 #define PROPERTY_PIN             "pin"
 #define PROPERTY_OPERATOR_ID     "operator-id"
-#define PROPERTY_CURRENT_BANDS   "current-bands"
-#define PROPERTY_ALLOWED_MODES   "allowed-modes"
-#define PROPERTY_PREFERRED_MODE  "preferred-mode"
 
 struct _MMSimpleConnectPropertiesPrivate {
     /* PIN */
     gchar *pin;
     /* Operator ID */
     gchar *operator_id;
-    /* Bands */
-    gboolean current_bands_set;
-    MMModemBand *current_bands;
-    guint n_current_bands;
-    /* Modes */
-    gboolean current_modes_set;
-    MMModemMode allowed_modes;
-    MMModemMode preferred_mode;
     /* Bearer properties */
     MMBearerProperties *bearer_properties;
 };
@@ -124,110 +113,6 @@ mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
     g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
 
     return self->priv->operator_id;
-}
-
-/*****************************************************************************/
-
-/**
- * mm_simple_connect_properties_set_current_bands:
- * @self: a #MMSimpleConnectProperties.
- * @bands: array of #MMModemBand values.
- * @n_bands: number of elements in @bands.
- *
- * Sets the frequency bands to use.
- */
-void
-mm_simple_connect_properties_set_current_bands (MMSimpleConnectProperties *self,
-                                                const MMModemBand *bands,
-                                                guint n_bands)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    g_free (self->priv->current_bands);
-    self->priv->n_current_bands = n_bands;
-    self->priv->current_bands = g_new (MMModemBand, self->priv->n_current_bands);
-    memcpy (self->priv->current_bands,
-            bands,
-            sizeof (MMModemBand) * self->priv->n_current_bands);
-    self->priv->current_bands_set = TRUE;
-}
-
-/**
- * mm_simple_connect_properties_get_current_bands:
- * @self: a #MMSimpleConnectProperties.
- * @bands: (out): location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
- * @n_bands: (out) number of elements in @bands.
- *
- * Gets the frequency bands to use.
- *
- * Returns: %TRUE if @bands is set, %FALSE otherwise.
- */
-gboolean
-mm_simple_connect_properties_get_current_bands (MMSimpleConnectProperties *self,
-                                                const MMModemBand **bands,
-                                                guint *n_bands)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), FALSE);
-    g_return_val_if_fail (bands != NULL, FALSE);
-    g_return_val_if_fail (n_bands != NULL, FALSE);
-
-    if (self->priv->current_bands_set) {
-        *bands = self->priv->current_bands;
-        *n_bands = self->priv->n_current_bands;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-/*****************************************************************************/
-
-/**
- * mm_simple_connect_properties_set_current_modes:
- * @self: a #MMSimpleConnectProperties.
- * @allowed: bitmask of #MMModemMode values specifying which are allowed.
- * @preferred: a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
- *
- * Sets the modes allowed to use, and which of them is preferred.
- */
-void
-mm_simple_connect_properties_set_current_modes (MMSimpleConnectProperties *self,
-                                                MMModemMode allowed,
-                                                MMModemMode preferred)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    self->priv->allowed_modes = allowed;
-    self->priv->preferred_mode = preferred;
-    self->priv->current_modes_set = TRUE;
-}
-
-/**
- * mm_simple_connect_properties_get_current_modes:
- * @self: a #MMSimpleConnectProperties.
- * @allowed: (out): location for the bitmask of #MMModemMode values specifying which are allowed.
- * @preferred: (out): loction for a #MMModemMode value, specifying which of the ones in @allowed is preferred, if any.
- *
- * Gets the modes allowed to use, and which of them is preferred.
- *
- * Returns: %TRUE if @allowed and @preferred are set, %FALSE otherwise.
- */
-gboolean
-mm_simple_connect_properties_get_current_modes (MMSimpleConnectProperties *self,
-                                                MMModemMode *allowed,
-                                                MMModemMode *preferred)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), FALSE);
-    g_return_val_if_fail (allowed != NULL, FALSE);
-    g_return_val_if_fail (preferred != NULL, FALSE);
-
-    if (self->priv->current_modes_set) {
-        *allowed = self->priv->allowed_modes;
-        *preferred = self->priv->preferred_mode;
-        return TRUE;
-    }
-
-    return FALSE;
 }
 
 /*****************************************************************************/
@@ -517,24 +402,6 @@ mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self)
                                PROPERTY_OPERATOR_ID,
                                g_variant_new_string (self->priv->operator_id));
 
-    if (self->priv->current_bands)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_CURRENT_BANDS,
-                               mm_common_bands_array_to_variant (self->priv->current_bands,
-                                                                 self->priv->n_current_bands));
-
-    if (self->priv->current_modes_set) {
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_ALLOWED_MODES,
-                               g_variant_new_uint32 (self->priv->allowed_modes));
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_PREFERRED_MODE,
-                               g_variant_new_uint32 (self->priv->preferred_mode));
-    }
-
     /* Merge dictionaries */
     bearer_properties_dictionary = mm_bearer_properties_get_dictionary (self->priv->bearer_properties);
     g_variant_iter_init (&iter, bearer_properties_dictionary);
@@ -575,20 +442,7 @@ key_value_foreach (const gchar *key,
         mm_simple_connect_properties_set_pin (ctx->self, value);
     else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
         mm_simple_connect_properties_set_operator_id (ctx->self, value);
-    else if (g_str_equal (key, PROPERTY_CURRENT_BANDS)) {
-        MMModemBand *bands = NULL;
-        guint n_bands = 0;
-
-        mm_common_get_bands_from_string (value, &bands, &n_bands, &ctx->error);
-        if (!ctx->error) {
-            mm_simple_connect_properties_set_current_bands (ctx->self, bands, n_bands);
-            g_free (bands);
-        }
-    } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
-        ctx->allowed_modes_str = g_strdup (value);
-    } else if (g_str_equal (key, PROPERTY_PREFERRED_MODE)) {
-        ctx->preferred_mode_str = g_strdup (value);
-    } else {
+    else {
         ctx->error = g_error_new (MM_CORE_ERROR,
                                   MM_CORE_ERROR_INVALID_ARGS,
                                   "Invalid properties string, unexpected key '%s'",
@@ -605,8 +459,6 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
     ParseKeyValueContext ctx;
 
     ctx.error = NULL;
-    ctx.allowed_modes_str = NULL;
-    ctx.preferred_mode_str = NULL;
     ctx.self = mm_simple_connect_properties_new ();
 
     mm_common_parse_key_value_string (str,
@@ -620,34 +472,6 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
         g_object_unref (ctx.self);
         ctx.self = NULL;
     }
-    else if (ctx.allowed_modes_str || ctx.preferred_mode_str) {
-        MMModemMode allowed_modes;
-        MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
-
-        allowed_modes = (ctx.allowed_modes_str ?
-                         mm_common_get_modes_from_string (ctx.allowed_modes_str,
-                                                          &ctx.error) :
-                         MM_MODEM_MODE_ANY);
-
-        if (!ctx.error && ctx.preferred_mode_str) {
-            preferred_mode = mm_common_get_modes_from_string (ctx.preferred_mode_str,
-                                                              &ctx.error);
-        }
-
-        if (ctx.error) {
-            g_propagate_error (error, ctx.error);
-            g_object_unref (ctx.self);
-            ctx.self = NULL;
-        } else {
-            mm_simple_connect_properties_set_current_modes (
-                ctx.self,
-                allowed_modes,
-                preferred_mode);
-        }
-    }
-
-    g_free (ctx.allowed_modes_str);
-    g_free (ctx.preferred_mode_str);
 
     return ctx.self;
 }
@@ -663,8 +487,6 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     gchar *key;
     GVariant *value;
     MMSimpleConnectProperties *self;
-    GVariant *allowed_modes_variant = NULL;
-    GVariant *preferred_mode_variant = NULL;
 
     self = mm_simple_connect_properties_new ();
     if (!dictionary)
@@ -696,19 +518,6 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                 mm_simple_connect_properties_set_operator_id (
                     self,
                     g_variant_get_string (value, NULL));
-            else if (g_str_equal (key, PROPERTY_CURRENT_BANDS)) {
-                GArray *array;
-
-                array = mm_common_bands_variant_to_garray (value);
-                mm_simple_connect_properties_set_current_bands (
-                    self,
-                    (MMModemBand *)array->data,
-                    array->len);
-                g_array_unref (array);
-            } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES))
-                allowed_modes_variant = g_variant_ref (value);
-            else if (g_str_equal (key, PROPERTY_PREFERRED_MODE))
-                preferred_mode_variant = g_variant_ref (value);
             else {
                 /* Set inner error, will stop the loop */
                 inner_error = g_error_new (MM_CORE_ERROR,
@@ -728,28 +537,6 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
         g_object_unref (self);
         self = NULL;
     }
-    /* If we got allowed modes variant, check if we got preferred mode */
-    else if (allowed_modes_variant) {
-        mm_simple_connect_properties_set_current_modes (
-            self,
-            g_variant_get_uint32 (allowed_modes_variant),
-            (preferred_mode_variant ?
-             g_variant_get_uint32 (preferred_mode_variant) :
-             MM_MODEM_MODE_NONE));
-    }
-    /* If we only got preferred mode, assume allowed is ANY */
-    else if (preferred_mode_variant) {
-        mm_simple_connect_properties_set_current_modes (
-            self,
-            MM_MODEM_MODE_ANY,
-            g_variant_get_uint32 (preferred_mode_variant));
-    }
-
-    /* Cleanup last things before exiting */
-    if (allowed_modes_variant)
-        g_variant_unref (allowed_modes_variant);
-    if (preferred_mode_variant)
-        g_variant_unref (preferred_mode_variant);
 
     return self;
 }
@@ -779,11 +566,6 @@ mm_simple_connect_properties_init (MMSimpleConnectProperties *self)
 
     /* Some defaults */
     self->priv->bearer_properties = mm_bearer_properties_new ();
-    self->priv->allowed_modes = MM_MODEM_MODE_ANY;
-    self->priv->preferred_mode = MM_MODEM_MODE_NONE;
-    self->priv->current_bands = g_new (MMModemBand, 1);
-    self->priv->current_bands[0] = MM_MODEM_BAND_UNKNOWN;
-    self->priv->n_current_bands = 1;
 }
 
 static void
@@ -793,7 +575,6 @@ finalize (GObject *object)
 
     g_free (self->priv->pin);
     g_free (self->priv->operator_id);
-    g_free (self->priv->current_bands);
     g_object_unref (self->priv->bearer_properties);
 
     G_OBJECT_CLASS (mm_simple_connect_properties_parent_class)->finalize (object);

@@ -52,27 +52,6 @@
               given as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"current-bands"</literal></term>
-            <listitem>
-              List of <link linkend="MMModemBand">MMModemBand</link> values,
-              to specify all the bands allowed in the modem, given as a list of
-              unsigned integer values (signature <literal>"au"</literal>).
-            </listitem>
-          </varlistentry>
-          <varlistentry><term><literal>"allowed-modes"</literal></term>
-            <listitem>
-              Bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
-              to specify all the modes allowed in the modem, given as an
-              unsigned integer value (signature <literal>"u"</literal>).
-            </listitem>
-          </varlistentry>
-          <varlistentry><term><literal>"preferred-mode"</literal></term>
-            <listitem>
-              Specific <link linkend="MMModemMode">MMModemMode</link> preferred
-              among the ones allowed, if any. Given as an unsigned integer value
-              (signature <literal>"u"</literal>).
-            </listitem>
-          </varlistentry>
           <varlistentry><term><literal>"apn"</literal></term>
             <listitem>
               For GSM/UMTS and LTE devices the APN to use,

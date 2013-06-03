@@ -174,8 +174,6 @@ typedef enum {
     CONNECTION_STEP_WAIT_FOR_INITIALIZED,
     CONNECTION_STEP_ENABLE,
     CONNECTION_STEP_WAIT_FOR_ENABLED,
-    CONNECTION_STEP_CURRENT_MODES,
-    CONNECTION_STEP_CURRENT_BANDS,
     CONNECTION_STEP_REGISTER,
     CONNECTION_STEP_BEARER,
     CONNECTION_STEP_CONNECT,
@@ -187,8 +185,6 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     MMIfaceModemSimple *self;
     ConnectionStep step;
-    gulong state_changed_id;
-    guint state_changed_wait_id;
 
     /* Expected input properties */
     GVariant *dictionary;
@@ -201,9 +197,6 @@ typedef struct {
 static void
 connection_context_free (ConnectionContext *ctx)
 {
-    g_assert (ctx->state_changed_id == 0);
-    g_assert (ctx->state_changed_wait_id == 0);
-
     g_variant_unref (ctx->dictionary);
     if (ctx->properties)
         g_object_unref (ctx->properties);
@@ -272,82 +265,6 @@ register_in_3gpp_or_cdma_network_ready (MMIfaceModemSimple *self,
     /* Registered now! */
     ctx->step++;
     connection_step (ctx);
-}
-
-static gboolean
-after_set_current_modes_timeout_cb (ConnectionContext *ctx)
-{
-    /* Allowed modes set... almost there! */
-    ctx->step++;
-    connection_step (ctx);
-    return FALSE;
-}
-
-static void
-set_current_modes_ready (MMBaseModem *self,
-                         GAsyncResult *res,
-                         ConnectionContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_iface_modem_set_current_modes_finish (MM_IFACE_MODEM (self), res, &error)) {
-        if (g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_UNSUPPORTED)) {
-            g_error_free (error);
-            /* If setting bands is unsupported, keep on without sleep */
-            ctx->step++;
-            connection_step (ctx);
-        } else {
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
-            connection_context_free (ctx);
-        }
-        return;
-    }
-
-    /* Setting allowed modes will reset the current registration, so we'll need
-     * a couple of seconds to settle down. This sleep time just makes sure that
-     * the modem has enough time to report being unregistered. */
-    mm_dbg ("Will wait to settle down after updating allowed modes");
-    g_timeout_add_seconds (2, (GSourceFunc)after_set_current_modes_timeout_cb, ctx);
-}
-
-static gboolean
-after_set_current_bands_timeout_cb (ConnectionContext *ctx)
-{
-    /* Bands set... almost there! */
-    ctx->step++;
-    connection_step (ctx);
-    return FALSE;
-}
-
-static void
-set_current_bands_ready (MMBaseModem *self,
-                         GAsyncResult *res,
-                         ConnectionContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_iface_modem_set_current_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
-        if (g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_UNSUPPORTED)) {
-            g_error_free (error);
-            /* If setting bands is unsupported, keep on without sleep */
-            ctx->step++;
-            connection_step (ctx);
-        } else {
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
-            connection_context_free (ctx);
-        }
-        return;
-    }
-
-    /* Setting bands will reset the current registration, so we'll need a couple
-     * of seconds to settle down. This sleep time just makes sure that the modem
-     * has enough time to report being unregistered. */
-    mm_dbg ("Will wait to settle down after updating bands");
-    g_timeout_add_seconds (2, (GSourceFunc)after_set_current_bands_timeout_cb, ctx);
 }
 
 static void
@@ -556,59 +473,6 @@ connection_step (ConnectionContext *ctx)
                                              ctx);
         return;
 
-    case CONNECTION_STEP_CURRENT_MODES: {
-        MMModemMode allowed_modes = MM_MODEM_MODE_ANY;
-        MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
-
-        mm_info ("Simple connect state (%d/%d): Current modes",
-                 ctx->step, CONNECTION_STEP_LAST);
-
-        /* Don't set modes unless explicitly requested to do so */
-        if (mm_simple_connect_properties_get_current_modes (ctx->properties,
-                                                            &allowed_modes,
-                                                            &preferred_mode)) {
-            mm_iface_modem_set_current_modes (MM_IFACE_MODEM (ctx->self),
-                                              allowed_modes,
-                                              preferred_mode,
-                                              (GAsyncReadyCallback)set_current_modes_ready,
-                                              ctx);
-            return;
-        }
-
-        /* Fall down to next step */
-        ctx->step++;
-    }
-
-    case CONNECTION_STEP_CURRENT_BANDS: {
-        const MMModemBand *bands = NULL;
-        guint n_bands = 0;
-
-        mm_info ("Simple connect state (%d/%d): Current Bands",
-                 ctx->step, CONNECTION_STEP_LAST);
-
-        /* Don't set bands unless explicitly requested to do so */
-        if (mm_simple_connect_properties_get_current_bands (ctx->properties, &bands, &n_bands)) {
-            GArray *array;
-            guint i;
-
-            if (bands && *bands) {
-                array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
-                for (i = 0; i < n_bands; i++)
-                    g_array_insert_val (array, i, bands[i]);
-
-                mm_iface_modem_set_current_bands (MM_IFACE_MODEM (ctx->self),
-                                                  array,
-                                                  (GAsyncReadyCallback)set_current_bands_ready,
-                                                  ctx);
-                g_array_unref (array);
-                return;
-            }
-        }
-
-        /* Fall down to next step */
-        ctx->step++;
-    }
-
     case CONNECTION_STEP_REGISTER:
         mm_info ("Simple connect state (%d/%d): Register",
                  ctx->step, CONNECTION_STEP_LAST);
@@ -778,10 +642,6 @@ connect_auth_ready (MMBaseModem *self,
 
     /* Log about all the parameters being used for the simple connect */
     {
-        const MMModemBand *bands;
-        guint n_bands;
-        MMModemMode allowed;
-        MMModemMode preferred;
         MMBearerAllowedAuth allowed_auth;
         gchar *str;
         MMBearerIpFamily ip_family;
@@ -789,25 +649,6 @@ connect_auth_ready (MMBaseModem *self,
 #define VALIDATE_UNSPECIFIED(str) (str ? str : "unspecified")
 
         mm_dbg ("   PIN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_pin (ctx->properties)));
-
-        if (mm_simple_connect_properties_get_current_modes (ctx->properties, &allowed, &preferred)) {
-            str = mm_modem_mode_build_string_from_mask (allowed);
-            mm_dbg ("   Allowed mode: %s", str);
-            g_free (str);
-            str = mm_modem_mode_build_string_from_mask (preferred);
-            mm_dbg ("   Preferred mode: %s", str);
-            g_free (str);
-        } else {
-            mm_dbg ("   Allowed mode: %s", VALIDATE_UNSPECIFIED (NULL));
-            mm_dbg ("   Preferred mode: %s", VALIDATE_UNSPECIFIED (NULL));
-        }
-
-        if (mm_simple_connect_properties_get_current_bands (ctx->properties, &bands, &n_bands)) {
-            str = mm_common_build_bands_string (bands, n_bands);
-            mm_dbg ("   Bands: %s", str);
-            g_free (str);
-        } else
-            mm_dbg ("   Bands: %s", VALIDATE_UNSPECIFIED (NULL));
 
         mm_dbg ("   Operator ID: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_operator_id (ctx->properties)));
 
@@ -830,7 +671,6 @@ connect_auth_ready (MMBaseModem *self,
             g_free (str);
         } else
             mm_dbg ("   Allowed authentication: %s", VALIDATE_UNSPECIFIED (NULL));
-
 
         mm_dbg ("   User: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_user (ctx->properties)));
 

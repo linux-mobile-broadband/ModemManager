@@ -63,12 +63,6 @@ void mm_simple_connect_properties_set_pin           (MMSimpleConnectProperties *
                                                      const gchar *pin);
 void mm_simple_connect_properties_set_operator_id   (MMSimpleConnectProperties *self,
                                                      const gchar *operator_id);
-void mm_simple_connect_properties_set_current_bands (MMSimpleConnectProperties *self,
-                                                     const MMModemBand *bands,
-                                                     guint n_bands);
-void mm_simple_connect_properties_set_current_modes (MMSimpleConnectProperties *self,
-                                                     MMModemMode allowed,
-                                                     MMModemMode preferred);
 void mm_simple_connect_properties_set_apn           (MMSimpleConnectProperties *self,
                                                      const gchar *apn);
 void mm_simple_connect_properties_set_allowed_auth  (MMSimpleConnectProperties *self,
@@ -86,12 +80,6 @@ void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *
 
 const gchar         *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *self);
 const gchar         *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *self);
-gboolean             mm_simple_connect_properties_get_current_bands (MMSimpleConnectProperties *self,
-                                                                     const MMModemBand **bands,
-                                                                     guint *n_bands);
-gboolean             mm_simple_connect_properties_get_current_modes (MMSimpleConnectProperties *self,
-                                                                     MMModemMode *allowed,
-                                                                     MMModemMode *preferred);
 const gchar         *mm_simple_connect_properties_get_apn           (MMSimpleConnectProperties *self);
 MMBearerAllowedAuth  mm_simple_connect_properties_get_allowed_auth  (MMSimpleConnectProperties *self);
 const gchar         *mm_simple_connect_properties_get_user          (MMSimpleConnectProperties *self);
