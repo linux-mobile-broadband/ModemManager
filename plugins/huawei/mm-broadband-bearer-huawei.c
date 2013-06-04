@@ -225,10 +225,21 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
 
     switch (ctx->step) {
     case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
-        MMBearerIpFamily ip_type;
+        MMBearerIpFamily ip_family;
 
-        ip_type = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-        if (ip_type != MM_BEARER_IP_FAMILY_IPV4) {
+        ip_family = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+        if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
+            ip_family == MM_BEARER_IP_FAMILY_ANY) {
+            gchar *ip_family_str;
+
+            ip_family = mm_bearer_get_default_ip_family (MM_BEARER (ctx->self));
+            ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            mm_dbg ("No specific IP family requested, defaulting to %s",
+                    ip_family_str);
+            g_free (ip_family_str);
+        }
+
+        if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_UNSUPPORTED,
