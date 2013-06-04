@@ -1446,31 +1446,14 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
             }
         }
 
-        /* If no expected ID found, error */
-        if (mode == MM_MODEM_MODE_NONE) {
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Invalid list of supported networks: '%s'",
-                                 response);
-        } else {
-            /* Keep our results */
+        /* If no expected ID found, log error */
+        if (mode == MM_MODEM_MODE_NONE)
+            mm_dbg ("Invalid list of supported networks reported by WS46=?: '%s'", response);
+        else
             ctx->mode |= mode;
-        }
-    }
-
-    /* Process error, which may come either directly from the AT command or from
-     * our parsing logic. In this case, always fallback to some default guesses. */
-    if (error) {
-        mm_dbg ("Generic query of supported 3GPP networks failed: '%s'", error->message);
+    } else {
+        mm_dbg ("Generic query of supported 3GPP networks with WS46=? failed: '%s'", error->message);
         g_error_free (error);
-
-        /* If PS supported, assume we can do both 2G and 3G, even if it may not really
-         * be true. This is the generic implementation anyway, plugins can use modem
-         * specific commands to check which technologies are supported. */
-        if (ctx->self->priv->modem_3gpp_ps_network_supported) {
-            mm_dbg ("Assuming device allows (3GPP) 2G/3G network modes");
-            ctx->mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        }
     }
 
     /* Now keep on with the loading, we may need CDMA-specific checks */
@@ -1536,10 +1519,6 @@ modem_load_supported_modes (MMIfaceModem *self,
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
         /* Run +WS46=? in order to know if the modem is 2G-only or 2G/3G */
         ctx->run_ws46 = TRUE;
-
-        /* If the modem has LTE caps, it does 4G */
-        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-            ctx->mode |= MM_MODEM_MODE_4G;
     }
 
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
