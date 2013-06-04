@@ -1131,6 +1131,7 @@ connect (MMBearer *self,
     MMBaseModem *modem = NULL;
     MMAtSerialPort *primary;
     ConnectContext *ctx;
+    const gchar *apn;
 
     /* Don't try to connect if already connected */
     if (MM_BROADBAND_BEARER (self)->priv->port) {
@@ -1177,6 +1178,54 @@ connect (MMBearer *self,
         return;
     }
 
+    /* Default bearer connection logic
+     *
+     * 1) 3GPP-only modem:
+     *     1a) If no APN given, error.
+     *     1b) If APN given, run 3GPP connection logic.
+     *     1c) If APN given, but empty (""), run 3GPP connection logic and try
+     *         to use default subscription APN.
+     *
+     * 2) 3GPP2-only modem:
+     *     2a) If no APN given, run CDMA connection logic.
+     *     2b) If APN given, error.
+     *
+     * 3) 3GPP and 3GPP2 modem:
+     *     3a) If no APN given, run CDMA connection logic.
+     *     3b) If APN given, run 3GPP connection logic.
+     *     1c) If APN given, but empty (""), run 3GPP connection logic and try
+     *         to use default subscription APN.
+     */
+
+    /* Check whether we have an APN */
+    apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (self)));
+
+    /* Is this a 3GPP only modem and no APN was given? If so, error */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "3GPP connection logic requires APN setting");
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Is this a 3GPP2 only modem and APN was given? If so, error */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem)) && apn) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "3GPP2 doesn't support APN setting");
+        g_object_unref (modem);
+        return;
+    }
+
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
@@ -1185,8 +1234,9 @@ connect (MMBearer *self,
                                              user_data,
                                              connect);
 
-    /* If the modem has 3GPP capabilities, launch 3GPP-based connection */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem))) {
+    /* If the modem has 3GPP capabilities and an APN, launch 3GPP-based connection */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) && apn) {
+        mm_dbg ("Launching 3GPP connection attempt with APN '%s'", apn);
         MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp (
             MM_BROADBAND_BEARER (self),
             MM_BROADBAND_MODEM (modem),
@@ -1199,8 +1249,9 @@ connect (MMBearer *self,
         return;
     }
 
-    /* Otherwise, launch CDMA-specific connection */
-    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem))) {
+    /* Otherwise, launch CDMA-specific connection. */
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) && !apn) {
+        mm_dbg ("Launching 3GPP2 connection attempt");
         MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma (
             MM_BROADBAND_BEARER (self),
             MM_BROADBAND_MODEM (modem),

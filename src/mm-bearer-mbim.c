@@ -26,6 +26,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-iface-modem.h"
 #include "mm-modem-helpers-mbim.h"
 #include "mm-serial-enums-types.h"
 #include "mm-bearer-mbim.h"
@@ -777,9 +778,34 @@ _connect (MMBearer *self,
     ConnectContext *ctx;
     MMPort *data;
     MbimDevice *device;
+    MMBaseModem *modem  = NULL;
+    const gchar *apn;
 
     if (!peek_ports (self, &device, &data, callback, user_data))
         return;
+
+    g_object_get (self,
+                  MM_BEARER_MODEM, &modem,
+                  NULL);
+    g_assert (modem);
+
+    /* Check whether we have an APN */
+    apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (self)));
+
+    /* Is this a 3GPP only modem and no APN was given? If so, error */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "3GPP connection logic requires APN setting");
+        g_object_unref (modem);
+        return;
+    }
+
+    g_object_unref (modem);
 
     mm_dbg ("Launching connection with data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (data)),

@@ -26,6 +26,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-iface-modem.h"
 #include "mm-bearer-qmi.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-serial-enums-types.h"
@@ -788,6 +789,7 @@ _connect (MMBearer *self,
     MMPort *data;
     MMQmiPort *qmi;
     GError *error = NULL;
+    const gchar *apn;
 
     g_object_get (self,
                   MM_BEARER_MODEM, &modem,
@@ -817,6 +819,35 @@ _connect (MMBearer *self,
             user_data,
             error);
         g_object_unref (data);
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Check whether we have an APN */
+    apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (self)));
+
+    /* Is this a 3GPP only modem and no APN was given? If so, error */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "3GPP connection logic requires APN setting");
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Is this a 3GPP2 only modem and APN was given? If so, error */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem)) && apn) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "3GPP2 doesn't support APN setting");
         g_object_unref (modem);
         return;
     }
