@@ -1276,6 +1276,7 @@ typedef struct {
     GSimpleAsyncResult *result;
     MMBroadbandModem *self;
     MMModemMode mode;
+    gboolean run_cnti;
     gboolean run_ws46;
     gboolean run_gcap;
 } LoadSupportedModesContext;
@@ -1462,8 +1463,71 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
 }
 
 static void
+supported_modes_cnti_ready (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            LoadSupportedModesContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!error) {
+        MMModemMode mode = MM_MODEM_MODE_NONE;
+        gchar *lower;
+
+        lower = g_ascii_strdown (response, -1);
+
+        if (g_strstr_len (lower, -1, "gsm") ||
+            g_strstr_len (lower, -1, "gprs") ||
+            g_strstr_len (lower, -1, "edge")) {
+            mm_dbg ("Device allows (3GPP) 2G networks");
+            mode |= MM_MODEM_MODE_2G;
+        }
+
+        if (g_strstr_len (lower, -1, "umts") ||
+            g_strstr_len (lower, -1, "hsdpa") ||
+            g_strstr_len (lower, -1, "hsupa") ||
+            g_strstr_len (lower, -1, "hspa+")) {
+            mm_dbg ("Device allows (3GPP) 3G networks");
+            mode |= MM_MODEM_MODE_3G;
+        }
+
+        if (g_strstr_len (lower, -1, "lte")) {
+            mm_dbg ("Device allows (3GPP) 4G networks");
+            mode |= MM_MODEM_MODE_4G;
+        }
+
+        g_free (lower);
+
+        /* If no expected ID found, log error */
+        if (mode == MM_MODEM_MODE_NONE)
+            mm_dbg ("Invalid list of supported networks reported by *CNTI: '%s'", response);
+        else
+            ctx->mode |= mode;
+    } else {
+        mm_dbg ("Generic query of supported 3GPP networks with *CNTI failed: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Now keep on with the loading */
+    ctx->run_cnti = FALSE;
+    load_supported_modes_step (ctx);
+}
+
+static void
 load_supported_modes_step (LoadSupportedModesContext *ctx)
 {
+    if (ctx->run_cnti) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (ctx->self),
+            "*CNTI=2",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)supported_modes_cnti_ready,
+            ctx);
+        return;
+    }
+
     if (ctx->run_ws46) {
         mm_base_modem_at_command (
             MM_BASE_MODEM (ctx->self),
@@ -1517,8 +1581,9 @@ modem_load_supported_modes (MMIfaceModem *self,
     ctx->mode = MM_MODEM_MODE_NONE;
 
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
-        /* Run +WS46=? in order to know if the modem is 2G-only or 2G/3G */
+        /* Run +WS46=? and *CNTI=2 */
         ctx->run_ws46 = TRUE;
+        ctx->run_cnti = TRUE;
     }
 
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
