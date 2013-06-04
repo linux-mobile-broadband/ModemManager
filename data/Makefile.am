@@ -33,17 +33,10 @@ endif
 
 # DBus Activation file
 dbusactivationdir = $(datadir)/dbus-1/system-services
+dbusactivation_in_files = org.freedesktop.ModemManager1.service.in
+org.freedesktop.ModemManager1.service: org.freedesktop.ModemManager1.service.in
+	$(edit) $< >$@
 dbusactivation_DATA = org.freedesktop.ModemManager1.service
-dbusactivation_in_files_systemd = org.freedesktop.ModemManager1.service.systemd.in
-dbusactivation_in_files_nosystemd = org.freedesktop.ModemManager1.service.nosystemd.in
-if HAVE_SYSTEMD
-org.freedesktop.ModemManager1.service: org.freedesktop.ModemManager1.service.systemd.in
-	$(edit) $< >$@
-else
-org.freedesktop.ModemManager1.service: org.freedesktop.ModemManager1.service.nosystemd.in
-	$(edit) $< >$@
-endif
-
 
 # Icon
 icondir=${datadir}/icons/hicolor/22x22/apps

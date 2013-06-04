@@ -10,4 +10,3 @@ StandardError=null
 
 [Install]
 WantedBy=multi-user.target
-Alias=dbus-org.freedesktop.ModemManager1.service
