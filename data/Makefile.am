@@ -84,8 +84,7 @@ endif
 
 EXTRA_DIST = \
 	$(systemdsystemunit_in_files) \
-	$(dbusactivation_in_files_systemd) \
-	$(dbusactivation_in_files_nosystemd) \
+	$(dbusactivation_in_files) \
 	$(dbusservice_file_polkit) \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
