@@ -285,10 +285,11 @@ device_added (MMManager *manager,
         goto out;
     }
 
-    /* If the physdev is a 'platform' device that's not whitelisted, ignore it */
+    /* If the physdev is a 'platform' or 'pnp' device that's not whitelisted, ignore it */
     physdev_subsys = g_udev_device_get_subsystem (physdev);
     if (   physdev_subsys
-        && !strcmp (physdev_subsys, "platform")
+        && (   g_str_equal (physdev_subsys, "platform")
+            || g_str_equal (physdev_subsys, "pnp"))
         && !g_udev_device_get_property_as_boolean (physdev, "ID_MM_PLATFORM_DRIVER_PROBE")) {
         mm_dbg ("(%s/%s): port's parent platform driver is not whitelisted", subsys, name);
         goto out;
