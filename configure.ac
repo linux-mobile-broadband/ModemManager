@@ -99,22 +99,51 @@ fi
 AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
 
 # PolicyKit
-AC_ARG_WITH(polkit, AS_HELP_STRING([--with-polkit], [Build with PolicyKit support]))
-AM_CONDITIONAL(WITH_POLKIT, test "x$with_polkit" = "xyes")
-case $with_polkit in
-    yes)
-        with_polkit=yes
-	PKG_CHECK_MODULES(POLKIT, polkit-gobject-1 >= 0.97)
-	AC_DEFINE(WITH_POLKIT, 1, [Define if you want to use PolicyKit])
-	AC_SUBST(POLKIT_CFLAGS)
-	AC_SUBST(POLKIT_LIBS)
+PKG_CHECK_MODULES(POLKIT, [polkit-gobject-1 >= 0.97], [have_polkit=yes],[have_polkit=no])
+AC_ARG_WITH(polkit,
+            AS_HELP_STRING([--with-polkit=(strict|permissive|none)],
+                           [Enable PolicyKit support [[default=auto]]]),,
+            [with_polkit=auto])
+# Handle 'auto' ('strict' if polkit found, 'none' otherwise),
+#  'yes' ('strict') and 'no' ('none')
+if test "x$with_polkit" = "xauto"; then
+	if test "x$have_polkit" = "xno"; then
+        with_polkit="none"
+    else
+        with_polkit="strict"
+    fi
+elif test "x$with_polkit" = "xno"; then
+    with_polkit=none
+elif test "x$with_polkit" = "xyes"; then
+    with_polkit=strict
+fi
+# Build policies context
+if test "x$with_polkit" = "xnone"; then
+    AC_DEFINE(WITH_POLKIT, 0, [Define if you have PolicyKit support])
+else
+	if test "x$have_polkit" = "xno"; then
+		AC_MSG_ERROR(PolicyKit development headers are required)
+	fi
 
-	AM_GLIB_GNU_GETTEXT
-        ;;
-    *)
-        with_polkit=no
-        ;;
-esac
+    case "x$with_polkit" in
+        "xpermissive")
+            MM_DEFAULT_USER_POLICY="yes"
+            ;;
+        "xstrict")
+            MM_DEFAULT_USER_POLICY="auth_self_keep"
+            ;;
+        *)
+            AC_MSG_ERROR([Wrong value for --with-polkit: $with_polkit])
+            ;;
+    esac
+
+    AC_DEFINE(WITH_POLKIT, 1, [Define if you have PolicyKit support])
+    AC_SUBST(POLKIT_CFLAGS)
+    AC_SUBST(POLKIT_LIBS)
+    AC_SUBST(MM_DEFAULT_USER_POLICY)
+fi
+
+AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xnone" ])
 
 # PPPD
 AC_CHECK_HEADERS(pppd/pppd.h, have_pppd_headers="yes", have_pppd_headers="no")
@@ -234,7 +263,7 @@ Makefile
 data/Makefile
 data/ModemManager.pc
 data/mm-glib.pc
-data/org.freedesktop.ModemManager1.policy
+data/org.freedesktop.ModemManager1.policy.in
 include/Makefile
 build-aux/Makefile
 libqcdm/Makefile

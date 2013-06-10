@@ -58,10 +58,10 @@ diagrams = \
 
 
 # Polkit
-dist_polkit_policy_in_files = org.freedesktop.ModemManager1.policy.in
+polkit_policy_in_in_files = org.freedesktop.ModemManager1.policy.in.in
 if WITH_POLKIT
 polkit_policydir = $(datadir)/polkit-1/actions
-dist_polkit_policy_DATA = $(dist_polkit_policy_in_files:.policy.in=.policy)
+polkit_policy_DATA = $(polkit_policy_in_in_files:.policy.in.in=.policy)
 @INTLTOOL_POLICY_RULE@
 endif
 
@@ -75,7 +75,8 @@ pkgconfig_DATA = \
 
 DISTCLEANFILES = \
 	$(dbusactivation_DATA) \
-	$(dbusservice_DATA)
+	$(dbusservice_DATA) \
+	$(polkit_policy_DATA)
 
 if HAVE_SYSTEMD
 DISTCLEANFILES += $(systemdsystemunit_DATA)
@@ -88,6 +89,6 @@ EXTRA_DIST = \
 	$(dbusservice_file_polkit) \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
-	$(dist_polkit_policy_in_files) \
+	$(polkit_policy_in_in_files) \
 	$(logos) \
 	$(diagrams)

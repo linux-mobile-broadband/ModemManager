@@ -23,7 +23,7 @@
     <_message>System policy prevents unlocking or controlling the mobile broadband device.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>auth_self_keep</allow_active>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
     </defaults>
   </action>
 
@@ -32,7 +32,7 @@
     <_message>System policy prevents adding, modifying, or deleting this device's contacts.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>auth_self_keep</allow_active>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
     </defaults>
   </action>
 
@@ -41,7 +41,7 @@
     <_message>System policy prevents sending or maniuplating this device's text messages.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>auth_self_keep</allow_active>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
     </defaults>
   </action>
 
@@ -50,7 +50,7 @@
     <_message>System policy prevents enabling or viewing geographic location information.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>auth_self_keep</allow_active>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
     </defaults>
   </action>
 
