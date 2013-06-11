@@ -14,6 +14,7 @@
   <xi:include href="org.freedesktop.ModemManager1.Modem.Location.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Time.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
-  <xi:include href="org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
+
+  <!--xi:include href="wip-org.freedesktop.ModemManager1.Modem.Contacts.xml"/-->
 
 </tp:spec>

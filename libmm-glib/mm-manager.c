@@ -71,11 +71,11 @@ get_proxy_type (GDBusObjectManagerClient *manager,
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Location",       GSIZE_TO_POINTER (MM_TYPE_MODEM_LOCATION));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Time",           GSIZE_TO_POINTER (MM_TYPE_MODEM_TIME));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Firmware",       GSIZE_TO_POINTER (MM_TYPE_MODEM_FIRMWARE));
-        g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Contacts",       GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_CONTACTS_PROXY));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.ModemCdma",      GSIZE_TO_POINTER (MM_TYPE_MODEM_CDMA));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp",      GSIZE_TO_POINTER (MM_TYPE_MODEM_3GPP));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd", GSIZE_TO_POINTER (MM_TYPE_MODEM_3GPP_USSD));
         g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Simple",         GSIZE_TO_POINTER (MM_TYPE_MODEM_SIMPLE));
+        /* g_hash_table_insert (lookup_hash, "org.freedesktop.ModemManager1.Modem.Contacts",    GSIZE_TO_POINTER (MM_GDBUS_TYPE_MODEM_CONTACTS_PROXY)); */
         g_once_init_leave (&once_init_value, 1);
     }
 
