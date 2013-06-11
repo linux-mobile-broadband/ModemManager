@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <!--
- ModemManager 0.6 Interface Specification
+ ModemManager 0.8 Interface Specification
 
-   Copyright (C) 2008 Novell, Inc.
-   Copyright (C) 2008-2011 Red Hat, Inc.
-   Copyright (C) 2011 The Chromium OS Authors
-   Copyright (C) 2011 Google, Inc.
+   Copyright (C) 2011-2013 Red Hat, Inc.
+   Copyright (C) 2011-2013 Google, Inc.
+   Copyright (C) 2011-2013 Lanedo GmbH
 -->
 
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
