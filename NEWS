@@ -3,7 +3,7 @@ Overview of changes in ModemManager 0.8.0
 
 - More flexible D-Bus API that accounts for the capabilities of modern devices
 - Native support for Gobi and QMI-based Qualcomm devices via libqmi
+- Native support for MBIM-based devices via libmbim
 - Preliminary support for GPS-based Location Services with some devices
 - More complete messaging API
 - Fully-featured command-line client (mmcli)
-
