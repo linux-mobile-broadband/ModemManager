@@ -1,0 +1,156 @@
+<?xml version="1.0"?>
+<!DOCTYPE part PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+]>
+<part id="ref-migrating" xmlns:xi="http://www.w3.org/2003/XInclude">
+  <title>Migrating from ModemManager 0.6 to ModemManager 0.8</title>
+  <partintro>
+    <para>
+      ModemManager 0.8 is a new major version of ModemManager that breaks both
+      API and ABI compared to previous versions. These changes allow better
+      managing new types of devices (e.g. those with multiple capabilities),
+      or those not based in AT commands for operation (e.g. QMI or MBIM modems).
+    </para>
+    <para>
+      This section provides an introduction to the changes done in the DBus interface
+      with respect to the main operations performed with modems through ModemManager.
+    </para>
+  </partintro>
+
+  <chapter>
+    <section>
+      <title>Listing available modems</title>
+      <para>
+        The D-Bus name <literal>org.freedesktop.ModemManager1</literal>
+        on the system bus is the new name used by the ModemManager 0.8 daemon, and it
+        implements several standard DBus interfaces, including the new
+        <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-objectmanager">
+          <literal>org.freedesktop.DBus.ObjectManager</literal>
+        </ulink>
+        interface, which allows to list available modem objects and get notifications
+        where new ones are added or when existing ones are removed. There are therefore
+        neither a custom method to enumerate devices as in the old 0.6 interface, nor
+        custom signals to notify about added or removed modems.
+      </para>
+      <para>
+        Modems which are found but are not usable will be flagged with a
+        <link linkend="MM-MODEM-STATE-FAILED:CAPS"><constant>MM_MODEM_STATE_FAILED</constant></link>
+        state in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem.State">
+          <literal>State</literal>
+        </link>
+        property, and a more detailed reason about the failure will be given in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem.StateFailedReason">
+          <literal>StateFailedReason</literal>
+        </link>
+        property. The most common case of failure is to have the SIM missing in a modem which
+        requires one for operation.
+      </para>
+    </section>
+
+    <section>
+      <title>PIN unlocking</title>
+      <para>
+        The process of PIN unlocking the modem is now performed with the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Sim.SendPin">
+          <literal>SendPin()</literal>
+        </link>
+        method in the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Sim">
+          <literal>org.freedesktop.ModemManager1.Sim</literal>
+        </link>
+        interface.
+      </para>
+      <para>
+        The path of the SIM object is specified in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem.Sim">
+          <literal>Sim</literal>
+        </link>
+        property of the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Modem">
+          <literal>org.freedesktop.ModemManager1.Modem</literal>
+        </link>
+        interface. If the modem doesn't have a SIM, no object path will be given.
+      </para>
+    </section>
+
+    <section>
+      <title>Connection and disconnection</title>
+      <para>
+        The process of requesting to connect or disconnect the modem is now split into
+        two operations: creating a bearer with
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">
+          <literal>CreateBearer()</literal>
+        </link>
+        in the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Modem">
+          <literal>org.freedesktop.ModemManager1.Modem</literal>
+        </link>
+        interface and getting the bearer connected with
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Bearer.Connect">
+          <literal>Connect()</literal>
+        </link>
+        in the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Bearer">
+          <literal>org.freedesktop.ModemManager1.Bearer</literal>
+        </link>
+        interface. These two steps are equivalent to the old <literal>Connect()</literal>
+        method in the previous <literal>org.freedesktop.ModemManager.Modem</literal>
+        interface.
+      </para>
+      <para>
+        The old <literal>Disconnect()</literal>
+        method in the previous <literal>org.freedesktop.ModemManager.Modem</literal>
+        interface is therefore also applied in a per-bearer basis through the new
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Bearer.Disconnect">
+          <literal>Disconnect()</literal>
+        </link>
+        in the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Bearer">
+          <literal>org.freedesktop.ModemManager1.Bearer</literal>
+        </link>
+        interface.
+      </para>
+      <para>
+        This logic of splitting the connection logic allows ModemManager to create
+        multiple bearers that may be connected to e.g. different access points (if
+        the modem allows it).
+      </para>
+    </section>
+
+    <section>
+      <title>Simple connection</title>
+      <para>
+        In order to simplify the whole sequence to get the modem connected, ModemManager
+        still exposes a Simple interface, renamed as:
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Simple">
+          <literal>org.freedesktop.ModemManager1.Modem.Simple</literal>
+          </link>.
+      </para>
+      <para>
+        The
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">
+          <literal>Connect()</literal>
+        </link>
+        method will create a single bearer with the parameters specified in the call an get
+        it connected, while the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Disconnect">
+          <literal>Disconnect()</literal>
+        </link>
+        method will disconnect all available bearers.
+      </para>
+      <para>
+        One of the main differences with respect to the 0.6 interface, is that
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">
+          <literal>Connect()</literal>
+        </link>
+        doesn't support to change allowed modes or bands. Instead, these operations should
+        be done through the methods in the
+        <link linkend="gdbus-org.freedesktop.ModemManager1.Modem">
+          <literal>org.freedesktop.ModemManager1.Modem</literal>
+        </link>
+        interface.
+      </para>
+    </section>
+  </chapter>
+</part>

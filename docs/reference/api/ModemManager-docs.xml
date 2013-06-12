@@ -44,6 +44,7 @@
       <year>2010</year>
       <year>2011</year>
       <year>2012</year>
+      <year>2013</year>
       <holder>The ModemManager Authors</holder>
     </copyright>
 
@@ -74,6 +75,9 @@
 
   <!-- Part 2, DBus reference -->
   <xi:include href="xml/ModemManager-dbus-reference.xml"/>
+
+  <!-- Part 3, Migration reference -->
+  <xi:include href="xml/ModemManager-migration-reference.xml"/>
 
   <index>
     <title>Index</title>
