@@ -1,6 +1,13 @@
-AC_PREREQ([2.60])
+AC_PREREQ([2.63])
 
-AC_INIT([ModemManager],[0.7.991],[dcbw@redhat.com],[ModemManager])
+dnl The MM version number
+m4_define([mm_major_version], [0])
+m4_define([mm_minor_version], [7])
+m4_define([mm_micro_version], [991])
+m4_define([mm_version],
+          [mm_major_version.mm_minor_version.mm_micro_version])
+
+AC_INIT([ModemManager],[mm_version],[dcbw@redhat.com],[ModemManager])
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_MAINTAINER_MODE([enable])
@@ -20,6 +27,16 @@ AC_PROG_INSTALL
 dnl Initialize libtool
 LT_PREREQ([2.2])
 LT_INIT
+
+dnl Version stuff
+MM_MAJOR_VERSION=mm_major_version
+MM_MINOR_VERSION=mm_minor_version
+MM_MICRO_VERSION=mm_micro_version
+MM_VERSION=mm_version
+AC_SUBST(MM_MAJOR_VERSION)
+AC_SUBST(MM_MINOR_VERSION)
+AC_SUBST(MM_MICRO_VERSION)
+AC_SUBST(MM_VERSION)
 
 dnl
 dnl Documentation
@@ -166,7 +183,7 @@ AC_SUBST(PPPD_PLUGIN_DIR)
 
 
 dnl
-dnl Tests
+dnl Unit tests
 dnl
 AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build ModemManager tests]))
 AM_CONDITIONAL(WITH_TESTS, test "x$with_tests" = "xyes")
@@ -265,6 +282,7 @@ data/ModemManager.pc
 data/mm-glib.pc
 data/org.freedesktop.ModemManager1.policy.in
 include/Makefile
+include/ModemManager-version.h
 build-aux/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile

@@ -28,6 +28,8 @@ libtool
 callouts/mm-modem-probe
 test/lsudev
 
+include/ModemManager-version.h
+
 libmm-glib/generated/mm-gdbus-*.[ch]
 libmm-glib/generated/mm-enums-types.[ch]
 libmm-glib/generated/mm-errors-types.[ch]

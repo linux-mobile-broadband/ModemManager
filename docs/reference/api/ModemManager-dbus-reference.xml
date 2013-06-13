@@ -75,12 +75,6 @@
     </section>
   </chapter>
 
-  <chapter id="ref-dbus-common-types">
-    <title>Common types</title>
-    <xi:include href="mm-enums.xml"/>
-    <xi:include href="mm-errors.xml"/>
-  </chapter>
-
   <chapter id="ref-dbus-object-manager">
     <title>The <literal>/org/freedesktop/ModemManager1</literal> object</title>
     <para>

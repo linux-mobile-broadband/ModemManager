@@ -1,4 +1,13 @@
 <SECTION>
+<FILE>mm-version</FILE>
+<TITLE>Version checks</TITLE>
+MM_MAJOR_VERSION
+MM_MICRO_VERSION
+NM_MINOR_VERSION
+MM_CHECK_VERSION
+</SECTION>
+
+<SECTION>
 <FILE>mm-enums</FILE>
 <TITLE>Flags and Enumerations</TITLE>
 MMBearerIpFamily

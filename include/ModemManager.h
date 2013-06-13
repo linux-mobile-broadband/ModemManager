@@ -1,6 +1,6 @@
 /*
  * ModemManager Interface Specification
- * version 0.6
+ * version 0.8
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,8 +18,9 @@
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2012 Red Hat, Inc.
- * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2009 - 2013 Red Hat, Inc.
+ * Copyright (C) 2011 - 2013 Google, Inc.
+ * Copyright (C) 2011 - 2013 Lanedo Gmbh
  */
 
 #ifndef _MODEM_MANAGER_H_
@@ -36,5 +37,7 @@
 /* Public header with errors */
 #include <ModemManager-errors.h>
 
+/* Public header with version info */
+#include <ModemManager-version.h>
 
 #endif /*  _MODEM_MANAGER_H_ */

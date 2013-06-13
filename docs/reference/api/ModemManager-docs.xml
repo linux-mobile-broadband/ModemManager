@@ -73,6 +73,13 @@
   <!-- Part 1, overview -->
   <xi:include href="xml/ModemManager-overview.xml"/>
 
+  <part id="ref-common-types">
+    <title>Common types and definitions</title>
+    <xi:include href="xml/mm-version.xml"/>
+    <xi:include href="xml/mm-enums.xml"/>
+    <xi:include href="xml/mm-errors.xml"/>
+  </part>
+
   <!-- Part 2, DBus reference -->
   <xi:include href="xml/ModemManager-dbus-reference.xml"/>
 
