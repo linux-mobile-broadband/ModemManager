@@ -7,6 +7,19 @@ m4_define([mm_micro_version], [991])
 m4_define([mm_version],
           [mm_major_version.mm_minor_version.mm_micro_version])
 
+dnl libtool versioning for libmm-glib (-version-info c:r:a)
+dnl    If the interface is unchanged, but the implementation has changed or
+dnl        been fixed, then increment r.
+dnl    Otherwise, increment c and zero r.
+dnl        If the interface has grown (that is, the new library is compatible
+dnl            with old code), increment a.
+dnl        If the interface has changed in an incompatible way (that is,
+dnl            functions have changed or been removed), then zero a.
+m4_define([mm_glib_lt_current],  [0])
+m4_define([mm_glib_lt_revision], [0])
+m4_define([mm_glib_lt_age],      [0])
+
+
 AC_INIT([ModemManager],[mm_version],[dcbw@redhat.com],[ModemManager])
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -37,6 +50,14 @@ AC_SUBST(MM_MAJOR_VERSION)
 AC_SUBST(MM_MINOR_VERSION)
 AC_SUBST(MM_MICRO_VERSION)
 AC_SUBST(MM_VERSION)
+
+dnl libtool version stuff
+MM_GLIB_LT_CURRENT=mm_glib_lt_current
+MM_GLIB_LT_REVISION=mm_glib_lt_revision
+MM_GLIB_LT_AGE=mm_glib_lt_age
+AC_SUBST(MM_GLIB_LT_CURRENT)
+AC_SUBST(MM_GLIB_LT_REVISION)
+AC_SUBST(MM_GLIB_LT_AGE)
 
 dnl
 dnl Documentation
