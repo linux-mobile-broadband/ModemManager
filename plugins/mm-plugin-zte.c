@@ -19,6 +19,7 @@
 #include "mm-plugin-zte.h"
 #include "mm-modem-zte.h"
 #include "mm-generic-cdma.h"
+#include "mm-errors.h"
 
 G_DEFINE_TYPE (MMPluginZte, mm_plugin_zte, MM_TYPE_PLUGIN_BASE)
 
@@ -72,8 +73,15 @@ custom_init_response_cb (MMPluginBaseSupportsTask *task,
                          guint32 *out_level,
                          gpointer user_data)
 {
-    if (error)
+    if (error) {
+        /* If we've tried twice and the error is a timeout just stop sending
+         * the custom init because the port probably isn't an AT one.
+         */
+        if (tries >= 2 && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            return FALSE;
+
         return tries <= 4 ? TRUE : FALSE;
+    }
 
     /* No error, assume success */
     return FALSE;
