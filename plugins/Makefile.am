@@ -1,3 +1,4 @@
+include $(top_srcdir)/gtester.make
 
 # Common CPPFLAGS and LDFLAGS
 
@@ -29,6 +30,9 @@ endif
 # UDev rules
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA =
+
+# Unit tests
+noinst_PROGRAMS =
 
 ########################################
 
@@ -104,14 +108,27 @@ libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_huawei_la_SOURCES = \
 	huawei/mm-plugin-huawei.c \
 	huawei/mm-plugin-huawei.h \
+	huawei/mm-modem-helpers-huawei.c \
+	huawei/mm-modem-helpers-huawei.h \
 	huawei/mm-broadband-modem-huawei.c \
 	huawei/mm-broadband-modem-huawei.h \
 	huawei/mm-broadband-bearer-huawei.c \
 	huawei/mm-broadband-bearer-huawei.h
-
 libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 udevrules_DATA += huawei/77-mm-huawei-net-port-types.rules
+
+noinst_PROGRAMS += test-modem-helpers-huawei
+test_modem_helpers_huawei_SOURCES = \
+	huawei/mm-modem-helpers-huawei.c \
+	huawei/mm-modem-helpers-huawei.h \
+	huawei/tests/test-modem-helpers-huawei.c
+test_modem_helpers_huawei_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/huawei \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_huawei_LDFLAGS = $(top_builddir)/libmm-glib/libmm-glib.la
+
 
 # MBM
 libmm_plugin_mbm_la_SOURCES = \
@@ -353,6 +370,10 @@ libmm_plugin_telit_la_SOURCES = \
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
+
 # Additional files to include in the distribution
 EXTRA_DIST = \
 	$(udevrules_DATA)
+
+# Unit tests
+TEST_PROGS += $(noinst_PROGRAMS)
