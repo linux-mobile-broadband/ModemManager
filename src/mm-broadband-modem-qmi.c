@@ -47,6 +47,7 @@ static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
+static MMIfaceModemMessaging *iface_modem_messaging_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
@@ -95,6 +96,7 @@ struct _MMBroadbandModemQmiPrivate {
     gpointer activation_ctx;
 
     /* Messaging helpers */
+    gboolean messaging_fallback_at;
     gboolean messaging_unsolicited_events_enabled;
     gboolean messaging_unsolicited_events_setup;
     guint messaging_event_report_indication_id;
@@ -6234,12 +6236,25 @@ messaging_check_support_finish (MMIfaceModemMessaging *self,
 }
 
 static void
+parent_messaging_check_support_ready (MMIfaceModemMessaging *_self,
+                                      GAsyncResult *res,
+                                      GSimpleAsyncResult *simple)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    self->priv->messaging_fallback_at = iface_modem_messaging_parent->check_support_finish (_self, res, NULL);
+
+    g_simple_async_result_set_op_res_gboolean (simple, self->priv->messaging_fallback_at);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
 messaging_check_support (MMIfaceModemMessaging *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    gboolean supported;
     MMQmiPort *port;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -6248,25 +6263,27 @@ messaging_check_support (MMIfaceModemMessaging *self,
                                         messaging_check_support);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
-    if (!port)
-        supported = FALSE;
-    else
-        /* If we have support for the WMS client, messaging is supported */
-        supported = !!mm_qmi_port_peek_client (port,
-                                               QMI_SERVICE_WMS,
-                                               MM_QMI_PORT_FLAG_DEFAULT);
+    /* If we have support for the WMS client, messaging is supported */
+    if (!port || !mm_qmi_port_peek_client (port, QMI_SERVICE_WMS, MM_QMI_PORT_FLAG_DEFAULT)) {
+        /* Try to fallback to AT support */
+        iface_modem_messaging_parent->check_support (
+            self,
+            (GAsyncReadyCallback)parent_messaging_check_support_ready,
+            result);
+        return;
+    }
 
     /* We only handle 3GPP messaging (PDU based) currently, so just ignore
      * CDMA-only QMI modems */
-    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self)) && supported) {
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
         mm_dbg ("Messaging capabilities supported by this modem, "
                 "but 3GPP2 messaging not supported yet by ModemManager");
-        supported = FALSE;
-    } else
-        mm_dbg ("Messaging capabilities %s by this modem",
-                supported ? "supported" : "not supported");
+        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+    } else {
+        mm_dbg ("Messaging capabilities supported");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    }
 
-    g_simple_async_result_set_op_res_gboolean (result, supported);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -6275,29 +6292,44 @@ messaging_check_support (MMIfaceModemMessaging *self,
 /* Load supported storages (Messaging interface) */
 
 static gboolean
-messaging_load_supported_storages_finish (MMIfaceModemMessaging *self,
+messaging_load_supported_storages_finish (MMIfaceModemMessaging *_self,
                                           GAsyncResult *res,
                                           GArray **mem1,
                                           GArray **mem2,
                                           GArray **mem3,
                                           GError **error)
 {
-    MMSmsStorage supported [2] = { MM_SMS_STORAGE_SM, MM_SMS_STORAGE_ME };
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    MMSmsStorage supported;
 
-    *mem1 = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), 2),
-                                 supported, 2);
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->load_supported_storages_finish (_self, res, mem1, mem2, mem3, error);
+    }
+
+    *mem1 = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), 2);
+    supported = MM_SMS_STORAGE_SM;
+    g_array_append_val (*mem1, supported);
+    supported = MM_SMS_STORAGE_ME;
+    g_array_append_val (*mem1, supported);
     *mem2 = g_array_ref (*mem1);
     *mem3 = g_array_ref (*mem1);
-
     return TRUE;
 }
 
 static void
-messaging_load_supported_storages (MMIfaceModemMessaging *self,
+messaging_load_supported_storages (MMIfaceModemMessaging *_self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     GSimpleAsyncResult *result;
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        iface_modem_messaging_parent->load_supported_storages (_self, callback, user_data);
+        return;
+    }
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -6309,13 +6341,61 @@ messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Setup SMS format (Messaging interface) */
+
+static gboolean
+modem_messaging_setup_sms_format_finish (MMIfaceModemMessaging *_self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->setup_sms_format_finish (_self, res, error);
+    }
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_messaging_setup_sms_format (MMIfaceModemMessaging *_self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GSimpleAsyncResult *result;
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->setup_sms_format (_self, callback, user_data);
+    }
+
+    /* noop */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_setup_sms_format);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Set default storage (Messaging interface) */
 
 static gboolean
-messaging_set_default_storage_finish (MMIfaceModemMessaging *self,
+messaging_set_default_storage_finish (MMIfaceModemMessaging *_self,
                                       GAsyncResult *res,
                                       GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->set_default_storage_finish (_self, res, error);
+    }
+
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -6346,16 +6426,23 @@ wms_set_routes_ready (QmiClientWms *client,
 }
 
 static void
-messaging_set_default_storage (MMIfaceModemMessaging *self,
+messaging_set_default_storage (MMIfaceModemMessaging *_self,
                                MMSmsStorage storage,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     GSimpleAsyncResult *result;
     QmiClient *client = NULL;
     QmiMessageWmsSetRoutesInput *input;
     GArray *routes_array;
     QmiMessageWmsSetRoutesInputRouteListElement route;
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        iface_modem_messaging_parent->set_default_storage (_self, storage, callback, user_data);
+        return;
+    }
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
@@ -6432,10 +6519,17 @@ load_initial_sms_parts_context_complete_and_free (LoadInitialSmsPartsContext *ct
 }
 
 static gboolean
-load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
+load_initial_sms_parts_finish (MMIfaceModemMessaging *_self,
                                GAsyncResult *res,
                                GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->load_initial_sms_parts_finish (_self, res, error);
+    }
+
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -6693,13 +6787,19 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
 }
 
 static void
-load_initial_sms_parts (MMIfaceModemMessaging *self,
+load_initial_sms_parts (MMIfaceModemMessaging *_self,
                         MMSmsStorage storage,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     LoadInitialSmsPartsContext *ctx;
     QmiClient *client = NULL;
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->load_initial_sms_parts (_self, storage, callback, user_data);
+    }
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
@@ -6833,10 +6933,32 @@ messaging_event_report_indication_cb (QmiClientNas *client,
 }
 
 static gboolean
-messaging_setup_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *self,
-                                                   GAsyncResult *res,
-                                                   GError **error)
+messaging_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *_self,
+                                             GAsyncResult *res,
+                                             GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->cleanup_unsolicited_events_finish (_self, res, error);
+    }
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+messaging_setup_unsolicited_events_finish (MMIfaceModemMessaging *_self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->setup_unsolicited_events_finish (_self, res, error);
+    }
+
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -6891,10 +7013,17 @@ common_setup_cleanup_messaging_unsolicited_events (MMBroadbandModemQmi *self,
 }
 
 static void
-messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
+messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *_self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->cleanup_unsolicited_events (_self, callback, user_data);
+    }
+
     common_setup_cleanup_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
                                                        FALSE,
                                                        callback,
@@ -6902,10 +7031,17 @@ messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
 }
 
 static void
-messaging_setup_unsolicited_events (MMIfaceModemMessaging *self,
+messaging_setup_unsolicited_events (MMIfaceModemMessaging *_self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->setup_unsolicited_events (_self, callback, user_data);
+    }
+
     common_setup_cleanup_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
                                                        TRUE,
                                                        callback,
@@ -6933,10 +7069,32 @@ enable_messaging_unsolicited_events_context_complete_and_free (EnableMessagingUn
 }
 
 static gboolean
-messaging_enable_disable_unsolicited_events_finish (MMIfaceModemMessaging *self,
-                                                    GAsyncResult *res,
-                                                    GError **error)
+messaging_disable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
+                                             GAsyncResult *res,
+                                             GError **error)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->disable_unsolicited_events_finish (_self, res, error);
+    }
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
+                                            GAsyncResult *res,
+                                            GError **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->enable_unsolicited_events_finish (_self, res, error);
+    }
+
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
@@ -7019,10 +7177,17 @@ common_enable_disable_messaging_unsolicited_events (MMBroadbandModemQmi *self,
 }
 
 static void
-messaging_disable_unsolicited_events (MMIfaceModemMessaging *self,
+messaging_disable_unsolicited_events (MMIfaceModemMessaging *_self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->disable_unsolicited_events (_self, callback, user_data);
+    }
+
     common_enable_disable_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
                                                         FALSE,
                                                         callback,
@@ -7030,10 +7195,17 @@ messaging_disable_unsolicited_events (MMIfaceModemMessaging *self,
 }
 
 static void
-messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->enable_unsolicited_events (_self, callback, user_data);
+    }
+
     common_enable_disable_messaging_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
                                                         TRUE,
                                                         callback,
@@ -7044,8 +7216,15 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
 /* Create SMS (Messaging interface) */
 
 static MMSms *
-messaging_create_sms (MMIfaceModemMessaging *self)
+messaging_create_sms (MMIfaceModemMessaging *_self)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle fallback */
+    if (self->priv->messaging_fallback_at) {
+        return iface_modem_messaging_parent->create_sms (_self);
+    }
+
     return mm_sms_qmi_new (MM_BASE_MODEM (self));
 }
 
@@ -8625,24 +8804,26 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 static void
 iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
+    iface_modem_messaging_parent = g_type_interface_peek_parent (iface);
+
     iface->check_support = messaging_check_support;
     iface->check_support_finish = messaging_check_support_finish;
     iface->load_supported_storages = messaging_load_supported_storages;
     iface->load_supported_storages_finish = messaging_load_supported_storages_finish;
-    iface->setup_sms_format = NULL;
-    iface->setup_sms_format_finish = NULL;
+    iface->setup_sms_format = modem_messaging_setup_sms_format;
+    iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
     iface->set_default_storage = messaging_set_default_storage;
     iface->set_default_storage_finish = messaging_set_default_storage_finish;
     iface->load_initial_sms_parts = load_initial_sms_parts;
     iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
     iface->setup_unsolicited_events = messaging_setup_unsolicited_events;
-    iface->setup_unsolicited_events_finish = messaging_setup_cleanup_unsolicited_events_finish;
+    iface->setup_unsolicited_events_finish = messaging_setup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = messaging_cleanup_unsolicited_events;
-    iface->cleanup_unsolicited_events_finish = messaging_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events_finish = messaging_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
+    iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = messaging_disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = messaging_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events_finish = messaging_disable_unsolicited_events_finish;
     iface->create_sms = messaging_create_sms;
 }
 
