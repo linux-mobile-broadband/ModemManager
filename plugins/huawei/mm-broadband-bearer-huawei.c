@@ -29,6 +29,7 @@
 #include "mm-broadband-bearer-huawei.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-modem-helpers-huawei.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerHuawei, mm_broadband_bearer_huawei, MM_TYPE_BROADBAND_BEARER)
 
@@ -43,7 +44,7 @@ struct _MMBroadbandBearerHuaweiPrivate {
 typedef enum {
     CONNECT_3GPP_CONTEXT_STEP_FIRST = 0,
     CONNECT_3GPP_CONTEXT_STEP_NDISDUP,
-    CONNECT_3GPP_CONTEXT_STEP_DHCP,
+    CONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY,
     CONNECT_3GPP_CONTEXT_STEP_LAST
 } Connect3gppContextStep;
 
@@ -85,7 +86,7 @@ connect_3gpp_finish (MMBroadbandBearer *self,
 static void connect_3gpp_context_step (Connect3gppContext *ctx);
 
 static gboolean
-connect_retry_dhcp_check_cb (MMBroadbandBearerHuawei *self)
+connect_retry_ndisstatqry_check_cb (MMBroadbandBearerHuawei *self)
 {
     Connect3gppContext *ctx;
 
@@ -103,12 +104,17 @@ connect_retry_dhcp_check_cb (MMBroadbandBearerHuawei *self)
 }
 
 static void
-connect_dhcp_check_ready (MMBaseModem *modem,
-                          GAsyncResult *res,
-                          MMBroadbandBearerHuawei *self)
+connect_ndisstatqry_check_ready (MMBaseModem *modem,
+                                 GAsyncResult *res,
+                                 MMBroadbandBearerHuawei *self)
 {
     Connect3gppContext *ctx;
+    const gchar *response;
     GError *error = NULL;
+    gboolean ipv4_available;
+    gboolean ipv4_connected;
+    gboolean ipv6_available;
+    gboolean ipv6_connected;
 
     ctx = self->priv->connect_pending;
     g_assert (ctx != NULL);
@@ -116,31 +122,38 @@ connect_dhcp_check_ready (MMBaseModem *modem,
     /* Balance refcount */
     g_object_unref (self);
 
-    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        /* Only retry the DHCP check if we get a mobile equipment error, or if
-         * the command timed out. */
-        if (error->domain == MM_MOBILE_EQUIPMENT_ERROR ||
-            g_error_matches (error,
-                             MM_SERIAL_ERROR,
-                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            g_error_free (error);
-            /* Setup timeout to retry the same step */
-            g_timeout_add_seconds (1,
-                                   (GSourceFunc)connect_retry_dhcp_check_cb,
-                                   g_object_ref (self));
-            return;
-        }
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (!response ||
+        !mm_huawei_parse_ndisstatqry_response (response,
+                                               &ipv4_available,
+                                               &ipv4_connected,
+                                               &ipv6_available,
+                                               &ipv6_connected,
+                                               &error)) {
+        mm_dbg ("Modem doesn't properly support ^NDISSTATQRY command: %s", error->message);
+        g_error_free (error);
 
-        /* Fatal error happened; e.g. modem unplugged */
-        self->priv->connect_pending = NULL;
-        g_simple_async_result_take_error (ctx->result, error);
+        ctx->self->priv->connect_pending = NULL;
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_MOBILE_EQUIPMENT_ERROR,
+                                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                         "Connection attempt not supported");
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    /* Success! */
-    ctx->step++;
-    connect_3gpp_context_step (ctx);
+    /* Connected in IPv4? */
+    if (ipv4_available && ipv4_connected) {
+        /* Success! */
+        ctx->step++;
+        connect_3gpp_context_step (ctx);
+        return;
+    }
+
+    /* Setup timeout to retry the same step */
+    g_timeout_add_seconds (1,
+                           (GSourceFunc)connect_retry_ndisstatqry_check_cb,
+                           g_object_ref (self));
 }
 
 static void
@@ -287,7 +300,7 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         return;
     }
 
-    case CONNECT_3GPP_CONTEXT_STEP_DHCP:
+    case CONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY:
         /* Wait for dial up timeout, retries for 60 times
          * (1s between the retries, so it means 1 minute).
          * If too many retries, failed
@@ -307,12 +320,12 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         ctx->check_count++;
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
-                                       "^DHCP?",
+                                       "^NDISSTATQRY?",
                                        3,
                                        FALSE,
                                        FALSE,
                                        NULL,
-                                       (GAsyncReadyCallback)connect_dhcp_check_ready,
+                                       (GAsyncReadyCallback)connect_ndisstatqry_check_ready,
                                        g_object_ref (ctx->self));
         return;
 
@@ -389,7 +402,7 @@ connect_3gpp (MMBroadbandBearer *self,
 typedef enum {
     DISCONNECT_3GPP_CONTEXT_STEP_FIRST = 0,
     DISCONNECT_3GPP_CONTEXT_STEP_NDISDUP,
-    DISCONNECT_3GPP_CONTEXT_STEP_DHCP,
+    DISCONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY,
     DISCONNECT_3GPP_CONTEXT_STEP_LAST
 } Disconnect3gppContextStep;
 
@@ -424,7 +437,7 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
 static void disconnect_3gpp_context_step (Disconnect3gppContext *ctx);
 
 static gboolean
-disconnect_retry_dhcp_check_cb (MMBroadbandBearerHuawei *self)
+disconnect_retry_ndisstatqry_check_cb (MMBroadbandBearerHuawei *self)
 {
     Disconnect3gppContext *ctx;
 
@@ -441,11 +454,17 @@ disconnect_retry_dhcp_check_cb (MMBroadbandBearerHuawei *self)
 }
 
 static void
-disconnect_dhcp_check_ready (MMBaseModem *modem,
-                             GAsyncResult *res,
-                             MMBroadbandBearerHuawei *self)
+disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
+                                    GAsyncResult *res,
+                                    MMBroadbandBearerHuawei *self)
 {
     Disconnect3gppContext *ctx;
+    const gchar *response;
+    GError *error = NULL;
+    gboolean ipv4_available;
+    gboolean ipv4_connected;
+    gboolean ipv6_available;
+    gboolean ipv6_connected;
 
     ctx = self->priv->disconnect_pending;
     g_assert (ctx != NULL);
@@ -453,18 +472,38 @@ disconnect_dhcp_check_ready (MMBaseModem *modem,
     /* Balance refcount */
     g_object_unref (self);
 
-    /* If any response give, we're still connected */
-    if (mm_base_modem_at_command_full_finish (modem, res, NULL)) {
-        /* Setup timeout to retry the same step */
-        g_timeout_add_seconds (1,
-                               (GSourceFunc)disconnect_retry_dhcp_check_cb,
-                               g_object_ref (self));
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (!response ||
+        !mm_huawei_parse_ndisstatqry_response (response,
+                                               &ipv4_available,
+                                               &ipv4_connected,
+                                               &ipv6_available,
+                                               &ipv6_connected,
+                                               &error)) {
+        mm_dbg ("Modem doesn't properly support ^NDISSTATQRY command: %s", error->message);
+        g_error_free (error);
+
+        ctx->self->priv->connect_pending = NULL;
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_MOBILE_EQUIPMENT_ERROR,
+                                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                         "Disconnection attempt not supported");
+        disconnect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    /* Success! */
-    ctx->step++;
-    disconnect_3gpp_context_step (ctx);
+    /* Disconnected IPv4? */
+    if (ipv4_available && !ipv4_connected) {
+        /* Success! */
+        ctx->step++;
+        disconnect_3gpp_context_step (ctx);
+        return;
+    }
+
+    /* Setup timeout to retry the same step */
+    g_timeout_add_seconds (1,
+                           (GSourceFunc)disconnect_retry_ndisstatqry_check_cb,
+                           g_object_ref (self));
 }
 
 static void
@@ -517,7 +556,7 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
                                        g_object_ref (ctx->self));
         return;
 
-    case DISCONNECT_3GPP_CONTEXT_STEP_DHCP:
+    case DISCONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY:
         /* If too many retries (1s of wait between the retries), failed */
         if (ctx->check_count > 10) {
             /* Clear context */
@@ -534,12 +573,12 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
         ctx->check_count++;
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
-                                       "^DHCP?",
+                                       "^NDISSTATQRY?",
                                        3,
                                        FALSE,
                                        FALSE,
                                        NULL,
-                                       (GAsyncReadyCallback)disconnect_dhcp_check_ready,
+                                       (GAsyncReadyCallback)disconnect_ndisstatqry_check_ready,
                                        g_object_ref (ctx->self));
         return;
 
