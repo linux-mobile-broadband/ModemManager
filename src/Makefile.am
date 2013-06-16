@@ -258,6 +258,8 @@ endif
 # Additional MBIM support in ModemManager
 if WITH_MBIM
 ModemManager_SOURCES += \
+	mm-sms-mbim.h \
+	mm-sms-mbim.c \
 	mm-sim-mbim.h \
 	mm-sim-mbim.c \
 	mm-bearer-mbim.h \

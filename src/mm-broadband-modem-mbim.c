@@ -25,6 +25,7 @@
 #include "mm-broadband-modem-mbim.h"
 #include "mm-bearer-mbim.h"
 #include "mm-sim-mbim.h"
+#include "mm-sms-mbim.h"
 
 #include "ModemManager.h"
 #include "mm-log.h"
@@ -2310,6 +2311,15 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Create SMS (Messaging interface) */
+
+static MMSms *
+messaging_create_sms (MMIfaceModemMessaging *self)
+{
+    return mm_sms_mbim_new (MM_BASE_MODEM (self));
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -2472,7 +2482,7 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->enable_unsolicited_events_finish = NULL;
     iface->disable_unsolicited_events = NULL;
     iface->disable_unsolicited_events_finish = NULL;
-    iface->create_sms = NULL;
+    iface->create_sms = messaging_create_sms;
 }
 
 static void
