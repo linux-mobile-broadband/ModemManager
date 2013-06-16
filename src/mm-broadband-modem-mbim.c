@@ -34,13 +34,16 @@
 #include "mm-bearer-list.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-messaging.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init))
 
 typedef enum {
     PROCESS_NOTIFICATION_FLAG_NONE                 = 0,
@@ -2117,6 +2120,45 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Check support (Messaging interface) */
+
+static gboolean
+messaging_check_support_finish (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    /* no error expected here */
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+messaging_check_support (MMIfaceModemMessaging *_self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_check_support);
+
+    /* We only handle 3GPP messaging (PDU based) currently */
+    if (self->priv->caps_sms & MBIM_SMS_CAPS_PDU_RECEIVE &&
+        self->priv->caps_sms & MBIM_SMS_CAPS_PDU_SEND) {
+        mm_dbg ("Messaging capabilities supported");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    } else {
+        mm_dbg ("Messaging capabilities not supported by this modem");
+        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -2256,6 +2298,30 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* TODO: use MBIM_CID_VISIBLE_PROVIDERS */
     iface->scan_networks = NULL;
     iface->scan_networks_finish = NULL;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    iface->check_support = messaging_check_support;
+    iface->check_support_finish = messaging_check_support_finish;
+    iface->load_supported_storages = NULL;
+    iface->load_supported_storages_finish = NULL;
+    iface->setup_sms_format = NULL;
+    iface->setup_sms_format_finish = NULL;
+    iface->set_default_storage = NULL;
+    iface->set_default_storage_finish = NULL;
+    iface->load_initial_sms_parts = NULL;
+    iface->load_initial_sms_parts_finish = NULL;
+    iface->setup_unsolicited_events = NULL;
+    iface->setup_unsolicited_events_finish = NULL;
+    iface->cleanup_unsolicited_events = NULL;
+    iface->cleanup_unsolicited_events_finish = NULL;
+    iface->enable_unsolicited_events = NULL;
+    iface->enable_unsolicited_events_finish = NULL;
+    iface->disable_unsolicited_events = NULL;
+    iface->disable_unsolicited_events_finish = NULL;
+    iface->create_sms = NULL;
 }
 
 static void
