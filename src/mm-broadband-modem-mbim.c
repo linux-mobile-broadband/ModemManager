@@ -2196,6 +2196,120 @@ messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Load initial SMS parts */
+
+typedef struct {
+    MMBroadbandModemMbim *self;
+    GSimpleAsyncResult *result;
+} LoadInitialSmsPartsContext;
+
+static void
+load_initial_sms_parts_context_complete_and_free (LoadInitialSmsPartsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadInitialSmsPartsContext, ctx);
+}
+
+static gboolean
+load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+sms_read_query_ready (MbimDevice *device,
+                      GAsyncResult *res,
+                      LoadInitialSmsPartsContext *ctx)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    guint32 messages_count;
+    MbimSmsPduReadRecord **pdu_messages;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_sms_read_response_parse (
+            response,
+            NULL,
+            &messages_count,
+            &pdu_messages,
+            NULL, /* cdma_messages */
+            &error)) {
+        guint i;
+
+        for (i = 0; i < messages_count; i++) {
+            MbimSmsPduReadRecord *pdu = pdu_messages[i];
+            MMSmsPart *part;
+
+            part = mm_sms_part_new_from_binary_pdu (pdu->message_index,
+                                                    pdu->pdu_data,
+                                                    pdu->pdu_data_size,
+                                                    &error);
+            if (part) {
+                mm_dbg ("Correctly parsed PDU (%d)", pdu->message_index);
+                mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                                    part,
+                                                    mm_sms_state_from_mbim_message_status (pdu->message_status),
+                                                    MM_SMS_STORAGE_MT);
+            } else {
+                /* Don't treat the error as critical */
+                mm_dbg ("Error parsing PDU (%d): %s",
+                        pdu->message_index,
+                        error->message);
+                g_error_free (error);
+            }
+        }
+    } else
+        g_simple_async_result_take_error (ctx->result, error);
+
+    if (response)
+        mbim_message_unref (response);
+
+    load_initial_sms_parts_context_complete_and_free (ctx);
+}
+
+static void
+load_initial_sms_parts (MMIfaceModemMessaging *self,
+                        MMSmsStorage storage,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    LoadInitialSmsPartsContext *ctx;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    g_assert (storage == MM_SMS_STORAGE_MT);
+
+    ctx = g_slice_new0 (LoadInitialSmsPartsContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_initial_sms_parts);
+
+    mm_dbg ("loading SMS parts...");
+    message = mbim_message_sms_read_query_new (MBIM_SMS_FORMAT_PDU,
+                                               MBIM_SMS_FLAG_ALL,
+                                               0, /* message index, unused */
+                                               NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)sms_read_query_ready,
+                         ctx);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -2348,8 +2462,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_sms_format_finish = NULL;
     iface->set_default_storage = NULL;
     iface->set_default_storage_finish = NULL;
-    iface->load_initial_sms_parts = NULL;
-    iface->load_initial_sms_parts_finish = NULL;
+    iface->load_initial_sms_parts = load_initial_sms_parts;
+    iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
     iface->setup_unsolicited_events = NULL;
     iface->setup_unsolicited_events_finish = NULL;
     iface->cleanup_unsolicited_events = NULL;

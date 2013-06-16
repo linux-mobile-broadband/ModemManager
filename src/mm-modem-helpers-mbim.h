@@ -32,4 +32,9 @@ MMModemAccessTechnology mm_modem_access_technology_from_mbim_data_class (MbimDat
 
 GError *mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error);
 
+/*****************************************************************************/
+/* MBIM/SMS to MM translations */
+
+MMSmsState mm_sms_state_from_mbim_message_status (MbimSmsStatus status);
+
 #endif  /* MM_MODEM_HELPERS_MBIM_H */

@@ -186,3 +186,22 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
                             nw_error);
     }
 }
+
+/*****************************************************************************/
+
+MMSmsState
+mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
+{
+    switch (status) {
+    case MBIM_SMS_STATUS_NEW:
+        return MM_SMS_STATE_RECEIVED;
+    case MBIM_SMS_STATUS_OLD:
+        return MM_SMS_STATE_RECEIVED;
+    case MBIM_SMS_STATUS_DRAFT:
+        return MM_SMS_STATE_STORED;
+    case MBIM_SMS_STATUS_SENT:
+        return MM_SMS_STATE_SENT;
+    }
+
+    return MM_SMS_STATE_UNKNOWN;
+}
