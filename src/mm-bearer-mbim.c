@@ -548,9 +548,17 @@ packet_service_set_ready (MbimDevice *device,
     }
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
-        return;
+        /* Don't make NoDeviceSupport errors fatal; just try to keep on the
+         * connection sequence even with this error. */
+        if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NO_DEVICE_SUPPORT)) {
+            mm_dbg ("Device doesn't support packet service attach");
+            g_error_free (error);
+        } else {
+            /* All other errors are fatal */
+            g_simple_async_result_take_error (ctx->result, error);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
     }
 
     /* Keep on */
