@@ -1053,7 +1053,7 @@ set_property (GObject *object,
         break;
     }
     case PROP_DEFAULT_IP_FAMILY:
-        self->priv->default_ip_family = g_value_get_enum (value);
+        self->priv->default_ip_family = g_value_get_flags (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1086,7 +1086,7 @@ get_property (GObject *object,
         g_value_set_object (value, self->priv->config);
         break;
     case PROP_DEFAULT_IP_FAMILY:
-        g_value_set_enum (value, self->priv->default_ip_family);
+        g_value_set_flags (value, self->priv->default_ip_family);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1204,12 +1204,12 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_CONFIG, properties[PROP_CONFIG]);
 
     properties[PROP_DEFAULT_IP_FAMILY] =
-        g_param_spec_enum (MM_BEARER_DEFAULT_IP_FAMILY,
-                           "Bearer default IP family",
-                           "IP family to use for this bearer when no IP family is specified",
-                           MM_TYPE_BEARER_IP_FAMILY,
-                           MM_BEARER_IP_FAMILY_IPV4,
-                           G_PARAM_READWRITE);
+        g_param_spec_flags (MM_BEARER_DEFAULT_IP_FAMILY,
+                            "Bearer default IP family",
+                            "IP family to use for this bearer when no IP family is specified",
+                            MM_TYPE_BEARER_IP_FAMILY,
+                            MM_BEARER_IP_FAMILY_IPV4,
+                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_DEFAULT_IP_FAMILY, properties[PROP_DEFAULT_IP_FAMILY]);
 }
 
