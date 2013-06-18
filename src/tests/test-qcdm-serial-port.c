@@ -439,11 +439,7 @@ test_pty_cleanup (gpointer user_data)
     }
 }
 
-#if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;
-#else
-typedef void (*TCFunc)(void);
-#endif
 
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
 #define TESTCASE_PTY(t, d) g_test_create_case (#t, sizeof (*d), d, (TCFunc) test_pty_create, (TCFunc) t, (TCFunc) test_pty_cleanup)
