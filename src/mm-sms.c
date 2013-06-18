@@ -87,9 +87,6 @@ get_validity_relative (GVariant *tuple)
 
     if (type == MM_SMS_VALIDITY_TYPE_RELATIVE)
         value_integer = g_variant_get_uint32 (value);
-    else
-        /* Currently not supported other than relative */
-        g_warn_if_reached ();
 
     g_variant_unref (value);
 
