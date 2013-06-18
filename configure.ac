@@ -184,20 +184,6 @@ fi
 AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xnone" ])
 
 dnl
-dnl Unit tests
-dnl
-AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build ModemManager tests]))
-AM_CONDITIONAL(WITH_TESTS, test "x$with_tests" = "xyes")
-case $with_tests in
-    yes)
-        with_tests=yes
-        ;;
-    *)
-        with_tests=no
-        ;;
-esac
-
-dnl
 dnl MBIM support (auto by default)
 dnl
 AC_ARG_WITH(mbim, AS_HELP_STRING([--without-mbim], [Build without MBIM support]), [], [with_mbim=auto])
