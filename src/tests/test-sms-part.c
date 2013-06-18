@@ -842,6 +842,7 @@ _mm_log (const char *loc,
          const char *fmt,
          ...)
 {
+#if defined ENABLE_TEST_MESSAGE_TRACES
     /* Dummy log function */
     va_list args;
     gchar *msg;
@@ -851,6 +852,7 @@ _mm_log (const char *loc,
     va_end (args);
     g_print ("%s\n", msg);
     g_free (msg);
+#endif
 }
 
 int main (int argc, char **argv)
