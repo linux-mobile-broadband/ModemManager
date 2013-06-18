@@ -183,26 +183,6 @@ fi
 
 AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xnone" ])
 
-# PPPD
-AC_CHECK_HEADERS(pppd/pppd.h, have_pppd_headers="yes", have_pppd_headers="no")
-AM_CONDITIONAL(HAVE_PPPD_H, test "x$have_pppd_headers" = "xyes")
-case $have_pppd_headers in
-    yes) ;;
-    *)
-        have_pppd_headers=no
-        ;;
-esac
-
-AC_ARG_WITH([pppd-plugin-dir], AS_HELP_STRING([--with-pppd-plugin-dir=DIR], [path to the pppd plugins directory]))
-
-if test -n "$with_pppd_plugin_dir" ; then
-	PPPD_PLUGIN_DIR="$with_pppd_plugin_dir"
-else
-	PPPD_PLUGIN_DIR="${libdir}/pppd/2.4.5"
-fi
-AC_SUBST(PPPD_PLUGIN_DIR)
-
-
 dnl
 dnl Unit tests
 dnl
@@ -344,7 +324,6 @@ echo "
     udev base directory:     ${UDEV_BASE_DIR}
     systemd unit directory:  ${with_systemdsystemunitdir}
 
-    PPP-enabled tests:       ${have_pppd_headers}
     PolicyKit support:       ${with_polkit}
     Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
