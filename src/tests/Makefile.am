@@ -1,3 +1,4 @@
+include $(top_srcdir)/gtester.make
 
 noinst_PROGRAMS = \
 	test-modem-helpers \
@@ -9,6 +10,8 @@ noinst_PROGRAMS = \
 if WITH_QMI
 noinst_PROGRAMS += test-modem-helpers-qmi
 endif
+
+TEST_PROGS += $(noinst_PROGRAMS)
 
 ################
 
@@ -156,19 +159,4 @@ test_sms_part_LDADD = \
 if WITH_QMI
 test_sms_part_CPPFLAGS += $(QMI_CFLAGS)
 test_sms_part_LDADD += $(QMI_LIBS)
-endif
-
-################
-
-if WITH_TESTS
-
-check-local: $(noinst_PROGRAMS)
-	$(abs_builddir)/test-modem-helpers
-	$(abs_builddir)/test-charsets
-	$(abs_builddir)/test-qcdm-serial-port
-	$(abs_builddir)/test-sms-part
-if WITH_QMI
-	$(abs_builddir)/test-modem-helpers-qmi
-endif
-
 endif

@@ -1,6 +1,7 @@
+include $(top_srcdir)/gtester.make
 
-noinst_PROGRAMS = \
-	test-common-helpers
+noinst_PROGRAMS = test-common-helpers
+TEST_PROGS += $(noinst_PROGRAMS)
 
 test_common_helpers_SOURCES = \
 	test-common-helpers.c
@@ -19,10 +20,3 @@ test_common_helpers_CPPFLAGS = \
 test_common_helpers_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(MM_LIBS)
-
-if WITH_TESTS
-
-check-local: test-common-helpers
-	$(abs_builddir)/test-common-helpers
-
-endif

@@ -1,10 +1,11 @@
-if WITH_TESTS
+include $(top_srcdir)/gtester.make
+
+noinst_PROGRAMS = test-qcdm modepref
+TEST_PROGS += test-qcdm
 
 INCLUDES = \
 	-I$(top_srcdir)/libqcdm/src \
 	-I$(top_srcdir)/src
-
-noinst_PROGRAMS = test-qcdm modepref
 
 test_qcdm_SOURCES = \
 	test-qcdm-crc.c \
@@ -18,9 +19,7 @@ test_qcdm_SOURCES = \
 	test-qcdm-result.c \
 	test-qcdm-result.h \
 	test-qcdm.c
-
 test_qcdm_CPPFLAGS = $(MM_CFLAGS)
-
 test_qcdm_LDADD = $(MM_LIBS)
 
 modepref_SOURCES = modepref.c
@@ -34,9 +33,3 @@ else
 test_qcdm_LDADD += $(top_builddir)/libqcdm/src/libqcdm.la
 modepref_LDADD += $(top_builddir)/libqcdm/src/libqcdm.la
 endif
-
-check-local: test-qcdm
-	$(abs_builddir)/test-qcdm
-
-endif
-
