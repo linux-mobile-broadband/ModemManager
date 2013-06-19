@@ -64,7 +64,7 @@ struct _MMBroadbandModemMbimPrivate {
 
     /* Process unsolicited notifications */
     guint notification_id;
-    ProcessNotificationFlag notification_flags;
+    ProcessNotificationFlag setup_flags;
 
     /* 3GPP registration helpers */
     gchar *current_operator_id;
@@ -1641,11 +1641,11 @@ basic_connect_notification (MMBroadbandModemMbim *self,
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_BASIC_CONNECT_SIGNAL_STATE:
-        if (self->priv->notification_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
             basic_connect_notification_signal_state (self, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_REGISTER_STATE:
-        if (self->priv->notification_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
             basic_connect_notification_register_state (self, notification);
         break;
     default:
@@ -1660,7 +1660,7 @@ sms_notification (MMBroadbandModemMbim *self,
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_SMS_READ:
-        if (self->priv->notification_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ)
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ)
             sms_notification_read_sms (self, notification);
         break;
     default:
@@ -1722,7 +1722,7 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
                                   self);
     } else {
         /* Don't remove the signal if there are still listeners interested */
-        if (self->priv->notification_flags == PROCESS_NOTIFICATION_FLAG_NONE &&
+        if (self->priv->setup_flags == PROCESS_NOTIFICATION_FLAG_NONE &&
             self->priv->notification_id &&
             g_signal_handler_is_connected (device, self->priv->notification_id))
             g_signal_handler_disconnect (device, self->priv->notification_id);
@@ -1749,7 +1749,7 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), FALSE, callback, user_data);
 }
 
@@ -1758,7 +1758,7 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), TRUE, callback, user_data);
 }
 
@@ -1770,7 +1770,7 @@ cleanup_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags &= ~PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), FALSE, callback, user_data);
 }
 
@@ -1779,7 +1779,7 @@ setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags |= PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), TRUE, callback, user_data);
 }
 
@@ -2389,7 +2389,7 @@ cleanup_unsolicited_events_messaging (MMIfaceModemMessaging *self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags &= ~PROCESS_NOTIFICATION_FLAG_SMS_READ;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SMS_READ;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), FALSE, callback, user_data);
 }
 
@@ -2398,7 +2398,7 @@ setup_unsolicited_events_messaging (MMIfaceModemMessaging *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    MM_BROADBAND_MODEM_MBIM (self)->priv->notification_flags |= PROCESS_NOTIFICATION_FLAG_SMS_READ;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SMS_READ;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), TRUE, callback, user_data);
 }
 
