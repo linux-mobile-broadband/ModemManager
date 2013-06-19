@@ -65,6 +65,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Process unsolicited notifications */
     guint notification_id;
     ProcessNotificationFlag setup_flags;
+    ProcessNotificationFlag enable_flags;
 
     /* 3GPP registration helpers */
     gchar *current_operator_id;
@@ -1712,6 +1713,11 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
                                         user_data,
                                         common_setup_cleanup_unsolicited_events);
 
+    mm_dbg ("Supported notifications: signal (%s), registration (%s), sms (%s)",
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no");
+
     if (setup) {
         /* Don't re-enable it if already there */
         if (!self->priv->notification_id)
@@ -1784,20 +1790,20 @@ setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Enable/Disable unsolicited events (3GPP interface) */
+/* Enable/disable unsolicited events (common) */
 
 static gboolean
-modem_3gpp_common_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
-                                                            GAsyncResult *res,
-                                                            GError **error)
+common_enable_disable_unsolicited_events_finish (MMBroadbandModemMbim *self,
+                                                 GAsyncResult *res,
+                                                 GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-disable_signal_state_set_ready_cb (MbimDevice *device,
-                                   GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+subscriber_list_set_ready_cb (MbimDevice *device,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -1818,57 +1824,15 @@ disable_signal_state_set_ready_cb (MbimDevice *device,
 }
 
 static void
-enable_signal_state_set_ready_cb (MbimDevice *device,
-                                  GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    guint32 rssi;
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_signal_state_response_parse (
-            response,
-            &rssi,
-            NULL, /* error_rate */
-            NULL, /* signal_strength_interval */
-            NULL, /* rssi_threshold */
-            NULL, /* error_rate_threshold */
-            &error)) {
-        guint32 quality;
-        GObject *self;
-
-        /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
-        mm_dbg ("Initial signal state: %u --> %u%%", rssi, quality);
-
-        self = g_async_result_get_source_object (G_ASYNC_RESULT (simple));
-        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
-        g_object_unref (self);
-
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    } else
-        g_simple_async_result_take_error (simple, error);
-
-    if (response)
-        mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
-common_enable_disable_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
-                                               gboolean enable,
-                                               GAsyncReadyCallback callback,
-                                               gpointer user_data)
-{
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimMessage *request;
     MbimDevice *device;
     GSimpleAsyncResult *result;
-    MbimMessage *message;
-    GAsyncReadyCallback ready_cb;
+    MbimEventEntry **entries;
+    guint n_entries = 0;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -1876,37 +1840,99 @@ common_enable_disable_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        common_enable_disable_unsolicited_events_3gpp);
+                                        common_enable_disable_unsolicited_events);
 
-#define DISABLE_FEATURE G_MAXUINT32
-#define AUTO_FEATURE    0
+    mm_dbg ("Enabled notifications: signal (%s), registration (%s), sms (%s)",
+            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
+            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
+            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no");
 
-    if (enable) {
-        ready_cb = (GAsyncReadyCallback)enable_signal_state_set_ready_cb;
-        message = (mbim_message_signal_state_set_new (
-                       30, /* signal_strength_interval */
-                       DISABLE_FEATURE, /* rssi_threshold */
-                       DISABLE_FEATURE, /* error_rate_threshold */
-                       NULL));
-    } else {
-        ready_cb = (GAsyncReadyCallback)disable_signal_state_set_ready_cb;
-        message = (mbim_message_signal_state_set_new (
-                       DISABLE_FEATURE, /* signal_strength_interval */
-                       DISABLE_FEATURE, /* rssi_threshold */
-                       DISABLE_FEATURE, /* error_rate_threshold */
-                       NULL));
+    entries = g_new0 (MbimEventEntry *, 3);
+
+    /* Basic connect service */
+    if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ||
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES) {
+        entries[n_entries] = g_new (MbimEventEntry, 1);
+        memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_BASIC_CONNECT, sizeof (MbimUuid));
+        entries[n_entries]->cids_count = 0;
+        entries[n_entries]->cids = g_new0 (guint32, 2);
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SIGNAL_STATE;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_REGISTER_STATE;
+        n_entries++;
     }
 
-#undef DISABLE_FEATURE
-#undef AUTO_FEATURE
+    /* SMS service */
+    if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ) {
+        entries[n_entries] = g_new (MbimEventEntry, 1);
+        memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_SMS, sizeof (MbimUuid));
+        entries[n_entries]->cids_count = 2;
+        entries[n_entries]->cids = g_new0 (guint32, 2);
+        entries[n_entries]->cids[0] = MBIM_CID_SMS_READ;
+        entries[n_entries]->cids[1] = MBIM_CID_SMS_MESSAGE_STORE_STATUS;
+        n_entries++;
+    }
 
+    request = (mbim_message_device_service_subscriber_list_set_new (
+                   n_entries,
+                   (const MbimEventEntry *const *)entries,
+                   NULL));
     mbim_device_command (device,
-                         message,
+                         request,
                          10,
                          NULL,
-                         ready_cb,
+                         (GAsyncReadyCallback)subscriber_list_set_ready_cb,
                          result);
-    mbim_message_unref (message);
+    mbim_message_unref (request);
+    mbim_event_entry_array_free (entries);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited registration events */
+
+static gboolean
+modem_3gpp_common_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3gpp *self,
+                                                                         GAsyncResult *res,
+                                                                         GError **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_MBIM (self), res, error);
+}
+
+static void
+modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                    gboolean cs_supported,
+                                                    gboolean ps_supported,
+                                                    gboolean eps_supported,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
+}
+
+
+static void
+modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+                                                   gboolean cs_supported,
+                                                   gboolean ps_supported,
+                                                   gboolean eps_supported,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_common_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                            GAsyncResult *res,
+                                                            GError **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_MBIM (self), res, error);
 }
 
 static void
@@ -1914,7 +1940,8 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    common_enable_disable_unsolicited_events_3gpp (self, FALSE, callback, user_data);
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
 }
 
 static void
@@ -1922,7 +1949,8 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    common_enable_disable_unsolicited_events_3gpp (self, TRUE, callback, user_data);
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
 }
 
 /*****************************************************************************/
@@ -2403,6 +2431,35 @@ setup_unsolicited_events_messaging (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable unsolicited event handlers (Messaging interface) */
+
+static gboolean
+common_enable_disable_unsolicited_events_messaging_finish (MMIfaceModemMessaging *self,
+                                                           GAsyncResult *res,
+                                                           GError **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_MBIM (self), res, error);
+}
+
+static void
+disable_unsolicited_events_messaging (MMIfaceModemMessaging *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SMS_READ;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
+}
+
+static void
+enable_unsolicited_events_messaging (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SMS_READ;
+    common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
+}
+
+/*****************************************************************************/
 /* Create SMS (Messaging interface) */
 
 static MMSms *
@@ -2533,6 +2590,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_registration_events_finish = common_setup_cleanup_unsolicited_events_3gpp_finish;
     iface->cleanup_unsolicited_registration_events = cleanup_unsolicited_registration_events;
     iface->cleanup_unsolicited_registration_events_finish = common_setup_cleanup_unsolicited_events_3gpp_finish;
+    iface->enable_unsolicited_registration_events = modem_3gpp_enable_unsolicited_registration_events;
+    iface->enable_unsolicited_registration_events_finish = modem_3gpp_common_enable_disable_unsolicited_registration_events_finish;
+    iface->disable_unsolicited_registration_events = modem_3gpp_disable_unsolicited_registration_events;
+    iface->disable_unsolicited_registration_events_finish = modem_3gpp_common_enable_disable_unsolicited_registration_events_finish;
     iface->load_operator_code = modem_3gpp_load_operator_code;
     iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
     iface->load_operator_name = modem_3gpp_load_operator_name;
@@ -2541,12 +2602,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;
     iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
-
-    /* Unneeded things */
-    iface->enable_unsolicited_registration_events = NULL;
-    iface->enable_unsolicited_registration_events_finish = NULL;
-    iface->disable_unsolicited_registration_events = NULL;
-    iface->disable_unsolicited_registration_events_finish = NULL;
 
     /* TODO: use MBIM_CID_VISIBLE_PROVIDERS */
     iface->scan_networks = NULL;
@@ -2570,10 +2625,10 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_messaging_finish;
     iface->cleanup_unsolicited_events = cleanup_unsolicited_events_messaging;
     iface->cleanup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_messaging_finish;
-    iface->enable_unsolicited_events = NULL;
-    iface->enable_unsolicited_events_finish = NULL;
-    iface->disable_unsolicited_events = NULL;
-    iface->disable_unsolicited_events_finish = NULL;
+    iface->enable_unsolicited_events = enable_unsolicited_events_messaging;
+    iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
+    iface->disable_unsolicited_events = disable_unsolicited_events_messaging;
+    iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
     iface->create_sms = messaging_create_sms;
 }
 
