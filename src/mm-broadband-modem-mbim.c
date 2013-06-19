@@ -1734,7 +1734,7 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
 }
 
 /*****************************************************************************/
-/* Setup/cleanup unsolicited events */
+/* Setup/cleanup unsolicited events (3GPP interface) */
 
 static gboolean
 common_setup_cleanup_unsolicited_events_3gpp_finish (MMIfaceModem3gpp *self,
@@ -1784,12 +1784,12 @@ setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Enable/Disable unsolicited events */
+/* Enable/Disable unsolicited events (3GPP interface) */
 
 static gboolean
-common_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
-                                                 GAsyncResult *res,
-                                                 GError **error)
+modem_3gpp_common_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                            GAsyncResult *res,
+                                                            GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -1859,10 +1859,10 @@ enable_signal_state_set_ready_cb (MbimDevice *device,
 }
 
 static void
-common_enable_disable_unsolicited_events (MMIfaceModem3gpp *_self,
-                                          gboolean enable,
-                                          GAsyncReadyCallback callback,
-                                          gpointer user_data)
+common_enable_disable_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
+                                               gboolean enable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
     MbimDevice *device;
@@ -1876,7 +1876,7 @@ common_enable_disable_unsolicited_events (MMIfaceModem3gpp *_self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        common_enable_disable_unsolicited_events);
+                                        common_enable_disable_unsolicited_events_3gpp);
 
 #define DISABLE_FEATURE G_MAXUINT32
 #define AUTO_FEATURE    0
@@ -1910,19 +1910,19 @@ common_enable_disable_unsolicited_events (MMIfaceModem3gpp *_self,
 }
 
 static void
-disable_unsolicited_events (MMIfaceModem3gpp *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
 {
-    common_enable_disable_unsolicited_events (self, FALSE, callback, user_data);
+    common_enable_disable_unsolicited_events_3gpp (self, FALSE, callback, user_data);
 }
 
 static void
-enable_unsolicited_events (MMIfaceModem3gpp *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
-    common_enable_disable_unsolicited_events (self, TRUE, callback, user_data);
+    common_enable_disable_unsolicited_events_3gpp (self, TRUE, callback, user_data);
 }
 
 /*****************************************************************************/
@@ -2525,10 +2525,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_3gpp_finish;
     iface->cleanup_unsolicited_events = cleanup_unsolicited_events_3gpp;
     iface->cleanup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_3gpp_finish;
-    iface->enable_unsolicited_events = enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
-    iface->disable_unsolicited_events = disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_common_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_common_enable_disable_unsolicited_events_finish;
     iface->setup_unsolicited_registration_events = setup_unsolicited_registration_events;
     iface->setup_unsolicited_registration_events_finish = common_setup_cleanup_unsolicited_events_3gpp_finish;
     iface->cleanup_unsolicited_registration_events = cleanup_unsolicited_registration_events;
