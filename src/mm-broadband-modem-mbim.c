@@ -1656,6 +1656,73 @@ basic_connect_notification (MMBroadbandModemMbim *self,
 }
 
 static void
+alert_sms_read_query_ready (MbimDevice *device,
+                            GAsyncResult *res,
+                            MMBroadbandModemMbim *self)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    guint32 messages_count;
+    MbimSmsPduReadRecord **pdu_messages;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_sms_read_response_parse (
+            response,
+            NULL,
+            &messages_count,
+            &pdu_messages,
+            NULL, /* cdma_messages */
+            &error)) {
+        guint i;
+
+        for (i = 0; i < messages_count; i++)
+            add_sms_part (self, pdu_messages[i]);
+        mbim_sms_pdu_read_record_array_free (pdu_messages);
+    }
+
+    if (error) {
+        mm_dbg ("Flash message reading failed: %s", error->message);
+        g_error_free (error);
+    }
+
+    if (response)
+        mbim_message_unref (response);
+
+    g_object_unref (self);
+}
+
+static void
+sms_notification_read_alert_sms (MMBroadbandModemMbim *self,
+                                 guint32 index)
+{
+    MMMbimPort *port;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (!port)
+        return;
+    device = mm_mbim_port_peek_device (port);
+    if (!device)
+        return;
+
+    mm_dbg ("Reading flash SMS at index '%u'", index);
+    message = mbim_message_sms_read_query_new (MBIM_SMS_FORMAT_PDU,
+                                               MBIM_SMS_FLAG_INDEX,
+                                               index,
+                                               NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)alert_sms_read_query_ready,
+                         g_object_ref (self));
+    mbim_message_unref (message);
+}
+
+static void
 sms_notification (MMBroadbandModemMbim *self,
                   MbimMessage *notification)
 {
@@ -1664,6 +1731,25 @@ sms_notification (MMBroadbandModemMbim *self,
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ)
             sms_notification_read_sms (self, notification);
         break;
+
+    case MBIM_CID_SMS_MESSAGE_STORE_STATUS: {
+        MbimSmsStatusFlag flag;
+        guint32 index;
+
+        /* New flash/alert message? */
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ &&
+            mbim_message_sms_message_store_status_notification_parse (
+                notification,
+                &flag,
+                &index,
+                NULL)) {
+            mm_dbg ("Received flash message: '%s'", mbim_sms_status_flag_get_string (flag));
+            if (flag == MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
+                sms_notification_read_alert_sms (self, index);
+        }
+        break;
+    }
+
     default:
         /* Ignore */
         break;
