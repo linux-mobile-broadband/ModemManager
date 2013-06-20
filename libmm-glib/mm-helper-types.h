@@ -21,6 +21,7 @@
  */
 
 #include <ModemManager.h>
+#include <glib.h>
 
 #if !defined (__LIBMM_GLIB_H_INSIDE__) && !defined (LIBMM_GLIB_COMPILATION)
 #error "Only <libmm-glib.h> can be included directly."
@@ -40,5 +41,20 @@ typedef struct _MMModemModeCombination {
     MMModemMode allowed;
     MMModemMode preferred;
 } MMModemModeCombination;
+
+/**
+ * MMModemPortInfo:
+ * @name: Name of the port.
+ * @type: A #MMModemPortType value.
+ *
+ * Information of a given port.
+ */
+typedef struct _MMModemPortInfo {
+    gchar *name;
+    MMModemPortType type;
+} MMModemPortInfo;
+
+void mm_modem_port_info_array_free (MMModemPortInfo *array,
+                                    guint array_size);
 
 #endif /* _MM_HELPER_TYPES_H_ */

@@ -32,6 +32,9 @@ gchar *mm_common_build_capabilities_string (const MMModemCapability *capabilitie
 gchar *mm_common_build_bands_string (const MMModemBand *bands,
                                      guint n_bands);
 
+gchar *mm_common_build_ports_string (const MMModemPortInfo *ports,
+                                     guint n_ports);
+
 gchar *mm_common_build_sms_storages_string (const MMSmsStorage *storages,
                                             guint n_storages);
 
@@ -56,6 +59,13 @@ MMBearerAllowedAuth   mm_common_get_allowed_auth_from_string (const gchar *str,
                                                               GError **error);
 MMSmsStorage          mm_common_get_sms_storage_from_string  (const gchar *str,
                                                               GError **error);
+
+GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
+MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
+                                                 guint *n_ports);
+GVariant        *mm_common_ports_array_to_variant  (const MMModemPortInfo *ports,
+                                                    guint n_ports);
+GVariant        *mm_common_ports_garray_to_variant (GArray *array);
 
 GArray       *mm_common_sms_storages_variant_to_garray (GVariant *variant);
 MMSmsStorage *mm_common_sms_storages_variant_to_array  (GVariant *variant,

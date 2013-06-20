@@ -32,6 +32,7 @@ MMModemState
 MMModemStateFailedReason
 MMModemStateChangeReason
 MMModemPowerState
+MMModemPortType
 MMSmsPduType
 MMSmsState
 MMSmsDeliveryState

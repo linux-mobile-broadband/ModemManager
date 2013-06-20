@@ -4019,6 +4019,15 @@ interface_initialization_step (InitializationContext *ctx)
             g_assert (primary != NULL);
             mm_gdbus_modem_set_primary_port (ctx->skeleton, mm_port_get_device (primary));
         }
+        /* Load ports if not done before */
+        if (!mm_gdbus_modem_get_ports (ctx->skeleton)) {
+            MMModemPortInfo *port_infos;
+            guint n_port_infos;
+
+            port_infos = mm_base_modem_get_port_infos (MM_BASE_MODEM (ctx->self), &n_port_infos);
+            mm_gdbus_modem_set_ports (ctx->skeleton, mm_common_ports_array_to_variant (port_infos, n_port_infos));
+            mm_modem_port_info_array_free (port_infos, n_port_infos);
+        }
         /* Fall down to next step */
         ctx->step++;
 

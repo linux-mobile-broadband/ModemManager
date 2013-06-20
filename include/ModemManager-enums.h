@@ -395,6 +395,28 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
 } MMModemBand;
 
 /**
+ * MMModemPortType:
+ * @MM_MODEM_PORT_TYPE_UNKNOWN: Unknown.
+ * @MM_MODEM_PORT_TYPE_NET: Net port.
+ * @MM_MODEM_PORT_TYPE_AT: AT port.
+ * @MM_MODEM_PORT_TYPE_QCDM: QCDM port.
+ * @MM_MODEM_PORT_TYPE_GPS: GPS port.
+ * @MM_MODEM_PORT_TYPE_QMI: QMI port.
+ * @MM_MODEM_PORT_TYPE_MBIM: MBIM port.
+ *
+ * Type of modem port.
+ */
+typedef enum { /*< underscore_name=mm_modem_port_type >*/
+    MM_MODEM_PORT_TYPE_UNKNOWN = 1,
+    MM_MODEM_PORT_TYPE_NET     = 2,
+    MM_MODEM_PORT_TYPE_AT      = 3,
+    MM_MODEM_PORT_TYPE_QCDM    = 4,
+    MM_MODEM_PORT_TYPE_GPS     = 5,
+    MM_MODEM_PORT_TYPE_QMI     = 6,
+    MM_MODEM_PORT_TYPE_MBIM    = 7
+} MMModemPortType;
+
+/**
  * MMSmsPduType:
  * @MM_SMS_PDU_TYPE_UNKNOWN: Unknown type.
  * @MM_SMS_PDU_TYPE_DELIVER: SMS has been received from the SMSC.

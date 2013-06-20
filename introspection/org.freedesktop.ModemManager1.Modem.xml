@@ -327,6 +327,16 @@
     <property name="PrimaryPort" type="s" access="read" />
 
     <!--
+        Ports:
+
+        The list of ports in the modem, given as an array of string and unsigned
+        integer pairs. The string is the port name or path, and the integer is
+        the port type given as a
+        <link linkend="MMModemPortType">MMModemPortType</link> value.
+    -->
+    <property name="Ports" type="a(su)" access="read" />
+
+    <!--
         EquipmentIdentifier:
 
         The identity of the device.

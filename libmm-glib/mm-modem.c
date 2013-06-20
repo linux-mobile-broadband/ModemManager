@@ -44,6 +44,11 @@
 G_DEFINE_TYPE (MMModem, mm_modem, MM_GDBUS_TYPE_MODEM_PROXY)
 
 struct _MMModemPrivate {
+    /* Ports */
+    GMutex ports_mutex;
+    guint ports_id;
+    GArray *ports;
+
     /* UnlockRetries */
     GMutex unlock_retries_mutex;
     guint unlock_retries_id;
@@ -679,6 +684,124 @@ mm_modem_dup_primary_port (MMModem *self)
 
     RETURN_NON_EMPTY_STRING (
         mm_gdbus_modem_dup_primary_port (MM_GDBUS_MODEM (self)));
+}
+
+/*****************************************************************************/
+
+static void
+ports_updated (MMModem *self,
+               GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->ports_mutex);
+    {
+        GVariant *dictionary;
+
+        if (self->priv->ports)
+            g_array_unref (self->priv->ports);
+
+        dictionary = mm_gdbus_modem_get_ports (MM_GDBUS_MODEM (self));
+        self->priv->ports = (dictionary ?
+                             mm_common_ports_variant_to_garray (dictionary) :
+                             NULL);
+    }
+    g_mutex_unlock (&self->priv->ports_mutex);
+}
+
+static gboolean
+ensure_internal_ports (MMModem *self,
+                       MMModemPortInfo **dup_ports,
+                       guint *dup_ports_n)
+{
+    gboolean ret;
+
+    g_mutex_lock (&self->priv->ports_mutex);
+    {
+        /* If this is the first time ever asking for the array, setup the
+         * update listener and the initial array, if any. */
+        if (!self->priv->ports_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_modem_dup_ports (MM_GDBUS_MODEM (self));
+            if (dictionary) {
+                self->priv->ports = mm_common_ports_variant_to_garray (dictionary);
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->ports_id =
+                g_signal_connect (self,
+                                  "notify::ports",
+                                  G_CALLBACK (ports_updated),
+                                  NULL);
+        }
+
+        if (!self->priv->ports)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_ports && dup_ports_n) {
+                *dup_ports_n = self->priv->ports->len;
+                if (self->priv->ports->len > 0) {
+                    *dup_ports = g_malloc (sizeof (MMModemPortInfo) * self->priv->ports->len);
+                    memcpy (*dup_ports, self->priv->ports->data, sizeof (MMModemPortInfo) * self->priv->ports->len);
+                } else
+                    *dup_ports = NULL;
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->ports_mutex);
+
+    return ret;
+}
+
+/**
+ * mm_modem_peek_current_ports:
+ * @self: A #MMModem.
+ * @ports: (out) (array length=n_ports): Return location for the array of #MMModemPortInfo values. Do not free the returned value, it is owned by @self.
+ * @n_ports: (out): Return location for the number of values in @ports.
+ *
+ * Gets the list of ports in the modem.
+ *
+ * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ */
+gboolean
+mm_modem_peek_ports (MMModem *self,
+                     const MMModemPortInfo **ports,
+                     guint *n_ports)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (ports != NULL, FALSE);
+    g_return_val_if_fail (n_ports != NULL, FALSE);
+
+    if (!ensure_internal_ports (self, NULL, NULL))
+        return FALSE;
+
+    *n_ports = self->priv->ports->len;
+    *ports = (MMModemPortInfo *)self->priv->ports->data;
+    return TRUE;
+}
+
+/**
+ * mm_modem_get_ports:
+ * @self: A #MMModem.
+ * @ports: (out) (array length=n_ports): Return location for the array of #MMModemPortInfo values. The returned array should be freed with mm_modem_port_info_array_free() when no longer needed.
+ * @n_ports: (out): Return location for the number of values in @ports.
+ *
+ * Gets the list of ports in the modem.
+ *
+ * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ */
+gboolean
+mm_modem_get_ports (MMModem *self,
+                    MMModemPortInfo **ports,
+                    guint *n_ports)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (ports != NULL, FALSE);
+    g_return_val_if_fail (n_ports != NULL, FALSE);
+
+    return ensure_internal_ports (self, ports, n_ports);
 }
 
 /*****************************************************************************/

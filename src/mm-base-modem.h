@@ -23,6 +23,9 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include <mm-gdbus-modem.h>
 
 #include "mm-auth.h"
@@ -154,6 +157,9 @@ MMMbimPort       *mm_base_modem_get_port_mbim_for_data (MMBaseModem *self, MMPor
 MMAtSerialPort   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
+
+MMModemPortInfo *mm_base_modem_get_port_infos         (MMBaseModem *self,
+                                                       guint *n_port_infos);
 
 void     mm_base_modem_set_hotplugged (MMBaseModem *self,
                                        gboolean hotplugged);

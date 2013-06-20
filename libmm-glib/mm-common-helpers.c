@@ -78,6 +78,31 @@ mm_common_build_bands_string (const MMModemBand *bands,
 }
 
 gchar *
+mm_common_build_ports_string (const MMModemPortInfo *ports,
+                              guint n_ports)
+{
+    gboolean first = TRUE;
+    GString *str;
+    guint i;
+
+    if (!ports || !n_ports)
+        return g_strdup ("none");
+
+    str = g_string_new ("");
+    for (i = 0; i < n_ports; i++) {
+        g_string_append_printf (str, "%s%s (%s)",
+                                first ? "" : ", ",
+                                ports[i].name,
+                                mm_modem_port_type_get_string (ports[i].type));
+
+        if (first)
+            first = FALSE;
+    }
+
+    return g_string_free (str, FALSE);
+}
+
+gchar *
 mm_common_build_sms_storages_string (const MMSmsStorage *storages,
                                      guint n_storages)
 {
@@ -192,6 +217,72 @@ mm_common_sms_storages_garray_to_variant (GArray *array)
                                                         array->len);
 
     return mm_common_sms_storages_array_to_variant (NULL, 0);
+}
+
+GArray *
+mm_common_ports_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        guint i;
+        guint n;
+
+        n = g_variant_n_children (variant);
+
+        if (n > 0) {
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), n);
+            for (i = 0; i < n; i++) {
+                MMModemPortInfo info;
+
+                g_variant_get_child (variant, i, "(su)", &info.name, &info.type);
+                g_array_append_val (array, info);
+            }
+        }
+    }
+
+    return array;
+}
+
+MMModemPortInfo *
+mm_common_ports_variant_to_array (GVariant *variant,
+                                  guint *n_ports)
+{
+    GArray *array;
+
+    array = mm_common_ports_variant_to_garray (variant);
+    if (n_ports)
+        *n_ports = array->len;
+    return (MMModemPortInfo *) g_array_free (array, FALSE);
+}
+
+GVariant *
+mm_common_ports_array_to_variant (const MMModemPortInfo *ports,
+                                  guint n_ports)
+{
+    GVariantBuilder builder;
+    guint i;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(su)"));
+
+    for (i = 0; i < n_ports; i++) {
+        GVariant *tuple[2];
+
+        tuple[0] = g_variant_new_string (ports[i].name);
+        tuple[1] = g_variant_new_uint32 ((guint32)ports[i].type);
+        g_variant_builder_add_value (&builder, g_variant_new_tuple (tuple, 2));
+    }
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_ports_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_ports_array_to_variant ((const MMModemPortInfo *)array->data,
+                                                 array->len);
+
+    return mm_common_ports_array_to_variant (NULL, 0);
 }
 
 MMModemCapability

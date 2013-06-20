@@ -260,6 +260,9 @@ print_modem_info (void)
     gchar *own_numbers_string;
     MMModemBand *bands = NULL;
     guint n_bands = 0;
+    MMModemPortInfo *ports = NULL;
+    guint n_ports = 0;
+    gchar *ports_string;
     MMUnlockRetries *unlock_retries;
     guint signal_quality = 0;
     gboolean signal_quality_recent = FALSE;
@@ -288,6 +291,9 @@ print_modem_info (void)
     mm_modem_get_supported_bands (ctx->modem, &bands, &n_bands);
     supported_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
+    mm_modem_get_ports (ctx->modem, &ports, &n_ports);
+    ports_string = mm_common_build_ports_string (ports, n_ports);
+    mm_modem_port_info_array_free (ports, n_ports);
     if (mm_modem_get_current_modes (ctx->modem, &allowed_modes, &preferred_mode)) {
         allowed_modes_string = mm_modem_mode_build_string_from_mask (allowed_modes);
         preferred_mode_string = mm_modem_mode_build_string_from_mask (preferred_mode);
@@ -371,11 +377,13 @@ print_modem_info (void)
              "  System   |         device: '%s'\n"
              "           |        drivers: '%s'\n"
              "           |         plugin: '%s'\n"
-             "           |   primary port: '%s'\n",
+             "           |   primary port: '%s'\n"
+             "           |          ports: '%s'\n",
              VALIDATE_UNKNOWN (mm_modem_get_device (ctx->modem)),
              VALIDATE_UNKNOWN (drivers_string),
              VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)),
-             VALIDATE_UNKNOWN (mm_modem_get_primary_port (ctx->modem)));
+             VALIDATE_UNKNOWN (mm_modem_get_primary_port (ctx->modem)),
+             VALIDATE_UNKNOWN (ports_string));
 
     /* Numbers related stuff */
     g_print ("  -------------------------\n"
@@ -489,6 +497,7 @@ print_modem_info (void)
              VALIDATE_PATH (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
+    g_free (ports_string);
     g_free (supported_ip_families_string);
     g_free (current_bands_string);
     g_free (supported_bands_string);

@@ -74,6 +74,7 @@ mm_object_get_type
 <TITLE>MMModem</TITLE>
 MMModem
 MMModemModeCombination
+MMModemPortInfo
 <SUBSECTION Getters>
 mm_modem_get_path
 mm_modem_dup_path
@@ -95,6 +96,8 @@ mm_modem_get_plugin
 mm_modem_dup_plugin
 mm_modem_get_primary_port
 mm_modem_dup_primary_port
+mm_modem_peek_ports
+mm_modem_get_ports
 mm_modem_get_device
 mm_modem_dup_device
 mm_modem_get_equipment_identifier
@@ -162,6 +165,8 @@ mm_modem_delete_bearer_sync
 mm_modem_command
 mm_modem_command_finish
 mm_modem_command_sync
+<SUBSECTION Other>
+mm_modem_port_info_array_free
 <SUBSECTION Standard>
 MMModemClass
 MMModemPrivate
@@ -970,6 +975,7 @@ mm_modem_lock_get_string
 mm_modem_access_technology_build_string_from_mask
 mm_modem_mode_build_string_from_mask
 mm_modem_band_get_string
+mm_modem_port_type_get_string
 mm_modem_3gpp_registration_state_get_string
 mm_modem_3gpp_facility_build_string_from_mask
 mm_modem_3gpp_network_availability_get_string
@@ -1013,6 +1019,7 @@ mm_modem_3gpp_facility_get_string
 mm_modem_3gpp_network_availability_build_string_from_mask
 mm_modem_3gpp_ussd_session_state_build_string_from_mask
 mm_firmware_image_type_build_string_from_mask
+mm_modem_port_type_build_string_from_mask
 <SUBSECTION Standard>
 MM_TYPE_BEARER_IP_FAMILY
 MM_TYPE_BEARER_IP_METHOD
@@ -1036,6 +1043,7 @@ MM_TYPE_MODEM_STATE
 MM_TYPE_MODEM_STATE_FAILED_REASON
 MM_TYPE_MODEM_STATE_CHANGE_REASON
 MM_TYPE_MODEM_POWER_STATE
+MM_TYPE_MODEM_PORT_TYPE
 MM_TYPE_SMS_DELIVERY_STATE
 MM_TYPE_SMS_PDU_TYPE
 MM_TYPE_SMS_STATE
@@ -1063,6 +1071,7 @@ mm_modem_state_change_reason_get_type
 mm_modem_state_get_type
 mm_modem_state_failed_reason_get_type
 mm_modem_power_state_get_type
+mm_modem_port_type_get_type
 mm_sms_delivery_state_get_type
 mm_sms_pdu_type_get_type
 mm_sms_state_get_type
@@ -1443,6 +1452,8 @@ mm_gdbus_modem_dup_plugin
 mm_gdbus_modem_get_power_state
 mm_gdbus_modem_get_primary_port
 mm_gdbus_modem_dup_primary_port
+mm_gdbus_modem_get_ports
+mm_gdbus_modem_dup_ports
 mm_gdbus_modem_get_revision
 mm_gdbus_modem_dup_revision
 mm_gdbus_modem_get_signal_quality
@@ -1511,6 +1522,7 @@ mm_gdbus_modem_set_model
 mm_gdbus_modem_set_own_numbers
 mm_gdbus_modem_set_plugin
 mm_gdbus_modem_set_primary_port
+mm_gdbus_modem_set_ports
 mm_gdbus_modem_set_revision
 mm_gdbus_modem_set_signal_quality
 mm_gdbus_modem_set_sim

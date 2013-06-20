@@ -6,6 +6,7 @@ libmm_glib_la_SOURCES = \
 	libmm-glib.h \
 	mm-helpers.h \
 	mm-helper-types.h \
+	mm-helper-types.c \
 	mm-manager.h \
 	mm-manager.c \
 	mm-object.h \

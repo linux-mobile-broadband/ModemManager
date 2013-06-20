@@ -968,6 +968,53 @@ mm_base_modem_has_at_port (MMBaseModem *self)
     return FALSE;
 }
 
+MMModemPortInfo *
+mm_base_modem_get_port_infos (MMBaseModem *self,
+                              guint *n_port_infos)
+{
+    GHashTableIter iter;
+    MMModemPortInfo *port_infos;
+    MMPort *port;
+    guint i;
+
+    *n_port_infos = g_hash_table_size (self->priv->ports);
+    port_infos = g_new (MMModemPortInfo, *n_port_infos);
+    g_hash_table_iter_init (&iter, self->priv->ports);
+    i = 0;
+    while (g_hash_table_iter_next (&iter, NULL, (gpointer)&port)) {
+        port_infos[i].name = g_strdup (mm_port_get_device (port));
+        switch (mm_port_get_port_type (port)) {
+        case MM_PORT_TYPE_NET:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_NET;
+            break;
+        case MM_PORT_TYPE_AT:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_AT;
+            break;
+        case MM_PORT_TYPE_QCDM:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_QCDM;
+            break;
+        case MM_PORT_TYPE_GPS:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_GPS;
+            break;
+        case MM_PORT_TYPE_QMI:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_QMI;
+            break;
+        case MM_PORT_TYPE_MBIM:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_MBIM;
+            break;
+        case MM_PORT_TYPE_UNKNOWN:
+        case MM_PORT_TYPE_IGNORED:
+        default:
+            port_infos[i].type = MM_MODEM_PORT_TYPE_UNKNOWN;
+            break;
+        }
+
+        i++;
+    }
+
+    return port_infos;
+}
+
 static void
 initialize_ready (MMBaseModem *self,
                   GAsyncResult *res)
