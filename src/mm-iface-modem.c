@@ -2983,7 +2983,8 @@ typedef struct {
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
     MMModemPowerState power_state;
-    MMModemPowerState previous_power_state;
+    MMModemPowerState previous_cached_power_state;
+    MMModemPowerState previous_real_power_state;
 } SetPowerStateContext;
 
 static void
@@ -3029,6 +3030,9 @@ modem_power_up_ready (MMIfaceModem *self,
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_up_finish (self, res, &error);
     if (error) {
+        /* If the real and cached ones are different, set the real one */
+        if (ctx->previous_cached_power_state != ctx->previous_real_power_state)
+            mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->previous_real_power_state);
         g_simple_async_result_take_error (ctx->result, error);
         set_power_state_context_complete_and_free (ctx);
         return;
@@ -3060,15 +3064,100 @@ modem_power_down_ready (MMIfaceModem *self,
     GError *error = NULL;
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_down_finish (self, res, &error);
-    if (error)
+    if (error) {
+        /* If the real and cached ones are different, set the real one */
+        if (ctx->previous_cached_power_state != ctx->previous_real_power_state)
+            mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->previous_real_power_state);
         g_simple_async_result_take_error (ctx->result, error);
-    else {
+    } else {
         mm_dbg ("Modem set in low-power mode...");
         mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->power_state);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     }
 
     set_power_state_context_complete_and_free (ctx);
+}
+
+static void
+set_power_state (SetPowerStateContext *ctx)
+{
+    /* Already done if we're in the desired power state */
+    if (ctx->previous_real_power_state == ctx->power_state) {
+        mm_dbg ("No need to change power state: already in '%s' power state",
+                mm_modem_power_state_get_string (ctx->power_state));
+        /* If the real and cached ones are different, set the real one */
+        if (ctx->previous_cached_power_state != ctx->previous_real_power_state)
+            mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->previous_real_power_state);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_power_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Supported transitions:
+     * UNKNOWN|OFF|LOW --> ON
+     * ON --> LOW
+     */
+
+    /* Going into low power mode? */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_LOW) {
+        /* Error if unsupported */
+        if (!MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down ||
+            !MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down_finish) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Going into low-power mode is not supported by this modem");
+            set_power_state_context_complete_and_free (ctx);
+            return;
+        }
+
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down (
+            MM_IFACE_MODEM (ctx->self),
+            (GAsyncReadyCallback)modem_power_down_ready,
+            ctx);
+        return;
+    }
+
+    /* Going out of low power mode? */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
+        /* Error if unsupported */
+        if (!MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_up ||
+            !MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_up_finish) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Going into full-power mode is not supported by this modem");
+            set_power_state_context_complete_and_free (ctx);
+            return;
+        }
+
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_up (
+            MM_IFACE_MODEM (ctx->self),
+            (GAsyncReadyCallback)modem_power_up_ready,
+            ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static void
+set_power_state_load_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            SetPowerStateContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->previous_real_power_state = MM_IFACE_MODEM_GET_INTERFACE (self)->load_power_state_finish (self, res, &error);
+    if (error) {
+        g_debug ("Couldn't reload current power state: %s", error->message);
+        g_error_free (error);
+        /* Default to the cached one */
+        ctx->previous_real_power_state = ctx->previous_cached_power_state;
+    }
+
+    /* And keep on */
+    set_power_state (ctx);
 }
 
 void
@@ -3097,61 +3186,26 @@ mm_iface_modem_set_power_state (MMIfaceModem *self,
         set_power_state_context_complete_and_free (ctx);
         return;
     }
-    ctx->previous_power_state = mm_gdbus_modem_get_power_state (ctx->skeleton);
 
-    /* Already done if we're in the desired power state */
-    if (ctx->previous_power_state == ctx->power_state) {
-        mm_dbg ("No need to change power state: already in '%s' power state",
-                mm_modem_power_state_get_string (ctx->power_state));
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_power_state_context_complete_and_free (ctx);
+    ctx->previous_cached_power_state = mm_gdbus_modem_get_power_state (ctx->skeleton);
+
+    /* We cannot really rely on the power state value that we had cached before,
+     * as the real power status of the modem may also be changed by rfkill. So,
+     * before updating the current power state, re-check which is the real power
+     * state. */
+    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state (
+            ctx->self,
+            (GAsyncReadyCallback)set_power_state_load_ready,
+            ctx);
         return;
     }
 
-    /* Supported transitions:
-     * UNKNOWN|OFF|LOW --> ON
-     * ON --> LOW
-     */
-
-    /* Going into low power mode? */
-    if (ctx->power_state == MM_MODEM_POWER_STATE_LOW) {
-        /* Error if unsupported */
-        if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_down ||
-            !MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_down_finish) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Going into low-power mode is not supported by this modem");
-            set_power_state_context_complete_and_free (ctx);
-            return;
-        }
-
-        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_down (MM_IFACE_MODEM (self),
-                                                               (GAsyncReadyCallback)modem_power_down_ready,
-                                                               ctx);
-        return;
-    }
-
-    /* Going out of low power mode? */
-    if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
-        /* Error if unsupported */
-        if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_up ||
-            !MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_up_finish) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Going into full-power mode is not supported by this modem");
-            set_power_state_context_complete_and_free (ctx);
-            return;
-        }
-
-        MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_up (MM_IFACE_MODEM (self),
-                                                             (GAsyncReadyCallback)modem_power_up_ready,
-                                                             ctx);
-        return;
-    }
-
-    g_assert_not_reached ();
+    /* If there is no way to load power state, just keep on assuming the cached
+     * one is also the real one */
+    ctx->previous_real_power_state = ctx->previous_cached_power_state;
+    set_power_state (ctx);
 }
 
 /*****************************************************************************/
