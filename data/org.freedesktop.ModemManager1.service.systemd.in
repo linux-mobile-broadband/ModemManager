@@ -1,0 +1,11 @@
+# This D-Bus service activation file is only for systemd support since
+# an auto-activated ModemManager would be quite surprising for those people
+# who have MM installed but turned off.  Thus the Exec path available to
+# D-Bus is /bin/false, but systemd knows the real Exec path due to the MM
+# systemd .service file.
+
+[D-BUS Service]
+Name=org.freedesktop.ModemManager1
+Exec=/bin/false
+User=root
+SystemdService=dbus-org.freedesktop.ModemManager1.service
