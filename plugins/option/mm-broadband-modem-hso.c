@@ -65,9 +65,30 @@ modem_create_bearer_finish (MMIfaceModem *self,
     MMBearer *bearer;
 
     bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New HSO bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+    mm_dbg ("New %s bearer created at DBus path '%s'",
+            MM_IS_BROADBAND_BEARER_HSO (bearer) ? "HSO" : "Generic",
+            mm_bearer_get_path (bearer));
 
     return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_new_ready (GObject *source,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    MMBearer *bearer = NULL;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -101,6 +122,17 @@ modem_create_bearer (MMIfaceModem *self,
                                         callback,
                                         user_data,
                                         modem_create_bearer);
+
+    if (mm_bearer_properties_get_ip_type (properties) &
+        (MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6)) {
+        mm_dbg ("Creating generic bearer (IPv6 requested)...");
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
+                                 properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_new_ready,
+                                 result);
+        return;
+    }
 
     mm_dbg ("Creating HSO bearer...");
     mm_broadband_bearer_hso_new (MM_BROADBAND_MODEM_HSO (self),
