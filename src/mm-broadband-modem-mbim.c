@@ -1824,9 +1824,10 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
         /* Don't remove the signal if there are still listeners interested */
         if (self->priv->setup_flags == PROCESS_NOTIFICATION_FLAG_NONE &&
             self->priv->notification_id &&
-            g_signal_handler_is_connected (device, self->priv->notification_id))
+            g_signal_handler_is_connected (device, self->priv->notification_id)) {
             g_signal_handler_disconnect (device, self->priv->notification_id);
-        self->priv->notification_id = 0;
+            self->priv->notification_id = 0;
+        }
     }
 
     g_simple_async_result_complete_in_idle (result);
