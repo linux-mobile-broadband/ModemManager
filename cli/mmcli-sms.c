@@ -190,7 +190,7 @@ print_sms_info (MMSms *sms)
         g_print ("             | validity (relative): '%u'\n",
                  mm_sms_get_validity_relative (sms));
 
-    g_print ("             |               class: '%u'\n"
+    g_print ("             |               class: '%d'\n"
              "             |             storage: '%s'\n",
              mm_sms_get_class (sms),
              mm_sms_storage_get_string (mm_sms_get_storage (sms)));
