@@ -1761,7 +1761,15 @@ device_notification_cb (MbimDevice *device,
                         MbimMessage *notification,
                         MMBroadbandModemMbim *self)
 {
-    switch (mbim_message_indicate_status_get_service (notification)) {
+    MbimService service;
+
+    service = mbim_message_indicate_status_get_service (notification);
+    mm_dbg ("Received notification (service '%s', command '%s')",
+            mbim_service_get_string (service),
+            mbim_cid_get_printable (service,
+                                    mbim_message_indicate_status_get_cid (notification)));
+
+    switch (service) {
     case MBIM_SERVICE_BASIC_CONNECT:
         basic_connect_notification (self, notification);
         break;
