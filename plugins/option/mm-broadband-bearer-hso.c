@@ -143,6 +143,7 @@ ip_config_ready (MMBaseModem *modem,
             ip_config = mm_bearer_ip_config_new ();
             mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_STATIC);
             mm_bearer_ip_config_set_address (ip_config,  items[i]);
+            mm_bearer_ip_config_set_prefix (ip_config, 32);
         } else if (i == 3 || i == 4) { /* DNS entries */
             guint32 tmp;
 
