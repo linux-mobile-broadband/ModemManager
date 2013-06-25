@@ -208,11 +208,46 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
         /* Warn if the best plugin found for this port differs from the
          * best plugin found for the the first probed port */
         else if (!g_str_equal (mm_plugin_get_name (device_plugin),
-                               mm_plugin_get_name (port_probe_ctx->best_plugin)))
-            mm_warn ("(Plugin Manager) (%s): plugin mismatch error (expected: '%s', got: '%s')",
-                     g_udev_device_get_name (port_probe_ctx->port),
-                     mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
-                     mm_plugin_get_name (port_probe_ctx->best_plugin));
+                               mm_plugin_get_name (port_probe_ctx->best_plugin))) {
+            /* Icera modems may not reply to the icera probing in all ports. We handle this by
+             * checking the forbidden/allowed icera flags in both the current and the expected
+             * plugins. If either of these plugins requires icera and the other doesn't, we
+             * pick the Icera one as best plugin. */
+            gboolean previous_forbidden_icera;
+            gboolean previous_allowed_icera;
+            gboolean new_forbidden_icera;
+            gboolean new_allowed_icera;
+
+            g_object_get (device_plugin,
+                          MM_PLUGIN_ALLOWED_ICERA, &previous_allowed_icera,
+                          MM_PLUGIN_FORBIDDEN_ICERA, &previous_forbidden_icera,
+                          NULL);
+            g_assert (previous_allowed_icera == FALSE || previous_forbidden_icera == FALSE);
+
+            g_object_get (port_probe_ctx->best_plugin,
+                          MM_PLUGIN_ALLOWED_ICERA, &new_allowed_icera,
+                          MM_PLUGIN_FORBIDDEN_ICERA, &new_forbidden_icera,
+                          NULL);
+            g_assert (new_allowed_icera == FALSE || new_forbidden_icera == FALSE);
+
+            if (previous_allowed_icera && new_forbidden_icera) {
+                mm_warn ("(Plugin Manager) (%s): will use plugin '%s' instead of '%s', modem is Icera-capable",
+                         g_udev_device_get_name (port_probe_ctx->port),
+                         mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
+                         mm_plugin_get_name (port_probe_ctx->best_plugin));
+            } else if (new_allowed_icera && previous_forbidden_icera) {
+                mm_warn ("(Plugin Manager) (%s): overriding previously selected device plugin '%s' with '%s', modem is Icera-capable",
+                         g_udev_device_get_name (port_probe_ctx->port),
+                         mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
+                         mm_plugin_get_name (port_probe_ctx->best_plugin));
+                mm_device_set_plugin (ctx->device, G_OBJECT (port_probe_ctx->best_plugin));
+            } else {
+                mm_warn ("(Plugin Manager) (%s): plugin mismatch error (expected: '%s', got: '%s')",
+                         g_udev_device_get_name (port_probe_ctx->port),
+                         mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
+                         mm_plugin_get_name (port_probe_ctx->best_plugin));
+            }
+        }
     }
 
     /* Remove us from the list of running probes */
@@ -313,17 +348,31 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
                 port_probe_ctx->defer_id = g_idle_add ((GSourceFunc)deferred_support_check_idle,
                                                        port_probe_ctx);
             }
-            /* TODO: Cancel probing in the port if the plugin being
-             * checked right now is not the one being suggested.
+            /* We should *not* cancel probing in the port if the plugin being
+             * checked right now is not the one being suggested. Each port
+             * should run its probing independently, and we'll later decide
+             * which result applies to the whole device.
              */
             else if (suggested_plugin &&
                      /* The GENERIC plugin is NEVER suggested to others */
                      !g_str_equal (mm_plugin_get_name (suggested_plugin),
                                    MM_PLUGIN_GENERIC_NAME)) {
-                mm_dbg ("(Plugin Manager) (%s) [%s] suggested plugin for port",
-                        mm_plugin_get_name (suggested_plugin),
-                        g_udev_device_get_name (port_probe_ctx->port));
-                port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
+                gboolean forbidden_icera;
+
+                /* If the plugin has MM_PLUGIN_FORBIDDEN_ICERA set, we do *not* suggest
+                 * the plugin to others. Icera devices may not reply to the icera probing
+                 * in all ports, so if other ports need to be tested for icera support,
+                 * they should all go on. */
+                g_object_get (suggested_plugin,
+                              MM_PLUGIN_FORBIDDEN_ICERA, &forbidden_icera,
+                              NULL);
+
+                if (!forbidden_icera) {
+                    mm_dbg ("(Plugin Manager) (%s) [%s] suggested plugin for port",
+                            mm_plugin_get_name (suggested_plugin),
+                            g_udev_device_get_name (port_probe_ctx->port));
+                    port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
+                }
             }
         }
     }
@@ -357,12 +406,16 @@ plugin_supports_port_ready (MMPlugin *plugin,
             port_probe_ctx->suggested_plugin != plugin) {
             /* The last plugin we tried said it supported this port, but it
              * doesn't correspond with the one we're being suggested. */
-            g_warn_if_reached ();
+            mm_dbg ("(Plugin Manager) (%s) [%s] found best plugin for port, "
+                    "but not the same as the suggested one (%s)",
+                    mm_plugin_get_name (port_probe_ctx->best_plugin),
+                    g_udev_device_get_name (port_probe_ctx->port),
+                    mm_plugin_get_name (port_probe_ctx->suggested_plugin));
+        } else {
+            mm_dbg ("(Plugin Manager) (%s) [%s] found best plugin for port",
+                    mm_plugin_get_name (port_probe_ctx->best_plugin),
+                    g_udev_device_get_name (port_probe_ctx->port));
         }
-
-        mm_dbg ("(Plugin Manager) (%s) [%s] found best plugin for port",
-                mm_plugin_get_name (port_probe_ctx->best_plugin),
-                g_udev_device_get_name (port_probe_ctx->port));
         port_probe_ctx->current = NULL;
 
         /* Step, which will end the port probe operation */

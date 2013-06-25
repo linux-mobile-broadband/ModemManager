@@ -218,7 +218,7 @@ mm_port_probe_set_result_at_icera (MMPortProbe *self,
         self->priv->is_icera = TRUE;
         self->priv->flags |= MM_PORT_PROBE_AT_ICERA;
     } else {
-        mm_dbg ("(%s/%s) Modem is NOT Icera-based",
+        mm_dbg ("(%s/%s) Modem is probably not Icera-based",
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
         self->priv->is_icera = FALSE;
