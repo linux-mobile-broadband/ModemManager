@@ -4067,6 +4067,7 @@ interface_initialization_step (InitializationContext *ctx)
                     ctx->self,
                     (GAsyncReadyCallback)load_supported_capabilities_ready,
                     ctx);
+                g_array_unref (supported_capabilities);
                 return;
             }
 
