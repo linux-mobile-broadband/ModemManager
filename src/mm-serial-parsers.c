@@ -340,6 +340,7 @@ mm_serial_parser_v1_parse (gpointer data,
         local_error = mm_connection_error_for_code (code);
         goto done;
     }
+    g_match_info_free (match_info);
 
     /* NA error */
     found = g_regex_match_full (parser->regex_na,
