@@ -70,68 +70,143 @@ struct _MMBroadbandModemIceraPrivate {
 /*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
+static void
+add_supported_mode (GArray **combinations,
+                    guint mode)
+{
+    MMModemModeCombination combination;
+
+    switch (mode) {
+    case 0:
+        mm_dbg ("Modem supports 2G-only mode");
+        combination.allowed = MM_MODEM_MODE_2G;
+        combination.preferred = MM_MODEM_MODE_NONE;
+        break;
+    case 1:
+        mm_dbg ("Modem supports 3G-only mode");
+        combination.allowed = MM_MODEM_MODE_3G;
+        combination.preferred = MM_MODEM_MODE_NONE;
+        break;
+    case 2:
+        mm_dbg ("Modem supports 2G/3G mode with 2G preferred");
+        combination.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        combination.preferred = MM_MODEM_MODE_2G;
+        break;
+    case 3:
+        mm_dbg ("Modem supports 2G/3G mode with 3G preferred");
+        combination.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        combination.preferred = MM_MODEM_MODE_3G;
+        break;
+    case 5:
+        mm_dbg ("Modem supports 'any', but not explicitly listing it");
+        /* Any, no need to add it to the list */
+        return;
+    default:
+        mm_warn ("Unsupported Icera mode found: %u", mode);
+        return;
+    }
+
+    if (*combinations == NULL)
+        *combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+
+    g_array_append_val (*combinations, combination);
+}
+
 static GArray *
 load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    GArray *combinations = NULL;
+    const gchar *response;
+    gchar **split = NULL;
+    GMatchInfo *match_info;
+    GRegex *r;
+    guint i;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
         return NULL;
 
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
+    /* Reply goes like this:
+     * AT%IPSYS=?
+     * %IPSYS: (0-3,5),(0-3)
+     */
 
-static void
-parent_load_supported_modes_ready (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-    GArray *all;
-    GArray *combinations;
-    GArray *filtered;
-    MMModemModeCombination mode;
+    r = g_regex_new ("\\%IPSYS:\\s*\\((.*)\\)\\s*,\\((.*)\\)",
+                     G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
 
-    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
-    if (!all) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
+    g_regex_match (r, response, 0, &match_info);
+    if (g_match_info_matches (match_info)) {
+        gchar *aux;
+
+        aux = mm_get_string_unquoted_from_match_info (match_info, 1);
+        if (aux) {
+            split = g_strsplit (aux, ",", -1);
+            g_free (aux);
+        }
     }
 
-    /* Build list of combinations */
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+    g_match_info_free (match_info);
+    g_regex_unref (r);
 
-    /* 2G only */
-    mode.allowed = MM_MODEM_MODE_2G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 3G only */
-    mode.allowed = MM_MODEM_MODE_3G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G and 3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G and 3G, 2G preferred */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_2G;
-    g_array_append_val (combinations, mode);
-    /* 2G and 3G, 3G preferred */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_3G;
-    g_array_append_val (combinations, mode);
+    if (!split) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "%%IPSYS=? response didn't match");
+        g_regex_unref (r);
+        return NULL;
+    }
 
-    /* Filter out those unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations);
-    g_array_unref (all);
-    g_array_unref (combinations);
+    for (i = 0; split[i]; i++) {
+        gchar *interval_separator;
 
-    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_strstrip (split[i]);
+        interval_separator = strstr (split[i], "-");
+        if (interval_separator) {
+            /* Add all in interval */
+            gchar *first, *last;
+            guint modefirst, modelast;
+
+            first = g_strdup (split[i]);
+            interval_separator = strstr (first, "-");
+            *(interval_separator++) = '\0';
+            last = interval_separator;
+
+            if (mm_get_uint_from_str (first, &modefirst) &&
+                mm_get_uint_from_str (last, &modelast) &&
+                modefirst < modelast &&
+                modelast <= 5) {
+                guint j;
+
+                for (j = modefirst; j <= modelast; j++)
+                    add_supported_mode (&combinations, j);
+            } else
+                mm_warn ("Couldn't parse mode interval (%s) in %%IPSYS=? response", split[i]);
+            g_free (first);
+        } else {
+            guint mode;
+
+            /* Add single */
+            if (mm_get_uint_from_str (split[i], &mode))
+                add_supported_mode (&combinations, mode);
+            else
+                mm_warn ("Couldn't parse mode (%s) in %%IPSYS=? response", split[i]);
+        }
+    }
+
+    g_strfreev (split);
+
+    if (!combinations)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No mode combinations were parsed from the %%IPSYS=? response (%s)",
+                     response);
+
+    return combinations;
 }
 
 static void
@@ -139,14 +214,12 @@ load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    /* Run parent's loading */
-    iface_modem_parent->load_supported_modes (
-        MM_IFACE_MODEM (self),
-        (GAsyncReadyCallback)parent_load_supported_modes_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_supported_modes));
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%IPSYS=?",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
