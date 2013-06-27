@@ -1044,4 +1044,11 @@ mm_broadband_modem_altair_lte_class_init (MMBroadbandModemAltairLteClass *klass)
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemAltairLtePrivate));
 
     broadband_modem_class->setup_ports = setup_ports;
+
+    /* The Altair LTE modem reboots itself upon receiving an ATZ command. We
+     * need to skip the default implementation in MMBroadbandModem to prevent
+     * an ATZ command from being issued as part of the modem initialization
+     * sequence when enabling the modem. */
+    broadband_modem_class->enabling_modem_init = NULL;
+    broadband_modem_class->enabling_modem_init_finish = NULL;
 }
