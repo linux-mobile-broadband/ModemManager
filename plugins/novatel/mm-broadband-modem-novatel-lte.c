@@ -376,7 +376,9 @@ load_current_bands_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    /* Never fails */
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
     return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
                                        G_SIMPLE_ASYNC_RESULT (res)));
 }
