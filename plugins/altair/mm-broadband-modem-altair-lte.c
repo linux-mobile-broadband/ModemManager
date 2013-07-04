@@ -960,11 +960,6 @@ mm_broadband_modem_altair_lte_init (MMBroadbandModemAltairLte *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    /* the modem is powered up at startup - no need to waste
-     * on power query and power up commands */
-    iface->load_power_state = NULL;
-    iface->load_power_state_finish = NULL;
-
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->create_bearer = modem_create_bearer;
