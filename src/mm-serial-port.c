@@ -937,7 +937,9 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
      */
     if (ioctl (priv->fd, TIOCGSERIAL, &sinfo) == 0) {
         sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
-        ioctl (priv->fd, TIOCSSERIAL, &sinfo);
+        if (ioctl (priv->fd, TIOCSSERIAL, &sinfo) < 0)
+            mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
+                     device, g_strerror (errno));
     }
 
     g_get_current_time (&tv_end);
@@ -1027,7 +1029,9 @@ mm_serial_port_close (MMSerialPort *self)
             if (sinfo.closing_wait != ASYNC_CLOSING_WAIT_NONE) {
                 mm_warn ("(%s): serial port closing_wait was reset!", device);
                 sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
-                (void) ioctl (priv->fd, TIOCSSERIAL, &sinfo);
+                if (ioctl (priv->fd, TIOCSSERIAL, &sinfo) < 0)
+                    mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
+                             device, g_strerror (errno));
             }
         }
 
