@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 0.8 Interface Specification
+
+   Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Signal:
+      @short_description: The ModemManager Signal interface.
+
+      This interface provides access to extended signal quality information.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.Signal">
+
+    <!--
+        Setup:
+        @rate: refresh rate to set. 0 to disable retrieval.
+
+        Setup extended signal quality information retrieval.
+    -->
+    <method name="Setup">
+      <arg name="rate" type="u" direction="in" />
+    </method>
+
+    <!--
+        Rate:
+
+        Refresh rate for the extended signal quality information updates,
+        in seconds. A value of 0 disables the retrieval of the values.
+    -->
+    <property name="Rate" type="u" access="read" />
+
+    <!--
+        CdmaRssi:
+
+        CDMA1x RSSI (Received Signal Strength Indication), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="CdmaRssi" type="(bd)" access="read" />
+
+    <!--
+        CdmaEcio:
+
+        CDMA1x Ec/Io, in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="CdmaEcio" type="(bd)" access="read" />
+
+    <!--
+        EvdoRssi:
+
+        CDMA EV-DO RSSI (Received Signal Strength Indication), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="EvdoRssi" type="(bd)" access="read" />
+
+    <!--
+        EvdoEcio:
+
+        CDMA EV-DO Ec/Io, in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="EvdoEcio" type="(bd)" access="read" />
+
+    <!--
+        EvdoSinr:
+
+        CDMA EV-DO SINR level, in dB.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="EvdoSinr" type="(bd)" access="read" />
+
+    <!--
+        EvdoIo:
+
+        CDMA EV-DO IO, in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="EvdoIo" type="(bd)" access="read" />
+
+    <!--
+        GsmRssi:
+
+        GSM RSSI (Received Signal Strength Indication), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="GsmRssi" type="(bd)" access="read" />
+
+    <!--
+        UmtsRssi:
+
+        UMTS (WCDMA) RSSI (Received Signal Strength Indication), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="UmtsRssi" type="(bd)" access="read" />
+
+    <!--
+        UmtsEcio:
+
+        UMTS (WCDMA) Ec/Io, in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="UmtsEcio" type="(bd)" access="read" />
+
+    <!--
+        LteRssi:
+
+        LTE RSSI (Received Signal Strength Indication), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="LteRssi" type="(bd)" access="read" />
+
+    <!--
+        LteRsrq:
+
+        LTE RSRQ (Reference Signal Received Quality), in dB.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="LteRsrq" type="(bd)" access="read" />
+
+    <!--
+        LteRsrp:
+
+        LTE RSRP (Reference Signal Received Power), in dBm.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="LteRsrp" type="(bd)" access="read" />
+
+    <!--
+        LteSnr:
+
+        LTE S/R ratio, in dB.
+
+        The boolean flag indicates whether the value is valid.
+    -->
+    <property name="LteSnr" type="(bd)" access="read" />
+
+  </interface>
+</node>

@@ -192,6 +192,13 @@
            send_interface="org.freedesktop.ModemManager1.Sms"
            send_member="Send"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Signal.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Signal"
+           send_member="Setup"/>
+
   </policy>
 
   <policy user="root">

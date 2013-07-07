@@ -33,7 +33,8 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml
 
 BUILT_SOURCES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)
 
@@ -97,7 +98,8 @@ mm_gdbus_modem_generated = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml
 mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
@@ -107,7 +109,8 @@ mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
-	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Simple.xml
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Simple.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Signal.xml
 $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
