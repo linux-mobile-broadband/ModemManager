@@ -110,6 +110,10 @@
         <xi:include href="xml/mm-modem-firmware.xml"/>
         <xi:include href="xml/mm-firmware-properties.xml"/>
       </section>
+      <section>
+        <title>Extended signal information</title>
+        <xi:include href="xml/mm-modem-signal.xml"/>
+      </section>
     </chapter>
 
     <chapter>
@@ -174,6 +178,10 @@
     <xi:include href="xml/MmGdbusModemFirmware.xml"/>
     <xi:include href="xml/MmGdbusModemFirmwareProxy.xml"/>
     <xi:include href="xml/MmGdbusModemFirmwareSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemSignal.xml"/>
+    <xi:include href="xml/MmGdbusModemSignalProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemSignalSkeleton.xml"/>
 
     <!--xi:include href="xml/MmGdbusModemContacts.xml"/>
     <xi:include href="xml/MmGdbusModemContactsProxy.xml"/>

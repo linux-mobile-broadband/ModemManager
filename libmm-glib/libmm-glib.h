@@ -43,6 +43,7 @@
 # include <mm-modem-messaging.h>
 # include <mm-modem-time.h>
 # include <mm-modem-firmware.h>
+# include <mm-modem-signal.h>
 #endif
 
 #if defined (_LIBMM_INSIDE_MM) ||    \

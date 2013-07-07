@@ -27,6 +27,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem-time.c \
 	mm-modem-firmware.h \
 	mm-modem-firmware.c \
+	mm-modem-signal.h \
+	mm-modem-signal.c \
 	mm-sim.h \
 	mm-sim.c \
 	mm-sms.h \
