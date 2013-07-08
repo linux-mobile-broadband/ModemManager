@@ -35,6 +35,7 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-firmware.h"
+#include "mm-iface-modem-signal.h"
 #include "mm-sim-qmi.h"
 #include "mm-bearer-qmi.h"
 #include "mm-sms-qmi.h"
@@ -46,6 +47,7 @@ static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
+static void iface_modem_signal_init (MMIfaceModemSignal *iface);
 
 static MMIfaceModemMessaging *iface_modem_messaging_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
@@ -57,7 +59,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init))
 
 struct _MMBroadbandModemQmiPrivate {
     /* Cached device IDs, retrieved by the modem interface when loading device
@@ -8616,6 +8619,201 @@ firmware_change_current (MMIfaceModemFirmware *self,
 }
 
 /*****************************************************************************/
+/* Load extended signal information */
+
+static gdouble
+get_db_from_sinr_level (QmiNasEvdoSinrLevel level)
+{
+    switch (level) {
+    case QMI_NAS_EVDO_SINR_LEVEL_0: return -9.0;
+    case QMI_NAS_EVDO_SINR_LEVEL_1: return -6;
+    case QMI_NAS_EVDO_SINR_LEVEL_2: return -4.5;
+    case QMI_NAS_EVDO_SINR_LEVEL_3: return -3;
+    case QMI_NAS_EVDO_SINR_LEVEL_4: return -2;
+    case QMI_NAS_EVDO_SINR_LEVEL_5: return 1;
+    case QMI_NAS_EVDO_SINR_LEVEL_6: return 3;
+    case QMI_NAS_EVDO_SINR_LEVEL_7: return 6;
+    case QMI_NAS_EVDO_SINR_LEVEL_8: return +9;
+    default:
+        mm_warn ("Invalid SINR level '%u'", level);
+        return -G_MAXDOUBLE;
+    }
+}
+
+static gboolean
+signal_load_values_finish (MMIfaceModemSignal *self,
+                           GAsyncResult *res,
+                           gboolean *cdma_available,
+                           gdouble *cdma_rssi,
+                           gdouble *cdma_ecio,
+                           gboolean *evdo_available,
+                           gdouble *evdo_rssi,
+                           gdouble *evdo_ecio,
+                           gdouble *evdo_sinr,
+                           gdouble *evdo_io,
+                           gboolean *gsm_available,
+                           gdouble *gsm_rssi,
+                           gboolean *umts_available,
+                           gdouble *umts_rssi,
+                           gdouble *umts_ecio,
+                           gboolean *lte_available,
+                           gdouble *lte_rssi,
+                           gdouble *lte_rsrq,
+                           gdouble *lte_rsrp,
+                           gdouble *lte_snr,
+                           GError **error)
+{
+    QmiMessageNasGetSignalInfoOutput *output;
+    gint8 rssi;
+    gint16 ecio;
+    QmiNasEvdoSinrLevel sinr_level;
+    gint32 io;
+    gint8 rsrq;
+    gint16 rsrp;
+    gint16 snr;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    output = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    /* CDMA */
+    if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output,
+                                                                         &rssi,
+                                                                         &ecio,
+                                                                         NULL)) {
+        *cdma_available = TRUE;
+        *cdma_rssi = (double)rssi;
+        *cdma_ecio = ((double)ecio) * (-0.5);
+    } else {
+        *cdma_available = FALSE;
+        *cdma_rssi = 0.0;
+        *cdma_ecio = 0.0;
+    }
+
+    /* HDR... */
+    if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output,
+                                                                        &rssi,
+                                                                        &ecio,
+                                                                        &sinr_level,
+                                                                        &io,
+                                                                        NULL)) {
+        *evdo_available = TRUE;
+        *evdo_rssi = (double)rssi;
+        *evdo_ecio = ((double)ecio) * (-0.5);
+        *evdo_sinr = get_db_from_sinr_level (sinr_level);
+        *evdo_io = (double)io;
+    } else {
+        *evdo_available = FALSE;
+        *evdo_rssi = 0.0;
+        *evdo_ecio = 0.0;
+        *evdo_sinr = 0.0;
+        *evdo_io = 0.0;
+    }
+
+    /* GSM */
+    if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output,
+                                                                        &rssi,
+                                                                        NULL)) {
+        *gsm_available = TRUE;
+        *gsm_rssi = (double)rssi;
+    } else {
+        *gsm_available = FALSE;
+        *gsm_rssi = 0.0;
+    }
+
+    /* WCDMA... */
+    if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output,
+                                                                          &rssi,
+                                                                          &ecio,
+                                                                          NULL)) {
+        *umts_available = TRUE;
+        *umts_rssi = (double)rssi;
+        *umts_ecio = ((double)ecio) * (-0.5);
+    } else {
+        *umts_available = FALSE;
+        *umts_rssi = 0.0;
+        *umts_ecio = 0.0;
+    }
+
+    /* LTE... */
+    if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output,
+                                                                        &rssi,
+                                                                        &rsrq,
+                                                                        &rsrp,
+                                                                        &snr,
+                                                                        NULL)) {
+        *lte_available = TRUE;
+        *lte_rssi = (double)rssi;
+        *lte_rsrq = (gdouble)rsrq;
+        *lte_rsrp = (gdouble)rsrp;
+        *lte_snr = (0.1) * ((gdouble)snr);
+    } else {
+        *lte_available = FALSE;
+        *lte_rssi = 0.0;
+        *lte_rsrq = 0.0;
+        *lte_rsrp = 0.0;
+        *lte_snr = 0.0;
+    }
+
+    return TRUE;
+}
+
+static void
+signal_load_values_get_signal_info_ready (QmiClientNas *client,
+                                          GAsyncResult *res,
+                                          GSimpleAsyncResult *simple)
+{
+    QmiMessageNasGetSignalInfoOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_signal_info_finish (client, res, &error);
+    if (!output)
+        g_simple_async_result_take_error (simple, error);
+    else if (!qmi_message_nas_get_signal_info_output_get_result (output, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        /* set the output bundle as result, we'll read the values directly in finish() */
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   qmi_message_nas_get_signal_info_output_ref (output),
+                                                   (GDestroyNotify)qmi_message_nas_get_signal_info_output_unref);
+
+    if (output)
+        qmi_message_nas_get_signal_info_output_unref (output);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+signal_load_values (MMIfaceModemSignal *self,
+                    GCancellable *cancellable,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    mm_dbg ("loading extended signal information...");
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        signal_load_values);
+
+    qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (client),
+                                    NULL,
+                                    5,
+                                    NULL,
+                                    (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
+                                    result);
+}
+
+/*****************************************************************************/
 /* First enabling step */
 
 static gboolean
@@ -9114,6 +9312,13 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->enable_location_gathering_finish = enable_location_gathering_finish;
     iface->disable_location_gathering = disable_location_gathering;
     iface->disable_location_gathering_finish = disable_location_gathering_finish;
+}
+
+static void
+iface_modem_signal_init (MMIfaceModemSignal *iface)
+{
+    iface->load_values = signal_load_values;
+    iface->load_values_finish = signal_load_values_finish;
 }
 
 static void
