@@ -113,8 +113,8 @@ supports_port (MMPluginBase *base,
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    /* Only TCT/T&A for now */
-    if (vendor != 0x1bbb)
+    /* Only TCT/T&A and Olivetti for now */
+    if (vendor != 0x1bbb && vendor != 0x0b3c)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* If the port wasn't tagged, we don't support it */
