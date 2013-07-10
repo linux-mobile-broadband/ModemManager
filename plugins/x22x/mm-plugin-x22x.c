@@ -241,8 +241,8 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
-    /* Vendors: X22x and TAMobile */
-    static const guint16 vendor_ids[] = { 0x1bbb, 0 };
+    /* Vendors: TAMobile and Olivetti */
+    static const guint16 vendor_ids[] = { 0x1bbb, 0x0b3c, 0 };
     /* Only handle X22X tagged devices here. */
     static const gchar *udev_tags[] = {
         "ID_MM_X22X_TAGGED",
