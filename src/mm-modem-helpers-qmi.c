@@ -955,7 +955,7 @@ mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyP
 QmiNasRadioTechnologyPreference
 mm_modem_capability_to_qmi_radio_technology_preference (MMModemCapability caps)
 {
-    QmiNasRatModePreference qmi = 0;
+    QmiNasRadioTechnologyPreference qmi = 0;
 
     /* It is not expected to have a modem supporting 3GPP and 3GPP2 at the same
      * time but not supporting SSP. */
@@ -1079,7 +1079,7 @@ mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
     mm_dbg ("Unhandled modem mode: '%s'", str);
     g_free (str);
 
-    return MM_MODEM_MODE_NONE;
+    return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_AUTOMATIC;
 }
 
 /*****************************************************************************/
@@ -1093,7 +1093,7 @@ mm_modem_3gpp_registration_state_from_qmi_registration_state (QmiNasAttachState 
         return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
     if (attach_state == QMI_NAS_ATTACH_STATE_DETACHED)
-        return QMI_NAS_REGISTRATION_STATE_NOT_REGISTERED;
+        return MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
 
     /* attached */
 
