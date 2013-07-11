@@ -4782,8 +4782,8 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     guint16 sid = 0;
     guint16 nid = 0;
     guint16 bs_id = 0;
-    gint32 bs_longitude = MM_LOCATION_LONGITUDE_UNKNOWN;
-    gint32 bs_latitude = MM_LOCATION_LATITUDE_UNKNOWN;
+    gint32 bs_longitude = G_MININT32;
+    gint32 bs_latitude = G_MININT32;
 
     if (response_output)
         qmi_message_nas_get_serving_system_output_get_serving_system (
@@ -4933,11 +4933,11 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
     /* Longitude and latitude given in units of 0.25 secs
      * Note that multiplying by 0.25 is like dividing by 4, so 60*60*4=14400 */
 #define QMI_LONGITUDE_TO_DEGREES(longitude)       \
-    (longitude != MM_LOCATION_LONGITUDE_UNKNOWN ? \
+    (longitude != G_MININT32 ? \
      (((gdouble)longitude) / 14400.0) :           \
      MM_LOCATION_LONGITUDE_UNKNOWN)
 #define QMI_LATITUDE_TO_DEGREES(latitude)         \
-    (latitude != MM_LOCATION_LATITUDE_UNKNOWN ?   \
+    (latitude != G_MININT32 ?   \
      (((gdouble)latitude) / 14400.0) :            \
      MM_LOCATION_LATITUDE_UNKNOWN)
 
