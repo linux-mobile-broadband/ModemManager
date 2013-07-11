@@ -372,7 +372,7 @@ libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 
 # Additional files to include in the distribution
-EXTRA_DIST = \
+EXTRA_DIST += \
 	$(udevrules_DATA)
 
 # Unit tests
