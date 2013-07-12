@@ -61,7 +61,9 @@ libmm_glib_la_SOURCES = \
 	mm-network-timezone.h \
 	mm-network-timezone.c \
 	mm-firmware-properties.h \
-	mm-firmware-properties.c
+	mm-firmware-properties.c \
+	mm-cdma-manual-activation-properties.h \
+	mm-cdma-manual-activation-properties.c
 
 libmm_glib_la_CPPFLAGS = \
 	$(LIBMM_GLIB_CFLAGS) \
