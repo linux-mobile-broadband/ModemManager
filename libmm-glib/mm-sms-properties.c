@@ -181,7 +181,7 @@ mm_sms_properties_peek_data_bytearray (MMSmsProperties *self)
  *
  * Gets the message data.
  *
- * Returns: (transfer none): A #GByteArray with the message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_byte_array_unref().
+ * Returns: (transfer full): A #GByteArray with the message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_byte_array_unref().
  */
 GByteArray *
 mm_sms_properties_get_data_bytearray (MMSmsProperties *self)
@@ -637,7 +637,7 @@ consume_variant (MMSmsProperties *properties,
                 properties,
                 g_variant_get_uint32 (val));
         } else if (type != MM_SMS_VALIDITY_TYPE_UNKNOWN)
-            g_warning ("SMS validity type '%s' not supported yet", 
+            g_warning ("SMS validity type '%s' not supported yet",
                        mm_sms_validity_type_get_string (type));
         g_variant_unref (val);
     } else if (g_str_equal (key, PROPERTY_CLASS))
