@@ -120,7 +120,7 @@ struct _MMIfaceModemCdma {
 
     /* Manual activation */
     void (* activate_manual) (MMIfaceModemCdma *self,
-                              GVariant *properties,
+                              MMCdmaManualActivationProperties *properties,
                               GAsyncReadyCallback callback,
                               gpointer user_data);
     gboolean (* activate_manual_finish) (MMIfaceModemCdma *self,
