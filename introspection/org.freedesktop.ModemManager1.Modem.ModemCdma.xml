@@ -36,12 +36,68 @@
 
     <!--
         ActivateManual:
-        @properties: A dictionary of properties to set on the modem, including <literal>"mdn"</literal> and <literal>"min"</literal>.
+        @properties: A dictionary of properties to set on the modem.
 
         Sets the modem provisioning data directly, without contacting the
         carrier over the air.
 
         Some modems will reboot after this call is made.
+
+        This dictionary is composed of a string identifier key
+        with an associated data which contains type-specific location
+        information:
+
+        <variablelist>
+        <varlistentry><term>"spc"</term>
+          <listitem>
+            <para>
+              The Service Programming Code, given as a string of exactly 6 digit characters. Mandatory parameter.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"sid"</term>
+          <listitem>
+            <para>
+              The System Identification Number, given as a 16-bit unsigned integer (signature <literal>"q"</literal>). Mandatory parameter.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"mdn"</term>
+          <listitem>
+            <para>
+              The Mobile Directory Number, given as a string of maximum 15 characters. Mandatory parameter.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"min"</term>
+          <listitem>
+            <para>
+              The Mobile Identification Number, given as a string of maximum 15 characters. Mandatory parameter.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"mn-ha-key"</term>
+          <listitem>
+            <para>
+              The MN-HA key, given as a string of maximum 16 characters.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"mn-aaa-key"</term>
+          <listitem>
+            <para>
+              The MN-AAA key, given as a string of maximum 16 characters.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"prl"</term>
+          <listitem>
+            <para>
+              The Preferred Roaming List, given as an array of maximum 16384 bytes.
+            </para>
+          </listitem>
+        </varlistentry>
+        </variablelist>
     -->
     <method name="ActivateManual">
       <arg name="properties" type="a{sv}" direction="in" />

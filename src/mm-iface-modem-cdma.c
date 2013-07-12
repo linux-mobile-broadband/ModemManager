@@ -277,7 +277,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* If activating OTA is not implemented, report an error */
+    /* If manual activation is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
