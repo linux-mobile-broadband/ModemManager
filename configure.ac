@@ -218,10 +218,14 @@ AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [
 AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
 case $with_qmi in
     yes)
-        PKG_CHECK_MODULES(QMI, qmi-glib)
-        AC_DEFINE(WITH_QMI, 1, [Define if you want QMI support])
-        AC_SUBST(QMI_CFLAGS)
-        AC_SUBST(QMI_LIBS)
+        PKG_CHECK_MODULES(QMI, [qmi-glib >= 1.4], [have_qmi=yes],[have_qmi=no])
+        if test "x$have_qmi" = "xno"; then
+            AC_MSG_ERROR([Couldn't find libqmi-glib. Install it, or otherwise configure using --without-qmi to disable QMI support.])
+        else
+            AC_DEFINE(WITH_QMI, 1, [Define if you want QMI support])
+            AC_SUBST(QMI_CFLAGS)
+            AC_SUBST(QMI_LIBS)
+        fi
         ;;
     *)
         with_qmi=no
