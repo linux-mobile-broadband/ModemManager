@@ -341,6 +341,98 @@ mm_modem_cdma_activate_sync (MMModemCdma *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_cdma_activate_manual_finish:
+ * @self: A #MMModemCdma.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_cdma_activate_manual().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_cdma_activate_manual().
+ *
+ * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_cdma_activate_manual_finish (MMModemCdma *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_CDMA (self), FALSE);
+
+    return mm_gdbus_modem_cdma_call_activate_manual_finish (MM_GDBUS_MODEM_CDMA (self), res, error);
+}
+
+/**
+ * mm_modem_cdma_activate_manual:
+ * @self: A #MMModemCdma.
+ * @properties: A #MMCdmaManualActivationProperties.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to provision the modem with the given properties.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_cdma_activate_manual_finish() to get the result of the operation.
+ *
+ * See mm_modem_cdma_activate_manual_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_cdma_activate_manual (MMModemCdma *self,
+                               MMCdmaManualActivationProperties *properties,
+                               GCancellable *cancellable,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GVariant *dictionary;
+
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+
+    dictionary = mm_cdma_manual_activation_properties_get_dictionary (properties);
+    mm_gdbus_modem_cdma_call_activate_manual (MM_GDBUS_MODEM_CDMA (self),
+                                              dictionary,
+                                              cancellable,
+                                              callback,
+                                              user_data);
+    g_variant_unref (dictionary);
+}
+
+/**
+ * mm_modem_cdma_activate_manual_sync:
+ * @self: A #MMModemCdma.
+ * @properties: A #MMCdmaManualActivationProperties.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to provision the modem with the given properties.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_cdma_activate_manual()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_cdma_activate_manual_sync (MMModemCdma *self,
+                                    MMCdmaManualActivationProperties *properties,
+                                    GCancellable *cancellable,
+                                    GError **error)
+{
+    GVariant *dictionary;
+    gboolean ret;
+
+    g_return_val_if_fail (MM_IS_MODEM_CDMA (self), FALSE);
+
+    dictionary = mm_cdma_manual_activation_properties_get_dictionary (properties);
+    ret = (mm_gdbus_modem_cdma_call_activate_manual_sync (
+               MM_GDBUS_MODEM_CDMA (self),
+               dictionary,
+               cancellable,
+               error));
+    g_variant_unref (dictionary);
+    return ret;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_cdma_init (MMModemCdma *self)
 {

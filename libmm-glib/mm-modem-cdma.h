@@ -31,6 +31,7 @@
 #include <ModemManager.h>
 
 #include "mm-gdbus-modem.h"
+#include "mm-cdma-manual-activation-properties.h"
 
 G_BEGIN_DECLS
 
@@ -104,6 +105,19 @@ gboolean mm_modem_cdma_activate_sync   (MMModemCdma *self,
                                         const gchar *carrier,
                                         GCancellable *cancellable,
                                         GError **error);
+
+void     mm_modem_cdma_activate_manual        (MMModemCdma *self,
+                                               MMCdmaManualActivationProperties *properties,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+gboolean mm_modem_cdma_activate_manual_finish (MMModemCdma *self,
+                                               GAsyncResult *res,
+                                               GError **error);
+gboolean mm_modem_cdma_activate_manual_sync   (MMModemCdma *self,
+                                               MMCdmaManualActivationProperties *properties,
+                                               GCancellable *cancellable,
+                                               GError **error);
 
 G_END_DECLS
 

@@ -344,6 +344,9 @@ mm_modem_cdma_get_activation_state
 mm_modem_cdma_activate
 mm_modem_cdma_activate_finish
 mm_modem_cdma_activate_sync
+mm_modem_cdma_activate_manual
+mm_modem_cdma_activate_manual_finish
+mm_modem_cdma_activate_manual_sync
 <SUBSECTION Standard>
 MMModemCdmaClass
 MM_IS_MODEM_CDMA
