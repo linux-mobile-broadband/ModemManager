@@ -195,6 +195,7 @@ build_sms_properties_from_input (const gchar *properties_string,
         g_object_unref (file);
 
         mm_sms_properties_set_data (properties, (guint8 *)contents, contents_size);
+        g_free (contents);
     }
 
     return properties;
