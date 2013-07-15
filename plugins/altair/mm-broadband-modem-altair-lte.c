@@ -913,8 +913,11 @@ setup_ports (MMBroadbandModem *self)
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_altair_lte_parent_class)->setup_ports (self);
 
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary)
+        return;
 
-    g_object_set (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+    g_object_set (primary,
+                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
                   MM_AT_SERIAL_PORT_SEND_LF, TRUE,
                   MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);
