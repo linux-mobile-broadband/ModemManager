@@ -45,11 +45,21 @@ static Context *ctx;
 
 /* Options */
 static gchar *activate_str;
+static gchar *activate_manual_str;
+static gchar *activate_manual_with_prl_str;
 
 static GOptionEntry entries[] = {
     { "cdma-activate", 0, 0, G_OPTION_ARG_STRING, &activate_str,
       "Provision the modem to use with a given carrier using OTA settings.",
       "[CARRIER]"
+    },
+    { "cdma-activate-manual", 0, 0, G_OPTION_ARG_STRING, &activate_manual_str,
+      "Provision the modem with the given settings. 'spc', 'sid', 'mdn' and 'min' are mandatory, 'mn-ha-key' and 'mn-aaa-key' are optional.",
+      "[\"key=value,...\"]"
+    },
+    { "cdma-activate-manual-with-prl", 0, 0, G_OPTION_ARG_STRING, &activate_manual_with_prl_str,
+      "Use the given file contents as data for the PRL.",
+      "[File path]"
     },
     { NULL }
 };
@@ -78,10 +88,17 @@ mmcli_modem_cdma_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (!!activate_str);
+    n_actions = (!!activate_str +
+                 !!activate_manual_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many CDMA actions requested\n");
+        exit (EXIT_FAILURE);
+    }
+
+    if (activate_manual_with_prl_str && !activate_manual_str) {
+        g_printerr ("error: `--cdma-activate-manual-with-prl' must be given along "
+                    "with `--cdma-activate-manual'\n");
         exit (EXIT_FAILURE);
     }
 
@@ -156,6 +173,81 @@ activate_ready (MMModemCdma  *modem_cdma,
 }
 
 static void
+activate_manual_process_reply (gboolean result,
+                               const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't manually activate the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully activated the modem manually\n");
+}
+
+static void
+activate_manual_ready (MMModemCdma  *modem_cdma,
+                       GAsyncResult *result,
+                       gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_cdma_activate_manual_finish (modem_cdma, result, &error);
+    activate_manual_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static MMCdmaManualActivationProperties *
+build_activate_manual_properties_from_input (const gchar *properties_string,
+                                             const gchar *prl_file)
+{
+    GError *error = NULL;
+    MMCdmaManualActivationProperties *properties;
+
+    properties = mm_cdma_manual_activation_properties_new_from_string (properties_string, &error);
+
+    if (!properties) {
+        g_printerr ("error: cannot parse properties string: '%s'\n", error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    if (prl_file) {
+        gchar *path;
+        GFile *file;
+        gchar *contents;
+        gsize contents_size;
+
+        g_debug ("Reading data from file '%s'", prl_file);
+
+        file = g_file_new_for_commandline_arg (prl_file);
+        path = g_file_get_path (file);
+        if (!g_file_get_contents (path,
+                                  &contents,
+                                  &contents_size,
+                                  &error)) {
+            g_printerr ("error: cannot read from file '%s': '%s'\n",
+                        prl_file, error->message);
+            exit (EXIT_FAILURE);
+        }
+        g_free (path);
+        g_object_unref (file);
+
+        if (!mm_cdma_manual_activation_properties_set_prl (properties,
+                                                           (guint8 *)contents,
+                                                           contents_size,
+                                                           &error)) {
+            g_printerr ("error: cannot set PRL: '%s'\n", error->message);
+            exit (EXIT_FAILURE);
+        }
+        g_free (contents);
+    }
+
+    return properties;
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -177,6 +269,23 @@ get_modem_ready (GObject      *source,
                                 ctx->cancellable,
                                 (GAsyncReadyCallback)activate_ready,
                                 NULL);
+        return;
+    }
+
+    /* Request to manually activate the modem? */
+    if (activate_manual_str) {
+        MMCdmaManualActivationProperties *properties;
+
+        properties = build_activate_manual_properties_from_input (activate_manual_str,
+                                                                  activate_manual_with_prl_str);
+
+        g_debug ("Asynchronously manually activating the modem...");
+        mm_modem_cdma_activate_manual (ctx->modem_cdma,
+                                       properties,
+                                       ctx->cancellable,
+                                       (GAsyncReadyCallback)activate_manual_ready,
+                                       NULL);
+        g_object_unref (properties);
         return;
     }
 
@@ -229,6 +338,25 @@ mmcli_modem_cdma_run_synchronous (GDBusConnection *connection)
             NULL,
             &error);
         activate_process_reply (result, error);
+        return;
+    }
+
+    /* Request to manually activate the modem? */
+    if (activate_manual_str) {
+        MMCdmaManualActivationProperties *properties;
+        gboolean result;
+
+        properties = build_activate_manual_properties_from_input (activate_manual_str,
+                                                                  activate_manual_with_prl_str);
+
+        g_debug ("Synchronously manually activating the modem...");
+        result = mm_modem_cdma_activate_manual_sync (
+            ctx->modem_cdma,
+            properties,
+            NULL,
+            &error);
+        activate_manual_process_reply (result, error);
+        g_object_unref (properties);
         return;
     }
 
