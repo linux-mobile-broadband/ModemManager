@@ -6573,17 +6573,8 @@ messaging_check_support (MMIfaceModemMessaging *self,
         return;
     }
 
-    /* We only handle 3GPP messaging (PDU based) currently, so just ignore
-     * CDMA-only QMI modems */
-    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
-        mm_dbg ("Messaging capabilities supported by this modem, "
-                "but 3GPP2 messaging not supported yet by ModemManager");
-        g_simple_async_result_set_op_res_gboolean (result, FALSE);
-    } else {
-        mm_dbg ("Messaging capabilities supported");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    }
-
+    mm_dbg ("Messaging capabilities supported");
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -6784,11 +6775,20 @@ messaging_set_default_storage (MMIfaceModemMessaging *_self,
 
 typedef enum {
     LOAD_INITIAL_SMS_PARTS_STEP_FIRST,
-    LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL,
-    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_READ,
-    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_NOT_READ,
-    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_SENT,
-    LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_NOT_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_FIRST,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_ALL,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MT_NOT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MO_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MO_NOT_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_FIRST,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_ALL,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MT_NOT_READ,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MO_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MO_NOT_SENT,
+    LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST,
     LOAD_INITIAL_SMS_PARTS_STEP_LAST
 } LoadInitialSmsPartsStep;
 
@@ -6942,8 +6942,10 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
     if (ctx->i >= ctx->message_array->len ||
         !ctx->message_array) {
         /* If we just listed all SMS, we're done. Otherwise go to next tag. */
-        if (ctx->step == LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL)
-            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_LAST;
+        if (ctx->step == LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_ALL)
+            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST;
+        else if (ctx->step == LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_ALL)
+            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST;
         else
             ctx->step++;
         load_initial_sms_parts_step (ctx);
@@ -6960,11 +6962,21 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
         mm_sms_storage_to_qmi_storage_type (ctx->storage),
         message->memory_index,
         NULL);
-    /* Only reading 3GPP SMS for now */
-    qmi_message_wms_raw_read_input_set_message_mode (
-        input,
-        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
-        NULL);
+
+    /* set message mode */
+    if (ctx->step < LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST)
+        qmi_message_wms_raw_read_input_set_message_mode (
+            input,
+            QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+            NULL);
+    else if (ctx->step < LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST)
+        qmi_message_wms_raw_read_input_set_message_mode (
+            input,
+            QMI_WMS_MESSAGE_MODE_CDMA,
+            NULL);
+    else
+        g_assert_not_reached ();
+
     qmi_client_wms_raw_read (QMI_CLIENT_WMS (ctx->client),
                              input,
                              3,
@@ -7019,36 +7031,95 @@ static void
 load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
 {
     QmiMessageWmsListMessagesInput *input;
+    gint mode = -1;
     gint tag_type = -1;
 
     switch (ctx->step) {
     case LOAD_INITIAL_SMS_PARTS_STEP_FIRST:
         ctx->step++;
         /* Fall down */
-    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_ALL:
-        mm_dbg ("loading all messages from storage '%s'...",
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_FIRST:
+        /* If modem doesn't have 3GPP caps, skip 3GPP SMS */
+        if (!mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST;
+            load_initial_sms_parts_step (ctx);
+            return;
+        }
+        ctx->step++;
+        /* Fall down */
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_ALL:
+        mm_dbg ("loading all 3GPP messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
+        mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
         break;
-    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_READ:
-        mm_dbg ("loading MT-read messages from storage '%s'...",
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MT_READ:
+        mm_dbg ("loading 3GPP MT-read messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
         tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_READ;
+        mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
         break;
-    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_NOT_READ:
-        mm_dbg ("loading MT-not-read messages from storage '%s'...",
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MT_NOT_READ:
+        mm_dbg ("loading 3GPP MT-not-read messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
         tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
+        mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
         break;
-    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_SENT:
-        mm_dbg ("loading MO-sent messages from storage '%s'...",
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MO_SENT:
+        mm_dbg ("loading 3GPP MO-sent messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
         tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT;
+        mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
         break;
-    case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_NOT_SENT:
-        mm_dbg ("loading MO-not-sent messages from storage '%s'...",
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LIST_MO_NOT_SENT:
+        mm_dbg ("loading 3GPP MO-not-sent messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
         tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT;
+        mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
         break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST:
+        ctx->step++;
+        /* Fall down */
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_FIRST:
+        /* If modem doesn't have CDMA caps, skip CDMA SMS */
+        if (!mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
+            ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST;
+            load_initial_sms_parts_step (ctx);
+            return;
+        }
+        ctx->step++;
+        /* Fall down */
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_ALL:
+        mm_dbg ("loading all CDMA messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        mode = QMI_WMS_MESSAGE_MODE_CDMA;
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MT_READ:
+        mm_dbg ("loading CDMA MT-read messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_READ;
+        mode = QMI_WMS_MESSAGE_MODE_CDMA;
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MT_NOT_READ:
+        mm_dbg ("loading CDMA MT-not-read messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
+        mode = QMI_WMS_MESSAGE_MODE_CDMA;
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MO_SENT:
+        mm_dbg ("loading CDMA MO-sent messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT;
+        mode = QMI_WMS_MESSAGE_MODE_CDMA;
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LIST_MO_NOT_SENT:
+        mm_dbg ("loading CDMA MO-not-sent messages from storage '%s'...",
+                mm_sms_storage_get_string (ctx->storage));
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT;
+        mode = QMI_WMS_MESSAGE_MODE_CDMA;
+        break;
+    case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST:
+        ctx->step++;
+        /* Fall down */
     case LOAD_INITIAL_SMS_PARTS_STEP_LAST:
         /* All steps done */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -7056,7 +7127,7 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         return;
     }
 
-    /* Request to list messages in a given storage */
+    g_assert (mode != -1);
     input = qmi_message_wms_list_messages_input_new ();
     qmi_message_wms_list_messages_input_set_storage_type (
         input,
@@ -7064,7 +7135,7 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         NULL);
     qmi_message_wms_list_messages_input_set_message_mode (
         input,
-        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        (QmiWmsMessageMode)mode,
         NULL);
     if (tag_type != -1)
         qmi_message_wms_list_messages_input_set_message_tag (
