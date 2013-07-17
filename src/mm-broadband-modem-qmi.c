@@ -6599,8 +6599,11 @@ messaging_load_supported_storages_finish (MMIfaceModemMessaging *_self,
     }
 
     *mem1 = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), 2);
-    supported = MM_SMS_STORAGE_SM;
-    g_array_append_val (*mem1, supported);
+    /* Add SM storage only if not CDMA-only */
+    if (!mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
+        supported = MM_SMS_STORAGE_SM;
+        g_array_append_val (*mem1, supported);
+    }
     supported = MM_SMS_STORAGE_ME;
     g_array_append_val (*mem1, supported);
     *mem2 = g_array_ref (*mem1);
