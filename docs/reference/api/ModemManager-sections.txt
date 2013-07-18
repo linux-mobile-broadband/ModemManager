@@ -43,6 +43,7 @@ MMSmsState
 MMSmsDeliveryState
 MMSmsStorage
 MMSmsValidityType
+MMSmsCdmaTeleserviceId
 </SECTION>
 
 <SECTION>

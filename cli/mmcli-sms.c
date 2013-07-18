@@ -200,6 +200,16 @@ print_sms_info (MMSms *sms)
                  VALIDATE (mm_sms_get_smsc (sms)),
                  mm_sms_get_class (sms));
     }
+    /* Teleservice ID is 3GPP2 specific */
+    else if (pdu_type == MM_SMS_PDU_TYPE_CDMA_DELIVER ||
+             pdu_type == MM_SMS_PDU_TYPE_CDMA_SUBMIT ||
+             pdu_type == MM_SMS_PDU_TYPE_CDMA_CANCELLATION ||
+             pdu_type == MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT ||
+             pdu_type == MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT ||
+             pdu_type == MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT) {
+        g_print ("             |      teleservice id: '%s'\n",
+                 mm_sms_cdma_teleservice_id_get_string (mm_sms_get_teleservice_id (sms)));
+    }
 
     if (pdu_type == MM_SMS_PDU_TYPE_SUBMIT)
         g_print ("             |     delivery report: '%s'\n",

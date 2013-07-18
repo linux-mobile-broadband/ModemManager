@@ -571,6 +571,24 @@ mm_sms_get_pdu_type (MMSms *self)
 /*****************************************************************************/
 
 /**
+ * mm_sms_get_teleservice_id:
+ * @self: A #MMSms.
+ *
+ * Gets the 3GPP2 Teleservice ID.
+ *
+ * Returns: a #MMSmsCdmaTeleserviceId.
+ */
+MMSmsCdmaTeleserviceId
+mm_sms_get_teleservice_id (MMSms *self)
+{
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN);
+
+    return (MMSmsCdmaTeleserviceId) mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sms_send_finish:
  * @self: A #MMSms.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_send().

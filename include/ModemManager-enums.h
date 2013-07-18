@@ -574,6 +574,33 @@ typedef enum { /*< underscore_name=mm_sms_validity_type >*/
 } MMSmsValidityType;
 
 /**
+ * MMSmsCdmaTeleserviceId:
+ * @MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN: Unknown.
+ * @MM_SMS_CDMA_TELESERVICE_ID_CMT91: IS-91 Extended Protocol Enhanced Services.
+ * @MM_SMS_CDMA_TELESERVICE_ID_WPT: Wireless Paging Teleservice.
+ * @MM_SMS_CDMA_TELESERVICE_ID_WMT: Wireless Messaging Teleservice.
+ * @MM_SMS_CDMA_TELESERVICE_ID_VMN: Voice Mail Notification.
+ * @MM_SMS_CDMA_TELESERVICE_ID_WAP: Wireless Application Protocol.
+ * @MM_SMS_CDMA_TELESERVICE_ID_WEMT: Wireless Enhanced Messaging Teleservice.
+ * @MM_SMS_CDMA_TELESERVICE_ID_SCPT: Service Category Programming Teleservice.
+ * @MM_SMS_CDMA_TELESERVICE_ID_CATPT: Card Application Toolkit Protocol Teleservice.
+ *
+ * Teleservice IDs supported for CDMA SMS, as defined in 3GPP2 X.S0004-550-E
+ * (section 2.256) and 3GPP2 C.S0015-B (section 3.4.3.1).
+ */
+typedef enum { /*< underscore_name=mm_sms_cdma_teleservice_id >*/
+    MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN = 0x0000,
+    MM_SMS_CDMA_TELESERVICE_ID_CMT91   = 0x1000,
+    MM_SMS_CDMA_TELESERVICE_ID_WPT     = 0x1001,
+    MM_SMS_CDMA_TELESERVICE_ID_WMT     = 0x1002,
+    MM_SMS_CDMA_TELESERVICE_ID_VMN     = 0x1003,
+    MM_SMS_CDMA_TELESERVICE_ID_WAP     = 0x1004,
+    MM_SMS_CDMA_TELESERVICE_ID_WEMT    = 0x1005,
+    MM_SMS_CDMA_TELESERVICE_ID_SCPT    = 0x1006,
+    MM_SMS_CDMA_TELESERVICE_ID_CATPT   = 0x1007,
+} MMSmsCdmaTeleserviceId;
+
+/**
  * MMModemLocationSource:
  * @MM_MODEM_LOCATION_SOURCE_NONE: None.
  * @MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI: Location Area Code and Cell ID.

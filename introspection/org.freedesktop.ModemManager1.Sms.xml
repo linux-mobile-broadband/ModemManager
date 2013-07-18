@@ -129,6 +129,15 @@
     <property name="Class" type="i" access="read" />
 
     <!--
+        TeleserviceId:
+
+        A <link linkend="MMSmsCdmaTeleserviceId">MMSmsCdmaTeleserviceId</link> value.
+
+        Always <link linkend="MM-SMS-CDMA-TELESERVICE-ID-UNKNOWN:CAPS">MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN</link> for 3GPP.
+    -->
+    <property name="TeleserviceId" type="u" access="read" />
+
+    <!--
         DeliveryReportRequest:
 
         #TRUE if delivery report request is required, #FALSE otherwise.

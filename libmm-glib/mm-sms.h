@@ -103,6 +103,8 @@ MMSmsStorage  mm_sms_get_storage                 (MMSms *self);
 
 MMSmsPduType  mm_sms_get_pdu_type                (MMSms *self);
 
+MMSmsCdmaTeleserviceId mm_sms_get_teleservice_id (MMSms *self);
+
 void     mm_sms_send        (MMSms *self,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
