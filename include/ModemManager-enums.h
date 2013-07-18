@@ -419,17 +419,29 @@ typedef enum { /*< underscore_name=mm_modem_port_type >*/
 /**
  * MMSmsPduType:
  * @MM_SMS_PDU_TYPE_UNKNOWN: Unknown type.
- * @MM_SMS_PDU_TYPE_DELIVER: SMS has been received from the SMSC.
- * @MM_SMS_PDU_TYPE_SUBMIT: SMS is sent, or to be sent to the SMSC.
- * @MM_SMS_PDU_TYPE_STATUS_REPORT: SMS is a status report received from the SMSC.
+ * @MM_SMS_PDU_TYPE_DELIVER: 3GPP Mobile-Terminated (MT) message.
+ * @MM_SMS_PDU_TYPE_SUBMIT: 3GPP Mobile-Originated (MO) message.
+ * @MM_SMS_PDU_TYPE_STATUS_REPORT: 3GPP status report (MT).
+ * @MM_SMS_PDU_TYPE_CDMA_DELIVER: 3GPP2 Mobile-Terminated (MT) message.
+ * @MM_SMS_PDU_TYPE_CDMA_SUBMIT: 3GPP2 Mobile-Originated (MO) message.
+ * @MM_SMS_PDU_TYPE_CDMA_CANCELLATION: 3GPP2 Cancellation (MO) message.
+ * @MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT: 3GPP2 Delivery Acknowledgement (MT) message.
+ * @MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT: 3GPP2 User Acknowledgement (MT or MO) message.
+ * @MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT: 3GPP2 Read Acknowledgement (MT or MO) message.
  *
  * Type of PDUs used in the SMS.
  */
 typedef enum { /*< underscore_name=mm_sms_pdu_type >*/
-    MM_SMS_PDU_TYPE_UNKNOWN       = 0,
+    MM_SMS_PDU_TYPE_UNKNOWN = 0,
     MM_SMS_PDU_TYPE_DELIVER       = 1,
     MM_SMS_PDU_TYPE_SUBMIT        = 2,
-    MM_SMS_PDU_TYPE_STATUS_REPORT = 3
+    MM_SMS_PDU_TYPE_STATUS_REPORT = 3,
+    MM_SMS_PDU_TYPE_CDMA_DELIVER                  = 32,
+    MM_SMS_PDU_TYPE_CDMA_SUBMIT                   = 33,
+    MM_SMS_PDU_TYPE_CDMA_CANCELLATION             = 34,
+    MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT = 35,
+    MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT     = 36,
+    MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT     = 37,
 } MMSmsPduType;
 
 /**
