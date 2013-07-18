@@ -1500,6 +1500,7 @@ assemble_sms (MMSms *self,
                   "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
                   "class",     mm_sms_part_get_class (sorted_parts[0]),
                   "teleservice-id", MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
+                  "service-category", MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
                   "validity",                (validity_relative ?
                                               g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (validity_relative)) :
@@ -1739,6 +1740,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                   "smsc",     mm_sms_properties_get_smsc (properties),
                   "class",    mm_sms_properties_get_class (properties),
                   "teleservice-id", MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
+                  "service-category", MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
                   "delivery-report-request", mm_sms_properties_get_delivery_report_request (properties),
                   "validity", (mm_sms_properties_get_validity_type (properties) == MM_SMS_VALIDITY_TYPE_RELATIVE ?
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (mm_sms_properties_get_validity_relative (properties))) :

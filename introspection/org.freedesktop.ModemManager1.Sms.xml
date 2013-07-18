@@ -138,6 +138,15 @@
     <property name="TeleserviceId" type="u" access="read" />
 
     <!--
+        ServiceCategory:
+
+        A <link linkend="MMSmsCdmaServiceCategory">MMSmsCdmaServiceCategory</link> value.
+
+        Always <link linkend="MM-SMS-CDMA-SERVICE-CATEGORY-UNKNOWN:CAPS">MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN</link> for 3GPP.
+    -->
+    <property name="ServiceCategory" type="u" access="read" />
+
+    <!--
         DeliveryReportRequest:
 
         #TRUE if delivery report request is required, #FALSE otherwise.

@@ -589,6 +589,24 @@ mm_sms_get_teleservice_id (MMSms *self)
 /*****************************************************************************/
 
 /**
+ * mm_sms_get_service_category:
+ * @self: A #MMSms.
+ *
+ * Gets the 3GPP2 Service Category.
+ *
+ * Returns: a #MMSmsCdmaServiceCategory.
+ */
+MMSmsCdmaServiceCategory
+mm_sms_get_service_category (MMSms *self)
+{
+    g_return_val_if_fail (MM_IS_SMS (self), MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN);
+
+    return (MMSmsCdmaServiceCategory) mm_gdbus_sms_get_service_category (MM_GDBUS_SMS (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sms_send_finish:
  * @self: A #MMSms.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_send().
