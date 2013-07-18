@@ -255,8 +255,6 @@ mm_firmware_properties_get_dictionary (MMFirmwareProperties *self)
 {
     GVariantBuilder builder;
 
-    g_return_val_if_fail (MM_IS_FIRMWARE_PROPERTIES (self), NULL);
-
     /* We do allow NULL */
     if (!self)
         return NULL;
