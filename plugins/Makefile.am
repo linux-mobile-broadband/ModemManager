@@ -132,8 +132,8 @@ test_modem_helpers_huawei_SOURCES = \
 test_modem_helpers_huawei_CPPFLAGS = \
 	-I$(top_srcdir)/plugins/huawei \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
-test_modem_helpers_huawei_LDFLAGS = $(top_builddir)/libmm-glib/libmm-glib.la
-
+test_modem_helpers_huawei_LDADD = $(top_builddir)/libmm-glib/libmm-glib.la
+test_modem_helpers_huawei_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # MBM
 libmm_plugin_mbm_la_SOURCES = \
