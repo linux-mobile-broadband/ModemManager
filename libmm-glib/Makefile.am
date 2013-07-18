@@ -65,7 +65,9 @@ libmm_glib_la_SOURCES = \
 	mm-firmware-properties.h \
 	mm-firmware-properties.c \
 	mm-cdma-manual-activation-properties.h \
-	mm-cdma-manual-activation-properties.c
+	mm-cdma-manual-activation-properties.c \
+	mm-signal.h \
+	mm-signal.c
 
 libmm_glib_la_CPPFLAGS = \
 	-I$(srcdir) \
@@ -120,7 +122,8 @@ include_HEADERS = \
 	mm-unlock-retries.h \
 	mm-network-timezone.h \
 	mm-firmware-properties.h \
-	mm-cdma-manual-activation-properties.h
+	mm-cdma-manual-activation-properties.h \
+	mm-signal.h
 
 CLEANFILES =
 

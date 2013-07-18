@@ -41,6 +41,25 @@
 
 G_DEFINE_TYPE (MMModemSignal, mm_modem_signal, MM_GDBUS_TYPE_MODEM_SIGNAL_PROXY)
 
+typedef struct {
+    GMutex mutex;
+    guint id;
+    MMSignal *info;
+} UpdatedProperty;
+
+typedef enum {
+    UPDATED_PROPERTY_TYPE_CDMA = 0,
+    UPDATED_PROPERTY_TYPE_EVDO = 1,
+    UPDATED_PROPERTY_TYPE_GSM  = 2,
+    UPDATED_PROPERTY_TYPE_UMTS = 3,
+    UPDATED_PROPERTY_TYPE_LTE  = 4,
+    UPDATED_PROPERTY_TYPE_LAST
+} UpdatedPropertyType;
+
+struct _MMModemSignalPrivate {
+    UpdatedProperty values [UPDATED_PROPERTY_TYPE_LAST];
+};
+
 /*****************************************************************************/
 
 /**
@@ -95,8 +114,8 @@ mm_modem_signal_dup_path (MMModemSignal *self)
  */
 gboolean
 mm_modem_signal_setup_finish (MMModemSignal *self,
-                  GAsyncResult *res,
-                  GError **error)
+                              GAsyncResult *res,
+                              GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), FALSE);
 
@@ -120,10 +139,10 @@ mm_modem_signal_setup_finish (MMModemSignal *self,
  */
 void
 mm_modem_signal_setup (MMModemSignal *self,
-               guint rate,
-               GCancellable *cancellable,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+                       guint rate,
+                       GCancellable *cancellable,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_SIGNAL (self));
 
@@ -146,9 +165,9 @@ mm_modem_signal_setup (MMModemSignal *self,
  */
 gboolean
 mm_modem_signal_setup_sync (MMModemSignal *self,
-                guint rate,
-                GCancellable *cancellable,
-                GError **error)
+                            guint rate,
+                            GCancellable *cancellable,
+                            GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), FALSE);
 
@@ -175,182 +194,409 @@ mm_modem_signal_get_rate (MMModemSignal *self)
 
 /*****************************************************************************/
 
-#define GETTER(VALUE)                                                   \
-    gboolean                                                            \
-    mm_modem_signal_get_##VALUE (MMModemSignal *self,                   \
-                                gdouble *value)                         \
-    {                                                                   \
-        GVariant *variant;                                              \
-        gboolean is_valid = FALSE;                                      \
-        double val = 0.0;                                               \
-                                                                        \
-        g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), FALSE);        \
-                                                                        \
-        variant = mm_gdbus_modem_signal_dup_##VALUE (MM_GDBUS_MODEM_SIGNAL (self)); \
-            if (variant) {                                              \
-                g_variant_get (variant,                                 \
-                               "(bd)",                                  \
-                               &is_valid,                               \
-                               &val);                                   \
-                g_variant_unref (variant);                              \
-            }                                                           \
-                                                                        \
-            if (is_valid)                                               \
-                *value = val;                                           \
-            return is_valid;                                            \
+static void values_updated (MMModemSignal *self, GParamSpec *pspec, UpdatedPropertyType type);
+
+static void
+cdma_updated (MMModemSignal *self,
+              GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_CDMA);
+}
+
+static void
+evdo_updated (MMModemSignal *self,
+              GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_EVDO);
+}
+
+static void
+gsm_updated (MMModemSignal *self,
+             GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_GSM);
+}
+
+static void
+umts_updated (MMModemSignal *self,
+              GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_UMTS);
+}
+
+static void
+lte_updated (MMModemSignal *self,
+             GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_LTE);
+}
+
+typedef GVariant * (* Getter)          (MmGdbusModemSignal *self);
+typedef GVariant * (* Dupper)          (MmGdbusModemSignal *self);
+typedef void       (* UpdatedCallback) (MMModemSignal *self, GParamSpec *pspec);
+typedef struct {
+    const gchar *signal_name;
+    Getter get;
+    Dupper dup;
+    UpdatedCallback updated_callback;
+} SignalData;
+
+static const SignalData signal_data [UPDATED_PROPERTY_TYPE_LAST] = {
+    { "notify::cdma", mm_gdbus_modem_signal_get_cdma, mm_gdbus_modem_signal_dup_cdma, cdma_updated },
+    { "notify::evdo", mm_gdbus_modem_signal_get_evdo, mm_gdbus_modem_signal_dup_evdo, evdo_updated },
+    { "notify::gsm",  mm_gdbus_modem_signal_get_gsm,  mm_gdbus_modem_signal_dup_gsm,  gsm_updated  },
+    { "notify::umts", mm_gdbus_modem_signal_get_umts, mm_gdbus_modem_signal_dup_umts, umts_updated },
+    { "notify::lte",  mm_gdbus_modem_signal_get_lte,  mm_gdbus_modem_signal_dup_lte,  lte_updated  }
+};
+
+static void
+values_updated (MMModemSignal *self,
+                GParamSpec *pspec,
+                UpdatedPropertyType type)
+{
+    g_mutex_lock (&self->priv->values[type].mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->values[type].info);
+        dictionary = signal_data[type].get (MM_GDBUS_MODEM_SIGNAL (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->values[type].info = mm_signal_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid signal info update received: %s", error->message);
+                g_error_free (error);
+            }
+        }
     }
+    g_mutex_unlock (&self->priv->values[type].mutex);
+}
+
+static void
+ensure_internal (MMModemSignal *self,
+                 MMSignal **dup,
+                 UpdatedPropertyType type)
+{
+    g_mutex_lock (&self->priv->values[type].mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->values[type].id) {
+            GVariant *dictionary;
+
+            dictionary = signal_data[type].dup (MM_GDBUS_MODEM_SIGNAL (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->values[type].info = mm_signal_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid signal info: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->values[type].id =
+                g_signal_connect (self,
+                                  signal_data[type].signal_name,
+                                  G_CALLBACK (signal_data[type].updated_callback),
+                                  NULL);
+        }
+
+        if (dup && self->priv->values[type].info)
+            *dup = g_object_ref (self->priv->values[type].info);
+    }
+    g_mutex_unlock (&self->priv->values[type].mutex);
+}
+
+/*****************************************************************************/
 
 /**
- * mm_modem_get_cdma_rssi:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_get_cdma:
+ * @self: A #MMModem.
  *
- * Gets the CDMA1x RSSI (Received Signal Strength Indication), in dBm.
+ * Gets a #MMSignal object specifying the CDMA signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_get_cdma() again to get a new #MMSignal with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
-GETTER(cdma_rssi)
+MMSignal *
+mm_modem_signal_get_cdma (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_CDMA);
+    return info;
+}
 
 /**
- * mm_modem_get_cdma_ecio:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_peek_cdma:
+ * @self: A #MMModem.
  *
- * Gets the CDMA1x Ec/Io, in dBm.
+ * Gets a #MMSignal object specifying the CDMA signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_get_cdma() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
  */
-GETTER(cdma_ecio)
+MMSignal *
+mm_modem_signal_peek_cdma (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_CDMA);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_CDMA].info;
+}
+
+/*****************************************************************************/
 
 /**
- * mm_modem_get_evdo_rssi:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_get_evdo:
+ * @self: A #MMModem.
  *
- * Gets the CDMA EV-DO RSSI (Received Signal Strength Indication), in dBm.
+ * Gets a #MMSignal object specifying the EV-DO signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_get_evdo() again to get a new #MMSignal with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
-GETTER(evdo_rssi)
+MMSignal *
+mm_modem_signal_get_evdo (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_EVDO);
+    return info;
+}
 
 /**
- * mm_modem_get_evdo_ecio:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_peek_evdo:
+ * @self: A #MMModem.
  *
- * Gets the CDMA EV-DO Ec/Io, in dBm.
+ * Gets a #MMSignal object specifying the EV-DO signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_get_evdo() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
  */
-GETTER(evdo_ecio)
+MMSignal *
+mm_modem_signal_peek_evdo (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_EVDO);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_EVDO].info;
+}
+
+/*****************************************************************************/
 
 /**
- * mm_modem_get_evdo_sinr:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_get_gsm:
+ * @self: A #MMModem.
  *
- * Gets the CDMA EV-DO SINR level, in dB.
+ * Gets a #MMSignal object specifying the GSM signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_get_gsm() again to get a new #MMSignal with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
-GETTER(evdo_sinr)
+MMSignal *
+mm_modem_signal_get_gsm (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_GSM);
+    return info;
+}
 
 /**
- * mm_modem_get_evdo_io:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_peek_gsm:
+ * @self: A #MMModem.
  *
- * Gets the CDMA EV-DO IO, in dBm.
+ * Gets a #MMSignal object specifying the GSM signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_get_gsm() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
  */
-GETTER(evdo_io)
+MMSignal *
+mm_modem_signal_peek_gsm (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_GSM);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_GSM].info;
+}
+
+/*****************************************************************************/
 
 /**
- * mm_modem_get_gsm_rssi:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_get_umts:
+ * @self: A #MMModem.
  *
- * Gets the GSM RSSI (Received Signal Strength Indication), in dBm.
+ * Gets a #MMSignal object specifying the UMTS signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_get_umts() again to get a new #MMSignal with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
-GETTER(gsm_rssi)
+MMSignal *
+mm_modem_signal_get_umts (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_UMTS);
+    return info;
+}
 
 /**
- * mm_modem_get_umts_rssi:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_peek_umts:
+ * @self: A #MMModem.
  *
- * Gets the UMTS (WCDMA) RSSI (Received Signal Strength Indication), in dBm.
+ * Gets a #MMSignal object specifying the UMTS signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_get_umts() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
  */
-GETTER(umts_rssi)
+MMSignal *
+mm_modem_signal_peek_umts (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_UMTS);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_UMTS].info;
+}
+
+/*****************************************************************************/
 
 /**
- * mm_modem_get_umts_ecio:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_get_lte:
+ * @self: A #MMModem.
  *
- * Gets the UMTS (WCDMA) Ec/Io, in dBm.
+ * Gets a #MMSignal object specifying the LTE signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_get_lte() again to get a new #MMSignal with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
-GETTER(umts_ecio)
+MMSignal *
+mm_modem_signal_get_lte (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_LTE);
+    return info;
+}
 
 /**
- * mm_modem_get_lte_rssi:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
+ * mm_modem_peek_lte:
+ * @self: A #MMModem.
  *
- * Gets the LTE RSSI (Received Signal Strength Indication), in dBm.
+ * Gets a #MMSignal object specifying the LTE signal information.
  *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_get_lte() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
  */
-GETTER(lte_rssi)
+MMSignal *
+mm_modem_signal_peek_lte (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-/**
- * mm_modem_get_lte_rsrq:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
- *
- * Gets the LTE RSRQ (Reference Signal Received Quality), in dB.
- *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
- */
-GETTER(lte_rsrq)
-
-/**
- * mm_modem_get_lte_rsrp:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
- *
- * Gets the LTE RSRP (Reference Signal Received Power), in dBm.
- *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
- */
-GETTER(lte_rsrp)
-
-/**
- * mm_modem_get_lte_snr:
- * @self: A #MMModemSignal.
- * @value: (out): Return location for the value.
- *
- * Gets the LTE S/R ratio, in dB.
- *
- * Returns: %TRUE if @value is valid, %FALSE otherwise.
- */
-GETTER(lte_snr)
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_LTE);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_LTE].info;
+}
 
 /*****************************************************************************/
 
 static void
 mm_modem_signal_init (MMModemSignal *self)
 {
+    guint i;
+
+    /* Setup private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_SIGNAL, MMModemSignalPrivate);
+
+    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
+        g_mutex_init (&self->priv->values[i].mutex);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMModemSignal *self = MM_MODEM_SIGNAL (object);
+    guint i;
+
+    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
+        g_mutex_clear (&self->priv->values[i].mutex);
+
+    G_OBJECT_CLASS (mm_modem_signal_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMModemSignal *self = MM_MODEM_SIGNAL (object);
+    guint i;
+
+    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
+        g_clear_object (&self->priv->values[i].info);
+
+    G_OBJECT_CLASS (mm_modem_signal_parent_class)->dispose (object);
 }
 
 static void
 mm_modem_signal_class_init (MMModemSignalClass *modem_class)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (modem_class);
+
+    g_type_class_add_private (object_class, sizeof (MMModemSignalPrivate));
+
+    /* Virtual methods */
+    object_class->dispose = dispose;
+    object_class->finalize = finalize;
 }

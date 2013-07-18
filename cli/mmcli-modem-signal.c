@@ -135,7 +135,7 @@ mmcli_modem_signal_shutdown (void)
 static void
 print_signal_info (void)
 {
-    gdouble value;
+    MMSignal *signal;
 
     g_print ("\n"
              "%s\n"
@@ -145,71 +145,55 @@ print_signal_info (void)
              mm_modem_signal_get_rate (ctx->modem_signal));
 
     /* CDMA */
-    g_print ("  -------------------------\n");
-    if (mm_modem_signal_get_cdma_rssi (ctx->modem_signal, &value))
-        g_print ("  CDMA1x | RSSI: '%.2lf' dBm\n", value);
-    else
-        g_print ("  CDMA1x | RSSI: unknown\n");
-    if (mm_modem_signal_get_cdma_ecio (ctx->modem_signal, &value))
-        g_print ("         | EcIo: '%.2lf' dBm\n", value);
-    else
-        g_print ("         | EcIo: unknown\n");
+    signal = mm_modem_signal_peek_cdma (ctx->modem_signal);
+    if (signal)
+        g_print ("  -------------------------\n"
+                 "  CDMA1x | RSSI: '%.2lf' dBm\n"
+                 "         | EcIo: '%.2lf' dBm\n",
+                 mm_signal_get_rssi (signal),
+                 mm_signal_get_ecio (signal));
 
     /* EVDO */
-    g_print ("  -------------------------\n");
-    if (mm_modem_signal_get_evdo_rssi (ctx->modem_signal, &value))
-        g_print ("  EV-DO  | RSSI: '%.2lf' dBm\n", value);
-    else
-        g_print ("  EV-DO  | RSSI: unknown\n");
-    if (mm_modem_signal_get_evdo_ecio (ctx->modem_signal, &value))
-        g_print ("         | EcIo: '%.2lf' dBm\n", value);
-    else
-        g_print ("         | EcIo: unknown\n");
-    if (mm_modem_signal_get_evdo_sinr (ctx->modem_signal, &value))
-        g_print ("         | SINR: '%.2lf' dBm\n", value);
-    else
-        g_print ("         | SINR: unknown\n");
-    if (mm_modem_signal_get_evdo_io (ctx->modem_signal, &value))
-        g_print ("         |   Io: '%.2lf' dB\n", value);
-    else
-        g_print ("         |   Io: unknown\n");
+    signal = mm_modem_signal_peek_evdo (ctx->modem_signal);
+    if (signal)
+        g_print ("  -------------------------\n"
+                 "  EV-DO  | RSSI: '%.2lf' dBm\n"
+                 "         | EcIo: '%.2lf' dBm\n"
+                 "         | SINR: '%.2lf' dBm\n"
+                 "         |   Io: '%.2lf' dB\n",
+                 mm_signal_get_rssi (signal),
+                 mm_signal_get_ecio (signal),
+                 mm_signal_get_sinr (signal),
+                 mm_signal_get_io (signal));
 
     /* GSM */
-    g_print ("  -------------------------\n");
-    if (mm_modem_signal_get_gsm_rssi (ctx->modem_signal, &value))
-        g_print ("  GSM    | RSSI: '%.2lf' dBm\n", value);
-    else
-        g_print ("  GSM    | RSSI: unknown\n");
+    signal = mm_modem_signal_peek_gsm (ctx->modem_signal);
+    if (signal)
+        g_print ("  -------------------------\n"
+                 "  GSM    | RSSI: '%.2lf' dBm\n",
+                 mm_signal_get_rssi (signal));
 
     /* UMTS */
-    g_print ("  -------------------------\n");
-    if (mm_modem_signal_get_umts_rssi (ctx->modem_signal, &value))
-        g_print ("  UMTS   | RSSI: '%.2lf' dBm\n", value);
-    else
-        g_print ("  UMTS   | RSSI: unknown\n");
-    if (mm_modem_signal_get_umts_ecio (ctx->modem_signal, &value))
-        g_print ("         | EcIo: '%.2lf' dBm\n", value);
-    else
-        g_print ("         | EcIo: unknown\n");
+    signal = mm_modem_signal_peek_umts (ctx->modem_signal);
+    if (signal)
+        g_print ("  -------------------------\n"
+                 "  UMTS   | RSSI: '%.2lf' dBm\n"
+                 "         | EcIo: '%.2lf' dBm\n",
+                 mm_signal_get_rssi (signal),
+                 mm_signal_get_ecio (signal));
 
     /* LTE */
-    g_print ("  -------------------------\n");
-    if (mm_modem_signal_get_lte_rssi (ctx->modem_signal, &value))
-        g_print ("  LTE    | RSSI: '%.2lf' dBm\n", value);
-    else
-        g_print ("  LTE    | RSSI: unknown\n");
-    if (mm_modem_signal_get_lte_rsrq (ctx->modem_signal, &value))
-        g_print ("         | RSRQ: '%.2lf' dB\n", value);
-    else
-        g_print ("         | RSRQ: unknown\n");
-    if (mm_modem_signal_get_lte_rsrp (ctx->modem_signal, &value))
-        g_print ("         | RSRP: '%.2lf' dBm\n", value);
-    else
-        g_print ("         | RSRP: unknown\n");
-    if (mm_modem_signal_get_lte_snr (ctx->modem_signal, &value))
-        g_print ("         |  SNR: '%.2lf' dB\n", value);
-    else
-        g_print ("         |  SNR: unknown\n");
+    signal = mm_modem_signal_peek_lte (ctx->modem_signal);
+    if (signal)
+        g_print ("  -------------------------\n"
+                 "  LTE    | RSSI: '%.2lf' dBm\n"
+                 "         | RSRQ: '%.2lf' dB\n"
+                 "         | RSRP: '%.2lf' dBm\n"
+                 "         |  SNR: '%.2lf' dB\n",
+                 mm_signal_get_rssi (signal),
+                 mm_signal_get_rsrq (signal),
+                 mm_signal_get_rsrp (signal),
+                 mm_signal_get_snr (signal));
 }
 
 static void

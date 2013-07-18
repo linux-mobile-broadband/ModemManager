@@ -10,6 +10,7 @@ mm_connection_error_get_type
 mm_core_error_get_type
 mm_firmware_image_type_get_type
 mm_firmware_properties_get_type
+mm_signal_get_type
 mm_gdbus_bearer_get_type
 mm_gdbus_bearer_proxy_get_type
 mm_gdbus_bearer_skeleton_get_type

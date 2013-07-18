@@ -113,6 +113,7 @@
       <section>
         <title>Extended signal information</title>
         <xi:include href="xml/mm-modem-signal.xml"/>
+        <xi:include href="xml/mm-signal.xml"/>
       </section>
     </chapter>
 

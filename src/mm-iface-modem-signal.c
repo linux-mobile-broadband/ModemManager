@@ -59,19 +59,11 @@ clear_values (MMIfaceModemSignal *self)
     if (!skeleton)
         return;
 
-    mm_gdbus_modem_signal_set_cdma_rssi (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_cdma_ecio (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_evdo_rssi (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_evdo_ecio (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_evdo_sinr (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_evdo_io   (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_gsm_rssi  (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_umts_rssi (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_umts_ecio (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_lte_rssi  (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_lte_rsrq  (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_lte_rsrp  (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
-    mm_gdbus_modem_signal_set_lte_snr   (skeleton, g_variant_new ("(bd)", FALSE, 0.0));
+    mm_gdbus_modem_signal_set_cdma (skeleton, NULL);
+    mm_gdbus_modem_signal_set_evdo (skeleton, NULL);
+    mm_gdbus_modem_signal_set_gsm  (skeleton, NULL);
+    mm_gdbus_modem_signal_set_umts (skeleton, NULL);
+    mm_gdbus_modem_signal_set_lte  (skeleton, NULL);
     g_object_unref (skeleton);
 }
 
@@ -79,6 +71,8 @@ static void
 load_values_ready (MMIfaceModemSignal *self,
                    GAsyncResult *res)
 {
+    MMSignal *info;
+    GVariant *dictionary;
     GError *error = NULL;
     gboolean cdma_available;
     gdouble cdma_rssi;
@@ -137,19 +131,59 @@ load_values_ready (MMIfaceModemSignal *self,
         return;
     }
 
-    mm_gdbus_modem_signal_set_cdma_rssi (skeleton, g_variant_new ("(bd)", cdma_available, cdma_rssi));
-    mm_gdbus_modem_signal_set_cdma_ecio (skeleton, g_variant_new ("(bd)", cdma_available, cdma_ecio));
-    mm_gdbus_modem_signal_set_evdo_rssi (skeleton, g_variant_new ("(bd)", evdo_available, evdo_rssi));
-    mm_gdbus_modem_signal_set_evdo_ecio (skeleton, g_variant_new ("(bd)", evdo_available, evdo_ecio));
-    mm_gdbus_modem_signal_set_evdo_sinr (skeleton, g_variant_new ("(bd)", evdo_available, evdo_sinr));
-    mm_gdbus_modem_signal_set_evdo_io   (skeleton, g_variant_new ("(bd)", evdo_available, evdo_io));
-    mm_gdbus_modem_signal_set_gsm_rssi  (skeleton, g_variant_new ("(bd)", gsm_available, gsm_rssi));
-    mm_gdbus_modem_signal_set_umts_rssi (skeleton, g_variant_new ("(bd)", umts_available, umts_rssi));
-    mm_gdbus_modem_signal_set_umts_ecio (skeleton, g_variant_new ("(bd)", umts_available, umts_ecio));
-    mm_gdbus_modem_signal_set_lte_rssi  (skeleton, g_variant_new ("(bd)", lte_available, lte_rssi));
-    mm_gdbus_modem_signal_set_lte_rsrq  (skeleton, g_variant_new ("(bd)", lte_available, lte_rsrq));
-    mm_gdbus_modem_signal_set_lte_rsrp  (skeleton, g_variant_new ("(bd)", lte_available,lte_rsrp));
-    mm_gdbus_modem_signal_set_lte_snr   (skeleton, g_variant_new ("(bd)", lte_available, lte_snr));
+    if (cdma_available) {
+        info = mm_signal_new ();
+        mm_signal_set_rssi (info, cdma_rssi);
+        mm_signal_set_ecio (info, cdma_ecio);
+        dictionary = mm_signal_get_dictionary (info);
+        mm_gdbus_modem_signal_set_cdma (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (info);
+    }
+
+    if (evdo_available) {
+        info = mm_signal_new ();
+        mm_signal_set_rssi (info, evdo_rssi);
+        mm_signal_set_ecio (info, evdo_ecio);
+        mm_signal_set_sinr (info, evdo_sinr);
+        mm_signal_set_io (info, evdo_io);
+        dictionary = mm_signal_get_dictionary (info);
+        mm_gdbus_modem_signal_set_evdo (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (info);
+    }
+
+    if (gsm_available) {
+        info = mm_signal_new ();
+        mm_signal_set_rssi (info, gsm_rssi);
+        dictionary = mm_signal_get_dictionary (info);
+        mm_gdbus_modem_signal_set_gsm (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (info);
+    }
+
+    if (umts_available) {
+        info = mm_signal_new ();
+        mm_signal_set_rssi (info, umts_rssi);
+        mm_signal_set_ecio (info, umts_ecio);
+        dictionary = mm_signal_get_dictionary (info);
+        mm_gdbus_modem_signal_set_umts (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (info);
+    }
+
+    if (lte_available) {
+        info = mm_signal_new ();
+        mm_signal_set_rssi (info, lte_rssi);
+        mm_signal_set_rsrq (info, lte_rsrq);
+        mm_signal_set_rsrp (info, lte_rsrp);
+        mm_signal_set_snr (info, lte_snr);
+        dictionary = mm_signal_get_dictionary (info);
+        mm_gdbus_modem_signal_set_lte (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (info);
+    }
+
     /* Flush right away */
     g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
 

@@ -68,6 +68,7 @@
 #include <mm-network-timezone.h>
 #include <mm-firmware-properties.h>
 #include <mm-cdma-manual-activation-properties.h>
+#include <mm-signal.h>
 
 /* generated */
 #include <mm-errors-types.h>

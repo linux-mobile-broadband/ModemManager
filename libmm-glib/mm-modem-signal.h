@@ -29,6 +29,7 @@
 
 #include <ModemManager.h>
 
+#include "mm-signal.h"
 #include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
@@ -42,6 +43,7 @@ G_BEGIN_DECLS
 
 typedef struct _MMModemSignal MMModemSignal;
 typedef struct _MMModemSignalClass MMModemSignalClass;
+typedef struct _MMModemSignalPrivate MMModemSignalPrivate;
 
 /**
  * MMModemSignal:
@@ -52,7 +54,7 @@ typedef struct _MMModemSignalClass MMModemSignalClass;
 struct _MMModemSignal {
     /*< private >*/
     MmGdbusModemSignalProxy parent;
-    gpointer unused;
+    MMModemSignalPrivate *priv;
 };
 
 struct _MMModemSignalClass {
@@ -79,41 +81,20 @@ gboolean mm_modem_signal_setup_sync   (MMModemSignal *self,
                                        GCancellable *cancellable,
                                        GError **error);
 
-/* CDMA1x */
-gboolean mm_modem_signal_get_cdma_rssi (MMModemSignal *self,
-                                        gdouble *value);
-gboolean mm_modem_signal_get_cdma_ecio (MMModemSignal *self,
-                                        gdouble *value);
+MMSignal *mm_modem_signal_get_cdma (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_cdma (MMModemSignal *self);
 
-/* EV-DO */
-gboolean mm_modem_signal_get_evdo_rssi (MMModemSignal *self,
-                                        gdouble *value);
-gboolean mm_modem_signal_get_evdo_ecio (MMModemSignal *self,
-                                        gdouble *value);
-gboolean mm_modem_signal_get_evdo_sinr (MMModemSignal *self,
-                                        gdouble *value);
-gboolean mm_modem_signal_get_evdo_io   (MMModemSignal *self,
-                                        gdouble *value);
+MMSignal *mm_modem_signal_get_evdo  (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_evdo (MMModemSignal *self);
 
-/* GSM */
-gboolean mm_modem_signal_get_gsm_rssi (MMModemSignal *self,
-                                       gdouble *value);
+MMSignal *mm_modem_signal_get_gsm   (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_gsm  (MMModemSignal *self);
 
-/* UMTS */
-gboolean mm_modem_signal_get_umts_rssi (MMModemSignal *self,
-                                        gdouble *value);
-gboolean mm_modem_signal_get_umts_ecio (MMModemSignal *self,
-                                        gdouble *value);
+MMSignal *mm_modem_signal_get_umts  (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_umts (MMModemSignal *self);
 
-/* LTE */
-gboolean mm_modem_signal_get_lte_rssi (MMModemSignal *self,
-                                       gdouble *value);
-gboolean mm_modem_signal_get_lte_rsrq (MMModemSignal *self,
-                                       gdouble *value);
-gboolean mm_modem_signal_get_lte_rsrp (MMModemSignal *self,
-                                       gdouble *value);
-gboolean mm_modem_signal_get_lte_snr  (MMModemSignal *self,
-                                       gdouble *value);
+MMSignal *mm_modem_signal_get_lte   (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_lte  (MMModemSignal *self);
 
 G_END_DECLS
 
