@@ -31,6 +31,14 @@ typedef struct _MMIfaceModemSignal MMIfaceModemSignal;
 struct _MMIfaceModemSignal {
     GTypeInterface g_iface;
 
+    /* Check for Messaging support (async) */
+    void (* check_support) (MMIfaceModemSignal *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+    gboolean (*check_support_finish) (MMIfaceModemSignal *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
     /* Load all values */
     void     (* load_values)        (MMIfaceModemSignal *self,
                                      GCancellable *cancellable,

@@ -21,8 +21,12 @@
 #include "mm-iface-modem-signal.h"
 #include "mm-log.h"
 
+#define SUPPORT_CHECKED_TAG "signal-support-checked-tag"
+#define SUPPORTED_TAG       "signal-supported-tag"
 #define REFRESH_CONTEXT_TAG "signal-refresh-context-tag"
 
+static GQuark support_checked_quark;
+static GQuark supported_quark;
 static GQuark refresh_context_quark;
 
 /*****************************************************************************/
@@ -404,6 +408,36 @@ mm_iface_modem_signal_enable (MMIfaceModemSignal *self,
 
 /*****************************************************************************/
 
+typedef struct _InitializationContext InitializationContext;
+static void interface_initialization_step (InitializationContext *ctx);
+
+typedef enum {
+    INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_CHECK_SUPPORT,
+    INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
+    INITIALIZATION_STEP_LAST
+} InitializationStep;
+
+struct _InitializationContext {
+    MMIfaceModemSignal *self;
+    MmGdbusModemSignal *skeleton;
+    GCancellable *cancellable;
+    GSimpleAsyncResult *result;
+    InitializationStep step;
+};
+
+static void
+initialization_context_complete_and_free (InitializationContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->skeleton);
+    g_slice_free (InitializationContext, ctx);
+}
+
+
 gboolean
 mm_iface_modem_signal_initialize_finish (MMIfaceModemSignal *self,
                                          GAsyncResult *res,
@@ -412,23 +446,133 @@ mm_iface_modem_signal_initialize_finish (MMIfaceModemSignal *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static gboolean
+initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Interface initialization cancelled");
+    initialization_context_complete_and_free (ctx);
+    return TRUE;
+}
+
+static void
+check_support_ready (MMIfaceModemSignal *self,
+                     GAsyncResult *res,
+                     InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+        if (error) {
+            /* This error shouldn't be treated as critical */
+            mm_dbg ("Extended signal support check failed: '%s'", error->message);
+            g_error_free (error);
+        }
+    } else {
+        /* Signal is supported! */
+        g_object_set_qdata (G_OBJECT (self),
+                            supported_quark,
+                            GUINT_TO_POINTER (TRUE));
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
+interface_initialization_step (InitializationContext *ctx)
+{
+    /* Don't run new steps if we're cancelled */
+    if (initialization_context_complete_and_free_if_cancelled (ctx))
+        return;
+
+    switch (ctx->step) {
+    case INITIALIZATION_STEP_FIRST:
+        /* Setup quarks if we didn't do it before */
+        if (G_UNLIKELY (!support_checked_quark))
+            support_checked_quark = (g_quark_from_static_string (
+                                         SUPPORT_CHECKED_TAG));
+        if (G_UNLIKELY (!supported_quark))
+            supported_quark = (g_quark_from_static_string (
+                                   SUPPORTED_TAG));
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_CHECK_SUPPORT:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   support_checked_quark))) {
+            /* Set the checked flag so that we don't run it again */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                support_checked_quark,
+                                GUINT_TO_POINTER (TRUE));
+            /* Initially, assume we don't support it */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                supported_quark,
+                                GUINT_TO_POINTER (FALSE));
+
+            if (MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (ctx->self)->check_support &&
+                MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (ctx->self)->check_support_finish) {
+                MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (ctx->self)->check_support (
+                    ctx->self,
+                    (GAsyncReadyCallback)check_support_ready,
+                    ctx);
+                return;
+            }
+
+            /* If there is no implementation to check support, assume we DON'T
+             * support it. */
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   supported_quark))) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Extended Signal information not supported");
+            initialization_context_complete_and_free (ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_LAST:
+        /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-setup",
+                          G_CALLBACK (handle_setup),
+                          ctx->self);
+        /* Finally, export the new interface */
+        mm_gdbus_object_skeleton_set_modem_signal (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+                                                   MM_GDBUS_MODEM_SIGNAL (ctx->skeleton));
+
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        initialization_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
 void
 mm_iface_modem_signal_initialize (MMIfaceModemSignal *self,
                                   GCancellable *cancellable,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    InitializationContext *ctx;
     MmGdbusModemSignal *skeleton = NULL;
-    gboolean supported;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_signal_initialize);
-
-    supported = (MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values &&
-                 MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values_finish);
 
     /* Did we already create it? */
     g_object_get (self,
@@ -436,35 +580,25 @@ mm_iface_modem_signal_initialize (MMIfaceModemSignal *self,
                   NULL);
     if (!skeleton) {
         skeleton = mm_gdbus_modem_signal_skeleton_new ();
-
+        clear_values (self);
         g_object_set (self,
                       MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON, skeleton,
                       NULL);
-
-        if (supported) {
-            /* Set initial values */
-            clear_values (self);
-
-            /* Handle method invocations */
-            g_signal_connect (skeleton,
-                              "handle-setup",
-                              G_CALLBACK (handle_setup),
-                              self);
-            /* Finally, export the new interface */
-            mm_gdbus_object_skeleton_set_modem_signal (MM_GDBUS_OBJECT_SKELETON (self),
-                                                       MM_GDBUS_MODEM_SIGNAL (skeleton));
-        }
     }
 
-    if (supported)
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Extended signal information reporting not supported");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    /* Perform async initialization here */
+
+    ctx = g_slice_new0 (InitializationContext);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_signal_initialize);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    ctx->skeleton = skeleton;
+
+    interface_initialization_step (ctx);
 }
 
 void
