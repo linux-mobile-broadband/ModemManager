@@ -30,7 +30,9 @@ libmodem_helpers_la_SOURCES = \
 	mm-charsets.c \
 	mm-charsets.h \
 	mm-sms-part.h \
-	mm-sms-part.c
+	mm-sms-part.c \
+	mm-sms-part-3gpp.h \
+	mm-sms-part-3gpp.c
 
 # Additional QMI support in libmodem-helpers
 if WITH_QMI
@@ -191,8 +193,6 @@ ModemManager_SOURCES = \
 	mm-base-modem-at.c \
 	mm-base-modem.h \
 	mm-base-modem.c \
-	mm-sms-part.h \
-	mm-sms-part.c \
 	mm-sms.h \
 	mm-sms.c \
 	mm-sms-list.h \

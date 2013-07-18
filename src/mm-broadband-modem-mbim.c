@@ -36,6 +36,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-messaging.h"
+#include "mm-sms-part-3gpp.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -2407,10 +2408,10 @@ add_sms_part (MMBroadbandModemMbim *self,
     MMSmsPart *part;
     GError *error = NULL;
 
-    part = mm_sms_part_new_from_binary_pdu (pdu->message_index,
-                                            pdu->pdu_data,
-                                            pdu->pdu_data_size,
-                                            &error);
+    part = mm_sms_part_3gpp_new_from_binary_pdu (pdu->message_index,
+                                                 pdu->pdu_data,
+                                                 pdu->pdu_data_size,
+                                                 &error);
     if (part) {
         mm_dbg ("Correctly parsed PDU (%d)", pdu->message_index);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),

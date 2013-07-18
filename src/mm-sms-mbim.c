@@ -29,6 +29,7 @@
 #include "mm-sms-mbim.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
+#include "mm-sms-part-3gpp.h"
 
 G_DEFINE_TYPE (MMSmsMbim, mm_sms_mbim, MM_TYPE_SMS)
 
@@ -154,7 +155,7 @@ sms_send_next_part (SmsSendContext *ctx)
     }
 
     /* Get PDU */
-    pdu = mm_sms_part_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
     if (!pdu) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_send_context_complete_and_free (ctx);

@@ -42,6 +42,7 @@
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sms-list.h"
+#include "mm-sms-part-3gpp.h"
 #include "mm-sim.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
@@ -5575,7 +5576,7 @@ sms_part_ready (MMBroadbandModem *self,
 {
     MMSmsPart *part;
     gint rv, status, tpdu_len;
-    gchar pdu[SMS_MAX_PDU_LEN + 1];
+    gchar pdu[MM_SMS_PART_3GPP_MAX_PDU_LEN + 1];
     const gchar *response;
     GError *error = NULL;
 
@@ -5593,7 +5594,7 @@ sms_part_ready (MMBroadbandModem *self,
         return;
     }
 
-    rv = sscanf (response, "+CMGR: %d,,%d %" G_STRINGIFY (SMS_MAX_PDU_LEN) "s",
+    rv = sscanf (response, "+CMGR: %d,,%d %" G_STRINGIFY (MM_SMS_PART_3GPP_MAX_PDU_LEN) "s",
                  &status, &tpdu_len, pdu);
     if (rv != 3) {
         error = g_error_new (MM_CORE_ERROR,
@@ -5605,7 +5606,7 @@ sms_part_ready (MMBroadbandModem *self,
         return;
     }
 
-    part = mm_sms_part_new_from_pdu (ctx->idx, pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (ctx->idx, pdu, &error);
     if (part) {
         mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -5715,7 +5716,7 @@ cds_received (MMAtSerialPort *port,
     if (!pdu)
         return;
 
-    part = mm_sms_part_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, &error);
     if (part) {
         mm_dbg ("Correctly parsed non-stored PDU");
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -6082,7 +6083,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
         MM3gppPduInfo *info = l->data;
         MMSmsPart *part;
 
-        part = mm_sms_part_new_from_pdu (info->index, info->pdu, &error);
+        part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, &error);
         if (part) {
             mm_dbg ("Correctly parsed PDU (%d)", info->index);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),

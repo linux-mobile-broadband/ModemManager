@@ -40,6 +40,7 @@
 #include "mm-sim-qmi.h"
 #include "mm-bearer-qmi.h"
 #include "mm-sms-qmi.h"
+#include "mm-sms-part-3gpp.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -6858,10 +6859,10 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
         MMSmsPart *part;
         GError *error = NULL;
 
-        part = mm_sms_part_new_from_binary_pdu (index,
-                                                (guint8 *)data->data,
-                                                data->len,
-                                                &error);
+        part = mm_sms_part_3gpp_new_from_binary_pdu (index,
+                                                     (guint8 *)data->data,
+                                                     data->len,
+                                                     &error);
         if (part) {
             mm_dbg ("Correctly parsed PDU (%d)",
                     index);

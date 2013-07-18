@@ -30,6 +30,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms.h"
+#include "mm-sms-part-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
@@ -123,7 +124,7 @@ generate_submit_pdus (MMSms *self,
     g_assert (!(text != NULL && data != NULL));
 
     if (text) {
-        split_text = mm_sms_part_util_split_text (text, &encoding);
+        split_text = mm_sms_part_3gpp_util_split_text (text, &encoding);
         if (!split_text) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -134,7 +135,7 @@ generate_submit_pdus (MMSms *self,
         n_parts = g_strv_length (split_text);
     } else if (data) {
         encoding = MM_SMS_ENCODING_8BIT;
-        split_data = mm_sms_part_util_split_data (data, data_len);
+        split_data = mm_sms_part_3gpp_util_split_data (data, data_len);
         g_assert (split_data != NULL);
         /* noop within the for */
         for (n_parts = 0; split_data[n_parts]; n_parts++);
@@ -703,7 +704,7 @@ sms_get_store_or_send_command (MMSmsPart *part,
 
         /* AT+CMGW=<length>[, <stat>]<CR> PDU can be entered. <CTRL-Z>/<ESC> */
 
-        pdu = mm_sms_part_get_submit_pdu (part, &pdulen, &msgstart, error);
+        pdu = mm_sms_part_3gpp_get_submit_pdu (part, &pdulen, &msgstart, error);
         if (!pdu)
             /* 'error' should already be set */
             return FALSE;
