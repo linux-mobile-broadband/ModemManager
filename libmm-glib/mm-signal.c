@@ -371,7 +371,7 @@ mm_signal_new_from_dictionary (GVariant *dictionary,
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMSignal *self;
+    MMSignal *self = NULL;
 
     if (!dictionary) {
         g_set_error (error,
@@ -390,10 +390,10 @@ mm_signal_new_from_dictionary (GVariant *dictionary,
         return NULL;
     }
 
-    self = mm_signal_new ();
     g_variant_iter_init (&iter, dictionary);
-    while (!inner_error &&
-           g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+    while (!inner_error && g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+        if (!self)
+            self = mm_signal_new ();
         consume_variant (self,
                          key,
                          value,
@@ -405,8 +405,7 @@ mm_signal_new_from_dictionary (GVariant *dictionary,
     /* If error, destroy the object */
     if (inner_error) {
         g_propagate_error (error, inner_error);
-        g_object_unref (self);
-        return NULL;
+        g_clear_object (&self);
     }
 
     return self;
