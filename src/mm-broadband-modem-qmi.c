@@ -8619,6 +8619,46 @@ firmware_change_current (MMIfaceModemFirmware *self,
 }
 
 /*****************************************************************************/
+/* Check support (Signal interface) */
+
+static gboolean
+signal_check_support_finish (MMIfaceModemSignal *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+signal_check_support (MMIfaceModemSignal *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    MMQmiPort *port;
+    gboolean supported = FALSE;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        signal_check_support);
+
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    if (port) {
+        client = mm_qmi_port_peek_client (port, QMI_SERVICE_NAS, MM_QMI_PORT_FLAG_DEFAULT);
+        if (client)
+            supported = qmi_client_check_version (client, 1, 8);
+    }
+
+    mm_dbg ("Extended signal capabilities %ssupported", supported ? "" : "not ");
+    g_simple_async_result_set_op_res_gboolean (result, supported);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Load extended signal information */
 
 static gdouble
@@ -9317,6 +9357,8 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 static void
 iface_modem_signal_init (MMIfaceModemSignal *iface)
 {
+    iface->check_support = signal_check_support;
+    iface->check_support_finish = signal_check_support_finish;
     iface->load_values = signal_load_values;
     iface->load_values_finish = signal_load_values_finish;
 }
