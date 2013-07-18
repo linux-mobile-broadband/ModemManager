@@ -6719,16 +6719,7 @@ static void
 load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
 {
     QmiMessageWmsListMessagesInput *input;
-
-    /* Request to list messages in a given storage */
-    input = qmi_message_wms_list_messages_input_new ();
-    qmi_message_wms_list_messages_input_set_storage_type (
-        input,
-        mm_sms_storage_to_qmi_storage_type (ctx->storage),
-        NULL);
-    qmi_message_wms_list_messages_input_set_message_mode (input,
-                                                          QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
-                                                          NULL);
+    gint tag_type = -1;
 
     switch (ctx->step) {
     case LOAD_INITIAL_SMS_PARTS_STEP_FIRST:
@@ -6741,34 +6732,22 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
     case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_READ:
         mm_dbg ("loading MT-read messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
-        qmi_message_wms_list_messages_input_set_message_tag (
-            input,
-            QMI_WMS_MESSAGE_TAG_TYPE_MT_READ,
-            NULL);
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_READ;
         break;
     case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MT_NOT_READ:
         mm_dbg ("loading MT-not-read messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
-        qmi_message_wms_list_messages_input_set_message_tag (
-            input,
-            QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ,
-            NULL);
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
         break;
     case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_SENT:
         mm_dbg ("loading MO-sent messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
-        qmi_message_wms_list_messages_input_set_message_tag (
-            input,
-            QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT,
-            NULL);
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT;
         break;
     case LOAD_INITIAL_SMS_PARTS_STEP_LIST_MO_NOT_SENT:
         mm_dbg ("loading MO-not-sent messages from storage '%s'...",
                 mm_sms_storage_get_string (ctx->storage));
-        qmi_message_wms_list_messages_input_set_message_tag (
-            input,
-            QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT,
-            NULL);
+        tag_type = QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT;
         break;
     case LOAD_INITIAL_SMS_PARTS_STEP_LAST:
         /* All steps done */
@@ -6776,6 +6755,22 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         load_initial_sms_parts_context_complete_and_free (ctx);
         return;
     }
+
+    /* Request to list messages in a given storage */
+    input = qmi_message_wms_list_messages_input_new ();
+    qmi_message_wms_list_messages_input_set_storage_type (
+        input,
+        mm_sms_storage_to_qmi_storage_type (ctx->storage),
+        NULL);
+    qmi_message_wms_list_messages_input_set_message_mode (
+        input,
+        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        NULL);
+    if (tag_type != -1)
+        qmi_message_wms_list_messages_input_set_message_tag (
+            input,
+            (QmiWmsMessageTagType)tag_type,
+            NULL);
 
     qmi_client_wms_list_messages (QMI_CLIENT_WMS (ctx->client),
                                   input,
