@@ -3,10 +3,10 @@
 "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
 ]>
 <part id="ref-migrating" xmlns:xi="http://www.w3.org/2003/XInclude">
-  <title>Migrating from ModemManager 0.6 to ModemManager 0.8</title>
+  <title>Migrating from ModemManager 0.6 to ModemManager 1.0</title>
   <partintro>
     <para>
-      ModemManager 0.8 is a new major version of ModemManager that breaks both
+      ModemManager 1.0 is a new major version of ModemManager that breaks both
       API and ABI compared to previous versions. These changes allow better
       managing new types of devices (e.g. those with multiple capabilities),
       or those not based in AT commands for operation (e.g. QMI or MBIM modems).
@@ -22,7 +22,7 @@
       <title>Listing available modems</title>
       <para>
         The D-Bus name <literal>org.freedesktop.ModemManager1</literal>
-        on the system bus is the new name used by the ModemManager 0.8 daemon, and it
+        on the system bus is the new name used by the ModemManager 1.0 daemon, and it
         implements several standard DBus interfaces, including the new
         <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-objectmanager">
           <literal>org.freedesktop.DBus.ObjectManager</literal>
