@@ -48,6 +48,10 @@ struct _MMSmsPart {
     guint concat_reference;
     guint concat_max;
     guint concat_sequence;
+
+    /* CDMA specific */
+    MMSmsCdmaTeleserviceId cdma_teleservice_id;
+    MMSmsCdmaServiceCategory cdma_service_category;
 };
 
 void
@@ -162,6 +166,11 @@ mm_sms_part_should_concat (MMSmsPart *self)
     return self->should_concat;
 }
 
+PART_GET_FUNC (MMSmsCdmaTeleserviceId, cdma_teleservice_id)
+PART_SET_FUNC (MMSmsCdmaTeleserviceId, cdma_teleservice_id)
+PART_GET_FUNC (MMSmsCdmaServiceCategory, cdma_service_category)
+PART_SET_FUNC (MMSmsCdmaServiceCategory, cdma_service_category)
+
 MMSmsPart *
 mm_sms_part_new (guint index,
                  MMSmsPduType pdu_type)
@@ -173,6 +182,8 @@ mm_sms_part_new (guint index,
     sms_part->pdu_type = pdu_type;
     sms_part->encoding = MM_SMS_ENCODING_UNKNOWN;
     sms_part->delivery_state = MM_SMS_DELIVERY_STATE_UNKNOWN;
+    sms_part->cdma_teleservice_id = MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN;
+    sms_part->cdma_service_category = MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN;
     sms_part->class = -1;
 
     return sms_part;

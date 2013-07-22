@@ -116,4 +116,12 @@ void              mm_sms_part_set_concat_sequence    (MMSmsPart *part,
 
 gboolean          mm_sms_part_should_concat          (MMSmsPart *part);
 
+/* CDMA specific */
+MMSmsCdmaTeleserviceId   mm_sms_part_get_cdma_teleservice_id   (MMSmsPart *part);
+void                     mm_sms_part_set_cdma_teleservice_id   (MMSmsPart *part,
+                                                                MMSmsCdmaTeleserviceId cdma_teleservice_id);
+MMSmsCdmaServiceCategory mm_sms_part_get_cdma_service_category (MMSmsPart *part);
+void                     mm_sms_part_set_cdma_service_category (MMSmsPart *part,
+                                                                MMSmsCdmaServiceCategory cdma_service_category);
+
 #endif /* MM_SMS_PART_H */

@@ -1500,8 +1500,8 @@ assemble_sms (MMSms *self,
                                                         g_byte_array_ref (fulldata)),
                   "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
                   "class",     mm_sms_part_get_class (sorted_parts[0]),
-                  "teleservice-id", MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
-                  "service-category", MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+                  "teleservice-id",   mm_sms_part_get_cdma_teleservice_id (sorted_parts[0]),
+                  "service-category", mm_sms_part_get_cdma_service_category (sorted_parts[0]),
                   "number",    mm_sms_part_get_number (sorted_parts[0]),
                   "validity",                (validity_relative ?
                                               g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (validity_relative)) :
