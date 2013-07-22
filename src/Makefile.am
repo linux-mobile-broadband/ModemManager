@@ -32,7 +32,9 @@ libmodem_helpers_la_SOURCES = \
 	mm-sms-part.h \
 	mm-sms-part.c \
 	mm-sms-part-3gpp.h \
-	mm-sms-part-3gpp.c
+	mm-sms-part-3gpp.c \
+	mm-sms-part-cdma.h \
+	mm-sms-part-cdma.c
 
 # Additional QMI support in libmodem-helpers
 if WITH_QMI
