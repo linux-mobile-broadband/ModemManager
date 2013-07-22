@@ -5,7 +5,8 @@ noinst_PROGRAMS = \
 	test-charsets \
 	test-qcdm-serial-port \
 	test-at-serial-port \
-	test-sms-part-3gpp
+	test-sms-part-3gpp \
+	test-sms-part-cdma
 
 if WITH_QMI
 noinst_PROGRAMS += test-modem-helpers-qmi
@@ -159,4 +160,28 @@ test_sms_part_3gpp_LDADD = \
 if WITH_QMI
 test_sms_part_3gpp_CPPFLAGS += $(QMI_CFLAGS)
 test_sms_part_3gpp_LDADD += $(QMI_LIBS)
+endif
+
+################
+
+test_sms_part_cdma_SOURCES = \
+	test-sms-part-cdma.c
+
+test_sms_part_cdma_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_srcdir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated
+
+test_sms_part_cdma_LDADD = \
+	$(top_builddir)/src/libmodem-helpers.la \
+	$(MM_LIBS)
+
+if WITH_QMI
+test_sms_part_cdma_CPPFLAGS += $(QMI_CFLAGS)
+test_sms_part_cdma_LDADD += $(QMI_LIBS)
 endif

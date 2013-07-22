@@ -53,6 +53,7 @@ src/tests/test-charsets
 src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port
 src/tests/test-sms-part-3gpp
+src/tests/test-sms-part-cdma
 
 cli/mmcli
 
