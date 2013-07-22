@@ -862,39 +862,39 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu1", test_pdu1);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu2", test_pdu2);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu3", test_pdu3);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu3-nonzero-pid", test_pdu3_nzpid);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu3-mms", test_pdu3_mms);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu3-natl", test_pdu3_natl);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu3-8bit", test_pdu3_8bit);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-dcsf1", test_pdu_dcsf1);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-dcsf-8bit", test_pdu_dcsf_8bit);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-udhi", test_pdu_udhi);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-multipart", test_pdu_multipart);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-stored-by-us", test_pdu_stored_by_us);
-    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-not-stored", test_pdu_not_stored);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu1", test_pdu1);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu2", test_pdu2);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu3", test_pdu3);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu3-nonzero-pid", test_pdu3_nzpid);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu3-mms", test_pdu3_mms);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu3-natl", test_pdu3_natl);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu3-8bit", test_pdu3_8bit);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-dcsf1", test_pdu_dcsf1);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-dcsf-8bit", test_pdu_dcsf_8bit);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-udhi", test_pdu_udhi);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-multipart", test_pdu_multipart);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-stored-by-us", test_pdu_stored_by_us);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-not-stored", test_pdu_not_stored);
 
-    g_test_add_func ("/MM/SMS/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
-    g_test_add_func ("/MM/SMS/Address-Encoder/smsc-unknown", test_address_encode_smsc_unknown);
-    g_test_add_func ("/MM/SMS/Address-Encoder/intl", test_address_encode_intl);
-    g_test_add_func ("/MM/SMS/Address-Encoder/unknown", test_address_encode_unknown);
+    g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
+    g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/smsc-unknown", test_address_encode_smsc_unknown);
+    g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/intl", test_address_encode_intl);
+    g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/unknown", test_address_encode_unknown);
 
-    g_test_add_func ("/MM/SMS/PDU-Creator/UCS2-with-smsc", test_create_pdu_ucs2_with_smsc);
-    g_test_add_func ("/MM/SMS/PDU-Creator/UCS2-no-smsc", test_create_pdu_ucs2_no_smsc);
-    g_test_add_func ("/MM/SMS/PDU-Creator/GSM-with-smsc", test_create_pdu_gsm_with_smsc);
-    g_test_add_func ("/MM/SMS/PDU-Creator/GSM-no-smsc", test_create_pdu_gsm_no_smsc);
-    g_test_add_func ("/MM/SMS/PDU-Creator/GSM-3", test_create_pdu_gsm_3);
-    g_test_add_func ("/MM/SMS/PDU-Creator/GSM-no-validity", test_create_pdu_gsm_no_validity);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/UCS2-with-smsc", test_create_pdu_ucs2_with_smsc);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/UCS2-no-smsc", test_create_pdu_ucs2_no_smsc);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/GSM-with-smsc", test_create_pdu_gsm_with_smsc);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/GSM-no-smsc", test_create_pdu_gsm_no_smsc);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/GSM-3", test_create_pdu_gsm_3);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Creator/GSM-no-validity", test_create_pdu_gsm_no_validity);
 
-    g_test_add_func ("/MM/SMS/Text-Split/short", test_text_split_short);
-    g_test_add_func ("/MM/SMS/Text-Split/short-UCS2", test_text_split_short_ucs2);
-    g_test_add_func ("/MM/SMS/Text-Split/max-single-pdu", test_text_split_max_single_pdu);
-    g_test_add_func ("/MM/SMS/Text-Split/max-single-pdu-UCS2", test_text_split_max_single_pdu_ucs2);
-    g_test_add_func ("/MM/SMS/Text-Split/two-pdu", test_text_split_two_pdu);
-    g_test_add_func ("/MM/SMS/Text-Split/two-pdu-UCS2", test_text_split_two_pdu_ucs2);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/short", test_text_split_short);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/short-UCS2", test_text_split_short_ucs2);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/max-single-pdu", test_text_split_max_single_pdu);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/max-single-pdu-UCS2", test_text_split_max_single_pdu_ucs2);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/two-pdu", test_text_split_two_pdu);
+    g_test_add_func ("/MM/SMS/3GPP/Text-Split/two-pdu-UCS2", test_text_split_two_pdu_ucs2);
 
     return g_test_run ();
 }

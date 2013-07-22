@@ -52,7 +52,7 @@ src/tests/test-modem-helpers-qmi
 src/tests/test-charsets
 src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port
-src/tests/test-sms-part
+src/tests/test-sms-part-3gpp
 
 cli/mmcli
 
