@@ -814,6 +814,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     const char *device;
     struct serial_struct sinfo = { 0 };
     GTimeVal tv_start, tv_end;
+    int errno_save;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 
@@ -835,6 +836,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         devfile = g_strdup_printf ("/dev/%s", device);
         errno = 0;
         priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
+        errno_save = errno;
         g_free (devfile);
     }
 
@@ -846,13 +848,16 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         g_set_error (error,
                      MM_SERIAL_ERROR,
                      (errno == ENODEV) ? MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE : MM_SERIAL_ERROR_OPEN_FAILED,
-                     "Could not open serial device %s: %s", device, strerror (errno));
+                     "Could not open serial device %s: %s", device, strerror (errno_save));
+        mm_dbg ("(%s) could not open serial device (%d)", device, errno_save);
         return FALSE;
     }
 
     if (ioctl (priv->fd, TIOCEXCL) < 0) {
+        errno_save = errno;
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
-                     "Could not lock serial device %s: %s", device, strerror (errno));
+                     "Could not lock serial device %s: %s", device, strerror (errno_save));
+        mm_dbg ("(%s) could not lock serial device (%d)", device, errno_save);
         goto error;
     }
 
@@ -860,14 +865,18 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     tcflush (priv->fd, TCIOFLUSH);
 
     if (tcgetattr (priv->fd, &priv->old_t) < 0) {
+        errno_save = errno;
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
-                     "Could not open serial device %s: %s", device, strerror (errno));
+                     "Could not set attributes on serial device %s: %s", device, strerror (errno_save));
+        mm_dbg ("(%s) could not set attributes on serial device (%d)", device, errno_save);
         goto error;
     }
 
     g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->config_fd);
-    if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error))
+    if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error)) {
+        mm_dbg ("(%s) failed to configure serial device", device);
         goto error;
+    }
 
     /* Don't wait for pending data when closing the port; this can cause some
      * stupid devices that don't respond to URBs on a particular port to hang
