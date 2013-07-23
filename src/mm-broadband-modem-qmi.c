@@ -5115,6 +5115,8 @@ modem_cdma_load_activation_state (MMIfaceModemCdma *self,
 /*****************************************************************************/
 /* Manual and OTA Activation (CDMA interface) */
 
+#define MAX_MDN_CHECK_RETRIES 10
+
 typedef enum {
     CDMA_ACTIVATION_STEP_FIRST,
     CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS,
@@ -5137,6 +5139,7 @@ typedef struct {
     guint segment_i;
     guint n_segments;
     GArray **segments;
+    guint n_mdn_check_retries;
 } CdmaActivationContext;
 
 static void
@@ -5211,6 +5214,61 @@ activation_power_cycle_ready (MMBroadbandModemQmi *self,
     /* And go on to next step */
     ctx->step++;
     cdma_activation_context_step (ctx);
+}
+
+static gboolean
+retry_msisdn_check_cb (CdmaActivationContext *ctx)
+{
+    cdma_activation_context_step (ctx);
+    return FALSE;
+}
+
+static void
+activate_manual_get_msisdn_ready (QmiClientDms *client,
+                                  GAsyncResult *res,
+                                  CdmaActivationContext *ctx)
+{
+    QmiMessageDmsGetMsisdnOutput *output = NULL;
+    GError *error = NULL;
+    const gchar *current_mdn = NULL;
+    const gchar *expected_mdn = NULL;
+
+    qmi_message_dms_activate_manual_input_get_info (ctx->input_manual,
+                                                    NULL, /* spc */
+                                                    NULL, /* sid */
+                                                    &expected_mdn,
+                                                    NULL, /* min */
+                                                    NULL);
+
+    output = qmi_client_dms_get_msisdn_finish (client, res, &error);
+    if (output &&
+        qmi_message_dms_get_msisdn_output_get_result (output, NULL) &&
+        qmi_message_dms_get_msisdn_output_get_msisdn (output, &current_mdn, NULL) &&
+        g_str_equal (current_mdn, expected_mdn)) {
+        mm_dbg ("MDN successfully updated to '%s'", expected_mdn);
+        qmi_message_dms_get_msisdn_output_unref (output);
+        /* And go on to next step */
+        ctx->step++;
+        cdma_activation_context_step (ctx);
+        return;
+    }
+
+    if (output)
+        qmi_message_dms_get_msisdn_output_unref (output);
+
+    if (ctx->n_mdn_check_retries < MAX_MDN_CHECK_RETRIES) {
+        /* Retry after some time */
+        mm_dbg ("MDN not yet updated, retrying...");
+        g_timeout_add (1, (GSourceFunc) retry_msisdn_check_cb, ctx);
+        return;
+    }
+
+    /* Well, all retries consumed already, return error */
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "MDN was not correctly set during manual activation");
+    cdma_activation_context_complete_and_free (ctx);
 }
 
 static void
@@ -5399,23 +5457,31 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
         ctx->step++;
         /* Fall down to next step */
 
-    case CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS: {
-        QmiMessageDmsSetEventReportInput *input;
+    case CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS:
+        /* Indications needed in automatic activation */
+        if (ctx->input_automatic) {
+            QmiMessageDmsSetEventReportInput *input;
 
-        mm_info ("Activation step [1/5]: enabling indications");
+            mm_info ("Activation step [1/5]: enabling indications");
 
-        input = qmi_message_dms_set_event_report_input_new ();
-        qmi_message_dms_set_event_report_input_set_activation_state_reporting (input, TRUE, NULL);
-        qmi_client_dms_set_event_report (
-            ctx->client,
-            input,
-            5,
-            NULL,
-            (GAsyncReadyCallback)ser_activation_state_ready,
-            ctx);
-        qmi_message_dms_set_event_report_input_unref (input);
-        return;
-    }
+            input = qmi_message_dms_set_event_report_input_new ();
+            qmi_message_dms_set_event_report_input_set_activation_state_reporting (input, TRUE, NULL);
+            qmi_client_dms_set_event_report (
+                ctx->client,
+                input,
+                5,
+                NULL,
+                (GAsyncReadyCallback)ser_activation_state_ready,
+                ctx);
+            qmi_message_dms_set_event_report_input_unref (input);
+            return;
+        }
+
+        /* Manual activation, no indications needed */
+        g_assert (ctx->input_manual != NULL);
+        mm_info ("Activation step [1/5]: indications not needed in manual activation");
+        ctx->step++;
+        /* Fall down to next step */
 
     case CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION:
         /* Automatic activation */
@@ -5432,34 +5498,46 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
         }
 
         /* Manual activation */
-        if (ctx->input_manual) {
-            if (!ctx->segments)
-                mm_info ("Activation step [2/5]: requesting manual activation");
-            else {
-                mm_info ("Activation step [2/5]: requesting manual activation (PRL segment %u/%u)",
-                         (ctx->segment_i + 1), ctx->n_segments);
-                qmi_message_dms_activate_manual_input_set_prl (
-                    ctx->input_manual,
-                    (guint16)ctx->total_segments_size,
-                    (guint8)ctx->segment_i,
-                    ctx->segments[ctx->segment_i],
-                    NULL);
-            }
-
-            qmi_client_dms_activate_manual (ctx->client,
-                                            ctx->input_manual,
-                                            10,
-                                            NULL,
-                                            (GAsyncReadyCallback)activate_manual_ready,
-                                            ctx);
-            return;
+        g_assert (ctx->input_manual != NULL);
+        if (!ctx->segments)
+            mm_info ("Activation step [2/5]: requesting manual activation");
+        else {
+            mm_info ("Activation step [2/5]: requesting manual activation (PRL segment %u/%u)",
+                     (ctx->segment_i + 1), ctx->n_segments);
+            qmi_message_dms_activate_manual_input_set_prl (
+                ctx->input_manual,
+                (guint16)ctx->total_segments_size,
+                (guint8)ctx->segment_i,
+                ctx->segments[ctx->segment_i],
+                NULL);
         }
 
-        g_assert_not_reached ();
+        qmi_client_dms_activate_manual (ctx->client,
+                                        ctx->input_manual,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback)activate_manual_ready,
+                                        ctx);
         return;
 
     case CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED:
-        mm_info ("Activation step [3/5]: waiting for activation state updates");
+        /* Automatic activation */
+        if (ctx->input_automatic) {
+            /* State updates via unsolicited messages */
+            mm_info ("Activation step [3/5]: waiting for activation state updates");
+            return;
+        }
+
+        /* Manual activation; needs MSISDN checks */
+        g_assert (ctx->input_manual != NULL);
+        ctx->n_mdn_check_retries++;
+        mm_info ("Activation step [3/5]: checking MDN update (retry %u)", ctx->n_mdn_check_retries);
+        qmi_client_dms_get_msisdn (ctx->client,
+                                   NULL,
+                                   5,
+                                   NULL,
+                                   (GAsyncReadyCallback)activate_manual_get_msisdn_ready,
+                                   ctx);
         return;
 
     case CDMA_ACTIVATION_STEP_POWER_CYCLE:
