@@ -18,7 +18,7 @@
 
     <!--
         Setup:
-        @rate: refresh rate to set. 0 to disable retrieval.
+        @rate: refresh rate to set, in seconds. 0 to disable retrieval.
 
         Setup extended signal quality information retrieval.
     -->
