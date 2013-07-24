@@ -105,6 +105,7 @@ include_HEADERS = \
 	mm-modem-location.h \
 	mm-modem-time.h \
 	mm-modem-firmware.h \
+	mm-modem-signal.h \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \
