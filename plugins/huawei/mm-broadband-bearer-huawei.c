@@ -483,7 +483,7 @@ disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
         mm_dbg ("Modem doesn't properly support ^NDISSTATQRY command: %s", error->message);
         g_error_free (error);
 
-        ctx->self->priv->connect_pending = NULL;
+        ctx->self->priv->disconnect_pending = NULL;
         g_simple_async_result_set_error (ctx->result,
                                          MM_MOBILE_EQUIPMENT_ERROR,
                                          MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
