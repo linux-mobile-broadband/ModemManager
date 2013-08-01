@@ -333,20 +333,22 @@ mm_filter_supported_capabilities (MMModemCapability all,
 #define CREG3 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
+#define CREG4 "\\+(CREG|CGREG|CEREG):\\s*([0-9]),\\s*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
+#define CREG5 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*(\"[^,]*\")\\s*,\\s*(\"[^,\\s]*\")"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-#define CREG5 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+#define CREG6 "\\+(CREG|CGREG|CEREG):\\s*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9])"
+#define CREG7 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-#define CREG6 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+#define CREG8 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
 /* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
-#define CREG7 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
+#define CREG9 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
-#define CREG8 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)"
+#define CREG10 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)"
 
 /* +CEREG: <stat>,<lac>,<rac>,<ci>,<AcT>     (ETSI 27.007 v8.6 CREG=2 unsolicited with RAC) */
 #define CEREG1 "\\+(CEREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
@@ -357,7 +359,7 @@ mm_filter_supported_capabilities (MMModemCapability all,
 GPtrArray *
 mm_3gpp_creg_regex_get (gboolean solicited)
 {
-    GPtrArray *array = g_ptr_array_sized_new (10);
+    GPtrArray *array = g_ptr_array_sized_new (12);
     GRegex *regex;
 
     /* #1 */
@@ -421,6 +423,22 @@ mm_3gpp_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CREG8 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CREG8 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #9 */
+    if (solicited)
+        regex = g_regex_new (CREG9 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG9 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #10 */
+    if (solicited)
+        regex = g_regex_new (CREG10 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG10 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
