@@ -840,9 +840,49 @@ test_creg2_iridium_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG:002,001,\"18d8\",\"ffff\"";
-    const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE, FALSE };
+    const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 5, FALSE, FALSE };
 
     test_creg_match ("Iridium, CREG=2", TRUE, reply, data, &result);
+}
+
+static void
+test_creg2_no_leading_zeros_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "+CREG:2,1,0001,0010";
+    const CregResult result = { 1, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE, FALSE };
+
+    test_creg_match ("solicited CREG=2 with no leading zeros in integer fields", TRUE, reply, data, &result);
+}
+
+static void
+test_creg2_leading_zeros_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "+CREG:002,001,\"0001\",\"0010\"";
+    const CregResult result = { 1, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 5, FALSE, FALSE };
+
+    test_creg_match ("solicited CREG=2 with leading zeros in integer fields", TRUE, reply, data, &result);
+}
+
+static void
+test_creg2_no_leading_zeros_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 1,0001,0010,0\r\n";
+    const CregResult result = { 1, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 6, FALSE, FALSE };
+
+    test_creg_match ("unsolicited CREG=2 with no leading zeros in integer fields", FALSE, reply, data, &result);
+}
+
+static void
+test_creg2_leading_zeros_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 001,\"0001\",\"0010\",000\r\n";
+    const CregResult result = { 1, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 7, FALSE, FALSE };
+
+    test_creg_match ("unsolicited CREG=2 with leading zeros in integer fields", FALSE, reply, data, &result);
 }
 
 static void
@@ -870,7 +910,7 @@ test_cgreg2_f3607gw_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "+CGREG: 2,1,\"8BE3\",\"00002B5D\",3";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 6, TRUE, FALSE };
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 8, TRUE, FALSE };
 
     test_creg_match ("Ericsson F3607gw CGREG=2", TRUE, reply, data, &result);
 }
@@ -880,7 +920,7 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"8BE3\",\"00002B5D\",3\r\n";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 5, TRUE, FALSE };
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 6, TRUE, FALSE };
 
     test_creg_match ("Ericsson F3607gw CGREG=2", FALSE, reply, data, &result);
 }
@@ -900,7 +940,7 @@ test_cgreg2_md400_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 5,\"0502\",\"0404736D\",2\r\n";
-    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UMTS, 5, TRUE, FALSE };
+    const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UMTS, 6, TRUE, FALSE };
 
     test_creg_match ("Sony-Ericsson MD400 CGREG=2", FALSE, reply, data, &result);
 }
@@ -941,7 +981,7 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,000B,2816, B, C2816\r\n";
-    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 7, FALSE, FALSE };
+    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 9, FALSE, FALSE };
 
     test_creg_match ("Samsung Wave S8500 CREG=2", FALSE, reply, data, &result);
 }
@@ -961,7 +1001,7 @@ test_cgreg2_unsolicited_with_rac (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"1422\",\"00000142\",3,\"00\"\r\n";
-    const CregResult result = { 1, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 8, TRUE, FALSE };
+    const CregResult result = { 1, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 10, TRUE, FALSE };
 
     test_creg_match ("CGREG=2 with RAC", FALSE, reply, data, &result);
 }
@@ -991,7 +1031,7 @@ test_cereg2_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 2,1, 1F00, 79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 8, FALSE, TRUE };
 
     test_creg_match ("CEREG=2", TRUE, reply, data, &result);
 }
@@ -1001,9 +1041,29 @@ test_cereg2_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 1, 1F00, 79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 5, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, TRUE };
 
     test_creg_match ("CEREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg2_altair_lte_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 1, 2, 0001, 00000100, 7\r\n";
+    const CregResult result = { 2, 0x0001, 0x00000100, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 8, FALSE, TRUE };
+
+    test_creg_match ("Altair LTE CEREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg2_altair_lte_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 2, 0001, 00000100, 7\r\n";
+    const CregResult result = { 2, 0x0001, 0x00000100, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, TRUE };
+
+    test_creg_match ("Altair LTE CEREG=2", FALSE, reply, data, &result);
 }
 
 static void
@@ -1011,7 +1071,7 @@ test_cereg2_novatel_lte_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 2,1, 1F00, 20 ,79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 10, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 12, FALSE, TRUE };
 
     test_creg_match ("Novatel LTE E362 CEREG=2", TRUE, reply, data, &result);
 }
@@ -1021,7 +1081,7 @@ test_cereg2_novatel_lte_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 1, 1F00, 20 ,79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 9, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 11, FALSE, TRUE };
 
     test_creg_match ("Novatel LTE E362 CEREG=2", FALSE, reply, data, &result);
 }
@@ -2222,6 +2282,10 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_iridium_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_no_leading_zeros_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_no_leading_zeros_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_unsolicited, reg_data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, reg_data));
@@ -2235,6 +2299,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cereg1_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_altair_lte_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_altair_lte_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_unsolicited, reg_data));
 
