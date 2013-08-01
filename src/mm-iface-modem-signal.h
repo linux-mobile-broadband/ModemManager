@@ -19,6 +19,9 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #define MM_TYPE_IFACE_MODEM_SIGNAL               (mm_iface_modem_signal_get_type ())
 #define MM_IFACE_MODEM_SIGNAL(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_SIGNAL, MMIfaceModemSignal))
 #define MM_IS_IFACE_MODEM_SIGNAL(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_SIGNAL))
@@ -46,24 +49,11 @@ struct _MMIfaceModemSignal {
                                      gpointer user_data);
     gboolean (* load_values_finish) (MMIfaceModemSignal *self,
                                      GAsyncResult *res,
-                                     gboolean *cdma_available,
-                                     gdouble *cdma_rssi,
-                                     gdouble *cdma_ecio,
-                                     gboolean *evdo_available,
-                                     gdouble *evdo_rssi,
-                                     gdouble *evdo_ecio,
-                                     gdouble *evdo_sinr,
-                                     gdouble *evdo_io,
-                                     gboolean *gsm_available,
-                                     gdouble *gsm_rssi,
-                                     gboolean *umts_available,
-                                     gdouble *umts_rssi,
-                                     gdouble *umts_ecio,
-                                     gboolean *lte_available,
-                                     gdouble *lte_rssi,
-                                     gdouble *lte_rsrq,
-                                     gdouble *lte_rsrp,
-                                     gdouble *lte_snr,
+                                     MMSignal **cdma,
+                                     MMSignal **evdo,
+                                     MMSignal **gsm,
+                                     MMSignal **umts,
+                                     MMSignal **lte,
                                      GError **error);
 };
 

@@ -8661,6 +8661,55 @@ signal_check_support (MMIfaceModemSignal *self,
 /*****************************************************************************/
 /* Load extended signal information */
 
+typedef enum {
+    SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST,
+    SIGNAL_LOAD_VALUES_STEP_SIGNAL_INFO,
+    SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST
+} SignalLoadValuesStep;
+
+typedef struct {
+    MMSignal *cdma;
+    MMSignal *evdo;
+    MMSignal *gsm;
+    MMSignal *umts;
+    MMSignal *lte;
+} SignalLoadValuesResult;
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientNas *client;
+    GSimpleAsyncResult *result;
+    SignalLoadValuesStep step;
+    SignalLoadValuesResult *values_result;
+} SignalLoadValuesContext;
+
+static void
+signal_load_values_result_free (SignalLoadValuesResult *result)
+{
+    if (result->cdma)
+        g_object_unref (result->cdma);
+    if (result->evdo)
+        g_object_unref (result->evdo);
+    if (result->gsm)
+        g_object_unref (result->gsm);
+    if (result->umts)
+        g_object_unref (result->umts);
+    if (result->lte)
+        g_object_unref (result->lte);
+    g_slice_free (SignalLoadValuesResult, result);
+}
+
+static void
+signal_load_values_context_complete_and_free (SignalLoadValuesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    if (ctx->values_result)
+        signal_load_values_result_free (ctx->values_result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (SignalLoadValuesContext, ctx);
+}
+
 static gdouble
 get_db_from_sinr_level (QmiNasEvdoSinrLevel level)
 {
@@ -8683,27 +8732,37 @@ get_db_from_sinr_level (QmiNasEvdoSinrLevel level)
 static gboolean
 signal_load_values_finish (MMIfaceModemSignal *self,
                            GAsyncResult *res,
-                           gboolean *cdma_available,
-                           gdouble *cdma_rssi,
-                           gdouble *cdma_ecio,
-                           gboolean *evdo_available,
-                           gdouble *evdo_rssi,
-                           gdouble *evdo_ecio,
-                           gdouble *evdo_sinr,
-                           gdouble *evdo_io,
-                           gboolean *gsm_available,
-                           gdouble *gsm_rssi,
-                           gboolean *umts_available,
-                           gdouble *umts_rssi,
-                           gdouble *umts_ecio,
-                           gboolean *lte_available,
-                           gdouble *lte_rssi,
-                           gdouble *lte_rsrq,
-                           gdouble *lte_rsrp,
-                           gdouble *lte_snr,
+                           MMSignal **cdma,
+                           MMSignal **evdo,
+                           MMSignal **gsm,
+                           MMSignal **umts,
+                           MMSignal **lte,
                            GError **error)
 {
+    SignalLoadValuesResult *values_result;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    values_result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *cdma = values_result->cdma ? g_object_ref (values_result->cdma) : NULL;
+    *evdo = values_result->evdo ? g_object_ref (values_result->evdo) : NULL;
+    *gsm  = values_result->gsm  ? g_object_ref (values_result->gsm)  : NULL;
+    *umts = values_result->umts ? g_object_ref (values_result->umts) : NULL;
+    *lte  = values_result->lte  ? g_object_ref (values_result->lte)  : NULL;
+
+    return TRUE;
+}
+
+static void signal_load_values_context_step (SignalLoadValuesContext *ctx);
+
+static void
+signal_load_values_get_signal_info_ready (QmiClientNas *client,
+                                          GAsyncResult *res,
+                                          SignalLoadValuesContext *ctx)
+{
     QmiMessageNasGetSignalInfoOutput *output;
+    GError *error = NULL;
     gint8 rssi;
     gint16 ecio;
     QmiNasEvdoSinrLevel sinr_level;
@@ -8712,23 +8771,30 @@ signal_load_values_finish (MMIfaceModemSignal *self,
     gint16 rsrp;
     gint16 snr;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+    output = qmi_client_nas_get_signal_info_finish (client, res, &error);
+    if (!output) {
+        g_simple_async_result_take_error (ctx->result, error);
+        signal_load_values_context_complete_and_free (ctx);
+        return;
+    }
 
-    output = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (!qmi_message_nas_get_signal_info_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        signal_load_values_context_complete_and_free (ctx);
+        qmi_message_nas_get_signal_info_output_unref (output);
+        return;
+    }
+
+    ctx->values_result = g_slice_new0 (SignalLoadValuesResult);
 
     /* CDMA */
     if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output,
                                                                          &rssi,
                                                                          &ecio,
                                                                          NULL)) {
-        *cdma_available = TRUE;
-        *cdma_rssi = (double)rssi;
-        *cdma_ecio = ((double)ecio) * (-0.5);
-    } else {
-        *cdma_available = FALSE;
-        *cdma_rssi = 0.0;
-        *cdma_ecio = 0.0;
+        ctx->values_result->cdma = mm_signal_new ();
+        mm_signal_set_rssi (ctx->values_result->cdma, (gdouble)rssi);
+        mm_signal_set_ecio (ctx->values_result->cdma, ((gdouble)ecio) * (-0.5));
     }
 
     /* HDR... */
@@ -8738,28 +8804,19 @@ signal_load_values_finish (MMIfaceModemSignal *self,
                                                                         &sinr_level,
                                                                         &io,
                                                                         NULL)) {
-        *evdo_available = TRUE;
-        *evdo_rssi = (double)rssi;
-        *evdo_ecio = ((double)ecio) * (-0.5);
-        *evdo_sinr = get_db_from_sinr_level (sinr_level);
-        *evdo_io = (double)io;
-    } else {
-        *evdo_available = FALSE;
-        *evdo_rssi = 0.0;
-        *evdo_ecio = 0.0;
-        *evdo_sinr = 0.0;
-        *evdo_io = 0.0;
+        ctx->values_result->evdo = mm_signal_new ();
+        mm_signal_set_rssi (ctx->values_result->evdo, (gdouble)rssi);
+        mm_signal_set_ecio (ctx->values_result->evdo, ((gdouble)ecio) * (-0.5));
+        mm_signal_set_sinr (ctx->values_result->evdo, get_db_from_sinr_level (sinr_level));
+        mm_signal_set_io (ctx->values_result->evdo, (gdouble)io);
     }
 
     /* GSM */
     if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output,
                                                                         &rssi,
                                                                         NULL)) {
-        *gsm_available = TRUE;
-        *gsm_rssi = (double)rssi;
-    } else {
-        *gsm_available = FALSE;
-        *gsm_rssi = 0.0;
+        ctx->values_result->gsm = mm_signal_new ();
+        mm_signal_set_rssi (ctx->values_result->gsm, (gdouble)rssi);
     }
 
     /* WCDMA... */
@@ -8767,13 +8824,9 @@ signal_load_values_finish (MMIfaceModemSignal *self,
                                                                           &rssi,
                                                                           &ecio,
                                                                           NULL)) {
-        *umts_available = TRUE;
-        *umts_rssi = (double)rssi;
-        *umts_ecio = ((double)ecio) * (-0.5);
-    } else {
-        *umts_available = FALSE;
-        *umts_rssi = 0.0;
-        *umts_ecio = 0.0;
+        ctx->values_result->umts = mm_signal_new ();
+        mm_signal_set_rssi (ctx->values_result->umts, (gdouble)rssi);
+        mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)ecio) * (-0.5));
     }
 
     /* LTE... */
@@ -8783,45 +8836,51 @@ signal_load_values_finish (MMIfaceModemSignal *self,
                                                                         &rsrp,
                                                                         &snr,
                                                                         NULL)) {
-        *lte_available = TRUE;
-        *lte_rssi = (double)rssi;
-        *lte_rsrq = (gdouble)rsrq;
-        *lte_rsrp = (gdouble)rsrp;
-        *lte_snr = (0.1) * ((gdouble)snr);
-    } else {
-        *lte_available = FALSE;
-        *lte_rssi = 0.0;
-        *lte_rsrq = 0.0;
-        *lte_rsrp = 0.0;
-        *lte_snr = 0.0;
+        ctx->values_result->lte = mm_signal_new ();
+        mm_signal_set_rssi (ctx->values_result->lte, (gdouble)rssi);
+        mm_signal_set_rsrq (ctx->values_result->lte, (gdouble)rsrq);
+        mm_signal_set_rsrp (ctx->values_result->lte, (gdouble)rsrp);
+        mm_signal_set_snr (ctx->values_result->lte, (0.1) * ((gdouble)snr));
     }
 
-    return TRUE;
+    qmi_message_nas_get_signal_info_output_unref (output);
+
+    /* Keep on */
+    ctx->step++;
+    signal_load_values_context_step (ctx);
 }
 
 static void
-signal_load_values_get_signal_info_ready (QmiClientNas *client,
-                                          GAsyncResult *res,
-                                          GSimpleAsyncResult *simple)
+signal_load_values_context_step (SignalLoadValuesContext *ctx)
 {
-    QmiMessageNasGetSignalInfoOutput *output;
-    GError *error = NULL;
+    switch (ctx->step) {
+    case SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST:
+        ctx->step++;
+        /* Fall down */
+    case SIGNAL_LOAD_VALUES_STEP_SIGNAL_INFO:
+        qmi_client_nas_get_signal_info (ctx->client,
+                                        NULL,
+                                        5,
+                                        NULL,
+                                        (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
+                                        ctx);
+        return;
+    case SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST:
+        if (ctx->values_result) {
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       ctx->values_result,
+                                                       (GDestroyNotify)signal_load_values_result_free);
+            ctx->values_result = NULL;
+        } else
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "No way to load extended signal information");
+        signal_load_values_context_complete_and_free (ctx);
+        return;
+    }
 
-    output = qmi_client_nas_get_signal_info_finish (client, res, &error);
-    if (!output)
-        g_simple_async_result_take_error (simple, error);
-    else if (!qmi_message_nas_get_signal_info_output_get_result (output, &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        /* set the output bundle as result, we'll read the values directly in finish() */
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   qmi_message_nas_get_signal_info_output_ref (output),
-                                                   (GDestroyNotify)qmi_message_nas_get_signal_info_output_unref);
-
-    if (output)
-        qmi_message_nas_get_signal_info_output_unref (output);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_assert_not_reached ();
 }
 
 static void
@@ -8830,7 +8889,7 @@ signal_load_values (MMIfaceModemSignal *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    SignalLoadValuesContext *ctx;
     QmiClient *client = NULL;
 
     mm_dbg ("loading extended signal information...");
@@ -8840,17 +8899,16 @@ signal_load_values (MMIfaceModemSignal *self,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        signal_load_values);
+    ctx = g_slice_new0 (SignalLoadValuesContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             signal_load_values);
+    ctx->step = SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST;
 
-    qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (client),
-                                    NULL,
-                                    5,
-                                    NULL,
-                                    (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
-                                    result);
+    signal_load_values_context_step (ctx);
 }
 
 /*****************************************************************************/

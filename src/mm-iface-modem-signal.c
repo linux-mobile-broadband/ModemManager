@@ -75,50 +75,23 @@ static void
 load_values_ready (MMIfaceModemSignal *self,
                    GAsyncResult *res)
 {
-    MMSignal *info;
     GVariant *dictionary;
     GError *error = NULL;
-    gboolean cdma_available;
-    gdouble cdma_rssi;
-    gdouble cdma_ecio;
-    gboolean evdo_available;
-    gdouble evdo_rssi;
-    gdouble evdo_ecio;
-    gdouble evdo_sinr;
-    gdouble evdo_io;
-    gboolean gsm_available;
-    gdouble gsm_rssi;
-    gboolean umts_available;
-    gdouble umts_rssi;
-    gdouble umts_ecio;
-    gboolean lte_available;
-    gdouble lte_rssi;
-    gdouble lte_rsrq;
-    gdouble lte_rsrp;
-    gdouble lte_snr;
+    MMSignal *cdma = NULL;
+    MMSignal *evdo = NULL;
+    MMSignal *gsm = NULL;
+    MMSignal *umts = NULL;
+    MMSignal *lte = NULL;
     MmGdbusModemSignal *skeleton;
 
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values_finish (
             self,
             res,
-            &cdma_available,
-            &cdma_rssi,
-            &cdma_ecio,
-            &evdo_available,
-            &evdo_rssi,
-            &evdo_ecio,
-            &evdo_sinr,
-            &evdo_io,
-            &gsm_available,
-            &gsm_rssi,
-            &umts_available,
-            &umts_rssi,
-            &umts_ecio,
-            &lte_available,
-            &lte_rssi,
-            &lte_rsrq,
-            &lte_rsrp,
-            &lte_snr,
+            &cdma,
+            &evdo,
+            &gsm,
+            &umts,
+            &lte,
             &error)) {
         mm_warn ("Couldn't load extended signal information: %s", error->message);
         g_error_free (error);
@@ -135,57 +108,39 @@ load_values_ready (MMIfaceModemSignal *self,
         return;
     }
 
-    if (cdma_available) {
-        info = mm_signal_new ();
-        mm_signal_set_rssi (info, cdma_rssi);
-        mm_signal_set_ecio (info, cdma_ecio);
-        dictionary = mm_signal_get_dictionary (info);
+    if (cdma) {
+        dictionary = mm_signal_get_dictionary (cdma);
         mm_gdbus_modem_signal_set_cdma (skeleton, dictionary);
         g_variant_unref (dictionary);
-        g_object_unref (info);
+        g_object_unref (cdma);
     }
 
-    if (evdo_available) {
-        info = mm_signal_new ();
-        mm_signal_set_rssi (info, evdo_rssi);
-        mm_signal_set_ecio (info, evdo_ecio);
-        mm_signal_set_sinr (info, evdo_sinr);
-        mm_signal_set_io (info, evdo_io);
-        dictionary = mm_signal_get_dictionary (info);
+    if (evdo) {
+        dictionary = mm_signal_get_dictionary (evdo);
         mm_gdbus_modem_signal_set_evdo (skeleton, dictionary);
         g_variant_unref (dictionary);
-        g_object_unref (info);
+        g_object_unref (evdo);
     }
 
-    if (gsm_available) {
-        info = mm_signal_new ();
-        mm_signal_set_rssi (info, gsm_rssi);
-        dictionary = mm_signal_get_dictionary (info);
+    if (gsm) {
+        dictionary = mm_signal_get_dictionary (gsm);
         mm_gdbus_modem_signal_set_gsm (skeleton, dictionary);
         g_variant_unref (dictionary);
-        g_object_unref (info);
+        g_object_unref (gsm);
     }
 
-    if (umts_available) {
-        info = mm_signal_new ();
-        mm_signal_set_rssi (info, umts_rssi);
-        mm_signal_set_ecio (info, umts_ecio);
-        dictionary = mm_signal_get_dictionary (info);
+    if (umts) {
+        dictionary = mm_signal_get_dictionary (umts);
         mm_gdbus_modem_signal_set_umts (skeleton, dictionary);
         g_variant_unref (dictionary);
-        g_object_unref (info);
+        g_object_unref (umts);
     }
 
-    if (lte_available) {
-        info = mm_signal_new ();
-        mm_signal_set_rssi (info, lte_rssi);
-        mm_signal_set_rsrq (info, lte_rsrq);
-        mm_signal_set_rsrp (info, lte_rsrp);
-        mm_signal_set_snr (info, lte_snr);
-        dictionary = mm_signal_get_dictionary (info);
+    if (lte) {
+        dictionary = mm_signal_get_dictionary (lte);
         mm_gdbus_modem_signal_set_lte (skeleton, dictionary);
         g_variant_unref (dictionary);
-        g_object_unref (info);
+        g_object_unref (lte);
     }
 
     /* Flush right away */
