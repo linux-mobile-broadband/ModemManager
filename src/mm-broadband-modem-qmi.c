@@ -8636,7 +8636,6 @@ signal_check_support (MMIfaceModemSignal *self,
                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    QmiClient *client = NULL;
     MMQmiPort *port;
     gboolean supported = FALSE;
 
@@ -8646,11 +8645,10 @@ signal_check_support (MMIfaceModemSignal *self,
                                         signal_check_support);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
-    if (port) {
-        client = mm_qmi_port_peek_client (port, QMI_SERVICE_NAS, MM_QMI_PORT_FLAG_DEFAULT);
-        if (client)
-            supported = qmi_client_check_version (client, 1, 8);
-    }
+
+    /* If NAS service is available, assume either signal info or signal strength are supported */
+    if (port)
+        supported = !!mm_qmi_port_peek_client (port, QMI_SERVICE_NAS, MM_QMI_PORT_FLAG_DEFAULT);
 
     mm_dbg ("Extended signal capabilities %ssupported", supported ? "" : "not ");
     g_simple_async_result_set_op_res_gboolean (result, supported);
@@ -8664,6 +8662,7 @@ signal_check_support (MMIfaceModemSignal *self,
 typedef enum {
     SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST,
     SIGNAL_LOAD_VALUES_STEP_SIGNAL_INFO,
+    SIGNAL_LOAD_VALUES_STEP_SIGNAL_STRENGTH,
     SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST
 } SignalLoadValuesStep;
 
@@ -8757,12 +8756,152 @@ signal_load_values_finish (MMIfaceModemSignal *self,
 static void signal_load_values_context_step (SignalLoadValuesContext *ctx);
 
 static void
+signal_load_values_get_signal_strength_ready (QmiClientNas *client,
+                                              GAsyncResult *res,
+                                              SignalLoadValuesContext *ctx)
+{
+    QmiMessageNasGetSignalStrengthOutput *output;
+    GArray *array;
+    gint32 aux_int32;
+    gint16 aux_int16;
+    gint8 aux_int8;
+    QmiNasRadioInterface radio_interface;
+    QmiNasEvdoSinrLevel sinr;
+
+    output = qmi_client_nas_get_signal_strength_finish (client, res, NULL);
+    if (!output || !qmi_message_nas_get_signal_strength_output_get_result (output, NULL)) {
+        /* No hard errors, go on to next step */
+        ctx->step++;
+        signal_load_values_context_step (ctx);
+        if (output)
+            qmi_message_nas_get_signal_strength_output_unref (output);
+        return;
+    }
+
+    /* Good, we have results */
+    ctx->values_result = g_slice_new0 (SignalLoadValuesResult);
+
+    /* RSSI */
+    if (qmi_message_nas_get_signal_strength_output_get_rssi_list (output, &array, NULL)) {
+        guint i;
+
+        for (i = 0; i < array->len; i++) {
+            QmiMessageNasGetSignalStrengthOutputRssiListElement *element;
+
+            element = &g_array_index (array, QmiMessageNasGetSignalStrengthOutputRssiListElement, i);
+
+            switch (element->radio_interface) {
+            case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
+                if (!ctx->values_result->cdma)
+                    ctx->values_result->cdma = mm_signal_new ();
+                mm_signal_set_rssi (ctx->values_result->cdma, (gdouble)element->rssi);
+                break;
+            case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
+                if (!ctx->values_result->evdo)
+                    ctx->values_result->evdo = mm_signal_new ();
+                mm_signal_set_rssi (ctx->values_result->evdo, (gdouble)element->rssi);
+                break;
+            case QMI_NAS_RADIO_INTERFACE_GSM:
+                if (!ctx->values_result->gsm)
+                    ctx->values_result->gsm = mm_signal_new ();
+                mm_signal_set_rssi (ctx->values_result->gsm, (gdouble)element->rssi);
+                break;
+            case QMI_NAS_RADIO_INTERFACE_UMTS:
+                if (!ctx->values_result->umts)
+                    ctx->values_result->umts = mm_signal_new ();
+                mm_signal_set_rssi (ctx->values_result->umts, (gdouble)element->rssi);
+                break;
+            case QMI_NAS_RADIO_INTERFACE_LTE:
+                if (!ctx->values_result->lte)
+                    ctx->values_result->lte = mm_signal_new ();
+                mm_signal_set_rssi (ctx->values_result->lte, (gdouble)element->rssi);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    /* ECIO (CDMA, EV-DO and UMTS) */
+    if (qmi_message_nas_get_signal_strength_output_get_ecio_list (output, &array, NULL)) {
+        guint i;
+
+        for (i = 0; i < array->len; i++) {
+            QmiMessageNasGetSignalStrengthOutputEcioListElement *element;
+
+            element = &g_array_index (array, QmiMessageNasGetSignalStrengthOutputEcioListElement, i);
+
+            switch (element->radio_interface) {
+            case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
+                if (!ctx->values_result->cdma)
+                    ctx->values_result->cdma = mm_signal_new ();
+                mm_signal_set_ecio (ctx->values_result->cdma, ((gdouble)element->ecio) * (-0.5));
+                break;
+            case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
+                if (!ctx->values_result->evdo)
+                    ctx->values_result->evdo = mm_signal_new ();
+                mm_signal_set_ecio (ctx->values_result->evdo, ((gdouble)element->ecio) * (-0.5));
+                break;
+            case QMI_NAS_RADIO_INTERFACE_UMTS:
+                if (!ctx->values_result->umts)
+                    ctx->values_result->umts = mm_signal_new ();
+                mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)element->ecio) * (-0.5));
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    /* IO (EV-DO) */
+    if (qmi_message_nas_get_signal_strength_output_get_io (output, &aux_int32, NULL)) {
+        if (!ctx->values_result->evdo)
+            ctx->values_result->evdo = mm_signal_new ();
+        mm_signal_set_io (ctx->values_result->evdo, (gdouble)aux_int32);
+    }
+
+    /* RSRP (LTE) */
+    if (qmi_message_nas_get_signal_strength_output_get_lte_rsrp (output, &aux_int16, NULL)) {
+        if (!ctx->values_result->lte)
+            ctx->values_result->lte = mm_signal_new ();
+        mm_signal_set_rsrp (ctx->values_result->lte, (gdouble)aux_int16);
+    }
+
+    /* RSRQ (LTE) */
+    if (qmi_message_nas_get_signal_strength_output_get_rsrq (output, &aux_int8, &radio_interface, NULL) &&
+        radio_interface == QMI_NAS_RADIO_INTERFACE_LTE) {
+        if (!ctx->values_result->lte)
+            ctx->values_result->lte = mm_signal_new ();
+        mm_signal_set_rsrq (ctx->values_result->lte, (gdouble)aux_int8);
+    }
+
+    /* SNR (LTE) */
+    if (qmi_message_nas_get_signal_strength_output_get_lte_snr (output, &aux_int16, NULL)) {
+        if (!ctx->values_result->lte)
+            ctx->values_result->lte = mm_signal_new ();
+        mm_signal_set_snr (ctx->values_result->lte, (0.1) * ((gdouble)aux_int16));
+    }
+
+    /* SINR (EV-DO) */
+    if (qmi_message_nas_get_signal_strength_output_get_sinr (output, &sinr, NULL)) {
+        if (!ctx->values_result->evdo)
+            ctx->values_result->evdo = mm_signal_new ();
+        mm_signal_set_sinr (ctx->values_result->evdo, get_db_from_sinr_level (sinr));
+    }
+
+    qmi_message_nas_get_signal_strength_output_unref (output);
+
+    /* Go on */
+    ctx->step++;
+    signal_load_values_context_step (ctx);
+}
+
+static void
 signal_load_values_get_signal_info_ready (QmiClientNas *client,
                                           GAsyncResult *res,
                                           SignalLoadValuesContext *ctx)
 {
     QmiMessageNasGetSignalInfoOutput *output;
-    GError *error = NULL;
     gint8 rssi;
     gint16 ecio;
     QmiNasEvdoSinrLevel sinr_level;
@@ -8771,20 +8910,17 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
     gint16 rsrp;
     gint16 snr;
 
-    output = qmi_client_nas_get_signal_info_finish (client, res, &error);
-    if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        signal_load_values_context_complete_and_free (ctx);
+    output = qmi_client_nas_get_signal_info_finish (client, res, NULL);
+    if (!output || !qmi_message_nas_get_signal_info_output_get_result (output, NULL)) {
+        /* No hard errors, go on to next step */
+        ctx->step++;
+        signal_load_values_context_step (ctx);
+        if (output)
+            qmi_message_nas_get_signal_info_output_unref (output);
         return;
     }
 
-    if (!qmi_message_nas_get_signal_info_output_get_result (output, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        signal_load_values_context_complete_and_free (ctx);
-        qmi_message_nas_get_signal_info_output_unref (output);
-        return;
-    }
-
+    /* Good, we have results */
     ctx->values_result = g_slice_new0 (SignalLoadValuesResult);
 
     /* CDMA */
@@ -8853,34 +8989,81 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
 static void
 signal_load_values_context_step (SignalLoadValuesContext *ctx)
 {
+
+#define VALUES_RESULT_LOADED(ctx)    \
+    (ctx->values_result &&           \
+     (ctx->values_result->cdma ||    \
+      ctx->values_result->evdo ||    \
+      ctx->values_result->gsm  ||    \
+      ctx->values_result->umts ||    \
+      ctx->values_result->lte))
+
     switch (ctx->step) {
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST:
         ctx->step++;
         /* Fall down */
+
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_INFO:
-        qmi_client_nas_get_signal_info (ctx->client,
-                                        NULL,
-                                        5,
-                                        NULL,
-                                        (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
-                                        ctx);
-        return;
+        if (qmi_client_check_version (QMI_CLIENT (ctx->client), 1, 8)) {
+            qmi_client_nas_get_signal_info (ctx->client,
+                                            NULL,
+                                            5,
+                                            NULL,
+                                            (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
+                                            ctx);
+            return;
+        }
+        ctx->step++;
+        /* Fall down */
+
+   case SIGNAL_LOAD_VALUES_STEP_SIGNAL_STRENGTH:
+       /* If already loaded with signal info, don't try signal strength */
+       if (!VALUES_RESULT_LOADED (ctx)) {
+           QmiMessageNasGetSignalStrengthInput *input;
+
+           input = qmi_message_nas_get_signal_strength_input_new ();
+           qmi_message_nas_get_signal_strength_input_set_request_mask (
+               input,
+               (QMI_NAS_SIGNAL_STRENGTH_REQUEST_RSSI |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_ECIO |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_IO |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_SINR |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_RSRQ |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_LTE_SNR |
+                QMI_NAS_SIGNAL_STRENGTH_REQUEST_LTE_RSRP),
+               NULL);
+           qmi_client_nas_get_signal_strength (ctx->client,
+                                               input,
+                                               5,
+                                               NULL,
+                                               (GAsyncReadyCallback)signal_load_values_get_signal_strength_ready,
+                                               ctx);
+           qmi_message_nas_get_signal_strength_input_unref (input);
+           return;
+       }
+       ctx->step++;
+       /* Fall down */
+
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST:
-        if (ctx->values_result) {
+        /* If any result is set, succeed */
+        if (VALUES_RESULT_LOADED (ctx)) {
             g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                        ctx->values_result,
                                                        (GDestroyNotify)signal_load_values_result_free);
             ctx->values_result = NULL;
-        } else
+        } else {
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
                                              "No way to load extended signal information");
+        }
         signal_load_values_context_complete_and_free (ctx);
         return;
     }
 
     g_assert_not_reached ();
+
+#undef VALUES_RESULT_LOADED
 }
 
 static void
