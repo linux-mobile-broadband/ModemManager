@@ -67,6 +67,12 @@ typedef enum {
     NDISDUP_SUPPORTED
 } NdisdupSupport;
 
+typedef enum {
+    RFSWITCH_SUPPORT_UNKNOWN,
+    RFSWITCH_NOT_SUPPORTED,
+    RFSWITCH_SUPPORTED
+} RfswitchSupport;
+
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
     GRegex *rssi_regex;
@@ -89,6 +95,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ndisstat_regex;
 
     NdisdupSupport ndisdup_support;
+    RfswitchSupport rfswitch_support;
 
     gboolean sysinfoex_supported;
     gboolean sysinfoex_support_checked;
@@ -2536,6 +2543,210 @@ modem_time_load_network_time (MMIfaceModemTime *self,
 }
 
 /*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+static void
+parent_load_power_state_ready (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *result)
+{
+    GError *error = NULL;
+    MMModemPowerState power_state;
+
+    power_state = iface_modem_parent->load_power_state_finish (self, res, &error);
+    if (error)
+        g_simple_async_result_take_error (result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (power_state), NULL);
+
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+}
+
+static void
+huawei_rfswitch_check_ready (MMBaseModem *_self,
+                             GAsyncResult *res,
+                             GSimpleAsyncResult *result)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GError *error = NULL;
+    const gchar *response;
+    gint sw_state;
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
+    if (response) {
+        response = mm_strip_tag (response, "^RFSWITCH:");
+        if (sscanf (response, "%d", &sw_state) != 1 ||
+            (sw_state != 0 && sw_state != 1)) {
+            mm_warn ("Couldn't parse ^RFSWITCH response: '%s'", response);
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse ^RFSWITCH response: '%s'",
+                                 response);
+        }
+    }
+
+    switch (self->priv->rfswitch_support) {
+    case RFSWITCH_SUPPORT_UNKNOWN:
+        if (error) {
+            mm_dbg ("The device does not support ^RFSWITCH");
+            self->priv->rfswitch_support = RFSWITCH_NOT_SUPPORTED;
+            g_error_free (error);
+            /* Fall back to parent's load_power_state */
+            iface_modem_parent->load_power_state (MM_IFACE_MODEM (self),
+                                                  (GAsyncReadyCallback)parent_load_power_state_ready,
+                                                  result);
+            return;
+        }
+
+        mm_dbg ("The device supports ^RFSWITCH");
+        self->priv->rfswitch_support = RFSWITCH_SUPPORTED;
+        break;
+    case RFSWITCH_SUPPORTED:
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+
+    if (error)
+        g_simple_async_result_take_error (result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   sw_state ?
+                                                   GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON) :
+                                                   GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW),
+                                                   NULL);
+
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+}
+
+static MMModemPowerState
+load_power_state_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_power_state (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_power_state);
+
+    switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
+    case RFSWITCH_SUPPORT_UNKNOWN:
+    case RFSWITCH_SUPPORTED: {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "^RFSWITCH?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)huawei_rfswitch_check_ready,
+                                  result);
+        break;
+    }
+    case RFSWITCH_NOT_SUPPORTED:
+      /* Run parent's load_power_state */
+      iface_modem_parent->load_power_state (self,
+                                            (GAsyncReadyCallback)parent_load_power_state_ready,
+                                            result);
+      break;
+    default:
+      g_assert_not_reached ();
+      break;
+    }
+}
+
+/*****************************************************************************/
+/* Modem power up (Modem interface) */
+
+static gboolean
+huawei_modem_power_up_finish (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+huawei_modem_power_up (MMIfaceModem *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
+    case RFSWITCH_NOT_SUPPORTED:
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CFUN=1",
+                                  30,
+                                  FALSE,
+                                  callback,
+                                  user_data);
+        break;
+    case RFSWITCH_SUPPORTED:
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "^RFSWITCH=1",
+                                  30,
+                                  FALSE,
+                                  callback,
+                                  user_data);
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+}
+
+/*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+huawei_modem_power_down_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+huawei_modem_power_down (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
+    case RFSWITCH_NOT_SUPPORTED:
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CFUN=0",
+                                  30,
+                                  FALSE,
+                                  callback,
+                                  user_data);
+        break;
+    case RFSWITCH_SUPPORTED:
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "^RFSWITCH=0",
+                                  30,
+                                  FALSE,
+                                  callback,
+                                  user_data);
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+}
+
+/*****************************************************************************/
 /* Check support (Time interface) */
 
 static gboolean
@@ -2700,6 +2911,7 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
+    self->priv->rfswitch_support = RFSWITCH_SUPPORT_UNKNOWN;
 
     self->priv->sysinfoex_supported = FALSE;
     self->priv->sysinfoex_support_checked = FALSE;
@@ -2751,6 +2963,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
     iface->create_bearer = huawei_modem_create_bearer;
     iface->create_bearer_finish = huawei_modem_create_bearer_finish;
+    iface->load_power_state = load_power_state;
+    iface->load_power_state_finish = load_power_state_finish;
+    iface->modem_power_up = huawei_modem_power_up;
+    iface->modem_power_up_finish = huawei_modem_power_up_finish;
+    iface->modem_power_down = huawei_modem_power_down;
+    iface->modem_power_down_finish = huawei_modem_power_down_finish;
 }
 
 static void
