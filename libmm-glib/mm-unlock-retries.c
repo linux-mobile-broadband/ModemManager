@@ -112,8 +112,8 @@ mm_unlock_retries_cmp (MMUnlockRetries *a,
 /**
  * mm_unlock_retries_foreach:
  * @self: a @MMUnlockRetries.
- * @callback: callback to call for each available lock.
- * @user_data: data to pass to @callback.
+ * @callback: (scope call): callback to call for each available lock.
+ * @user_data: (closure) data to pass to @callback.
  *
  * Executes @callback for each lock information found in @self.
  */

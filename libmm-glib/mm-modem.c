@@ -758,7 +758,7 @@ ensure_internal_ports (MMModem *self,
 /**
  * mm_modem_peek_current_ports:
  * @self: A #MMModem.
- * @ports: (out) (array length=n_ports): Return location for the array of #MMModemPortInfo values. Do not free the returned value, it is owned by @self.
+ * @ports: (out) (array length=n_ports) (transfer none): Return location for the array of #MMModemPortInfo values. Do not free the returned value, it is owned by @self.
  * @n_ports: (out): Return location for the number of values in @ports.
  *
  * Gets the list of ports in the modem.
@@ -1510,7 +1510,7 @@ mm_modem_get_current_bands (MMModem *self,
 /**
  * mm_modem_peek_current_bands:
  * @self: A #MMModem.
- * @bands: (out) (array length=n_storages): Return location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
+ * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
  * Gets the list of radio frequency and technology bands the #MMModem is currently
@@ -1740,7 +1740,7 @@ list_bearers_context_complete_and_free (ListBearersContext *ctx)
  *
  * Finishes an operation started with mm_modem_list_bearers().
  *
- * Returns: (transfer full): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Modem): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
  */
 GList *
 mm_modem_list_bearers_finish (MMModem *self,
@@ -1892,7 +1892,7 @@ mm_modem_list_bearers (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_list_bearers()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Modem): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
  */
 GList *
 mm_modem_list_bearers_sync (MMModem *self,
@@ -2802,7 +2802,7 @@ mm_modem_set_current_bands_sync (MMModem *self,
  *
  * Finishes an operation started with mm_modem_get_sim().
  *
- * Returns: a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
  */
 MMSim *
 mm_modem_get_sim_finish (MMModem *self,
@@ -2906,7 +2906,7 @@ mm_modem_get_sim (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_get_sim()
  * for the asynchronous version of this method.
  *
- * Returns: a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
  */
 MMSim *
 mm_modem_get_sim_sync (MMModem *self,

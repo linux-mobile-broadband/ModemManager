@@ -255,7 +255,7 @@ list_sms_context_complete_and_free (ListSmsContext *ctx)
  *
  * Finishes an operation started with mm_modem_messaging_list().
  *
- * Returns: (element-type MM.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
 mm_modem_messaging_list_finish (MMModemMessaging *self,
@@ -407,7 +407,7 @@ mm_modem_messaging_list (MMModemMessaging *self,
  * The calling thread is blocked until a reply is received. See mm_modem_messaging_list()
  * for the asynchronous version of this method.
  *
- * Returns: (element-type MM.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type MMSms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
 mm_modem_messaging_list_sync (MMModemMessaging *self,
@@ -598,7 +598,7 @@ mm_modem_messaging_create (MMModemMessaging *self,
 }
 
 /**
- * mm_modem_create_sms_sync:
+ * mm_modem_messaging_create_sync:
  * @self: A #MMModemMessaging.
  * @properties: A ##MMSmsProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.

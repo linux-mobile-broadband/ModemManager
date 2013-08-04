@@ -408,6 +408,16 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 
 /*****************************************************************************/
 
+
+/**
+ * mm_bearer_properties_consume_string:
+ * @self: a #MMBearerProperties
+ * @key:
+ * @value:
+ * @error: (allow-none): Return location for error or %NULL.
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
 gboolean
 mm_bearer_properties_consume_string (MMBearerProperties *self,
                                      const gchar *key,
@@ -517,6 +527,15 @@ mm_bearer_properties_new_from_string (const gchar *str,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_consume_variant:
+ * @properties: a #MMBearerProperties
+ * @key:
+ * @value: a #GVariant
+ * @error: (allow-none): Return location for error or %NULL.
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
 gboolean
 mm_bearer_properties_consume_variant (MMBearerProperties *properties,
                                       const gchar *key,
@@ -613,6 +632,14 @@ mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_dup:
+ * @orig: a #MMBearerProperties
+ *
+ * Creates a copy of @orig.
+ *
+ * Returns: (transfer full): a newly created #MMBearerProperties
+ */
 MMBearerProperties *
 mm_bearer_properties_dup (MMBearerProperties *orig)
 {

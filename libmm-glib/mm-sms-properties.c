@@ -708,6 +708,14 @@ mm_sms_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_sms_properties_dup:
+ * @orig: a #MMSmsProperties
+ *
+ * Returns a copy of @orig.
+ *
+ * Returns: (transfer full): a #MMSmsProperties
+ */
 MMSmsProperties *
 mm_sms_properties_dup (MMSmsProperties *orig)
 {

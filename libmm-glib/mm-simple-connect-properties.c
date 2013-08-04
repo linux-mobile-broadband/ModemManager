@@ -363,6 +363,14 @@ mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_get_bearer_properties:
+ * @self: a #MMSimpleConnectProperties:
+ *
+ * Returns the bearer properties of @self.
+ *
+ * Returns: (transfer full): a #MMBearerProperties
+ */
 MMBearerProperties *
 mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
 {

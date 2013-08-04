@@ -101,7 +101,7 @@ mm_modem_location_get_capabilities (MMModemLocation *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_location_get_capabilities:
+ * mm_modem_location_get_enabled:
  * @self: A #MMModemLocation.
  *
  * Gets a bitmask of the location capabilities which are enabled in this #MMModemLocation.

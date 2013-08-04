@@ -100,7 +100,7 @@ MMSimpleConnectProperties *mm_simple_connect_properties_new_from_string (const g
 MMSimpleConnectProperties *mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                                                                              GError **error);
 
-MMBearerProperties *mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *properties);
+MMBearerProperties *mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self);
 
 GVariant *mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self);
 #endif

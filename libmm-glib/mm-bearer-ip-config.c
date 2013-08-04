@@ -139,7 +139,7 @@ mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
  *
  * Gets the list of IP addresses of DNS servers to be used with this bearer.
  *
- * Returns: a NULL-terminated array of strings. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none) (array zero-terminated=1): a NULL-terminated array of strings. Do not free the returned value, it is owned by @self.
  */
 const gchar **
 mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
@@ -331,6 +331,14 @@ mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_dup:
+ * @orig: a #MMBearerIpConfig
+ *
+ * Creates a copy of @orig.
+ *
+ * Returns: (transfer full): a newly created #MMBearerIpConfig
+ */
 MMBearerIpConfig *
 mm_bearer_ip_config_dup (MMBearerIpConfig *orig)
 {

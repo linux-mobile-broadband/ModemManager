@@ -102,7 +102,7 @@ gboolean mm_bearer_properties_consume_string (MMBearerProperties *self,
                                               const gchar *value,
                                               GError **error);
 
-gboolean mm_bearer_properties_consume_variant (MMBearerProperties *self,
+gboolean mm_bearer_properties_consume_variant (MMBearerProperties *properties,
                                                const gchar *key,
                                                GVariant *value,
                                                GError **error);

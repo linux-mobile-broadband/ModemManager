@@ -499,7 +499,7 @@ create_networks_list (GVariant *variant)
  *
  * Finishes an operation started with mm_modem_3gpp_scan().
  *
- * Returns: a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ * Returns: (transfer full) (element-type ModemManager.Modem3gppNetwork): a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
  */
 GList *
 mm_modem_3gpp_scan_finish (MMModem3gpp *self,
@@ -552,7 +552,7 @@ mm_modem_3gpp_scan (MMModem3gpp *self,
  * The calling thread is blocked until a reply is received. See mm_modem_3gpp_scan()
  * for the asynchronous version of this method.
  *
- * Returns: a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ * Returns:  (transfer full) (element-type ModemManager.Modem3gppNetwork):  a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
  */
 GList *
 mm_modem_3gpp_scan_sync (MMModem3gpp *self,

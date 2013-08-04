@@ -245,7 +245,7 @@ build_results (const gchar *str_selected,
  * mm_modem_firmware_list_finish:
  * @self: A #MMModemFirmware.
  * @selected: (out) (allow-none) (transfer full): The selected firmware slot, or NULL if no slot is selected (such as if all slots are empty, or no slots exist). The returned value should be freed with g_object_unref().
- * @installed: (out) (allow-none) (transfer full): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
+ * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_firmware_list().
  * @error: Return location for error or %NULL.
  *
@@ -321,7 +321,7 @@ mm_modem_firmware_list (MMModemFirmware *self,
  * mm_modem_firmware_list_sync:
  * @self: A #MMModemFirmware.
  * @selected: (out) (allow-none) (transfer full): The selected firmware slot, or NULL if no slot is selected (such as if all slots are empty, or no slots exist). The returned value should be freed with g_object_unref().
- * @installed: (out) (allow-none) (transfer full): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
+ * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return firmware for error or %NULL.
  *
