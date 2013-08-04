@@ -110,6 +110,9 @@ AC_SUBST(GLIB_GENMARSHAL)
 GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
 AC_SUBST(GLIB_MKENUMS)
 
+# GObject Introspection
+GOBJECT_INTROSPECTION_CHECK([0.9.6])
+
 # DBus system directory
 AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
@@ -308,6 +311,7 @@ echo "
     systemd unit directory:  ${with_systemdsystemunitdir}
 
     PolicyKit support:       ${with_polkit}
+    GObject Introspection:   ${found_introspection}
     Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}

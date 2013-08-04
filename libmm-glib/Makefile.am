@@ -66,13 +66,17 @@ libmm_glib_la_SOURCES = \
 	mm-cdma-manual-activation-properties.c
 
 libmm_glib_la_CPPFLAGS = \
-	$(LIBMM_GLIB_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
 	-I${top_srcdir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated \
-	-DLIBMM_GLIB_COMPILATION
+	-DLIBMM_GLIB_COMPILATION \
+	$(AM_CPPFLAGS)
+
+libmm_glib_la_CFLAGS = \
+	$(LIBMM_GLIB_CFLAGS) \
+	$(AM_CFLAGS)
 
 libmm_glib_la_LIBADD = \
 	${top_builddir}/libmm-glib/generated/libmm-generated.la \
@@ -113,3 +117,70 @@ include_HEADERS = \
 	mm-network-timezone.h \
 	mm-firmware-properties.h \
 	mm-cdma-manual-activation-properties.h
+
+CLEANFILES =
+
+# Introspection
+
+if HAVE_INTROSPECTION
+
+GENERATED_H = \
+	mm-enums-types.h \
+	mm-errors-types.h \
+	mm-gdbus-manager.h \
+	mm-gdbus-sim.h \
+	mm-gdbus-sms.h \
+	mm-gdbus-bearer.h \
+	mm-gdbus-modem.h
+
+GENERATED_C = \
+	mm-enums-types.c \
+	mm-errors-types.c \
+	mm-errors-quarks.c \
+	mm-gdbus-manager.c \
+	mm-gdbus-sim.c \
+	mm-gdbus-sms.c \
+	mm-gdbus-bearer.c \
+	mm-gdbus-modem.c
+
+PUBLIC_H = \
+	ModemManager-names.h \
+	ModemManager-enums.h \
+	ModemManager-errors.h \
+	ModemManager-version.h \
+	ModemManager.h
+
+INTROSPECTION_GIRS = ModemManager-1.0.gir
+INTROSPECTION_SCANNER_ARGS = --warn-all
+INTROSPECTION_COMPILER_ARGS =
+
+ModemManager-1.0.gir: libmm-glib.la
+ModemManager_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 Gio-2.0
+ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS)
+ModemManager_1_0_gir_LIBS = libmm-glib.la
+ModemManager_1_0_gir_EXPORT_PACKAGES = libmm-glib
+ModemManager_1_0_gir_SCANNERFLAGS = \
+	--c-include "libmm-glib.h" \
+	--identifier-prefix=MM \
+	--identifier-prefix=Mm \
+	--symbol-prefix=mm
+ModemManager_1_0_gir_FILES = \
+	$(include_HEADERS) \
+	$(filter-out %.h,$(libmm_glib_la_SOURCES)) \
+	$(filter %.c,$(libmm_glib_la_SOURCES)) \
+	$(addprefix generated/,$(GENERATED_H)) \
+	$(addprefix generated/,$(GENERATED_C)) \
+	$(addprefix $(srcdir)/../include/,$(PUBLIC_H)) \
+	$(NULL)
+
+girdir = $(datadir)/gir-1.0
+nodist_gir_DATA = $(INTROSPECTION_GIRS)
+
+typelibdir = $(libdir)/girepository-1.0
+nodist_typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
+
+CLEANFILES += $(nodist_gir_DATA) $(nodist_typelib_DATA)
+
+endif # HAVE_INTROSPECTION
+
+-include $(INTROSPECTION_MAKEFILE)

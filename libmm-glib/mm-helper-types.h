@@ -37,10 +37,11 @@
  *
  * #MMModemModeCombination is a simple struct holding a pair of #MMModemMode values.
  */
-typedef struct _MMModemModeCombination {
+typedef struct _MMModemModeCombination MMModemModeCombination;
+struct _MMModemModeCombination {
     MMModemMode allowed;
     MMModemMode preferred;
-} MMModemModeCombination;
+};
 
 /**
  * MMModemPortInfo:
@@ -49,10 +50,11 @@ typedef struct _MMModemModeCombination {
  *
  * Information of a given port.
  */
-typedef struct _MMModemPortInfo {
+typedef struct _MMModemPortInfo MMModemPortInfo;
+struct _MMModemPortInfo {
     gchar *name;
     MMModemPortType type;
-} MMModemPortInfo;
+};
 
 void mm_modem_port_info_array_free (MMModemPortInfo *array,
                                     guint array_size);
