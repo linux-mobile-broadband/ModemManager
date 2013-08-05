@@ -32,6 +32,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 #include "mm-utils.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
@@ -738,6 +739,93 @@ do_enable_power_up_done (MMGenericGsm *gsm,
 /*****************************************************************************/
 
 static void
+parent_get_iccid_cb (MMModem *modem,
+                     const char *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        mm_callback_info_set_result (info, g_strdup (response), g_free);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_sim_iccid_done (MMAtSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    const char *p;
+    char *parsed;
+    GError *local = NULL;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        /* Fall back to parent AT+CRSM */
+        mm_serial_port_close (MM_SERIAL_PORT (port));
+        MM_GENERIC_GSM_CLASS (mm_modem_huawei_gsm_parent_class)->get_sim_iccid (MM_GENERIC_GSM (info->modem), parent_get_iccid_cb, info);
+        return;
+    }
+
+    p = mm_strip_tag (response->str, "^ICCID:");
+    if (!p) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse !ICCID response");
+        goto done;
+    }
+
+    parsed = mm_gsm_parse_iccid (p, TRUE, &local);
+    if (parsed)
+        mm_callback_info_set_result (info, g_strdup (parsed), g_free);
+    else {
+        g_assert (local);
+        info->error = local;
+    }
+
+done:
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_sim_iccid (MMGenericGsm *modem,
+               MMModemStringFn callback,
+               gpointer callback_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+    GError *error = NULL;
+
+    port = mm_generic_gsm_get_best_at_port (modem, &error);
+    if (!port)
+        goto error;
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &error))
+        goto error;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, callback_data);
+    mm_at_serial_port_queue_command (port, "^ICCID?", 3, get_sim_iccid_done, info);
+    return;
+
+error:
+    callback (MM_MODEM (modem), NULL, error, callback_data);
+    g_clear_error (&error);
+}
+
+/*****************************************************************************/
+
+static void
 disable_unsolicited_done (MMAtSerialPort *port,
                           GString *response,
                           GError *error,
@@ -928,4 +1016,5 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
+    gsm_class->get_sim_iccid = get_sim_iccid;
 }
