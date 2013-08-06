@@ -113,6 +113,9 @@ AC_SUBST(GLIB_MKENUMS)
 # GObject Introspection
 GOBJECT_INTROSPECTION_CHECK([0.9.6])
 
+# Vala bindings
+VAPIGEN_CHECK(0.18)
+
 # DBus system directory
 AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
@@ -294,6 +297,7 @@ docs/reference/libmm-glib/version.xml
 libmm-glib/Makefile
 libmm-glib/generated/Makefile
 libmm-glib/tests/Makefile
+vapi/Makefile
 cli/Makefile
 ])
 AC_OUTPUT
@@ -312,6 +316,7 @@ echo "
 
     PolicyKit support:       ${with_polkit}
     GObject Introspection:   ${found_introspection}
+    Vala Bindings:           ${enable_vala}
     Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}
