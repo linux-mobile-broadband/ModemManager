@@ -111,4 +111,5 @@ include_HEADERS = \
 	mm-location-cdma-bs.h \
 	mm-unlock-retries.h \
 	mm-network-timezone.h \
-	mm-firmware-properties.h
+	mm-firmware-properties.h \
+	mm-cdma-manual-activation-properties.h
