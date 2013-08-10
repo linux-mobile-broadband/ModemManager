@@ -422,6 +422,30 @@ sysinfo (MMBroadbandModemHuawei *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+reset_finish (MMIfaceModem *self,
+              GAsyncResult *res,
+              GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+reset (MMIfaceModem *self,
+       GAsyncReadyCallback callback,
+       gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^RESET",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static MMModemAccessTechnology
@@ -2951,6 +2975,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->reset = reset;
+    iface->reset_finish = reset_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_unlock_retries = load_unlock_retries;
