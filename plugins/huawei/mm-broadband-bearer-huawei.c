@@ -558,7 +558,7 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
 
     case DISCONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY:
         /* If too many retries (1s of wait between the retries), failed */
-        if (ctx->check_count > 10) {
+        if (ctx->check_count > 60) {
             /* Clear context */
             ctx->self->priv->disconnect_pending = NULL;
             g_simple_async_result_set_error (ctx->result,
