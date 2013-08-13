@@ -173,23 +173,23 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK             = 47,  /*< nick=CorpPuk >*/
     MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN              = 100, /*< nick=Unknown >*/
     /* GPRS related errors */
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR           = 102, /*< nick=Gprs.ImsiUnknownInHlr           >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS                    = 103, /*< nick=Gprs.IllegalMs                  >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR           = 104, /*< nick=Gprs.ImsiUnknownInVlr           >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME                    = 106, /*< nick=Gprs.IllegalMe                  >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED           = 107, /*< nick=Gprs.ServiceNotAllowed          >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED              = 111, /*< nick=Gprs.PlmnNotAllowed             >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED          = 112, /*< nick=Gprs.LocationNotAllowed         >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED           = 113, /*< nick=Gprs.RomaingNotAllowed          >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA     = 115, /*< nick=Gprs.NoCellsInLocationArea      >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE               = 117, /*< nick=Gprs.NetworkFailure             >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION                    = 122, /*< nick=Gprs.Congestion                 >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED  = 132, /*< nick=Gprs.ServiceOptionNotSupported  >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED = 133, /*< nick=Gprs.ServiceOptionNotSubscribed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER   = 134, /*< nick=Gprs.ServiceOptionOutOfOrder    >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                       = 148, /*< nick=Gprs.Unknown                    >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE              = 149, /*< nick=Gprs.PdpAuthFailure             >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS          = 150, /*< nick=Gprs.InvalidMobileClass         >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR           = 102, /*< nick=GprsImsiUnknownInHlr           >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS                    = 103, /*< nick=GprsIllegalMs                  >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR           = 104, /*< nick=GprsImsiUnknownInVlr           >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME                    = 106, /*< nick=GprsIllegalMe                  >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED           = 107, /*< nick=GprsServiceNotAllowed          >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED              = 111, /*< nick=GprsPlmnNotAllowed             >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED          = 112, /*< nick=GprsLocationNotAllowed         >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED           = 113, /*< nick=GprsRomaingNotAllowed          >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA     = 115, /*< nick=GprsNoCellsInLocationArea      >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE               = 117, /*< nick=GprsNetworkFailure             >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION                    = 122, /*< nick=GprsCongestion                 >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED  = 132, /*< nick=GprsServiceOptionNotSupported  >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED = 133, /*< nick=GprsServiceOptionNotSubscribed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER   = 134, /*< nick=GprsServiceOptionOutOfOrder    >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                       = 148, /*< nick=GprsUnknown                    >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE              = 149, /*< nick=GprsPdpAuthFailure             >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS          = 150, /*< nick=GprsInvalidMobileClass         >*/
 } MMMobileEquipmentError;
 
 /**
