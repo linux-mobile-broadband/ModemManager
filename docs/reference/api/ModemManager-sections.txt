@@ -33,6 +33,10 @@ MMModemStateFailedReason
 MMModemStateChangeReason
 MMModemPowerState
 MMModemPortType
+MMOmaFeature
+MMOmaSessionState
+MMOmaSessionStateFailedReason
+MMOmaSessionType
 MMSmsPduType
 MMSmsState
 MMSmsDeliveryState
