@@ -103,6 +103,14 @@ GVariant          *mm_common_capability_combinations_garray_to_variant (GArray *
 GVariant          *mm_common_build_capability_combinations_any         (void);
 GVariant          *mm_common_build_capability_combinations_none        (void);
 
+GArray                              *mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant);
+MMOmaPendingNetworkInitiatedSession *mm_common_oma_pending_network_initiated_sessions_variant_to_array  (GVariant *variant,
+                                                                                                         guint *n_modes);
+GVariant                            *mm_common_oma_pending_network_initiated_sessions_array_to_variant  (const MMOmaPendingNetworkInitiatedSession *modes,
+                                                                                                         guint n_modes);
+GVariant                            *mm_common_oma_pending_network_initiated_sessions_garray_to_variant (GArray *array);
+GVariant                            *mm_common_build_oma_pending_network_initiated_sessions_default     (void);
+
 typedef gboolean (*MMParseKeyValueForeachFn) (const gchar *key,
                                               const gchar *value,
                                               gpointer user_data);

@@ -745,6 +745,86 @@ mm_common_build_mode_combinations_default (void)
     return g_variant_builder_end (&builder);
 }
 
+GArray *
+mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            MMOmaPendingNetworkInitiatedSession session;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMOmaPendingNetworkInitiatedSession), n);
+            while (g_variant_iter_loop (&iter, "(uu)", &session.session_type, &session.session_id))
+                g_array_append_val (array, session);
+        }
+    }
+
+    /* If nothing set, fallback to empty */
+    if (!array)
+        array = g_array_new (FALSE, FALSE, sizeof (MMOmaPendingNetworkInitiatedSession));
+
+    return array;
+}
+
+MMOmaPendingNetworkInitiatedSession *
+mm_common_oma_pending_network_initiated_sessions_variant_to_array (GVariant *variant,
+                                                                   guint *n_sessions)
+{
+    GArray *array;
+
+    array = mm_common_oma_pending_network_initiated_sessions_variant_to_garray (variant);
+    if (n_sessions)
+        *n_sessions = array->len;
+    return (MMOmaPendingNetworkInitiatedSession *) g_array_free (array, FALSE);
+}
+
+GVariant *
+mm_common_oma_pending_network_initiated_sessions_array_to_variant (const MMOmaPendingNetworkInitiatedSession *sessions,
+                                                                   guint n_sessions)
+{
+    if (n_sessions > 0) {
+        GVariantBuilder builder;
+        guint i;
+
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+
+        for (i = 0; i < n_sessions; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new ("(uu)",
+                                                        ((guint32)sessions[i].session_type),
+                                                        ((guint32)sessions[i].session_id)));
+        return g_variant_builder_end (&builder);
+    }
+
+    return mm_common_build_oma_pending_network_initiated_sessions_default ();
+}
+
+GVariant *
+mm_common_oma_pending_network_initiated_sessions_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_oma_pending_network_initiated_sessions_array_to_variant ((const MMOmaPendingNetworkInitiatedSession *)array->data,
+                                                                                  array->len);
+
+    return mm_common_oma_pending_network_initiated_sessions_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_oma_pending_network_initiated_sessions_default (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+    return g_variant_builder_end (&builder);
+}
+
 gboolean
 mm_common_get_boolean_from_string (const gchar *value,
                                    GError **error)

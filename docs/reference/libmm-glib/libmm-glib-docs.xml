@@ -115,6 +115,10 @@
         <xi:include href="xml/mm-modem-signal.xml"/>
         <xi:include href="xml/mm-signal.xml"/>
       </section>
+      <section>
+        <title>OMA support</title>
+        <xi:include href="xml/mm-modem-oma.xml"/>
+      </section>
     </chapter>
 
     <chapter>
