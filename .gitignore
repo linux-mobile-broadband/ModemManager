@@ -38,6 +38,8 @@ libmm-glib/generated/mm-errors-types.[ch]
 libmm-glib/generated/mm-errors-quarks.c
 libmm-glib/generated/*.xml
 libmm-glib/tests/test-common-helpers
+libmm-glib/*.gir
+libmm-glib/*.typelib
 
 src/ModemManager
 src/mm-daemon-enums-types.c
@@ -53,6 +55,8 @@ src/tests/test-at-serial-port
 src/tests/test-sms-part
 
 cli/mmcli
+
+vapi/libmm-glib.vapi
 
 libqcdm/tests/test-qcdm
 libqcdm/tests/modepref
