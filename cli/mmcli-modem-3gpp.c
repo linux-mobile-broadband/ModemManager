@@ -76,7 +76,7 @@ static GOptionEntry entries[] = {
       "[command]"
     },
     { "3gpp-ussd-respond", 0, 0, G_OPTION_ARG_STRING, &ussd_respond_str,
-      "Request a given modem to initiate a USSD session",
+      "Request a given modem to respond to a USSD request",
       "[response]"
     },
     { "3gpp-ussd-cancel", 0, 0, G_OPTION_ARG_NONE, &ussd_cancel_flag,
