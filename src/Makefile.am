@@ -217,6 +217,8 @@ ModemManager_SOURCES = \
 	mm-iface-modem-firmware.c \
 	mm-iface-modem-signal.h \
 	mm-iface-modem-signal.c \
+	mm-iface-modem-oma.h \
+	mm-iface-modem-oma.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
 	mm-serial-parsers.c \

@@ -38,6 +38,7 @@
 #include "mm-iface-modem-time.h"
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-iface-modem-oma.h"
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sms-list.h"
@@ -58,6 +59,7 @@ static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_time_init (MMIfaceModemTime *iface);
 static void iface_modem_signal_init (MMIfaceModemSignal *iface);
+static void iface_modem_oma_init (MMIfaceModemOma *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
@@ -70,6 +72,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_OMA, iface_modem_oma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 enum {
@@ -83,6 +86,7 @@ enum {
     PROP_MODEM_MESSAGING_DBUS_SKELETON,
     PROP_MODEM_TIME_DBUS_SKELETON,
     PROP_MODEM_SIGNAL_DBUS_SKELETON,
+    PROP_MODEM_OMA_DBUS_SKELETON,
     PROP_MODEM_FIRMWARE_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
@@ -191,6 +195,10 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Signal interface --->*/
     /* Properties */
     GObject *modem_signal_dbus_skeleton;
+
+    /*<--- Modem OMA interface --->*/
+    /* Properties */
+    GObject *modem_oma_dbus_skeleton;
 
     /*<--- Modem Firmware interface --->*/
     /* Properties */
@@ -7934,6 +7942,7 @@ typedef enum {
     DISABLING_STEP_IFACE_SIMPLE,
     DISABLING_STEP_IFACE_FIRMWARE,
     DISABLING_STEP_IFACE_SIGNAL,
+    DISABLING_STEP_IFACE_OMA,
     DISABLING_STEP_IFACE_TIME,
     DISABLING_STEP_IFACE_MESSAGING,
     DISABLING_STEP_IFACE_LOCATION,
@@ -8046,6 +8055,7 @@ INTERFACE_DISABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FAL
 INTERFACE_DISABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 INTERFACE_DISABLE_READY_FN (iface_modem_signal,    MM_IFACE_MODEM_SIGNAL,    FALSE)
 INTERFACE_DISABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
+INTERFACE_DISABLE_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FALSE)
 
 static void
 bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
@@ -8150,6 +8160,18 @@ disabling_step (DisablingContext *ctx)
             mm_iface_modem_signal_disable (MM_IFACE_MODEM_SIGNAL (ctx->self),
                                            (GAsyncReadyCallback)iface_modem_signal_disable_ready,
                                            ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_IFACE_OMA:
+        if (ctx->self->priv->modem_oma_dbus_skeleton) {
+            mm_dbg ("Modem has OMA capabilities, disabling the OMA interface...");
+            /* Disabling the Modem Oma interface */
+            mm_iface_modem_oma_disable (MM_IFACE_MODEM_OMA (ctx->self),
+                                        (GAsyncReadyCallback)iface_modem_oma_disable_ready,
+                                        ctx);
             return;
         }
         /* Fall down to next step */
@@ -8287,6 +8309,7 @@ typedef enum {
     ENABLING_STEP_IFACE_MESSAGING,
     ENABLING_STEP_IFACE_TIME,
     ENABLING_STEP_IFACE_SIGNAL,
+    ENABLING_STEP_IFACE_OMA,
     ENABLING_STEP_IFACE_FIRMWARE,
     ENABLING_STEP_IFACE_SIMPLE,
     ENABLING_STEP_LAST,
@@ -8386,6 +8409,7 @@ INTERFACE_ENABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALS
 INTERFACE_ENABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 INTERFACE_ENABLE_READY_FN (iface_modem_signal,    MM_IFACE_MODEM_SIGNAL,    FALSE)
 INTERFACE_ENABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
+INTERFACE_ENABLE_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FALSE)
 
 static void
 enabling_started_ready (MMBroadbandModem *self,
@@ -8568,6 +8592,19 @@ enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case ENABLING_STEP_IFACE_OMA:
+        if (ctx->self->priv->modem_oma_dbus_skeleton) {
+            mm_dbg ("Modem has OMA capabilities, enabling the OMA interface...");
+            /* Enabling the Modem Oma interface */
+            mm_iface_modem_oma_enable (MM_IFACE_MODEM_OMA (ctx->self),
+                                       ctx->cancellable,
+                                       (GAsyncReadyCallback)iface_modem_oma_enable_ready,
+                                       ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case ENABLING_STEP_IFACE_FIRMWARE:
         /* Fall down to next step */
         ctx->step++;
@@ -8679,6 +8716,7 @@ typedef enum {
     INITIALIZE_STEP_IFACE_MESSAGING,
     INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIGNAL,
+    INITIALIZE_STEP_IFACE_OMA,
     INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_IFACE_SIMPLE,
     INITIALIZE_STEP_LAST,
@@ -8875,6 +8913,7 @@ INTERFACE_INIT_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_signal,    MM_IFACE_MODEM_SIGNAL,    FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_firmware,  MM_IFACE_MODEM_FIRMWARE,  FALSE)
 
 static void
@@ -8993,6 +9032,14 @@ initialize_step (InitializeContext *ctx)
                                           ctx->cancellable,
                                           (GAsyncReadyCallback)iface_modem_signal_initialize_ready,
                                           ctx);
+        return;
+
+    case INITIALIZE_STEP_IFACE_OMA:
+        /* Initialize the Oma interface */
+        mm_iface_modem_oma_initialize (MM_IFACE_MODEM_OMA (ctx->self),
+                                       ctx->cancellable,
+                                       (GAsyncReadyCallback)iface_modem_oma_initialize_ready,
+                                       ctx);
         return;
 
     case INITIALIZE_STEP_IFACE_FIRMWARE:
@@ -9240,6 +9287,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_signal_dbus_skeleton);
         self->priv->modem_signal_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_OMA_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_oma_dbus_skeleton);
+        self->priv->modem_oma_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_FIRMWARE_DBUS_SKELETON:
         g_clear_object (&self->priv->modem_firmware_dbus_skeleton);
         self->priv->modem_firmware_dbus_skeleton = g_value_dup_object (value);
@@ -9337,6 +9388,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_SIGNAL_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_signal_dbus_skeleton);
+        break;
+    case PROP_MODEM_OMA_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_oma_dbus_skeleton);
         break;
     case PROP_MODEM_FIRMWARE_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_firmware_dbus_skeleton);
@@ -9682,6 +9736,11 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
 }
 
 static void
+iface_modem_oma_init (MMIfaceModemOma *iface)
+{
+}
+
+static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
 }
@@ -9752,6 +9811,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIGNAL_DBUS_SKELETON,
                                       MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_OMA_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_OMA_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_FIRMWARE_DBUS_SKELETON,
