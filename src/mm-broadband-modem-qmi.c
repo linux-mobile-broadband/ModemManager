@@ -36,6 +36,7 @@
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-iface-modem-oma.h"
 #include "mm-sim-qmi.h"
 #include "mm-bearer-qmi.h"
 #include "mm-sms-qmi.h"
@@ -46,6 +47,7 @@ static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_oma_init (MMIfaceModemOma *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 static void iface_modem_signal_init (MMIfaceModemSignal *iface);
 
@@ -59,8 +61,9 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_OMA, iface_modem_oma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 struct _MMBroadbandModemQmiPrivate {
     /* Cached device IDs, retrieved by the modem interface when loading device
@@ -7990,6 +7993,45 @@ enable_location_gathering (MMIfaceModemLocation *self,
 }
 
 /*****************************************************************************/
+/* Check support (OMA interface) */
+
+static gboolean
+oma_check_support_finish (MMIfaceModemOma *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    /* no error expected here */
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+oma_check_support (MMIfaceModemOma *self,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMQmiPort *port;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        oma_check_support);
+
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    /* If we have support for the OMA client, OMA is supported */
+    if (!port || !mm_qmi_port_peek_client (port, QMI_SERVICE_OMA, MM_QMI_PORT_FLAG_DEFAULT)) {
+        mm_dbg ("OMA capabilities not supported");
+        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+    } else {
+        mm_dbg ("OMA capabilities supported");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -9601,6 +9643,13 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->check_support_finish = signal_check_support_finish;
     iface->load_values = signal_load_values;
     iface->load_values_finish = signal_load_values_finish;
+}
+
+static void
+iface_modem_oma_init (MMIfaceModemOma *iface)
+{
+    iface->check_support = oma_check_support;
+    iface->check_support_finish = oma_check_support_finish;
 }
 
 static void
