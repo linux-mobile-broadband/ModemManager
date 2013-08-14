@@ -116,6 +116,11 @@ GOBJECT_INTROSPECTION_CHECK([0.9.6])
 # Vala bindings
 VAPIGEN_CHECK(0.18)
 
+# Sanity check
+if test "x$enable_vala" = "xyes" -a ! -f "$VAPIGEN_MAKEFILE"; then
+  AC_MSG_ERROR([Vala bindings enabled but Makefile.vapigen not found. Install vala-devel, or pass --disable-vala])
+fi
+
 # DBus system directory
 AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
