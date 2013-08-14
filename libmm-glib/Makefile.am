@@ -146,13 +146,11 @@ GENERATED_C = \
 	mm-gdbus-modem.c
 
 PUBLIC_H = \
+	ModemManager-names.h \
+	ModemManager-version.h
 	ModemManager-enums.h \
 	ModemManager-errors.h \
 	ModemManager.h
-
-PUBLIC_H_GENERATED = \
-	ModemManager-names.h \
-	ModemManager-version.h
 
 INTROSPECTION_GIRS = ModemManager-1.0.gir
 INTROSPECTION_SCANNER_ARGS = --warn-all
@@ -174,8 +172,7 @@ ModemManager_1_0_gir_FILES = \
 	$(filter %.c,$(libmm_glib_la_SOURCES)) \
 	$(addprefix generated/,$(GENERATED_H)) \
 	$(addprefix generated/,$(GENERATED_C)) \
-	$(addprefix $(srcdir)/../include/,$(PUBLIC_H)) \
-	$(addprefix $(builddir)/../include/,$(PUBLIC_H_GENERATED)) \
+	$(addprefix ../include/,$(PUBLIC_H)) \
 	$(NULL)
 
 girdir = $(datadir)/gir-1.0
