@@ -4806,6 +4806,26 @@ mm_iface_modem_is_cdma_only (MMIfaceModem *self)
 
 /*****************************************************************************/
 
+const gchar *
+mm_iface_modem_get_model (MMIfaceModem *self)
+{
+    const gchar *model = NULL;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        model = mm_gdbus_modem_get_model (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return model;
+}
+
+/*****************************************************************************/
+
 static void
 iface_modem_init (gpointer g_iface)
 {
