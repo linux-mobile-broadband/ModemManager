@@ -1079,6 +1079,21 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
 }
 
 static void
+skip_unknown_storages (GArray *mem)
+{
+    guint i = mem->len;
+
+    if (!mem)
+        return;
+
+    /* Remove UNKNOWN from the list of supported storages */
+    while (i-- > 0) {
+        if (g_array_index (mem, MMSmsStorage, i) == MM_SMS_STORAGE_UNKNOWN)
+            g_array_remove_index (mem, i);
+    }
+}
+
+static void
 load_supported_storages_ready (MMIfaceModemMessaging *self,
                                GAsyncResult *res,
                                InitializationContext *ctx)
@@ -1102,6 +1117,11 @@ load_supported_storages_ready (MMIfaceModemMessaging *self,
         gchar *mem3;
         GArray *supported_storages;
         guint i;
+
+        /* Never add unknown storages */
+        skip_unknown_storages (storage_ctx->supported_mem1);
+        skip_unknown_storages (storage_ctx->supported_mem2);
+        skip_unknown_storages (storage_ctx->supported_mem3);
 
         mem1 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem1->data,
                                                     storage_ctx->supported_mem1->len);
