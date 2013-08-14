@@ -437,8 +437,19 @@ reset (MMIfaceModem *self,
        GAsyncReadyCallback callback,
        gpointer user_data)
 {
+    const gchar *command;
+
+    /* Unlike other Huawei modems that support AT^RESET for resetting the modem,
+     * Huawei MU736 supports AT^RESET but does not reset the modem upon receiving
+     * AT^RESET. It does, however, support resetting itself via AT+CFUN=16.
+     */
+    if (g_strcmp0 (mm_iface_modem_get_model (self), "MU736") == 0)
+        command = "+CFUN=16";
+    else
+        command = "^RESET";
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^RESET",
+                              command,
                               3,
                               FALSE,
                               callback,
