@@ -66,7 +66,9 @@ libmm_glib_la_SOURCES = \
 	mm-cdma-manual-activation-properties.c
 
 libmm_glib_la_CPPFLAGS = \
+	-I$(srcdir) \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
 	-I${top_srcdir}/libmm-glib/generated \
@@ -144,11 +146,13 @@ GENERATED_C = \
 	mm-gdbus-modem.c
 
 PUBLIC_H = \
-	ModemManager-names.h \
 	ModemManager-enums.h \
 	ModemManager-errors.h \
-	ModemManager-version.h \
 	ModemManager.h
+
+PUBLIC_H_GENERATED = \
+	ModemManager-names.h \
+	ModemManager-version.h
 
 INTROSPECTION_GIRS = ModemManager-1.0.gir
 INTROSPECTION_SCANNER_ARGS = --warn-all
@@ -156,7 +160,7 @@ INTROSPECTION_COMPILER_ARGS =
 
 ModemManager-1.0.gir: libmm-glib.la
 ModemManager_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 Gio-2.0
-ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS) -I$(top_builddir)/include -I$(top_srcdir)/libmm-glib
+ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS)
 ModemManager_1_0_gir_LIBS = libmm-glib.la
 ModemManager_1_0_gir_EXPORT_PACKAGES = libmm-glib
 ModemManager_1_0_gir_SCANNERFLAGS = \
@@ -171,6 +175,7 @@ ModemManager_1_0_gir_FILES = \
 	$(addprefix generated/,$(GENERATED_H)) \
 	$(addprefix generated/,$(GENERATED_C)) \
 	$(addprefix $(srcdir)/../include/,$(PUBLIC_H)) \
+	$(addprefix $(builddir)/../include/,$(PUBLIC_H_GENERATED)) \
 	$(NULL)
 
 girdir = $(datadir)/gir-1.0
