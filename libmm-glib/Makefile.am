@@ -156,7 +156,7 @@ INTROSPECTION_COMPILER_ARGS =
 
 ModemManager-1.0.gir: libmm-glib.la
 ModemManager_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 Gio-2.0
-ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS)
+ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS) -I$(top_builddir)/include -I$(top_srcdir)/libmm-glib
 ModemManager_1_0_gir_LIBS = libmm-glib.la
 ModemManager_1_0_gir_EXPORT_PACKAGES = libmm-glib
 ModemManager_1_0_gir_SCANNERFLAGS = \
