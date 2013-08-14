@@ -111,6 +111,11 @@ struct _MMBroadbandModemQmiPrivate {
     MMModemLocationSource enabled_sources;
     guint location_event_report_indication_id;
 
+    /* Oma helpers */
+    gboolean oma_unsolicited_events_enabled;
+    gboolean oma_unsolicited_events_setup;
+    guint oma_event_report_indication_id;
+
     /* Firmware helpers */
     GList *firmware_list;
     MMFirmwareProperties *current_firmware;
@@ -8032,6 +8037,261 @@ oma_check_support (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited event handlers (OMA interface) */
+
+static void
+oma_event_report_indication_cb (QmiClientNas *client,
+                                QmiIndicationOmaEventReportOutput *output,
+                                MMBroadbandModemQmi *self)
+{
+    QmiOmaSessionState qmi_session_state;
+    QmiOmaSessionType network_initiated_alert_session_type;
+    guint16 network_initiated_alert_session_id;
+
+    /* Update session state? */
+    if (qmi_indication_oma_event_report_output_get_session_state (
+            output,
+            &qmi_session_state,
+            NULL)) {
+        QmiOmaSessionFailedReason qmi_oma_session_failed_reason = QMI_OMA_SESSION_FAILED_REASON_UNKNOWN;
+
+        if (qmi_session_state == QMI_OMA_SESSION_STATE_FAILED)
+            qmi_indication_oma_event_report_output_get_session_fail_reason (
+                output,
+                &qmi_oma_session_failed_reason,
+                NULL);
+
+        mm_iface_modem_oma_update_session_state (
+            MM_IFACE_MODEM_OMA (self),
+            mm_oma_session_state_from_qmi_oma_session_state (qmi_session_state),
+            mm_oma_session_state_failed_reason_from_qmi_oma_session_failed_reason (qmi_oma_session_failed_reason));
+    }
+
+    /* New network initiated session? */
+    if (qmi_indication_oma_event_report_output_get_network_initiated_alert (
+            output,
+            &network_initiated_alert_session_type,
+            &network_initiated_alert_session_id,
+            NULL)) {
+        mm_iface_modem_oma_add_pending_network_initiated_session (
+            MM_IFACE_MODEM_OMA (self),
+            mm_oma_session_type_from_qmi_oma_session_type (network_initiated_alert_session_type),
+            (guint)network_initiated_alert_session_id);
+    }
+}
+
+static gboolean
+common_oma_setup_cleanup_unsolicited_events_finish (MMIfaceModemOma *_self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+common_setup_cleanup_oma_unsolicited_events (MMBroadbandModemQmi *self,
+                                             gboolean enable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_setup_cleanup_oma_unsolicited_events);
+
+    if (enable == self->priv->oma_unsolicited_events_setup) {
+        mm_dbg ("OMA unsolicited events already %s; skipping",
+                enable ? "setup" : "cleanup");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Store new state */
+    self->priv->oma_unsolicited_events_setup = enable;
+
+    /* Connect/Disconnect "Event Report" indications */
+    if (enable) {
+        g_assert (self->priv->oma_event_report_indication_id == 0);
+        self->priv->oma_event_report_indication_id =
+            g_signal_connect (client,
+                              "event-report",
+                              G_CALLBACK (oma_event_report_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->oma_event_report_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->oma_event_report_indication_id);
+        self->priv->oma_event_report_indication_id = 0;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+static void
+oma_cleanup_unsolicited_events (MMIfaceModemOma *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    common_setup_cleanup_oma_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                 FALSE,
+                                                 callback,
+                                                 user_data);
+}
+
+static void
+oma_setup_unsolicited_events (MMIfaceModemOma *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    common_setup_cleanup_oma_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                 TRUE,
+                                                 callback,
+                                                 user_data);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (OMA interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    GSimpleAsyncResult *result;
+    QmiClientOma *client;
+    gboolean enable;
+} EnableOmaUnsolicitedEventsContext;
+
+static void
+enable_oma_unsolicited_events_context_complete_and_free (EnableOmaUnsolicitedEventsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (EnableOmaUnsolicitedEventsContext, ctx);
+}
+
+static gboolean
+common_oma_enable_disable_unsolicited_events_finish (MMIfaceModemOma *self,
+                                                     GAsyncResult *res,
+                                                     GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+ser_oma_indicator_ready (QmiClientOma *client,
+                         GAsyncResult *res,
+                         EnableOmaUnsolicitedEventsContext *ctx)
+{
+    QmiMessageOmaSetEventReportOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_oma_set_event_report_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: '%s'", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_oma_set_event_report_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't set event report: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_oma_set_event_report_output_unref (output);
+
+    /* Just ignore errors for now */
+    ctx->self->priv->oma_unsolicited_events_enabled = ctx->enable;
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enable_oma_unsolicited_events_context_complete_and_free (ctx);
+}
+
+static void
+common_enable_disable_oma_unsolicited_events (MMBroadbandModemQmi *self,
+                                              gboolean enable,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data)
+{
+    EnableOmaUnsolicitedEventsContext *ctx;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+    QmiMessageOmaSetEventReportInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_enable_disable_oma_unsolicited_events);
+
+    if (enable == self->priv->oma_unsolicited_events_enabled) {
+        mm_dbg ("OMA unsolicited events already %s; skipping",
+                enable ? "enabled" : "disabled");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    ctx = g_slice_new0 (EnableOmaUnsolicitedEventsContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->enable = enable;
+    ctx->result = result;
+
+    input = qmi_message_oma_set_event_report_input_new ();
+    qmi_message_oma_set_event_report_input_set_session_state_reporting (
+        input,
+        ctx->enable,
+        NULL);
+    qmi_message_oma_set_event_report_input_set_network_initiated_alert_reporting (
+        input,
+        ctx->enable,
+        NULL);
+    qmi_client_oma_set_event_report (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)ser_oma_indicator_ready,
+        ctx);
+    qmi_message_oma_set_event_report_input_unref (input);
+}
+
+static void
+oma_disable_unsolicited_events (MMIfaceModemOma *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    common_enable_disable_oma_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                  FALSE,
+                                                  callback,
+                                                  user_data);
+}
+
+static void
+oma_enable_unsolicited_events (MMIfaceModemOma *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    common_enable_disable_oma_unsolicited_events (MM_BROADBAND_MODEM_QMI (self),
+                                                  TRUE,
+                                                  callback,
+                                                  user_data);
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -9366,7 +9626,8 @@ initialization_started (MMBroadbandModem *self,
     ctx->services[1] = QMI_SERVICE_NAS;
     ctx->services[2] = QMI_SERVICE_WMS;
     ctx->services[3] = QMI_SERVICE_PDS;
-    ctx->services[4] = QMI_SERVICE_UNKNOWN;
+    ctx->services[4] = QMI_SERVICE_OMA;
+    ctx->services[5] = QMI_SERVICE_UNKNOWN;
 
     /* Now open our QMI port */
     mm_qmi_port_open (ctx->qmi,
@@ -9650,6 +9911,14 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
 {
     iface->check_support = oma_check_support;
     iface->check_support_finish = oma_check_support_finish;
+    iface->setup_unsolicited_events = oma_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = oma_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = oma_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = common_oma_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = oma_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = common_oma_enable_disable_unsolicited_events_finish;
 }
 
 static void
