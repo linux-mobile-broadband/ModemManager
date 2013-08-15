@@ -46,40 +46,50 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
     *ipv6_available = FALSE;
 
     /* The response maybe as:
-     * <CR><LF>^NDISSTATQRY: 1,,,IPV4<CR><LF>^NDISSTATQRY: 0,33,,IPV6<CR><LF>
-     * <CR><LF><CR><LF>OK<CR><LF>
-     * So we have to split the status for IPv4 and IPv6. For now, we only care
-     * about IPv4.
+     *     ^NDISSTATQRY: 1,,,IPV4
+     *     ^NDISSTATQRY: 0,33,,IPV6
+     *     OK
+     *
+     * Or, in newer firmwares:
+     *     ^NDISSTATQRY:0,,,"IPV4",0,,,"IPV6"
+     *     OK
      */
-    r = g_regex_new ("\\^NDISSTATQRY:\\s*(\\d),(.*),(.*),(.*)(\\r\\n)?",
+    r = g_regex_new ("\\^NDISSTATQRY:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
+                     "(?:\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, NULL);
     g_assert (r != NULL);
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
-    while (!inner_error && g_match_info_matches (match_info)) {
-        gchar *ip_type_str;
-        guint connected;
+    if (!inner_error && g_match_info_matches (match_info)) {
+        guint ip_type_field = 4;
 
-        /* Read values */
-        ip_type_str = mm_get_string_unquoted_from_match_info (match_info, 4);
-        if (!ip_type_str ||
-            !mm_get_uint_from_match_info (match_info, 1, &connected) ||
-            (connected != 0 && connected != 1)) {
-          inner_error = g_error_new (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Couldn't parse ^NDISSTATQRY fields");
-        } else if (g_ascii_strcasecmp (ip_type_str, "IPV4") == 0) {
-            *ipv4_available = TRUE;
-            *ipv4_connected = (gboolean)connected;
-        } else if (g_ascii_strcasecmp (ip_type_str, "IPV6") == 0) {
-            *ipv6_available = TRUE;
-            *ipv6_connected = (gboolean)connected;
+        /* IPv4 and IPv6 are fields 4 and (if available) 8 */
+
+        while (!inner_error && ip_type_field <= 8) {
+            gchar *ip_type_str;
+            guint connected;
+
+            ip_type_str = mm_get_string_unquoted_from_match_info (match_info, ip_type_field);
+            if (!ip_type_str)
+                break;
+
+            if (!mm_get_uint_from_match_info (match_info, (ip_type_field - 3), &connected) ||
+                (connected != 0 && connected != 1)) {
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_FAILED,
+                                           "Couldn't parse ^NDISSTATQRY fields");
+            } else if (g_ascii_strcasecmp (ip_type_str, "IPV4") == 0) {
+                *ipv4_available = TRUE;
+                *ipv4_connected = (gboolean)connected;
+            } else if (g_ascii_strcasecmp (ip_type_str, "IPV6") == 0) {
+                *ipv6_available = TRUE;
+                *ipv6_connected = (gboolean)connected;
+            }
+
+            g_free (ip_type_str);
+            ip_type_field += 4;
         }
-
-        g_free (ip_type_str);
-        if (!inner_error)
-            g_match_info_next (match_info, &inner_error);
     }
 
     g_match_info_free (match_info);
