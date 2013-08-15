@@ -74,7 +74,7 @@ modem_power_down (MMIfaceModem *self,
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN=4",
-                              6,
+                              20,
                               FALSE,
                               callback,
                               user_data);
