@@ -8334,6 +8334,62 @@ oma_accept_network_initiated_session (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Cancel session (OMA interface) */
+
+static gboolean
+oma_cancel_session_finish (MMIfaceModemOma *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+oma_cancel_session_ready (QmiClientOma *client,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    QmiMessageOmaCancelSessionOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_oma_cancel_session_finish (client, res, &error);
+    if (!output || !qmi_message_oma_cancel_session_output_get_result (output, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (output)
+        qmi_message_oma_cancel_session_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+oma_cancel_session (MMIfaceModemOma *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    qmi_client_oma_cancel_session (
+        QMI_CLIENT_OMA (client),
+        NULL,
+        5,
+        NULL,
+        (GAsyncReadyCallback)oma_cancel_session_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   oma_cancel_session));
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited event handlers (OMA interface) */
 
 static void
@@ -10222,6 +10278,8 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
     iface->start_client_initiated_session_finish = oma_start_client_initiated_session_finish;
     iface->accept_network_initiated_session = oma_accept_network_initiated_session;
     iface->accept_network_initiated_session_finish = oma_accept_network_initiated_session_finish;
+    iface->cancel_session = oma_cancel_session;
+    iface->cancel_session_finish = oma_cancel_session_finish;
     iface->setup_unsolicited_events = oma_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = oma_cleanup_unsolicited_events;
