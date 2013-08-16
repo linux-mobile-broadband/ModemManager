@@ -65,6 +65,9 @@ Show time specific options.
 .B \-\-help\-firmware
 Show firmware specific options.
 .TP
+.B \-\-help\-oma
+Show OMA specific options.
+.TP
 .B \-\-help\-sim
 Show SIM card specific options.
 .TP
@@ -425,6 +428,30 @@ of available firmware images can be seen using the
 \fB\-\-firmware\-list\fR option.
 
 The \fBID\fR provided is a \fIUNIQUE\fR identifier for the firmware.
+
+.SH OMA OPTIONS
+All OMA options require the \fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-oma\-status
+Show the status of the OMA device management subsystem.
+.TP
+.B \-\-oma\-start\-client\-initiated\-session=[SESSION TYPE]
+Request to start a client initiated session.
+
+The given session type must be one of:
+ 'client\-initiated\-device\-configure'
+ 'client\-initiated\-prl\-update'
+ 'client\-initiated\-hands\-free\-activation'
+.TP
+.B \-\-oma\-accept\-network\-initiated\-session=[SESSION ID]
+Request to accept a network initiated session.
+.TP
+.B \-\-oma\-reject\-network\-initiated\-session=[SESSION ID]
+Request to reject a network initiated session.
+.TP
+.B \-\-oma\-cancel\-session
+Request to cancel current OMA session, if any.
 
 .SH SIM OPTIONS
 .TP

@@ -109,6 +109,14 @@ void          mmcli_modem_signal_run_asynchronous   (GDBusConnection *connection
 void          mmcli_modem_signal_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_signal_shutdown           (void);
 
+/* Oma group */
+GOptionGroup *mmcli_modem_oma_get_option_group   (void);
+gboolean      mmcli_modem_oma_options_enabled    (void);
+void          mmcli_modem_oma_run_asynchronous   (GDBusConnection *connection,
+                                                  GCancellable    *cancellable);
+void          mmcli_modem_oma_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_oma_shutdown           (void);
+
 /* Bearer group */
 GOptionGroup *mmcli_bearer_get_option_group   (void);
 gboolean      mmcli_bearer_options_enabled    (void);

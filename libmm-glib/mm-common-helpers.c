@@ -957,6 +957,78 @@ mm_common_get_sms_storage_from_string (const gchar *str,
     return MM_SMS_STORAGE_UNKNOWN;
 }
 
+MMOmaFeature
+mm_common_get_oma_features_from_string (const gchar *str,
+                                        GError **error)
+{
+    GError *inner_error = NULL;
+    MMOmaFeature features;
+    gchar **feature_strings;
+	GFlagsClass *flags_class;
+
+    features = MM_OMA_FEATURE_NONE;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_OMA_FEATURE));
+    feature_strings = g_strsplit (str, "|", -1);
+
+    if (feature_strings) {
+        guint i;
+
+        for (i = 0; feature_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (feature_strings[i], flags_class->values[j].value_nick)) {
+                    features |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMOmaFeature value",
+                    feature_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        features = MM_OMA_FEATURE_NONE;
+    }
+
+    g_type_class_unref (flags_class);
+    g_strfreev (feature_strings);
+    return features;
+}
+
+MMOmaSessionType
+mm_common_get_oma_session_type_from_string (const gchar *str,
+                                            GError **error)
+{
+	GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_OMA_SESSION_TYPE));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMOmaSessionType value",
+                 str);
+    return MM_OMA_SESSION_TYPE_UNKNOWN;
+}
+
 GVariant *
 mm_common_build_bands_unknown (void)
 {
