@@ -8370,10 +8370,16 @@ oma_event_report_indication_cb (QmiClientNas *client,
             &network_initiated_alert_session_type,
             &network_initiated_alert_session_id,
             NULL)) {
-        mm_iface_modem_oma_add_pending_network_initiated_session (
-            MM_IFACE_MODEM_OMA (self),
-            mm_oma_session_type_from_qmi_oma_session_type (network_initiated_alert_session_type),
-            (guint)network_initiated_alert_session_id);
+        MMOmaSessionType session_type;
+
+        session_type = mm_oma_session_type_from_qmi_oma_session_type (network_initiated_alert_session_type);
+        if (session_type == MM_OMA_SESSION_TYPE_UNKNOWN)
+            g_warning ("Unknown QMI OMA session type '%u'", network_initiated_alert_session_type);
+        else
+            mm_iface_modem_oma_add_pending_network_initiated_session (
+                MM_IFACE_MODEM_OMA (self),
+                session_type,
+                (guint)network_initiated_alert_session_id);
     }
 }
 
