@@ -8266,6 +8266,74 @@ oma_start_client_initiated_session (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Accept network initiated session (OMA interface) */
+
+static gboolean
+oma_accept_network_initiated_session_finish (MMIfaceModemOma *self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+oma_send_selection_ready (QmiClientOma *client,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    QmiMessageOmaSendSelectionOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_oma_send_selection_finish (client, res, &error);
+    if (!output || !qmi_message_oma_send_selection_output_get_result (output, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (output)
+        qmi_message_oma_send_selection_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+oma_accept_network_initiated_session (MMIfaceModemOma *self,
+                                      guint session_id,
+                                      gboolean accept,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    QmiClient *client = NULL;
+    QmiMessageOmaSendSelectionInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    input = qmi_message_oma_send_selection_input_new ();
+    qmi_message_oma_send_selection_input_set_network_initiated_alert_selection (
+        input,
+        accept,
+        (guint16)session_id,
+        NULL);
+
+    qmi_client_oma_send_selection (
+        QMI_CLIENT_OMA (client),
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)oma_send_selection_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   oma_accept_network_initiated_session));
+
+    qmi_message_oma_send_selection_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited event handlers (OMA interface) */
 
 static void
@@ -10146,6 +10214,8 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
     iface->setup_finish = oma_setup_finish;
     iface->start_client_initiated_session = oma_start_client_initiated_session;
     iface->start_client_initiated_session_finish = oma_start_client_initiated_session_finish;
+    iface->accept_network_initiated_session = oma_accept_network_initiated_session;
+    iface->accept_network_initiated_session_finish = oma_accept_network_initiated_session_finish;
     iface->setup_unsolicited_events = oma_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = oma_cleanup_unsolicited_events;
