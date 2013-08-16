@@ -49,6 +49,8 @@ add_or_remove_pending_network_initiated_session (MMIfaceModemOma *self,
     GArray *array;
     guint i;
 
+    g_assert (session_type != MM_OMA_SESSION_TYPE_UNKNOWN);
+
     g_object_get (self,
                   MM_IFACE_MODEM_OMA_DBUS_SKELETON, &skeleton,
                   NULL);
@@ -377,6 +379,7 @@ typedef struct {
     MmGdbusModemOma *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemOma *self;
+    MMOmaSessionType session_type;
     guint session_id;
     gboolean accept;
 } HandleAcceptNetworkInitiatedSessionContext;
@@ -388,6 +391,31 @@ handle_accept_network_initiated_session_context_free (HandleAcceptNetworkInitiat
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_slice_free (HandleAcceptNetworkInitiatedSessionContext, ctx);
+}
+
+static void
+accept_network_initiated_session_ready (MMIfaceModemOma *self,
+                                        GAsyncResult *res,
+                                        HandleAcceptNetworkInitiatedSessionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        /* If accepted or rejected, remove from pending */
+        add_or_remove_pending_network_initiated_session (self, FALSE, ctx->session_type, ctx->session_id);
+
+        /* If accepted, set as current */
+        if (ctx->accept) {
+            mm_gdbus_modem_oma_set_session_type (ctx->skeleton, ctx->session_type);
+            mm_iface_modem_oma_update_session_state (self, MM_OMA_SESSION_STATE_STARTED, MM_OMA_SESSION_STATE_FAILED_REASON_UNKNOWN);
+        }
+
+        mm_gdbus_modem_oma_complete_accept_network_initiated_session (ctx->skeleton, ctx->invocation);
+    }
+
+    handle_accept_network_initiated_session_context_free (ctx);
 }
 
 static MMOmaSessionType
@@ -419,36 +447,6 @@ get_pending_network_initiated_session_type (MMIfaceModemOma *self,
     }
 
     return session_type;
-}
-
-static void
-accept_network_initiated_session_ready (MMIfaceModemOma *self,
-                                        GAsyncResult *res,
-                                        HandleAcceptNetworkInitiatedSessionContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        MMOmaSessionType session_type;
-
-        /* Get session type */
-        session_type = get_pending_network_initiated_session_type (self, ctx->session_id);
-
-        /* If accepted or rejected, remove from pending */
-        add_or_remove_pending_network_initiated_session (self, FALSE, session_type, ctx->session_id);
-
-        /* If accepted, set as current */
-        if (ctx->accept) {
-            mm_gdbus_modem_oma_set_session_type (ctx->skeleton, session_type);
-            mm_iface_modem_oma_update_session_state (self, MM_OMA_SESSION_STATE_STARTED, MM_OMA_SESSION_STATE_FAILED_REASON_UNKNOWN);
-        }
-
-        mm_gdbus_modem_oma_complete_accept_network_initiated_session (ctx->skeleton, ctx->invocation);
-    }
-
-    handle_accept_network_initiated_session_context_free (ctx);
 }
 
 static void
@@ -490,8 +488,21 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    mm_dbg ("%s network-initiated OMA session (%u)",
+    ctx->session_type = get_pending_network_initiated_session_type (ctx->self, ctx->session_id);
+    if (ctx->session_type == MM_OMA_SESSION_TYPE_UNKNOWN) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot accept network-initiated OMA session: "
+                                               "unknown session id (%u)",
+                                               ctx->session_id);
+        handle_accept_network_initiated_session_context_free (ctx);
+        return;
+    }
+
+    mm_dbg ("%s network-initiated OMA session (%s, %u)",
             ctx->accept ? "Accepting" : "Rejecting",
+            mm_oma_session_type_get_string (ctx->session_type),
             ctx->session_id);
     MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session (
         ctx->self,
@@ -514,6 +525,7 @@ handle_accept_network_initiated_session (MmGdbusModemOma *skeleton,
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
+    ctx->session_type = MM_OMA_SESSION_TYPE_UNKNOWN;
     ctx->session_id = session_id;
     ctx->accept = accept;
 
