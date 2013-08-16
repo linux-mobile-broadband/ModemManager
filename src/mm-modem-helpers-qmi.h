@@ -98,6 +98,7 @@ QmiWdsAuthentication mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllow
 /* QMI/OMA to MM translations */
 
 MMOmaSessionType mm_oma_session_type_from_qmi_oma_session_type (QmiOmaSessionType qmi_session_type);
+QmiOmaSessionType mm_oma_session_type_to_qmi_oma_session_type (MMOmaSessionType mm_session_type);
 
 MMOmaSessionState mm_oma_session_state_from_qmi_oma_session_state (QmiOmaSessionState qmi_session_state);
 

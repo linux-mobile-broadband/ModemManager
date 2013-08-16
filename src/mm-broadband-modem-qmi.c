@@ -8195,6 +8195,77 @@ oma_setup (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Start client initiated session (OMA interface) */
+
+static gboolean
+oma_start_client_initiated_session_finish (MMIfaceModemOma *self,
+                                           GAsyncResult *res,
+                                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+oma_start_session_ready (QmiClientOma *client,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    QmiMessageOmaStartSessionOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_oma_start_session_finish (client, res, &error);
+    if (!output || !qmi_message_oma_start_session_output_get_result (output, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    if (output)
+        qmi_message_oma_start_session_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+oma_start_client_initiated_session (MMIfaceModemOma *self,
+                                    MMOmaSessionType session_type,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+    QmiClient *client = NULL;
+    QmiMessageOmaStartSessionInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    /* It's already checked in mm-iface-modem-oma; so just assert if this is not ok */
+    g_assert (session_type == MM_OMA_SESSION_TYPE_CLIENT_INITIATED_DEVICE_CONFIGURE ||
+              session_type == MM_OMA_SESSION_TYPE_CLIENT_INITIATED_PRL_UPDATE ||
+              session_type == MM_OMA_SESSION_TYPE_CLIENT_INITIATED_HANDS_FREE_ACTIVATION);
+
+    input = qmi_message_oma_start_session_input_new ();
+    qmi_message_oma_start_session_input_set_session_type (
+        input,
+        mm_oma_session_type_to_qmi_oma_session_type (session_type),
+        NULL);
+
+    qmi_client_oma_start_session (
+        QMI_CLIENT_OMA (client),
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)oma_start_session_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   oma_start_client_initiated_session));
+
+    qmi_message_oma_start_session_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited event handlers (OMA interface) */
 
 static void
@@ -10073,6 +10144,8 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
     iface->load_features_finish = oma_load_features_finish;
     iface->setup = oma_setup;
     iface->setup_finish = oma_setup_finish;
+    iface->start_client_initiated_session = oma_start_client_initiated_session;
+    iface->start_client_initiated_session_finish = oma_start_client_initiated_session_finish;
     iface->setup_unsolicited_events = oma_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = oma_cleanup_unsolicited_events;

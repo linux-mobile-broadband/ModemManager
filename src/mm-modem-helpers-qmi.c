@@ -1297,6 +1297,29 @@ mm_oma_session_type_from_qmi_oma_session_type (QmiOmaSessionType qmi_session_typ
     }
 }
 
+QmiOmaSessionType
+mm_oma_session_type_to_qmi_oma_session_type (MMOmaSessionType mm_session_type)
+{
+    switch (mm_session_type) {
+    case MM_OMA_SESSION_TYPE_CLIENT_INITIATED_DEVICE_CONFIGURE:
+        return QMI_OMA_SESSION_TYPE_CLIENT_INITIATED_DEVICE_CONFIGURE;
+    case MM_OMA_SESSION_TYPE_CLIENT_INITIATED_PRL_UPDATE:
+        return QMI_OMA_SESSION_TYPE_CLIENT_INITIATED_PRL_UPDATE;
+    case MM_OMA_SESSION_TYPE_CLIENT_INITIATED_HANDS_FREE_ACTIVATION:
+        return QMI_OMA_SESSION_TYPE_CLIENT_INITIATED_HANDS_FREE_ACTIVATION;
+    case MM_OMA_SESSION_TYPE_DEVICE_INITIATED_HANDS_FREE_ACTIVATION:
+        return QMI_OMA_SESSION_TYPE_DEVICE_INITIATED_HANDS_FREE_ACTIVATION;
+    case MM_OMA_SESSION_TYPE_NETWORK_INITIATED_PRL_UPDATE:
+        return QMI_OMA_SESSION_TYPE_NETWORK_INITIATED_PRL_UPDATE;
+    case MM_OMA_SESSION_TYPE_NETWORK_INITIATED_DEVICE_CONFIGURE:
+        return QMI_OMA_SESSION_TYPE_NETWORK_INITIATED_DEVICE_CONFIGURE;
+    case MM_OMA_SESSION_TYPE_DEVICE_INITIATED_PRL_UPDATE:
+        return QMI_OMA_SESSION_TYPE_DEVICE_INITIATED_PRL_UPDATE;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
 MMOmaSessionState
 mm_oma_session_state_from_qmi_oma_session_state (QmiOmaSessionState qmi_session_state)
 {
