@@ -8037,6 +8037,90 @@ oma_check_support (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Load features (OMA interface) */
+
+static MMOmaFeature
+oma_load_features_finish (MMIfaceModemOma *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_OMA_FEATURE_NONE;
+
+    return (MMOmaFeature) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+oma_get_feature_setting_ready (QmiClientOma *client,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    QmiMessageOmaGetFeatureSettingOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_oma_get_feature_setting_finish (client, res, &error);
+    if (!output || !qmi_message_oma_get_feature_setting_output_get_result (output, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMOmaFeature features = MM_OMA_FEATURE_NONE;
+        gboolean enabled;
+
+        if (qmi_message_oma_get_feature_setting_output_get_device_provisioning_service_update_config (
+                output,
+                &enabled,
+                NULL) &&
+            enabled)
+            features |= MM_OMA_FEATURE_DEVICE_PROVISIONING;
+
+        if (qmi_message_oma_get_feature_setting_output_get_prl_service_update_config (
+                output,
+                &enabled,
+                NULL) &&
+            enabled)
+            features |= MM_OMA_FEATURE_PRL_UPDATE;
+
+        if (qmi_message_oma_get_feature_setting_output_get_hfa_feature_config (
+                output,
+                &enabled,
+                NULL) &&
+            enabled)
+            features |= MM_OMA_FEATURE_HANDS_FREE_ACTIVATION;
+
+        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER ((guint)features), NULL);
+    }
+
+    if (output)
+        qmi_message_oma_get_feature_setting_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+oma_load_features (MMIfaceModemOma *self,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_OMA, &client,
+                            callback, user_data))
+        return;
+
+    qmi_client_oma_get_feature_setting (
+        QMI_CLIENT_OMA (client),
+        NULL,
+        5,
+        NULL,
+        (GAsyncReadyCallback)oma_get_feature_setting_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   oma_load_features));
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited event handlers (OMA interface) */
 
 static void
@@ -9911,6 +9995,8 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
 {
     iface->check_support = oma_check_support;
     iface->check_support_finish = oma_check_support_finish;
+    iface->load_features = oma_load_features;
+    iface->load_features_finish = oma_load_features_finish;
     iface->setup_unsolicited_events = oma_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = common_oma_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = oma_cleanup_unsolicited_events;
