@@ -41,6 +41,7 @@
 #include "mm-bearer-qmi.h"
 #include "mm-sms-qmi.h"
 #include "mm-sms-part-3gpp.h"
+#include "mm-sms-part-cdma.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -6847,42 +6848,42 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
                        QmiWmsMessageFormat format,
                        GArray *data)
 {
+    MMSmsPart *part = NULL;
+    GError *error = NULL;
+
     switch (format) {
     case QMI_WMS_MESSAGE_FORMAT_CDMA:
-        mm_dbg ("Skipping CDMA messages for now...");
-        break;
-    case QMI_WMS_MESSAGE_FORMAT_MWI:
-        mm_dbg ("Don't know how to process 'message waiting indicator' messages");
+        part = mm_sms_part_cdma_new_from_binary_pdu (index,
+                                                     (guint8 *)data->data,
+                                                     data->len,
+                                                     &error);
+
         break;
     case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
-    case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST: {
-        MMSmsPart *part;
-        GError *error = NULL;
-
+    case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST:
         part = mm_sms_part_3gpp_new_from_binary_pdu (index,
                                                      (guint8 *)data->data,
                                                      data->len,
                                                      &error);
-        if (part) {
-            mm_dbg ("Correctly parsed PDU (%d)",
-                    index);
-            mm_iface_modem_messaging_take_part (self,
-                                                part,
-                                                mm_sms_state_from_qmi_message_tag (tag),
-                                                mm_sms_storage_from_qmi_storage_type (storage));
-        } else {
-            /* Don't treat the error as critical */
-            mm_dbg ("Error parsing PDU (%d): %s",
-                    index,
-                    error->message);
-            g_error_free (error);
-        }
-
         break;
-    }
+    case QMI_WMS_MESSAGE_FORMAT_MWI:
+        mm_dbg ("Don't know how to process 'message waiting indicator' messages");
+        break;
     default:
         mm_dbg ("Unhandled message format '%u'", format);
         break;
+    }
+
+    if (part) {
+        mm_dbg ("Correctly parsed PDU (%d)", index);
+        mm_iface_modem_messaging_take_part (self,
+                                            part,
+                                            mm_sms_state_from_qmi_message_tag (tag),
+                                            mm_sms_storage_from_qmi_storage_type (storage));
+    } else if (error) {
+        /* Don't treat the error as critical */
+        mm_dbg ("Error parsing PDU (%d): %s", index, error->message);
+        g_error_free (error);
     }
 }
 
