@@ -793,6 +793,15 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
     g_return_val_if_fail (mm_sms_part_get_number (part) != NULL, NULL);
     g_return_val_if_fail (mm_sms_part_get_text (part) != NULL || mm_sms_part_get_data (part) != NULL, NULL);
 
+    if (mm_sms_part_get_pdu_type (part) != MM_SMS_PDU_TYPE_SUBMIT) {
+        g_set_error (error,
+                     MM_MESSAGE_ERROR,
+                     MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                     "Invalid PDU type to generate a 'submit' PDU: '%s'",
+                     mm_sms_pdu_type_get_string (mm_sms_part_get_pdu_type (part)));
+        return NULL;
+    }
+
     mm_dbg ("Creating PDU for part...");
 
     /* Build up the PDU */
