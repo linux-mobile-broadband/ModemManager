@@ -211,6 +211,103 @@ test_invalid_address_length (void)
         NULL);
 }
 
+static void
+test_created_by_us (void)
+{
+    static const guint8 pdu[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* destination address */
+        0x04, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer data */
+        0x08, 0x0D,
+        0x00, 0x03, 0x20, 0x00, 0x00, /* message id */
+        0x01, 0x06, 0x10, 0x24, 0x18, 0x30, 0x60, 0x80 /* user_data */
+    };
+
+    common_test_part_from_pdu (
+        pdu, sizeof (pdu),
+        MM_SMS_CDMA_TELESERVICE_ID_WMT,
+        MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+        "3305773196",
+        0,
+        "AAAA");
+}
+
+/********************* PDU CREATOR TESTS *********************/
+
+static void
+common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
+                        const gchar *number,
+                        const gchar *text,
+                        const guint8 *data,
+                        gsize data_size,
+                        const guint8 *expected,
+                        gsize expected_size)
+{
+    MMSmsPart *part;
+    guint8 *pdu;
+    guint len = 0;
+    GError *error = NULL;
+
+    g_assert (number != NULL);
+
+    part = mm_sms_part_new (0, MM_SMS_PDU_TYPE_CDMA_SUBMIT);
+    mm_sms_part_set_cdma_teleservice_id (part, teleservice_id);
+    mm_sms_part_set_number (part, number);
+    if (text)
+        mm_sms_part_set_text (part, text);
+    else {
+        GByteArray *data_bytearray;
+
+        data_bytearray = g_byte_array_sized_new (data_size);
+        g_byte_array_append (data_bytearray, data, data_size);
+        mm_sms_part_take_data (part, data_bytearray);
+    }
+
+    pdu = mm_sms_part_cdma_get_submit_pdu (part, &len, &error);
+
+    trace_pdu (pdu, len);
+
+    g_assert_no_error (error);
+    g_assert (pdu != NULL);
+    g_assert_cmpuint (len, ==, expected_size);
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+
+    g_free (pdu);
+}
+
+static void
+test_create_pdu_text (void)
+{
+    static const char *number = "3305773196";
+    static const char *text = "AAAA";
+    static const guint8 expected[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* destination address */
+        0x04, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer data */
+        0x08, 0x0D,
+        0x00, 0x03, 0x20, 0x00, 0x00, /* message id */
+        0x01, 0x06, 0x10, 0x24, 0x18, 0x30, 0x60, 0x80 /* user_data */
+    };
+
+    common_test_create_pdu (MM_SMS_CDMA_TELESERVICE_ID_WMT,
+                            number,
+                            text,
+                            NULL, 0,
+                            expected, sizeof (expected));
+}
+
 /************************************************************/
 
 void
@@ -243,6 +340,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/pdu1", test_pdu1);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-parameter-length", test_invalid_parameter_length);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-address-length", test_invalid_address_length);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/created-by-us", test_created_by_us);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/Text", test_create_pdu_text);
 
     return g_test_run ();
 }

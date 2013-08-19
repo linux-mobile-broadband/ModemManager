@@ -30,4 +30,8 @@ MMSmsPart *mm_sms_part_cdma_new_from_binary_pdu (guint index,
                                                  gsize pdu_len,
                                                  GError **error);
 
+guint8 *mm_sms_part_cdma_get_submit_pdu (MMSmsPart *part,
+                                         guint *out_pdulen,
+                                         GError **error);
+
 #endif /* MM_SMS_PART_CDMA_H */

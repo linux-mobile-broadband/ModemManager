@@ -1110,3 +1110,373 @@ mm_sms_part_cdma_new_from_binary_pdu (guint index,
 
     return sms_part;
 }
+
+/*****************************************************************************/
+/* Write bits; o_bits < 8; n_bits <= 8
+ *
+ * Byte 0            Byte 1
+ * [7|6|5|4|3|2|1|0] [7|6|5|4|3|2|1|0]
+ *
+ * o_bits+n_bits <= 16
+ *
+ * NOTE! The bits being set should be 0 initially.
+ */
+static void
+write_bits (guint8 *bytes,
+            guint8 o_bits,
+            guint8 n_bits,
+            guint8 bits)
+{
+    guint8 bits_in_first;
+    guint8 bits_in_second;
+
+    g_assert (o_bits < 8);
+    g_assert (n_bits <= 8);
+    g_assert (o_bits + n_bits <= 16);
+
+    /* Write only in the first byte */
+    if (o_bits + n_bits <= 8) {
+        bytes[0] |= (bits & ((1 << n_bits) - 1)) << (8 - o_bits - n_bits);
+        return;
+    }
+
+    /* Write (8 - o_bits) in the first byte and (n_bits - (8 - o_bits)) in the second byte */
+    bits_in_first = 8 - o_bits;
+    bits_in_second = n_bits - bits_in_first;
+
+    write_bits (&bytes[0], o_bits, bits_in_first, (bits >> bits_in_second));
+    write_bits (&bytes[1], 0, bits_in_second, bits);
+}
+
+/*****************************************************************************/
+
+static guint8
+dtmf_from_ascii (guint8 ascii)
+{
+    if (ascii >= '1' && ascii <= '9')
+        return ascii - '0';
+    if (ascii == '0')
+        return 10;
+    if (ascii == '*')
+        return 11;
+    if (ascii == '#')
+        return 12;
+
+    mm_dbg ("        invalid ascii digit in dtmf conversion: %c", ascii);
+    return 0;
+}
+
+static gboolean
+write_teleservice_id (MMSmsPart *part,
+                      guint8 *pdu,
+                      guint *absolute_offset,
+                      GError **error)
+{
+    guint16 aux16;
+
+    if (mm_sms_part_get_cdma_teleservice_id (part) != MM_SMS_CDMA_TELESERVICE_ID_WMT) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Teleservice '%s' not supported",
+                     mm_sms_cdma_teleservice_id_get_string (
+                         mm_sms_part_get_cdma_teleservice_id (part)));
+        return FALSE;
+    }
+
+    /* Teleservice ID: WMT always */
+    pdu[0] = PARAMETER_ID_TELESERVICE_ID;
+    pdu[1] = 2; /* parameter_len, always 2 */
+    aux16 = GUINT16_TO_BE (MM_SMS_CDMA_TELESERVICE_ID_WMT);
+    memcpy (&pdu[2], &aux16, 2);
+
+    *absolute_offset += 4;
+    return TRUE;
+}
+
+static gboolean
+write_destination_address (MMSmsPart *part,
+                           guint8 *pdu,
+                           guint *absolute_offset,
+                           GError **error)
+{
+    const gchar *number;
+    guint bit_offset;
+    guint byte_offset;
+    guint n_digits;
+    guint i;
+
+#define OFFSETS_UPDATE(n_bits) do { \
+        bit_offset += n_bits;       \
+        if (bit_offset >= 8) {      \
+            bit_offset-=8;          \
+            byte_offset++;          \
+        }                           \
+    } while (0)
+
+    number = mm_sms_part_get_number (part);
+    n_digits = strlen (number);
+
+    pdu[0] = PARAMETER_ID_DESTINATION_ADDRESS;
+    /* Write parameter length at the end */
+
+    byte_offset = 2;
+    bit_offset = 0;
+
+    /* Digit mode: DTMF always */
+    write_bits (&pdu[byte_offset], bit_offset, 1, DIGIT_MODE_DTMF);
+    OFFSETS_UPDATE (1);
+
+    /* Number mode: DIGIT always */
+    write_bits (&pdu[byte_offset], bit_offset, 1, NUMBER_MODE_DIGIT);
+    OFFSETS_UPDATE (1);
+
+    /* Number type and numbering plan only needed in ASCII digit mode, so skip */
+
+    /* Number of fields */
+    if (n_digits > 256) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Number too long (max 256 digits, %u given)",
+                     n_digits);
+        return FALSE;
+    }
+    write_bits (&pdu[byte_offset], bit_offset, 8, n_digits);
+    OFFSETS_UPDATE (8);
+
+    /* Actual DTMF encoded number */
+    for (i = 0; i < n_digits; i++) {
+        guint8 dtmf;
+
+        dtmf = dtmf_from_ascii (number[i]);
+        if (!dtmf) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_UNSUPPORTED,
+                         "Unsupported character in number: '%c'. Cannot convert to DTMF",
+                         number[i]);
+            return FALSE;
+        }
+        write_bits (&pdu[byte_offset], bit_offset, 4, dtmf);
+        OFFSETS_UPDATE (4);
+    }
+
+#undef OFFSETS_UPDATE
+
+    /* Write parameter length (remove header length to offset) */
+    byte_offset += !!bit_offset - 2;
+    if (byte_offset > 256) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Number too long (max 256 bytes, %u given)",
+                     byte_offset);
+        return FALSE;
+    }
+    pdu[1] = byte_offset;
+
+    *absolute_offset += (2 + pdu[1]);
+    return TRUE;
+}
+
+static gboolean
+write_bearer_data_message_identifier (MMSmsPart *part,
+                                      guint8 *pdu,
+                                      guint *parameter_offset,
+                                      GError **error)
+{
+    pdu[0] = SUBPARAMETER_ID_MESSAGE_ID;
+    pdu[1] = 3; /* subparameter_len, always 3 */
+
+    /* Message type */
+    write_bits (&pdu[2], 0, 4, TELESERVICE_MESSAGE_TYPE_SUBMIT);
+
+    /* Skip adding a message id; assume it's filled in by device */
+
+    /* And no need for a header ind value, always false */
+
+    *parameter_offset += 5;
+    return TRUE;
+}
+
+static gboolean
+write_bearer_data_user_data (MMSmsPart *part,
+                             guint8 *pdu,
+                             guint *parameter_offset,
+                             GError **error)
+{
+    const gchar *text;
+    const GByteArray *data;
+    guint bit_offset = 0;
+    guint byte_offset = 0;
+    guint num_fields;
+    guint i;
+
+#define OFFSETS_UPDATE(n_bits) do { \
+        bit_offset += n_bits;       \
+        if (bit_offset >= 8) {      \
+            bit_offset-=8;          \
+            byte_offset++;          \
+        }                           \
+    } while (0)
+
+    text = mm_sms_part_get_text (part);
+    data = mm_sms_part_get_data (part);
+    g_assert (text || data);
+    g_assert (!(!text && !data));
+
+    pdu[0] = SUBPARAMETER_ID_USER_DATA;
+    /* Write parameter length at the end */
+    byte_offset = 2;
+    bit_offset = 0;
+
+    /* Message encoding*/
+    write_bits (&pdu[byte_offset], bit_offset, 5, data ? ENCODING_OCTET : ENCODING_ASCII_7BIT);
+    OFFSETS_UPDATE (5);
+
+    /* Number of fields */
+    num_fields = data ? data->len : strlen (text);
+    if (num_fields > 256) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Data too long (max 256 fields, %u given)",
+                     num_fields);
+        return FALSE;
+    }
+    write_bits (&pdu[byte_offset], bit_offset, 8, num_fields);
+    OFFSETS_UPDATE (8);
+
+    /* Actual text or data */
+    if (data) {
+        for (i = 0; i < num_fields; i++) {
+            write_bits (&pdu[byte_offset], bit_offset, 8, data->data[i]);
+            OFFSETS_UPDATE (8);
+        }
+    } else {
+        for (i = 0; i < num_fields; i++) {
+            /* ASCII-7 characters given in gchar should have the most
+             * significant bit set to 0 */
+            if (text[i] & 0x80) {
+                g_set_error (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Unsupported character in text: '%u'. Cannot convert to ASCII-7",
+                             text[i]);
+                return FALSE;
+            }
+            write_bits (&pdu[byte_offset], bit_offset, 7, text[i]);
+            OFFSETS_UPDATE (7);
+        }
+    }
+
+#undef OFFSETS_UPDATE
+
+    /* Write subparameter length (remove header length to offset) */
+    byte_offset += !!bit_offset - 2;
+    if (byte_offset > 256) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Data or Text too long (max 256 bytes, %u given)",
+                     byte_offset);
+        return FALSE;
+    }
+    pdu[1] = byte_offset;
+
+    *parameter_offset += (2 + pdu[1]);
+    return TRUE;
+}
+
+static gboolean
+write_bearer_data (MMSmsPart *part,
+                   guint8 *pdu,
+                   guint *absolute_offset,
+                   GError **error)
+{
+    GError *inner_error = NULL;
+    guint offset = 0;
+
+    pdu[0] = PARAMETER_ID_BEARER_DATA;
+    /* Write parameter length at the end */
+
+    offset = 2;
+    if (!write_bearer_data_message_identifier (part, &pdu[offset], &offset, &inner_error))
+        mm_dbg ("Error writing message identifier: %s", inner_error->message);
+    else if (!write_bearer_data_user_data (part, &pdu[offset], &offset, &inner_error))
+        mm_dbg ("Error writing user data: %s", inner_error->message);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_prefix_error (error, "Error writing bearer data: ");
+        return FALSE;
+    }
+
+    /* Write parameter length (remove header length to offset) */
+    offset -= 2;
+    if (offset > 256) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Bearer data too long (max 256 bytes, %u given)",
+                     offset);
+        return FALSE;
+    }
+    pdu[1] = offset;
+
+    *absolute_offset += (2 + pdu[1]);
+    return TRUE;
+}
+
+guint8 *
+mm_sms_part_cdma_get_submit_pdu (MMSmsPart *part,
+                                 guint *out_pdulen,
+                                 GError **error)
+{
+    GError *inner_error = NULL;
+    guint offset = 0;
+    guint8 *pdu;
+
+    g_return_val_if_fail (mm_sms_part_get_number (part) != NULL, NULL);
+    g_return_val_if_fail (mm_sms_part_get_text (part) != NULL || mm_sms_part_get_data (part) != NULL, NULL);
+
+    if (mm_sms_part_get_pdu_type (part) != MM_SMS_PDU_TYPE_CDMA_SUBMIT) {
+        g_set_error (error,
+                     MM_MESSAGE_ERROR,
+                     MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                     "Invalid PDU type to generate a 'submit' PDU: '%s'",
+                     mm_sms_pdu_type_get_string (mm_sms_part_get_pdu_type (part)));
+        return NULL;
+    }
+
+    mm_dbg ("Creating PDU for part...");
+
+    /* Current max size estimations:
+     *  Message type: 1 byte
+     *  Teleservice ID: 5 bytes
+     *  Destination address: 2 + 256 bytes
+     *  Bearer data: 2 + 256 bytes
+     */
+    pdu = g_malloc0 (1024);
+
+    /* First byte: SMS message type */
+    pdu[offset++] = MESSAGE_TYPE_POINT_TO_POINT;
+
+    if (!write_teleservice_id (part, &pdu[offset], &offset, &inner_error))
+        mm_dbg ("Error writing Teleservice ID: %s", inner_error->message);
+    else if (!write_destination_address (part, &pdu[offset], &offset, &inner_error))
+        mm_dbg ("Error writing destination address: %s", inner_error->message);
+    else if (!write_bearer_data (part, &pdu[offset], &offset, &inner_error))
+        mm_dbg ("Error writing bearer data: %s", inner_error->message);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_prefix_error (error, "Cannot create CDMA SMS part: ");
+        g_free (pdu);
+        return NULL;
+    }
+
+    *out_pdulen = offset;
+    return pdu;
+}
