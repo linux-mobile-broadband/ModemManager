@@ -744,7 +744,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
                             const struct Parameter *subparameter)
 {
     guint8 message_encoding;
-    guint8 message_type;
+    guint8 message_type = 0;
     guint8 num_fields;
     guint byte_offset = 0;
     guint bit_offset = 0;
@@ -823,6 +823,48 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
     num_fields = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
     OFFSETS_UPDATE (8);
     mm_dbg ("            num fields: %u", num_fields);
+
+    /* Now, process actual text or data */
+    switch (message_encoding) {
+    case ENCODING_OCTET: {
+        GByteArray *data;
+        guint i;
+
+        SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_fields * 8)) / 8));
+
+        data = g_byte_array_sized_new (num_fields);
+        g_byte_array_set_size (data, num_fields);
+        for (i = 0; i < num_fields; i++) {
+            data->data[i] = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
+            OFFSETS_UPDATE (8);
+        }
+
+        mm_dbg ("            data: (%u bytes)", num_fields);
+        mm_sms_part_take_data (sms_part, data);
+        break;
+    }
+
+    case ENCODING_ASCII_7BIT: {
+        gchar *text;
+        guint i;
+
+        SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_fields * 7)) / 8));
+
+        text = g_malloc (num_fields + 1);
+        for (i = 0; i < num_fields; i++) {
+            text[i] = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 7);
+            OFFSETS_UPDATE (7);
+        }
+        text[i] = '\0';
+
+        mm_dbg ("            text: '%s'", text);
+        mm_sms_part_take_text (sms_part, text);
+        break;
+    }
+
+    default:
+        mm_dbg ("            text/data: ignored (unsupported encoding)");
+    }
 
 #undef OFFSETS_UPDATE
 #undef SUBPARAMETER_SIZE_CHECK

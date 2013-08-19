@@ -49,7 +49,8 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
                               MMSmsCdmaTeleserviceId expected_teleservice_id,
                               MMSmsCdmaServiceCategory expected_service_category,
                               const gchar *expected_address,
-                              guint8 expected_bearer_reply_option)
+                              guint8 expected_bearer_reply_option,
+                              const gchar *expected_text)
 {
     MMSmsPart *part;
     GError *error = NULL;
@@ -71,6 +72,8 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
     }
     if (expected_bearer_reply_option)
         g_assert_cmpuint (expected_bearer_reply_option, ==, mm_sms_part_get_message_reference (part));
+    if (expected_text)
+        g_assert_cmpstr (expected_text, ==, mm_sms_part_get_text (part));
 
     mm_sms_part_free (part);
 }
@@ -81,7 +84,8 @@ common_test_part_from_pdu (const guint8 *pdu,
                            MMSmsCdmaTeleserviceId expected_teleservice_id,
                            MMSmsCdmaServiceCategory expected_service_category,
                            const gchar *expected_address,
-                           guint8 expected_bearer_reply_option)
+                           guint8 expected_bearer_reply_option,
+                           const gchar *expected_text)
 {
     gchar *hexpdu;
 
@@ -90,7 +94,8 @@ common_test_part_from_pdu (const guint8 *pdu,
                                   expected_teleservice_id,
                                   expected_service_category,
                                   expected_address,
-                                  expected_bearer_reply_option);
+                                  expected_bearer_reply_option,
+                                  expected_text);
     g_free (hexpdu);
 }
 
@@ -146,7 +151,8 @@ test_pdu1 (void)
         MM_SMS_CDMA_TELESERVICE_ID_WMT,
         MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
         "3305773196",
-        63);
+        63,
+        "AAAA");
 }
 
 static void
@@ -201,7 +207,8 @@ test_invalid_address_length (void)
         MM_SMS_CDMA_TELESERVICE_ID_WMT,
         MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
         "",
-        63);
+        63,
+        NULL);
 }
 
 /************************************************************/
