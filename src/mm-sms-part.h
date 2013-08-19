@@ -31,6 +31,14 @@ typedef struct _MMSmsPart MMSmsPart;
 
 #define SMS_PART_INVALID_INDEX G_MAXUINT
 
+#define MM_SMS_PART_IS_3GPP(part)                                       \
+    (mm_sms_part_get_pdu_type (part) >= MM_SMS_PDU_TYPE_DELIVER &&      \
+     mm_sms_part_get_pdu_type (part) <= MM_SMS_PDU_TYPE_STATUS_REPORT)
+
+#define MM_SMS_PART_IS_CDMA(part)                                       \
+    (mm_sms_part_get_pdu_type (part) >= MM_SMS_PDU_TYPE_CDMA_DELIVER && \
+     mm_sms_part_get_pdu_type (part) <= MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT)
+
 MMSmsPart *mm_sms_part_new  (guint index,
                              MMSmsPduType type);
 void       mm_sms_part_free (MMSmsPart *part);

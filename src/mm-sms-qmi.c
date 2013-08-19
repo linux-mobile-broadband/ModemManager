@@ -29,6 +29,7 @@
 #include "mm-sms-qmi.h"
 #include "mm-base-modem.h"
 #include "mm-sms-part-3gpp.h"
+#include "mm-sms-part-cdma.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMSmsQmi, mm_sms_qmi, MM_TYPE_SMS);
@@ -160,7 +161,7 @@ static void
 sms_store_next_part (SmsStoreContext *ctx)
 {
     QmiMessageWmsRawWriteInput *input;
-    guint8 *pdu;
+    guint8 *pdu = NULL;
     guint pdulen = 0;
     guint msgstart = 0;
     GArray *array;
@@ -174,10 +175,22 @@ sms_store_next_part (SmsStoreContext *ctx)
     }
 
     /* Get PDU */
-    pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
+        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
+        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
+
     if (!pdu) {
-        /* 'error' should already be set */
-        g_simple_async_result_take_error (ctx->result, error);
+        if (error)
+            g_simple_async_result_take_error (ctx->result, error);
+        else
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unknown or unsupported PDU type in SMS part: %s",
+                                             mm_sms_pdu_type_get_string (
+                                                 mm_sms_part_get_pdu_type (
+                                                     (MMSmsPart *)ctx->current->data)));
         sms_store_context_complete_and_free (ctx);
         return;
     }
@@ -193,7 +206,9 @@ sms_store_next_part (SmsStoreContext *ctx)
     qmi_message_wms_raw_write_input_set_raw_message_data (
         input,
         mm_sms_storage_to_qmi_storage_type (ctx->storage),
-        QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT,
+        (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
+         QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT :
+         QMI_WMS_MESSAGE_FORMAT_CDMA),
         array,
         NULL);
     qmi_client_wms_raw_write (ctx->client,
@@ -326,16 +341,29 @@ static void
 sms_send_generic (SmsSendContext *ctx)
 {
     QmiMessageWmsRawSendInput *input;
-    guint8 *pdu;
+    guint8 *pdu = NULL;
     guint pdulen = 0;
     guint msgstart = 0;
     GArray *array;
     GError *error = NULL;
 
     /* Get PDU */
-    pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
+        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
+        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
+
     if (!pdu) {
-        g_simple_async_result_take_error (ctx->result, error);
+        if (error)
+            g_simple_async_result_take_error (ctx->result, error);
+        else
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unknown or unsupported PDU type in SMS part: %s",
+                                             mm_sms_pdu_type_get_string (
+                                                 mm_sms_part_get_pdu_type (
+                                                     (MMSmsPart *)ctx->current->data)));
         sms_send_context_complete_and_free (ctx);
         return;
     }
@@ -347,10 +375,11 @@ sms_send_generic (SmsSendContext *ctx)
     g_free (pdu);
 
     input = qmi_message_wms_raw_send_input_new ();
-
     qmi_message_wms_raw_send_input_set_raw_message_data (
         input,
-        QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT,
+        (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
+         QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT :
+         QMI_WMS_MESSAGE_FORMAT_CDMA),
         array,
         NULL);
 
@@ -405,6 +434,8 @@ send_from_storage_ready (QmiClientWms *client,
         } else {
             QmiWmsGsmUmtsRpCause rp_cause;
             QmiWmsGsmUmtsTpCause tp_cause;
+            QmiWmsCdmaCauseCode cdma_cause_code;
+            QmiWmsCdmaErrorClass cdma_error_class;
 
             if (qmi_message_wms_send_from_memory_storage_output_get_gsm_wcdma_cause_info (
                     output,
@@ -416,6 +447,24 @@ send_from_storage_ready (QmiClientWms *client,
                          qmi_wms_gsm_umts_rp_cause_get_string (rp_cause),
                          tp_cause,
                          qmi_wms_gsm_umts_tp_cause_get_string (tp_cause));
+            }
+
+            if (qmi_message_wms_send_from_memory_storage_output_get_cdma_cause_code (
+                    output,
+                    &cdma_cause_code,
+                    NULL)) {
+                mm_warn ("Couldn't send SMS; cause code (%u): '%s'",
+                         cdma_cause_code,
+                         qmi_wms_cdma_cause_code_get_string (cdma_cause_code));
+            }
+
+            if (qmi_message_wms_send_from_memory_storage_output_get_cdma_error_class (
+                    output,
+                    &cdma_error_class,
+                    NULL)) {
+                mm_warn ("Couldn't send SMS; error class (%u): '%s'",
+                         cdma_error_class,
+                         qmi_wms_cdma_error_class_get_string (cdma_error_class));
             }
 
             g_prefix_error (&error, "Couldn't write SMS part: ");
@@ -449,7 +498,9 @@ sms_send_from_storage (SmsSendContext *ctx)
         input,
         mm_sms_storage_to_qmi_storage_type (mm_sms_get_storage (ctx->self)),
         mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
-        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
+         QMI_WMS_MESSAGE_MODE_GSM_WCDMA :
+         QMI_WMS_MESSAGE_MODE_CDMA),
         NULL);
 
     qmi_client_wms_send_from_memory_storage (
@@ -613,7 +664,9 @@ delete_next_part (SmsDeletePartsContext *ctx)
         NULL);
     qmi_message_wms_delete_input_set_message_mode (
         input,
-        QMI_WMS_MESSAGE_MODE_GSM_WCDMA,
+        (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
+         QMI_WMS_MESSAGE_MODE_GSM_WCDMA:
+         QMI_WMS_MESSAGE_MODE_CDMA),
         NULL);
     qmi_client_wms_delete (ctx->client,
                            input,
