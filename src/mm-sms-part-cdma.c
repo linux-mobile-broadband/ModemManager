@@ -348,7 +348,7 @@ read_teleservice_id (MMSmsPart *sms_part,
         return;
     }
 
-    mm_dbg ("        teleservice ID read: %s (%u)",
+    mm_dbg ("        teleservice ID: %s (%u)",
             mm_sms_cdma_teleservice_id_get_string (teleservice_id),
             teleservice_id);
 
@@ -416,7 +416,7 @@ read_service_category (MMSmsPart *sms_part,
         return;
     }
 
-    mm_dbg ("        service category read: %s (%u)",
+    mm_dbg ("        service category: %s (%u)",
             mm_sms_cdma_service_category_get_string (service_category),
             service_category);
 
@@ -610,7 +610,7 @@ read_address (MMSmsPart *sms_part,
     } else
         mm_dbg ("        data network address number type unknown (%u)", number_type);
 
-    mm_dbg ("        address read: %s", number);
+    mm_dbg ("        address: %s", number);
 
     mm_sms_part_set_number (sms_part, number);
     g_free (number);
@@ -634,7 +634,7 @@ read_bearer_reply_option (MMSmsPart *sms_part,
     }
 
     sequence = read_bits (&parameter->parameter_value[0], 0, 6);
-    mm_dbg ("        sequence read: %u", sequence);
+    mm_dbg ("        sequence: %u", sequence);
 
     mm_sms_part_set_message_reference (sms_part, sequence);
 }
@@ -657,10 +657,10 @@ read_cause_codes (MMSmsPart *sms_part,
     }
 
     sequence = read_bits (&parameter->parameter_value[0], 0, 6);
-    mm_dbg ("        sequence read: %u", sequence);
+    mm_dbg ("        sequence: %u", sequence);
 
     error_class = read_bits (&parameter->parameter_value[0], 6, 2);
-    mm_dbg ("        error class read: %u", error_class);
+    mm_dbg ("        error class: %u", error_class);
 
     if (error_class != ERROR_CLASS_NO_ERROR) {
         if (parameter->parameter_len != 2) {
@@ -669,12 +669,12 @@ read_cause_codes (MMSmsPart *sms_part,
             return;
         }
         cause_code = parameter->parameter_value[1];
-        mm_dbg ("        cause code read: %u", cause_code);
+        mm_dbg ("        cause code: %u", cause_code);
     } else
         cause_code = 0;
 
     delivery_state = cause_code_to_delivery_state (error_class, cause_code);
-    mm_dbg ("        delivery state built: %s", mm_sms_delivery_state_get_string (delivery_state));
+    mm_dbg ("        delivery state: %s", mm_sms_delivery_state_get_string (delivery_state));
 
     mm_sms_part_set_message_reference (sms_part, sequence);
     mm_sms_part_set_delivery_state (sms_part, delivery_state);
@@ -736,7 +736,7 @@ read_bearer_data_message_identifier (MMSmsPart *sms_part,
     mm_dbg ("            message id: %u", (guint) message_id);
 
     header_ind = read_bits (&subparameter->parameter_value[2], 4, 1);
-    mm_dbg ("            header indicator read: %u", header_ind);
+    mm_dbg ("            header indicator: %u", header_ind);
 }
 
 static void
