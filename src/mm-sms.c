@@ -1802,7 +1802,9 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                   "state",    MM_SMS_STATE_UNKNOWN,
                   "storage",  MM_SMS_STORAGE_UNKNOWN,
                   "number",   mm_sms_properties_get_number (properties),
-                  "pdu-type", MM_SMS_PDU_TYPE_SUBMIT,
+                  "pdu-type", (mm_sms_properties_get_teleservice_id (properties) == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN ?
+                               MM_SMS_PDU_TYPE_SUBMIT :
+                               MM_SMS_PDU_TYPE_CDMA_SUBMIT),
                   "text",     text,
                   "data",     (data ?
                                g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
@@ -1814,8 +1816,8 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                                NULL),
                   "smsc",     mm_sms_properties_get_smsc (properties),
                   "class",    mm_sms_properties_get_class (properties),
-                  "teleservice-id", MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
-                  "service-category", MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+                  "teleservice-id",          mm_sms_properties_get_teleservice_id (properties),
+                  "service-category",        mm_sms_properties_get_service_category (properties),
                   "delivery-report-request", mm_sms_properties_get_delivery_report_request (properties),
                   "validity", (mm_sms_properties_get_validity_type (properties) == MM_SMS_VALIDITY_TYPE_RELATIVE ?
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (mm_sms_properties_get_validity_relative (properties))) :
