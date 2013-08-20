@@ -59,6 +59,10 @@ MMBearerAllowedAuth   mm_common_get_allowed_auth_from_string (const gchar *str,
                                                               GError **error);
 MMSmsStorage          mm_common_get_sms_storage_from_string  (const gchar *str,
                                                               GError **error);
+MMSmsCdmaTeleserviceId   mm_common_get_sms_cdma_teleservice_id_from_string   (const gchar *str,
+                                                                              GError **error);
+MMSmsCdmaServiceCategory mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
+                                                                              GError **error);
 MMOmaFeature          mm_common_get_oma_features_from_string (const gchar *str,
                                                               GError **error);
 MMOmaSessionType      mm_common_get_oma_session_type_from_string (const gchar *str,

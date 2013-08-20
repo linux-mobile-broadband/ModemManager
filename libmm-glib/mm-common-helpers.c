@@ -957,6 +957,50 @@ mm_common_get_sms_storage_from_string (const gchar *str,
     return MM_SMS_STORAGE_UNKNOWN;
 }
 
+MMSmsCdmaTeleserviceId
+mm_common_get_sms_cdma_teleservice_id_from_string (const gchar *str,
+                                                   GError **error)
+{
+	GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_CDMA_TELESERVICE_ID));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMSmsCdmaTeleserviceId value",
+                 str);
+    return MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN;
+}
+
+MMSmsCdmaServiceCategory
+mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
+                                                     GError **error)
+{
+	GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_CDMA_SERVICE_CATEGORY));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMSmsCdmaServiceCategory value",
+                 str);
+    return MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN;
+}
+
 MMOmaFeature
 mm_common_get_oma_features_from_string (const gchar *str,
                                         GError **error)

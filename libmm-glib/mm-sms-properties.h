@@ -74,6 +74,10 @@ void mm_sms_properties_set_class                   (MMSmsProperties *self,
                                                     gint class);
 void mm_sms_properties_set_delivery_report_request (MMSmsProperties *self,
                                                     gboolean request);
+void mm_sms_properties_set_teleservice_id          (MMSmsProperties *self,
+                                                    MMSmsCdmaTeleserviceId teleservice_id);
+void mm_sms_properties_set_service_category        (MMSmsProperties *self,
+                                                    MMSmsCdmaServiceCategory service_category);
 
 const gchar  *mm_sms_properties_get_text                    (MMSmsProperties *self);
 const guint8 *mm_sms_properties_get_data                    (MMSmsProperties *self,
@@ -86,6 +90,8 @@ MMSmsValidityType mm_sms_properties_get_validity_type       (MMSmsProperties *se
 guint         mm_sms_properties_get_validity_relative       (MMSmsProperties *self);
 gint          mm_sms_properties_get_class                   (MMSmsProperties *self);
 gboolean      mm_sms_properties_get_delivery_report_request (MMSmsProperties *self);
+MMSmsCdmaTeleserviceId   mm_sms_properties_get_teleservice_id   (MMSmsProperties *self);
+MMSmsCdmaServiceCategory mm_sms_properties_get_service_category (MMSmsProperties *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */

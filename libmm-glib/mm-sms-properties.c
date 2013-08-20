@@ -34,7 +34,7 @@
  * mm_modem_messaging_create() or mm_modem_messaging_create_sync().
  */
 
-G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT)
 
 #define PROPERTY_TEXT                    "text"
 #define PROPERTY_DATA                    "data"
@@ -43,6 +43,8 @@ G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 #define PROPERTY_VALIDITY                "validity"
 #define PROPERTY_CLASS                   "class"
 #define PROPERTY_DELIVERY_REPORT_REQUEST "delivery-report-request"
+#define PROPERTY_TELESERVICE_ID          "teleservice-id"
+#define PROPERTY_SERVICE_CATEGORY        "service-category"
 
 struct _MMSmsPropertiesPrivate {
     gchar *text;
@@ -54,6 +56,8 @@ struct _MMSmsPropertiesPrivate {
     gint class;
     gboolean delivery_report_request_set;
     gboolean delivery_report_request;
+    MMSmsCdmaTeleserviceId teleservice_id;
+    MMSmsCdmaServiceCategory service_category;
 };
 
 /*****************************************************************************/
@@ -385,6 +389,74 @@ mm_sms_properties_get_delivery_report_request (MMSmsProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_sms_properties_set_teleservice_id:
+ * @self: A #MMSmsProperties.
+ * @teleservice_id: The CDMA teleservice ID.
+ *
+ * Sets the CDMA teleservice ID of the SMS.
+ */
+void
+mm_sms_properties_set_teleservice_id (MMSmsProperties *self,
+                                      MMSmsCdmaTeleserviceId teleservice_id)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->teleservice_id = teleservice_id;
+}
+
+/**
+ * mm_sms_properties_get_teleservice_id:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the CDMA teleservice ID of the SMS.
+ *
+ * Returns: the CDMA teleservice ID.
+ */
+MMSmsCdmaTeleserviceId
+mm_sms_properties_get_teleservice_id (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN);
+
+    return self->priv->teleservice_id;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sms_properties_set_service_category:
+ * @self: A #MMSmsProperties.
+ * @service_category: The CDMA service category.
+ *
+ * Sets the CDMA service category of the SMS.
+ */
+void
+mm_sms_properties_set_service_category (MMSmsProperties *self,
+                                        MMSmsCdmaServiceCategory service_category)
+{
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
+    self->priv->service_category = service_category;
+}
+
+/**
+ * mm_sms_properties_get_service_category:
+ * @self: A #MMSmsProperties.
+ *
+ * Gets the CDMA message service category of the SMS.
+ *
+ * Returns: the CDMA service category.
+ */
+MMSmsCdmaServiceCategory
+mm_sms_properties_get_service_category (MMSmsProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN);
+
+    return self->priv->service_category;
+}
+
+/*****************************************************************************/
+
 GVariant *
 mm_sms_properties_get_dictionary (MMSmsProperties *self)
 {
@@ -445,6 +517,18 @@ mm_sms_properties_get_dictionary (MMSmsProperties *self)
                                "{sv}",
                                PROPERTY_DELIVERY_REPORT_REQUEST,
                                g_variant_new_boolean (self->priv->delivery_report_request));
+
+    if (self->priv->teleservice_id != MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_TELESERVICE_ID,
+                               g_variant_new_uint32 (self->priv->teleservice_id));
+
+    if (self->priv->service_category != MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_SERVICE_CATEGORY,
+                               g_variant_new_uint32 (self->priv->service_category));
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
@@ -539,7 +623,29 @@ consume_string (MMSmsProperties *self,
         }
 
         mm_sms_properties_set_delivery_report_request (self, request);
-    }  else if (g_str_equal (key, PROPERTY_DATA)) {
+    } else if (g_str_equal (key, PROPERTY_TELESERVICE_ID)) {
+        MMSmsCdmaTeleserviceId teleservice_id;
+        GError *inner_error = NULL;
+
+        teleservice_id = mm_common_get_sms_cdma_teleservice_id_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+
+        mm_sms_properties_set_teleservice_id (self, teleservice_id);
+    } else if (g_str_equal (key, PROPERTY_SERVICE_CATEGORY)) {
+        MMSmsCdmaServiceCategory service_category;
+        GError *inner_error = NULL;
+
+        service_category = mm_common_get_sms_cdma_service_category_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+
+        mm_sms_properties_set_service_category (self, service_category);
+    } else if (g_str_equal (key, PROPERTY_DATA)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
@@ -648,6 +754,14 @@ consume_variant (MMSmsProperties *properties,
         mm_sms_properties_set_delivery_report_request (
             properties,
             g_variant_get_boolean (value));
+    else if (g_str_equal (key, PROPERTY_TELESERVICE_ID))
+        mm_sms_properties_set_teleservice_id (
+            properties,
+            g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_SERVICE_CATEGORY))
+        mm_sms_properties_set_service_category (
+            properties,
+            g_variant_get_uint32 (value));
     else {
         /* Set error */
         g_set_error (error,
@@ -756,6 +870,8 @@ mm_sms_properties_init (MMSmsProperties *self)
                                               MMSmsPropertiesPrivate);
     self->priv->validity_type = MM_SMS_VALIDITY_TYPE_UNKNOWN;
     self->priv->class = -1;
+    self->priv->teleservice_id = MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN;
+    self->priv->service_category = MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN;
 }
 
 static void
