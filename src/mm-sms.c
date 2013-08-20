@@ -1819,6 +1819,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                   "teleservice-id",          mm_sms_properties_get_teleservice_id (properties),
                   "service-category",        mm_sms_properties_get_service_category (properties),
                   "delivery-report-request", mm_sms_properties_get_delivery_report_request (properties),
+                  "delivery-state",          MM_SMS_DELIVERY_STATE_UNKNOWN,
                   "validity", (mm_sms_properties_get_validity_type (properties) == MM_SMS_VALIDITY_TYPE_RELATIVE ?
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (mm_sms_properties_get_validity_relative (properties))) :
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
