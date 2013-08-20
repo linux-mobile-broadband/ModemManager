@@ -95,8 +95,8 @@ get_validity_relative (GVariant *tuple)
 }
 
 static gboolean
-generate_submit_pdus (MMSms *self,
-                      GError **error)
+generate_3gpp_submit_pdus (MMSms *self,
+                           GError **error)
 {
     guint i;
     guint n_parts;
@@ -230,6 +230,70 @@ generate_submit_pdus (MMSms *self,
     self->priv->is_assembled = TRUE;
 
     return TRUE;
+}
+
+static gboolean
+generate_cdma_submit_pdus (MMSms *self,
+                           GError **error)
+{
+    const gchar *text;
+    GVariant *data_variant;
+    const guint8 *data;
+    gsize data_len = 0;
+
+    MMSmsPart *part;
+
+    g_assert (self->priv->parts == NULL);
+
+    text = mm_gdbus_sms_get_text (MM_GDBUS_SMS (self));
+    data_variant = mm_gdbus_sms_get_data (MM_GDBUS_SMS (self));
+    data = (data_variant ?
+            g_variant_get_fixed_array (data_variant,
+                                       &data_len,
+                                       sizeof (guchar)) :
+            NULL);
+
+    g_assert (text != NULL || data != NULL);
+    g_assert (!(text != NULL && data != NULL));
+
+    /* Create new part */
+    part = mm_sms_part_new (SMS_PART_INVALID_INDEX, MM_SMS_PDU_TYPE_CDMA_SUBMIT);
+    if (text)
+        mm_sms_part_set_text (part, text);
+    else if (data) {
+        GByteArray *part_data;
+
+        part_data = g_byte_array_sized_new (data_len);
+        g_byte_array_append (part_data, data, data_len);
+        mm_sms_part_take_data (part, part_data);
+    } else
+        g_assert_not_reached ();
+    mm_sms_part_set_encoding (part, data ? MM_SMS_ENCODING_8BIT : MM_SMS_ENCODING_UNKNOWN);
+    mm_sms_part_set_number (part, mm_gdbus_sms_get_number (MM_GDBUS_SMS (self)));
+    mm_sms_part_set_cdma_teleservice_id (part, mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)));
+    mm_sms_part_set_cdma_service_category (part, mm_gdbus_sms_get_service_category (MM_GDBUS_SMS (self)));
+
+    mm_dbg ("Created SMS part for CDMA SMS");
+
+    /* Add to the list of parts */
+    self->priv->parts = g_list_append (self->priv->parts, part);
+
+    /* No more parts are expected */
+    self->priv->is_assembled = TRUE;
+
+    return TRUE;
+}
+
+static gboolean
+generate_submit_pdus (MMSms *self,
+                      GError **error)
+{
+    /* First; decide which kind of PDU we'll generate. If Teleservice ID given,
+     * this will be a 3GPP2 SMS */
+    if (mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)) != MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN)
+        return generate_cdma_submit_pdus (self, error);
+    else
+        return generate_3gpp_submit_pdus (self, error);
 }
 
 /*****************************************************************************/
