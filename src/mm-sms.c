@@ -362,10 +362,12 @@ prepare_sms_to_be_stored (MMSms *self,
     /* If the message is a multipart message, we need to set a proper
      * multipart reference. When sending a message which wasn't stored
      * yet, we can just get a random multipart reference. */
-    self->priv->multipart_reference = reference;
-    for (l = self->priv->parts; l; l = g_list_next (l)) {
-        mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
-                                          self->priv->multipart_reference);
+    if (self->priv->is_multipart) {
+        self->priv->multipart_reference = reference;
+        for (l = self->priv->parts; l; l = g_list_next (l)) {
+            mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
+                                              self->priv->multipart_reference);
+        }
     }
 
     return TRUE;
@@ -529,10 +531,12 @@ prepare_sms_to_be_sent (MMSms *self,
     /* If the message is a multipart message, we need to set a proper
      * multipart reference. When sending a message which wasn't stored
      * yet, we can just get a random multipart reference. */
-    self->priv->multipart_reference = g_random_int_range (1,255);
-    for (l = self->priv->parts; l; l = g_list_next (l)) {
-        mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
-                                          self->priv->multipart_reference);
+    if (self->priv->is_multipart) {
+        self->priv->multipart_reference = g_random_int_range (1,255);
+        for (l = self->priv->parts; l; l = g_list_next (l)) {
+            mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
+                                              self->priv->multipart_reference);
+        }
     }
 
     return TRUE;
