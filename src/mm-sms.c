@@ -322,9 +322,12 @@ handle_store_ready (MMSms *self,
 {
     GError *error = NULL;
 
-    if (!MM_SMS_GET_CLASS (self)->store_finish (self, res, &error))
+    if (!MM_SMS_GET_CLASS (self)->store_finish (self, res, &error)) {
+        /* On error, clear up the parts we generated */
+        g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
+        self->priv->parts = NULL;
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), ctx->storage);
 
         /* Transition from Unknown->Stored for SMS which were created by the user */
@@ -493,9 +496,12 @@ handle_send_ready (MMSms *self,
 {
     GError *error = NULL;
 
-    if (!MM_SMS_GET_CLASS (self)->send_finish (self, res, &error))
+    if (!MM_SMS_GET_CLASS (self)->send_finish (self, res, &error)) {
+        /* On error, clear up the parts we generated */
+        g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
+        self->priv->parts = NULL;
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         /* Transition from Unknown->Sent or Stored->Sent */
         if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN ||
             mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED) {
