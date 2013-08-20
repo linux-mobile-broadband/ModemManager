@@ -25,6 +25,7 @@
 #include <libmm-glib.h>
 
 #include "mm-modem-helpers-qmi.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-qmi.h"
 #include "mm-base-modem.h"
@@ -84,6 +85,33 @@ ensure_qmi_client (MMSmsQmi *self,
 }
 
 /*****************************************************************************/
+
+static gboolean
+check_sms_type_support (MMSmsQmi *self,
+                        MMBaseModem *modem,
+                        MMSmsPart *first_part,
+                        GError **error)
+{
+    if (MM_SMS_PART_IS_3GPP (first_part) && !mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Non-3GPP modem doesn't support 3GPP SMS");
+        return FALSE;
+    }
+
+    if (MM_SMS_PART_IS_CDMA (first_part) && !mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Non-CDMA modem doesn't support CDMA SMS");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Store the SMS */
 
 typedef struct {
@@ -98,7 +126,7 @@ typedef struct {
 static void
 sms_store_context_complete_and_free (SmsStoreContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->client);
     g_object_unref (ctx->modem);
@@ -229,6 +257,7 @@ sms_store (MMSms *self,
 {
     SmsStoreContext *ctx;
     QmiClient *client = NULL;
+    GError *error = NULL;
 
     /* Ensure WMS client */
     if (!ensure_qmi_client (MM_SMS_QMI (self),
@@ -250,6 +279,15 @@ sms_store (MMSms *self,
                   NULL);
 
     ctx->current = mm_sms_get_parts (self);
+
+    /* Check whether we support the given SMS type */
+    if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on */
     sms_store_next_part (ctx);
 }
 
@@ -537,6 +575,7 @@ sms_send (MMSms *self,
 {
     SmsSendContext *ctx;
     QmiClient *client = NULL;
+    GError *error = NULL;
 
     /* Ensure WMS client */
     if (!ensure_qmi_client (MM_SMS_QMI (self),
@@ -559,7 +598,15 @@ sms_send (MMSms *self,
     /* If the SMS is STORED, try to send from storage */
     ctx->from_storage = (mm_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
 
-    ctx->current = mm_sms_get_parts (self);;
+    ctx->current = mm_sms_get_parts (self);
+
+    /* Check whether we support the given SMS type */
+    if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_send_context_complete_and_free (ctx);
+        return;
+    }
+
     sms_send_next_part (ctx);
 }
 
