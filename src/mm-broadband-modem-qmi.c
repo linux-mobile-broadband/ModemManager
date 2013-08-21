@@ -8781,7 +8781,14 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
     /* Good, we have results */
     ctx->values_result = g_slice_new0 (SignalLoadValuesResult);
 
-    /* RSSI */
+    /* RSSI
+     *
+     * We will assume that valid access technologies reported in this output
+     * are the ones which are listed in the RSSI output. If a given access tech
+     * is not given in this list, it will not be considered afterwards (e.g. if
+     * no EV-DO is given in the RSSI list, the SINR level won't be processed,
+     * even if the TLV is available.
+     */
     if (qmi_message_nas_get_signal_strength_output_get_rssi_list (output, &array, NULL)) {
         guint i;
 
@@ -8833,19 +8840,16 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
 
             switch (element->radio_interface) {
             case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
-                if (!ctx->values_result->cdma)
-                    ctx->values_result->cdma = mm_signal_new ();
-                mm_signal_set_ecio (ctx->values_result->cdma, ((gdouble)element->ecio) * (-0.5));
+                if (ctx->values_result->cdma)
+                    mm_signal_set_ecio (ctx->values_result->cdma, ((gdouble)element->ecio) * (-0.5));
                 break;
             case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
-                if (!ctx->values_result->evdo)
-                    ctx->values_result->evdo = mm_signal_new ();
-                mm_signal_set_ecio (ctx->values_result->evdo, ((gdouble)element->ecio) * (-0.5));
+                if (ctx->values_result->evdo)
+                    mm_signal_set_ecio (ctx->values_result->evdo, ((gdouble)element->ecio) * (-0.5));
                 break;
             case QMI_NAS_RADIO_INTERFACE_UMTS:
-                if (!ctx->values_result->umts)
-                    ctx->values_result->umts = mm_signal_new ();
-                mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)element->ecio) * (-0.5));
+                if (ctx->values_result->umts)
+                    mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)element->ecio) * (-0.5));
                 break;
             default:
                 break;
@@ -8855,38 +8859,33 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
 
     /* IO (EV-DO) */
     if (qmi_message_nas_get_signal_strength_output_get_io (output, &aux_int32, NULL)) {
-        if (!ctx->values_result->evdo)
-            ctx->values_result->evdo = mm_signal_new ();
-        mm_signal_set_io (ctx->values_result->evdo, (gdouble)aux_int32);
+        if (ctx->values_result->evdo)
+            mm_signal_set_io (ctx->values_result->evdo, (gdouble)aux_int32);
     }
 
     /* RSRP (LTE) */
     if (qmi_message_nas_get_signal_strength_output_get_lte_rsrp (output, &aux_int16, NULL)) {
-        if (!ctx->values_result->lte)
-            ctx->values_result->lte = mm_signal_new ();
-        mm_signal_set_rsrp (ctx->values_result->lte, (gdouble)aux_int16);
+        if (ctx->values_result->lte)
+            mm_signal_set_rsrp (ctx->values_result->lte, (gdouble)aux_int16);
     }
 
     /* RSRQ (LTE) */
     if (qmi_message_nas_get_signal_strength_output_get_rsrq (output, &aux_int8, &radio_interface, NULL) &&
         radio_interface == QMI_NAS_RADIO_INTERFACE_LTE) {
-        if (!ctx->values_result->lte)
-            ctx->values_result->lte = mm_signal_new ();
-        mm_signal_set_rsrq (ctx->values_result->lte, (gdouble)aux_int8);
+        if (ctx->values_result->lte)
+            mm_signal_set_rsrq (ctx->values_result->lte, (gdouble)aux_int8);
     }
 
     /* SNR (LTE) */
     if (qmi_message_nas_get_signal_strength_output_get_lte_snr (output, &aux_int16, NULL)) {
-        if (!ctx->values_result->lte)
-            ctx->values_result->lte = mm_signal_new ();
-        mm_signal_set_snr (ctx->values_result->lte, (0.1) * ((gdouble)aux_int16));
+        if (ctx->values_result->lte)
+            mm_signal_set_snr (ctx->values_result->lte, (0.1) * ((gdouble)aux_int16));
     }
 
     /* SINR (EV-DO) */
     if (qmi_message_nas_get_signal_strength_output_get_sinr (output, &sinr, NULL)) {
-        if (!ctx->values_result->evdo)
-            ctx->values_result->evdo = mm_signal_new ();
-        mm_signal_set_sinr (ctx->values_result->evdo, get_db_from_sinr_level (sinr));
+        if (ctx->values_result->evdo)
+            mm_signal_set_sinr (ctx->values_result->evdo, get_db_from_sinr_level (sinr));
     }
 
     qmi_message_nas_get_signal_strength_output_unref (output);
