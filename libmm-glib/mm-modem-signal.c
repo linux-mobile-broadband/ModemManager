@@ -177,7 +177,7 @@ mm_modem_signal_setup_sync (MMModemSignal *self,
 /*****************************************************************************/
 
 /**
- * mm_modem_get_rate:
+ * mm_modem_signal_get_rate:
  * @self: A #MMModemSignal.
  *
  * Gets the currently configured refresh rate.
@@ -314,17 +314,17 @@ ensure_internal (MMModemSignal *self,
 /*****************************************************************************/
 
 /**
- * mm_modem_get_cdma:
+ * mm_modem_signal_get_cdma:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the CDMA signal information.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_cdma() again to get a new #MMSignal with the
+ * mm_modem_signal_get_cdma() again to get a new #MMSignal with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMSignal *
 mm_modem_signal_get_cdma (MMModemSignal *self)
@@ -338,17 +338,17 @@ mm_modem_signal_get_cdma (MMModemSignal *self)
 }
 
 /**
- * mm_modem_peek_cdma:
+ * mm_modem_signal_peek_cdma:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the CDMA signal information.
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_cdma() if on another
+ * @self was constructed. Use mm_modem_signal_get_cdma() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it belongs to @self.
  */
 MMSignal *
 mm_modem_signal_peek_cdma (MMModemSignal *self)
@@ -362,17 +362,17 @@ mm_modem_signal_peek_cdma (MMModemSignal *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_get_evdo:
+ * mm_modem_signal_get_evdo:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the EV-DO signal information.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_evdo() again to get a new #MMSignal with the
+ * mm_modem_signal_get_evdo() again to get a new #MMSignal with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMSignal *
 mm_modem_signal_get_evdo (MMModemSignal *self)
@@ -386,17 +386,17 @@ mm_modem_signal_get_evdo (MMModemSignal *self)
 }
 
 /**
- * mm_modem_peek_evdo:
+ * mm_modem_signal_peek_evdo:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the EV-DO signal information.
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_evdo() if on another
+ * @self was constructed. Use mm_modem_signal_get_evdo() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it belongs to @self.
  */
 MMSignal *
 mm_modem_signal_peek_evdo (MMModemSignal *self)
@@ -410,17 +410,17 @@ mm_modem_signal_peek_evdo (MMModemSignal *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_get_gsm:
+ * mm_modem_signal_get_gsm:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the GSM signal information.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_gsm() again to get a new #MMSignal with the
+ * mm_modem_signal_get_gsm() again to get a new #MMSignal with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMSignal *
 mm_modem_signal_get_gsm (MMModemSignal *self)
@@ -434,17 +434,17 @@ mm_modem_signal_get_gsm (MMModemSignal *self)
 }
 
 /**
- * mm_modem_peek_gsm:
+ * mm_modem_signal_peek_gsm:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the GSM signal information.
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_gsm() if on another
+ * @self was constructed. Use mm_modem_signal_get_gsm() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it belongs to @self.
  */
 MMSignal *
 mm_modem_signal_peek_gsm (MMModemSignal *self)
@@ -458,17 +458,17 @@ mm_modem_signal_peek_gsm (MMModemSignal *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_get_umts:
+ * mm_modem_signal_get_umts:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the UMTS signal information.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_umts() again to get a new #MMSignal with the
+ * mm_modem_signal_get_umts() again to get a new #MMSignal with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMSignal *
 mm_modem_signal_get_umts (MMModemSignal *self)
@@ -482,17 +482,17 @@ mm_modem_signal_get_umts (MMModemSignal *self)
 }
 
 /**
- * mm_modem_peek_umts:
+ * mm_modem_signal_peek_umts:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the UMTS signal information.
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_umts() if on another
+ * @self was constructed. Use mm_modem_signal_get_umts() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it belongs to @self.
  */
 MMSignal *
 mm_modem_signal_peek_umts (MMModemSignal *self)
@@ -506,17 +506,17 @@ mm_modem_signal_peek_umts (MMModemSignal *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_get_lte:
+ * mm_modem_signal_get_lte:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the LTE signal information.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_lte() again to get a new #MMSignal with the
+ * mm_modem_signal_get_lte() again to get a new #MMSignal with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMSignal that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMSignal *
 mm_modem_signal_get_lte (MMModemSignal *self)
@@ -530,17 +530,17 @@ mm_modem_signal_get_lte (MMModemSignal *self)
 }
 
 /**
- * mm_modem_peek_lte:
+ * mm_modem_signal_peek_lte:
  * @self: A #MMModem.
  *
  * Gets a #MMSignal object specifying the LTE signal information.
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_lte() if on another
+ * @self was constructed. Use mm_modem_signal_get_lte() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMSignal. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it belongs to @self.
  */
 MMSignal *
 mm_modem_signal_peek_lte (MMModemSignal *self)
