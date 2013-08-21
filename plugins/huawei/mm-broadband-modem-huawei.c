@@ -94,6 +94,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *hcsq_regex;
     GRegex *ndisstat_regex;
     GRegex *pdpdeact_regex;
+    GRegex *ndisend_regex;
 
     NdisdupSupport ndisdup_support;
     RfswitchSupport rfswitch_support;
@@ -2878,6 +2879,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             ports[i],
             self->priv->pdpdeact_regex,
             NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->ndisend_regex,
+            NULL, NULL, NULL);
     }
 }
 
@@ -2951,6 +2956,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->pdpdeact_regex = g_regex_new ("\\r\\n\\^PDPDEACT:.+\\r+\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ndisend_regex = g_regex_new ("\\r\\n\\^NDISEND:.+\\r+\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = RFSWITCH_SUPPORT_UNKNOWN;
@@ -2977,6 +2984,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->hcsq_regex);
     g_regex_unref (self->priv->ndisstat_regex);
     g_regex_unref (self->priv->pdpdeact_regex);
+    g_regex_unref (self->priv->ndisend_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
 }
