@@ -228,7 +228,7 @@ ensure_internal_timezone (MMModemTime *self,
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_get_network_timezone() again to get a new #MMNetworkTimezone with the
+ * mm_modem_time_get_network_timezone() again to get a new #MMNetworkTimezone with the
  * new values.</warning>
  *
  * Returns: (transfer full): A #MMNetworkTimezone that must be freed with g_object_unref() or %NULL if unknown.
@@ -252,7 +252,7 @@ mm_modem_time_get_network_timezone (MMModemTime *self)
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_network_timezone() if on another
+ * @self was constructed. Use mm_modem_time_get_network_timezone() if on another
  * thread.</warning>
  *
  * Returns: (transfer none): A #MMNetworkTimezone. Do not free the returned value, it belongs to @self.
