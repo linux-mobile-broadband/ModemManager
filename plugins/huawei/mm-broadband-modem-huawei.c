@@ -88,6 +88,8 @@ struct _MMBroadbandModemHuaweiPrivate {
     /* Regex to ignore */
     GRegex *boot_regex;
     GRegex *csnr_regex;
+    GRegex *cusatp_regex;
+    GRegex *cusatend_regex;
     GRegex *simst_regex;
     GRegex *srvst_regex;
     GRegex *stin_regex;
@@ -2898,6 +2900,14 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             NULL, NULL, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
+            self->priv->cusatp_regex,
+            NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->cusatend_regex,
+            NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
             self->priv->simst_regex,
             NULL, NULL, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (
@@ -2985,6 +2995,10 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->csnr_regex = g_regex_new ("\\r\\n\\^CSNR:.+\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->cusatp_regex = g_regex_new ("\\r\\n\\+CUSATP:.+\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->cusatend_regex = g_regex_new ("\\r\\n\\+CUSATEND\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->simst_regex = g_regex_new ("\\r\\n\\^SIMST:.+\\r\\n",
                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->srvst_regex = g_regex_new ("\\r\\n\\^SRVST:.+\\r\\n",
@@ -3019,6 +3033,8 @@ finalize (GObject *object)
     g_regex_unref (self->priv->dsflowrpt_regex);
     g_regex_unref (self->priv->boot_regex);
     g_regex_unref (self->priv->csnr_regex);
+    g_regex_unref (self->priv->cusatp_regex);
+    g_regex_unref (self->priv->cusatend_regex);
     g_regex_unref (self->priv->simst_regex);
     g_regex_unref (self->priv->srvst_regex);
     g_regex_unref (self->priv->stin_regex);
