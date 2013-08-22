@@ -176,6 +176,7 @@ handle_response (MMSerialPort *port,
 typedef struct {
     GRegex *regex;
     MMAtSerialUnsolicitedMsgFn callback;
+    gboolean enable;
     gpointer user_data;
     GDestroyNotify notify;
 } MMAtUnsolicitedMsgHandler;
@@ -219,8 +220,32 @@ mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
     }
 
     handler->callback = callback;
+    handler->enable = TRUE;
     handler->user_data = user_data;
     handler->notify = notify;
+}
+
+void
+mm_at_serial_port_enable_disable_unsolicited_msg_handler (MMAtSerialPort *self,
+                                                          GRegex *regex,
+                                                          gboolean enable)
+{
+    GSList *existing;
+    MMAtUnsolicitedMsgHandler *handler;
+    MMAtSerialPortPrivate *priv;
+
+    g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
+    g_return_if_fail (regex != NULL);
+
+    priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
+
+    existing = g_slist_find_custom (priv->unsolicited_msg_handlers,
+                                    regex,
+                                    (GCompareFunc)unsolicited_msg_handler_cmp);
+    if (existing) {
+        handler = existing->data;
+        handler->enable = enable;
+    }
 }
 
 static gboolean
@@ -253,6 +278,9 @@ parse_unsolicited (MMSerialPort *port, GByteArray *response)
         MMAtUnsolicitedMsgHandler *handler = (MMAtUnsolicitedMsgHandler *) iter->data;
         GMatchInfo *match_info;
         gboolean matches;
+
+        if (!handler->enable)
+            continue;
 
         matches = g_regex_match_full (handler->regex,
                                       (const char *) response->data,

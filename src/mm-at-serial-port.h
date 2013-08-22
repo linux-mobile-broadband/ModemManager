@@ -89,6 +89,10 @@ void     mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
                                                         gpointer user_data,
                                                         GDestroyNotify notify);
 
+void     mm_at_serial_port_enable_disable_unsolicited_msg_handler (MMAtSerialPort *self,
+                                                                   GRegex *regex,
+                                                                   gboolean enable);
+
 void     mm_at_serial_port_set_response_parser (MMAtSerialPort *self,
                                                 MMAtSerialResponseParserFn fn,
                                                 gpointer user_data,
