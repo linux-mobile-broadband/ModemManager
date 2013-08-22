@@ -97,6 +97,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ndisstat_regex;
     GRegex *pdpdeact_regex;
     GRegex *ndisend_regex;
+    GRegex *rfswitch_regex;
 
     NdisdupSupport ndisdup_support;
     RfswitchSupport rfswitch_support;
@@ -2626,6 +2627,27 @@ modem_time_load_network_time (MMIfaceModemTime *self,
 /* Power state loading (Modem interface) */
 
 static void
+enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
+                                                   gboolean enable)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    mm_dbg ("%s ^RFSWITCH unsolicited event handler",
+            enable ? "Enable" : "Disable");
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    for (i = 0; i < 2; i++)
+        if (ports[i])
+            mm_at_serial_port_enable_disable_unsolicited_msg_handler (
+                ports[i],
+                self->priv->rfswitch_regex,
+                enable);
+}
+
+static void
 parent_load_power_state_ready (MMIfaceModem *self,
                                GAsyncResult *res,
                                GSimpleAsyncResult *result)
@@ -2652,6 +2674,9 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
     GError *error = NULL;
     const gchar *response;
     gint sw_state;
+
+    enable_disable_unsolicited_rfswitch_event_handler (MM_BROADBAND_MODEM_HUAWEI (self),
+                                                       TRUE /* enable */);
 
     response = mm_base_modem_at_command_finish (_self, res, &error);
     if (response) {
@@ -2728,6 +2753,12 @@ load_power_state (MMIfaceModem *self,
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
     case RFSWITCH_SUPPORT_UNKNOWN:
     case RFSWITCH_SUPPORTED: {
+        /* Temporarily disable the unsolicited ^RFSWITCH event handler in order to
+         * prevent it from discarding the response to the ^RFSWITCH? command.
+         * It will be re-enabled in huawei_rfswitch_check_ready.
+         */
+        enable_disable_unsolicited_rfswitch_event_handler (MM_BROADBAND_MODEM_HUAWEI (self),
+                                                           FALSE /* enable */);
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "^RFSWITCH?",
                                   3,
@@ -2934,6 +2965,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             ports[i],
             self->priv->ndisend_regex,
             NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->rfswitch_regex,
+            NULL, NULL, NULL);
     }
 }
 
@@ -3013,6 +3048,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->ndisend_regex = g_regex_new ("\\r\\n\\^NDISEND:.+\\r+\\n",
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->rfswitch_regex = g_regex_new ("\\r\\n\\^RFSWITCH:.+\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = RFSWITCH_SUPPORT_UNKNOWN;
@@ -3042,6 +3079,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->ndisstat_regex);
     g_regex_unref (self->priv->pdpdeact_regex);
     g_regex_unref (self->priv->ndisend_regex);
+    g_regex_unref (self->priv->rfswitch_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
 }
