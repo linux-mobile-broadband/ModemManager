@@ -161,7 +161,7 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
     mm_base_modem_at_command (
         ctx->modem,
         "%DPDNACT=1",
-        10, /* timeout */
+        20, /* timeout */
         FALSE, /* allow_cached */
         (GAsyncReadyCallback)connect_3gpp_connect_ready, /* callback */
         ctx); /* user_data */
@@ -208,7 +208,7 @@ connect_3gpp (MMBroadbandBearer *bearer,
     mm_base_modem_at_command (
         ctx->modem,
         command,
-        6, /* timeout */
+        10, /* timeout */
         FALSE, /* allow_cached */
         (GAsyncReadyCallback)connect_3gpp_apnsettings_ready,
         ctx); /* user_data */
@@ -313,7 +313,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     mm_base_modem_at_command (
         ctx->modem,
         "%DPDNACT=0",
-        10, /* timeout */
+        20, /* timeout */
         FALSE, /* allow_cached */
         (GAsyncReadyCallback)disconnect_3gpp_check_status,
         ctx); /* user_data */

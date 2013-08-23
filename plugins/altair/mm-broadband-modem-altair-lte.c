@@ -706,7 +706,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         "%STATCM=1",
-        6,
+        10,
         FALSE, /* allow_cached */
         FALSE, /* raw */
         NULL, /* cancellable */
@@ -798,7 +798,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         "%STATCM=0",
-        5,
+        10,
         FALSE, /* allow_cached */
         FALSE, /* raw */
         NULL, /* cancellable */
