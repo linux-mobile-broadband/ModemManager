@@ -226,9 +226,9 @@ mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
 }
 
 void
-mm_at_serial_port_enable_disable_unsolicited_msg_handler (MMAtSerialPort *self,
-                                                          GRegex *regex,
-                                                          gboolean enable)
+mm_at_serial_port_enable_unsolicited_msg_handler (MMAtSerialPort *self,
+                                                  GRegex *regex,
+                                                  gboolean enable)
 {
     GSList *existing;
     MMAtUnsolicitedMsgHandler *handler;

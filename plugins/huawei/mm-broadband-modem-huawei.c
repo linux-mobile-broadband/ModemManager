@@ -2641,7 +2641,7 @@ enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
 
     for (i = 0; i < 2; i++)
         if (ports[i])
-            mm_at_serial_port_enable_disable_unsolicited_msg_handler (
+            mm_at_serial_port_enable_unsolicited_msg_handler (
                 ports[i],
                 self->priv->rfswitch_regex,
                 enable);
