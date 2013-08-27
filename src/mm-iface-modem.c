@@ -1626,7 +1626,6 @@ handle_reset_auth_ready (MMBaseModem *self,
                          GAsyncResult *res,
                          HandleResetContext *ctx)
 {
-    MMModemState modem_state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -1642,20 +1641,6 @@ handle_reset_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot reset the modem: operation not supported");
-        handle_reset_context_free (ctx);
-        return;
-    }
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot reset modem: not initialized/unlocked yet");
         handle_reset_context_free (ctx);
         return;
     }
@@ -1725,7 +1710,6 @@ handle_factory_reset_auth_ready (MMBaseModem *self,
                                  GAsyncResult *res,
                                  HandleFactoryResetContext *ctx)
 {
-    MMModemState modem_state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -1742,21 +1726,6 @@ handle_factory_reset_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot reset the modem to factory defaults: "
                                                "operation not supported");
-        handle_factory_reset_context_free (ctx);
-        return;
-    }
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot reset the modem to factory defaults: "
-                                               "not initialized/unlocked yet");
         handle_factory_reset_context_free (ctx);
         return;
     }
@@ -4441,6 +4410,17 @@ interface_initialization_step (InitializationContext *ctx)
                           "handle-set-current-capabilities",
                           G_CALLBACK (handle_set_current_capabilities),
                           ctx->self);
+        /* Allow the reset and factory reset operation in FAILED state to rescue the modem.
+         * Also, for a modem that doesn't support SIM hot swapping, a reset is needed to
+         * force the modem to detect the newly inserted SIM. */
+        g_signal_connect (ctx->skeleton,
+                          "handle-reset",
+                          G_CALLBACK (handle_reset),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-factory-reset",
+                          G_CALLBACK (handle_factory_reset),
+                          ctx->self);
 
         if (ctx->fatal_error) {
             g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
@@ -4471,14 +4451,6 @@ interface_initialization_step (InitializationContext *ctx)
             g_signal_connect (ctx->skeleton,
                               "handle-set-power-state",
                               G_CALLBACK (handle_set_power_state),
-                              ctx->self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-reset",
-                              G_CALLBACK (handle_reset),
-                              ctx->self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-factory-reset",
-                              G_CALLBACK (handle_factory_reset),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-bands",
