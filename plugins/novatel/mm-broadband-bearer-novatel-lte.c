@@ -196,6 +196,16 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
     }
 
     mm_dbg ("Error: '%s'", result);
+
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Connection setup operation has been cancelled");
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+
     if (ctx->retries > 0) {
         ctx->retries--;
         mm_dbg ("Retrying status check in a second. %d retries left.",
