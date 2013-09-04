@@ -57,6 +57,7 @@ typedef struct {
     GSimpleAsyncResult *result;
     Connect3gppContextStep step;
     guint check_count;
+    guint failed_ndisstatqry_count;
 } Connect3gppContext;
 
 static void
@@ -130,16 +131,10 @@ connect_ndisstatqry_check_ready (MMBaseModem *modem,
                                                &ipv6_available,
                                                &ipv6_connected,
                                                &error)) {
-        mm_dbg ("Modem doesn't properly support ^NDISSTATQRY command: %s", error->message);
+        ctx->failed_ndisstatqry_count++;
+        mm_dbg ("Unexpected response to ^NDISSTATQRY command: %s (Attempts so far: %u)",
+                error->message, ctx->failed_ndisstatqry_count);
         g_error_free (error);
-
-        ctx->self->priv->connect_pending = NULL;
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
-                                         "Connection attempt not supported");
-        connect_3gpp_context_complete_and_free (ctx);
-        return;
     }
 
     /* Connected in IPv4? */
@@ -316,6 +311,18 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
             return;
         }
 
+        /* Give up if too many unexpected responses to NIDSSTATQRY are encountered. */
+        if (ctx->failed_ndisstatqry_count > 10) {
+            /* Clear context */
+            ctx->self->priv->connect_pending = NULL;
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_MOBILE_EQUIPMENT_ERROR,
+                                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                             "Connection attempt not supported.");
+            connect_3gpp_context_complete_and_free (ctx);
+            return;
+        }
+
         /* Check if connected */
         ctx->check_count++;
         mm_base_modem_at_command_full (ctx->modem,
@@ -413,6 +420,7 @@ typedef struct {
     GSimpleAsyncResult *result;
     Disconnect3gppContextStep step;
     guint check_count;
+    guint failed_ndisstatqry_count;
 } Disconnect3gppContext;
 
 static void
@@ -480,16 +488,10 @@ disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
                                                &ipv6_available,
                                                &ipv6_connected,
                                                &error)) {
-        mm_dbg ("Modem doesn't properly support ^NDISSTATQRY command: %s", error->message);
+        ctx->failed_ndisstatqry_count++;
+        mm_dbg ("Unexpected response to ^NDISSTATQRY command: %s (Attempts so far: %u)",
+                error->message, ctx->failed_ndisstatqry_count);
         g_error_free (error);
-
-        ctx->self->priv->disconnect_pending = NULL;
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
-                                         "Disconnection attempt not supported");
-        disconnect_3gpp_context_complete_and_free (ctx);
-        return;
     }
 
     /* Disconnected IPv4? */
@@ -565,6 +567,18 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
                                              MM_MOBILE_EQUIPMENT_ERROR,
                                              MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
                                              "Disconnection attempt timed out");
+            disconnect_3gpp_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Give up if too many unexpected responses to NIDSSTATQRY are encountered. */
+        if (ctx->failed_ndisstatqry_count > 10) {
+            /* Clear context */
+            ctx->self->priv->disconnect_pending = NULL;
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_MOBILE_EQUIPMENT_ERROR,
+                                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                             "Disconnection attempt not supported.");
             disconnect_3gpp_context_complete_and_free (ctx);
             return;
         }
