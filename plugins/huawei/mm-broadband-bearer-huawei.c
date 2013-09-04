@@ -112,10 +112,10 @@ connect_ndisstatqry_check_ready (MMBaseModem *modem,
     Connect3gppContext *ctx;
     const gchar *response;
     GError *error = NULL;
-    gboolean ipv4_available;
-    gboolean ipv4_connected;
-    gboolean ipv6_available;
-    gboolean ipv6_connected;
+    gboolean ipv4_available = FALSE;
+    gboolean ipv4_connected = FALSE;
+    gboolean ipv6_available = FALSE;
+    gboolean ipv6_connected = FALSE;
 
     ctx = self->priv->connect_pending;
     g_assert (ctx != NULL);
@@ -469,10 +469,10 @@ disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
     Disconnect3gppContext *ctx;
     const gchar *response;
     GError *error = NULL;
-    gboolean ipv4_available;
-    gboolean ipv4_connected;
-    gboolean ipv6_available;
-    gboolean ipv6_connected;
+    gboolean ipv4_available = FALSE;
+    gboolean ipv4_connected = FALSE;
+    gboolean ipv6_available = FALSE;
+    gboolean ipv6_connected = FALSE;
 
     ctx = self->priv->disconnect_pending;
     g_assert (ctx != NULL);
