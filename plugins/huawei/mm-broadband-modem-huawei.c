@@ -1936,25 +1936,27 @@ huawei_modem_create_bearer (MMIfaceModem *self,
 
     port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET);
     if (port) {
-        GUdevDevice *net_port;
-        GUdevClient *client;
+        /* Check NDISDUP support the first time we need it */
+        if (ctx->self->priv->ndisdup_support == NDISDUP_SUPPORT_UNKNOWN) {
+            GUdevDevice *net_port;
+            GUdevClient *client;
 
-        client = g_udev_client_new (NULL);
-        net_port = (g_udev_client_query_by_subsystem_and_name (
+            client = g_udev_client_new (NULL);
+            net_port = (g_udev_client_query_by_subsystem_and_name (
                             client,
                             "net",
                             mm_port_get_device (port)));
-        if (g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
-            mm_dbg ("This device can support ndisdup feature");
-            ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
-        } else {
-            mm_dbg ("This device can not support ndisdup feature");
-            ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
+            if (g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+                mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
+                ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
+            } else {
+                mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
+                ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
+            }
+            g_object_unref (client);
         }
 
         create_bearer_for_net_port (ctx);
-
-        g_object_unref (client);
         return;
     }
 
