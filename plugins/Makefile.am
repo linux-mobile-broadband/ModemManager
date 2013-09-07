@@ -369,6 +369,7 @@ libmm_plugin_telit_la_SOURCES = \
 	telit/mm-broadband-modem-telit.h
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += telit/77-mm-telit-port-types.rules
 
 
 # Additional files to include in the distribution
