@@ -59,8 +59,8 @@ iccid_read_ready (MMBaseModem *modem,
     GError *error = NULL;
     const gchar *response;
     const gchar *p;
-    gchar buf[21];
-    gint i;
+    char *parsed;
+    GError *local = NULL;
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
@@ -82,34 +82,13 @@ iccid_read_ready (MMBaseModem *modem,
         return;
     }
 
-    memset (buf, 0, sizeof (buf));
-    for (i = 0; i < 20; i++) {
-        if (!isdigit (p[i]) && (p[i] != 'F') && (p[i] == 'f')) {
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "CRSM ICCID response contained invalid character '%c'",
-                                             p[i]);
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
-            return;
-        }
-
-        if (p[i] == 'F' || p[i] == 'f') {
-            buf[i] = 0;
-            break;
-        }
-        buf[i] = p[i];
-    }
-
-    if (i != 19 && i != 20)
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid +CRSM ICCID response size (was %d, expected 19 or 20)",
-                                         i);
+    /* Sierra !ICCID response is already character swapped */
+    parsed = mm_3gpp_parse_iccid (p, FALSE, &local);
+    if (parsed)
+        g_simple_async_result_set_op_res_gpointer (simple, parsed, g_free);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, buf, NULL);
+        g_simple_async_result_take_error (simple, local);
+
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }

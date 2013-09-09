@@ -1891,6 +1891,88 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 
 /*************************************************************************/
 
+char *
+mm_3gpp_parse_iccid (const char *raw_iccid, gboolean swap, GError **error)
+{
+    char *buf, *swapped = NULL;
+    gsize len = 0;
+    int f_pos = -1, i;
+
+    g_return_val_if_fail (raw_iccid != NULL, NULL);
+
+    /* Skip spaces and quotes */
+    while (raw_iccid && *raw_iccid && (isspace (*raw_iccid) || *raw_iccid == '"'))
+        raw_iccid++;
+
+    /* Make sure the buffer is only digits or 'F' */
+    buf = g_strdup (raw_iccid);
+    for (len = 0; buf[len]; len++) {
+        if (isdigit (buf[len]))
+            continue;
+        if (buf[len] == 'F' || buf[len] == 'f') {
+            buf[len] = 'F';  /* canonicalize the F */
+            f_pos = len;
+            continue;
+        }
+        if (buf[len] == '\"') {
+            buf[len] = 0;
+            break;
+        }
+
+        /* Invalid character */
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "ICCID response contained invalid character '%c'",
+                     buf[len]);
+        goto error;
+    }
+
+    /* BCD encoded ICCIDs are 20 digits long */
+    if (len != 20) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Invalid ICCID response size (was %zd, expected 20)",
+                     len);
+        goto error;
+    }
+
+    /* Ensure if there's an 'F' that it's second-to-last if swap = TRUE,
+     * otherwise last if swap = FALSE */
+    if (f_pos >= 0) {
+        if ((swap && (f_pos != len - 2)) || (!swap && (f_pos != len - 1))) {
+            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Invalid ICCID length (unexpected F position)");
+            goto error;
+        }
+    }
+
+    if (swap) {
+        /* Swap digits in the ICCID response to get the actual ICCID, each
+         * group of 2 digits is reversed.
+         *
+         *    21436587 -> 12345678
+         */
+        swapped = g_malloc0 (25);
+        for (i = 0; i < 10; i++) {
+            swapped[i * 2] = buf[(i * 2) + 1];
+            swapped[(i * 2) + 1] = buf[i * 2];
+        }
+    } else
+        swapped = g_strdup (buf);
+
+    /* Zero out the F for 19 digit ICCIDs */
+    if (swapped[len - 1] == 'F')
+        swapped[len - 1] = 0;
+
+    g_free (buf);
+    return swapped;
+
+error:
+    g_free (buf);
+    g_free (swapped);
+    return NULL;
+}
+
+/*************************************************************************/
+
 gboolean
 mm_3gpp_parse_operator_id (const gchar *operator_id,
                            guint16 *mcc,

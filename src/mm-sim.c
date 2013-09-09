@@ -946,7 +946,6 @@ parse_iccid (const gchar *response,
              GError **error)
 {
     gchar buf[21];
-    gchar swapped[21];
     const gchar *str;
     gint sw1;
     gint sw2;
@@ -974,69 +973,8 @@ parse_iccid (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        gsize len = 0;
-        gint f_pos = -1;
-        gint i;
-
-        /* Make sure the buffer is only digits or 'F' */
-        for (len = 0; len < sizeof (buf) && buf[len]; len++) {
-            if (isdigit (buf[len]))
-                continue;
-            if (buf[len] == 'F' || buf[len] == 'f') {
-                buf[len] = 'F';  /* canonicalize the F */
-                f_pos = len;
-                continue;
-            }
-            if (buf[len] == '\"') {
-                buf[len] = 0;
-                break;
-            }
-
-            /* Invalid character */
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "CRSM ICCID response contained invalid character '%c'",
-                         buf[len]);
-            return NULL;
-        }
-
-        /* BCD encoded ICCIDs are 20 digits long */
-        if (len != 20) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Invalid +CRSM ICCID response size (was %zd, expected 20)",
-                         len);
-            return NULL;
-        }
-
-        /* Ensure if there's an 'F' that it's second-to-last */
-        if ((f_pos >= 0) && (f_pos != len - 2)) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Invalid +CRSM ICCID length (unexpected F)");
-            return NULL;
-        }
-
-        /* Swap digits in the EFiccid response to get the actual ICCID, each
-         * group of 2 digits is reversed in the +CRSM response.  i.e.:
-         *
-         *    21436587 -> 12345678
-         */
-        memset (swapped, 0, sizeof (swapped));
-        for (i = 0; i < 10; i++) {
-            swapped[i * 2] = buf[(i * 2) + 1];
-            swapped[(i * 2) + 1] = buf[i * 2];
-        }
-
-        /* Zero out the F for 19 digit ICCIDs */
-        if (swapped[len - 1] == 'F')
-            swapped[len - 1] = 0;
-
-
-        return g_strdup (swapped);
+        /* +CRSM response must be character-swapped */
+        return mm_3gpp_parse_iccid (buf, TRUE, error);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
