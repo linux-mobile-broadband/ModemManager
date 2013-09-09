@@ -434,7 +434,7 @@ mm_modem_oma_get_session_state (MMModemOma *self)
 {
     g_return_val_if_fail (MM_IS_MODEM_OMA (self), MM_OMA_SESSION_STATE_UNKNOWN);
 
-    return (MMOmaSessionType) mm_gdbus_modem_oma_get_session_state (MM_GDBUS_MODEM_OMA (self));
+    return (MMOmaSessionState) mm_gdbus_modem_oma_get_session_state (MM_GDBUS_MODEM_OMA (self));
 }
 
 /*****************************************************************************/
