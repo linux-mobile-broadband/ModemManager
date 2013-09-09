@@ -43,6 +43,7 @@
 #include "mm-broadband-modem-huawei.h"
 #include "mm-broadband-bearer-huawei.h"
 #include "mm-broadband-bearer.h"
+#include "mm-sim-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -2861,6 +2862,30 @@ huawei_modem_power_down (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create SIM (Modem interface) */
+
+static MMSim *
+huawei_modem_create_sim_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return mm_sim_huawei_new_finish (res, error);
+}
+
+static void
+huawei_modem_create_sim (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    /* New Sierra SIM */
+    mm_sim_huawei_new (MM_BASE_MODEM (self),
+                       NULL, /* cancellable */
+                       callback,
+                       user_data);
+}
+
+
+/*****************************************************************************/
 /* Check support (Time interface) */
 
 static gboolean
@@ -3127,6 +3152,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = huawei_modem_power_up_finish;
     iface->modem_power_down = huawei_modem_power_down;
     iface->modem_power_down_finish = huawei_modem_power_down_finish;
+    iface->create_sim = huawei_modem_create_sim;
+    iface->create_sim_finish = huawei_modem_create_sim_finish;
 }
 
 static void
