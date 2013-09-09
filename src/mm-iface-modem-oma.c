@@ -132,6 +132,7 @@ mm_iface_modem_oma_update_session_state (MMIfaceModemOma *self,
         /* Flush current change before signaling the state change,
          * so that clients get the proper state already in the
          * state-changed callback */
+        mm_gdbus_modem_oma_set_session_state (skeleton, new_session_state);
         g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
         mm_gdbus_modem_oma_emit_session_state_changed (
             skeleton,
