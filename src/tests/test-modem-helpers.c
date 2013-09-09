@@ -18,6 +18,7 @@
 
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
+#include "mm-errors.h"
 
 typedef struct {
     GPtrArray *solicited_creg;
@@ -1211,6 +1212,80 @@ test_cind_response_moto_v3m (void *f, gpointer d)
     test_cind_results ("Motorola V3m", reply, &expected[0], ARRAY_LEN (expected));
 }
 
+static void
+test_iccid_parse_quoted_swap_19_digit (void *f, gpointer d)
+{
+    const char *raw_iccid = "\"984402003576012594F9\"";
+    const char *expected = "8944200053671052499";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, TRUE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+}
+
+static void
+test_iccid_parse_unquoted_swap_20_digit (void *f, gpointer d)
+{
+    const char *raw_iccid = "98231420326409614067";
+    const char *expected = "89324102234690160476";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, TRUE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+}
+
+static void
+test_iccid_parse_unquoted_unswapped_19_digit (void *f, gpointer d)
+{
+    const char *raw_iccid = "8944200053671052499F";
+    const char *expected = "8944200053671052499";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+}
+
+static void
+test_iccid_parse_quoted_unswapped_20_digit (void *f, gpointer d)
+{
+    const char *raw_iccid = "\"89324102234690160476\"";
+    const char *expected = "89324102234690160476";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+}
+
+static void
+test_iccid_parse_short (void *f, gpointer d)
+{
+    const char *raw_iccid = "982314203264096";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, TRUE, &error);
+    g_assert_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+}
+
+static void
+test_iccid_parse_invalid_chars (void *f, gpointer d)
+{
+    const char *raw_iccid = "98231420326ab9614067";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_gsm_parse_iccid (raw_iccid, TRUE, &error);
+    g_assert_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -1325,6 +1400,13 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, data));
     g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, data));
+
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_swap_19_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_swap_20_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_unswapped_19_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_20_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_short, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_invalid_chars, NULL));
 
     while (item->devid) {
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));

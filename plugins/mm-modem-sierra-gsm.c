@@ -407,8 +407,8 @@ get_sim_iccid_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     const char *p;
-    char buf[21];
-    int i;
+    char *parsed;
+    GError *local = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -428,29 +428,12 @@ get_sim_iccid_done (MMAtSerialPort *port,
         goto done;
     }
 
-    memset (buf, 0, sizeof (buf));
-    for (i = 0; i < 20; i++) {
-        if (!isdigit (p[i]) && (p[i] != 'F') && (p[i] == 'f')) {
-            info->error = g_error_new (MM_MODEM_ERROR,
-                                       MM_MODEM_ERROR_GENERAL,
-                                       "CRSM ICCID response contained invalid character '%c'",
-                                       p[i]);
-            goto done;
-        }
-        if (p[i] == 'F' || p[i] == 'f') {
-            buf[i] = 0;
-            break;
-        }
-        buf[i] = p[i];
-    }
-
-    if (i == 19 || i == 20)
-        mm_callback_info_set_result (info, g_strdup (buf), g_free);
+    parsed = mm_gsm_parse_iccid (p, FALSE, &local);
+    if (parsed)
+        mm_callback_info_set_result (info, g_strdup (parsed), g_free);
     else {
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Invalid +CRSM ICCID response size (was %d, expected 19 or 20)",
-                                   i);
+        g_assert (local);
+        info->error = local;
     }
 
 done:

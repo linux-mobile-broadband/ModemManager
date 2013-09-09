@@ -535,7 +535,8 @@ real_get_iccid_done (MMAtSerialPort *port,
     const char *str;
     int sw1, sw2;
     gboolean success = FALSE;
-    char buf[21], swapped[21];
+    char buf[21];
+    GError *local = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -565,64 +566,15 @@ real_get_iccid_done (MMAtSerialPort *port,
     }
 
     if ((sw1 == 0x90 && sw2 == 0x00) || (sw1 == 0x91) || (sw1 == 0x92) || (sw1 == 0x9f)) {
-        gsize len = 0;
-        int f_pos = -1, i;
+        char *parsed;
 
-        /* Make sure the buffer is only digits or 'F' */
-        for (len = 0; len < sizeof (buf) && buf[len]; len++) {
-            if (isdigit (buf[len]))
-                continue;
-            if (buf[len] == 'F' || buf[len] == 'f') {
-                buf[len] = 'F';  /* canonicalize the F */
-                f_pos = len;
-                continue;
-            }
-            if (buf[len] == '\"') {
-                buf[len] = 0;
-                break;
-            }
-
-            /* Invalid character */
-            info->error = g_error_new (MM_MODEM_ERROR,
-                                       MM_MODEM_ERROR_GENERAL,
-                                       "CRSM ICCID response contained invalid character '%c'",
-                                       buf[len]);
-            goto done;
+        parsed = mm_gsm_parse_iccid (buf, TRUE, &local);
+        if (parsed)
+            mm_callback_info_set_result (info, g_strdup (parsed), g_free);
+        else {
+            g_assert (local);
+            info->error = local;
         }
-
-        /* BCD encoded ICCIDs are 20 digits long */
-        if (len != 20) {
-            info->error = g_error_new (MM_MODEM_ERROR,
-                                       MM_MODEM_ERROR_GENERAL,
-                                       "Invalid +CRSM ICCID response size (was %zd, expected 20)",
-                                       len);
-            goto done;
-        }
-
-        /* Ensure if there's an 'F' that it's second-to-last */
-        if ((f_pos >= 0) && (f_pos != len - 2)) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                               MM_MODEM_ERROR_GENERAL,
-                                               "Invalid +CRSM ICCID length (unexpected F)");
-            goto done;
-        }
-
-        /* Swap digits in the EFiccid response to get the actual ICCID, each
-         * group of 2 digits is reversed in the +CRSM response.  i.e.:
-         *
-         *    21436587 -> 12345678
-         */
-        memset (swapped, 0, sizeof (swapped));
-        for (i = 0; i < 10; i++) {
-            swapped[i * 2] = buf[(i * 2) + 1];
-            swapped[(i * 2) + 1] = buf[i * 2];
-        }
-
-        /* Zero out the F for 19 digit ICCIDs */
-        if (swapped[len - 1] == 'F')
-            swapped[len - 1] = 0;
-
-        mm_callback_info_set_result (info, g_strdup (swapped), g_free);
     } else {
         MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 

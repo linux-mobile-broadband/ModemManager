@@ -67,6 +67,10 @@ gboolean mm_gsm_parse_clck_test_response (const char *reply,
 gboolean mm_gsm_parse_clck_response (const char *reply,
                                      gboolean *enabled);
 
+char *mm_gsm_parse_iccid (const char *raw_iccid,
+                          gboolean swap,
+                          GError **error);
+
 char *mm_gsm_get_facility_name (MMModemGsmFacility facility);
 
 MMModemGsmAccessTech mm_gsm_string_to_access_tech (const char *string);
