@@ -102,6 +102,7 @@ error:
     MM_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier (self,
                                                                     (GAsyncReadyCallback) parent_load_sim_identifier_ready,
                                                                     simple);
+    g_object_unref (self);
 }
 
 static void
