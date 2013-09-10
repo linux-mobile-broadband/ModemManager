@@ -30,7 +30,6 @@
 #include <ModemManager.h>
 
 #include "mm-helper-types.h"
-#include "mm-common-helpers.h"
 #include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS

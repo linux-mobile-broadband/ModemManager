@@ -26,6 +26,7 @@
 #include "mm-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-modem-oma.h"
+#include "mm-common-helpers.h"
 
 /**
  * SECTION: mm-modem-oma
