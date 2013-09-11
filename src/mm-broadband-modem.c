@@ -1987,7 +1987,8 @@ modem_load_signal_quality (MMIfaceModem *self,
     /* Check whether we can get a non-connected AT port */
     ctx->port = (MMSerialPort *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (ctx->port) {
-        if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported)
+        if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported &&
+            CIND_INDICATOR_IS_VALID (MM_BROADBAND_MODEM (self)->priv->modem_cind_indicator_signal_quality))
             signal_quality_cind (ctx);
         else
             signal_quality_csq (ctx);
