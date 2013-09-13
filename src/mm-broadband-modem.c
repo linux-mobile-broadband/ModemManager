@@ -8681,7 +8681,7 @@ enable (MMBaseModem *self,
     case MM_MODEM_STATE_ENABLING:
         g_simple_async_result_set_error (result,
                                          MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
+                                         MM_CORE_ERROR_IN_PROGRESS,
                                          "Cannot enable modem: "
                                          "already being enabled");
         break;
@@ -9157,7 +9157,7 @@ initialize (MMBaseModem *self,
     case MM_MODEM_STATE_INITIALIZING:
         g_simple_async_result_set_error (result,
                                          MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
+                                         MM_CORE_ERROR_IN_PROGRESS,
                                          "Cannot initialize modem: "
                                          "already being initialized");
         break;
