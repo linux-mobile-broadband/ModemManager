@@ -3530,6 +3530,12 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
     if (!g_cancellable_is_cancelled (ctx->cancellable))
         return FALSE;
 
+    /* Simply ignore any fatal error encountered as the initialization is cancelled anyway. */
+    if (ctx->fatal_error) {
+        g_error_free (ctx->fatal_error);
+        ctx->fatal_error = NULL;
+    }
+
     g_simple_async_result_set_error (ctx->result,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_CANCELLED,
