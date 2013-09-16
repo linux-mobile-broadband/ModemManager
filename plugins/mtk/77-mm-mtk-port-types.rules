@@ -3,14 +3,13 @@
 ACTION!="add|change", GOTO="mm_mtk_port_types_end"
 
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="0e8d", GOTO="mm_mtk_port_types_vendorcheck"
-GOTO="mm_mtk_port_types_end"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="2001", GOTO="mm_dlink_port_types_vendorcheck"
+GOTO="mm_x22x_port_types_end"
+
+# MediaTek devices ---------------------------
 
 LABEL="mm_mtk_port_types_vendorcheck"
-
 ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
-
-# Modem port flag setting
-# ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_MTK_MODEM_PORT}="1"
 
 ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
 ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
@@ -31,5 +30,19 @@ ATTRS{idProduct}=="00a5", ENV{ID_MM_MTK_TAGGED}="1"
 ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_MODEM_PORT}="1"
 ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_MTK_AT_PORT}="1"
 ATTRS{idProduct}=="00a7", ENV{ID_MM_MTK_TAGGED}="1"
+
+GOTO="mm_mtk_port_types_end"
+
+# D-Link devices ---------------------------
+
+LABEL="mm_dlink_port_types_vendorcheck"
+ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
+
+# D-Link DWM-156 A5 (and later?)
+ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idProduct}=="7d00", ENV{ID_MM_MTK_TAGGED}="1"
+
+GOTO="mm_mtk_port_types_end"
 
 LABEL="mm_mtk_port_types_end"
