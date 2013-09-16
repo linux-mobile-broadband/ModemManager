@@ -11,25 +11,25 @@ GOTO="mm_x22x_port_types_end"
 LABEL="mm_mtk_port_types_vendorcheck"
 ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
-ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="00a1", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a1", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a1", ENV{ID_MM_MTK_TAGGED}="1"
 
-ATTRS{idProduct}=="00a2", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="00a2", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="00a2", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a2", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a2", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a2", ENV{ID_MM_MTK_TAGGED}="1"
 
-ATTRS{idProduct}=="00a4", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="00a4", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="00a4", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a4", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a4", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a4", ENV{ID_MM_MTK_TAGGED}="1"
 
-ATTRS{idProduct}=="00a5", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="00a5", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="00a5", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a5", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a5", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a5", ENV{ID_MM_MTK_TAGGED}="1"
 
-ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="00a7", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{ID_MM_MTK_TAGGED}="1"
 
 GOTO="mm_mtk_port_types_end"
 
@@ -39,9 +39,9 @@ LABEL="mm_dlink_port_types_vendorcheck"
 ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
 # D-Link DWM-156 A5 (and later?)
-ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
-ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
-ATTRS{idProduct}=="7d00", ENV{ID_MM_MTK_TAGGED}="1"
+ATTRS{idVendor}=="2001", ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_MTK_MODEM_PORT}="1"
+ATTRS{idVendor}=="2001", ATTRS{idProduct}=="7d00", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_MTK_AT_PORT}="1"
+ATTRS{idVendor}=="2001", ATTRS{idProduct}=="7d00", ENV{ID_MM_MTK_TAGGED}="1"
 
 GOTO="mm_mtk_port_types_end"
 
