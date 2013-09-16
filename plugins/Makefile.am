@@ -77,7 +77,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-sierra.la \
 	libmm-plugin-mbm.la \
 	libmm-plugin-via.la \
-	libmm-plugin-telit.la
+	libmm-plugin-telit.la \
+	libmm-plugin-mtk.la
 
 # Generic
 libmm_plugin_generic_la_SOURCES = \
@@ -372,6 +373,16 @@ libmm_plugin_telit_la_SOURCES = \
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += telit/77-mm-telit-port-types.rules
+
+# MTK
+libmm_plugin_mtk_la_SOURCES = \
+	mtk/mm-plugin-mtk.c \
+	mtk/mm-plugin-mtk.h \
+	mtk/mm-broadband-modem-mtk.h \
+	mtk/mm-broadband-modem-mtk.c
+libmm_plugin_mtk_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_mtk_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += mtk/77-mm-mtk-port-types.rules
 
 
 # Additional files to include in the distribution
