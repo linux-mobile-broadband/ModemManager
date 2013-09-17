@@ -80,12 +80,12 @@ mm_iface_modem_bind_simple_status (MMIfaceModem *self,
 /*****************************************************************************/
 /* Helper method to wait for a final state */
 
-#define MODEM_STATE_IS_INTERMEDIATE(state)      \
-    (state == MM_MODEM_STATE_INITIALIZING ||    \
-     state == MM_MODEM_STATE_INITIALIZING ||    \
-     state == MM_MODEM_STATE_INITIALIZING ||    \
-     state == MM_MODEM_STATE_INITIALIZING ||    \
-     state == MM_MODEM_STATE_INITIALIZING)
+#define MODEM_STATE_IS_INTERMEDIATE(state)       \
+    (state == MM_MODEM_STATE_INITIALIZING  ||    \
+     state == MM_MODEM_STATE_DISABLING     ||    \
+     state == MM_MODEM_STATE_ENABLING      ||    \
+     state == MM_MODEM_STATE_DISCONNECTING ||    \
+     state == MM_MODEM_STATE_CONNECTING)
 
 typedef struct {
     MMIfaceModem *self;
