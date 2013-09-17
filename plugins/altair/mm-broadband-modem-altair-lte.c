@@ -678,7 +678,7 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    mm_base_modem_at_command_full_finish (self, res, &error);
     if (error)
         g_simple_async_result_take_error (simple, error);
     else
