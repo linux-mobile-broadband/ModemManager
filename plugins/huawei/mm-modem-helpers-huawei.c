@@ -23,7 +23,7 @@
 #include "mm-modem-helpers-huawei.h"
 
 /*****************************************************************************/
-/* ^NDISSTATQRY response parser */
+/* ^NDISSTAT /  ^NDISSTATQRY response parser */
 
 gboolean
 mm_huawei_parse_ndisstatqry_response (const gchar *response,
@@ -37,8 +37,10 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
     GMatchInfo *match_info;
     GError *inner_error = NULL;
 
-    if (!response || !g_str_has_prefix (response, "^NDISSTATQRY:")) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing ^NDISSTATQRY prefix");
+    if (!response ||
+        !(g_str_has_prefix (response, "^NDISSTAT:") ||
+          g_str_has_prefix (response, "^NDISSTATQRY:"))) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing ^NDISSTAT / ^NDISSTATQRY prefix");
         return FALSE;
     }
 
@@ -46,6 +48,8 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
     *ipv6_available = FALSE;
 
     /* The response maybe as:
+     *     ^NDISSTAT: 1,,,IPV4
+     *     ^NDISSTAT: 0,33,,IPV6
      *     ^NDISSTATQRY: 1,,,IPV4
      *     ^NDISSTATQRY: 0,33,,IPV6
      *     OK
@@ -54,8 +58,8 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
      *     ^NDISSTATQRY:0,,,"IPV4",0,,,"IPV6"
      *     OK
      */
-    r = g_regex_new ("\\^NDISSTATQRY:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
-                     "(?:\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
+    r = g_regex_new ("\\^NDISSTAT(?:QRY)?:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
+                     "(?:\\^NDISSTAT:|\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, NULL);
     g_assert (r != NULL);
@@ -78,7 +82,7 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
                 (connected != 0 && connected != 1)) {
                 inner_error = g_error_new (MM_CORE_ERROR,
                                            MM_CORE_ERROR_FAILED,
-                                           "Couldn't parse ^NDISSTATQRY fields");
+                                           "Couldn't parse ^NDISSTAT / ^NDISSTATQRY fields");
             } else if (g_ascii_strcasecmp (ip_type_str, "IPV4") == 0) {
                 *ipv4_available = TRUE;
                 *ipv4_connected = (gboolean)connected;
@@ -98,7 +102,7 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
     if (!ipv4_available && !ipv6_available) {
         inner_error = g_error_new (MM_CORE_ERROR,
                                    MM_CORE_ERROR_FAILED,
-                                   "Couldn't find IPv4 or IPv6 info in ^NDISSTATQRY response");
+                                   "Couldn't find IPv4 or IPv6 info in ^NDISSTAT / ^NDISSTATQRY response");
     }
 
     if (inner_error) {

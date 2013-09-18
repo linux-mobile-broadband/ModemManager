@@ -19,7 +19,7 @@
 
 #include "glib.h"
 
-/* ^NDISSTATQRY response parser */
+/* ^NDISSTAT / ^NDISSTATQRY response parser */
 gboolean mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                                gboolean *ipv4_available,
                                                gboolean *ipv4_connected,

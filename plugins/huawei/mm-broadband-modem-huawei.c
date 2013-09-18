@@ -34,6 +34,7 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
+#include "mm-modem-helpers-huawei.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -43,6 +44,7 @@
 #include "mm-broadband-modem-huawei.h"
 #include "mm-broadband-bearer-huawei.h"
 #include "mm-broadband-bearer.h"
+#include "mm-bearer-list.h"
 #include "mm-sim-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
@@ -85,6 +87,7 @@ struct _MMBroadbandModemHuaweiPrivate {
 
     /* Regex for connection status related notifications */
     GRegex *dsflowrpt_regex;
+    GRegex *ndisstat_regex;
 
     /* Regex to ignore */
     GRegex *boot_regex;
@@ -97,7 +100,6 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *srvst_regex;
     GRegex *stin_regex;
     GRegex *hcsq_regex;
-    GRegex *ndisstat_regex;
     GRegex *pdpdeact_regex;
     GRegex *ndisend_regex;
     GRegex *rfswitch_regex;
@@ -1510,6 +1512,68 @@ huawei_status_changed (MMAtSerialPort *port,
     g_free (str);
 }
 
+typedef struct {
+    gboolean ipv4_available;
+    gboolean ipv4_connected;
+    gboolean ipv6_available;
+    gboolean ipv6_connected;
+} NdisstatResult;
+
+static void
+bearer_report_connection_status (MMBearer *bearer,
+                                 NdisstatResult *ndisstat_result)
+{
+    if (ndisstat_result->ipv4_available) {
+        /* TODO: MMBroadbandBearerHuawei does not currently support IPv6.
+         * When it does, we should check the IP family associated with each bearer. */
+        mm_broadband_bearer_huawei_report_connection_status (MM_BROADBAND_BEARER_HUAWEI (bearer),
+                                                             ndisstat_result->ipv4_connected);
+    }
+}
+
+static void
+huawei_ndisstat_changed (MMAtSerialPort *port,
+                         GMatchInfo *match_info,
+                         MMBroadbandModemHuawei *self)
+{
+    gchar *str;
+    NdisstatResult ndisstat_result;
+    GError *error = NULL;
+    MMBearerList *list = NULL;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (!mm_huawei_parse_ndisstatqry_response (str,
+                                               &ndisstat_result.ipv4_available,
+                                               &ndisstat_result.ipv4_connected,
+                                               &ndisstat_result.ipv6_available,
+                                               &ndisstat_result.ipv6_connected,
+                                               &error)) {
+        mm_dbg ("Ignore invalid ^NDISSTAT unsolicited message: '%s' (error %s)",
+                str, error->message);
+        g_error_free (error);
+        return;
+    }
+
+    mm_dbg ("NDIS status: IPv4 %s, IPv6 %s",
+            ndisstat_result.ipv4_available ?
+            (ndisstat_result.ipv4_connected ? "connected" : "disconnected") : "not available",
+            ndisstat_result.ipv6_available ?
+            (ndisstat_result.ipv6_connected ? "connected" : "disconnected") : "not available");
+
+    /* If empty bearer list, nothing else to do */
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    if (!list)
+        return;
+
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_report_connection_status,
+                            &ndisstat_result);
+
+    g_object_unref (list);
+}
+
 static void
 set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
                                       gboolean enable)
@@ -1546,6 +1610,13 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             ports[i],
             self->priv->dsflowrpt_regex,
             enable ? (MMAtSerialUnsolicitedMsgFn)huawei_status_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->ndisstat_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_ndisstat_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -2992,10 +3063,6 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             NULL, NULL, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
-            self->priv->ndisstat_regex,
-            NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
-            ports[i],
             self->priv->pdpdeact_regex,
             NULL, NULL, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (
@@ -3063,6 +3130,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->dsflowrpt_regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n",
                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ndisstat_regex = g_regex_new ("\\r\\n(\\^NDISSTAT:.+)\\r+\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->boot_regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->connect_regex = g_regex_new ("\\r\\n\\^CONNECT .+\\r\\n",
@@ -3083,8 +3152,6 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->hcsq_regex = g_regex_new ("\\r\\n\\^HCSQ:.+\\r+\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    self->priv->ndisstat_regex = g_regex_new ("\\r\\n\\^NDISSTAT:.+\\r+\\n",
-                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->pdpdeact_regex = g_regex_new ("\\r\\n\\^PDPDEACT:.+\\r+\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->ndisend_regex = g_regex_new ("\\r\\n\\^NDISEND:.+\\r+\\n",
@@ -3109,6 +3176,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->hrssilvl_regex);
     g_regex_unref (self->priv->mode_regex);
     g_regex_unref (self->priv->dsflowrpt_regex);
+    g_regex_unref (self->priv->ndisstat_regex);
     g_regex_unref (self->priv->boot_regex);
     g_regex_unref (self->priv->connect_regex);
     g_regex_unref (self->priv->csnr_regex);
@@ -3119,7 +3187,6 @@ finalize (GObject *object)
     g_regex_unref (self->priv->srvst_regex);
     g_regex_unref (self->priv->stin_regex);
     g_regex_unref (self->priv->hcsq_regex);
-    g_regex_unref (self->priv->ndisstat_regex);
     g_regex_unref (self->priv->pdpdeact_regex);
     g_regex_unref (self->priv->ndisend_regex);
     g_regex_unref (self->priv->rfswitch_regex);

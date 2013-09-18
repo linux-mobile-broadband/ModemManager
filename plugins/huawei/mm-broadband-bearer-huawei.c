@@ -639,6 +639,26 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
+void
+mm_broadband_bearer_huawei_report_connection_status (MMBroadbandBearerHuawei *self,
+                                                     gboolean connected)
+{
+    /* When a pending connection / disconnection attempt is in progress, we use
+     * ^NDISSTATQRY? to check the connection status and thus temporarily ignore
+     * ^NDISSTAT unsolicited messages */
+    if (self->priv->connect_pending || self->priv->disconnect_pending)
+        return;
+
+    /* We already use ^NDISSTATQRY? to poll the connection status, so only
+     * handle network-initiated disconnection here. */
+    if (!connected) {
+        mm_dbg ("Disconnect bearer '%s'", mm_bearer_get_path (MM_BEARER (self)));
+        mm_bearer_report_disconnection (MM_BEARER (self));
+    }
+}
+
+/*****************************************************************************/
+
 MMBearer *
 mm_broadband_bearer_huawei_new_finish (GAsyncResult *res,
                                        GError **error)

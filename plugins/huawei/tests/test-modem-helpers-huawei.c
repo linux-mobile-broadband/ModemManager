@@ -20,7 +20,7 @@
 #include "mm-modem-helpers-huawei.h"
 
 /*****************************************************************************/
-/* Test ^NDISSTATQRY responses */
+/* Test ^NDISSTAT / ^NDISSTATQRY responses */
 
 typedef struct {
     const gchar *str;
@@ -31,6 +31,38 @@ typedef struct {
 } NdisstatqryTest;
 
 static const NdisstatqryTest ndisstatqry_tests[] = {
+    { "^NDISSTAT: 1,,,IPV4\r\n", TRUE,  TRUE,  FALSE, FALSE },
+    { "^NDISSTAT: 0,,,IPV4\r\n", TRUE,  FALSE, FALSE, FALSE },
+    { "^NDISSTAT: 1,,,IPV6\r\n", FALSE, FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,IPV6\r\n", FALSE, FALSE, TRUE,  FALSE },
+    { "^NDISSTAT: 1,,,IPV4\r\n"
+      "^NDISSTAT: 1,,,IPV6\r\n", TRUE,  TRUE,  TRUE,  TRUE  },
+    { "^NDISSTAT: 1,,,IPV4\r\n"
+      "^NDISSTAT: 0,,,IPV6\r\n", TRUE,  TRUE,  TRUE,  FALSE },
+    { "^NDISSTAT: 0,,,IPV4\r\n"
+      "^NDISSTAT: 1,,,IPV6\r\n", TRUE,  FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,IPV4\r\n"
+      "^NDISSTAT: 0,,,IPV6\r\n", TRUE,  FALSE, TRUE,  FALSE },
+    { "^NDISSTAT: 1,,,IPV4",     TRUE,  TRUE,  FALSE, FALSE },
+    { "^NDISSTAT: 0,,,IPV4",     TRUE,  FALSE, FALSE, FALSE },
+    { "^NDISSTAT: 1,,,IPV6",     FALSE, FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,IPV6",     FALSE, FALSE, TRUE,  FALSE },
+    { "^NDISSTAT: 1,,,IPV4\r\n"
+      "^NDISSTAT: 1,,,IPV6",     TRUE,  TRUE,  TRUE,  TRUE  },
+    { "^NDISSTAT: 1,,,IPV4\r\n"
+      "^NDISSTAT: 0,,,IPV6",     TRUE,  TRUE,  TRUE,  FALSE },
+    { "^NDISSTAT: 0,,,IPV4\r\n"
+      "^NDISSTAT: 1,,,IPV6",     TRUE,  FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,IPV4\r\n"
+      "^NDISSTAT: 0,,,IPV6",     TRUE,  FALSE, TRUE,  FALSE },
+    { "^NDISSTAT: 1,,,\"IPV4\",1,,,\"IPV6\"",     TRUE,  TRUE,  TRUE,  TRUE  },
+    { "^NDISSTAT: 1,,,\"IPV4\",0,,,\"IPV6\"",     TRUE,  TRUE,  TRUE,  FALSE },
+    { "^NDISSTAT: 0,,,\"IPV4\",1,,,\"IPV6\"",     TRUE,  FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,\"IPV4\",0,,,\"IPV6\"",     TRUE,  FALSE, TRUE,  FALSE },
+    { "^NDISSTAT: 1,,,\"IPV4\",1,,,\"IPV6\"\r\n", TRUE,  TRUE,  TRUE,  TRUE  },
+    { "^NDISSTAT: 1,,,\"IPV4\",0,,,\"IPV6\"\r\n", TRUE,  TRUE,  TRUE,  FALSE },
+    { "^NDISSTAT: 0,,,\"IPV4\",1,,,\"IPV6\"\r\n", TRUE,  FALSE, TRUE,  TRUE  },
+    { "^NDISSTAT: 0,,,\"IPV4\",0,,,\"IPV6\"\r\n", TRUE,  FALSE, TRUE,  FALSE },
     { "^NDISSTATQRY: 1,,,IPV4\r\n", TRUE,  TRUE,  FALSE, FALSE },
     { "^NDISSTATQRY: 0,,,IPV4\r\n", TRUE,  FALSE, FALSE, FALSE },
     { "^NDISSTATQRY: 1,,,IPV6\r\n", FALSE, FALSE, TRUE,  TRUE  },
