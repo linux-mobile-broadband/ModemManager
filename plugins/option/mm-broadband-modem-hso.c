@@ -216,7 +216,7 @@ load_unlock_retries (MMIfaceModem *self,
 
 typedef struct {
     guint cid;
-    MMBroadbandBearerHsoConnectionStatus status;
+    MMBearerConnectionStatus status;
 } BearerListReportStatusForeachContext;
 
 static void
@@ -226,8 +226,7 @@ bearer_list_report_status_foreach (MMBearer *bearer,
     if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
         return;
 
-    mm_broadband_bearer_hso_report_connection_status (MM_BROADBAND_BEARER_HSO (bearer),
-                                                      ctx->status);
+    mm_bearer_report_connection_status (MM_BEARER (bearer), ctx->status);
 }
 
 static void
@@ -247,24 +246,24 @@ hso_connection_status_changed (MMAtSerialPort *port,
 
     /* Setup context */
     ctx.cid = cid;
-    ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN;
+    ctx.status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
 
     switch (status) {
     case 1:
-        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
         break;
     case 3:
-        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED;
         break;
     case 0:
-        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
         break;
     default:
         break;
     }
 
     /* If unknown status, don't try to report anything */
-    if (ctx.status == MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN)
+    if (ctx.status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         return;
 
     /* If empty bearer list, nothing else to do */

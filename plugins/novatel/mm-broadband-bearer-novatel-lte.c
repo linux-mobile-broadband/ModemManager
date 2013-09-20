@@ -130,7 +130,7 @@ poll_connection_ready (MMBaseModem *modem,
     }
 
     if (is_qmistatus_disconnected (result)) {
-        mm_bearer_report_disconnection (MM_BEARER (bearer));
+        mm_bearer_report_connection_status (MM_BEARER (bearer), MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
         g_source_remove (bearer->priv->connection_poller);
         bearer->priv->connection_poller = 0;
     }

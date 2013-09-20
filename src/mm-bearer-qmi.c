@@ -1186,13 +1186,15 @@ disconnect (MMBearer *_self,
 /*****************************************************************************/
 
 static void
-report_disconnection (MMBearer *self)
+report_connection_status (MMBearer *self,
+                          MMBearerConnectionStatus status)
 {
-    /* Cleanup all connection related data */
-    reset_bearer_connection (MM_BEARER_QMI (self), TRUE, TRUE);
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+        /* Cleanup all connection related data */
+        reset_bearer_connection (MM_BEARER_QMI (self), TRUE, TRUE);
 
-    /* Chain up parent's report_disconection() */
-    MM_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_disconnection (self);
+    /* Chain up parent's report_connection_status() */
+    MM_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_connection_status (self, status);
 }
 
 /*****************************************************************************/
@@ -1253,5 +1255,5 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
-    bearer_class->report_disconnection = report_disconnection;
+    bearer_class->report_connection_status = report_connection_status;
 }

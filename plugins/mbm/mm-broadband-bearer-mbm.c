@@ -39,6 +39,7 @@
 #include "mm-broadband-bearer-mbm.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-daemon-enums-types.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerMbm, mm_broadband_bearer_mbm, MM_TYPE_BROADBAND_BEARER);
 
@@ -114,55 +115,63 @@ dial_3gpp_finish (MMBroadbandBearer *self,
     return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
 }
 
-void
-mm_broadband_bearer_mbm_report_connection_status (MMBroadbandBearerMbm *self,
-                                                  MMBroadbandBearerMbmConnectionStatus status)
+static void
+report_connection_status (MMBearer *bearer,
+                          MMBearerConnectionStatus status)
 {
+    MMBroadbandBearerMbm *self = MM_BROADBAND_BEARER_MBM (bearer);
     Dial3gppContext *ctx;
+
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED ||
+              status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 
     /* Recover context (if any) and remove both cancellation and timeout (if any)*/
     ctx = self->priv->connect_pending;
     self->priv->connect_pending = NULL;
+
+    /* Connection status reported but no connection attempt? */
+    if (!ctx) {
+        g_assert (self->priv->connect_pending_id == 0);
+
+        mm_dbg ("Received spontaneous *E2NAP (%s)",
+                mm_bearer_connection_status_get_string (status));
+
+        if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
+            /* If no connection attempt on-going, make sure we mark ourselves as
+             * disconnected */
+            MM_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
+                bearer,
+                status);
+        }
+        return;
+    }
 
     if (self->priv->connect_pending_id) {
         g_source_remove (self->priv->connect_pending_id);
         self->priv->connect_pending_id = 0;
     }
 
-    if (ctx && self->priv->connect_cancellable_id) {
+    if (self->priv->connect_cancellable_id) {
         g_cancellable_disconnect (ctx->cancellable,
                                   self->priv->connect_cancellable_id);
         self->priv->connect_cancellable_id = 0;
     }
 
-    switch (status) {
-    case MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN:
-        g_warn_if_reached ();
-        break;
-
-    case MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_CONNECTED:
-        if (!ctx)
-            break;
-
+    /* Reporting connected */
+    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED) {
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
                                                    (GDestroyNotify)g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
-
-    case MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_DISCONNECTED:
-        if (ctx) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Call setup failed");
-            dial_3gpp_context_complete_and_free (ctx);
-        } else {
-            /* Just ensure we mark ourselves as being disconnected... */
-            mm_bearer_report_disconnection (MM_BEARER (self));
-        }
-        break;
     }
+
+    /* Reporting disconnected */
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Call setup failed");
+    dial_3gpp_context_complete_and_free (ctx);
 }
 
 static void
@@ -591,10 +600,12 @@ mm_broadband_bearer_mbm_class_init (MMBroadbandBearerMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerMbmPrivate));
 
+    bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;

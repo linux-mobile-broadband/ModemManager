@@ -36,13 +36,6 @@
 
 #define MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD "broadband-bearer-icera-default-ip-method"
 
-typedef enum {
-    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN,
-    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED,
-    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED,
-    MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED
-} MMBroadbandBearerIceraConnectionStatus;
-
 typedef struct _MMBroadbandBearerIcera MMBroadbandBearerIcera;
 typedef struct _MMBroadbandBearerIceraClass MMBroadbandBearerIceraClass;
 typedef struct _MMBroadbandBearerIceraPrivate MMBroadbandBearerIceraPrivate;
@@ -67,8 +60,5 @@ void      mm_broadband_bearer_icera_new        (MMBroadbandModem *modem,
                                                 gpointer user_data);
 MMBearer *mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
                                                 GError **error);
-
-void mm_broadband_bearer_icera_report_connection_status (MMBroadbandBearerIcera *self,
-                                                         MMBroadbandBearerIceraConnectionStatus status);
 
 #endif /* MM_BROADBAND_BEARER_ICERA_H */

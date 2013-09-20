@@ -397,7 +397,7 @@ modem_set_current_modes (MMIfaceModem *self,
 
 typedef struct {
     guint cid;
-    MMBroadbandBearerIceraConnectionStatus status;
+    MMBearerConnectionStatus status;
 } BearerListReportStatusForeachContext;
 
 static void
@@ -410,8 +410,7 @@ bearer_list_report_status_foreach (MMBearer *bearer,
     if (!MM_IS_BROADBAND_BEARER_ICERA (bearer))
         return;
 
-    mm_broadband_bearer_icera_report_connection_status (MM_BROADBAND_BEARER_ICERA (bearer),
-                                                        ctx->status);
+    mm_bearer_report_connection_status (bearer, ctx->status);
 }
 
 static void
@@ -431,20 +430,20 @@ ipdpact_received (MMAtSerialPort *port,
 
     /* Setup context */
     ctx.cid = cid;
-    ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN;
+    ctx.status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
 
     switch (status) {
     case 0:
-        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
         break;
     case 1:
-        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
         break;
     case 2:
         /* activating */
         break;
     case 3:
-        ctx.status = MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED;
         break;
     default:
         mm_warn ("Unknown Icera connect status %d", status);
@@ -452,7 +451,7 @@ ipdpact_received (MMAtSerialPort *port,
     }
 
     /* If unknown status, don't try to report anything */
-    if (ctx.status == MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN)
+    if (ctx.status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         return;
 
     /* If empty bearer list, nothing else to do */

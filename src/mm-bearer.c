@@ -974,17 +974,25 @@ mm_bearer_disconnect_force (MMBearer *self)
 /*****************************************************************************/
 
 static void
-report_disconnection (MMBearer *self)
+report_connection_status (MMBearer *self,
+                          MMBearerConnectionStatus status)
 {
+    /* The only status expected at this point is DISCONNECTED.
+     * No other status should have been given to the generic implementation
+     * of report_connection_status (it would be an error).
+     */
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+
     /* In the generic bearer implementation we just need to reset the
      * interface status */
     bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
 }
 
 void
-mm_bearer_report_disconnection (MMBearer *self)
+mm_bearer_report_connection_status (MMBearer *self,
+                                    MMBearerConnectionStatus status)
 {
-    return MM_BEARER_GET_CLASS (self)->report_disconnection (self);
+    return MM_BEARER_GET_CLASS (self)->report_connection_status (self, status);
 }
 
 static void
@@ -1160,7 +1168,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
-    klass->report_disconnection = report_disconnection;
+    klass->report_connection_status = report_connection_status;
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BEARER_CONNECTION,

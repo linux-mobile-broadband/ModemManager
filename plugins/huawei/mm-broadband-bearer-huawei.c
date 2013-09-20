@@ -30,6 +30,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
+#include "mm-daemon-enums-types.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerHuawei, mm_broadband_bearer_huawei, MM_TYPE_BROADBAND_BEARER)
 
@@ -639,22 +640,34 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
-void
-mm_broadband_bearer_huawei_report_connection_status (MMBroadbandBearerHuawei *self,
-                                                     gboolean connected)
+static void
+report_connection_status (MMBearer *bearer,
+                          MMBearerConnectionStatus status)
 {
+    MMBroadbandBearerHuawei *self = MM_BROADBAND_BEARER_HUAWEI (bearer);
+
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED ||
+              status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+
     /* When a pending connection / disconnection attempt is in progress, we use
      * ^NDISSTATQRY? to check the connection status and thus temporarily ignore
      * ^NDISSTAT unsolicited messages */
     if (self->priv->connect_pending || self->priv->disconnect_pending)
         return;
 
+    mm_dbg ("Received spontaneous ^NDISSTAT (%s)",
+            mm_bearer_connection_status_get_string (status));
+
+    /* Ignore 'CONNECTED' */
+    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED)
+        return;
+
     /* We already use ^NDISSTATQRY? to poll the connection status, so only
      * handle network-initiated disconnection here. */
-    if (!connected) {
-        mm_dbg ("Disconnect bearer '%s'", mm_bearer_get_path (MM_BEARER (self)));
-        mm_bearer_report_disconnection (MM_BEARER (self));
-    }
+    mm_dbg ("Disconnect bearer '%s'", mm_bearer_get_path (MM_BEARER (self)));
+    MM_BEARER_CLASS (mm_broadband_bearer_huawei_parent_class)->report_connection_status (
+        bearer,
+        MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 /*****************************************************************************/
@@ -710,11 +723,12 @@ static void
 mm_broadband_bearer_huawei_class_init (MMBroadbandBearerHuaweiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
+    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHuaweiPrivate));
 
+    bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;

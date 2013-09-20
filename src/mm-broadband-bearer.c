@@ -1785,13 +1785,17 @@ disconnect (MMBearer *self,
 /*****************************************************************************/
 
 static void
-report_disconnection (MMBearer *self)
+report_connection_status (MMBearer *self,
+                          MMBearerConnectionStatus status)
 {
-    /* Cleanup all connection related data */
-    reset_bearer_connection (MM_BROADBAND_BEARER (self));
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+        /* Cleanup all connection related data */
+        reset_bearer_connection (MM_BROADBAND_BEARER (self));
 
-    /* Chain up parent's report_disconection() */
-    MM_BEARER_CLASS (mm_broadband_bearer_parent_class)->report_disconnection (self);
+    /* Chain up parent's report_connection_status() */
+    MM_BEARER_CLASS (mm_broadband_bearer_parent_class)->report_connection_status (
+        self,
+        status);
 }
 
 /*****************************************************************************/
@@ -2052,7 +2056,7 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
-    bearer_class->report_disconnection = report_disconnection;
+    bearer_class->report_connection_status = report_connection_status;
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;

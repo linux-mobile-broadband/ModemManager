@@ -797,15 +797,14 @@ load_unlock_retries (MMIfaceModem *self,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 typedef struct {
-    MMBroadbandBearerMbmConnectionStatus status;
+    MMBearerConnectionStatus status;
 } BearerListReportStatusForeachContext;
 
 static void
 bearer_list_report_status_foreach (MMBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
-    mm_broadband_bearer_mbm_report_connection_status (MM_BROADBAND_BEARER_MBM (bearer),
-                                                      ctx->status);
+    mm_bearer_report_connection_status (bearer, ctx->status);
 }
 
 static void
@@ -820,16 +819,16 @@ e2nap_received (MMAtSerialPort *port,
     if (!mm_get_uint_from_match_info (info, 1, &state))
         return;
 
-    ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN;
+    ctx.status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
 
     switch (state) {
     case MBM_E2NAP_DISCONNECTED:
         mm_dbg ("disconnected");
-        ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_DISCONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
         break;
     case MBM_E2NAP_CONNECTED:
         mm_dbg ("connected");
-        ctx.status = MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_CONNECTED;
+        ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
         break;
     case MBM_E2NAP_CONNECTING:
         mm_dbg ("connecting");
@@ -840,7 +839,7 @@ e2nap_received (MMAtSerialPort *port,
     }
 
     /* If unknown status, don't try to report anything */
-    if (ctx.status == MM_BROADBAND_BEARER_MBM_CONNECTION_STATUS_UNKNOWN)
+    if (ctx.status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         return;
 
     /* If empty bearer list, nothing else to do */

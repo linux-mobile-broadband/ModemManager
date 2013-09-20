@@ -518,7 +518,8 @@ static void
 bearer_list_report_disconnect_status_foreach (MMBearer *bearer,
                                               gpointer *user_data)
 {
-    mm_bearer_report_disconnection (bearer);
+    mm_bearer_report_connection_status (bearer,
+                                        MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 static void

@@ -67,6 +67,13 @@ typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_CONNECTED,
 } MMBearerStatus;
 
+typedef enum { /*< underscore_name=mm_bearer_connection_status >*/
+    MM_BEARER_CONNECTION_STATUS_UNKNOWN,
+    MM_BEARER_CONNECTION_STATUS_DISCONNECTED,
+    MM_BEARER_CONNECTION_STATUS_CONNECTED,
+    MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED,
+} MMBearerConnectionStatus;
+
 struct _MMBearer {
     MmGdbusBearerSkeleton parent;
     MMBearerPrivate *priv;
@@ -92,8 +99,9 @@ struct _MMBearerClass {
                                     GAsyncResult *res,
                                     GError **error);
 
-    /* Report disconnection */
-    void (* report_disconnection) (MMBearer *bearer);
+    /* Report connection status of this bearer */
+    void (* report_connection_status) (MMBearer *bearer,
+                                       MMBearerConnectionStatus status);
 };
 
 GType mm_bearer_get_type (void);
@@ -123,6 +131,7 @@ gboolean mm_bearer_disconnect_finish (MMBearer *self,
 
 void mm_bearer_disconnect_force (MMBearer *self);
 
-void mm_bearer_report_disconnection (MMBearer *self);
+void mm_bearer_report_connection_status (MMBearer *self,
+                                         MMBearerConnectionStatus status);
 
 #endif /* MM_BEARER_H */

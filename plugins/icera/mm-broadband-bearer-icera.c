@@ -32,6 +32,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-daemon-enums-types.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerIcera, mm_broadband_bearer_icera, MM_TYPE_BROADBAND_BEARER);
 
@@ -360,13 +361,14 @@ disconnect_3gpp_timed_out_cb (MMBroadbandBearerIcera *self)
 
 static void
 report_disconnect_status (MMBroadbandBearerIcera *self,
-                          MMBroadbandBearerIceraConnectionStatus status)
+                          MMBearerConnectionStatus status)
 {
     Disconnect3gppContext *ctx;
 
     /* Recover context */
     ctx = self->priv->disconnect_pending;
     self->priv->disconnect_pending = NULL;
+    g_assert (ctx != NULL);
 
     /* Cleanup timeout, if any */
     if (self->priv->disconnect_pending_id) {
@@ -374,42 +376,26 @@ report_disconnect_status (MMBroadbandBearerIcera *self,
         self->priv->disconnect_pending_id = 0;
     }
 
-    switch (status) {
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN:
-        g_warn_if_reached ();
-        break;
-
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED:
-        if (!ctx)
-            break;
-
+    /* Received 'CONNECTED' during a disconnection attempt? */
+    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "Disconnection failed");
         disconnect_3gpp_context_complete_and_free (ctx);
         return;
+    }
 
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED:
-        if (!ctx)
-            break;
-
-        /* Well, this actually means disconnection, right? */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disconnect_3gpp_context_complete_and_free (ctx);
-        return;
-
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED:
-        if (!ctx) {
-            mm_dbg ("Received spontaneous %%IPDPACT disconnect");
-            mm_bearer_report_disconnection (MM_BEARER (self));
-            break;
-        }
-
+    /* Received 'DISCONNECTED' during a disconnection attempt? */
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||
+        status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disconnect_3gpp_context_complete_and_free (ctx);
         return;
     }
+
+    /* No other status is expected by this implementation */
+    g_assert_not_reached ();
 }
 
 static void
@@ -658,9 +644,8 @@ forced_close_cb (MMSerialPort *port,
                  MMBroadbandBearerIcera *self)
 {
     /* Just treat the forced close event as any other unsolicited message */
-    mm_broadband_bearer_icera_report_connection_status (
-        self,
-        MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED);
+    mm_bearer_report_connection_status (MM_BEARER (self),
+                                        MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED);
 }
 
 static void
@@ -699,13 +684,18 @@ ier_query_ready (MMBaseModem *modem,
 
 static void
 report_connect_status (MMBroadbandBearerIcera *self,
-                       MMBroadbandBearerIceraConnectionStatus status)
+                       MMBearerConnectionStatus status)
 {
     Dial3gppContext *ctx;
+
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED ||
+              status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED ||
+              status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 
     /* Recover context and remove it from the private info */
     ctx = self->priv->connect_pending;
     self->priv->connect_pending = NULL;
+    g_assert (ctx != NULL);
 
     /* Cleanup cancellable, timeout and port closed watch, if any */
     if (self->priv->connect_pending_id) {
@@ -713,29 +703,19 @@ report_connect_status (MMBroadbandBearerIcera *self,
         self->priv->connect_pending_id = 0;
     }
 
-    if (ctx && self->priv->connect_cancellable_id) {
+    if (self->priv->connect_cancellable_id) {
         g_cancellable_disconnect (ctx->cancellable,
                                   self->priv->connect_cancellable_id);
         self->priv->connect_cancellable_id = 0;
     }
 
-    if (ctx && self->priv->connect_port_closed_id) {
+    if (self->priv->connect_port_closed_id) {
         g_signal_handler_disconnect (ctx->primary, self->priv->connect_port_closed_id);
         self->priv->connect_port_closed_id = 0;
     }
 
-    switch (status) {
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_UNKNOWN:
-        break;
-
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTED:
-        if (!ctx)
-            /* We may get this if the timeout for the connection attempt is
-             * reached before the unsolicited response. We should probably
-             * keep the CID around to request explicit disconnection in this
-             * case. */
-            break;
-
+    /* Received 'CONNECTED' during a connection attempt? */
+    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED) {
         /* If we wanted to get cancelled before, do it now */
         if (ctx->saved_error) {
             /* Keep error */
@@ -751,20 +731,19 @@ report_connect_status (MMBroadbandBearerIcera *self,
                                                    (GDestroyNotify)g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
+    }
 
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_CONNECTION_FAILED:
-        if (!ctx)
-            break;
+    /* If we wanted to get cancelled before and now we couldn't connect,
+     * use the cancelled error and return */
+    if (ctx->saved_error) {
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+        dial_3gpp_context_complete_and_free (ctx);
+        return;
+    }
 
-        /* If we wanted to get cancelled before and now we couldn't connect,
-         * use the cancelled error and return */
-        if (ctx->saved_error) {
-            g_simple_async_result_take_error (ctx->result, ctx->saved_error);
-            ctx->saved_error = NULL;
-            dial_3gpp_context_complete_and_free (ctx);
-            return;
-        }
-
+    /* Received CONNECTION_FAILED during a connection attempt? */
+    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
         /* Try to gather additional info about the connection failure */
         mm_base_modem_at_command_full (
             ctx->modem,
@@ -777,32 +756,14 @@ report_connect_status (MMBroadbandBearerIcera *self,
             (GAsyncReadyCallback)ier_query_ready,
             ctx);
         return;
-
-    case MM_BROADBAND_BEARER_ICERA_CONNECTION_STATUS_DISCONNECTED:
-        if (ctx) {
-            /* If we wanted to get cancelled before and now we couldn't connect,
-             * use the cancelled error and return */
-            if (ctx->saved_error) {
-                g_simple_async_result_take_error (ctx->result, ctx->saved_error);
-                ctx->saved_error = NULL;
-                dial_3gpp_context_complete_and_free (ctx);
-                return;
-            }
-
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Call setup failed");
-            dial_3gpp_context_complete_and_free (ctx);
-            return;
-        }
-
-        /* Just ensure we mark ourselves as being disconnected... */
-        mm_bearer_report_disconnection (MM_BEARER (self));
-        return;
     }
 
-    g_warn_if_reached ();
+    /* Otherwise, received 'DISCONNECTED' during a connection attempt? */
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Call setup failed");
+    dial_3gpp_context_complete_and_free (ctx);
 }
 
 static void
@@ -1060,15 +1021,36 @@ dial_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
-void
-mm_broadband_bearer_icera_report_connection_status (MMBroadbandBearerIcera *self,
-                                                    MMBroadbandBearerIceraConnectionStatus status)
+static void
+report_connection_status (MMBearer *bearer,
+                          MMBearerConnectionStatus status)
 {
-    if (self->priv->connect_pending)
-        report_connect_status (self, status);
+    MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (bearer);
 
-    if (self->priv->disconnect_pending)
+    /* Process pending connection attempt */
+    if (self->priv->connect_pending) {
+        report_connect_status (self, status);
+        return;
+    }
+
+    /* Process pending disconnection attempt */
+    if (self->priv->disconnect_pending) {
         report_disconnect_status (self, status);
+        return;
+    }
+
+    mm_dbg ("Received spontaneous %%IPDPACT (%s)",
+            mm_bearer_connection_status_get_string (status));
+
+    /* Received a random 'DISCONNECTED'...*/
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||
+        status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
+        /* If no connection/disconnection attempt on-going, make sure we mark ourselves as
+         * disconnected. Make sure we only pass 'DISCONNECTED' to the parent */
+        MM_BEARER_CLASS (mm_broadband_bearer_icera_parent_class)->report_connection_status (
+            bearer,
+            MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    }
 }
 
 /*****************************************************************************/
@@ -1165,12 +1147,14 @@ static void
 mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerIceraPrivate));
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+    bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;

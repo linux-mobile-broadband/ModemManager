@@ -56,7 +56,4 @@ void      mm_broadband_bearer_huawei_new        (MMBroadbandModemHuawei *modem,
 MMBearer *mm_broadband_bearer_huawei_new_finish (GAsyncResult *res,
                                                  GError **error);
 
-void mm_broadband_bearer_huawei_report_connection_status (MMBroadbandBearerHuawei *self,
-                                                          gboolean connected);
-
 #endif /* MM_BROADBAND_BEARER_HUAWEI_H */
