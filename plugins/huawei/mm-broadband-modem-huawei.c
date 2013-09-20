@@ -1525,11 +1525,14 @@ bearer_report_connection_status (MMBearer *bearer,
 {
     if (ndisstat_result->ipv4_available) {
         /* TODO: MMBroadbandBearerHuawei does not currently support IPv6.
-         * When it does, we should check the IP family associated with each bearer. */
+         * When it does, we should check the IP family associated with each bearer.
+         *
+         * Also, send DISCONNECTING so that we give some time before actually
+         * disconnecting the connection */
         mm_bearer_report_connection_status (bearer,
                                             ndisstat_result->ipv4_connected ?
                                             MM_BEARER_CONNECTION_STATUS_CONNECTED :
-                                            MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+                                            MM_BEARER_CONNECTION_STATUS_DISCONNECTING);
     }
 }
 

@@ -70,6 +70,7 @@ typedef enum { /*< underscore_name=mm_bearer_status >*/
 typedef enum { /*< underscore_name=mm_bearer_connection_status >*/
     MM_BEARER_CONNECTION_STATUS_UNKNOWN,
     MM_BEARER_CONNECTION_STATUS_DISCONNECTED,
+    MM_BEARER_CONNECTION_STATUS_DISCONNECTING,
     MM_BEARER_CONNECTION_STATUS_CONNECTED,
     MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED,
 } MMBearerConnectionStatus;
