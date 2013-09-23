@@ -84,6 +84,10 @@ ATTRS{idVendor}=="2341", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9207", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Adafruit Flora
+ATTRS{idVendor}=="239a", ATTRS{idProduct}=="0004", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="239a", ATTRS{idProduct}=="8004", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 # Altair U-Boot device
 ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051" ENV{ID_MM_DEVICE_IGNORE}="1"
 
