@@ -69,7 +69,7 @@ ATTRS{idVendor}=="9e88", ATTRS{idProduct}=="9e8f", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="6124", ENV{ID_MM_DEVICE_IGNORE}="1"
 
 # Dangerous Prototypes Bus Pirate v4
-ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="fb00" ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="fb00", ENV{ID_MM_DEVICE_IGNORE}="1"
 
 # All devices from the Swiss Federal Institute of Technology
 ATTRS{idVendor}=="0617", ENV{ID_MM_DEVICE_IGNORE}="1"
@@ -89,6 +89,6 @@ ATTRS{idVendor}=="239a", ATTRS{idProduct}=="0004", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="239a", ATTRS{idProduct}=="8004", ENV{ID_MM_DEVICE_IGNORE}="1"
 
 # Altair U-Boot device
-ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051" ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051", ENV{ID_MM_DEVICE_IGNORE}="1"
 
 LABEL="mm_usb_device_blacklist_end"
