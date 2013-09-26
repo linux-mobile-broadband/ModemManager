@@ -1112,6 +1112,13 @@ mm_serial_port_close (MMSerialPort *self)
         priv->queue_id = 0;
     }
 
+    if (priv->cancellable_id) {
+        g_assert (priv->cancellable != NULL);
+        g_cancellable_disconnect (priv->cancellable,
+                                  priv->cancellable_id);
+        priv->cancellable_id = 0;
+    }
+
     g_clear_object (&priv->cancellable);
 }
 
