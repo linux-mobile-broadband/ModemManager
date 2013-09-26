@@ -973,8 +973,7 @@ parse_iccid (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        /* +CRSM response must be character-swapped */
-        return mm_3gpp_parse_iccid (buf, TRUE, error);
+        return mm_3gpp_parse_iccid (buf, error);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,

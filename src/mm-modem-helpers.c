@@ -1892,8 +1892,9 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 /*************************************************************************/
 
 char *
-mm_3gpp_parse_iccid (const char *raw_iccid, gboolean swap, GError **error)
+mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
 {
+    gboolean swap;
     char *buf, *swapped = NULL;
     gsize len = 0;
     int f_pos = -1, i;
@@ -1932,6 +1933,22 @@ mm_3gpp_parse_iccid (const char *raw_iccid, gboolean swap, GError **error)
                      "Invalid ICCID response size (was %zd, expected 20)",
                      len);
         goto error;
+    }
+
+    /* The leading two digits of an ICCID is the major industry identifier and
+     * should be '89' for telecommunication purposes according to ISO/IEC 7812.
+     */
+    if (buf[0] == '8' && buf[1] == '9') {
+      swap = FALSE;
+    } else if (buf[0] == '9' && buf[1] == '8') {
+      swap = TRUE;
+    } else {
+      /* FIXME: Instead of erroring out, revisit this solution if we find any SIM
+       * that doesn't use '89' as the major industry identifier of the ICCID.
+       */
+      g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                   "Invalid ICCID response (leading two digits are not 89)");
+      goto error;
     }
 
     /* Ensure if there's an 'F' that it's second-to-last if swap = TRUE,

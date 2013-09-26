@@ -1533,7 +1533,7 @@ test_iccid_parse_quoted_swap_19_digit (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, TRUE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
 }
@@ -1546,7 +1546,7 @@ test_iccid_parse_unquoted_swap_20_digit (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, TRUE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
 }
@@ -1559,7 +1559,7 @@ test_iccid_parse_unquoted_unswapped_19_digit (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, FALSE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
 }
@@ -1572,7 +1572,7 @@ test_iccid_parse_quoted_unswapped_20_digit (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, FALSE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
 }
@@ -1584,7 +1584,7 @@ test_iccid_parse_short (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, TRUE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
 }
 
@@ -1595,7 +1595,29 @@ test_iccid_parse_invalid_chars (void *f, gpointer d)
     char *parsed;
     GError *error = NULL;
 
-    parsed = mm_3gpp_parse_iccid (raw_iccid, TRUE, &error);
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+}
+
+static void
+test_iccid_parse_quoted_invalid_mii (void *f, gpointer d)
+{
+    const char *raw_iccid = "\"0044200053671052499\"";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+}
+
+static void
+test_iccid_parse_unquoted_invalid_mii (void *f, gpointer d)
+{
+    const char *raw_iccid = "0044200053671052499";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
 }
 
@@ -2398,6 +2420,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_20_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_short, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_invalid_chars, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_invalid_mii, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_invalid_mii, NULL));
 
     while (item->devid) {
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));

@@ -87,8 +87,7 @@ iccid_read_ready (MMBaseModem *modem,
     if (!p)
         goto error;
 
-    /* Huawei ^ICCID response must be character swapped */
-    parsed = mm_3gpp_parse_iccid (p, TRUE, NULL);
+    parsed = mm_3gpp_parse_iccid (p, NULL);
     if (parsed) {
         g_simple_async_result_set_op_res_gpointer (simple, parsed, g_free);
         g_simple_async_result_complete (simple);

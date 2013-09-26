@@ -82,8 +82,7 @@ iccid_read_ready (MMBaseModem *modem,
         return;
     }
 
-    /* Sierra !ICCID response is already character swapped */
-    parsed = mm_3gpp_parse_iccid (p, FALSE, &local);
+    parsed = mm_3gpp_parse_iccid (p, &local);
     if (parsed)
         g_simple_async_result_set_op_res_gpointer (simple, parsed, g_free);
     else
