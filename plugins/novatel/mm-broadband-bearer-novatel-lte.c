@@ -114,6 +114,14 @@ is_qmistatus_disconnected (const gchar *str)
     return g_strrstr (str, "QMI State: DISCONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_DISCONNECTED");
 }
 
+static gboolean
+is_qmistatus_call_failed (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return (g_strrstr (str, "QMI_RESULT_FAILURE:QMI_ERR_CALL_FAILED") != NULL);
+}
+
 static void
 poll_connection_ready (MMBaseModem *modem,
                        GAsyncResult *res,
@@ -193,6 +201,9 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         g_object_unref (config);
         detailed_connect_context_complete_and_free (ctx);
         return;
+    } else if (is_qmistatus_call_failed (result)) {
+        /* Don't retry if the call failed */
+        ctx->retries = 0;
     }
 
     mm_dbg ("Error: '%s'", result);
