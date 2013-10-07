@@ -772,6 +772,23 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_network_availability >*/
 } MMModem3gppNetworkAvailability;
 
 /**
+ * MModem3gppSubscriptionState:
+ * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN: The subscription state is unknown.
+ * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNPROVISIONED: The account is unprovisioned.
+ * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED: The account is provisioned and has data available.
+ * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_OUT_OF_DATA: The account is provisioned but there is no data left.
+ *
+ * Describes the current subscription status of the SIM.  This value is only available after the
+ * modem attempts to register with the network.
+ */
+typedef enum { /*< underscore_name=mm_modem_3gpp_subscription_state >*/
+    MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN       = 0,
+    MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNPROVISIONED = 1,
+    MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED   = 2,
+    MM_MODEM_3GPP_SUBSCRIPTION_STATE_OUT_OF_DATA   = 3,
+} MMModem3gppSubscriptionState;
+
+/**
  * MMModem3gppUssdSessionState:
  * @MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN: Unknown state.
  * @MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE: No active session.

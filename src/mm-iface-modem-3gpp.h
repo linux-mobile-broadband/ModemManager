@@ -176,6 +176,14 @@ struct _MMIfaceModem3gpp {
                                           GAsyncResult *res,
                                           GError **error);
 
+    /* Loading of the subscription state property */
+    void (*load_subscription_state) (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    MMModem3gppSubscriptionState (*load_subscription_state_finish) (MMIfaceModem3gpp *self,
+                                                                    GAsyncResult *res,
+                                                                    GError **error);
+
     /* Scan current networks, expect a GList of MMModem3gppNetworkInfo */
     void (* scan_networks) (MMIfaceModem3gpp *self,
                             GAsyncReadyCallback callback,
@@ -216,7 +224,7 @@ gboolean mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
 /* Shutdown Modem 3GPP interface */
 void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
-/* Objects implementing this interface can report new registration states,
+/* Objects implementing this interface can report new registration info,
  * access technologies and location.
  * This may happen when handling unsolicited registration messages, or when
  * the interface asks to run registration state checks. */
@@ -226,6 +234,8 @@ void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                        MMModem3gppRegistrationState state);
 void mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
                                                         MMModem3gppRegistrationState state);
+void mm_iface_modem_3gpp_update_subscription_state (MMIfaceModem3gpp *self,
+                                                    MMModem3gppSubscriptionState state);
 void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
                                                      MMModemAccessTechnology access_tech);
 void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,
@@ -240,14 +250,14 @@ gboolean mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *s
                                                              GAsyncResult *res,
                                                              GError **error);
 
-/* Request to reload current operator */
-void     mm_iface_modem_3gpp_reload_current_operator        (MMIfaceModem3gpp *self,
-                                                             GAsyncReadyCallback callback,
-                                                             gpointer user_data);
-gboolean mm_iface_modem_3gpp_reload_current_operator_finish (MMIfaceModem3gpp *self,
-                                                             GAsyncResult *res,
-                                                             GError **error);
-void     mm_iface_modem_3gpp_clear_current_operator         (MMIfaceModem3gpp *self);
+/* Request to reload current registration information */
+void     mm_iface_modem_3gpp_reload_current_registration_info        (MMIfaceModem3gpp *self,
+                                                                      GAsyncReadyCallback callback,
+                                                                      gpointer user_data);
+gboolean mm_iface_modem_3gpp_reload_current_registration_info_finish (MMIfaceModem3gpp *self,
+                                                                      GAsyncResult *res,
+                                                                      GError **error);
+void     mm_iface_modem_3gpp_clear_current_operator                  (MMIfaceModem3gpp *self);
 
 /* Allow registering in the network */
 gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,

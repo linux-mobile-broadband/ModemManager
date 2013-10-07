@@ -136,5 +136,14 @@
     -->
     <property name="EnabledFacilityLocks" type="u" access="read" />
 
+    <!--
+        SubscriptionState:
+
+        A <link linkend="MMModem3gppSubscriptionState">MMModem3gppSubscriptionState</link>
+        value representing the subscription status of the account and whether there
+        is any data remaining, given as an unsigned integer (signature <literal>"u"</literal>).
+    -->
+    <property name="SubscriptionState" type="u" access="read" />
+
   </interface>
 </node>

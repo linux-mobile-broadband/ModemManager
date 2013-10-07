@@ -67,6 +67,7 @@ MMModemAccessTechnology       mm_simple_status_get_access_technologies (MMSimple
 MMModem3gppRegistrationState  mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self);
 const gchar                  *mm_simple_status_get_3gpp_operator_code      (MMSimpleStatus *self);
 const gchar                  *mm_simple_status_get_3gpp_operator_name      (MMSimpleStatus *self);
+MMModem3gppSubscriptionState  mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self);
 
 MMModemCdmaRegistrationState mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self);
 MMModemCdmaRegistrationState mm_simple_status_get_cdma_evdo_registration_state   (MMSimpleStatus *self);
@@ -88,6 +89,7 @@ guint                        mm_simple_status_get_cdma_nid                      
 #define MM_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE "m3gpp-registration-state"
 #define MM_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE      "m3gpp-operator-code"
 #define MM_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME      "m3gpp-operator-name"
+#define MM_SIMPLE_PROPERTY_3GPP_SUBSCRIPTION_STATE "m3gpp-subscription-state"
 
 #define MM_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE "cdma-cdma1x-registration-state"
 #define MM_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE   "cdma-evdo-registration-state"

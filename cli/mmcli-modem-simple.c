@@ -251,13 +251,16 @@ status_process_reply (MMSimpleStatus *result,
             (mm_simple_status_get_3gpp_registration_state (result) ==
              MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)) {
             g_print ("  -------------------------\n"
-                     " 3GPP    |   registration: '%s'\n"
+                     "  3GPP   |   registration: '%s'\n"
                      "         |  operator code: '%s'\n"
-                     "         |  operator name: '%s'\n",
+                     "         |  operator name: '%s'\n"
+                     "         |   subscription: '%s'\n",
                      mm_modem_3gpp_registration_state_get_string (
                          mm_simple_status_get_3gpp_registration_state (result)),
                      VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_code (result)),
-                     VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_name (result)));
+                     VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_name (result)),
+                     mm_modem_3gpp_subscription_state_get_string (
+                         mm_simple_status_get_3gpp_subscription_state (result)));
         }
 
         if ((mm_simple_status_get_cdma_cdma1x_registration_state (result) !=
@@ -296,7 +299,13 @@ status_process_reply (MMSimpleStatus *result,
 
         g_free (access_tech_str);
         g_free (bands_str);
+    } else {
+        g_print ("  -------------------------\n"
+                 "  3GPP   |   subscription: '%s'\n",
+                 mm_modem_3gpp_subscription_state_get_string (
+                     mm_simple_status_get_3gpp_subscription_state (result)));
     }
+
 
     g_print ("\n");
     g_object_unref (result);

@@ -246,6 +246,25 @@ mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_3gpp_get_subscription_state:
+ * @self: A #MMModem.
+ *
+ * Get the current subscription status of the account. This value is only
+ * available after the modem attempts to register with the network.
+ *
+ * Returns: A #MMModem3gppSubscriptionState value, specifying the current subscription state.
+ */
+MMModem3gppSubscriptionState
+mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
+
+    return mm_gdbus_modem3gpp_get_subscription_state (MM_GDBUS_MODEM3GPP (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_3gpp_get_enabled_facility_locks:
  * @self: A #MMModem3gpp.
  *

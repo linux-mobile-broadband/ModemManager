@@ -44,6 +44,7 @@ enum {
     PROP_3GPP_REGISTRATION_STATE,
     PROP_3GPP_OPERATOR_CODE,
     PROP_3GPP_OPERATOR_NAME,
+    PROP_3GPP_SUBSCRIPTION_STATE,
     PROP_CDMA_CDMA1X_REGISTRATION_STATE,
     PROP_CDMA_EVDO_REGISTRATION_STATE,
     PROP_CDMA_SID,
@@ -72,6 +73,8 @@ struct _MMSimpleStatusPrivate {
     gchar *modem_3gpp_operator_code;
     /* 3GPP operator name, given only when registered, signature 's' */
     gchar *modem_3gpp_operator_name;
+    /* 3GPP subsctiption state, signature 'u' */
+    MMModem3gppSubscriptionState modem_3gpp_subscription_state;
 
     /* <--- From the Modem CDMA interface ---> */
     /* CDMA/CDMA1x registration state, signature 'u' */
@@ -233,6 +236,25 @@ mm_simple_status_get_3gpp_operator_name (MMSimpleStatus *self)
 /*****************************************************************************/
 
 /**
+ * mm_simple_status_get_3gpp_subscription_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the current subscription status of the account.
+ *
+ * Returns: a #MMModem3gppSubscriptionState.
+ */
+MMModem3gppSubscriptionState
+mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_STATUS (self), MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
+
+    return self->priv->modem_3gpp_subscription_state;
+}
+
+
+/*****************************************************************************/
+
+/**
  * mm_simple_status_get_cdma_cdma1x_registration_state:
  * @self: a #MMSimpleStatus.
  *
@@ -375,6 +397,12 @@ mm_simple_status_get_dictionary (MMSimpleStatus *self)
 
     }
 
+    if (self->priv->modem_3gpp_subscription_state)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               MM_SIMPLE_PROPERTY_3GPP_SUBSCRIPTION_STATE,
+                               g_variant_new_uint32 (self->priv->modem_3gpp_subscription_state));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -414,6 +442,7 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
         if (g_str_equal (key, MM_SIMPLE_PROPERTY_STATE) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE) ||
+            g_str_equal (key, MM_SIMPLE_PROPERTY_3GPP_SUBSCRIPTION_STATE) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_CDMA_SID) ||
@@ -505,6 +534,9 @@ set_property (GObject *object,
         g_free (self->priv->modem_3gpp_operator_name);
         self->priv->modem_3gpp_operator_name = g_value_dup_string (value);
         break;
+    case PROP_3GPP_SUBSCRIPTION_STATE:
+        self->priv->modem_3gpp_subscription_state = g_value_get_enum (value);
+        break;
     case PROP_CDMA_CDMA1X_REGISTRATION_STATE:
         self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
         break;
@@ -553,6 +585,9 @@ get_property (GObject *object,
     case PROP_3GPP_OPERATOR_NAME:
         g_value_set_string (value, self->priv->modem_3gpp_operator_name);
         break;
+    case PROP_3GPP_SUBSCRIPTION_STATE:
+        g_value_set_enum (value, self->priv->modem_3gpp_subscription_state);
+        break;
     case PROP_CDMA_CDMA1X_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
         break;
@@ -582,6 +617,7 @@ mm_simple_status_init (MMSimpleStatus *self)
     self->priv->state = MM_MODEM_STATE_UNKNOWN;
     self->priv->access_technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_3gpp_subscription_state = MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
     self->priv->current_bands = g_variant_ref_sink (mm_common_build_bands_unknown ());
     self->priv->signal_quality = g_variant_ref_sink (g_variant_new ("(ub)", 0, 0));
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -677,6 +713,15 @@ mm_simple_status_class_init (MMSimpleStatusClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_3GPP_OPERATOR_NAME, properties[PROP_3GPP_OPERATOR_NAME]);
+
+    properties[PROP_3GPP_SUBSCRIPTION_STATE] =
+        g_param_spec_enum (MM_SIMPLE_PROPERTY_3GPP_SUBSCRIPTION_STATE,
+                           "3GPP subscription state",
+                           "Subscription state of the account",
+                           MM_TYPE_MODEM_3GPP_SUBSCRIPTION_STATE,
+                           MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_3GPP_SUBSCRIPTION_STATE, properties[PROP_3GPP_SUBSCRIPTION_STATE]);
 
     properties[PROP_CDMA_CDMA1X_REGISTRATION_STATE] =
         g_param_spec_enum (MM_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
