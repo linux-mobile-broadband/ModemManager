@@ -348,6 +348,8 @@ libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Altair LTE modem
 libmm_plugin_altair_lte_la_SOURCES = \
+	altair/mm-modem-helpers-altair-lte.c \
+	altair/mm-modem-helpers-altair-lte.h \
 	altair/mm-plugin-altair-lte.c \
 	altair/mm-plugin-altair-lte.h \
 	altair/mm-broadband-modem-altair-lte.c \
@@ -356,6 +358,17 @@ libmm_plugin_altair_lte_la_SOURCES = \
 	altair/mm-broadband-bearer-altair-lte.h
 libmm_plugin_altair_lte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_altair_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+noinst_PROGRAMS += test-modem-helpers-altair-lte
+test_modem_helpers_altair_lte_SOURCES = \
+	altair/mm-modem-helpers-altair-lte.c \
+	altair/mm-modem-helpers-altair-lte.h \
+	altair/tests/test-modem-helpers-altair-lte.c
+test_modem_helpers_altair_lte_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/altair \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_altair_lte_LDFLAGS = $(top_builddir)/libmm-glib/libmm-glib.la
+
 
 # VIA modem
 libmm_plugin_via_la_SOURCES = \
