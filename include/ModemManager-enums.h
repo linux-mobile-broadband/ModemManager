@@ -772,7 +772,7 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_network_availability >*/
 } MMModem3gppNetworkAvailability;
 
 /**
- * MModem3gppSubscriptionState:
+ * MMModem3gppSubscriptionState:
  * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN: The subscription state is unknown.
  * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNPROVISIONED: The account is unprovisioned.
  * @MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED: The account is provisioned and has data available.

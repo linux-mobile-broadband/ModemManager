@@ -16,6 +16,7 @@ MMBearerAllowedAuth
 MMFirmwareImageType
 MMModem3gppFacility
 MMModem3gppNetworkAvailability
+MMModem3gppSubscriptionState
 MMModem3gppRegistrationState
 MMModem3gppUssdSessionState
 MMModemAccessTechnology
