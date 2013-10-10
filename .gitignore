@@ -148,10 +148,9 @@ m4/xsize.m4
 
 uml290/uml290mode
 
-plugins/test-modem-helpers-huawei
-plugins/test-modem-helpers-huawei.log
-plugins/test-modem-helpers-huawei.trs
 plugins/test-suite.log
+plugins/test-modem-helpers-huawei*
+plugins/test-modem-helpers-altair*
 
 TAGS
 ABOUT-NLS
