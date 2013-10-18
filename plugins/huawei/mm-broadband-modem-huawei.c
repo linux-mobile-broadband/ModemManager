@@ -113,66 +113,6 @@ struct _MMBroadbandModemHuaweiPrivate {
 
 /*****************************************************************************/
 
-static gboolean
-sysinfoex_parse (const char *reply,
-                 guint *out_srv_status,
-                 guint *out_srv_domain,
-                 guint *out_roam_status,
-                 guint *out_sim_state,
-                 guint *out_sys_mode,
-                 guint *out_sys_submode,
-                 GError **error)
-{
-    gboolean matched;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-
-    g_assert (out_srv_status != NULL);
-    g_assert (out_srv_domain != NULL);
-    g_assert (out_roam_status != NULL);
-    g_assert (out_sim_state != NULL);
-    g_assert (out_sys_mode != NULL);
-    g_assert (out_sys_submode != NULL);
-
-    /* Format:
-     *
-     * ^SYSINFOEX: <srv_status>,<srv_domain>,<roam_status>,<sim_state>,<reserved>,<sysmode>,<sysmode_name>,<submode>,<submode_name>
-     */
-
-    /* ^SYSINFOEX:2,3,0,1,,3,"WCDMA",41,"HSPA+" */
-
-    r = g_regex_new ("\\^SYSINFOEX:\\s*(\\d+),(\\d+),(\\d+),(\\d+),?(\\d*),(\\d+),\"(.*)\",(\\d+),\"(.*)\"$", 0, 0, NULL);
-    g_assert (r != NULL);
-
-    matched = g_regex_match_full (r, reply, -1, 0, 0, &match_info, &match_error);
-    if (!matched) {
-        if (match_error) {
-            g_propagate_error (error, match_error);
-            g_prefix_error (error, "Could not parse ^SYSINFOEX results: ");
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't match ^SYSINFOEX reply");
-        }
-    } else {
-        mm_get_uint_from_match_info (match_info, 1, out_srv_status);
-        mm_get_uint_from_match_info (match_info, 2, out_srv_domain);
-        mm_get_uint_from_match_info (match_info, 3, out_roam_status);
-        mm_get_uint_from_match_info (match_info, 4, out_sim_state);
-
-        /* We just ignore the sysmode and submode name strings */
-        mm_get_uint_from_match_info (match_info, 6, out_sys_mode);
-        mm_get_uint_from_match_info (match_info, 8, out_sys_submode);
-    }
-
-    if (match_info)
-        g_match_info_free (match_info);
-    g_regex_unref (r);
-    return matched;
-}
-
 typedef struct {
     gboolean extended;
     guint srv_status;
@@ -314,14 +254,14 @@ run_sysinfoex_ready (MMBaseModem *_self,
 
     result = g_new0 (SysinfoResult, 1);
     result->extended = TRUE;
-    if (!sysinfoex_parse (response,
-                          &result->srv_status,
-                          &result->srv_domain,
-                          &result->roam_status,
-                          &result->sim_state,
-                          &result->sys_mode,
-                          &result->sys_submode,
-                          &error)) {
+    if (!mm_huawei_parse_sysinfoex_response (response,
+                                             &result->srv_status,
+                                             &result->srv_domain,
+                                             &result->roam_status,
+                                             &result->sim_state,
+                                             &result->sys_mode,
+                                             &result->sys_submode,
+                                             &error)) {
         mm_dbg ("^SYSINFOEX parsing failed: %s", error->message);
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
