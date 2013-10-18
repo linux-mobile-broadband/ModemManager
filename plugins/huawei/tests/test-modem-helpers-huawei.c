@@ -129,6 +129,69 @@ test_ndisstatqry (void)
 }
 
 /*****************************************************************************/
+/* Test ^SYSINFO responses */
+
+typedef struct {
+    const gchar *str;
+    guint expected_srv_status;
+    guint expected_srv_domain;
+    guint expected_roam_status;
+    guint expected_sys_mode;
+    guint expected_sim_state;
+    gboolean expected_sys_submode_valid;
+    guint expected_sys_submode;
+} SysinfoTest;
+
+static const SysinfoTest sysinfo_tests[] = {
+    { "^SYSINFO:2,4,5,3,1",      2, 4, 5, 3, 1, FALSE, 0 },
+    { "^SYSINFO:2,4,5,3,1,",     2, 4, 5, 3, 1, FALSE, 0 },
+    { "^SYSINFO:2,4,5,3,1,,",    2, 4, 5, 3, 1, FALSE, 0 },
+    { "^SYSINFO:2,4,5,3,1,6",    2, 4, 5, 3, 1, FALSE, 6 },
+    { "^SYSINFO:2,4,5,3,1,6,",   2, 4, 5, 3, 1, FALSE, 6 },
+    { "^SYSINFO:2,4,5,3,1,,3",   2, 4, 5, 3, 1, TRUE,  3 },
+    { "^SYSINFO:2,4,5,3,1,0,3",  2, 4, 5, 3, 1, TRUE,  3 },
+    { "^SYSINFO: 2,4,5,3,1,0,3", 2, 4, 5, 3, 1, TRUE,  3 },
+    { NULL,                      0, 0, 0, 0, 0, FALSE, 0 }
+};
+
+static void
+test_sysinfo (void)
+{
+    guint i;
+
+    for (i = 0; sysinfo_tests[i].str; i++) {
+        GError *error = NULL;
+        guint srv_status = 0;
+        guint srv_domain = 0;
+        guint roam_status = 0;
+        guint sys_mode = 0;
+        guint sim_state = 0;
+        gboolean sys_submode_valid = FALSE;
+        guint sys_submode = 0;
+
+        g_assert (mm_huawei_parse_sysinfo_response (sysinfo_tests[i].str,
+                                                    &srv_status,
+                                                    &srv_domain,
+                                                    &roam_status,
+                                                    &sys_mode,
+                                                    &sim_state,
+                                                    &sys_submode_valid,
+                                                    &sys_submode,
+                                                    &error) == TRUE);
+        g_assert_no_error (error);
+
+        g_assert (srv_status == sysinfo_tests[i].expected_srv_status);
+        g_assert (srv_domain == sysinfo_tests[i].expected_srv_domain);
+        g_assert (roam_status == sysinfo_tests[i].expected_roam_status);
+        g_assert (sys_mode == sysinfo_tests[i].expected_sys_mode);
+        g_assert (sim_state == sysinfo_tests[i].expected_sim_state);
+        g_assert (sys_submode_valid == sysinfo_tests[i].expected_sys_submode_valid);
+        if (sys_submode_valid)
+            g_assert (sys_submode == sysinfo_tests[i].expected_sys_submode);
+    }
+}
+
+/*****************************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -138,6 +201,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/huawei/ndisstatqry", test_ndisstatqry);
+    g_test_add_func ("/MM/huawei/sysinfo", test_sysinfo);
 
     return g_test_run ();
 }

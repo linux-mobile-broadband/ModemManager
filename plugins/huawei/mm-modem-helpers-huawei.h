@@ -27,4 +27,15 @@ gboolean mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                                gboolean *ipv6_connected,
                                                GError **error);
 
+/* ^SYSINFO response parser */
+gboolean mm_huawei_parse_sysinfo_response (const char *reply,
+                                           guint *out_srv_status,
+                                           guint *out_srv_domain,
+                                           guint *out_roam_status,
+                                           guint *out_sys_mode,
+                                           guint *out_sim_state,
+                                           gboolean *out_sys_submode_valid,
+                                           guint *out_sys_submode,
+                                           GError **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */
