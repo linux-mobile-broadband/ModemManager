@@ -3440,6 +3440,49 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Subscription State Loading (3GPP interface) */
+
+static MMModem3gppSubscriptionState
+modem_3gpp_load_subscription_state_finish (MMIfaceModem3gpp *self,
+                                           GAsyncResult *res,
+                                           GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+
+    return (MMModem3gppSubscriptionState) GPOINTER_TO_UINT (
+        g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_load_subscription_state);
+
+   /* Reloading subscription state only occurs on a successfully registered
+    * modem. (Although the 3GPP interface does not reflect this until after
+    * loading operator information completes.)
+    * By default, we can assume that successful registration implies a
+    * provisioned SIM.
+    */
+    mm_dbg ("Load subscription state: Marking the SIM as provisioned.");
+    g_simple_async_result_set_op_res_gpointer (
+        result,
+        GUINT_TO_POINTER (MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED),
+        NULL);
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Unsolicited registration messages handling (3GPP interface) */
 
 static gboolean
@@ -9626,6 +9669,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
     iface->load_operator_name = modem_3gpp_load_operator_name;
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
+    iface->load_subscription_state = modem_3gpp_load_subscription_state;
+    iface->load_subscription_state_finish = modem_3gpp_load_subscription_state_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;
