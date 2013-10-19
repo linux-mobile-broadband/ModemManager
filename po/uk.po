@@ -1,0 +1,98 @@
+# Ukrainian translation of Modem Manager
+# Copyright (C) 2013 Free Software Foundation, Inc.
+# This file is distributed under the same license as the Modem Manager package.
+#
+# Yuri Chornoivan <yurchor@ukr.net>, 2013.
+msgid ""
+msgstr ""
+"Project-Id-Version: Modem Manager\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-10-19 18:13+0300\n"
+"PO-Revision-Date: 2013-10-19 18:17+0300\n"
+"Last-Translator: Yuri Chornoivan <yurchor@ukr.net>\n"
+"Language-Team: Ukrainian <kde-i18n-uk@kde.org>\n"
+"Language: uk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Generator: Lokalize 1.5\n"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:1
+msgid "Control the Modem Manager daemon"
+msgstr "Керування фоновою службою Modem Manager"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:2
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Правила системи перешкоджають керування Modem Manager."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:3
+msgid "Unlock and control a mobile broadband device"
+msgstr "Розблокувати пристрій мобільної широкосмугової мережі і керувати ним"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:4
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Правила системи забороняють розблокування і керування пристроями "
+"широкосмугових мобільних мереж."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:5
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr ""
+"Додати, внести зміни і вилучити контакти пристрою мобільних широкосмугових "
+"мереж"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:6
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Правила системи перешкоджають додаванню, внесенню змін та вилученню записів "
+"контактів на цьому пристрої."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:7
+msgid "Send, save, modify, and delete text messages"
+msgstr "Надіслати, зберегти, внести зміни або вилучити текстові повідомлення"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:8
+msgid ""
+"System policy prevents sending or maniuplating this device's text messages."
+msgstr ""
+"Правила системи забороняють надсилання або керування текстовими "
+"повідомленнями цього пристрою."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:9
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Увімкнути або переглянути дані щодо географічного розташування і позиціювання"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:10
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Правила системи забороняють вмикання або перегляд даних щодо розташування."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:11
+msgid "Query and utilize network information and services"
+msgstr "Надіслати запит і використати дані щодо мережі і служби"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:12
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Правила системи забороняють надсилання запитів і використання даних щодо "
+"мережі і служб."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:13
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr ""
+"Опитування та керування мікропрограмою на пристрої мобільної широкосмугової "
+"мережі"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:14
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Правила системи перешкоджають опитуванню або керування мікропрограмою цього "
+"пристрою."
