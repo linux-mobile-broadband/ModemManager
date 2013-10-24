@@ -1743,19 +1743,16 @@ signal_quality_csq_ready (MMBroadbandModem *self,
 
         result_str = mm_strip_tag (result_str, "+CSQ:");
         if (sscanf (result_str, "%d, %d", &quality, &ber)) {
-            /* 99 means unknown */
             if (quality == 99) {
-                g_simple_async_result_take_error (
-                    ctx->result,
-                    mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK));
+                /* 99 means unknown, no service, etc */
+                quality = 0;
             } else {
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
-                g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                           GUINT_TO_POINTER (quality),
-                                                           NULL);
             }
-
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       GUINT_TO_POINTER (quality),
+                                                       NULL);
             signal_quality_context_complete_and_free (ctx);
             return;
         }
