@@ -986,7 +986,7 @@ ensure_internal_unlock_retries (MMModem *self,
  * mm_modem_get_unlock_retries() again to get a new #MMUnlockRetries with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMUnlockRetries that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMUnlockRetries that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMUnlockRetries *
 mm_modem_get_unlock_retries (MMModem *self)

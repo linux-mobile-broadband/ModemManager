@@ -389,7 +389,7 @@ mm_modem_location_get_full_sync (MMModemLocation *self,
  *
  * Finishes an operation started with mm_modem_location_get_3gpp().
  *
- * Returns: (transfer full) A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocation3gpp *
 mm_modem_location_get_3gpp_finish (MMModemLocation *self,
