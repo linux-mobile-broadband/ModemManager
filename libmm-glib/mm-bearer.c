@@ -273,7 +273,7 @@ ensure_internal_ipv4_config (MMBearer *self,
  * mm_bearer_get_ipv4_config() again to get a new #MMBearerIpConfig with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMBearerIpConfig *
 mm_bearer_get_ipv4_config (MMBearer *self)
@@ -298,7 +298,7 @@ mm_bearer_get_ipv4_config (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_ipv4_config() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
  */
 MMBearerIpConfig *
 mm_bearer_peek_ipv4_config (MMBearer *self)
@@ -385,7 +385,7 @@ ensure_internal_ipv6_config (MMBearer *self,
  * mm_bearer_get_ipv6_config() again to get a new #MMBearerIpConfig with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMBearerIpConfig *
 mm_bearer_get_ipv6_config (MMBearer *self)
@@ -410,7 +410,7 @@ mm_bearer_get_ipv6_config (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_ipv6_config() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
  */
 MMBearerIpConfig *
 mm_bearer_peek_ipv6_config (MMBearer *self)
@@ -497,7 +497,7 @@ ensure_internal_properties (MMBearer *self,
  * mm_bearer_get_properties() again to get a new #MMBearerProperties with the
  * new values.</warning>
  *
- * Returns: (transfer full) A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
  */
 MMBearerProperties *
 mm_bearer_get_properties (MMBearer *self)
@@ -522,7 +522,7 @@ mm_bearer_get_properties (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_properties() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMBearerProperties. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerProperties. Do not free the returned value, it belongs to @self.
  */
 MMBearerProperties *
 mm_bearer_peek_properties (MMBearer *self)

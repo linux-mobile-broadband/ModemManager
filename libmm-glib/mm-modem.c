@@ -1013,7 +1013,7 @@ mm_modem_get_unlock_retries (MMModem *self)
  * @self was constructed. Use mm_modem_get_unlock_retries() if on another
  * thread.</warning>
  *
- * Returns: (transfer none) A #MMUnlockRetries. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMUnlockRetries. Do not free the returned value, it belongs to @self.
  */
 MMUnlockRetries *
 mm_modem_peek_unlock_retries (MMModem *self)
@@ -2375,7 +2375,7 @@ mm_modem_factory_reset_sync (MMModem *self,
  *
  * Finishes an operation started with mm_modem_command().
  *
- * Returns: (transfer full) A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
  */
 gchar *
 mm_modem_command_finish (MMModem *self,
@@ -2437,7 +2437,7 @@ mm_modem_command (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_command()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
  */
 gchar *
 mm_modem_command_sync (MMModem *self,

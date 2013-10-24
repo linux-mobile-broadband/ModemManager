@@ -158,7 +158,7 @@ build_full_foreach (const gchar *trace_type,
  *
  * Gets a compilation of all cached traces.
  *
- * Returns: (transfer full) a string containing all traces, or #NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): a string containing all traces, or #NULL if none available. The returned value should be freed with g_free().
  */
 gchar *
 mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)

@@ -437,7 +437,7 @@ mm_modem_location_get_3gpp (MMModemLocation *self,
  * The calling thread is blocked until a reply is received. See mm_modem_location_get_3gpp()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocation3gpp *
 mm_modem_location_get_3gpp_sync (MMModemLocation *self,
@@ -461,7 +461,7 @@ mm_modem_location_get_3gpp_sync (MMModemLocation *self,
  *
  * Finishes an operation started with mm_modem_location_get_gps_nmea().
  *
- * Returns: (transfer full) A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationGpsNmea *
 mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
@@ -509,7 +509,7 @@ mm_modem_location_get_gps_nmea (MMModemLocation *self,
  * The calling thread is blocked until a reply is received. See mm_modem_location_get_gps_nmea()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationGpsNmea *
 mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
@@ -533,7 +533,7 @@ mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
  *
  * Finishes an operation started with mm_modem_location_get_gps_raw().
  *
- * Returns: (transfer full) A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationGpsRaw *
 mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
@@ -581,7 +581,7 @@ mm_modem_location_get_gps_raw (MMModemLocation *self,
  * The calling thread is blocked until a reply is received. See mm_modem_location_get_gps_raw()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationGpsRaw *
 mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
@@ -605,7 +605,7 @@ mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
  *
  * Finishes an operation started with mm_modem_location_get_cdma_bs().
  *
- * Returns: (transfer full) A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationCdmaBs *
 mm_modem_location_get_cdma_bs_finish (MMModemLocation *self,
@@ -653,7 +653,7 @@ mm_modem_location_get_cdma_bs (MMModemLocation *self,
  * The calling thread is blocked until a reply is received. See mm_modem_location_get_cdma_bs()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
  */
 MMLocationCdmaBs *
 mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,

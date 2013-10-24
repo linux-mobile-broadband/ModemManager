@@ -154,7 +154,7 @@ mm_sms_get_data (MMSms *self,
 /**
  * mm_sms_dup_data:
  * @self: A #MMSms.
- * @data_len: (out) Size of the output data, if any given.
+ * @data_len: (out): Size of the output data, if any given.
  *
  * Gets the message data.
  *
