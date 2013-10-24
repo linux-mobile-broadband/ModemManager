@@ -551,6 +551,14 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
         /* Store the context */
         ctx->self->priv->disconnect_pending = ctx;
 
+        /* We ignore any pending network-initiated disconnection in order to prevent it
+         * from interfering with the client-initiated disconnection, as we would like to
+         * proceed with the latter anyway. */
+        if (ctx->self->priv->network_disconnect_pending_id != 0) {
+            g_source_remove (ctx->self->priv->network_disconnect_pending_id);
+            ctx->self->priv->network_disconnect_pending_id = 0;
+        }
+
         ctx->step++;
         /* Fall down to the next step */
 
@@ -605,11 +613,6 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
         return;
 
     case DISCONNECT_3GPP_CONTEXT_STEP_LAST:
-        if (ctx->self->priv->network_disconnect_pending_id != 0) {
-            g_source_remove (ctx->self->priv->network_disconnect_pending_id);
-            ctx->self->priv->network_disconnect_pending_id = 0;
-        }
-
         /* Clear context */
         ctx->self->priv->disconnect_pending = NULL;
         /* Set data port as result */
