@@ -270,7 +270,14 @@ generate_cdma_submit_pdus (MMSms *self,
         g_assert_not_reached ();
     mm_sms_part_set_encoding (part, data ? MM_SMS_ENCODING_8BIT : MM_SMS_ENCODING_UNKNOWN);
     mm_sms_part_set_number (part, mm_gdbus_sms_get_number (MM_GDBUS_SMS (self)));
-    mm_sms_part_set_cdma_teleservice_id (part, mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)));
+
+    /* If creating a CDMA SMS part but we don't have a Teleservice ID, we default to WMT */
+    if (mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)) == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN) {
+        mm_dbg ("Defaulting to WMT teleservice ID when creating SMS part");
+        mm_sms_part_set_cdma_teleservice_id (part, MM_SMS_CDMA_TELESERVICE_ID_WMT);
+    } else
+        mm_sms_part_set_cdma_teleservice_id (part, mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)));
+
     mm_sms_part_set_cdma_service_category (part, mm_gdbus_sms_get_service_category (MM_GDBUS_SMS (self)));
 
     mm_dbg ("Created SMS part for CDMA SMS");
@@ -288,12 +295,25 @@ static gboolean
 generate_submit_pdus (MMSms *self,
                       GError **error)
 {
-    /* First; decide which kind of PDU we'll generate. If Teleservice ID given,
-     * this will be a 3GPP2 SMS */
-    if (mm_gdbus_sms_get_teleservice_id (MM_GDBUS_SMS (self)) != MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN)
-        return generate_cdma_submit_pdus (self, error);
-    else
+    MMBaseModem *modem;
+    gboolean is_3gpp;
+
+    /* First; decide which kind of PDU we'll generate, based on the current modem caps */
+
+    g_object_get (self,
+                  MM_SMS_MODEM, &modem,
+                  NULL);
+    g_assert (modem != NULL);
+
+    is_3gpp = mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem));
+    g_object_unref (modem);
+
+    /* On a 3GPP-capable modem, create always a 3GPP SMS (even if the modem is 3GPP+3GPP2) */
+    if (is_3gpp)
         return generate_3gpp_submit_pdus (self, error);
+
+    /* Otherwise, create a 3GPP2 SMS */
+    return generate_cdma_submit_pdus (self, error);
 }
 
 /*****************************************************************************/
