@@ -862,6 +862,32 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
         break;
     }
 
+    case ENCODING_LATIN: {
+        gchar *latin;
+        gchar *text;
+        guint i;
+
+        SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_fields * 8)) / 8));
+
+        latin = g_malloc (num_fields + 1);
+        for (i = 0; i < num_fields; i++) {
+            latin[i] = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
+            OFFSETS_UPDATE (8);
+        }
+        latin[i] = '\0';
+
+        text = g_convert (latin, -1, "UTF-8", "ISO−8859−1", NULL, NULL, NULL);
+        if (!text) {
+            mm_dbg ("            text/data: ignored (latin to UTF-8 conversion error)");
+        } else {
+            mm_dbg ("            text: '%s'", text);
+            mm_sms_part_take_text (sms_part, text);
+        }
+
+        g_free (latin);
+        break;
+    }
+
     default:
         mm_dbg ("            text/data: ignored (unsupported encoding)");
     }

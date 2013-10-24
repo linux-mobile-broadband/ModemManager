@@ -238,6 +238,50 @@ test_created_by_us (void)
         "AAAA");
 }
 
+static void
+test_latin_encoding (void)
+{
+    static const guint8 pdu[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* originating address */
+        0x02, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer reply option */
+        0x06, 0x01,
+        0xFC,
+        /* bearer data */
+        0x08, 0x39,
+            /* message id */
+            0x00, 0x03,
+            0x13, 0x8D, 0x20,
+            /* user data */
+            0x01, 0x27,
+            0x41, 0x29, 0x19, 0x22, 0xE1, 0x19, 0x1A, 0xE1,
+            0x1A, 0x01, 0x19, 0xA1, 0x19, 0xA1, 0xA9, 0xB1,
+            0xB9, 0xE9, 0x53, 0x4B, 0x23, 0xAB, 0x53, 0x23,
+            0xAB, 0x23, 0x2B, 0xAB, 0xAB, 0x2B, 0x23, 0xAB,
+            0x53, 0x23, 0x2B, 0xAB, 0x53, 0xAB, 0x20,
+            /* message center timestamp */
+            0x03, 0x06,
+            0x13, 0x10, 0x23, 0x20, 0x06, 0x37,
+            /* priority indicator */
+            0x08, 0x01,
+            0x00
+    };
+
+    common_test_part_from_pdu (
+        pdu, sizeof (pdu),
+        MM_SMS_CDMA_TELESERVICE_ID_WMT,
+        MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+        "3305773196",
+        63,
+        "#$\\##\\#@#4#4567=*idujdudeuuedujdeujud");
+}
+
 /********************* PDU CREATOR TESTS *********************/
 
 static void
@@ -341,6 +385,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-parameter-length", test_invalid_parameter_length);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-address-length", test_invalid_address_length);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/created-by-us", test_created_by_us);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/latin-encoding", test_latin_encoding);
+
     g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/Text", test_create_pdu_text);
 
     return g_test_run ();
