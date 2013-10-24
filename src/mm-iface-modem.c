@@ -304,7 +304,7 @@ load_unlock_required_ready (MMIfaceModem *self,
     }
 
     /* Got the lock value, return it */
-    g_simple_async_result_set_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (ctx->result),
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                GUINT_TO_POINTER (lock),
                                                NULL);
     internal_load_unlock_required_context_complete_and_free (ctx);
