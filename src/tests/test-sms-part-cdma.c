@@ -279,7 +279,92 @@ test_latin_encoding (void)
         MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
         "3305773196",
         63,
+        /* this is ASCII-7 but message uses latin encoding */
         "#$\\##\\#@#4#4567=*idujdudeuuedujdeujud");
+}
+
+static void
+test_latin_encoding_2 (void)
+{
+    static const guint8 pdu[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* originating address */
+        0x02, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer reply option */
+        0x06, 0x01,
+        0xFC,
+        /* bearer data */
+        0x08, 0x1C,
+            /* message id */
+            0x00, 0x03,
+            0x13, 0x8D, 0x20,
+            /* user data */
+            0x01, 0x0A,
+            0x40, 0x42, 0x1B, 0x0B, 0x6B, 0x83, 0x2F, 0x9B,
+            0x71, 0x08,
+            /* message center timestamp */
+            0x03, 0x06,
+            0x13, 0x10, 0x23, 0x20, 0x06, 0x37,
+            /* priority indicator */
+            0x08, 0x01,
+            0x00
+    };
+
+    common_test_part_from_pdu (
+        pdu, sizeof (pdu),
+        MM_SMS_CDMA_TELESERVICE_ID_WMT,
+        MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+        "3305773196",
+        63,
+        /* this is latin and message uses latin encoding */
+        "Campeón!");
+}
+
+static void
+test_unicode_encoding (void)
+{
+    static const guint8 pdu[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* originating address */
+        0x02, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer reply option */
+        0x06, 0x01,
+        0xFC,
+        /* bearer data */
+        0x08, 0x28,
+            /* message id */
+            0x00, 0x03,
+            0x1B, 0x73, 0xF0,
+            /* user data */
+            0x01, 0x16,
+            0x20, 0x52, 0x71, 0x6A, 0xB8, 0x5A, 0xA7, 0x92,
+            0xDB, 0xC3, 0x37, 0xC4, 0xB7, 0xDA, 0xDA, 0x82,
+            0x98, 0xB4, 0x50, 0x42, 0x94, 0x18,
+            /* message center timestamp */
+            0x03, 0x06,
+            0x13, 0x10, 0x24, 0x10, 0x45, 0x28,
+            /* priority indicator */
+            0x08, 0x01,
+            0x00
+    };
+
+    common_test_part_from_pdu (
+        pdu, sizeof (pdu),
+        MM_SMS_CDMA_TELESERVICE_ID_WMT,
+        MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+        "3305773196",
+        63,
+        "中國哲學書電子化計劃");
 }
 
 /********************* PDU CREATOR TESTS *********************/
@@ -326,7 +411,7 @@ common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
 }
 
 static void
-test_create_pdu_text (void)
+test_create_pdu_text_ascii_encoding (void)
 {
     static const char *number = "3305773196";
     static const char *text = "AAAA";
@@ -343,6 +428,71 @@ test_create_pdu_text (void)
         0x08, 0x0D,
         0x00, 0x03, 0x20, 0x00, 0x00, /* message id */
         0x01, 0x06, 0x10, 0x24, 0x18, 0x30, 0x60, 0x80 /* user_data */
+    };
+
+    common_test_create_pdu (MM_SMS_CDMA_TELESERVICE_ID_WMT,
+                            number,
+                            text,
+                            NULL, 0,
+                            expected, sizeof (expected));
+}
+
+static void
+test_create_pdu_text_latin_encoding (void)
+{
+    static const char *number = "3305773196";
+    static const char *text = "Campeón!";
+    static const guint8 expected[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* destination address */
+        0x04, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer data */
+        0x08, 0x11,
+            /* message id */
+            0x00, 0x03,
+            0x20, 0x00, 0x00,
+            /* user data */
+            0x01, 0x0A,
+            0x40, 0x42, 0x1B, 0x0B, 0x6B, 0x83, 0x2F, 0x9B,
+            0x71, 0x08
+    };
+
+    common_test_create_pdu (MM_SMS_CDMA_TELESERVICE_ID_WMT,
+                            number,
+                            text,
+                            NULL, 0,
+                            expected, sizeof (expected));
+}
+
+static void
+test_create_pdu_text_unicode_encoding (void)
+{
+    static const char *number = "3305773196";
+    static const char *text = "中國哲學書電子化計劃";
+    static const guint8 expected[] = {
+        /* message type */
+        0x00,
+        /* teleservice id */
+        0x00, 0x02,
+        0x10, 0x02,
+        /* destination address */
+        0x04, 0x07,
+        0x02, 0x8C, 0xE9, 0x5D, 0xCC, 0x65, 0x80,
+        /* bearer data */
+        0x08, 0x1D,
+            /* message id */
+            0x00, 0x03,
+            0x20, 0x00, 0x00,
+            /* user data */
+            0x01, 0x16,
+            0x20, 0x52, 0x71, 0x6A, 0xB8, 0x5A, 0xA7, 0x92,
+            0xDB, 0xC3, 0x37, 0xC4, 0xB7, 0xDA, 0xDA, 0x82,
+            0x98, 0xB4, 0x50, 0x42, 0x94, 0x18
     };
 
     common_test_create_pdu (MM_SMS_CDMA_TELESERVICE_ID_WMT,
@@ -386,8 +536,12 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-address-length", test_invalid_address_length);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/created-by-us", test_created_by_us);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/latin-encoding", test_latin_encoding);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/latin-encoding-2", test_latin_encoding_2);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/unicode-encoding", test_unicode_encoding);
 
-    g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/Text", test_create_pdu_text);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/ascii-encoding", test_create_pdu_text_ascii_encoding);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/latin-encoding", test_create_pdu_text_latin_encoding);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/unicode-encoding", test_create_pdu_text_unicode_encoding);
 
     return g_test_run ();
 }
