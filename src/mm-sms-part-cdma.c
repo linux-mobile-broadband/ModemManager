@@ -22,6 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-charsets.h"
 #include "mm-sms-part-cdma.h"
 #include "mm-log.h"
 
@@ -1326,6 +1327,65 @@ write_bearer_data_message_identifier (MMSmsPart *part,
     return TRUE;
 }
 
+static void
+decide_best_encoding (const gchar *text,
+                      GByteArray **out,
+                      guint *num_fields,
+                      guint *num_bits_per_field,
+                      Encoding *encoding)
+{
+    guint latin_unsupported = 0;
+    guint ascii_unsupported = 0;
+    guint i;
+    guint len;
+
+    len = strlen (text);
+
+    /* Check if we can do ASCII-7 */
+    for (i = 0; i < len; i++) {
+        if (text[i] & 0x80) {
+            ascii_unsupported++;
+            break;
+        }
+    }
+
+    /* If ASCII-7 already supported, done we are */
+    if (!ascii_unsupported) {
+        *out = g_byte_array_sized_new (len);
+        g_byte_array_append (*out, (const guint8 *)text, len);
+        *num_fields = len;
+        *num_bits_per_field = 7;
+        *encoding = ENCODING_ASCII_7BIT;
+        return;
+    }
+
+    /* Check if we can do Latin encoding */
+    mm_charset_get_encoded_len (text,
+                                MM_MODEM_CHARSET_8859_1,
+                                &latin_unsupported);
+    if (!latin_unsupported) {
+        *out = g_byte_array_sized_new (len);
+        mm_modem_charset_byte_array_append (*out,
+                                            text,
+                                            FALSE,
+                                            MM_MODEM_CHARSET_8859_1);
+        *num_fields = (*out)->len;
+        *num_bits_per_field = 8;
+        *encoding = ENCODING_LATIN;
+        return;
+    }
+
+    /* If no Latin and no ASCII, default to UTF-16 */
+    *out = g_byte_array_sized_new (len * 2);
+    mm_modem_charset_byte_array_append (*out,
+                                        text,
+                                        FALSE,
+                                        MM_MODEM_CHARSET_UCS2);
+    *num_fields = (*out)->len / 2;
+    *num_bits_per_field = 16;
+    *encoding = ENCODING_UNICODE;
+}
+
 static gboolean
 write_bearer_data_user_data (MMSmsPart *part,
                              guint8 *pdu,
@@ -1337,7 +1397,12 @@ write_bearer_data_user_data (MMSmsPart *part,
     guint bit_offset = 0;
     guint byte_offset = 0;
     guint num_fields;
+    guint num_bits_per_field;
     guint i;
+    Encoding encoding;
+    GByteArray *converted = NULL;
+    const GByteArray *aux;
+    guint num_bits_per_iter;
 
 #define OFFSETS_UPDATE(n_bits) do { \
         bit_offset += n_bits;       \
@@ -1357,13 +1422,29 @@ write_bearer_data_user_data (MMSmsPart *part,
     byte_offset = 2;
     bit_offset = 0;
 
+    /* Text or Data */
+    if (text) {
+        decide_best_encoding (text,
+                              &converted,
+                              &num_fields,
+                              &num_bits_per_field,
+                              &encoding);
+        aux = (const GByteArray *)converted;
+    } else {
+        aux = data;
+        num_fields = data->len;
+        num_bits_per_field = 8;
+        encoding = ENCODING_OCTET;
+    }
+
     /* Message encoding*/
-    write_bits (&pdu[byte_offset], bit_offset, 5, data ? ENCODING_OCTET : ENCODING_ASCII_7BIT);
+    write_bits (&pdu[byte_offset], bit_offset, 5, encoding);
     OFFSETS_UPDATE (5);
 
     /* Number of fields */
-    num_fields = data ? data->len : strlen (text);
     if (num_fields > 256) {
+        if (converted)
+            g_byte_array_unref (converted);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
@@ -1374,28 +1455,16 @@ write_bearer_data_user_data (MMSmsPart *part,
     write_bits (&pdu[byte_offset], bit_offset, 8, num_fields);
     OFFSETS_UPDATE (8);
 
-    /* Actual text or data */
-    if (data) {
-        for (i = 0; i < num_fields; i++) {
-            write_bits (&pdu[byte_offset], bit_offset, 8, data->data[i]);
-            OFFSETS_UPDATE (8);
-        }
-    } else {
-        for (i = 0; i < num_fields; i++) {
-            /* ASCII-7 characters given in gchar should have the most
-             * significant bit set to 0 */
-            if (text[i] & 0x80) {
-                g_set_error (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_UNSUPPORTED,
-                             "Unsupported character in text: '%u'. Cannot convert to ASCII-7",
-                             text[i]);
-                return FALSE;
-            }
-            write_bits (&pdu[byte_offset], bit_offset, 7, text[i]);
-            OFFSETS_UPDATE (7);
-        }
+    /* For ASCII-7, write 7 bits in each iteration; for the remaining ones
+     * go byte per byte */
+    num_bits_per_iter = num_bits_per_field < 8 ? num_bits_per_field : 8;
+    for (i = 0; i < aux->len; i++) {
+        write_bits (&pdu[byte_offset], bit_offset, num_bits_per_iter, aux->data[i]);
+        OFFSETS_UPDATE (num_bits_per_iter);
     }
+
+    if (converted)
+        g_byte_array_unref (converted);
 
 #undef OFFSETS_UPDATE
 
