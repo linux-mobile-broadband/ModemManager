@@ -889,6 +889,35 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
         break;
     }
 
+    case ENCODING_UNICODE: {
+        gchar *utf16;
+        gchar *text;
+        guint i;
+        guint num_bytes;
+
+        /* 2 bytes per field! */
+        num_bytes = num_fields * 2;
+
+        SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_bytes * 8)) / 8));
+
+        utf16 = g_malloc (num_bytes);
+        for (i = 0; i < num_bytes; i++) {
+            utf16[i] = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
+            OFFSETS_UPDATE (8);
+        }
+
+        text = g_convert (utf16, num_bytes, "UTF-8", "UCS-2BE", NULL, NULL, NULL);
+        if (!text) {
+            mm_dbg ("            text/data: ignored (UTF-16 to UTF-8 conversion error)");
+        } else {
+            mm_dbg ("            text: '%s'", text);
+            mm_sms_part_take_text (sms_part, text);
+        }
+
+        g_free (utf16);
+        break;
+    }
+
     default:
         mm_dbg ("            text/data: ignored (unsupported encoding)");
     }
