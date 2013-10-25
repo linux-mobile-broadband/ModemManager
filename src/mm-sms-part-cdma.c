@@ -783,7 +783,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
 
 #define SUBPARAMETER_SIZE_CHECK(required_size)                             \
     if (subparameter->parameter_len < required_size) {                  \
-        mm_dbg ("        cannot read address, need at least %u bytes (got %u)", \
+        mm_dbg ("        cannot read user data, need at least %u bytes (got %u)", \
                 required_size,                                          \
                 subparameter->parameter_len);                           \
         return;                                                         \
