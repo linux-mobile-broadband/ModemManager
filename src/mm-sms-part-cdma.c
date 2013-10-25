@@ -205,6 +205,29 @@ typedef enum {
     ENCODING_GSM_DCS                   = 10,
 } Encoding;
 
+static const gchar *
+encoding_to_string (Encoding encoding)
+{
+    static const gchar *encoding_str[] = {
+        "octet",
+        "extend protocol message",
+        "7-bit ASCII",
+        "IA5",
+        "unicode",
+        "shift-j is",
+        "korean",
+        "latin/hebrew",
+        "latin",
+        "7-bit GSM",
+        "GSM data coding scheme"
+    };
+
+    if (encoding >= ENCODING_OCTET && encoding <= ENCODING_GSM_DCS)
+        return encoding_str[encoding];
+
+    return "unknown";
+}
+
 /*****************************************************************************/
 /* Read bits; o_bits < 8; n_bits <= 8
  *
@@ -772,44 +795,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
     SUBPARAMETER_SIZE_CHECK (1);
     message_encoding = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 5);
     OFFSETS_UPDATE (5);
-    switch (message_encoding) {
-    case ENCODING_OCTET:
-        mm_dbg ("            message encoding: octet, unspecified");
-        break;
-    case ENCODING_EXTENDED_PROTOCOL_MESSAGE:
-        mm_dbg ("            message encoding: extended protocol message");
-        break;
-    case ENCODING_ASCII_7BIT:
-        mm_dbg ("            message encoding: 7-bit ASCII");
-        break;
-    case ENCODING_IA5:
-        mm_dbg ("            message encoding: IA5");
-        break;
-    case ENCODING_UNICODE:
-        mm_dbg ("            message encoding: unicode");
-        break;
-    case ENCODING_SHIFT_JIS:
-        mm_dbg ("            message encoding: shift-j is");
-        break;
-    case ENCODING_KOREAN:
-        mm_dbg ("            message encoding: korean");
-        break;
-    case ENCODING_LATIN_HEBREW:
-        mm_dbg ("            message encoding: latin/hebrew");
-        break;
-    case ENCODING_LATIN:
-        mm_dbg ("            message encoding: latin");
-        break;
-    case ENCODING_GSM_7BIT:
-        mm_dbg ("            message encoding: 7-bit GSM");
-        break;
-    case ENCODING_GSM_DCS:
-        mm_dbg ("            message encoding: GSM data coding scheme");
-        break;
-    default:
-        mm_dbg ("            message encoding unknown (%u)", message_encoding);
-        break;
-    }
+    mm_dbg ("            message encoding: %s", encoding_to_string (message_encoding));
 
     /* Message type, only if extended protocol message */
     if (message_encoding == ENCODING_EXTENDED_PROTOCOL_MESSAGE) {
@@ -1230,6 +1216,8 @@ write_teleservice_id (MMSmsPart *part,
 {
     guint16 aux16;
 
+    mm_dbg ("    writing teleservice ID...");
+
     if (mm_sms_part_get_cdma_teleservice_id (part) != MM_SMS_CDMA_TELESERVICE_ID_WMT) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -1239,6 +1227,10 @@ write_teleservice_id (MMSmsPart *part,
                          mm_sms_part_get_cdma_teleservice_id (part)));
         return FALSE;
     }
+
+    mm_dbg ("        teleservice ID: %s (%u)",
+            mm_sms_cdma_teleservice_id_get_string (MM_SMS_CDMA_TELESERVICE_ID_WMT),
+            MM_SMS_CDMA_TELESERVICE_ID_WMT);
 
     /* Teleservice ID: WMT always */
     pdu[0] = PARAMETER_ID_TELESERVICE_ID;
@@ -1262,6 +1254,8 @@ write_destination_address (MMSmsPart *part,
     guint n_digits;
     guint i;
 
+    mm_dbg ("    writing destination address...");
+
 #define OFFSETS_UPDATE(n_bits) do { \
         bit_offset += n_bits;       \
         if (bit_offset >= 8) {      \
@@ -1280,10 +1274,12 @@ write_destination_address (MMSmsPart *part,
     bit_offset = 0;
 
     /* Digit mode: DTMF always */
+    mm_dbg ("        digit mode: dtmf");
     write_bits (&pdu[byte_offset], bit_offset, 1, DIGIT_MODE_DTMF);
     OFFSETS_UPDATE (1);
 
     /* Number mode: DIGIT always */
+    mm_dbg ("        number mode: digit");
     write_bits (&pdu[byte_offset], bit_offset, 1, NUMBER_MODE_DIGIT);
     OFFSETS_UPDATE (1);
 
@@ -1298,10 +1294,12 @@ write_destination_address (MMSmsPart *part,
                      n_digits);
         return FALSE;
     }
+    mm_dbg ("        num fields: %u", n_digits);
     write_bits (&pdu[byte_offset], bit_offset, 8, n_digits);
     OFFSETS_UPDATE (8);
 
     /* Actual DTMF encoded number */
+    mm_dbg ("        address: %s", number);
     for (i = 0; i < n_digits; i++) {
         guint8 dtmf;
 
@@ -1344,6 +1342,8 @@ write_bearer_data_message_identifier (MMSmsPart *part,
 {
     pdu[0] = SUBPARAMETER_ID_MESSAGE_ID;
     pdu[1] = 3; /* subparameter_len, always 3 */
+
+    mm_dbg ("        writing message identifier: submit");
 
     /* Message type */
     write_bits (&pdu[2], 0, 4, TELESERVICE_MESSAGE_TYPE_SUBMIT);
@@ -1433,6 +1433,8 @@ write_bearer_data_user_data (MMSmsPart *part,
     const GByteArray *aux;
     guint num_bits_per_iter;
 
+    mm_dbg ("        writing user data...");
+
 #define OFFSETS_UPDATE(n_bits) do { \
         bit_offset += n_bits;       \
         if (bit_offset >= 8) {      \
@@ -1467,6 +1469,7 @@ write_bearer_data_user_data (MMSmsPart *part,
     }
 
     /* Message encoding*/
+    mm_dbg ("            message encoding: %s", encoding_to_string (encoding));
     write_bits (&pdu[byte_offset], bit_offset, 5, encoding);
     OFFSETS_UPDATE (5);
 
@@ -1481,11 +1484,16 @@ write_bearer_data_user_data (MMSmsPart *part,
                      num_fields);
         return FALSE;
     }
+    mm_dbg ("            num fields: %u", num_fields);
     write_bits (&pdu[byte_offset], bit_offset, 8, num_fields);
     OFFSETS_UPDATE (8);
 
     /* For ASCII-7, write 7 bits in each iteration; for the remaining ones
      * go byte per byte */
+    if (text)
+        mm_dbg ("            text: '%s'", text);
+    else
+        mm_dbg ("            data: (%u bytes)", num_fields);
     num_bits_per_iter = num_bits_per_field < 8 ? num_bits_per_field : 8;
     for (i = 0; i < aux->len; i++) {
         write_bits (&pdu[byte_offset], bit_offset, num_bits_per_iter, aux->data[i]);
@@ -1521,6 +1529,8 @@ write_bearer_data (MMSmsPart *part,
 {
     GError *inner_error = NULL;
     guint offset = 0;
+
+    mm_dbg ("    writing bearer data...");
 
     pdu[0] = PARAMETER_ID_BEARER_DATA;
     /* Write parameter length at the end */
