@@ -94,4 +94,20 @@ ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Bluegiga BLE112B
 ATTRS{idVendor}=="2458", ATTRS{idProduct}=="0001", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# MediaTek GPS chip (HOLUX M-1200E, GlobalTop Gms-d1, etc)
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="3329", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# PS-360 OEM (GPS sold with MS Street and Trips 2005)
+ATTRS{idVendor}=="067b", ATTRS{idProduct}=="aaa0", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# u-blox AG, u-blox 5 GPS chips
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a5", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a6", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Garmin GPS devices
+DRIVERS=="garmin_gps", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Cypress M8-based GPS devices, UPSes, and serial converters
+DRIVERS=="cypress_m8", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"

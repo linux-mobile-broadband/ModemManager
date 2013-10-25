@@ -24,6 +24,7 @@ ATTRS{idVendor}=="0711", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
 # Cygnal Integrated Products, Inc. CP210x
 ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea71", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
 # QinHeng Electronics HL-340
 ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
