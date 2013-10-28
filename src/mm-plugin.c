@@ -311,12 +311,17 @@ apply_pre_probing_filters (MMPlugin *self,
         }
     }
 
-    /* If we got filtered by vendor or product IDs  and we do not have vendor
-     * or product strings to compare with: unsupported */
+    /* If we got filtered by vendor or product IDs; mark it as unsupported only if:
+     *   a) we do not have vendor or product strings to compare with (i.e. plugin
+     *      doesn't have explicit vendor/product strings
+     *   b) the port is NOT an AT port which we can use for AT probing
+     */
     if ((vendor_filtered || product_filtered) &&
-        !self->priv->vendor_strings &&
-        !self->priv->product_strings &&
-        !self->priv->forbidden_product_strings) {
+        ((!self->priv->vendor_strings &&
+          !self->priv->product_strings &&
+          !self->priv->forbidden_product_strings) ||
+         g_str_equal (g_udev_device_get_subsystem (port), "net") ||
+         g_str_has_prefix (g_udev_device_get_name (port), "cdc-wdm"))) {
         mm_dbg ("(%s) [%s] filtered by vendor/product IDs",
                 self->priv->name,
                 g_udev_device_get_name (port));
