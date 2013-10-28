@@ -87,6 +87,7 @@ po/en@quot.header
 po/insert-header.sin
 po/quot.sed
 po/remove-potcdate.sin
+po/*.gmo
 
 docs/reference/api/version.xml
 docs/reference/api/ModemManager.args
