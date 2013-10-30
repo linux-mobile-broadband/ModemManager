@@ -390,8 +390,10 @@ huawei_custom_init (MMPortProbe *probe,
     }
 
     /* We can run custom init in the first interface! clear the timeout as it is no longer needed */
-    g_source_remove (fi_ctx->timeout_id);
-    fi_ctx->timeout_id = 0;
+    if (fi_ctx->timeout_id) {
+        g_source_remove (fi_ctx->timeout_id);
+        fi_ctx->timeout_id = 0;
+    }
 
     huawei_custom_init_step (ctx);
 }
