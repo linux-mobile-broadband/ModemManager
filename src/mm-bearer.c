@@ -441,7 +441,12 @@ disconnect_after_cancel_ready (MMBearer *self,
     else
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
 
-    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+    /* Report disconnection to the bearer object using class method
+     * mm_bearer_report_connection_status. This gives subclass implementations a
+     * chance to correctly update their own connection state, in case this base
+     * class ignores a failed disconnection attempt.
+     */
+    mm_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 static void
@@ -945,7 +950,12 @@ disconnect_force_ready (MMBearer *self,
     else
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
 
-    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+    /* Report disconnection to the bearer object using class method
+     * mm_bearer_report_connection_status. This gives subclass implementations a
+     * chance to correctly update their own connection state, in case this base
+     * class ignores a failed disconnection attempt.
+     */
+    mm_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 void
