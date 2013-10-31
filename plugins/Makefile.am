@@ -367,7 +367,8 @@ test_modem_helpers_altair_lte_SOURCES = \
 test_modem_helpers_altair_lte_CPPFLAGS = \
 	-I$(top_srcdir)/plugins/altair \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
-test_modem_helpers_altair_lte_LDFLAGS = $(top_builddir)/libmm-glib/libmm-glib.la
+test_modem_helpers_altair_lte_LDADD = $(top_builddir)/libmm-glib/libmm-glib.la
+test_modem_helpers_altair_lte_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 
 # VIA modem
