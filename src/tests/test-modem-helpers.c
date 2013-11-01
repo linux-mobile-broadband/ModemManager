@@ -1707,6 +1707,20 @@ test_cgdcont_test_response_multiple_and_ignore (void *f, gpointer d)
     test_cgdcont_test_results ("Multiple and Ignore", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+static void
+test_cgdcont_test_response_single_context (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CGDCONT: (1),\"IP\",,,(0),(0)\r\n"
+        "+CGDCONT: (1),\"IPV6\",,,(0),(0)\r\n";
+    static MM3gppPdpContextFormat expected[] = {
+        { 1, 1, MM_BEARER_IP_FAMILY_IPV4 },
+        { 1, 1, MM_BEARER_IP_FAMILY_IPV6 }
+    };
+
+    test_cgdcont_test_results ("Single Context", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
 /*****************************************************************************/
 /* Test CGDCONT read responses */
 
@@ -2443,6 +2457,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_single, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple_and_ignore, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_single_context, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));

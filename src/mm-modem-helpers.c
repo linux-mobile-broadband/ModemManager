@@ -764,7 +764,7 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
         return NULL;
     }
 
-    r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
+    r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-?(\\d+)?\\),\\(?\"(\\S+)\"",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, &inner_error);
     g_assert (r != NULL);
@@ -786,19 +786,18 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
             if (!mm_get_uint_from_match_info (match_info, 1, &min_cid))
                 mm_warn ("Invalid min CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
             else {
-                /* Read max CID */
+                MM3gppPdpContextFormat *format;
+
+                /* Read max CID: Optional! If no value given, we default to min CID */
                 if (!mm_get_uint_from_match_info (match_info, 2, &max_cid))
-                    mm_warn ("Invalid max CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
-                else {
-                    MM3gppPdpContextFormat *format;
+                    max_cid = min_cid;
 
-                    format = g_slice_new (MM3gppPdpContextFormat);
-                    format->pdp_type = pdp_type;
-                    format->min_cid = min_cid;
-                    format->max_cid = max_cid;
+                format = g_slice_new (MM3gppPdpContextFormat);
+                format->pdp_type = pdp_type;
+                format->min_cid = min_cid;
+                format->max_cid = max_cid;
 
-                    list = g_list_prepend (list, format);
-                }
+                list = g_list_prepend (list, format);
             }
         }
 
