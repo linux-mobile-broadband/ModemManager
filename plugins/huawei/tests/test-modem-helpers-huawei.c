@@ -17,6 +17,11 @@
 #include <glib-object.h>
 #include <locale.h>
 
+#include <ModemManager.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
+#include "mm-log.h"
 #include "mm-modem-helpers-huawei.h"
 
 /*****************************************************************************/
@@ -245,6 +250,26 @@ test_sysinfoex (void)
 }
 
 /*****************************************************************************/
+
+void
+_mm_log (const char *loc,
+         const char *func,
+         guint32 level,
+         const char *fmt,
+         ...)
+{
+#if defined ENABLE_TEST_MESSAGE_TRACES
+    /* Dummy log function */
+    va_list args;
+    gchar *msg;
+
+    va_start (args, fmt);
+    msg = g_strdup_vprintf (fmt, args);
+    va_end (args);
+    g_print ("%s\n", msg);
+    g_free (msg);
+#endif
+}
 
 int main (int argc, char **argv)
 {

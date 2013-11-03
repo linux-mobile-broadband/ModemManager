@@ -19,6 +19,7 @@
 
 #include "glib.h"
 
+/*****************************************************************************/
 /* ^NDISSTAT / ^NDISSTATQRY response parser */
 gboolean mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                                gboolean *ipv4_available,
@@ -27,6 +28,7 @@ gboolean mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                                gboolean *ipv6_connected,
                                                GError **error);
 
+/*****************************************************************************/
 /* ^SYSINFO response parser */
 gboolean mm_huawei_parse_sysinfo_response (const char *reply,
                                            guint *out_srv_status,
@@ -38,6 +40,7 @@ gboolean mm_huawei_parse_sysinfo_response (const char *reply,
                                            guint *out_sys_submode,
                                            GError **error);
 
+/*****************************************************************************/
 /* ^SYSINFOEX response parser */
 gboolean mm_huawei_parse_sysinfoex_response (const char *reply,
                                              guint *out_srv_status,
