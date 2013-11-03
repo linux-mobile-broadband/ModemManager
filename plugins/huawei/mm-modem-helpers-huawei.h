@@ -51,4 +51,16 @@ gboolean mm_huawei_parse_sysinfoex_response (const char *reply,
                                              guint *out_sys_submode,
                                              GError **error);
 
+/*****************************************************************************/
+/* ^PREFMODE test parser */
+
+typedef struct {
+    guint prefmode;
+    MMModemMode allowed;
+    MMModemMode preferred;
+} MMHuaweiPrefmodeCombination;
+
+GArray *mm_huawei_parse_prefmode_test (const gchar *response,
+                                       GError **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */

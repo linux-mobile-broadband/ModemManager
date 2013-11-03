@@ -22,6 +22,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 
 /*****************************************************************************/
@@ -250,6 +251,129 @@ test_sysinfoex (void)
 }
 
 /*****************************************************************************/
+/* Test ^PREFMODE=? responses */
+
+#define MAX_PREFMODE_COMBINATIONS 3
+
+typedef struct {
+    const gchar *str;
+    MMHuaweiPrefmodeCombination expected_modes[MAX_PREFMODE_COMBINATIONS];
+} PrefmodeTest;
+
+static const PrefmodeTest prefmode_tests[] = {
+    {
+        "^PREFMODE:(2,4,8)\r\n",
+        {
+            {
+                .prefmode = 8,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .prefmode = 4,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_3G
+            },
+            {
+                .prefmode = 2,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_2G
+            }
+        }
+    },
+    {
+        "^PREFMODE:(2,4)\r\n",
+        {
+            {
+                .prefmode = 4,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_3G
+            },
+            {
+                .prefmode = 2,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_2G
+            },
+            { 0, 0, 0}
+        }
+    },
+    {
+        "^PREFMODE:(2)\r\n",
+        {
+            {
+                .prefmode = 2,
+                .allowed = MM_MODEM_MODE_2G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            { 0, 0, 0}
+        }
+    },
+};
+
+static void
+test_prefmode (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (prefmode_tests); i++) {
+        GError *error = NULL;
+        GArray *combinations = NULL;
+        guint j;
+        guint n_expected_combinations = 0;
+
+        for (j = 0; j < MAX_PREFMODE_COMBINATIONS; j++) {
+            if (prefmode_tests[i].expected_modes[j].prefmode != 0)
+                n_expected_combinations++;
+        }
+
+        combinations = mm_huawei_parse_prefmode_test (prefmode_tests[i].str, &error);
+        g_assert_no_error (error);
+        g_assert (combinations != NULL);
+        g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
+
+#if defined ENABLE_TEST_MESSAGE_TRACES
+        for (j = 0; j < combinations->len; j++) {
+            MMHuaweiPrefmodeCombination *single;
+            gchar *allowed_str;
+            gchar *preferred_str;
+
+            single = &g_array_index (combinations, MMHuaweiPrefmodeCombination, j);
+            allowed_str = mm_modem_mode_build_string_from_mask (single->allowed);
+            preferred_str = mm_modem_mode_build_string_from_mask (single->preferred);
+            mm_dbg ("Test[%u], Combination[%u]: %u, \"%s\", \"%s\"",
+                    i,
+                    j,
+                    single->prefmode,
+                    allowed_str,
+                    preferred_str);
+            g_free (allowed_str);
+            g_free (preferred_str);
+        }
+#endif
+
+        for (j = 0; j < combinations->len; j++) {
+            MMHuaweiPrefmodeCombination *single;
+            guint k;
+            gboolean found = FALSE;
+
+            single = &g_array_index (combinations, MMHuaweiPrefmodeCombination, j);
+            for (k = 0; k <= n_expected_combinations; k++) {
+                if (single->allowed == prefmode_tests[i].expected_modes[k].allowed &&
+                    single->preferred == prefmode_tests[i].expected_modes[k].preferred &&
+                    single->prefmode == prefmode_tests[i].expected_modes[k].prefmode) {
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            g_assert (found == TRUE);
+        }
+
+        g_array_unref (combinations);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -281,6 +405,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/ndisstatqry", test_ndisstatqry);
     g_test_add_func ("/MM/huawei/sysinfo", test_sysinfo);
     g_test_add_func ("/MM/huawei/sysinfoex", test_sysinfoex);
+    g_test_add_func ("/MM/huawei/prefmode", test_prefmode);
 
     return g_test_run ();
 }

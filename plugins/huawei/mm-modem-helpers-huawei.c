@@ -20,6 +20,8 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-log.h"
+#include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 
 /*****************************************************************************/
@@ -243,4 +245,121 @@ mm_huawei_parse_sysinfoex_response (const char *reply,
         g_match_info_free (match_info);
     g_regex_unref (r);
     return matched;
+}
+
+/*****************************************************************************/
+/* ^PREFMODE test parser
+ *
+ * AT^PREFMODE=?
+ *   ^PREFMODE:(2,4,8)
+ */
+
+static gboolean
+mode_from_prefmode (guint huawei_mode,
+                    MMModemMode *modem_mode,
+                    GError **error)
+{
+    g_assert (modem_mode != NULL);
+
+    *modem_mode = MM_MODEM_MODE_NONE;
+    switch (huawei_mode) {
+    case 2:
+        *modem_mode = MM_MODEM_MODE_2G;
+        break;
+    case 4:
+        *modem_mode = MM_MODEM_MODE_3G;
+        break;
+    case 8:
+        *modem_mode = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        break;
+    default:
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No translation from huawei prefmode '%u' to mode",
+                     huawei_mode);
+    }
+
+    return *modem_mode != MM_MODEM_MODE_NONE ? TRUE : FALSE;
+}
+
+GArray *
+mm_huawei_parse_prefmode_test (const gchar *response,
+                               GError **error)
+{
+    gchar **split;
+    guint i;
+    MMModemMode all = MM_MODEM_MODE_NONE;
+    GArray *out;
+
+    response = mm_strip_tag (response, "^PREFMODE:");
+    split = g_strsplit_set (response, " (,)\r\n", -1);
+    if (!split) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected ^PREFMODE format output");
+        return NULL;
+    }
+
+    out = g_array_sized_new (FALSE,
+                             FALSE,
+                             sizeof (MMHuaweiPrefmodeCombination),
+                             3);
+    for (i = 0; split[i]; i++) {
+        guint val;
+        MMModemMode preferred = MM_MODEM_MODE_NONE;
+        GError *inner_error = NULL;
+        MMHuaweiPrefmodeCombination combination;
+
+        if (split[i][0] == '\0')
+            continue;
+
+        if (!mm_get_uint_from_str (split[i], &val)) {
+            mm_dbg ("Error parsing ^PREFMODE value: %s", split[i]);
+            continue;
+        }
+
+        if (!mode_from_prefmode (val, &preferred, &inner_error)) {
+            mm_dbg ("Unhandled ^PREFMODE: %s", inner_error->message);
+            g_error_free (inner_error);
+            continue;
+        }
+
+        combination.prefmode = val;
+        combination.allowed = MM_MODEM_MODE_NONE; /* reset it later */
+        combination.preferred = preferred;
+
+        all |= preferred;
+
+        g_array_append_val (out, combination);
+    }
+    g_strfreev (split);
+
+    /* No value */
+    if (out->len == 0) {
+        g_array_unref (out);
+        return NULL;
+    }
+
+    /* Single value listed; PREFERRED=NONE... */
+    if (out->len == 1) {
+        MMHuaweiPrefmodeCombination *combination;
+
+        combination = &g_array_index (out, MMHuaweiPrefmodeCombination, 0);
+        combination->allowed = all;
+        combination->preferred = MM_MODEM_MODE_NONE;
+    } else {
+        /* Multiple values, reset ALLOWED */
+        for (i = 0; i < out->len; i++) {
+            MMHuaweiPrefmodeCombination *combination;
+
+            combination = &g_array_index (out, MMHuaweiPrefmodeCombination, i);
+            combination->allowed = all;
+            if (combination->preferred == all)
+                combination->preferred = MM_MODEM_MODE_NONE;
+        }
+    }
+
+    return out;
 }
