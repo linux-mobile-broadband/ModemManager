@@ -15,6 +15,8 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -359,6 +361,303 @@ mm_huawei_parse_prefmode_test (const gchar *response,
             if (combination->preferred == all)
                 combination->preferred = MM_MODEM_MODE_NONE;
         }
+    }
+
+    return out;
+}
+
+/*****************************************************************************/
+/* ^SYSCFG test parser */
+
+static gchar **
+split_groups (const gchar *str,
+              GError **error)
+{
+    const gchar *p = str;
+    GPtrArray *out;
+    guint groups = 0;
+
+    /*
+     * Split string: (a),((b1),(b2)),,(d),((e1),(e2))
+     * Into:
+     *   - a
+     *   - (b1),(b2)
+     *   -
+     *   - d
+     *   - (e1),(e2)
+     */
+
+    out = g_ptr_array_new_with_free_func (g_free);
+
+    while (TRUE) {
+        const gchar *start;
+        guint inner_groups;
+
+        /* Skip whitespaces */
+        while (*p == ' ' || *p == '\r' || *p == '\n')
+            p++;
+
+        /* We're done, return */
+        if (*p == '\0') {
+            g_ptr_array_set_size (out, out->len + 1);
+            return (gchar **) g_ptr_array_free (out, FALSE);
+        }
+
+        /* Group separators */
+        if (groups > 0) {
+            if (*p != ',') {
+                g_set_error (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Unexpected group separator");
+                g_ptr_array_unref (out);
+                return NULL;
+            }
+            p++;
+        }
+
+        /* Skip whitespaces */
+        while (*p == ' ' || *p == '\r' || *p == '\n')
+            p++;
+
+        /* New group */
+        groups++;
+
+        /* Empty group? */
+        if (*p == ',' || *p == '\0') {
+            g_ptr_array_add (out, g_strdup (""));
+            continue;
+        }
+
+        /* No group start? */
+        if (*p != '(') {
+            /* Error */
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Expected '(' not found");
+            g_ptr_array_unref (out);
+            return NULL;
+        }
+        p++;
+
+        inner_groups = 0;
+        start = p;
+        while (TRUE) {
+            if (*p == '(') {
+                inner_groups++;
+                p++;
+                continue;
+            }
+
+            if (*p == '\0') {
+                g_set_error (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Early end of string found, unfinished group");
+                g_ptr_array_unref (out);
+                return NULL;
+            }
+
+            if (*p == ')') {
+                gchar *group;
+
+                if (inner_groups > 0) {
+                    inner_groups--;
+                    p++;
+                    continue;
+                }
+
+                group = g_strndup (start, p - start);
+                g_ptr_array_add (out, group);
+                p++;
+                break;
+            }
+
+            /* keep on */
+            p++;
+        }
+    }
+
+    g_assert_not_reached ();
+}
+
+static gboolean
+mode_from_syscfg (guint huawei_mode,
+                  MMModemMode *modem_mode,
+                  GError **error)
+{
+    g_assert (modem_mode != NULL);
+
+    *modem_mode = MM_MODEM_MODE_NONE;
+    switch (huawei_mode) {
+    case 2:
+        *modem_mode = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
+        break;
+    case 13:
+        *modem_mode = MM_MODEM_MODE_2G;
+        break;
+    case 14:
+        *modem_mode = MM_MODEM_MODE_3G;
+        break;
+    case 16:
+        /* ignore */
+        break;
+    default:
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No translation from huawei prefmode '%u' to mode",
+                     huawei_mode);
+    }
+
+    return *modem_mode != MM_MODEM_MODE_NONE ? TRUE : FALSE;
+}
+
+static GArray *
+parse_syscfg_modes (const gchar *modes_str,
+                    const gchar *acqorder_str,
+                    GError **error)
+{
+    GArray *out;
+    gchar **split;
+    guint i;
+    gint min_acqorder = 0;
+    gint max_acqorder = 0;
+
+    /* Start parsing acquisition order */
+    if (!sscanf (acqorder_str, "%d-%d", &min_acqorder, &max_acqorder))
+        mm_dbg ("Error parsing ^SYSCFG acquisition order range (%s)", acqorder_str);
+
+    /* Just in case, we default to supporting only auto */
+    if (max_acqorder < min_acqorder) {
+        min_acqorder = 0;
+        max_acqorder = 0;
+    }
+
+    /* Now parse modes */
+    split = g_strsplit (modes_str, ",", -1);
+    out = g_array_sized_new (FALSE,
+                             FALSE,
+                             sizeof (MMHuaweiSyscfgCombination),
+                             g_strv_length (split));
+    for (i = 0; split[i]; i++) {
+        guint val;
+        guint allowed = MM_MODEM_MODE_NONE;
+        GError *inner_error = NULL;
+        MMHuaweiSyscfgCombination combination;
+
+        if (!mm_get_uint_from_str (mm_strip_quotes (split[i]), &val)) {
+            mm_dbg ("Error parsing ^SYSCFG mode value: %s", split[i]);
+            continue;
+        }
+
+        if (!mode_from_syscfg (val, &allowed, &inner_error)) {
+            if (inner_error) {
+                mm_dbg ("Unhandled ^SYSCFG: %s", inner_error->message);
+                g_error_free (inner_error);
+            }
+            continue;
+        }
+
+        switch (allowed) {
+        case MM_MODEM_MODE_2G:
+        case MM_MODEM_MODE_3G:
+            /* single mode */
+            combination.allowed = allowed;
+            combination.preferred = MM_MODEM_MODE_NONE;
+            combination.mode = val;
+            combination.acqorder = 0;
+            g_array_append_val (out, combination);
+            break;
+        case (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G):
+            /* 2G and 3G; auto */
+            combination.allowed = allowed;
+            combination.mode = val;
+            if (min_acqorder == 0) {
+                combination.preferred = MM_MODEM_MODE_NONE;
+                combination.acqorder = 0;
+                g_array_append_val (out, combination);
+            }
+            /* 2G and 3G; 2G preferred */
+            if (min_acqorder <= 1 && max_acqorder >= 1) {
+                combination.preferred = MM_MODEM_MODE_2G;
+                combination.acqorder = 1;
+                g_array_append_val (out, combination);
+            }
+            /* 2G and 3G; 3G preferred */
+            if (min_acqorder <= 2 && max_acqorder >= 2) {
+                combination.preferred = MM_MODEM_MODE_3G;
+                combination.acqorder = 2;
+                g_array_append_val (out, combination);
+            }
+            break;
+        default:
+            g_assert_not_reached ();
+        }
+    }
+
+    /* If we didn't build a valid array of combinations, return an error */
+    if (out->len == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Cannot parse list of allowed mode combinations: '%s,%s'",
+                     modes_str,
+                     acqorder_str);
+        g_array_unref (out);
+        return NULL;
+    }
+
+    return out;
+}
+
+GArray *
+mm_huawei_parse_syscfg_test (const gchar *response,
+                             GError **error)
+{
+    gchar **split;
+    GError *inner_error = NULL;
+    GArray *out;
+
+    if (!response || !g_str_has_prefix (response, "^SYSCFG:")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Missing ^SYSCFG prefix");
+        return NULL;
+    }
+
+    /* Examples:
+     *
+     * ^SYSCFG:(2,13,14,16),
+     *         (0-3),
+     *         ((400000,"WCDMA2100")),
+     *         (0-2),
+     *         (0-4)
+     */
+    split = split_groups (mm_strip_tag (response, "^SYSCFG:"), error);
+    if (!split)
+        return NULL;
+
+    /* We expect 5 string chunks */
+    if (g_strv_length (split) < 5) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected ^SYSCFG format");
+        g_strfreev (split);
+        return FALSE;
+    }
+
+    /* Parse supported mode combinations */
+    out = parse_syscfg_modes (split[0], split[1], &inner_error);
+
+    g_strfreev (split);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
     }
 
     return out;

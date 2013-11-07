@@ -63,4 +63,17 @@ typedef struct {
 GArray *mm_huawei_parse_prefmode_test (const gchar *response,
                                        GError **error);
 
+/*****************************************************************************/
+/* ^SYSCFG test parser */
+
+typedef struct {
+    guint mode;
+    guint acqorder;
+    MMModemMode allowed;
+    MMModemMode preferred;
+} MMHuaweiSyscfgCombination;
+
+GArray *mm_huawei_parse_syscfg_test (const gchar *response,
+                                     GError **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */
