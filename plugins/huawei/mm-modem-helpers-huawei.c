@@ -662,3 +662,183 @@ mm_huawei_parse_syscfg_test (const gchar *response,
 
     return out;
 }
+
+/*****************************************************************************/
+/* ^SYSCFGEX test parser */
+
+static void
+huawei_syscfgex_combination_free (MMHuaweiSyscfgexCombination *item)
+{
+    /* Just the contents, not the item itself! */
+    g_free (item->mode_str);
+}
+
+static gboolean
+parse_mode_combination_string (const gchar *mode_str,
+                               MMModemMode *allowed,
+                               MMModemMode *preferred)
+{
+    guint n;
+
+    if (g_str_equal (mode_str, "00")) {
+        *allowed = MM_MODEM_MODE_ANY;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    }
+
+    *allowed = MM_MODEM_MODE_NONE;
+    *preferred = MM_MODEM_MODE_NONE;
+
+    for (n = 0; n < strlen (mode_str); n+=2) {
+        MMModemMode mode;
+
+        if (g_ascii_strncasecmp (&mode_str[n], "01", 2) == 0)
+            /* GSM */
+            mode = MM_MODEM_MODE_2G;
+        else if (g_ascii_strncasecmp (&mode_str[n], "02", 2) == 0)
+            /* WCDMA */
+            mode = MM_MODEM_MODE_3G;
+        else if (g_ascii_strncasecmp (&mode_str[n], "03", 2) == 0)
+            /* LTE */
+            mode = MM_MODEM_MODE_4G;
+        else if (g_ascii_strncasecmp (&mode_str[n], "04", 2) == 0)
+            /* CDMA Note: no EV-DO, just return single value, so assume CDMA1x*/
+            mode = MM_MODEM_MODE_2G;
+        else
+            mode = MM_MODEM_MODE_NONE;
+
+        if (mode != MM_MODEM_MODE_NONE) {
+            /* The first one in the list is the preferred combination */
+            if (n == 0)
+                *preferred |= mode;
+            *allowed |= mode;
+        }
+    }
+
+    switch (mm_count_bits_set (*allowed)) {
+    case 0:
+        /* No allowed, error */
+        return FALSE;
+    case 1:
+        /* If only one mode allowed, NONE preferred */
+        *preferred = MM_MODEM_MODE_NONE;
+        /* fall down */
+    default:
+        return TRUE;
+    }
+}
+
+static GArray *
+parse_mode_combination_string_list (const gchar *modes_str,
+                                    GError **error)
+{
+    GArray *supported_mode_combinations;
+    gchar **mode_combinations;
+    MMModemMode all = MM_MODEM_MODE_NONE;
+    gboolean has_all = FALSE;
+    guint i;
+
+    mode_combinations = g_strsplit (modes_str, ",", -1);
+    supported_mode_combinations = g_array_sized_new (FALSE,
+                                                     FALSE,
+                                                     sizeof (MMHuaweiSyscfgexCombination),
+                                                     g_strv_length (mode_combinations));
+    g_array_set_clear_func (supported_mode_combinations,
+                            (GDestroyNotify)huawei_syscfgex_combination_free);
+
+    for (i = 0; mode_combinations[i]; i++) {
+        MMHuaweiSyscfgexCombination combination;
+
+        mode_combinations[i] = mm_strip_quotes (mode_combinations[i]);
+        if (!parse_mode_combination_string (mode_combinations[i],
+                                            &combination.allowed,
+                                            &combination.preferred))
+            continue;
+
+        if (combination.allowed != MM_MODEM_MODE_ANY) {
+            combination.mode_str = g_strdup (mode_combinations[i]);
+            g_array_append_val (supported_mode_combinations, combination);
+
+            all |= combination.allowed;
+        } else {
+            /* don't add the all_combination here, we may have more
+             * combinations in the loop afterwards */
+            has_all = TRUE;
+        }
+    }
+
+    /* Add here the all_combination */
+    if (has_all) {
+        MMHuaweiSyscfgexCombination combination;
+
+        combination.allowed = all;
+        combination.preferred = MM_MODEM_MODE_NONE;
+        combination.mode_str = g_strdup ("00");
+        g_array_append_val (supported_mode_combinations, combination);
+    }
+
+    /* If we didn't build a valid array of combinations, return an error */
+    if (supported_mode_combinations->len == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Cannot parse list of allowed mode combinations: '%s'",
+                     modes_str);
+        g_array_unref (supported_mode_combinations);
+        return NULL;
+    }
+
+    return supported_mode_combinations;
+}
+
+GArray *
+mm_huawei_parse_syscfgex_test (const gchar *response,
+                               GError **error)
+{
+    gchar **split;
+    GError *inner_error = NULL;
+    GArray *out;
+
+    if (!response || !g_str_has_prefix (response, "^SYSCFGEX:")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Missing ^SYSCFGEX prefix");
+        return NULL;
+    }
+
+    /* Examples:
+     *
+     * ^SYSCFGEX: ("00","03","02","01","99"),
+     *            ((2000004e80380,"GSM850/GSM900/GSM1800/GSM1900/WCDMA850/WCDMA900/WCDMA1900/WCDMA2100"),
+     *             (3fffffff,"All Bands")),
+     *            (0-3),
+     *            (0-4),
+     *            ((800c5,"LTE2100/LTE1800/LTE2600/LTE900/LTE800"),
+     *             (7fffffffffffffff,"All bands"))
+     */
+    split = split_groups (mm_strip_tag (response, "^SYSCFGEX:"), error);
+    if (!split)
+        return NULL;
+
+    /* We expect 5 string chunks */
+    if (g_strv_length (split) < 5) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected ^SYSCFGEX format");
+        g_strfreev (split);
+        return NULL;
+    }
+
+    out = parse_mode_combination_string_list (split[0], &inner_error);
+
+    g_strfreev (split);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
+    return out;
+}

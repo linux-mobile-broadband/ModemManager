@@ -523,6 +523,190 @@ test_syscfg (void)
 }
 
 /*****************************************************************************/
+/* Test ^SYSCFGEX=? responses */
+
+#define MAX_SYSCFGEX_COMBINATIONS 5
+
+typedef struct {
+    const gchar *str;
+    MMHuaweiSyscfgexCombination expected_modes[MAX_SYSCFGEX_COMBINATIONS];
+} SyscfgexTest;
+
+static const SyscfgexTest syscfgex_tests[] = {
+    {
+        "^SYSCFGEX: (\"00\",\"03\",\"02\",\"01\",\"99\"),"
+        "((2000004e80380,\"GSM850/GSM900/GSM1800/GSM1900/WCDMA850/WCDMA900/WCDMA1900/WCDMA2100\"),(3fffffff,\"All Bands\")),"
+        "(0-3),"
+        "(0-4),"
+        "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
+        "\r\n",
+        {
+            {
+                .mode_str = "00",
+                .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "03",
+                .allowed = MM_MODEM_MODE_4G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "02",
+                .allowed = MM_MODEM_MODE_3G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "01",
+                .allowed = MM_MODEM_MODE_2G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            { NULL, 0, 0 }
+        }
+    },
+    {
+        "^SYSCFGEX: (\"030201\",\"0302\",\"03\",\"99\"),"
+        "((2000004e80380,\"GSM850/GSM900/GSM1800/GSM1900/WCDMA850/WCDMA900/WCDMA1900/WCDMA2100\"),(3fffffff,\"All Bands\")),"
+        "(0-3),"
+        "(0-4),"
+        "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
+        "\r\n",
+        {
+            {
+                .mode_str = "030201",
+                .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_4G
+            },
+            {
+                .mode_str = "0302",
+                .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G),
+                .preferred = MM_MODEM_MODE_4G
+            },
+            {
+                .mode_str = "03",
+                .allowed = MM_MODEM_MODE_4G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            { NULL, 0, 0 }
+        }
+    },
+    {
+        "^SYSCFGEX: (\"03\"),"
+        "((2000004e80380,\"GSM850/GSM900/GSM1800/GSM1900/WCDMA850/WCDMA900/WCDMA1900/WCDMA2100\"),(3fffffff,\"All Bands\")),"
+        "(0-3),"
+        "(0-4),"
+        "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
+        "\r\n",
+        {
+            {
+                .mode_str = "03",
+                .allowed = MM_MODEM_MODE_4G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            { NULL, 0, 0 }
+        }
+    },
+    {
+        "^SYSCFGEX: (\"00\",\"01\",\"02\",\"0102\",\"0201\"),"
+        "((3fffffff,\"All Bands\"),(2000000400180,\"GSM900/GSM1800/WCDMA900/WCDMA2100\"),(6A80000,\"GSM850/GSM1900/WCDMA850/AWS/WCDMA1900\")),"
+        "(0-2),"
+        "(0-4),"
+        "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
+        "\r\n",
+        {
+            {
+                .mode_str = "00",
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "01",
+                .allowed = MM_MODEM_MODE_2G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "02",
+                .allowed = MM_MODEM_MODE_3G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode_str = "0102",
+                .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
+                .preferred = MM_MODEM_MODE_2G
+            },
+            {
+                .mode_str = "0201",
+                .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
+                .preferred = MM_MODEM_MODE_3G
+            }
+        }
+    }
+};
+
+static void
+test_syscfgex (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (syscfgex_tests); i++) {
+        GError *error = NULL;
+        GArray *combinations = NULL;
+        guint j;
+        guint n_expected_combinations = 0;
+
+        for (j = 0; j < MAX_SYSCFGEX_COMBINATIONS; j++) {
+            if (syscfgex_tests[i].expected_modes[j].mode_str != NULL)
+                n_expected_combinations++;
+        }
+
+        combinations = mm_huawei_parse_syscfgex_test (syscfgex_tests[i].str, &error);
+        g_assert_no_error (error);
+        g_assert (combinations != NULL);
+        g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
+
+#if defined ENABLE_TEST_MESSAGE_TRACES
+        for (j = 0; j < combinations->len; j++) {
+            MMHuaweiSyscfgexCombination *single;
+            gchar *allowed_str;
+            gchar *preferred_str;
+
+            single = &g_array_index (combinations, MMHuaweiSyscfgexCombination, j);
+            allowed_str = mm_modem_mode_build_string_from_mask (single->allowed);
+            preferred_str = mm_modem_mode_build_string_from_mask (single->preferred);
+            mm_dbg ("Test[%u], Combination[%u]: \"%s\", \"%s\", \"%s\"",
+                    i,
+                    j,
+                    single->mode_str,
+                    allowed_str,
+                    preferred_str);
+            g_free (allowed_str);
+            g_free (preferred_str);
+        }
+#endif
+
+        for (j = 0; j < combinations->len; j++) {
+            MMHuaweiSyscfgexCombination *single;
+            guint k;
+            gboolean found = FALSE;
+
+            single = &g_array_index (combinations, MMHuaweiSyscfgexCombination, j);
+            for (k = 0; k <= n_expected_combinations; k++) {
+                if (g_str_equal (single->mode_str, syscfgex_tests[i].expected_modes[k].mode_str) &&
+                    single->allowed == syscfgex_tests[i].expected_modes[k].allowed &&
+                    single->preferred == syscfgex_tests[i].expected_modes[k].preferred) {
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            g_assert (found == TRUE);
+        }
+
+        g_array_unref (combinations);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -556,6 +740,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/sysinfoex", test_sysinfoex);
     g_test_add_func ("/MM/huawei/prefmode", test_prefmode);
     g_test_add_func ("/MM/huawei/syscfg", test_syscfg);
+    g_test_add_func ("/MM/huawei/syscfgex", test_syscfgex);
 
     return g_test_run ();
 }
