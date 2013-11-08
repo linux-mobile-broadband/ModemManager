@@ -65,16 +65,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TY
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
 typedef enum {
-    NDISDUP_SUPPORT_UNKNOWN,
-    NDISDUP_NOT_SUPPORTED,
-    NDISDUP_SUPPORTED
-} NdisdupSupport;
-
-typedef enum {
-    RFSWITCH_SUPPORT_UNKNOWN,
-    RFSWITCH_NOT_SUPPORTED,
-    RFSWITCH_SUPPORTED
-} RfswitchSupport;
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED
+} FeatureSupport;
 
 struct _MMBroadbandModemHuaweiPrivate {
     /* Regex for signal quality related notifications */
@@ -104,11 +98,9 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ndisend_regex;
     GRegex *rfswitch_regex;
 
-    NdisdupSupport ndisdup_support;
-    RfswitchSupport rfswitch_support;
-
-    gboolean sysinfoex_supported;
-    gboolean sysinfoex_support_checked;
+    FeatureSupport ndisdup_support;
+    FeatureSupport rfswitch_support;
+    FeatureSupport sysinfoex_support;
 };
 
 /*****************************************************************************/
@@ -231,9 +223,8 @@ run_sysinfoex_ready (MMBaseModem *_self,
     response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response) {
         /* First time we try, we fallback to ^SYSINFO */
-        if (!self->priv->sysinfoex_support_checked) {
-            self->priv->sysinfoex_support_checked = TRUE;
-            self->priv->sysinfoex_supported = FALSE;
+        if (self->priv->sysinfoex_support == FEATURE_SUPPORT_UNKNOWN) {
+            self->priv->sysinfoex_support = FEATURE_NOT_SUPPORTED;
             mm_dbg ("^SYSINFOEX failed: %s, assuming unsupported", error->message);
             g_error_free (error);
             run_sysinfo (self, simple);
@@ -248,9 +239,8 @@ run_sysinfoex_ready (MMBaseModem *_self,
         return;
     }
 
-    self->priv->sysinfoex_supported = TRUE;
-    if (!self->priv->sysinfoex_support_checked)
-        self->priv->sysinfoex_support_checked = TRUE;
+    if (self->priv->sysinfoex_support == FEATURE_SUPPORT_UNKNOWN)
+        self->priv->sysinfoex_support = FEATURE_SUPPORTED;
 
     result = g_new0 (SysinfoResult, 1);
     result->extended = TRUE;
@@ -300,7 +290,8 @@ sysinfo (MMBroadbandModemHuawei *self,
                                         callback,
                                         user_data,
                                         sysinfo);
-    if (!self->priv->sysinfoex_support_checked || self->priv->sysinfoex_supported)
+    if (self->priv->sysinfoex_support == FEATURE_SUPPORT_UNKNOWN ||
+        self->priv->sysinfoex_support == FEATURE_SUPPORTED)
         run_sysinfoex (self, result);
     else
         run_sysinfo (self, result);
@@ -1849,9 +1840,9 @@ static void
 create_bearer_for_net_port (CreateBearerContext *ctx)
 {
     switch (ctx->self->priv->ndisdup_support) {
-    case NDISDUP_SUPPORT_UNKNOWN:
+    case FEATURE_SUPPORT_UNKNOWN:
         g_assert_not_reached ();
-    case NDISDUP_NOT_SUPPORTED:
+    case FEATURE_NOT_SUPPORTED:
         mm_dbg ("^NDISDUP not supported, creating default bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
                                  ctx->properties,
@@ -1859,7 +1850,7 @@ create_bearer_for_net_port (CreateBearerContext *ctx)
                                  (GAsyncReadyCallback)broadband_bearer_new_ready,
                                  ctx);
         return;
-    case NDISDUP_SUPPORTED:
+    case FEATURE_SUPPORTED:
         mm_dbg ("^NDISDUP supported, creating huawei bearer...");
         mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (ctx->self),
                                         ctx->properties,
@@ -1891,7 +1882,7 @@ huawei_modem_create_bearer (MMIfaceModem *self,
     port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET);
     if (port) {
         /* Check NDISDUP support the first time we need it */
-        if (ctx->self->priv->ndisdup_support == NDISDUP_SUPPORT_UNKNOWN) {
+        if (ctx->self->priv->ndisdup_support == FEATURE_SUPPORT_UNKNOWN) {
             GUdevDevice *net_port;
             GUdevClient *client;
 
@@ -1902,10 +1893,10 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                             mm_port_get_device (port)));
             if (g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
                 mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
-                ctx->self->priv->ndisdup_support = NDISDUP_SUPPORTED;
+                ctx->self->priv->ndisdup_support = FEATURE_SUPPORTED;
             } else {
                 mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
-                ctx->self->priv->ndisdup_support = NDISDUP_NOT_SUPPORTED;
+                ctx->self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
             }
             g_object_unref (client);
         }
@@ -2649,10 +2640,10 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
     }
 
     switch (self->priv->rfswitch_support) {
-    case RFSWITCH_SUPPORT_UNKNOWN:
+    case FEATURE_SUPPORT_UNKNOWN:
         if (error) {
             mm_dbg ("The device does not support ^RFSWITCH");
-            self->priv->rfswitch_support = RFSWITCH_NOT_SUPPORTED;
+            self->priv->rfswitch_support = FEATURE_NOT_SUPPORTED;
             g_error_free (error);
             /* Fall back to parent's load_power_state */
             iface_modem_parent->load_power_state (MM_IFACE_MODEM (self),
@@ -2662,9 +2653,9 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
         }
 
         mm_dbg ("The device supports ^RFSWITCH");
-        self->priv->rfswitch_support = RFSWITCH_SUPPORTED;
+        self->priv->rfswitch_support = FEATURE_SUPPORTED;
         break;
-    case RFSWITCH_SUPPORTED:
+    case FEATURE_SUPPORTED:
         break;
     default:
         g_assert_not_reached ();
@@ -2708,8 +2699,8 @@ load_power_state (MMIfaceModem *self,
                                         load_power_state);
 
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
-    case RFSWITCH_SUPPORT_UNKNOWN:
-    case RFSWITCH_SUPPORTED: {
+    case FEATURE_SUPPORT_UNKNOWN:
+    case FEATURE_SUPPORTED: {
         /* Temporarily disable the unsolicited ^RFSWITCH event handler in order to
          * prevent it from discarding the response to the ^RFSWITCH? command.
          * It will be re-enabled in huawei_rfswitch_check_ready.
@@ -2724,7 +2715,7 @@ load_power_state (MMIfaceModem *self,
                                   result);
         break;
     }
-    case RFSWITCH_NOT_SUPPORTED:
+    case FEATURE_NOT_SUPPORTED:
       /* Run parent's load_power_state */
       iface_modem_parent->load_power_state (self,
                                             (GAsyncReadyCallback)parent_load_power_state_ready,
@@ -2753,7 +2744,7 @@ huawei_modem_power_up (MMIfaceModem *self,
                        gpointer user_data)
 {
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
-    case RFSWITCH_NOT_SUPPORTED:
+    case FEATURE_NOT_SUPPORTED:
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CFUN=1",
                                   30,
@@ -2761,7 +2752,7 @@ huawei_modem_power_up (MMIfaceModem *self,
                                   callback,
                                   user_data);
         break;
-    case RFSWITCH_SUPPORTED:
+    case FEATURE_SUPPORTED:
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "^RFSWITCH=1",
                                   30,
@@ -2792,7 +2783,7 @@ huawei_modem_power_down (MMIfaceModem *self,
                          gpointer user_data)
 {
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
-    case RFSWITCH_NOT_SUPPORTED:
+    case FEATURE_NOT_SUPPORTED:
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CFUN=0",
                                   30,
@@ -2800,7 +2791,7 @@ huawei_modem_power_down (MMIfaceModem *self,
                                   callback,
                                   user_data);
         break;
-    case RFSWITCH_SUPPORTED:
+    case FEATURE_SUPPORTED:
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "^RFSWITCH=0",
                                   30,
@@ -3040,11 +3031,9 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->rfswitch_regex = g_regex_new ("\\r\\n\\^RFSWITCH:.+\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
-    self->priv->ndisdup_support = NDISDUP_SUPPORT_UNKNOWN;
-    self->priv->rfswitch_support = RFSWITCH_SUPPORT_UNKNOWN;
-
-    self->priv->sysinfoex_supported = FALSE;
-    self->priv->sysinfoex_support_checked = FALSE;
+    self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->sysinfoex_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
