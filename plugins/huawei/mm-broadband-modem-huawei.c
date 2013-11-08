@@ -14,7 +14,7 @@
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google Inc.
  * Copyright (C) 2012 Huawei Technologies Co., Ltd
- * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 - 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <config.h>
@@ -101,6 +101,13 @@ struct _MMBroadbandModemHuaweiPrivate {
     FeatureSupport ndisdup_support;
     FeatureSupport rfswitch_support;
     FeatureSupport sysinfoex_support;
+    FeatureSupport syscfg_support;
+    FeatureSupport syscfgex_support;
+    FeatureSupport prefmode_support;
+
+    GArray *syscfg_supported_modes;
+    GArray *syscfgex_supported_modes;
+    GArray *prefmode_supported_modes;
 };
 
 /*****************************************************************************/
@@ -1008,73 +1015,209 @@ load_supported_modes_finish (MMIfaceModem *self,
 }
 
 static void
-parent_load_supported_modes_ready (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+syscfg_test_ready (MMBroadbandModemHuawei *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
 {
+    const gchar *response;
     GError *error = NULL;
-    GArray *all;
-    GArray *combinations;
-    GArray *filtered;
-    MMModemModeCombination mode;
 
-    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
-    if (!all) {
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (response, &error);
+
+    if (self->priv->syscfg_supported_modes) {
+        MMModemModeCombination mode;
+        guint i;
+        GArray *combinations;
+
+        /* Build list of combinations */
+        combinations = g_array_sized_new (FALSE,
+                                          FALSE,
+                                          sizeof (MMModemModeCombination),
+                                          self->priv->syscfg_supported_modes->len);
+        for (i = 0; i < self->priv->syscfg_supported_modes->len; i++) {
+            MMHuaweiSyscfgCombination *huawei_mode;
+
+            huawei_mode = &g_array_index (self->priv->syscfg_supported_modes,
+                                          MMHuaweiSyscfgCombination,
+                                          i);
+            mode.allowed = huawei_mode->allowed;
+            mode.preferred = huawei_mode->preferred;
+            g_array_append_val (combinations, mode);
+        }
+
+        self->priv->syscfg_support = FEATURE_SUPPORTED;
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   combinations,
+                                                   (GDestroyNotify)g_array_unref);
+    } else {
+        g_debug ("Error while checking ^SYSCFG format: %s", error->message);
+        /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
+        if (!g_error_matches (error,
+                              MM_MOBILE_EQUIPMENT_ERROR,
+                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN))
+            self->priv->syscfg_support = FEATURE_NOT_SUPPORTED;
         g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
     }
 
-    /* Build list of combinations */
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
-    /* 2G only */
-    mode.allowed = MM_MODEM_MODE_2G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 3G only */
-    mode.allowed = MM_MODEM_MODE_3G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G and 3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* CDMA modems don't support 'preferred' setups */
-    if (!mm_iface_modem_is_cdma_only (self)) {
-        /* 2G and 3G, 2G preferred */
-        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        mode.preferred = MM_MODEM_MODE_2G;
-        g_array_append_val (combinations, mode);
-        /* 2G and 3G, 3G preferred */
-        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        mode.preferred = MM_MODEM_MODE_3G;
-        g_array_append_val (combinations, mode);
-    }
-
-    /* Filter out those unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations);
-    g_array_unref (all);
-    g_array_unref (combinations);
-
-    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
 
 static void
-load_supported_modes (MMIfaceModem *self,
+syscfgex_test_ready (MMBroadbandModemHuawei *self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        self->priv->syscfgex_supported_modes = mm_huawei_parse_syscfgex_test (response, &error);
+
+    if (self->priv->syscfgex_supported_modes) {
+        MMModemModeCombination mode;
+        guint i;
+        GArray *combinations;
+
+        /* Build list of combinations */
+        combinations = g_array_sized_new (FALSE,
+                                          FALSE,
+                                          sizeof (MMModemModeCombination),
+                                          self->priv->syscfgex_supported_modes->len);
+        for (i = 0; i < self->priv->syscfgex_supported_modes->len; i++) {
+            MMHuaweiSyscfgexCombination *huawei_mode;
+
+            huawei_mode = &g_array_index (self->priv->syscfgex_supported_modes,
+                                          MMHuaweiSyscfgexCombination,
+                                          i);
+            mode.allowed = huawei_mode->allowed;
+            mode.preferred = huawei_mode->preferred;
+            g_array_append_val (combinations, mode);
+        }
+
+        self->priv->syscfgex_support = FEATURE_SUPPORTED;
+
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   combinations,
+                                                   (GDestroyNotify)g_array_unref);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
+    if (error) {
+        g_debug ("Error while checking ^SYSCFGEX format: %s", error->message);
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN)) {
+            g_simple_async_result_take_error (simple, error);
+            g_simple_async_result_complete (simple);
+            g_object_unref (simple);
+            return;
+        }
+        g_error_free (error);
+    }
+
+    self->priv->syscfgex_support = FEATURE_NOT_SUPPORTED;
+
+    /* Try with SYSCFG */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSCFG=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)syscfg_test_ready,
+                              simple);
+}
+
+static void
+prefmode_test_ready (MMBroadbandModemHuawei *self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        self->priv->prefmode_supported_modes = mm_huawei_parse_prefmode_test (response, &error);
+
+    if (self->priv->prefmode_supported_modes) {
+        MMModemModeCombination mode;
+        guint i;
+        GArray *combinations;
+
+        /* Build list of combinations */
+        combinations = g_array_sized_new (FALSE,
+                                          FALSE,
+                                          sizeof (MMModemModeCombination),
+                                          self->priv->prefmode_supported_modes->len);
+        for (i = 0; i < self->priv->prefmode_supported_modes->len; i++) {
+            MMHuaweiPrefmodeCombination *huawei_mode;
+
+            huawei_mode = &g_array_index (self->priv->prefmode_supported_modes,
+                                          MMHuaweiPrefmodeCombination,
+                                          i);
+            mode.allowed = huawei_mode->allowed;
+            mode.preferred = huawei_mode->preferred;
+            g_array_append_val (combinations, mode);
+        }
+
+        self->priv->prefmode_support = FEATURE_SUPPORTED;
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   combinations,
+                                                   (GDestroyNotify)g_array_unref);
+    } else {
+        g_debug ("Error while checking ^PREFMODE format: %s", error->message);
+        /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
+        if (!g_error_matches (error,
+                              MM_MOBILE_EQUIPMENT_ERROR,
+                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN))
+            self->priv->prefmode_support = FEATURE_NOT_SUPPORTED;
+        g_simple_async_result_take_error (simple, error);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_supported_modes (MMIfaceModem *_self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    /* Run parent's loading */
-    iface_modem_parent->load_supported_modes (
-        MM_IFACE_MODEM (self),
-        (GAsyncReadyCallback)parent_load_supported_modes_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_supported_modes));
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_modes);
+
+    if (mm_iface_modem_is_cdma_only (_self)) {
+        /* ^PREFMODE only in CDMA-only modems */
+        self->priv->syscfg_support = FEATURE_NOT_SUPPORTED;
+        self->priv->syscfgex_support = FEATURE_NOT_SUPPORTED;
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "^PREFMODE=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback)prefmode_test_ready,
+                                  result);
+        return;
+    }
+
+    /* Check SYSCFGEX */
+    self->priv->prefmode_support = FEATURE_NOT_SUPPORTED;
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SYSCFGEX=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)syscfgex_test_ready,
+                              result);
 }
 
 /*****************************************************************************/
@@ -3034,6 +3177,9 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->sysinfoex_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->syscfg_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->syscfgex_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->prefmode_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -3060,6 +3206,13 @@ finalize (GObject *object)
     g_regex_unref (self->priv->pdpdeact_regex);
     g_regex_unref (self->priv->ndisend_regex);
     g_regex_unref (self->priv->rfswitch_regex);
+
+    if (self->priv->syscfg_supported_modes)
+        g_array_unref (self->priv->syscfg_supported_modes);
+    if (self->priv->syscfgex_supported_modes)
+        g_array_unref (self->priv->syscfgex_supported_modes);
+    if (self->priv->prefmode_supported_modes)
+        g_array_unref (self->priv->prefmode_supported_modes);
 
     G_OBJECT_CLASS (mm_broadband_modem_huawei_parent_class)->finalize (object);
 }
