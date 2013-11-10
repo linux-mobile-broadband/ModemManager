@@ -102,4 +102,11 @@ typedef struct {
 GArray *mm_huawei_parse_syscfgex_test (const gchar *response,
                                        GError **error);
 
+/*****************************************************************************/
+/* ^SYSCFGEX response parser */
+
+const MMHuaweiSyscfgexCombination *mm_huawei_parse_syscfgex_response (const gchar *response,
+                                                                      const GArray *supported_mode_combinations,
+                                                                      GError **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */

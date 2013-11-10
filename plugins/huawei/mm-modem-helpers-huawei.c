@@ -954,3 +954,74 @@ mm_huawei_parse_syscfgex_test (const gchar *response,
 
     return out;
 }
+
+/*****************************************************************************/
+/* ^SYSCFGEX response parser */
+
+const MMHuaweiSyscfgexCombination *
+mm_huawei_parse_syscfgex_response (const gchar *response,
+                                   const GArray *supported_mode_combinations,
+                                   GError **error)
+{
+    gchar **split;
+    guint i;
+    gsize len;
+    gchar *str;
+
+    if (!response || !g_str_has_prefix (response, "^SYSCFGEX:")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Missing ^SYSCFGEX prefix");
+        return NULL;
+    }
+
+    /* Format:
+     *
+     * ^SYSCFGEX: "00",3FFFFFFF,1,2,7FFFFFFFFFFFFFFF
+     * ^SYSCFGEX: <mode>,<band>,<roam>,<srvdomain>,<lte-band>
+     */
+
+    response = mm_strip_tag (response, "^SYSCFGEX:");
+    split = g_strsplit (response, ",", -1);
+
+    /* We expect 5 string chunks */
+    if (g_strv_length (split) < 5) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected ^SYSCFGEX response format");
+        g_strfreev (split);
+        return NULL;
+    }
+
+    /* Unquote */
+    str = split[0];
+    len = strlen (str);
+    if ((len >= 2) && (str[0] == '"') && (str[len - 1] == '"')) {
+        str[0] = ' ';
+        str[len - 1] = ' ';
+        str = g_strstrip (str);
+    }
+
+    /* Look for current modes among the supported ones */
+    for (i = 0; i < supported_mode_combinations->len; i++) {
+        const MMHuaweiSyscfgexCombination *combination;
+
+        combination = &g_array_index (supported_mode_combinations,
+                                      MMHuaweiSyscfgexCombination,
+                                      i);
+        if (g_str_equal (str, combination->mode_str)) {
+            g_strfreev (split);
+            return combination;
+        }
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "No SYSCFGEX combination found matching the current one (%s)",
+                 str);
+    g_strfreev (split);
+    return NULL;
+}
