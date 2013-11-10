@@ -754,113 +754,8 @@ huawei_to_bands_array (guint32 huawei,
 }
 
 static gboolean
-huawei_to_modem_mode (guint mode,
-                      guint acquisition_order,
-                      MMModemMode *allowed,
-                      MMModemMode *preferred,
-                      GError **error)
-{
-    switch (mode) {
-    case 2:
-        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        switch (acquisition_order) {
-        case 1:
-            *preferred = MM_MODEM_MODE_2G;
-            return TRUE;
-        case 2:
-            *preferred = MM_MODEM_MODE_3G;
-            return TRUE;
-        case 0:
-            *preferred = MM_MODEM_MODE_NONE;
-            return TRUE;
-        default:
-            break;
-        }
-        break;
-
-    case 13:
-        *allowed = MM_MODEM_MODE_2G;
-        *preferred = MM_MODEM_MODE_NONE;
-        return TRUE;
-
-    case 14:
-        *allowed = MM_MODEM_MODE_3G;
-        *preferred = MM_MODEM_MODE_NONE;
-        return TRUE;
-
-    default:
-        break;
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Unexpected system mode reference (%u) or "
-                 "acquisition order (%u)",
-                 mode,
-                 acquisition_order);
-    return FALSE;
-}
-
-static gboolean
-allowed_mode_to_huawei (MMModemMode allowed,
-                        MMModemMode preferred,
-                        guint *huawei_mode,
-                        guint *huawei_acquisition_order,
-                        GError **error)
-{
-    gchar *allowed_str;
-    gchar *preferred_str;
-
-    if (allowed == MM_MODEM_MODE_ANY) {
-        *huawei_mode = 2;
-        *huawei_acquisition_order = 0;
-        return TRUE;
-    }
-
-    if (allowed == MM_MODEM_MODE_2G) {
-        *huawei_mode = 13;
-        *huawei_acquisition_order = 1;
-        return TRUE;
-    }
-
-    if (allowed == MM_MODEM_MODE_3G) {
-        *huawei_mode = 14;
-        *huawei_acquisition_order = 2;
-        return TRUE;
-    }
-
-    if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
-        *huawei_mode = 2;
-        if (preferred == MM_MODEM_MODE_2G)
-            *huawei_acquisition_order = 1;
-        else if (preferred == MM_MODEM_MODE_3G)
-            *huawei_acquisition_order = 2;
-        else
-            *huawei_acquisition_order = 0;
-        return TRUE;
-    }
-
-    /* Not supported */
-    allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-    preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Requested mode (allowed: '%s', preferred: '%s') not "
-                 "supported by the modem.",
-                 allowed_str,
-                 preferred_str);
-    g_free (allowed_str);
-    g_free (preferred_str);
-    return FALSE;
-}
-
-static gboolean
 parse_syscfg (const gchar *response,
               GArray **bands_array,
-              MMModemMode *allowed,
-              MMModemMode *preferred,
               GError **error)
 {
     gint mode;
@@ -880,12 +775,6 @@ parse_syscfg (const gchar *response,
                      response);
         return FALSE;
     }
-
-    /* Build allowed/preferred modes only if requested */
-    if (allowed &&
-        preferred &&
-        !huawei_to_modem_mode (mode, acquisition_order, allowed, preferred, error))
-        return FALSE;
 
     /* Band */
     if (bands_array &&
@@ -910,7 +799,7 @@ load_current_bands_finish (MMIfaceModem *self,
     if (!response)
         return NULL;
 
-    if (!parse_syscfg (response, &bands_array, NULL, NULL, error))
+    if (!parse_syscfg (response, &bands_array, error))
         return NULL;
 
     return bands_array;
@@ -1224,67 +1113,165 @@ load_supported_modes (MMIfaceModem *_self,
 /* Load initial allowed/preferred modes (Modem interface) */
 
 static gboolean
-parse_prefmode (const gchar *response, MMModemMode *preferred, GError **error)
-{
-    int a;
-
-    response = mm_strip_tag (response, "^PREFMODE:");
-    a = atoi (response);
-    if (a == 2) {
-        *preferred = MM_MODEM_MODE_2G;
-        return TRUE;
-    } else if (a == 4) {
-        *preferred = MM_MODEM_MODE_3G;
-        return TRUE;
-    } else if (a == 8) {
-        *preferred = MM_MODEM_MODE_NONE;
-        return TRUE;
-    }
-
-    g_set_error_literal (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Failed to parse ^PREFMODE response");
-    return FALSE;
-}
-
-static gboolean
 load_current_modes_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            MMModemMode *allowed,
                            MMModemMode *preferred,
                            GError **error)
 {
-    const gchar *response;
+    MMModemModeCombination *out;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
 
-    if (mm_iface_modem_is_cdma_only (self)) {
-        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        return parse_prefmode (response, preferred, error);
-    }
-
-    return parse_syscfg (response, NULL, allowed, preferred, error);
+    out = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *allowed = out->allowed;
+    *preferred = out->preferred;
+    return TRUE;
 }
 
 static void
-load_current_modes (MMIfaceModem *self,
+prefmode_load_current_modes_ready (MMBroadbandModemHuawei *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    const MMHuaweiPrefmodeCombination *current = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        current = mm_huawei_parse_prefmode_response (response,
+                                                     self->priv->prefmode_supported_modes,
+                                                     &error);
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMModemModeCombination out;
+
+        out.allowed = current->allowed;
+        out.preferred = current->preferred;
+        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+    }
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+syscfg_load_current_modes_ready (MMBroadbandModemHuawei *self,
+                                 GAsyncResult *res,
+                                 GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    const MMHuaweiSyscfgCombination *current = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        current = mm_huawei_parse_syscfg_response (response,
+                                                   self->priv->syscfg_supported_modes,
+                                                   &error);
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMModemModeCombination out;
+
+        out.allowed = current->allowed;
+        out.preferred = current->preferred;
+        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+syscfgex_load_current_modes_ready (MMBroadbandModemHuawei *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    const MMHuaweiSyscfgexCombination *current = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (response)
+        current = mm_huawei_parse_syscfgex_response (response,
+                                                     self->priv->syscfgex_supported_modes,
+                                                     &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        MMModemModeCombination out;
+
+        out.allowed = current->allowed;
+        out.preferred = current->preferred;
+        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_current_modes (MMIfaceModem *_self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    const char *command;
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GSimpleAsyncResult *result;
 
-    mm_dbg ("loading allowed_modes (huawei)...");
+    mm_dbg ("loading current modes (huawei)...");
 
-    command = mm_iface_modem_is_cdma_only (self) ? "^PREFMODE?" : "^SYSCFG?";
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              command,
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_current_modes);
+
+    if (self->priv->syscfgex_support == FEATURE_SUPPORTED) {
+        g_assert (self->priv->syscfgex_supported_modes != NULL);
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "^SYSCFGEX?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)syscfgex_load_current_modes_ready,
+            result);
+        return;
+    }
+
+    if (self->priv->syscfg_support == FEATURE_SUPPORTED) {
+        g_assert (self->priv->syscfg_supported_modes != NULL);
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "^SYSCFG?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)syscfg_load_current_modes_ready,
+            result);
+        return;
+    }
+
+    if (self->priv->prefmode_support == FEATURE_SUPPORTED) {
+        g_assert (self->priv->prefmode_supported_modes != NULL);
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "^PREFMODE?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)prefmode_load_current_modes_ready,
+            result);
+        return;
+    }
+
+    g_simple_async_result_set_error (result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unable to load current modes");
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -1315,6 +1302,60 @@ allowed_mode_to_prefmode (MMModemMode allowed, guint *huawei_mode, GError **erro
         g_free (allowed_str);
     }
     return *huawei_mode ? TRUE : FALSE;
+}
+
+static gboolean
+allowed_mode_to_huawei (MMModemMode allowed,
+                        MMModemMode preferred,
+                        guint *huawei_mode,
+                        guint *huawei_acquisition_order,
+                        GError **error)
+{
+    gchar *allowed_str;
+    gchar *preferred_str;
+
+    if (allowed == MM_MODEM_MODE_ANY) {
+        *huawei_mode = 2;
+        *huawei_acquisition_order = 0;
+        return TRUE;
+    }
+
+    if (allowed == MM_MODEM_MODE_2G) {
+        *huawei_mode = 13;
+        *huawei_acquisition_order = 1;
+        return TRUE;
+    }
+
+    if (allowed == MM_MODEM_MODE_3G) {
+        *huawei_mode = 14;
+        *huawei_acquisition_order = 2;
+        return TRUE;
+    }
+
+    if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        *huawei_mode = 2;
+        if (preferred == MM_MODEM_MODE_2G)
+            *huawei_acquisition_order = 1;
+        else if (preferred == MM_MODEM_MODE_3G)
+            *huawei_acquisition_order = 2;
+        else
+            *huawei_acquisition_order = 0;
+        return TRUE;
+    }
+
+    /* Not supported */
+    allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+    preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Requested mode (allowed: '%s', preferred: '%s') not "
+                 "supported by the modem.",
+                 allowed_str,
+                 preferred_str);
+    g_free (allowed_str);
+    g_free (preferred_str);
+    return FALSE;
 }
 
 static gboolean
