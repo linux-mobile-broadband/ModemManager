@@ -367,6 +367,52 @@ mm_huawei_parse_prefmode_test (const gchar *response,
 }
 
 /*****************************************************************************/
+/* ^PREFMODE response parser */
+
+const MMHuaweiPrefmodeCombination *
+mm_huawei_parse_prefmode_response (const gchar *response,
+                                   const GArray *supported_mode_combinations,
+                                   GError **error)
+{
+    gint mode;
+    guint i;
+
+    /* Format:
+     *
+     * ^PREFMODE: <mode>
+     */
+
+    response = mm_strip_tag (response, "^PREFMODE:");
+    if (!sscanf (response, "%d", &mode)) {
+        /* Dump error to upper layer */
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected PREFMODE response: '%s'",
+                     response);
+        return NULL;
+    }
+
+    /* Look for current modes among the supported ones */
+    for (i = 0; i < supported_mode_combinations->len; i++) {
+        const MMHuaweiPrefmodeCombination *combination;
+
+        combination = &g_array_index (supported_mode_combinations,
+                                      MMHuaweiPrefmodeCombination,
+                                      i);
+        if (mode == combination->prefmode)
+            return combination;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "No PREFMODE combination found matching the current one (%d)",
+                 mode);
+    return NULL;
+}
+
+/*****************************************************************************/
 /* ^SYSCFG test parser */
 
 static gchar **

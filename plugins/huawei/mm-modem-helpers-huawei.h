@@ -64,6 +64,13 @@ GArray *mm_huawei_parse_prefmode_test (const gchar *response,
                                        GError **error);
 
 /*****************************************************************************/
+/* ^PREFMODE response parser */
+
+const MMHuaweiPrefmodeCombination *mm_huawei_parse_prefmode_response (const gchar *response,
+                                                                      const GArray *supported_mode_combinations,
+                                                                      GError **error);
+
+/*****************************************************************************/
 /* ^SYSCFG test parser */
 
 typedef struct {

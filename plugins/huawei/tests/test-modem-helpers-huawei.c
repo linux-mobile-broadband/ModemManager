@@ -374,6 +374,61 @@ test_prefmode (void)
 }
 
 /*****************************************************************************/
+/* Test ^PREFMODE? responses */
+
+typedef struct {
+    const gchar *str;
+    const gchar *format;
+    MMModemMode allowed;
+    MMModemMode preferred;
+} PrefmodeResponseTest;
+
+static const PrefmodeResponseTest prefmode_response_tests[] = {
+    {
+        .str = "^PREFMODE:2\r\n",
+        .format = "^PREFMODE:(2,4,8)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_2G
+    },
+    {
+        .str = "^PREFMODE:4\r\n",
+        .format = "^PREFMODE:(2,4,8)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_3G
+    },
+    {
+        .str = "^PREFMODE:8\r\n",
+        .format = "^PREFMODE:(2,4,8)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_NONE
+    }
+};
+
+static void
+test_prefmode_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (prefmode_response_tests); i++) {
+        GArray *combinations = NULL;
+        const MMHuaweiPrefmodeCombination *found;
+        GError *error = NULL;
+
+        combinations = mm_huawei_parse_prefmode_test (prefmode_response_tests[i].format, NULL);
+        g_assert (combinations != NULL);
+
+        found = mm_huawei_parse_prefmode_response (prefmode_response_tests[i].str,
+                                                   combinations,
+                                                   &error);
+        g_assert (found != NULL);
+        g_assert_cmpuint (found->allowed, ==, prefmode_response_tests[i].allowed);
+        g_assert_cmpuint (found->preferred, ==, prefmode_response_tests[i].preferred);
+
+        g_array_unref (combinations);
+    }
+}
+
+/*****************************************************************************/
 /* Test ^SYSCFG=? responses */
 
 #define MAX_SYSCFG_COMBINATIONS 5
@@ -739,6 +794,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/sysinfo", test_sysinfo);
     g_test_add_func ("/MM/huawei/sysinfoex", test_sysinfoex);
     g_test_add_func ("/MM/huawei/prefmode", test_prefmode);
+    g_test_add_func ("/MM/huawei/prefmode/response", test_prefmode_response);
     g_test_add_func ("/MM/huawei/syscfg", test_syscfg);
     g_test_add_func ("/MM/huawei/syscfgex", test_syscfgex);
 
