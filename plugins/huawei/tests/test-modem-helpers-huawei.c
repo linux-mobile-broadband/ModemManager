@@ -578,6 +578,74 @@ test_syscfg (void)
 }
 
 /*****************************************************************************/
+/* Test ^SYSCFG? responses */
+
+typedef struct {
+    const gchar *str;
+    const gchar *format;
+    MMModemMode allowed;
+    MMModemMode preferred;
+} SyscfgResponseTest;
+
+static const SyscfgResponseTest syscfg_response_tests[] = {
+    {
+        .str = "^SYSCFG: 2,0,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_NONE
+    },
+    {
+        .str = "^SYSCFG: 2,1,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_2G
+    },
+    {
+        .str = "^SYSCFG: 2,2,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_3G
+    },
+    {
+        .str = "^SYSCFG: 13,0,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = MM_MODEM_MODE_2G,
+        .preferred = MM_MODEM_MODE_NONE
+    },
+    {
+        .str = "^SYSCFG: 14,0,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = MM_MODEM_MODE_3G,
+        .preferred = MM_MODEM_MODE_NONE
+    }
+};
+
+static void
+test_syscfg_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (syscfg_response_tests); i++) {
+        GArray *combinations = NULL;
+        const MMHuaweiSyscfgCombination *found;
+        GError *error = NULL;
+
+        combinations = mm_huawei_parse_syscfg_test (syscfg_response_tests[i].format, NULL);
+        g_assert (combinations != NULL);
+
+        found = mm_huawei_parse_syscfg_response (syscfg_response_tests[i].str,
+                                                 combinations,
+                                                 &error);
+
+        g_assert (found != NULL);
+        g_assert_cmpuint (found->allowed, ==, syscfg_response_tests[i].allowed);
+        g_assert_cmpuint (found->preferred, ==, syscfg_response_tests[i].preferred);
+
+        g_array_unref (combinations);
+    }
+}
+
+/*****************************************************************************/
 /* Test ^SYSCFGEX=? responses */
 
 #define MAX_SYSCFGEX_COMBINATIONS 5
@@ -796,6 +864,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/prefmode", test_prefmode);
     g_test_add_func ("/MM/huawei/prefmode/response", test_prefmode_response);
     g_test_add_func ("/MM/huawei/syscfg", test_syscfg);
+    g_test_add_func ("/MM/huawei/syscfg/response", test_syscfg_response);
     g_test_add_func ("/MM/huawei/syscfgex", test_syscfgex);
 
     return g_test_run ();

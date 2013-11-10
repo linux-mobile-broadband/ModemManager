@@ -84,6 +84,13 @@ GArray *mm_huawei_parse_syscfg_test (const gchar *response,
                                      GError **error);
 
 /*****************************************************************************/
+/* ^SYSCFG response parser */
+
+const MMHuaweiSyscfgCombination *mm_huawei_parse_syscfg_response (const gchar *response,
+                                                                  const GArray *supported_mode_combinations,
+                                                                  GError **error);
+
+/*****************************************************************************/
 /* ^SYSCFGEX test parser */
 
 typedef struct {

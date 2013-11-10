@@ -710,6 +710,72 @@ mm_huawei_parse_syscfg_test (const gchar *response,
 }
 
 /*****************************************************************************/
+/* ^SYSCFG response parser */
+
+const MMHuaweiSyscfgCombination *
+mm_huawei_parse_syscfg_response (const gchar *response,
+                                 const GArray *supported_mode_combinations,
+                                 GError **error)
+{
+    gchar **split;
+    guint mode;
+    guint acqorder;
+    guint i;
+
+    if (!response || !g_str_has_prefix (response, "^SYSCFG:")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Missing ^SYSCFG prefix");
+        return NULL;
+    }
+
+    /* Format:
+     *
+     * ^SYSCFG: <mode>,<acqorder>,<band>,<roam>,<srvdomain>
+     */
+
+    response = mm_strip_tag (response, "^SYSCFG:");
+    split = g_strsplit (response, ",", -1);
+
+    /* We expect 5 string chunks */
+    if (g_strv_length (split) < 5 ||
+        !mm_get_uint_from_str (split[0], &mode) ||
+        !mm_get_uint_from_str (split[1], &acqorder)) {
+        /* Dump error to upper layer */
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected ^SYSCFG response: '%s'",
+                     response);
+        g_strfreev (split);
+        return NULL;
+    }
+
+    /* Look for current modes among the supported ones */
+    for (i = 0; i < supported_mode_combinations->len; i++) {
+        const MMHuaweiSyscfgCombination *combination;
+
+        combination = &g_array_index (supported_mode_combinations,
+                                      MMHuaweiSyscfgCombination,
+                                      i);
+        if (mode == combination->mode && acqorder == combination->acqorder) {
+            g_strfreev (split);
+            return combination;
+        }
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "No SYSCFG combination found matching the current one (%d,%d)",
+                 mode,
+                 acqorder);
+    g_strfreev (split);
+    return NULL;
+}
+
+/*****************************************************************************/
 /* ^SYSCFGEX test parser */
 
 static void
