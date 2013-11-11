@@ -440,6 +440,41 @@ typedef struct {
 
 static const SyscfgTest syscfg_tests[] = {
     {
+        MM_HUAWEI_DEFAULT_SYSCFG_FMT,
+        {
+            {
+                .mode = 2,
+                .acqorder = 0,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode = 2,
+                .acqorder = 1,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_2G
+            },
+            {
+                .mode = 2,
+                .acqorder = 2,
+                .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+                .preferred = MM_MODEM_MODE_3G
+            },
+            {
+                .mode = 13,
+                .acqorder = 0,
+                .allowed = MM_MODEM_MODE_2G,
+                .preferred = MM_MODEM_MODE_NONE
+            },
+            {
+                .mode = 14,
+                .acqorder = 0,
+                .allowed = MM_MODEM_MODE_3G,
+                .preferred = MM_MODEM_MODE_NONE
+            }
+        }
+    },
+    {
         "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         {
             {

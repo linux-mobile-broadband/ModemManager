@@ -912,8 +912,19 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
     GError *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (response)
-        self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (response, &error);
+    if (response) {
+        /* There are 2G+3G Huawei modems out there which support mode switching with
+         * AT^SYSCFG, but fail to provide a valid response for AT^SYSCFG=? (they just
+         * return an empty string). So handle that case by providing a default response
+         * string to get parsed. Ugly, ugly, blame Huawei.
+         */
+        if (response[0])
+            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (response, &error);
+        else {
+            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (MM_HUAWEI_DEFAULT_SYSCFG_FMT, NULL);
+            g_assert (self->priv->syscfg_supported_modes != NULL);
+        }
+    }
 
     if (self->priv->syscfg_supported_modes) {
         MMModemModeCombination mode;

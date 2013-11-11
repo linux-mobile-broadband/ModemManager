@@ -73,6 +73,10 @@ const MMHuaweiPrefmodeCombination *mm_huawei_parse_prefmode_response (const gcha
 /*****************************************************************************/
 /* ^SYSCFG test parser */
 
+/* This is the default string we use as fallback when the modem gives
+ * an empty response to AT^SYSCFG=? */
+#define MM_HUAWEI_DEFAULT_SYSCFG_FMT "^SYSCFG:(2,13,14,16),(0-3),,,"
+
 typedef struct {
     guint mode;
     guint acqorder;
