@@ -210,6 +210,14 @@
     <property name="Sim" type="o" access="read" />
 
     <!--
+        Bearers:
+
+        The list of bearer object paths (EPS Bearers, PDP Contexts, or
+        CDMA2000 Packet Data Sessions).
+    -->
+    <property name="Bearers" type="ao" access="read" />
+
+    <!--
         SupportedCapabilities:
 
         List of <link linkend="MMModemCapability">MMModemCapability</link>

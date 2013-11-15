@@ -30,6 +30,7 @@
 #define MM_IS_BEARER_LIST_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BEARER_LIST))
 #define MM_BEARER_LIST_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER_LIST, MMBearerListClass))
 
+#define MM_BEARER_LIST_NUM_BEARERS        "num-bearers"
 #define MM_BEARER_LIST_MAX_BEARERS        "max-bearers"
 #define MM_BEARER_LIST_MAX_ACTIVE_BEARERS "max-active-bearers"
 

@@ -1721,7 +1721,7 @@ bearer_object_list_free (GList *list)
 static void
 list_bearers_context_complete_and_free (ListBearersContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
 
     g_strfreev (ctx->bearer_paths);
     bearer_object_list_free (ctx->bearer_objects);
@@ -1816,32 +1816,6 @@ create_next_bearer (ListBearersContext *ctx)
                                 NULL);
 }
 
-static void
-modem_list_bearers_ready (MMModem *self,
-                          GAsyncResult *res,
-                          ListBearersContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_gdbus_modem_call_list_bearers_finish (MM_GDBUS_MODEM (self), &ctx->bearer_paths, res, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        list_bearers_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If no bearers, just end here. */
-    if (!ctx->bearer_paths || !ctx->bearer_paths[0]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
-        list_bearers_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Got list of paths. If at least one found, start creating objects for each */
-    ctx->i = 0;
-    create_next_bearer (ctx);
-}
-
 /**
  * mm_modem_list_bearers:
  * @self: A #MMModem.
@@ -1875,10 +1849,19 @@ mm_modem_list_bearers (MMModem *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    mm_gdbus_modem_call_list_bearers (MM_GDBUS_MODEM (self),
-                                      cancellable,
-                                      (GAsyncReadyCallback)modem_list_bearers_ready,
-                                      ctx);
+    /* Read from the property, skip List() */
+    ctx->bearer_paths = mm_gdbus_modem_dup_bearers (MM_GDBUS_MODEM (self));
+
+    /* If no bearers, just end here. */
+    if (!ctx->bearer_paths || !ctx->bearer_paths[0]) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
+        list_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Got list of paths. If at least one found, start creating objects for each */
+    ctx->i = 0;
+    create_next_bearer (ctx);
 }
 
 /**
@@ -1905,11 +1888,8 @@ mm_modem_list_bearers_sync (MMModem *self,
 
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
 
-    if (!mm_gdbus_modem_call_list_bearers_sync (MM_GDBUS_MODEM (self),
-                                                &bearer_paths,
-                                                cancellable,
-                                                error))
-        return NULL;
+    /* Read from the property, skip List() */
+    bearer_paths = mm_gdbus_modem_dup_bearers (MM_GDBUS_MODEM (self));
 
     /* Only non-empty lists are returned */
     if (!bearer_paths)

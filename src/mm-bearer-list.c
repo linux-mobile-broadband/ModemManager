@@ -33,6 +33,7 @@ G_DEFINE_TYPE (MMBearerList, mm_bearer_list, G_TYPE_OBJECT);
 
 enum {
     PROP_0,
+    PROP_NUM_BEARERS,
     PROP_MAX_BEARERS,
     PROP_MAX_ACTIVE_BEARERS,
     PROP_LAST
@@ -91,8 +92,9 @@ mm_bearer_list_add_bearer (MMBearerList *self,
     }
 
     /* Keep our own reference */
-    self->priv->bearers = g_list_prepend (self->priv->bearers,
-                                          g_object_ref (bearer));
+    self->priv->bearers = g_list_prepend (self->priv->bearers, g_object_ref (bearer));
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_NUM_BEARERS]);
+
     return TRUE;
 }
 
@@ -115,8 +117,8 @@ mm_bearer_list_delete_bearer (MMBearerList *self,
     for (l = self->priv->bearers; l; l = g_list_next (l)) {
         if (g_str_equal (path, mm_bearer_get_path (MM_BEARER (l->data)))) {
             g_object_unref (l->data);
-            self->priv->bearers =
-                g_list_delete_link (self->priv->bearers, l);
+            self->priv->bearers = g_list_delete_link (self->priv->bearers, l);
+            g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_NUM_BEARERS]);
             return TRUE;
         }
     }
@@ -137,6 +139,7 @@ mm_bearer_list_delete_all_bearers (MMBearerList *self)
 
     g_list_free_full (self->priv->bearers, (GDestroyNotify) g_object_unref);
     self->priv->bearers = NULL;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_NUM_BEARERS]);
 }
 
 GStrv
@@ -288,6 +291,9 @@ set_property (GObject *object,
     MMBearerList *self = MM_BEARER_LIST (object);
 
     switch (prop_id) {
+    case PROP_NUM_BEARERS:
+        g_assert_not_reached ();
+        break;
     case PROP_MAX_BEARERS:
         self->priv->max_bearers = g_value_get_uint (value);
         break;
@@ -309,6 +315,9 @@ get_property (GObject *object,
     MMBearerList *self = MM_BEARER_LIST (object);
 
     switch (prop_id) {
+    case PROP_NUM_BEARERS:
+        g_value_set_uint (value, g_list_length (self->priv->bearers));
+        break;
     case PROP_MAX_BEARERS:
         g_value_set_uint (value, self->priv->max_bearers);
         break;
@@ -351,6 +360,16 @@ mm_bearer_list_class_init (MMBearerListClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
     object_class->dispose = dispose;
+
+    properties[PROP_NUM_BEARERS] =
+        g_param_spec_uint (MM_BEARER_LIST_NUM_BEARERS,
+                           "Number of bearers",
+                           "Current number of bearers in the list",
+                           0,
+                           G_MAXUINT,
+                           0,
+                           G_PARAM_READABLE);
+    g_object_class_install_property (object_class, PROP_NUM_BEARERS, properties[PROP_NUM_BEARERS]);
 
     properties[PROP_MAX_BEARERS] =
         g_param_spec_uint (MM_BEARER_LIST_MAX_BEARERS,
