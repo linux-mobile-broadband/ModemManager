@@ -28,7 +28,6 @@ enum {
     PROP_DEVICE,
     PROP_SUBSYS,
     PROP_TYPE,
-    PROP_CARRIER_DETECT,
     PROP_CONNECTED,
 
     LAST_PROP
@@ -40,7 +39,6 @@ typedef struct {
     char *device;
     MMPortSubsys subsys;
     MMPortType ptype;
-    gboolean carrier_detect;
     gboolean connected;
 } MMPortPrivate;
 
@@ -114,15 +112,6 @@ mm_port_get_port_type (MMPort *self)
 }
 
 gboolean
-mm_port_get_carrier_detect (MMPort *self)
-{
-    g_return_val_if_fail (self != NULL, MM_PORT_TYPE_UNKNOWN);
-    g_return_val_if_fail (MM_IS_PORT (self), MM_PORT_TYPE_UNKNOWN);
-
-    return MM_PORT_GET_PRIVATE (self)->carrier_detect;
-}
-
-gboolean
 mm_port_get_connected (MMPort *self)
 {
     g_return_val_if_fail (self != NULL, FALSE);
@@ -176,9 +165,6 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->ptype = g_value_get_uint (value);
         break;
-    case PROP_CARRIER_DETECT:
-        priv->carrier_detect = g_value_get_boolean (value);
-        break;
     case PROP_CONNECTED:
         priv->connected = g_value_get_boolean (value);
         break;
@@ -203,9 +189,6 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_TYPE:
         g_value_set_uint (value, priv->ptype);
-        break;
-    case PROP_CARRIER_DETECT:
-        g_value_set_boolean (value, priv->carrier_detect);
         break;
     case PROP_CONNECTED:
         g_value_set_boolean (value, priv->connected);
@@ -266,14 +249,6 @@ mm_port_class_init (MMPortClass *klass)
                             MM_PORT_TYPE_LAST,
                             MM_PORT_TYPE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-    g_object_class_install_property
-        (object_class, PROP_CARRIER_DETECT,
-         g_param_spec_boolean (MM_PORT_CARRIER_DETECT,
-                               "Carrier Detect",
-                               "Has Carrier Detect",
-                               TRUE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 
     g_object_class_install_property
         (object_class, PROP_CONNECTED,

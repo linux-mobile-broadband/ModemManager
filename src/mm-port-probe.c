@@ -1146,7 +1146,6 @@ serial_open_at (MMPortProbe *self)
                       MM_SERIAL_PORT_SEND_DELAY,     task->at_send_delay,
                       MM_AT_SERIAL_PORT_REMOVE_ECHO, task->at_remove_echo,
                       MM_AT_SERIAL_PORT_SEND_LF,     task->at_send_lf,
-                      MM_PORT_CARRIER_DETECT,        FALSE,
                       MM_SERIAL_PORT_SPEW_CONTROL,   TRUE,
                       NULL);
 

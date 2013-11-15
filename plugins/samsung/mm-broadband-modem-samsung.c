@@ -53,7 +53,6 @@ setup_ports (MMBroadbandModem *self)
             continue;
 
         g_object_set (ports[i],
-                      MM_PORT_CARRIER_DETECT,    FALSE,
                       MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
                       NULL);
     }

@@ -48,11 +48,10 @@ typedef enum { /*< underscore_name=mm_port_type >*/
 #define MM_IS_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT))
 #define MM_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT, MMPortClass))
 
-#define MM_PORT_DEVICE         "device"
-#define MM_PORT_SUBSYS         "subsys"
-#define MM_PORT_TYPE           "type"
-#define MM_PORT_CARRIER_DETECT "carrier-detect"
-#define MM_PORT_CONNECTED      "connected"
+#define MM_PORT_DEVICE    "device"
+#define MM_PORT_SUBSYS    "subsys"
+#define MM_PORT_TYPE      "type"
+#define MM_PORT_CONNECTED "connected"
 
 typedef struct _MMPort MMPort;
 typedef struct _MMPortClass MMPortClass;
@@ -72,8 +71,6 @@ const char * mm_port_get_device         (MMPort *self);
 MMPortSubsys mm_port_get_subsys         (MMPort *self);
 
 MMPortType   mm_port_get_port_type      (MMPort *self);
-
-gboolean     mm_port_get_carrier_detect (MMPort *self);
 
 gboolean     mm_port_get_connected      (MMPort *self);
 
