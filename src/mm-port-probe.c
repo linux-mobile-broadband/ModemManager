@@ -576,8 +576,7 @@ wdm_probe (MMPortProbe *self)
 
 static void
 serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
-                                  GByteArray *response,
-                                  GError *error,
+                                  GAsyncResult *res,
                                   MMPortProbe *self)
 {
     QcdmResult *result;
@@ -585,10 +584,14 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
     gboolean is_qcdm = FALSE;
     gboolean retry = FALSE;
     PortProbeRunTask *task = self->priv->task;
+    GError *error = NULL;
+    GByteArray *response;
+
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
-        return;
+        goto out;
 
     if (!error) {
         /* Parse the response */
@@ -604,7 +607,6 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
         } else {
             /* yay, probably a QCDM port */
             is_qcdm = TRUE;
-
             qcdm_result_unref (result);
         }
     } else {
@@ -619,13 +621,15 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
         cmd2 = g_object_steal_data (G_OBJECT (self), "cmd2");
         if (cmd2) {
             /* second try */
-            mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (task->serial),
-                                               cmd2,
-                                               3,
-                                               NULL,
-                                               (MMPortSerialQcdmResponseFn)serial_probe_qcdm_parse_response,
-                                               self);
-            return;
+            mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (task->serial),
+                                         cmd2,
+                                         3,
+                                         FALSE,
+                                         NULL,
+                                         (GAsyncReadyCallback)serial_probe_qcdm_parse_response,
+                                         self);
+            g_byte_array_unref (cmd2);
+            goto out;
         }
 
         /* no more retries left */
@@ -636,6 +640,12 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
 
     /* Reschedule probing */
     serial_probe_schedule (self);
+
+out:
+    if (response)
+        g_byte_array_unref (response);
+    if (error)
+        g_error_free (error);
 }
 
 static gboolean
@@ -707,7 +717,7 @@ serial_probe_qcdm (MMPortProbe *self)
     g_byte_array_append (verinfo, &marker, 1);
     len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
     if (len <= 0) {
-        g_byte_array_free (verinfo, TRUE);
+        g_byte_array_unref (verinfo);
         port_probe_run_task_complete (
             task,
             FALSE,
@@ -725,12 +735,14 @@ serial_probe_qcdm (MMPortProbe *self)
     g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
     g_object_set_data_full (G_OBJECT (self), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
 
-    mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (task->serial),
-                                       verinfo,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn)serial_probe_qcdm_parse_response,
-                                       self);
+    mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (task->serial),
+                                 verinfo,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)serial_probe_qcdm_parse_response,
+                                 self);
+    g_byte_array_unref (verinfo);
 
     return FALSE;
 }

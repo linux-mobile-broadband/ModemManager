@@ -594,7 +594,7 @@ mm_port_serial_got_response (MMPortSerial *self, GError *error)
         }
 
         g_clear_object (&info->cancellable);
-        g_byte_array_free (info->command, TRUE);
+        g_byte_array_unref (info->command);
         g_slice_free (MMQueueData, info);
     }
 
@@ -1102,11 +1102,11 @@ mm_port_serial_close (MMPortSerial *self)
                                                               item->callback,
                                                               item->user_data);
             g_error_free (error);
-            g_byte_array_free (response, TRUE);
+            g_byte_array_unref (response);
         }
 
         g_clear_object (&item->cancellable);
-        g_byte_array_free (item->command, TRUE);
+        g_byte_array_unref (item->command);
         g_slice_free (MMQueueData, item);
     }
     g_queue_clear (priv->queue);
@@ -1595,7 +1595,7 @@ ba_hash (gconstpointer v)
 static void
 ba_free (gpointer v)
 {
-    g_byte_array_free ((GByteArray *) v, TRUE);
+    g_byte_array_unref ((GByteArray *) v);
 }
 
 static void
@@ -1721,7 +1721,7 @@ finalize (GObject *object)
     MMPortSerialPrivate *priv = MM_PORT_SERIAL_GET_PRIVATE (self);
 
     g_hash_table_destroy (priv->reply_cache);
-    g_byte_array_free (priv->response, TRUE);
+    g_byte_array_unref (priv->response);
     g_queue_free (priv->queue);
 
     G_OBJECT_CLASS (mm_port_serial_parent_class)->finalize (object);

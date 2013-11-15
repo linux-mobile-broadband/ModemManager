@@ -581,30 +581,36 @@ load_current_capabilities_at (LoadCapabilitiesContext *ctx)
 
 static void
 mode_pref_qcdm_ready (MMPortSerialQcdm *port,
-                      GByteArray *response,
-                      GError *error,
+                      GAsyncResult *res,
                       LoadCapabilitiesContext *ctx)
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     u_int8_t pref = 0;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Fall back to AT checking */
         mm_dbg ("Failed to load NV ModePref: %s", error->message);
+        g_error_free (error);
         goto at_caps;
     }
 
     /* Parse the response */
-    result = qcdm_cmd_nv_get_mode_pref_result ((const gchar *) response->data,
+    result = qcdm_cmd_nv_get_mode_pref_result ((const gchar *)response->data,
                                                response->len,
                                                &err);
+    g_byte_array_unref (response);
     if (!result) {
         mm_dbg ("Failed to parse NV ModePref result: %d", err);
+        g_byte_array_unref (response);
         goto at_caps;
     }
 
     err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, &pref);
+    qcdm_result_unref (result);
     if (err) {
         mm_dbg ("Failed to read NV ModePref: %d", err);
         qcdm_result_unref (result);
@@ -677,12 +683,14 @@ load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
     cmd->len = qcdm_cmd_nv_get_mode_pref_new ((char *) cmd->data, 300, 0);
     g_assert (cmd->len);
 
-    mm_port_serial_qcdm_queue_command (ctx->qcdm_port,
-                                       cmd,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn) mode_pref_qcdm_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (ctx->qcdm_port,
+                                 cmd,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)mode_pref_qcdm_ready,
+                                 ctx);
+    g_byte_array_unref (cmd);
 }
 
 static void
@@ -1026,16 +1034,18 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
 
 static void
 mdn_qcdm_ready (MMPortSerialQcdm *port,
-                GByteArray *response,
-                GError *error,
+                GAsyncResult *res,
                 OwnNumbersContext *ctx)
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     const char *numbers[2] = { NULL, NULL };
+    GByteArray *response;
+    GError *error = NULL;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         own_numbers_context_complete_and_free (ctx);
         return;
     }
@@ -1112,12 +1122,14 @@ modem_load_own_numbers_done (MMIfaceModem *self,
             mdn->len = qcdm_cmd_nv_get_mdn_new ((char *) mdn->data, 200, 0);
             g_assert (mdn->len);
 
-            mm_port_serial_qcdm_queue_command (ctx->qcdm,
-                                               mdn,
-                                               3,
-                                               NULL,
-                                               (MMPortSerialQcdmResponseFn)mdn_qcdm_ready,
-                                               ctx);
+            mm_port_serial_qcdm_command (ctx->qcdm,
+                                         mdn,
+                                         3,
+                                         FALSE,
+                                         NULL,
+                                         (GAsyncReadyCallback)mdn_qcdm_ready,
+                                         ctx);
+            g_byte_array_unref (mdn);
             return;
         }
     } else {
@@ -1889,17 +1901,19 @@ signal_quality_cind (SignalQualityContext *ctx)
 
 static void
 signal_quality_qcdm_ready (MMPortSerialQcdm *port,
-                           GByteArray *response,
-                           GError *error,
+                           GAsyncResult *res,
                            SignalQualityContext *ctx)
 {
     QcdmResult *result;
     guint32 num = 0, quality = 0, i;
     gfloat best_db = -28;
     gint err = QCDM_SUCCESS;
+    GByteArray *response;
+    GError *error = NULL;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         signal_quality_context_complete_and_free (ctx);
         return;
     }
@@ -1908,6 +1922,7 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_pilot_sets_result ((const gchar *) response->data,
                                          response->len,
                                          &err);
+    g_byte_array_unref (response);
     if (!result) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
@@ -1961,12 +1976,14 @@ signal_quality_qcdm (SignalQualityContext *ctx)
     pilot_sets->len = qcdm_cmd_pilot_sets_new ((char *) pilot_sets->data, 25);
     g_assert (pilot_sets->len);
 
-    mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (ctx->port),
-                                       pilot_sets,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn)signal_quality_qcdm_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (ctx->port),
+                                 pilot_sets,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)signal_quality_qcdm_ready,
+                                 ctx);
+    g_byte_array_unref (pilot_sets);
 }
 
 static void
@@ -2136,16 +2153,18 @@ done:
 
 static void
 access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
-                              GByteArray *response,
-                              GError *error,
+                              GAsyncResult *res,
                               AccessTechContext *ctx)
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     guint8 l1;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -2153,6 +2172,7 @@ access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_wcdma_subsys_state_info_result ((const gchar *) response->data,
                                                       response->len,
                                                       &err);
+    g_byte_array_unref (response);
     if (result) {
         qcdm_result_get_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, &l1);
         qcdm_result_unref (result);
@@ -2168,8 +2188,7 @@ access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
 
 static void
 access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
-                            GByteArray *response,
-                            GError *error,
+                            GAsyncResult *res,
                             AccessTechContext *ctx)
 {
     GByteArray *cmd;
@@ -2177,9 +2196,12 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
     gint err = QCDM_SUCCESS;
     guint8 opmode = 0;
     guint8 sysmode = 0;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -2187,6 +2209,7 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_gsm_subsys_state_info_result ((const gchar *) response->data,
                                                     response->len,
                                                     &err);
+    g_byte_array_unref (response);
     if (!result) {
         error = g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
@@ -2208,27 +2231,31 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
     cmd->len = qcdm_cmd_wcdma_subsys_state_info_new ((char *) cmd->data, 50);
     g_assert (cmd->len);
 
-    mm_port_serial_qcdm_queue_command (port,
-                                       cmd,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn) access_tech_qcdm_wcdma_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (port,
+                                 cmd,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)access_tech_qcdm_wcdma_ready,
+                                 ctx);
+    g_byte_array_unref (cmd);
 }
 
 static void
 access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
-                            GByteArray *response,
-                            GError *error,
+                            GAsyncResult *res,
                             AccessTechContext *ctx)
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     guint8 session = 0;
     guint8 almp = 0;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -2236,6 +2263,7 @@ access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_hdr_subsys_state_info_result ((const gchar *) response->data,
                                                     response->len,
                                                     &err);
+    g_byte_array_unref (response);
     if (result) {
         qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session);
         qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp);
@@ -2252,17 +2280,19 @@ access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
 
 static void
 access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
-                             GByteArray *response,
-                             GError *error,
+                             GAsyncResult *res,
                              AccessTechContext *ctx)
 {
     GByteArray *cmd;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     guint32 hybrid;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, g_error_copy (error), FALSE);
+        access_tech_context_complete_and_free (ctx, error, FALSE);
         return;
     }
 
@@ -2270,6 +2300,7 @@ access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_cm_subsys_state_info_result ((const gchar *) response->data,
                                                    response->len,
                                                    &err);
+    g_byte_array_unref (response);
     if (!result) {
         error = g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
@@ -2291,12 +2322,14 @@ access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
     cmd->len = qcdm_cmd_hdr_subsys_state_info_new ((char *) cmd->data, 50);
     g_assert (cmd->len);
 
-    mm_port_serial_qcdm_queue_command (port,
-                                       cmd,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn) access_tech_qcdm_hdr_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (port,
+                                 cmd,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)access_tech_qcdm_hdr_ready,
+                                 ctx);
+    g_byte_array_unref (cmd);
 }
 
 static void
@@ -2373,25 +2406,34 @@ modem_load_access_technologies (MMIfaceModem *self,
         cmd->len = qcdm_cmd_gsm_subsys_state_info_new ((char *) cmd->data, 50);
         g_assert (cmd->len);
 
-        mm_port_serial_qcdm_queue_command (ctx->port,
-                                           cmd,
-                                           3,
-                                           NULL,
-                                           (MMPortSerialQcdmResponseFn) access_tech_qcdm_gsm_ready,
-                                           ctx);
-    } else if (mm_iface_modem_is_cdma (self)) {
+        mm_port_serial_qcdm_command (ctx->port,
+                                     cmd,
+                                     3,
+                                     FALSE,
+                                     NULL,
+                                     (GAsyncReadyCallback)access_tech_qcdm_gsm_ready,
+                                     ctx);
+        g_byte_array_unref (cmd);
+        return;
+    }
+
+    if (mm_iface_modem_is_cdma (self)) {
         cmd = g_byte_array_sized_new (50);
         cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
         g_assert (cmd->len);
 
-        mm_port_serial_qcdm_queue_command (ctx->port,
-                                           cmd,
-                                           3,
-                                           NULL,
-                                           (MMPortSerialQcdmResponseFn) access_tech_qcdm_cdma_ready,
-                                           ctx);
-    } else
-        g_assert_not_reached ();
+        mm_port_serial_qcdm_command (ctx->port,
+                                     cmd,
+                                     3,
+                                     FALSE,
+                                     NULL,
+                                     (GAsyncReadyCallback)access_tech_qcdm_cdma_ready,
+                                     ctx);
+        g_byte_array_unref (cmd);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -6367,12 +6409,14 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
     hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((gchar *) hdrstate->data, 25);
     g_assert (hdrstate->len);
 
-    mm_port_serial_qcdm_queue_command (ctx->qcdm,
-                                       hdrstate,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn)hdr_subsys_state_info_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (ctx->qcdm,
+                                 hdrstate,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)hdr_subsys_state_info_ready,
+                                 ctx);
+    g_byte_array_unref (hdrstate);
 }
 
 /*****************************************************************************/
@@ -6419,16 +6463,18 @@ modem_cdma_get_call_manager_state_finish (MMIfaceModemCdma *self,
 
 static void
 cm_subsys_state_info_ready (MMPortSerialQcdm *port,
-                            GByteArray *response,
-                            GError *error,
+                            GAsyncResult *res,
                             CallManagerStateContext *ctx)
 {
     QcdmResult *result;
     CallManagerStateResults *results;
     gint err = QCDM_SUCCESS;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         call_manager_state_context_complete_and_free (ctx);
         return;
     }
@@ -6437,6 +6483,7 @@ cm_subsys_state_info_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_cm_subsys_state_info_result ((const gchar *) response->data,
                                                    response->len,
                                                    &err);
+    g_byte_array_unref (response);
     if (!result) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
@@ -6491,12 +6538,14 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
     cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((gchar *) cmstate->data, 25);
     g_assert (cmstate->len);
 
-    mm_port_serial_qcdm_queue_command (ctx->qcdm,
-                                       cmstate,
-                                       3,
-                                       NULL,
-                                       (MMPortSerialQcdmResponseFn)cm_subsys_state_info_ready,
-                                       ctx);
+    mm_port_serial_qcdm_command (ctx->qcdm,
+                                 cmstate,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)cm_subsys_state_info_ready,
+                                 ctx);
+    g_byte_array_unref (cmstate);
 }
 
 /*****************************************************************************/
@@ -6687,17 +6736,19 @@ css_query_ready (MMIfaceModemCdma *self,
 
 static void
 qcdm_cdma_status_ready (MMPortSerialQcdm *port,
-                        GByteArray *response,
-                        GError *error,
+                        GAsyncResult *res,
                         Cdma1xServingSystemContext *ctx)
 {
     Cdma1xServingSystemResults *results;
-    QcdmResult *result;
+    QcdmResult *result = NULL;
     guint32 sid = MM_MODEM_CDMA_SID_UNKNOWN;
     guint32 nid = MM_MODEM_CDMA_NID_UNKNOWN;
     guint32 rxstate = 0;
     gint err = QCDM_SUCCESS;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error ||
         (result = qcdm_cmd_cdma_status_result ((const gchar *) response->data,
                                                response->len,
@@ -6711,8 +6762,14 @@ qcdm_cdma_status_ready (MMPortSerialQcdm *port,
                                   FALSE,
                                   (GAsyncReadyCallback)css_query_ready,
                                   ctx);
+        if (error)
+            g_error_free (error);
+        if (response)
+            g_byte_array_unref (response);
         return;
     }
+
+    g_byte_array_unref (response);
 
     qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
     qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
@@ -6764,12 +6821,14 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
         cdma_status = g_byte_array_sized_new (25);
         cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
         g_assert (cdma_status->len);
-        mm_port_serial_qcdm_queue_command (ctx->qcdm,
-                                           cdma_status,
-                                           3,
-                                           NULL,
-                                           (MMPortSerialQcdmResponseFn)qcdm_cdma_status_ready,
-                                           ctx);
+        mm_port_serial_qcdm_command (ctx->qcdm,
+                                     cdma_status,
+                                     3,
+                                     FALSE,
+                                     NULL,
+                                     (GAsyncReadyCallback)qcdm_cdma_status_ready,
+                                     ctx);
+        g_byte_array_unref (cdma_status);
         return;
     }
 

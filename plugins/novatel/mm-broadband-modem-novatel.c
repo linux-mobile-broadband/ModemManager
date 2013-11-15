@@ -452,23 +452,26 @@ snapshot_context_complete_and_free (SnapshotContext *ctx, guint hdr_revision)
 
 static void
 nw_snapshot_old_cb (MMPortSerialQcdm *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+                    GAsyncResult *res,
+                    SnapshotContext *ctx)
 {
-    SnapshotContext *ctx = user_data;
     QcdmResult *result;
     guint8 hdr_revision = QCDM_HDR_REV_UNKNOWN;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
         mm_dbg ("Couldn't run QCDM Novatel Modem MSM6500 snapshot: '%s'", error->message);
+        g_error_free (error);
         snapshot_context_complete_and_free (ctx, QCDM_HDR_REV_UNKNOWN);
         return;
     }
 
     /* Parse the response */
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+    g_byte_array_unref (response);
     if (result) {
         qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &hdr_revision);
         qcdm_result_unref (result);
@@ -480,23 +483,26 @@ nw_snapshot_old_cb (MMPortSerialQcdm *port,
 
 static void
 nw_snapshot_new_cb (MMPortSerialQcdm *port,
-                    GByteArray *response,
-                    GError *error,
-                    gpointer user_data)
+                    GAsyncResult *res,
+                    SnapshotContext *ctx)
 {
-    SnapshotContext *ctx = user_data;
     QcdmResult *result;
     GByteArray *nwsnap;
     guint8 hdr_revision = QCDM_HDR_REV_UNKNOWN;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         mm_dbg ("Couldn't run QCDM Novatel Modem MSM6800 snapshot: '%s'", error->message);
+        g_error_free (error);
         snapshot_context_complete_and_free (ctx, QCDM_HDR_REV_UNKNOWN);
         return;
     }
 
     /* Parse the response */
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
+    g_byte_array_unref (response);
     if (result) {
         qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &hdr_revision);
         qcdm_result_unref (result);
@@ -510,7 +516,14 @@ nw_snapshot_new_cb (MMPortSerialQcdm *port,
     nwsnap = g_byte_array_sized_new (25);
     nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
     g_assert (nwsnap->len);
-    mm_port_serial_qcdm_queue_command (port, nwsnap, 3, NULL, nw_snapshot_old_cb, ctx);
+    mm_port_serial_qcdm_command (port,
+                                 nwsnap,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)nw_snapshot_old_cb,
+                                 ctx);
+    g_byte_array_unref (nwsnap);
 }
 
 static gboolean
@@ -539,7 +552,14 @@ get_nw_modem_snapshot (MMBaseModem *self,
     nwsnap = g_byte_array_sized_new (25);
     nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
     g_assert (nwsnap->len);
-    mm_port_serial_qcdm_queue_command (port, nwsnap, 3, NULL, nw_snapshot_new_cb, ctx);
+    mm_port_serial_qcdm_command (port,
+                                 nwsnap,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)nw_snapshot_new_cb,
+                                 ctx);
+    g_byte_array_unref (nwsnap);
     return TRUE;
 }
 
@@ -967,19 +987,22 @@ parse_modem_eri (DetailedRegistrationStateContext *ctx, QcdmResult *result)
 
 static void
 reg_eri_6500_cb (MMPortSerialQcdm *port,
-                 GByteArray *response,
-                 GError *error,
-                 gpointer user_data)
+                 GAsyncResult *res,
+                 DetailedRegistrationStateContext *ctx)
 {
-    DetailedRegistrationStateContext *ctx = user_data;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
         mm_dbg ("Couldn't run QCDM MSM6500 ERI: '%s'", error->message);
+        g_error_free (error);
     } else {
         QcdmResult *result;
 
         result = qcdm_cmd_nw_subsys_eri_result ((const gchar *) response->data, response->len, NULL);
+        g_byte_array_unref (response);
         if (result) {
             parse_modem_eri (ctx, result);
             qcdm_result_unref (result);
@@ -993,30 +1016,41 @@ reg_eri_6500_cb (MMPortSerialQcdm *port,
 
 static void
 reg_eri_6800_cb (MMPortSerialQcdm *port,
-                 GByteArray *response,
-                 GError *error,
-                 gpointer user_data)
+                 GAsyncResult *res,
+                 DetailedRegistrationStateContext *ctx)
 {
-    DetailedRegistrationStateContext *ctx = user_data;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
         mm_dbg ("Couldn't run QCDM MSM6800 ERI: '%s'", error->message);
+        g_error_free (error);
     } else {
         QcdmResult *result;
-        GByteArray *nweri;
 
         /* Parse the response */
         result = qcdm_cmd_nw_subsys_eri_result ((const gchar *) response->data, response->len, NULL);
+        g_byte_array_unref (response);
         if (result) {
             parse_modem_eri (ctx, result);
             qcdm_result_unref (result);
         } else {
+            GByteArray *nweri;
+
             /* Try for MSM6500 */
             nweri = g_byte_array_sized_new (25);
             nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6500);
             g_assert (nweri->len);
-            mm_port_serial_qcdm_queue_command (port, nweri, 3, NULL, reg_eri_6500_cb, ctx);
+            mm_port_serial_qcdm_command (port,
+                                         nweri,
+                                         3,
+                                         FALSE,
+                                         NULL,
+                                         (GAsyncReadyCallback)reg_eri_6500_cb,
+                                         ctx);
+            g_byte_array_unref (nweri);
             return;
         }
     }
@@ -1053,7 +1087,14 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     nweri = g_byte_array_sized_new (25);
     nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6800);
     g_assert (nweri->len);
-    mm_port_serial_qcdm_queue_command (port, nweri, 3, NULL, reg_eri_6800_cb, ctx);
+    mm_port_serial_qcdm_command (port,
+                                 nweri,
+                                 3,
+                                 FALSE,
+                                 NULL,
+                                 (GAsyncReadyCallback)reg_eri_6800_cb,
+                                 ctx);
+    g_byte_array_unref (nweri);
 }
 
 /*****************************************************************************/

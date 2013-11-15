@@ -72,7 +72,7 @@ handle_response (MMPortSerial *port,
                  GCallback callback,
                  gpointer callback_data)
 {
-    MMPortSerialQcdmResponseFn response_callback = (MMPortSerialQcdmResponseFn) callback;
+    MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
     GByteArray *unescaped = NULL;
     guint8 *unescaped_buffer;
     GError *dm_error = NULL;
@@ -123,7 +123,7 @@ handle_response (MMPortSerial *port,
     }
 
 callback:
-    response_callback (MM_PORT_SERIAL_QCDM (port),
+    response_callback (MM_PORT_SERIAL (port),
                        unescaped,
                        dm_error ? dm_error : error,
                        callback_data);
@@ -137,48 +137,73 @@ callback:
 
 /*****************************************************************************/
 
-void
-mm_port_serial_qcdm_queue_command (MMPortSerialQcdm *self,
-                                   GByteArray *command,
-                                   guint32 timeout_seconds,
-                                   GCancellable *cancellable,
-                                   MMPortSerialQcdmResponseFn callback,
-                                   gpointer user_data)
+GByteArray *
+mm_port_serial_qcdm_command_finish (MMPortSerialQcdm *self,
+                                    GAsyncResult *res,
+                                    GError **error)
 {
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (MM_IS_PORT_SERIAL_QCDM (self));
-    g_return_if_fail (command != NULL);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
 
-    /* 'command' is expected to be already CRC-ed and escaped */
-    mm_port_serial_queue_command (MM_PORT_SERIAL (self),
-                                  command,
-                                  TRUE,
-                                  timeout_seconds,
-                                  cancellable,
-                                  (MMSerialResponseFn) callback,
-                                  user_data);
+    return g_byte_array_ref ((GByteArray *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+serial_command_ready (MMPortSerial *port,
+                      GByteArray *response,
+                      GError *error,
+                      GSimpleAsyncResult *simple)
+{
+    if (error)
+        g_simple_async_result_set_from_error (simple, error);
+    else if (response)
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   g_byte_array_ref (response),
+                                                   (GDestroyNotify)g_byte_array_unref);
+    else
+        g_assert_not_reached ();
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 void
-mm_port_serial_qcdm_queue_command_cached (MMPortSerialQcdm *self,
-                                          GByteArray *command,
-                                          guint32 timeout_seconds,
-                                          GCancellable *cancellable,
-                                          MMPortSerialQcdmResponseFn callback,
-                                          gpointer user_data)
+mm_port_serial_qcdm_command (MMPortSerialQcdm *self,
+                             GByteArray *command,
+                             guint32 timeout_seconds,
+                             gboolean allow_cached,
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
 {
-    g_return_if_fail (self != NULL);
+    GSimpleAsyncResult *simple;
+
     g_return_if_fail (MM_IS_PORT_SERIAL_QCDM (self));
     g_return_if_fail (command != NULL);
 
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_port_serial_qcdm_command);
+
     /* 'command' is expected to be already CRC-ed and escaped */
-    mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
-                                         command,
-                                         TRUE,
-                                         timeout_seconds,
-                                         cancellable,
-                                         (MMSerialResponseFn) callback,
-                                         user_data);
+
+    if (!allow_cached)
+        mm_port_serial_queue_command (MM_PORT_SERIAL (self),
+                                      g_byte_array_ref (command),
+                                      TRUE,
+                                      timeout_seconds,
+                                      cancellable,
+                                      (MMSerialResponseFn)serial_command_ready,
+                                      simple);
+    else
+        mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
+                                             g_byte_array_ref (command),
+                                             TRUE,
+                                             timeout_seconds,
+                                             cancellable,
+                                             (MMSerialResponseFn)serial_command_ready,
+                                             simple);
 }
 
 static void

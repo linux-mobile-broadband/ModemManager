@@ -32,11 +32,6 @@
 typedef struct _MMPortSerialQcdm MMPortSerialQcdm;
 typedef struct _MMPortSerialQcdmClass MMPortSerialQcdmClass;
 
-typedef void (*MMPortSerialQcdmResponseFn) (MMPortSerialQcdm *port,
-                                            GByteArray *response,
-                                            GError *error,
-                                            gpointer user_data);
-
 struct _MMPortSerialQcdm {
     MMPortSerial parent;
 };
@@ -50,18 +45,15 @@ GType mm_port_serial_qcdm_get_type (void);
 MMPortSerialQcdm *mm_port_serial_qcdm_new    (const char *name);
 MMPortSerialQcdm *mm_port_serial_qcdm_new_fd (int fd);
 
-void     mm_port_serial_qcdm_queue_command     (MMPortSerialQcdm *self,
+void        mm_port_serial_qcdm_command        (MMPortSerialQcdm *self,
                                                 GByteArray *command,
                                                 guint32 timeout_seconds,
+                                                gboolean allow_cached,
                                                 GCancellable *cancellable,
-                                                MMPortSerialQcdmResponseFn callback,
+                                                GAsyncReadyCallback callback,
                                                 gpointer user_data);
-
-void     mm_port_serial_qcdm_queue_command_cached (MMPortSerialQcdm *self,
-                                                   GByteArray *command,
-                                                   guint32 timeout_seconds,
-                                                   GCancellable *cancellable,
-                                                   MMPortSerialQcdmResponseFn callback,
-                                                   gpointer user_data);
+GByteArray *mm_port_serial_qcdm_command_finish (MMPortSerialQcdm *self,
+                                                GAsyncResult *res,
+                                                GError **error);
 
 #endif /* MM_PORT_SERIAL_QCDM_H */
