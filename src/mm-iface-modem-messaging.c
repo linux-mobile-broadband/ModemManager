@@ -490,6 +490,17 @@ mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessagi
 /*****************************************************************************/
 
 static void
+update_message_list (MmGdbusModemMessaging *skeleton,
+                     MMSmsList *list)
+{
+    gchar **paths;
+
+    paths = mm_sms_list_get_paths (list);
+    mm_gdbus_modem_messaging_set_messages (skeleton, (const gchar *const *)paths);
+    g_strfreev (paths);
+}
+
+static void
 sms_added (MMSmsList *list,
            const gchar *sms_path,
            gboolean received,
@@ -498,6 +509,7 @@ sms_added (MMSmsList *list,
     mm_dbg ("Added %s SMS at '%s'",
             received ? "received" : "local",
             sms_path);
+    update_message_list (skeleton, list);
     mm_gdbus_modem_messaging_emit_added (skeleton, sms_path, received);
 }
 
@@ -507,6 +519,7 @@ sms_deleted (MMSmsList *list,
              MmGdbusModemMessaging *skeleton)
 {
     mm_dbg ("Deleted SMS at '%s'", sms_path);
+    update_message_list (skeleton, list);
     mm_gdbus_modem_messaging_emit_deleted (skeleton, sms_path);
 }
 

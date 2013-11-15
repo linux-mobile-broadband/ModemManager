@@ -236,7 +236,7 @@ sms_object_list_free (GList *list)
 static void
 list_sms_context_complete_and_free (ListSmsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
 
     g_strfreev (ctx->sms_paths);
     sms_object_list_free (ctx->sms_objects);
@@ -331,32 +331,6 @@ create_next_sms (ListSmsContext *ctx)
                                 NULL);
 }
 
-static void
-list_ready (MMModemMessaging *self,
-            GAsyncResult *res,
-            ListSmsContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_gdbus_modem_messaging_call_list_finish (MM_GDBUS_MODEM_MESSAGING (self), &ctx->sms_paths, res, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        list_sms_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If no SMS, just end here. */
-    if (!ctx->sms_paths || !ctx->sms_paths[0]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
-        list_sms_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Got list of paths. If at least one found, start creating objects for each */
-    ctx->i = 0;
-    create_next_sms (ctx);
-}
-
 /**
  * mm_modem_messaging_list:
  * @self: A #MMModemMessaging.
@@ -390,10 +364,18 @@ mm_modem_messaging_list (MMModemMessaging *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    mm_gdbus_modem_messaging_call_list (MM_GDBUS_MODEM_MESSAGING (self),
-                                        cancellable,
-                                        (GAsyncReadyCallback)list_ready,
-                                        ctx);
+    ctx->sms_paths = mm_gdbus_modem_messaging_dup_messages (MM_GDBUS_MODEM_MESSAGING (self));
+
+    /* If no SMS, just end here. */
+    if (!ctx->sms_paths || !ctx->sms_paths[0]) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
+        list_sms_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Got list of paths. If at least one found, start creating objects for each */
+    ctx->i = 0;
+    create_next_sms (ctx);
 }
 
 /**
@@ -420,11 +402,7 @@ mm_modem_messaging_list_sync (MMModemMessaging *self,
 
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), NULL);
 
-    if (!mm_gdbus_modem_messaging_call_list_sync (MM_GDBUS_MODEM_MESSAGING (self),
-                                                  &sms_paths,
-                                                  cancellable,
-                                                  error))
-        return NULL;
+    sms_paths = mm_gdbus_modem_messaging_dup_messages (MM_GDBUS_MODEM_MESSAGING (self));
 
     /* Only non-empty lists are returned */
     if (!sms_paths)

@@ -225,6 +225,9 @@ mm_sms_list_add_sms (MMSmsList *self,
                      MMSms *sms)
 {
     self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
+    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                   mm_sms_get_path (sms),
+                   FALSE);
 }
 
 /*****************************************************************************/

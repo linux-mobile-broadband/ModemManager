@@ -96,6 +96,13 @@
     </signal>
 
     <!--
+        Messages:
+
+        The list of SMS object paths.
+    -->
+    <property name="Messages" type="ao" access="read" />
+
+    <!--
         SupportedStorages:
 
         A list of <link linkend="MMSmsStorage">MMSmsStorage</link> values,
