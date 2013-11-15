@@ -30,13 +30,6 @@
 
 G_DEFINE_TYPE (MMPortSerialQcdm, mm_port_serial_qcdm, MM_TYPE_PORT_SERIAL)
 
-#define MM_PORT_SERIAL_QCDM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_PORT_SERIAL_QCDM, MMPortSerialQcdmPrivate))
-
-typedef struct {
-    gboolean foo;
-} MMPortSerialQcdmPrivate;
-
-
 /*****************************************************************************/
 
 static gboolean
@@ -259,22 +252,11 @@ mm_port_serial_qcdm_init (MMPortSerialQcdm *self)
 }
 
 static void
-finalize (GObject *object)
-{
-    G_OBJECT_CLASS (mm_port_serial_qcdm_parent_class)->finalize (object);
-}
-
-static void
 mm_port_serial_qcdm_class_init (MMPortSerialQcdmClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMPortSerialClass *port_class = MM_PORT_SERIAL_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMPortSerialQcdmPrivate));
-
     /* Virtual methods */
-    object_class->finalize = finalize;
-
     port_class->parse_response = parse_response;
     port_class->handle_response = handle_response;
     port_class->config_fd = config_fd;
