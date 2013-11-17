@@ -31,6 +31,7 @@
 
 typedef struct _MMPortSerialAt MMPortSerialAt;
 typedef struct _MMPortSerialAtClass MMPortSerialAtClass;
+typedef struct _MMPortSerialAtPrivate MMPortSerialAtPrivate;
 
 /* AT port flags; for example consider a device with two AT ports (ACM0 and ACM1)
  * which could have the following layouts:
@@ -67,6 +68,7 @@ typedef void (*MMPortSerialAtUnsolicitedMsgFn) (MMPortSerialAt *port,
 
 struct _MMPortSerialAt {
     MMPortSerial parent;
+    MMPortSerialAtPrivate *priv;
 };
 
 struct _MMPortSerialAtClass {
