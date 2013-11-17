@@ -1362,12 +1362,14 @@ data_flash_cdma_ready (MMPortSerial *data,
 
 static void
 data_reopen_cdma_ready (MMPortSerial *data,
-                        GError *error,
+                        GAsyncResult *res,
                         DetailedDisconnectContext *ctx)
 {
-    if (error) {
+    GError *error = NULL;
+
+    if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
     }
@@ -1409,7 +1411,7 @@ disconnect_cdma (MMBroadbandBearer *self,
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
     mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
-                           (MMSerialReopenFn)data_reopen_cdma_ready,
+                           (GAsyncReadyCallback)data_reopen_cdma_ready,
                            ctx);
 }
 
@@ -1490,12 +1492,14 @@ data_flash_3gpp_ready (MMPortSerial *data,
 
 static void
 data_reopen_3gpp_ready (MMPortSerial *data,
-                        GError *error,
+                        GAsyncResult *res,
                         DetailedDisconnectContext *ctx)
 {
-    if (error) {
+    GError *error = NULL;
+
+    if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
     }
@@ -1516,7 +1520,7 @@ data_reopen_3gpp (DetailedDisconnectContext *ctx)
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
     mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
-                           (MMSerialReopenFn)data_reopen_3gpp_ready,
+                           (GAsyncReadyCallback)data_reopen_3gpp_ready,
                            ctx);
 }
 

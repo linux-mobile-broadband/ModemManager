@@ -35,7 +35,8 @@
 #include "mm-log.h"
 
 static gboolean mm_port_serial_queue_process (gpointer data);
-static void mm_port_serial_close_force (MMPortSerial *self);
+static void port_serial_close_force (MMPortSerial *self);
+static void port_serial_reopen_cancel (MMPortSerial *self);
 
 G_DEFINE_TYPE (MMPortSerial, mm_port_serial, MM_TYPE_PORT)
 
@@ -98,8 +99,9 @@ typedef struct {
     guint n_consecutive_timeouts;
 
     guint flash_id;
-    guint reopen_id;
     guint connected_id;
+
+    gpointer reopen_ctx;
 } MMPortSerialPrivate;
 
 typedef struct {
@@ -753,7 +755,7 @@ data_available (GIOChannel *source,
 
         if (priv->response->len)
             g_byte_array_remove_range (priv->response, 0, priv->response->len);
-        mm_port_serial_close_force (self);
+        port_serial_close_force (self);
         return FALSE;
     }
 
@@ -884,7 +886,7 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         return FALSE;
     }
 
-    if (priv->reopen_id) {
+    if (priv->reopen_ctx) {
         g_set_error (error,
                      MM_SERIAL_ERROR,
                      MM_SERIAL_ERROR_OPEN_FAILED,
@@ -1132,7 +1134,7 @@ mm_port_serial_close (MMPortSerial *self)
 }
 
 static void
-mm_port_serial_close_force (MMPortSerial *self)
+port_serial_close_force (MMPortSerial *self)
 {
     MMPortSerialPrivate *priv;
 
@@ -1148,8 +1150,11 @@ mm_port_serial_close_force (MMPortSerial *self)
     mm_dbg ("(%s) forced to close port", mm_port_get_device (MM_PORT (self)));
 
     /* If already closed, done */
-    if (!priv->open_count)
+    if (!priv->open_count && !priv->reopen_ctx)
         return;
+
+    /* Cancel port reopening if one is running */
+    port_serial_reopen_cancel (self);
 
     /* Force the port to close */
     priv->open_count = 1;
@@ -1243,108 +1248,142 @@ mm_port_serial_queue_command_cached (MMPortSerial *self,
     internal_queue_command (self, command, take_command, TRUE, timeout_seconds, cancellable, callback, user_data);
 }
 
+/*****************************************************************************/
+/* Reopen */
+
 typedef struct {
-    MMPortSerial *port;
+    MMPortSerial *self;
+    GSimpleAsyncResult *result;
     guint initial_open_count;
-    MMSerialReopenFn callback;
-    gpointer user_data;
-} ReopenInfo;
+    guint reopen_id;
+} ReopenContext;
+
+static void
+reopen_context_complete_and_free (ReopenContext *ctx)
+{
+    if (ctx->reopen_id)
+        g_source_remove (ctx->reopen_id);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (ReopenContext, ctx);
+}
+
+gboolean
+mm_port_serial_reopen_finish (MMPortSerial *port,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
 
 static void
 port_serial_reopen_cancel (MMPortSerial *self)
 {
     MMPortSerialPrivate *priv;
-
-    g_return_if_fail (MM_IS_PORT_SERIAL (self));
+    ReopenContext *ctx;
 
     priv = MM_PORT_SERIAL_GET_PRIVATE (self);
+    if (!priv->reopen_ctx)
+        return;
 
-    if (priv->reopen_id > 0) {
-        g_source_remove (priv->reopen_id);
-        priv->reopen_id = 0;
-    }
+    /* Recover context */
+    ctx = (ReopenContext *)priv->reopen_ctx;
+    priv->reopen_ctx = NULL;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Reopen cancelled");
+    reopen_context_complete_and_free (ctx);
 }
 
 static gboolean
-reopen_do (gpointer data)
+reopen_do (MMPortSerial *self)
 {
-    ReopenInfo *info = (ReopenInfo *) data;
-    MMPortSerialPrivate *priv = MM_PORT_SERIAL_GET_PRIVATE (info->port);
+    MMPortSerialPrivate *priv = MM_PORT_SERIAL_GET_PRIVATE (self);
+    ReopenContext *ctx;
     GError *error = NULL;
     guint i;
 
-    priv->reopen_id = 0;
+    /* Recover context */
+    g_assert (priv->reopen_ctx != NULL);
+    ctx = (ReopenContext *)priv->reopen_ctx;
+    priv->reopen_ctx = NULL;
 
-    for (i = 0; i < info->initial_open_count; i++) {
-        if (!mm_port_serial_open (info->port, &error)) {
+    ctx->reopen_id = 0;
+
+    for (i = 0; i < ctx->initial_open_count; i++) {
+        if (!mm_port_serial_open (ctx->self, &error)) {
             g_prefix_error (&error, "Couldn't reopen port (%u): ", i);
             break;
         }
     }
 
-    info->callback (info->port, error, info->user_data);
     if (error)
-        g_error_free (error);
-    g_slice_free (ReopenInfo, info);
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    reopen_context_complete_and_free (ctx);
+
     return FALSE;
 }
 
-gboolean
+void
 mm_port_serial_reopen (MMPortSerial *self,
                        guint32 reopen_time,
-                       MMSerialReopenFn callback,
+                       GAsyncReadyCallback callback,
                        gpointer user_data)
 {
-    ReopenInfo *info;
+    ReopenContext *ctx;
     MMPortSerialPrivate *priv;
     guint i;
 
-    g_return_val_if_fail (MM_IS_PORT_SERIAL (self), FALSE);
+    g_return_if_fail (MM_IS_PORT_SERIAL (self));
     priv = MM_PORT_SERIAL_GET_PRIVATE (self);
+
+    /* Setup context */
+    ctx = g_slice_new0 (ReopenContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_port_serial_reopen);
+    ctx->initial_open_count = priv->open_count;
 
     if (priv->forced_close) {
-        GError *error;
-
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Serial port has been forced close.");
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Serial port has been forced close.");
+        reopen_context_complete_and_free (ctx);
+        return;
     }
 
-    if (priv->reopen_id > 0) {
-        GError *error;
-
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_IN_PROGRESS,
-                                     "Modem is already being reopened.");
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
+    /* If already reopening, halt */
+    if (priv->reopen_ctx) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_IN_PROGRESS,
+                                         "Modem is already being reopened");
+        reopen_context_complete_and_free (ctx);
+        return;
     }
-
-    info = g_slice_new0 (ReopenInfo);
-    info->port = self;
-    info->callback = callback;
-    info->user_data = user_data;
-
-    priv = MM_PORT_SERIAL_GET_PRIVATE (self);
-    info->initial_open_count = priv->open_count;
 
     mm_dbg ("(%s) reopening port (%u)",
             mm_port_get_device (MM_PORT (self)),
-            info->initial_open_count);
+            ctx->initial_open_count);
 
-    for (i = 0; i < info->initial_open_count; i++)
+    for (i = 0; i < ctx->initial_open_count; i++)
         mm_port_serial_close (self);
 
     if (reopen_time > 0)
-        priv->reopen_id = g_timeout_add (reopen_time, reopen_do, info);
+        ctx->reopen_id = g_timeout_add (reopen_time, (GSourceFunc)reopen_do, self);
     else
-        priv->reopen_id = g_idle_add (reopen_do, info);
+        ctx->reopen_id = g_idle_add ((GSourceFunc)reopen_do, self);
 
-    return TRUE;
+    /* Store context in private info */
+    priv->reopen_ctx = ctx;
 }
 
 static gboolean
@@ -1706,9 +1745,7 @@ dispose (GObject *object)
         priv->timeout_id = 0;
     }
 
-    mm_port_serial_close_force (MM_PORT_SERIAL (object));
-
-    port_serial_reopen_cancel (MM_PORT_SERIAL (object));
+    port_serial_close_force (MM_PORT_SERIAL (object));
     mm_port_serial_flash_cancel (MM_PORT_SERIAL (object));
 
     G_OBJECT_CLASS (mm_port_serial_parent_class)->dispose (object);
