@@ -42,10 +42,11 @@
 
 typedef struct _MMPortSerial MMPortSerial;
 typedef struct _MMPortSerialClass MMPortSerialClass;
-
+typedef struct _MMPortSerialPrivate MMPortSerialPrivate;
 
 struct _MMPortSerial {
     MMPort parent;
+    MMPortSerialPrivate *priv;
 };
 
 struct _MMPortSerialClass {
