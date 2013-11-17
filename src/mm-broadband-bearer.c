@@ -1327,9 +1327,13 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
 
 static void
 data_flash_cdma_ready (MMPortSerial *data,
-                       GError *error,
+                       GAsyncResult *res,
                        DetailedDisconnectContext *ctx)
 {
+    GError *error = NULL;
+
+    mm_port_serial_flash_finish (data, res, &error);
+
     /* We kept the serial port open during connection, now we close that open
      * count */
     mm_port_serial_close (data);
@@ -1348,12 +1352,13 @@ data_flash_cdma_ready (MMPortSerial *data,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            g_simple_async_result_set_from_error (ctx->result, error);
+            g_simple_async_result_take_error (ctx->result, error);
             detailed_disconnect_context_complete_and_free (ctx);
             return;
         }
 
         mm_dbg ("Port flashing failed (not fatal): %s", error->message);
+        g_error_free (error);
     }
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -1379,7 +1384,7 @@ data_reopen_cdma_ready (MMPortSerial *data,
     mm_port_serial_flash (MM_PORT_SERIAL (ctx->data),
                           1000,
                           TRUE,
-                          (MMSerialFlashFn)data_flash_cdma_ready,
+                          (GAsyncReadyCallback)data_flash_cdma_ready,
                           ctx);
 }
 
@@ -1439,9 +1444,13 @@ cgact_data_ready (MMBaseModem *modem,
 
 static void
 data_flash_3gpp_ready (MMPortSerial *data,
-                       GError *error,
+                       GAsyncResult *res,
                        DetailedDisconnectContext *ctx)
 {
+    GError *error = NULL;
+
+    mm_port_serial_flash_finish (data, res, &error);
+
     /* We kept the serial port open during connection, now we close that open
      * count */
     mm_port_serial_close (data);
@@ -1460,12 +1469,13 @@ data_flash_3gpp_ready (MMPortSerial *data,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            g_simple_async_result_set_from_error (ctx->result, error);
+            g_simple_async_result_take_error (ctx->result, error);
             detailed_disconnect_context_complete_and_free (ctx);
             return;
         }
 
         mm_dbg ("Port flashing failed (not fatal): %s", error->message);
+        g_error_free (error);
     }
 
     /* Don't bother doing the CGACT again if it was already done on the
@@ -1509,7 +1519,7 @@ data_reopen_3gpp_ready (MMPortSerial *data,
     mm_port_serial_flash (MM_PORT_SERIAL (ctx->data),
                           1000,
                           TRUE,
-                          (MMSerialFlashFn)data_flash_3gpp_ready,
+                          (GAsyncReadyCallback)data_flash_3gpp_ready,
                           ctx);
 }
 

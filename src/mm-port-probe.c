@@ -1098,10 +1098,12 @@ serial_probe_schedule (MMPortProbe *self)
 }
 
 static void
-serial_flash_done (MMPortSerial *port,
-                   GError *error,
-                   MMPortProbe *self)
+serial_flash_ready (MMPortSerial *port,
+                    GAsyncResult *res,
+                    MMPortProbe *self)
 {
+    mm_port_serial_flash_finish (port, res, NULL);
+
     /* Schedule probing */
     serial_probe_schedule (self);
 }
@@ -1232,7 +1234,7 @@ serial_open_at (MMPortProbe *self)
     mm_port_serial_flash (MM_PORT_SERIAL (task->serial),
                           100,
                           TRUE,
-                          (MMSerialFlashFn)serial_flash_done,
+                          (GAsyncReadyCallback)serial_flash_ready,
                           self);
     return FALSE;
 }

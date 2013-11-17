@@ -98,9 +98,9 @@ typedef struct {
 
     guint n_consecutive_timeouts;
 
-    guint flash_id;
     guint connected_id;
 
+    gpointer flash_ctx;
     gpointer reopen_ctx;
 } MMPortSerialPrivate;
 
@@ -1465,25 +1465,73 @@ set_speed (MMPortSerial *self, speed_t speed, GError **error)
     return TRUE;
 }
 
+/*****************************************************************************/
+/* Flash */
+
 typedef struct {
-    MMPortSerial *port;
+    GSimpleAsyncResult *result;
+    MMPortSerial *self;
     speed_t current_speed;
-    MMSerialFlashFn callback;
-    gpointer user_data;
-} FlashInfo;
+    guint flash_id;
+} FlashContext;
+
+static void
+flash_context_complete_and_free (FlashContext *ctx)
+{
+    if (ctx->flash_id)
+        g_source_remove (ctx->flash_id);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (FlashContext, ctx);
+}
+
+gboolean
+mm_port_serial_flash_finish (MMPortSerial *port,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+void
+mm_port_serial_flash_cancel (MMPortSerial *self)
+{
+    MMPortSerialPrivate *priv;
+    FlashContext *ctx;
+
+    priv = MM_PORT_SERIAL_GET_PRIVATE (self);
+    if (!priv->flash_ctx)
+        return;
+
+    /* Recover context */
+    ctx = (FlashContext *)priv->flash_ctx;
+    priv->flash_ctx = NULL;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Flash cancelled");
+    flash_context_complete_and_free (ctx);
+}
 
 static gboolean
-flash_do (gpointer data)
+flash_do (MMPortSerial *self)
 {
-    FlashInfo *info = (FlashInfo *) data;
-    MMPortSerialPrivate *priv = MM_PORT_SERIAL_GET_PRIVATE (info->port);
+    MMPortSerialPrivate *priv = MM_PORT_SERIAL_GET_PRIVATE (self);
+    FlashContext *ctx;
     GError *error = NULL;
 
-    priv->flash_id = 0;
+    /* Recover context */
+    g_assert (priv->flash_ctx != NULL);
+    ctx = (FlashContext *)priv->flash_ctx;
+    priv->flash_ctx = NULL;
+
+    ctx->flash_id = 0;
 
     if (priv->flash_ok) {
-        if (info->current_speed) {
-            if (!set_speed (info->port, info->current_speed, &error))
+        if (ctx->current_speed) {
+            if (!set_speed (ctx->self, ctx->current_speed, &error))
                 g_assert (error);
         } else {
             error = g_error_new_literal (MM_SERIAL_ERROR,
@@ -1492,87 +1540,81 @@ flash_do (gpointer data)
         }
     }
 
-    info->callback (info->port, error, info->user_data);
-    g_clear_error (&error);
-    g_slice_free (FlashInfo, info);
-    return FALSE;
-}
+    if (error)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    flash_context_complete_and_free (ctx);
 
-gboolean
-mm_port_serial_flash (MMPortSerial *self,
-                      guint32 flash_time,
-                      gboolean ignore_errors,
-                      MMSerialFlashFn callback,
-                      gpointer user_data)
-{
-    FlashInfo *info = NULL;
-    MMPortSerialPrivate *priv;
-    GError *error = NULL;
-    gboolean success;
-
-    g_return_val_if_fail (MM_IS_PORT_SERIAL (self), FALSE);
-    g_return_val_if_fail (callback != NULL, FALSE);
-
-    priv = MM_PORT_SERIAL_GET_PRIVATE (self);
-
-    if (!mm_port_serial_is_open (self)) {
-        error = g_error_new_literal (MM_SERIAL_ERROR,
-                                     MM_SERIAL_ERROR_NOT_OPEN,
-                                     "The serial port is not open.");
-        goto error;
-    }
-
-    if (priv->flash_id > 0) {
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_IN_PROGRESS,
-                                     "Modem is already being flashed.");
-        goto error;
-    }
-
-    info = g_slice_new0 (FlashInfo);
-    info->port = self;
-    info->callback = callback;
-    info->user_data = user_data;
-
-    if (priv->flash_ok) {
-        /* Grab current speed so we can reset it after flashing */
-        success = get_speed (self, &info->current_speed, &error);
-        if (!success && !ignore_errors)
-            goto error;
-        g_clear_error (&error);
-
-        success = set_speed (self, B0, &error);
-        if (!success && !ignore_errors)
-            goto error;
-        g_clear_error (&error);
-
-        priv->flash_id = g_timeout_add (flash_time, flash_do, info);
-    } else
-        priv->flash_id = g_idle_add (flash_do, info);
-
-    return TRUE;
-
-error:
-    callback (self, error, user_data);
-    g_clear_error (&error);
-    if (info)
-        g_slice_free (FlashInfo, info);
     return FALSE;
 }
 
 void
-mm_port_serial_flash_cancel (MMPortSerial *self)
+mm_port_serial_flash (MMPortSerial *self,
+                      guint32 flash_time,
+                      gboolean ignore_errors,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
 {
+    FlashContext *ctx;
     MMPortSerialPrivate *priv;
+    GError *error = NULL;
+    gboolean success;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
-
     priv = MM_PORT_SERIAL_GET_PRIVATE (self);
 
-    if (priv->flash_id > 0) {
-        g_source_remove (priv->flash_id);
-        priv->flash_id = 0;
+    /* Setup context */
+    ctx = g_slice_new0 (FlashContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_port_serial_flash);
+
+    if (!mm_port_serial_is_open (self)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_SERIAL_ERROR,
+                                         MM_SERIAL_ERROR_NOT_OPEN,
+                                         "The serial port is not open.");
+        flash_context_complete_and_free (ctx);
+        return;
     }
+
+    if (priv->flash_ctx) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_IN_PROGRESS,
+                                         "Modem is already being flashed.");
+        flash_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!priv->flash_ok) {
+        priv->flash_ctx = ctx;
+        ctx->flash_id = g_idle_add ((GSourceFunc)flash_do, self);
+        return;
+    }
+
+    /* Grab current speed so we can reset it after flashing */
+    success = get_speed (self, &ctx->current_speed, &error);
+    if (!success && !ignore_errors) {
+        g_simple_async_result_take_error (ctx->result, error);
+        flash_context_complete_and_free (ctx);
+        return;
+    }
+    g_clear_error (&error);
+
+    success = set_speed (self, B0, &error);
+    if (!success && !ignore_errors) {
+        g_simple_async_result_take_error (ctx->result, error);
+        flash_context_complete_and_free (ctx);
+        return;
+    }
+    g_clear_error (&error);
+
+    priv->flash_ctx = ctx;
+    ctx->flash_id = g_timeout_add (flash_time, (GSourceFunc)flash_do, self);
 }
 
 gboolean

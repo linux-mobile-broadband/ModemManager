@@ -7906,16 +7906,17 @@ enabling_modem_init_ready (MMBroadbandModem *self,
 
 static void
 enabling_flash_done (MMPortSerial *port,
-                     GError *error,
+                     GAsyncResult *res,
                      EnablingStartedContext *ctx)
 {
-    if (error) {
+    GError *error = NULL;
+
+    if (!mm_port_serial_flash_finish (port, res, &error)) {
         g_prefix_error (&error, "Primary port flashing failed: ");
-        g_simple_async_result_set_from_error (ctx->result, error);
+        g_simple_async_result_take_error (ctx->result, error);
         enabling_started_context_complete_and_free (ctx);
         return;
     }
-
 
     if (ctx->modem_init_required) {
         mm_dbg ("Running modem initialization sequence...");
@@ -8033,7 +8034,7 @@ enabling_started (MMBroadbandModem *self,
     mm_port_serial_flash (MM_PORT_SERIAL (ctx->ports->primary),
                           100,
                           FALSE,
-                          (MMSerialFlashFn)enabling_flash_done,
+                          (GAsyncReadyCallback)enabling_flash_done,
                           ctx);
 }
 

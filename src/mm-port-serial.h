@@ -43,10 +43,6 @@
 typedef struct _MMPortSerial MMPortSerial;
 typedef struct _MMPortSerialClass MMPortSerialClass;
 
-typedef void (*MMSerialFlashFn)        (MMPortSerial *port,
-                                        GError *error,
-                                        gpointer user_data);
-
 typedef void (*MMSerialResponseFn)     (MMPortSerial *port,
                                         GByteArray *response,
                                         GError *error,
@@ -131,12 +127,14 @@ gboolean mm_port_serial_reopen_finish     (MMPortSerial *port,
                                            GAsyncResult *res,
                                            GError **error);
 
-gboolean mm_port_serial_flash             (MMPortSerial *self,
+void     mm_port_serial_flash             (MMPortSerial *self,
                                            guint32 flash_time,
                                            gboolean ignore_errors,
-                                           MMSerialFlashFn callback,
+                                           GAsyncReadyCallback callback,
                                            gpointer user_data);
-
+gboolean mm_port_serial_flash_finish      (MMPortSerial *self,
+                                           GAsyncResult *res,
+                                           GError **error);
 void     mm_port_serial_flash_cancel      (MMPortSerial *self);
 
 gboolean mm_port_serial_get_flash_ok      (MMPortSerial *self);
