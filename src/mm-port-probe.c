@@ -865,17 +865,20 @@ serial_probe_at_result_processor (MMPortProbe *self,
 
 static void
 serial_probe_at_parse_response (MMPortSerialAt *port,
-                                GString *response,
-                                GError *error,
+                                GAsyncResult *res,
                                 MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
     GVariant *result = NULL;
     GError *result_error = NULL;
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
-        return;
+        goto out;
 
     /* If AT probing cancelled, end this partial probing */
     if (g_cancellable_is_cancelled (task->at_probing_cancellable)) {
@@ -884,11 +887,11 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
                 g_udev_device_get_name (self->priv->port));
         task->at_result_processor (self, NULL);
         serial_probe_schedule (self);
-        return;
+        goto out;
     }
 
     if (!task->at_commands->response_processor (task->at_commands->command,
-                                                response ? response->str : NULL,
+                                                response,
                                                 !!task->at_commands[1].command,
                                                 error,
                                                 &result,
@@ -904,8 +907,7 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
                              g_udev_device_get_subsystem (self->priv->port),
                              g_udev_device_get_name (self->priv->port),
                              result_error->message));
-            g_error_free (result_error);
-            return;
+            goto out;
         }
 
         /* Go on to next command */
@@ -916,22 +918,28 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
             task->at_result_processor (self, NULL);
             /* Reschedule */
             serial_probe_schedule (self);
-            return;
+            goto out;
         }
 
         /* Schedule the next command in the probing group */
         task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
-        return;
+        goto out;
     }
 
     /* Run result processor.
      * Note that custom init commands are allowed to not return anything */
     task->at_result_processor (self, result);
-    if (result)
-        g_variant_unref (result);
 
     /* Reschedule probing */
     serial_probe_schedule (self);
+
+out:
+    if (result)
+        g_variant_unref (result);
+    if (error)
+        g_error_free (error);
+    if (result_error)
+        g_error_free (result_error);
 }
 
 static gboolean
@@ -955,13 +963,14 @@ serial_probe_at (MMPortProbe *self)
         return FALSE;
     }
 
-    mm_port_serial_at_queue_command (
+    mm_port_serial_at_command (
         MM_PORT_SERIAL_AT (task->serial),
         task->at_commands->command,
         task->at_commands->timeout,
         FALSE,
+        FALSE,
         task->at_probing_cancellable,
-        (MMPortSerialAtResponseFn)serial_probe_at_parse_response,
+        (GAsyncReadyCallback)serial_probe_at_parse_response,
         self);
     return FALSE;
 }

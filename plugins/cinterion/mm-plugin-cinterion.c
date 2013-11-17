@@ -76,24 +76,22 @@ cinterion_custom_init_finish (MMPortProbe *probe,
 
 static void
 sqport_ready (MMPortSerialAt *port,
-              GString *response,
-              GError *error,
+              GAsyncResult *res,
               CinterionCustomInitContext *ctx)
 {
+    const gchar *response;
+
     /* Ignore errors, just avoid tagging */
-    if (error) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        cinterion_custom_init_context_complete_and_free (ctx);
-        return;
+    response = mm_port_serial_at_command_finish (port, res, NULL);
+    if (response) {
+        /* A valid reply to AT^SQPORT tells us this is an AT port already */
+        mm_port_probe_set_result_at (ctx->probe, TRUE);
+
+        if (strstr (response, "Application"))
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_APP_PORT, GUINT_TO_POINTER (TRUE));
+        else if (strstr (response, "Modem"))
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_MODEM_PORT, GUINT_TO_POINTER (TRUE));
     }
-
-    /* A valid reply to AT^SQPORT tells us this is an AT port already */
-    mm_port_probe_set_result_at (ctx->probe, TRUE);
-
-    if (strstr (response->str, "Application"))
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_APP_PORT, GUINT_TO_POINTER (TRUE));
-    else if (strstr (response->str, "Modem"))
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_MODEM_PORT, GUINT_TO_POINTER (TRUE));
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     cinterion_custom_init_context_complete_and_free (ctx);
@@ -117,13 +115,14 @@ cinterion_custom_init (MMPortProbe *probe,
     ctx->port = g_object_ref (port);
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
 
-    mm_port_serial_at_queue_command (
+    mm_port_serial_at_command (
         ctx->port,
         "AT^SQPORT?",
         3,
         FALSE, /* raw */
+        FALSE, /* allow cached */
         ctx->cancellable,
-        (MMPortSerialAtResponseFn)sqport_ready,
+        (GAsyncReadyCallback)sqport_ready,
         ctx);
 }
 

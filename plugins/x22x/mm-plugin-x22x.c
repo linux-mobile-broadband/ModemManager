@@ -71,20 +71,22 @@ static void x22x_custom_init_step (X22xCustomInitContext *ctx);
 
 static void
 gmr_ready (MMPortSerialAt *port,
-           GString *response,
-           GError *error,
+           GAsyncResult *res,
            X22xCustomInitContext *ctx)
 {
     const gchar *p;
+    const gchar *response;
+    GError *error = NULL;
 
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* Just retry... */
         x22x_custom_init_step (ctx);
-        return;
+        goto out;
     }
 
     /* Note the lack of a ':' on the GMR; the X200 doesn't send one */
-    p = mm_strip_tag (response->str, "AT+GMR");
+    p = mm_strip_tag (response, "AT+GMR");
     if (p && *p != 'L') {
         /* X200 modems have a GMR firmware revision that starts with 'L', and
          * as far as I can tell X060s devices have a revision starting with 'C'.
@@ -101,6 +103,10 @@ gmr_ready (MMPortSerialAt *port,
     }
 
     x22x_custom_init_context_complete_and_free (ctx);
+
+out:
+    if (error)
+        g_error_free (error);
 }
 
 static void
@@ -127,13 +133,14 @@ x22x_custom_init_step (X22xCustomInitContext *ctx)
     }
 
     ctx->retries--;
-    mm_port_serial_at_queue_command (
+    mm_port_serial_at_command (
         ctx->port,
         "AT+GMR",
         3,
         FALSE, /* raw */
+        FALSE, /* allow_cached */
         ctx->cancellable,
-        (MMPortSerialAtResponseFn)gmr_ready,
+        (GAsyncReadyCallback)gmr_ready,
         ctx);
 }
 

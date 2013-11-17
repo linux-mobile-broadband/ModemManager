@@ -79,10 +79,13 @@ static void sierra_custom_init_step (SierraCustomInitContext *ctx);
 
 static void
 gcap_ready (MMPortSerialAt *port,
-            GString *response,
-            GError *error,
+            GAsyncResult *res,
             SierraCustomInitContext *ctx)
 {
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* If consumed all tries and the last error was a timeout, assume the
          * port is not AT */
@@ -106,7 +109,7 @@ gcap_ready (MMPortSerialAt *port,
 
         /* Just retry... */
         sierra_custom_init_step (ctx);
-        return;
+        goto out;
     }
 
     /* A valid reply to ATI tells us this is an AT port already */
@@ -118,23 +121,25 @@ gcap_ready (MMPortSerialAt *port,
      * or fail PPP.  So we whitelist modems that are known to allow PPP on the
      * secondary APP ports.
      */
-    if (strstr (response->str, "APP1")) {
+    if (strstr (response, "APP1")) {
         g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
 
         /* PPP-on-APP1-port whitelist */
-        if (strstr (response->str, "C885") || strstr (response->str, "USB 306") || strstr (response->str, "MC8790"))
+        if (strstr (response, "C885") ||
+            strstr (response, "USB 306") ||
+            strstr (response, "MC8790"))
             g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
 
         /* For debugging: let users figure out if their device supports PPP
          * on the APP1 port or not.
          */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
-            mm_dbg ("Sierra: APP1 PPP OK '%s'", response->str);
+            mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
             g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
-    } else if (strstr (response->str, "APP2") ||
-               strstr (response->str, "APP3") ||
-               strstr (response->str, "APP4")) {
+    } else if (strstr (response, "APP2") ||
+               strstr (response, "APP3") ||
+               strstr (response, "APP4")) {
         /* Additional APP ports don't support most AT commands, so they cannot
          * be used as the primary port.
          */
@@ -143,6 +148,10 @@ gcap_ready (MMPortSerialAt *port,
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     sierra_custom_init_context_complete_and_free (ctx);
+
+out:
+    if (error)
+        g_error_free (error);
 }
 
 static void
@@ -166,13 +175,14 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
     }
 
     ctx->retries--;
-    mm_port_serial_at_queue_command (
+    mm_port_serial_at_command (
         ctx->port,
         "ATI",
         3,
         FALSE, /* raw */
+        FALSE, /* allow_cached */
         ctx->cancellable,
-        (MMPortSerialAtResponseFn)gcap_ready,
+        (GAsyncReadyCallback)gcap_ready,
         ctx);
 }
 

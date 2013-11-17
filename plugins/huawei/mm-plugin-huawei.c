@@ -128,10 +128,13 @@ cache_port_mode (MMDevice *device,
 
 static void
 getportmode_ready (MMPortSerialAt *port,
-                   GString *response,
-                   GError *error,
+                   GAsyncResult *res,
                    HuaweiCustomInitContext *ctx)
 {
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         mm_dbg ("(Huawei) couldn't get port mode: '%s'",
                 error->message);
@@ -141,11 +144,8 @@ getportmode_ready (MMPortSerialAt *port,
          */
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
-                              MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
-            /* Retry */
-            huawei_custom_init_step (ctx);
-            return;
-        }
+                              MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN))
+            goto out;
 
         /* Port mode not supported */
     } else {
@@ -155,10 +155,10 @@ getportmode_ready (MMPortSerialAt *port,
 
         /* Results are cached in the parent device object */
         device = mm_port_probe_peek_device (ctx->probe);
-        cache_port_mode (device, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
-        cache_port_mode (device, response->str, "MDM:",  TAG_HUAWEI_MODEM_PORT);
-        cache_port_mode (device, response->str, "NDIS:", TAG_HUAWEI_NDIS_PORT);
-        cache_port_mode (device, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
+        cache_port_mode (device, response, "PCUI:", TAG_HUAWEI_PCUI_PORT);
+        cache_port_mode (device, response, "MDM:",  TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (device, response, "NDIS:", TAG_HUAWEI_NDIS_PORT);
+        cache_port_mode (device, response, "DIAG:", TAG_HUAWEI_DIAG_PORT);
         g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
 
         /* Mark port as being AT already */
@@ -166,23 +166,29 @@ getportmode_ready (MMPortSerialAt *port,
     }
 
     ctx->getportmode_done = TRUE;
+
+out:
+    if (error)
+        g_error_free (error);
+
     huawei_custom_init_step (ctx);
 }
 
 static void
 curc_ready (MMPortSerialAt *port,
-            GString *response,
-            GError *error,
+            GAsyncResult *res,
             HuaweiCustomInitContext *ctx)
 {
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* Retry if we get a timeout error */
         if (g_error_matches (error,
                              MM_SERIAL_ERROR,
-                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            huawei_custom_init_step (ctx);
-            return;
-        }
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            goto out;
 
         mm_dbg ("(Huawei) couldn't turn off unsolicited messages in"
                 "secondary ports: '%s'",
@@ -192,6 +198,11 @@ curc_ready (MMPortSerialAt *port,
     mm_dbg ("(Huawei) unsolicited messages in secondary ports turned off");
 
     ctx->curc_done = TRUE;
+
+out:
+    if (error)
+        g_error_free (error);
+
     huawei_custom_init_step (ctx);
 }
 
@@ -263,13 +274,14 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
 
         ctx->curc_retries--;
         /* Turn off unsolicited messages on secondary ports until needed */
-        mm_port_serial_at_queue_command (
+        mm_port_serial_at_command (
             ctx->port,
             "AT^CURC=0",
             3,
             FALSE, /* raw */
+            FALSE, /* allow_cached */
             ctx->cancellable,
-            (MMPortSerialAtResponseFn)curc_ready,
+            (GAsyncReadyCallback)curc_ready,
             ctx);
         return;
     }
@@ -283,13 +295,14 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
         }
 
         ctx->getportmode_retries--;
-        mm_port_serial_at_queue_command (
+        mm_port_serial_at_command (
             ctx->port,
             "AT^GETPORTMODE",
             3,
             FALSE, /* raw */
+            FALSE, /* allow_cached */
             ctx->cancellable,
-            (MMPortSerialAtResponseFn)getportmode_ready,
+            (GAsyncReadyCallback)getportmode_ready,
             ctx);
         return;
     }

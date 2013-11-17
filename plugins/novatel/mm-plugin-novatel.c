@@ -91,16 +91,19 @@ static void custom_init_step (CustomInitContext *ctx);
 
 static void
 nwdmat_ready (MMPortSerialAt *port,
-              GString *response,
-              GError *error,
+              GAsyncResult *res,
               CustomInitContext *ctx)
 {
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         if (g_error_matches (error,
                              MM_SERIAL_ERROR,
                              MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             custom_init_step (ctx);
-            return;
+            goto out;
         }
 
         mm_dbg ("(Novatel) Error flipping secondary ports to AT mode: %s", error->message);
@@ -109,6 +112,10 @@ nwdmat_ready (MMPortSerialAt *port,
     /* Finish custom_init */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     custom_init_context_complete_and_free (ctx);
+
+out:
+    if (error)
+        g_error_free (error);
 }
 
 static gboolean
@@ -147,13 +154,14 @@ custom_init_step (CustomInitContext *ctx)
 
     if (ctx->nwdmat_retries > 0) {
         ctx->nwdmat_retries--;
-        mm_port_serial_at_queue_command (ctx->port,
-                                         "$NWDMAT=1",
-                                         3,
-                                         FALSE, /* raw */
-                                         ctx->cancellable,
-                                         (MMPortSerialAtResponseFn)nwdmat_ready,
-                                         ctx);
+        mm_port_serial_at_command (ctx->port,
+                                   "$NWDMAT=1",
+                                   3,
+                                   FALSE, /* raw */
+                                   FALSE, /* allow_cached */
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)nwdmat_ready,
+                                   ctx);
         return;
     }
 

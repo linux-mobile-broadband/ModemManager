@@ -60,11 +60,6 @@ typedef void (*MMPortSerialAtUnsolicitedMsgFn) (MMPortSerialAt *port,
                                                 GMatchInfo *match_info,
                                                 gpointer user_data);
 
-typedef void (*MMPortSerialAtResponseFn)     (MMPortSerialAt *port,
-                                              GString *response,
-                                              GError *error,
-                                              gpointer user_data);
-
 #define MM_PORT_SERIAL_AT_REMOVE_ECHO           "remove-echo"
 #define MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED "init-sequence-enabled"
 #define MM_PORT_SERIAL_AT_INIT_SEQUENCE         "init-sequence"
@@ -97,21 +92,17 @@ void     mm_port_serial_at_set_response_parser (MMPortSerialAt *self,
                                                 gpointer user_data,
                                                 GDestroyNotify notify);
 
-void     mm_port_serial_at_queue_command     (MMPortSerialAt *self,
-                                              const char *command,
-                                              guint32 timeout_seconds,
-                                              gboolean is_raw,
-                                              GCancellable *cancellable,
-                                              MMPortSerialAtResponseFn callback,
-                                              gpointer user_data);
-
-void     mm_port_serial_at_queue_command_cached (MMPortSerialAt *self,
-                                                 const char *command,
-                                                 guint32 timeout_seconds,
-                                                 gboolean is_raw,
-                                                 GCancellable *cancellable,
-                                                 MMPortSerialAtResponseFn callback,
-                                                 gpointer user_data);
+void         mm_port_serial_at_command        (MMPortSerialAt *self,
+                                               const char *command,
+                                               guint32 timeout_seconds,
+                                               gboolean is_raw,
+                                               gboolean allow_cached,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+const gchar *mm_port_serial_at_command_finish (MMPortSerialAt *self,
+                                               GAsyncResult *res,
+                                               GError **error);
 
 /*
  * Convert a string into a quoted and escaped string. Returns a new

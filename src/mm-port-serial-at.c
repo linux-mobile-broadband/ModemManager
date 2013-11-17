@@ -158,16 +158,9 @@ handle_response (MMPortSerial *port,
                  GCallback callback,
                  gpointer callback_data)
 {
-    MMPortSerialAt *self = MM_PORT_SERIAL_AT (port);
-    MMPortSerialAtResponseFn response_callback = (MMPortSerialAtResponseFn) callback;
-    GString *string;
+    MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
 
-    /* Convert to a string and call the callback */
-    string = g_string_sized_new (response->len + 1);
-    g_string_append_len (string, (const char *) response->data, response->len);
-    response_callback (self, string, error, callback_data);
-    g_string_free (string, TRUE);
-
+    response_callback (port, response, error, callback_data);
     return response->len;
 }
 
@@ -350,43 +343,61 @@ at_command_to_byte_array (const char *command, gboolean is_raw, gboolean send_lf
     return buf;
 }
 
-void
-mm_port_serial_at_queue_command (MMPortSerialAt *self,
-                                 const char *command,
-                                 guint32 timeout_seconds,
-                                 gboolean is_raw,
-                                 GCancellable *cancellable,
-                                 MMPortSerialAtResponseFn callback,
-                                 gpointer user_data)
+const gchar *
+mm_port_serial_at_command_finish (MMPortSerialAt *self,
+                                  GAsyncResult *res,
+                                  GError **error)
 {
-    GByteArray *buf;
-    MMPortSerialAtPrivate *priv = MM_PORT_SERIAL_AT_GET_PRIVATE (self);
+    GString *str;
 
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (MM_IS_PORT_SERIAL_AT (self));
-    g_return_if_fail (command != NULL);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
 
-    buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
-    g_return_if_fail (buf != NULL);
+    str = (GString *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return str->str;
+}
 
-    mm_port_serial_queue_command (MM_PORT_SERIAL (self),
-                                  buf,
-                                  TRUE,
-                                  timeout_seconds,
-                                  cancellable,
-                                  (MMSerialResponseFn) callback,
-                                  user_data);
+static void
+string_free (GString *str)
+{
+    g_string_free (str, TRUE);
+}
+
+static void
+serial_command_ready (MMPortSerial *port,
+                      GByteArray *response,
+                      GError *error,
+                      GSimpleAsyncResult *simple)
+{
+    if (error)
+        g_simple_async_result_set_from_error (simple, error);
+    else if (response) {
+        GString *str;
+
+        /* Build a GString just with the response we need, and clear the
+         * processed range from the response buffer */
+        str = g_string_new_len ((const gchar *)response->data, response->len);
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   str,
+                                                   (GDestroyNotify)string_free);
+    } else
+        g_assert_not_reached ();
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 void
-mm_port_serial_at_queue_command_cached (MMPortSerialAt *self,
-                                        const char *command,
-                                        guint32 timeout_seconds,
-                                        gboolean is_raw,
-                                        GCancellable *cancellable,
-                                        MMPortSerialAtResponseFn callback,
-                                        gpointer user_data)
+mm_port_serial_at_command (MMPortSerialAt *self,
+                           const char *command,
+                           guint32 timeout_seconds,
+                           gboolean is_raw,
+                           gboolean allow_cached,
+                           GCancellable *cancellable,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
 {
+    GSimpleAsyncResult *simple;
     GByteArray *buf;
     MMPortSerialAtPrivate *priv = MM_PORT_SERIAL_AT_GET_PRIVATE (self);
 
@@ -397,13 +408,27 @@ mm_port_serial_at_queue_command_cached (MMPortSerialAt *self,
     buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
     g_return_if_fail (buf != NULL);
 
-    mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
-                                         buf,
-                                         TRUE,
-                                         timeout_seconds,
-                                         cancellable,
-                                         (MMSerialResponseFn) callback,
-                                         user_data);
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_port_serial_at_command);
+
+    if (!allow_cached)
+        mm_port_serial_queue_command (MM_PORT_SERIAL (self),
+                                      buf,
+                                      TRUE,
+                                      timeout_seconds,
+                                      cancellable,
+                                      (MMSerialResponseFn)serial_command_ready,
+                                      simple);
+    else
+        mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
+                                             buf,
+                                             TRUE,
+                                             timeout_seconds,
+                                             cancellable,
+                                             (MMSerialResponseFn)serial_command_ready,
+                                             simple);
 }
 
 static void
@@ -474,13 +499,14 @@ mm_port_serial_at_run_init_sequence (MMPortSerialAt *self)
 
     /* Just queue the init commands, don't wait for reply */
     for (i = 0; priv->init_sequence[i]; i++) {
-        mm_port_serial_at_queue_command (self,
-                                         priv->init_sequence[i],
-                                         3,
-                                         FALSE,
-                                         NULL,
-                                         NULL,
-                                         NULL);
+        mm_port_serial_at_command (self,
+                                   priv->init_sequence[i],
+                                   3,
+                                   FALSE,
+                                   FALSE,
+                                   NULL,
+                                   NULL,
+                                   NULL);
     }
 }
 
