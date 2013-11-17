@@ -151,19 +151,6 @@ parse_response (MMPortSerial *port, GByteArray *response, GError **error)
     return found;
 }
 
-static gsize
-handle_response (MMPortSerial *port,
-                 GByteArray *response,
-                 GError *error,
-                 GCallback callback,
-                 gpointer callback_data)
-{
-    MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
-
-    response_callback (port, response, error, callback_data);
-    return response->len;
-}
-
 /*****************************************************************************/
 
 typedef struct {
@@ -365,24 +352,31 @@ string_free (GString *str)
 
 static void
 serial_command_ready (MMPortSerial *port,
-                      GByteArray *response,
-                      GError *error,
+                      GAsyncResult *res,
                       GSimpleAsyncResult *simple)
 {
-    if (error)
-        g_simple_async_result_set_from_error (simple, error);
-    else if (response) {
-        GString *str;
+    GByteArray *response_buffer;
+    GError *error = NULL;
+    GString *response;
 
-        /* Build a GString just with the response we need, and clear the
-         * processed range from the response buffer */
-        str = g_string_new_len ((const gchar *)response->data, response->len);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   str,
-                                                   (GDestroyNotify)string_free);
-    } else
-        g_assert_not_reached ();
+    response_buffer = mm_port_serial_command_finish (port, res, &error);
+    if (!response_buffer) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
 
+    /* Build a GString just with the response we need, and clear the
+     * processed range from the response buffer */
+    response = g_string_new_len ((const gchar *)response_buffer->data, response_buffer->len);
+    if (response_buffer->len > 0)
+        g_byte_array_remove_range (response_buffer, 0, response_buffer->len);
+    g_byte_array_unref (response_buffer);
+
+    g_simple_async_result_set_op_res_gpointer (simple,
+                                               response,
+                                               (GDestroyNotify)string_free);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
@@ -413,22 +407,14 @@ mm_port_serial_at_command (MMPortSerialAt *self,
                                         user_data,
                                         mm_port_serial_at_command);
 
-    if (!allow_cached)
-        mm_port_serial_queue_command (MM_PORT_SERIAL (self),
-                                      buf,
-                                      TRUE,
-                                      timeout_seconds,
-                                      cancellable,
-                                      (MMSerialResponseFn)serial_command_ready,
-                                      simple);
-    else
-        mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
-                                             buf,
-                                             TRUE,
-                                             timeout_seconds,
-                                             cancellable,
-                                             (MMSerialResponseFn)serial_command_ready,
-                                             simple);
+    mm_port_serial_command (MM_PORT_SERIAL (self),
+                            buf,
+                            timeout_seconds,
+                            allow_cached,
+                            cancellable,
+                            (GAsyncReadyCallback)serial_command_ready,
+                            simple);
+    g_byte_array_unref (buf);
 }
 
 static void
@@ -637,7 +623,6 @@ mm_port_serial_at_class_init (MMPortSerialAtClass *klass)
 
     serial_class->parse_unsolicited = parse_unsolicited;
     serial_class->parse_response = parse_response;
-    serial_class->handle_response = handle_response;
     serial_class->debug_log = debug_log;
     serial_class->config = config;
 

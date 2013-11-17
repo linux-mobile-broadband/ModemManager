@@ -65,76 +65,6 @@ parse_response (MMPortSerial *port, GByteArray *response, GError **error)
     return find_qcdm_start (response, NULL);
 }
 
-static gsize
-handle_response (MMPortSerial *port,
-                 GByteArray *response,
-                 GError *error,
-                 GCallback callback,
-                 gpointer callback_data)
-{
-    MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
-    GByteArray *unescaped = NULL;
-    guint8 *unescaped_buffer;
-    GError *dm_error = NULL;
-    gsize used = 0;
-    gsize start = 0;
-    gboolean success = FALSE;
-    qcdmbool more = FALSE;
-    gsize unescaped_len = 0;
-
-    if (error)
-        goto callback;
-
-    /* Get the offset into the buffer of where the QCDM frame starts */
-    if (!find_qcdm_start (response, &start)) {
-        g_set_error_literal (&dm_error,
-                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Failed to parse QCDM packet.");
-        /* Discard the unparsable data */
-        used = response->len;
-        goto callback;
-    }
-
-    unescaped_buffer = g_malloc (1024);
-    success = dm_decapsulate_buffer ((const char *) (response->data + start),
-                                     response->len - start,
-                                     (char *) unescaped_buffer,
-                                     1024,
-                                     &unescaped_len,
-                                     &used,
-                                     &more);
-    if (!success) {
-        g_set_error_literal (&dm_error,
-                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Failed to unescape QCDM packet.");
-        g_free (unescaped_buffer);
-        unescaped_buffer = NULL;
-    } else if (more) {
-        /* Need more data; we shouldn't have gotten here since the parse
-         * function checks for the end-of-frame marker, but whatever.
-         */
-        g_free (unescaped_buffer);
-        return 0;
-    } else {
-        /* Successfully decapsulated the DM command */
-        g_assert (unescaped_len <= 1024);
-        unescaped_buffer = g_realloc (unescaped_buffer, unescaped_len);
-        unescaped = g_byte_array_new_take (unescaped_buffer, unescaped_len);
-    }
-
-callback:
-    response_callback (MM_PORT_SERIAL (port),
-                       unescaped,
-                       dm_error ? dm_error : error,
-                       callback_data);
-
-    if (unescaped)
-        g_byte_array_unref (unescaped);
-    g_clear_error (&dm_error);
-
-    return start + used;
-}
-
 /*****************************************************************************/
 
 GByteArray *
@@ -150,18 +80,77 @@ mm_port_serial_qcdm_command_finish (MMPortSerialQcdm *self,
 
 static void
 serial_command_ready (MMPortSerial *port,
-                      GByteArray *response,
-                      GError *error,
+                      GAsyncResult *res,
                       GSimpleAsyncResult *simple)
 {
+    GByteArray *response_buffer;
+    GByteArray *response;
+    GError *error = NULL;
+    gsize used = 0;
+    gsize start = 0;
+    guint8 *unescaped_buffer = NULL;
+    gboolean success = FALSE;
+    qcdmbool more = FALSE;
+    gsize unescaped_len = 0;
+
+    response_buffer = mm_port_serial_command_finish (port, res, &error);
+    if (!response_buffer)
+        goto out;
+
+    /* Get the offset into the buffer of where the QCDM frame starts */
+    start = 0;
+    if (!find_qcdm_start (response_buffer, &start)) {
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Failed to parse QCDM packet");
+        /* Discard the unparsable data */
+        used = response_buffer->len;
+        goto out;
+    }
+
+    unescaped_buffer = g_malloc (1024);
+    success = dm_decapsulate_buffer ((const char *)(response_buffer->data + start),
+                                     response_buffer->len - start,
+                                     (char *)unescaped_buffer,
+                                     1024,
+                                     &unescaped_len,
+                                     &used,
+                                     &more);
+    if (!success) {
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Failed to unescape QCDM packet");
+        g_free (unescaped_buffer);
+        unescaped_buffer = NULL;
+        goto out;
+    }
+
+    if (more) {
+        /* Need more data; we shouldn't have gotten here since the parse
+         * function checks for the end-of-frame marker, but whatever.
+         */
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "QCDM packet is not complete");
+        g_free (unescaped_buffer);
+        unescaped_buffer = NULL;
+        goto out;
+    }
+
+    /* Successfully decapsulated the DM command */
+    g_assert (error == NULL);
+    g_assert (unescaped_len <= 1024);
+    unescaped_buffer = g_realloc (unescaped_buffer, unescaped_len);
+    response = g_byte_array_new_take (unescaped_buffer, unescaped_len);
+    g_simple_async_result_set_op_res_gpointer (simple, response, (GDestroyNotify)g_byte_array_unref);
+
+out:
     if (error)
-        g_simple_async_result_set_from_error (simple, error);
-    else if (response)
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_byte_array_ref (response),
-                                                   (GDestroyNotify)g_byte_array_unref);
-    else
-        g_assert_not_reached ();
+        g_simple_async_result_take_error (simple, error);
+    if (start + used)
+        g_byte_array_remove_range (response_buffer, 0, start + used);
+    if (response_buffer)
+        g_byte_array_unref (response_buffer);
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -187,23 +176,13 @@ mm_port_serial_qcdm_command (MMPortSerialQcdm *self,
                                         mm_port_serial_qcdm_command);
 
     /* 'command' is expected to be already CRC-ed and escaped */
-
-    if (!allow_cached)
-        mm_port_serial_queue_command (MM_PORT_SERIAL (self),
-                                      g_byte_array_ref (command),
-                                      TRUE,
-                                      timeout_seconds,
-                                      cancellable,
-                                      (MMSerialResponseFn)serial_command_ready,
-                                      simple);
-    else
-        mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
-                                             g_byte_array_ref (command),
-                                             TRUE,
-                                             timeout_seconds,
-                                             cancellable,
-                                             (MMSerialResponseFn)serial_command_ready,
-                                             simple);
+    mm_port_serial_command (MM_PORT_SERIAL (self),
+                            command,
+                            timeout_seconds,
+                            allow_cached,
+                            cancellable,
+                            (GAsyncReadyCallback)serial_command_ready,
+                            simple);
 }
 
 static void
@@ -283,7 +262,6 @@ mm_port_serial_qcdm_class_init (MMPortSerialQcdmClass *klass)
 
     /* Virtual methods */
     port_class->parse_response = parse_response;
-    port_class->handle_response = handle_response;
     port_class->config_fd = config_fd;
     port_class->debug_log = debug_log;
 }

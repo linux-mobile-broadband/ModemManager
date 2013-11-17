@@ -43,11 +43,6 @@
 typedef struct _MMPortSerial MMPortSerial;
 typedef struct _MMPortSerialClass MMPortSerialClass;
 
-typedef void (*MMSerialResponseFn)     (MMPortSerial *port,
-                                        GByteArray *response,
-                                        GError *error,
-                                        gpointer user_data);
-
 
 struct _MMPortSerial {
     MMPort parent;
@@ -72,16 +67,6 @@ struct _MMPortSerialClass {
     gboolean (*parse_response)    (MMPortSerial *self,
                                    GByteArray *response,
                                    GError **error);
-
-    /* Called after parsing to allow the command response to be delivered to
-     * it's callback to be handled.  Returns the # of bytes of the response
-     * consumed.
-     */
-    gsize     (*handle_response)  (MMPortSerial *self,
-                                   GByteArray *response,
-                                   GError *error,
-                                   GCallback callback,
-                                   gpointer callback_data);
 
     /* Called to configure the serial port fd after it's opened.  On error, should
      * return FALSE and set 'error' as appropriate.
@@ -139,20 +124,15 @@ void     mm_port_serial_flash_cancel      (MMPortSerial *self);
 
 gboolean mm_port_serial_get_flash_ok      (MMPortSerial *self);
 
-void     mm_port_serial_queue_command     (MMPortSerial *self,
+void        mm_port_serial_command        (MMPortSerial *self,
                                            GByteArray *command,
-                                           gboolean take_command,
                                            guint32 timeout_seconds,
+                                           gboolean allow_cached,
                                            GCancellable *cancellable,
-                                           MMSerialResponseFn callback,
+                                           GAsyncReadyCallback callback,
                                            gpointer user_data);
-
-void     mm_port_serial_queue_command_cached (MMPortSerial *self,
-                                              GByteArray *command,
-                                              gboolean take_command,
-                                              guint32 timeout_seconds,
-                                              GCancellable *cancellable,
-                                              MMSerialResponseFn callback,
-                                              gpointer user_data);
+GByteArray *mm_port_serial_command_finish (MMPortSerial *self,
+                                           GAsyncResult *res,
+                                           GError **error);
 
 #endif /* MM_PORT_SERIAL_H */
