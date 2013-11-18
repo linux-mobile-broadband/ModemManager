@@ -624,7 +624,6 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
             mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (task->serial),
                                          cmd2,
                                          3,
-                                         FALSE,
                                          NULL,
                                          (GAsyncReadyCallback)serial_probe_qcdm_parse_response,
                                          self);
@@ -738,7 +737,6 @@ serial_probe_qcdm (MMPortProbe *self)
     mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (task->serial),
                                  verinfo,
                                  3,
-                                 FALSE,
                                  NULL,
                                  (GAsyncReadyCallback)serial_probe_qcdm_parse_response,
                                  self);

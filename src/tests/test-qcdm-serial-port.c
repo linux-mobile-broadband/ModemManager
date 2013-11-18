@@ -201,7 +201,7 @@ qcdm_request_verinfo (MMPortSerialQcdm *port,
         g_byte_array_free (verinfo, TRUE);
     verinfo->len = len;
 
-    mm_port_serial_qcdm_command (port, verinfo, 3, FALSE, NULL, cb, loop);
+    mm_port_serial_qcdm_command (port, verinfo, 3, NULL, cb, loop);
     g_byte_array_unref (verinfo);
 }
 

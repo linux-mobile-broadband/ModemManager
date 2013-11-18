@@ -48,7 +48,6 @@ MMPortSerialQcdm *mm_port_serial_qcdm_new_fd (int fd);
 void        mm_port_serial_qcdm_command        (MMPortSerialQcdm *self,
                                                 GByteArray *command,
                                                 guint32 timeout_seconds,
-                                                gboolean allow_cached,
                                                 GCancellable *cancellable,
                                                 GAsyncReadyCallback callback,
                                                 gpointer user_data);

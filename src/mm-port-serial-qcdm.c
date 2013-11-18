@@ -160,7 +160,6 @@ void
 mm_port_serial_qcdm_command (MMPortSerialQcdm *self,
                              GByteArray *command,
                              guint32 timeout_seconds,
-                             gboolean allow_cached,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
                              gpointer user_data)
@@ -179,7 +178,7 @@ mm_port_serial_qcdm_command (MMPortSerialQcdm *self,
     mm_port_serial_command (MM_PORT_SERIAL (self),
                             command,
                             timeout_seconds,
-                            allow_cached,
+                            FALSE, /* never cached */
                             cancellable,
                             (GAsyncReadyCallback)serial_command_ready,
                             simple);
