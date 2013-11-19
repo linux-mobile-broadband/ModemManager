@@ -674,7 +674,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
         qmi_device_parent = g_udev_device_get_parent (qmi_device);
         g_object_unref (qmi_device);
 
-        if (!data_device_parent) {
+        if (!qmi_device_parent) {
             mm_warn ("Couldn't get udev device parent for QMI port '%s'",
                      mm_port_get_device (MM_PORT (l->data)));
             continue;
@@ -825,7 +825,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
         mbim_device_parent = g_udev_device_get_parent (mbim_device);
         g_object_unref (mbim_device);
 
-        if (!data_device_parent) {
+        if (!mbim_device_parent) {
             mm_warn ("Couldn't get udev device parent for MBIM port '%s'",
                      mm_port_get_device (MM_PORT (l->data)));
             continue;
