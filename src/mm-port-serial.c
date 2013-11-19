@@ -177,7 +177,7 @@ mm_port_serial_command (MMPortSerial *self,
     ctx->cancellable = (cancellable ? g_object_ref (cancellable) : NULL);
 
     /* Only accept about 3 seconds of EAGAIN for this command */
-    if (self->priv->send_delay)
+    if (self->priv->send_delay && mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY)
         ctx->eagain_count = 3000000 / self->priv->send_delay;
     else
         ctx->eagain_count = 1000;
@@ -429,6 +429,10 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
     int parity;
     int stopbits;
 
+    /* No setup if not a tty */
+    if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY)
+        return TRUE;
+
     speed = parse_baudrate (self->priv->baud);
     bits = parse_bits (self->priv->bits);
     parity = parse_parity (self->priv->parity);
@@ -541,7 +545,7 @@ port_serial_process_command (MMPortSerial *self,
         serial_debug (self, "-->", (const char *) ctx->command->data, ctx->command->len);
     }
 
-    if (self->priv->send_delay == 0) {
+    if (self->priv->send_delay == 0 || mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY) {
         /* Send the whole command in one write */
         send_len = expected_status = ctx->command->len;
         p = ctx->command->data;
@@ -763,7 +767,10 @@ port_serial_queue_process (gpointer data)
 
     /* Schedule the next byte of the command to be sent */
     if (!ctx->done) {
-        port_serial_schedule_queue_process (self, self->priv->send_delay / 1000);
+        port_serial_schedule_queue_process (self,
+                                            (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY ?
+                                             self->priv->send_delay / 1000 :
+                                             0));
         return FALSE;
     }
 
@@ -992,40 +999,44 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         return FALSE;
     }
 
-    if (ioctl (self->priv->fd, TIOCEXCL) < 0) {
-        errno_save = errno;
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
-                     "Could not lock serial device %s: %s", device, strerror (errno_save));
-        mm_warn ("(%s) could not lock serial device (%d)", device, errno_save);
-        goto error;
-    }
+    /* Serial port specific setup */
+    if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY) {
+        /* Try to lock serial device */
+        if (ioctl (self->priv->fd, TIOCEXCL) < 0) {
+            errno_save = errno;
+            g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
+                         "Could not lock serial device %s: %s", device, strerror (errno_save));
+            mm_warn ("(%s) could not lock serial device (%d)", device, errno_save);
+            goto error;
+        }
 
-    /* Flush any waiting IO */
-    tcflush (self->priv->fd, TCIOFLUSH);
+        /* Flush any waiting IO */
+        tcflush (self->priv->fd, TCIOFLUSH);
 
-    if (tcgetattr (self->priv->fd, &self->priv->old_t) < 0) {
-        errno_save = errno;
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
-                     "Could not set attributes on serial device %s: %s", device, strerror (errno_save));
-        mm_warn ("(%s) could not set attributes on serial device (%d)", device, errno_save);
-        goto error;
+        if (tcgetattr (self->priv->fd, &self->priv->old_t) < 0) {
+            errno_save = errno;
+            g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
+                         "Could not set attributes on serial device %s: %s", device, strerror (errno_save));
+            mm_warn ("(%s) could not set attributes on serial device (%d)", device, errno_save);
+            goto error;
+        }
+
+        /* Don't wait for pending data when closing the port; this can cause some
+         * stupid devices that don't respond to URBs on a particular port to hang
+         * for 30 seconds when probing fails.  See GNOME bug #630670.
+         */
+        if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
+            sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
+            if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
+                mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
+                         device, g_strerror (errno));
+        }
     }
 
     g_warn_if_fail (MM_PORT_SERIAL_GET_CLASS (self)->config_fd);
     if (!MM_PORT_SERIAL_GET_CLASS (self)->config_fd (self, self->priv->fd, error)) {
         mm_dbg ("(%s) failed to configure serial device", device);
         goto error;
-    }
-
-    /* Don't wait for pending data when closing the port; this can cause some
-     * stupid devices that don't respond to URBs on a particular port to hang
-     * for 30 seconds when probing fails.  See GNOME bug #630670.
-     */
-    if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
-        sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
-        if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
-            mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
-                     device, g_strerror (errno));
     }
 
     g_get_current_time (&tv_end);
@@ -1108,21 +1119,7 @@ mm_port_serial_close (MMPortSerial *self)
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
-        /* Paranoid: ensure our closing_wait value is still set so we ignore
-         * pending data when closing the port.  See GNOME bug #630670.
-         */
-        if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
-            if (sinfo.closing_wait != ASYNC_CLOSING_WAIT_NONE) {
-                mm_warn ("(%s): serial port closing_wait was reset!", device);
-                sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
-                if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
-                    mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
-                             device, g_strerror (errno));
-            }
-        }
-
-        g_get_current_time (&tv_start);
-
+        /* Destroy channel */
         if (self->priv->channel) {
             data_watch_enable (self, FALSE);
             g_io_channel_shutdown (self->priv->channel, TRUE, NULL);
@@ -1130,8 +1127,27 @@ mm_port_serial_close (MMPortSerial *self)
             self->priv->channel = NULL;
         }
 
-        tcsetattr (self->priv->fd, TCSANOW, &self->priv->old_t);
-        tcflush (self->priv->fd, TCIOFLUSH);
+        g_get_current_time (&tv_start);
+
+        /* Serial port specific setup */
+        if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY) {
+            /* Paranoid: ensure our closing_wait value is still set so we ignore
+             * pending data when closing the port.  See GNOME bug #630670.
+             */
+            if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
+                if (sinfo.closing_wait != ASYNC_CLOSING_WAIT_NONE) {
+                    mm_warn ("(%s): serial port closing_wait was reset!", device);
+                    sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
+                    if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
+                        mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
+                                 device, g_strerror (errno));
+                }
+            }
+
+            tcsetattr (self->priv->fd, TCSANOW, &self->priv->old_t);
+            tcflush (self->priv->fd, TCIOFLUSH);
+        }
+
         close (self->priv->fd);
         self->priv->fd = -1;
 
@@ -1485,7 +1501,7 @@ flash_do (MMPortSerial *self)
 
     ctx->flash_id = 0;
 
-    if (self->priv->flash_ok) {
+    if (self->priv->flash_ok || mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY) {
         if (ctx->current_speed) {
             if (!set_speed (ctx->self, ctx->current_speed, &error))
                 g_assert (error);
@@ -1544,7 +1560,7 @@ mm_port_serial_flash (MMPortSerial *self,
         return;
     }
 
-    if (!self->priv->flash_ok) {
+    if (!self->priv->flash_ok || mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY) {
         self->priv->flash_ctx = ctx;
         ctx->flash_id = g_idle_add ((GSourceFunc)flash_do, self);
         return;
