@@ -254,6 +254,20 @@ mm_base_modem_grab_port (MMBaseModem *self,
         if (!port && ptype == MM_PORT_TYPE_MBIM)
             port = MM_PORT (mm_port_mbim_new (name));
 #endif
+
+        /* Non-serial AT port */
+        if (!port && ptype == MM_PORT_TYPE_AT) {
+            port = MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_USB));
+
+            /* Set common response parser */
+            mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),
+                                                   mm_serial_parser_v1_parse,
+                                                   mm_serial_parser_v1_new (),
+                                                   mm_serial_parser_v1_destroy);
+            /* Store flags already */
+            mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
+        }
+
         if (!port) {
             g_set_error (error,
                          MM_CORE_ERROR,
