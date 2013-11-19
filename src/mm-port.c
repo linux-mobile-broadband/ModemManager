@@ -42,46 +42,6 @@ struct _MMPortPrivate {
 
 /*****************************************************************************/
 
-static GObject*
-constructor (GType type,
-             guint n_construct_params,
-             GObjectConstructParam *construct_params)
-{
-    GObject *object;
-    MMPortPrivate *priv;
-
-    object = G_OBJECT_CLASS (mm_port_parent_class)->constructor (type,
-                                                                 n_construct_params,
-                                                                 construct_params);
-    if (!object)
-        return NULL;
-
-    priv = MM_PORT (object)->priv;
-
-    if (!priv->device) {
-        g_warning ("MMPort: no device provided");
-        g_object_unref (object);
-        return NULL;
-    }
-
-    if (priv->subsys == MM_PORT_SUBSYS_UNKNOWN) {
-        g_warning ("MMPort: invalid port subsystem");
-        g_object_unref (object);
-        return NULL;
-    }
-
-    /* Can't have a TTY subsystem port that's unknown */
-    if (   priv->subsys != MM_PORT_SUBSYS_NET
-        && priv->ptype == MM_PORT_TYPE_UNKNOWN) {
-        g_warning ("MMPort: invalid port type");
-        g_object_unref (object);
-        return NULL;
-    }
-
-    return object;
-}
-
-
 const char *
 mm_port_get_device (MMPort *self)
 {
@@ -215,7 +175,6 @@ mm_port_class_init (MMPortClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPortPrivate));
 
     /* Virtual methods */
-    object_class->constructor = constructor;
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->finalize = finalize;
