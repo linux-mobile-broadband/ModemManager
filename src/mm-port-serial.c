@@ -1571,14 +1571,6 @@ mm_port_serial_flash (MMPortSerial *self,
     ctx->flash_id = g_timeout_add (flash_time, (GSourceFunc)flash_do, self);
 }
 
-gboolean
-mm_port_serial_get_flash_ok (MMPortSerial *self)
-{
-    g_return_val_if_fail (MM_IS_PORT_SERIAL (self), TRUE);
-
-    return self->priv->flash_ok;
-}
-
 /*****************************************************************************/
 
 MMPortSerial *

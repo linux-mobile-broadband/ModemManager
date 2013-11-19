@@ -123,8 +123,6 @@ gboolean mm_port_serial_flash_finish      (MMPortSerial *self,
                                            GError **error);
 void     mm_port_serial_flash_cancel      (MMPortSerial *self);
 
-gboolean mm_port_serial_get_flash_ok      (MMPortSerial *self);
-
 void        mm_port_serial_command        (MMPortSerial *self,
                                            GByteArray *command,
                                            guint32 timeout_seconds,
