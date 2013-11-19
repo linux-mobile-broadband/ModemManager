@@ -3965,6 +3965,21 @@ sim_reinit_ready (MMSim *sim,
     interface_initialization_step (ctx);
 }
 
+void
+mm_iface_modem_update_own_numbers (MMIfaceModem *self,
+                                   const GStrv own_numbers)
+{
+    MmGdbusModem *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (skeleton) {
+        mm_gdbus_modem_set_own_numbers (skeleton, (const gchar * const *)own_numbers);
+        g_object_unref (skeleton);
+    }
+}
+
 static void
 load_own_numbers_ready (MMIfaceModem *self,
                         GAsyncResult *res,

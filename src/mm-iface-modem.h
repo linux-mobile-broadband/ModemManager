@@ -419,6 +419,10 @@ void mm_iface_modem_update_state (MMIfaceModem *self,
 void mm_iface_modem_update_failed_state (MMIfaceModem *self,
                                          MMModemStateFailedReason failed_reason);
 
+/* Allow update own numbers */
+void mm_iface_modem_update_own_numbers (MMIfaceModem *self,
+                                        const GStrv own_numbers);
+
 /* Allow reporting new access tech */
 void mm_iface_modem_update_access_technologies (MMIfaceModem *self,
                                                 MMModemAccessTechnology access_tech,

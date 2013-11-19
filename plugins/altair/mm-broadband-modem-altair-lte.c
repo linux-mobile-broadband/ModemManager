@@ -53,6 +53,12 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAltairLte, mm_broadband_modem_altair_lte
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 struct _MMBroadbandModemAltairLtePrivate {
+    /* Regex for SIM refresh notifications */
+    GRegex *sim_refresh_regex;
+    /* Timer that goes off 10s after the last SIM refresh notification.
+     * This indicates that there are no more SIM refreshes and we should
+     * reregister the device.*/
+    guint sim_refresh_timer_id;
     /* Regex for bearer related notifications */
     GRegex *statcm_regex;
 };
@@ -634,7 +640,101 @@ modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Setup/Cleanup unsolicited events (3GPP interface) */
+/* SIMREFRESH unsolicited event handler */
+
+static void
+altair_reregister_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         gpointer user_data)
+{
+    if (!mm_base_modem_at_command_finish (self, res, NULL)) {
+        mm_dbg ("Failed to reregister modem");
+    } else {
+        mm_dbg ("Modem reregistered successfully");
+    }
+}
+
+static void
+altair_deregister_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         gpointer user_data)
+{
+    if (!mm_base_modem_at_command_finish (self, res, NULL)) {
+        mm_dbg ("Deregister modem failed");
+        return;
+    }
+
+    mm_dbg ("Deregistered modem, now reregistering");
+
+    /* Register */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%CMATT=1",
+        10,
+        FALSE, /* allow_cached */
+        (GAsyncReadyCallback)altair_reregister_ready,
+        NULL);
+}
+
+static void
+altair_load_own_numbers_ready (MMIfaceModem *iface_modem,
+                               GAsyncResult *res,
+                               MMBroadbandModemAltairLte *self)
+{
+    GError *error = NULL;
+    GStrv str_list;
+
+    str_list = MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish (MM_IFACE_MODEM (self), res, &error);
+    if (error) {
+        mm_warn ("Couldn't reload Own Numbers: '%s'", error->message);
+        g_error_free (error);
+    }
+    if (str_list) {
+        mm_iface_modem_update_own_numbers (iface_modem, str_list);
+        g_strfreev (str_list);
+    }
+
+    /* Deregister */
+    mm_dbg ("Reregistering modem");
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%CMATT=0",
+        10,
+        FALSE, /* allow_cached */
+        (GAsyncReadyCallback)altair_deregister_ready,
+        NULL);
+}
+
+static gboolean
+altair_sim_refresh_timer_expired (MMBroadbandModemAltairLte *self)
+{
+    mm_dbg ("No more SIM refreshes, reloading Own Numbers and reregistering modem");
+
+    g_assert (MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers);
+    g_assert (MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish);
+    MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)altair_load_own_numbers_ready,
+        self);
+
+    self->priv->sim_refresh_timer_id = 0;
+    return FALSE;
+}
+
+static void
+altair_sim_refresh_changed (MMAtSerialPort *port,
+                            GMatchInfo *match_info,
+                            MMBroadbandModemAltairLte *self)
+{
+    mm_dbg ("Received SIM refresh notification");
+    if (self->priv->sim_refresh_timer_id) {
+        g_source_remove (self->priv->sim_refresh_timer_id);
+    }
+    self->priv->sim_refresh_timer_id =
+        g_timeout_add_seconds(10,
+                              (GSourceFunc)altair_sim_refresh_timer_expired,
+                              self);
+}
 
 typedef enum {
     MM_STATCM_ALTAIR_LTE_DEREGISTERED = 0,
@@ -650,6 +750,9 @@ bearer_list_report_disconnect_status_foreach (MMBearer *bearer,
     mm_bearer_report_connection_status (bearer,
                                         MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
+
+/*****************************************************************************/
+/* STATCM unsolicited event handler */
 
 static void
 altair_statcm_changed (MMAtSerialPort *port,
@@ -682,6 +785,9 @@ altair_statcm_changed (MMAtSerialPort *port,
 
 }
 
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
 static void
 set_3gpp_unsolicited_events_handlers (MMBroadbandModemAltairLte *self,
                                       gboolean enable)
@@ -696,6 +802,14 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemAltairLte *self,
     for (i = 0; i < 2; i++) {
         if (!ports[i])
             continue;
+
+        /* SIM refresh handler */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->sim_refresh_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)altair_sim_refresh_changed : NULL,
+            enable ? self : NULL,
+            NULL);
 
         /* bearer mode related */
         mm_at_serial_port_add_unsolicited_msg_handler (
@@ -794,6 +908,31 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
 /* Enabling unsolicited events (3GPP interface) */
 
 static gboolean
+response_processor_no_result_stop_on_error (MMBaseModem *self,
+                                            gpointer none,
+                                            const gchar *command,
+                                            const gchar *response,
+                                            gboolean last_command,
+                                            const GError *error,
+                                            GVariant **result,
+                                            GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return TRUE;
+    }
+
+    *result = NULL;
+    return FALSE;
+}
+
+static const MMBaseModemAtCommand unsolicited_events_enable_sequence[] = {
+  { "%STATCM=1", 10, FALSE, response_processor_no_result_stop_on_error },
+  { "%NOTIFYEV=\"SIMREFRESH\",1", 10, FALSE, NULL },
+  { NULL }
+};
+
+static gboolean
 modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
                                              GAsyncResult *res,
                                              GError **error)
@@ -808,7 +947,7 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
+    mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (error)
         g_simple_async_result_take_error (simple, error);
     else
@@ -832,14 +971,11 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
     }
 
     /* Our own enable now */
-    mm_base_modem_at_command_full (
+    mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-        "%STATCM=1",
-        10,
-        FALSE, /* allow_cached */
-        FALSE, /* raw */
-        NULL, /* cancellable */
+        unsolicited_events_enable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)own_enable_unsolicited_events_ready,
         simple);
 }
@@ -865,6 +1001,12 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 /* Disabling unsolicited events (3GPP interface) */
+
+static const MMBaseModemAtCommand unsolicited_events_disable_sequence[] = {
+  { "%STATCM=0", 10, FALSE, NULL },
+  { "%NOTIFYEV=\"SIMREFRESH\",0", 10, FALSE, NULL },
+  { NULL }
+};
 
 static gboolean
 modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
@@ -896,7 +1038,7 @@ own_disable_unsolicited_events_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
+    mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (error) {
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
@@ -924,14 +1066,11 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                         modem_3gpp_disable_unsolicited_events);
 
     /* Our own disable first */
-    mm_base_modem_at_command_full (
+    mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-        "%STATCM=0",
-        10,
-        FALSE, /* allow_cached */
-        FALSE, /* raw */
-        NULL, /* cancellable */
+        unsolicited_events_disable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
         result);
 }
@@ -1086,8 +1225,23 @@ mm_broadband_modem_altair_lte_init (MMBroadbandModemAltairLte *self)
                                               MM_TYPE_BROADBAND_MODEM_ALTAIR_LTE,
                                               MMBroadbandModemAltairLtePrivate);
 
+    self->priv->sim_refresh_regex = g_regex_new ("\\r\\n\\%NOTIFYEV:\\s*SIMREFRESH,?(\\d*)\\r+\\n",
+                                                 G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->sim_refresh_timer_id = 0;
     self->priv->statcm_regex = g_regex_new ("\\r\\n\\%STATCM:\\s*(\\d*),?(\\d*)\\r+\\n",
                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModemAltairLte *self = MM_BROADBAND_MODEM_ALTAIR_LTE (object);
+
+    if (self->priv->sim_refresh_timer_id)
+        g_source_remove (self->priv->sim_refresh_timer_id);
+    g_regex_unref (self->priv->sim_refresh_regex);
+    g_regex_unref (self->priv->statcm_regex);
+    G_OBJECT_CLASS (mm_broadband_modem_altair_lte_parent_class)->finalize (object);
 }
 
 static void
@@ -1174,6 +1328,7 @@ mm_broadband_modem_altair_lte_class_init (MMBroadbandModemAltairLteClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemAltairLtePrivate));
 
+    object_class->finalize = finalize;
     broadband_modem_class->setup_ports = setup_ports;
 
     /* The Altair LTE modem reboots itself upon receiving an ATZ command. We
