@@ -1156,8 +1156,13 @@ serial_open_at (MMPortProbe *self)
     /* Create AT serial port if not done before */
     if (!task->serial) {
         gpointer parser;
+        MMPortSubsys subsys = MM_PORT_SUBSYS_TTY;
 
-        task->serial = MM_PORT_SERIAL (mm_port_serial_at_new (g_udev_device_get_name (self->priv->port)));
+        if (g_str_has_prefix (g_udev_device_get_subsystem (self->priv->port), "usb"))
+            subsys = MM_PORT_SUBSYS_USB;
+
+        task->serial = MM_PORT_SERIAL (mm_port_serial_at_new (g_udev_device_get_name (self->priv->port),
+                                                              subsys));
         if (!task->serial) {
             port_probe_run_task_complete (
                 task,

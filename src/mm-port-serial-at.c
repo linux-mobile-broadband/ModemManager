@@ -388,7 +388,11 @@ mm_port_serial_at_command (MMPortSerialAt *self,
     g_return_if_fail (MM_IS_PORT_SERIAL_AT (self));
     g_return_if_fail (command != NULL);
 
-    buf = at_command_to_byte_array (command, is_raw, self->priv->send_lf);
+    buf = at_command_to_byte_array (command,
+                                    is_raw,
+                                    (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY ?
+                                     self->priv->send_lf :
+                                     TRUE));
     g_return_if_fail (buf != NULL);
 
     simple = g_simple_async_result_new (G_OBJECT (self),
@@ -496,11 +500,14 @@ config (MMPortSerial *_self)
 /*****************************************************************************/
 
 MMPortSerialAt *
-mm_port_serial_at_new (const char *name)
+mm_port_serial_at_new (const char *name,
+                       MMPortSubsys subsys)
 {
+    g_return_val_if_fail (subsys == MM_PORT_SUBSYS_TTY || subsys == MM_PORT_SUBSYS_USB, NULL);
+
     return MM_PORT_SERIAL_AT (g_object_new (MM_TYPE_PORT_SERIAL_AT,
                                             MM_PORT_DEVICE, name,
-                                            MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
+                                            MM_PORT_SUBSYS, subsys,
                                             MM_PORT_TYPE, MM_PORT_TYPE_AT,
                                             NULL));
 }

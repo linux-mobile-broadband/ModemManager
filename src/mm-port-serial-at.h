@@ -77,7 +77,8 @@ struct _MMPortSerialAtClass {
 
 GType mm_port_serial_at_get_type (void);
 
-MMPortSerialAt *mm_port_serial_at_new (const char *name);
+MMPortSerialAt *mm_port_serial_at_new (const char *name,
+                                       MMPortSubsys subsys);
 
 void     mm_port_serial_at_add_unsolicited_msg_handler (MMPortSerialAt *self,
                                                         GRegex *regex,
