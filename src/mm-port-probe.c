@@ -1177,7 +1177,7 @@ serial_open_at (MMPortProbe *self)
 
         g_object_set (task->serial,
                       MM_PORT_SERIAL_SPEW_CONTROL,   TRUE,
-                      MM_PORT_SERIAL_SEND_DELAY,     task->at_send_delay,
+                      MM_PORT_SERIAL_SEND_DELAY,     (subsys == MM_PORT_SUBSYS_TTY ? task->at_send_delay : 0),
                       MM_PORT_SERIAL_AT_REMOVE_ECHO, task->at_remove_echo,
                       MM_PORT_SERIAL_AT_SEND_LF,     task->at_send_lf,
                       NULL);
@@ -1399,9 +1399,7 @@ mm_port_probe_is_at (MMPortProbe *self)
 
     subsys = g_udev_device_get_subsystem (self->priv->port);
     name = g_udev_device_get_name (self->priv->port);
-    if (g_str_equal (subsys, "net") ||
-        (g_str_has_prefix (subsys, "usb") &&
-         g_str_has_prefix (name, "cdc-wdm")))
+    if (g_str_equal (subsys, "net"))
         return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_AT ?

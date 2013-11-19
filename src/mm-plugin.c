@@ -718,21 +718,27 @@ mm_plugin_supports_port (MMPlugin *self,
             probe_run_flags |= MM_PORT_PROBE_AT;
         else if (self->priv->single_at)
             probe_run_flags |= MM_PORT_PROBE_AT;
-        if (need_vendor_probing)
-            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_VENDOR);
-        if (need_product_probing)
-            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
         if (self->priv->qcdm)
             probe_run_flags |= MM_PORT_PROBE_QCDM;
-        if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
-            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
     } else {
         /* cdc-wdm ports... */
         probe_run_flags = MM_PORT_PROBE_NONE;
         if (self->priv->qmi && find_driver_in_device (device, "qmi_wwan"))
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        if (self->priv->mbim && find_driver_in_device (device, "cdc_mbim"))
+        else if (self->priv->mbim && find_driver_in_device (device, "cdc_mbim"))
             probe_run_flags |= MM_PORT_PROBE_MBIM;
+        else
+            probe_run_flags |= MM_PORT_PROBE_AT;
+    }
+
+    /* For potential AT ports, check for more things */
+    if (probe_run_flags & MM_PORT_PROBE_AT) {
+        if (need_vendor_probing)
+            probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
+        if (need_product_probing)
+            probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
+        if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
+            probe_run_flags |= MM_PORT_PROBE_AT_ICERA;
     }
 
     /* If no explicit probing was required, just request to grab it without probing anything.
