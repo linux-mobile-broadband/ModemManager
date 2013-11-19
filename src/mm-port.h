@@ -55,9 +55,11 @@ typedef enum { /*< underscore_name=mm_port_type >*/
 
 typedef struct _MMPort MMPort;
 typedef struct _MMPortClass MMPortClass;
+typedef struct _MMPortPrivate MMPortPrivate;
 
 struct _MMPort {
     GObject parent;
+    MMPortPrivate *priv;
 };
 
 struct _MMPortClass {

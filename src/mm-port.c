@@ -33,14 +33,12 @@ enum {
     LAST_PROP
 };
 
-#define MM_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_PORT, MMPortPrivate))
-
-typedef struct {
+struct _MMPortPrivate {
     char *device;
     MMPortSubsys subsys;
     MMPortType ptype;
     gboolean connected;
-} MMPortPrivate;
+};
 
 /*****************************************************************************/
 
@@ -58,7 +56,7 @@ constructor (GType type,
     if (!object)
         return NULL;
 
-    priv = MM_PORT_GET_PRIVATE (object);
+    priv = MM_PORT (object)->priv;
 
     if (!priv->device) {
         g_warning ("MMPort: no device provided");
@@ -90,7 +88,7 @@ mm_port_get_device (MMPort *self)
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (MM_IS_PORT (self), NULL);
 
-    return MM_PORT_GET_PRIVATE (self)->device;
+    return self->priv->device;
 }
 
 MMPortSubsys
@@ -99,7 +97,7 @@ mm_port_get_subsys (MMPort *self)
     g_return_val_if_fail (self != NULL, MM_PORT_SUBSYS_UNKNOWN);
     g_return_val_if_fail (MM_IS_PORT (self), MM_PORT_SUBSYS_UNKNOWN);
 
-    return MM_PORT_GET_PRIVATE (self)->subsys;
+    return self->priv->subsys;
 }
 
 MMPortType
@@ -108,7 +106,7 @@ mm_port_get_port_type (MMPort *self)
     g_return_val_if_fail (self != NULL, MM_PORT_TYPE_UNKNOWN);
     g_return_val_if_fail (MM_IS_PORT (self), MM_PORT_TYPE_UNKNOWN);
 
-    return MM_PORT_GET_PRIVATE (self)->ptype;
+    return self->priv->ptype;
 }
 
 gboolean
@@ -117,24 +115,21 @@ mm_port_get_connected (MMPort *self)
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (MM_IS_PORT (self), FALSE);
 
-    return MM_PORT_GET_PRIVATE (self)->connected;
+    return self->priv->connected;
 }
 
 void
 mm_port_set_connected (MMPort *self, gboolean connected)
 {
-    MMPortPrivate *priv;
-
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_PORT (self));
 
-    priv = MM_PORT_GET_PRIVATE (self);
-    if (priv->connected != connected) {
-        priv->connected = connected;
+    if (self->priv->connected != connected) {
+        self->priv->connected = connected;
         g_object_notify (G_OBJECT (self), MM_PORT_CONNECTED);
 
         mm_dbg ("(%s): port now %s",
-                priv->device,
+                self->priv->device,
                 connected ? "connected" : "disconnected");
     }
 }
@@ -144,29 +139,32 @@ mm_port_set_connected (MMPort *self, gboolean connected)
 static void
 mm_port_init (MMPort *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT, MMPortPrivate);
 }
 
 static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
 {
-    MMPortPrivate *priv = MM_PORT_GET_PRIVATE (object);
+    MMPort *self = MM_PORT (object);
 
     switch (prop_id) {
     case PROP_DEVICE:
         /* Construct only */
-        priv->device = g_value_dup_string (value);
+        self->priv->device = g_value_dup_string (value);
         break;
     case PROP_SUBSYS:
         /* Construct only */
-        priv->subsys = g_value_get_uint (value);
+        self->priv->subsys = g_value_get_uint (value);
         break;
     case PROP_TYPE:
         /* Construct only */
-        priv->ptype = g_value_get_uint (value);
+        self->priv->ptype = g_value_get_uint (value);
         break;
     case PROP_CONNECTED:
-        priv->connected = g_value_get_boolean (value);
+        self->priv->connected = g_value_get_boolean (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -178,20 +176,20 @@ static void
 get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
-    MMPortPrivate *priv = MM_PORT_GET_PRIVATE (object);
+    MMPort *self = MM_PORT (object);
 
     switch (prop_id) {
     case PROP_DEVICE:
-        g_value_set_string (value, priv->device);
+        g_value_set_string (value, self->priv->device);
         break;
     case PROP_SUBSYS:
-        g_value_set_uint (value, priv->subsys);
+        g_value_set_uint (value, self->priv->subsys);
         break;
     case PROP_TYPE:
-        g_value_set_uint (value, priv->ptype);
+        g_value_set_uint (value, self->priv->ptype);
         break;
     case PROP_CONNECTED:
-        g_value_set_boolean (value, priv->connected);
+        g_value_set_boolean (value, self->priv->connected);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -202,9 +200,9 @@ get_property (GObject *object, guint prop_id,
 static void
 finalize (GObject *object)
 {
-    MMPortPrivate *priv = MM_PORT_GET_PRIVATE (object);
+    MMPort *self = MM_PORT (object);
 
-    g_free (priv->device);
+    g_free (self->priv->device);
 
     G_OBJECT_CLASS (mm_port_parent_class)->finalize (object);
 }
