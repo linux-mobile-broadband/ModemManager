@@ -2098,6 +2098,149 @@ create_bearer_for_net_port (CreateBearerContext *ctx)
     }
 }
 
+static MMPortSerialAt *
+peek_port_at_for_data (MMBroadbandModemHuawei *self,
+                       MMPort *port)
+{
+    GUdevClient *client;
+    GUdevDevice *data_device;
+    GUdevDevice *data_device_parent = NULL;
+    GList *cdc_wdm_at_ports = NULL;
+    GList *l;
+    MMPortSerialAt *found = NULL;
+
+    client = g_udev_client_new (NULL);
+    data_device = (g_udev_client_query_by_subsystem_and_name (
+                       client,
+                       "net",
+                       mm_port_get_device (port)));
+
+    cdc_wdm_at_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                                 MM_PORT_SUBSYS_USB,
+                                                 MM_PORT_TYPE_AT,
+                                                 NULL);
+
+    /* Get parent of the data device */
+    data_device_parent = g_udev_device_get_parent (data_device);
+    if (!data_device_parent) {
+        mm_dbg ("Cannot get parent device (%s)", mm_port_get_device (port));
+        goto out;
+    }
+
+    /* Now walk the list of cdc-wdm AT ports looking for a match */
+    for (l = cdc_wdm_at_ports; l && !found; l = g_list_next (l)) {
+        GUdevDevice *cdc_wdm_device;
+        GUdevDevice *cdc_wdm_device_parent;
+
+        g_assert (MM_IS_PORT_SERIAL_AT (l->data));
+
+        /* Get udev device for the cdc-wdm port */
+        cdc_wdm_device = (g_udev_client_query_by_subsystem_and_name (
+                              client,
+                              "usb",
+                              mm_port_get_device (MM_PORT (l->data))));
+        if (!cdc_wdm_device) {
+            cdc_wdm_device = (g_udev_client_query_by_subsystem_and_name (
+                                  client,
+                                  "usbmisc",
+                                  mm_port_get_device (MM_PORT (l->data))));
+            if (!cdc_wdm_device) {
+                mm_warn ("Couldn't get udev device for cdc-wdm port '%s'",
+                         mm_port_get_device (MM_PORT (l->data)));
+                continue;
+            }
+        }
+
+        /* Get parent of the cdc-wdm device */
+        cdc_wdm_device_parent = g_udev_device_get_parent (cdc_wdm_device);
+        g_object_unref (cdc_wdm_device);
+
+        if (!cdc_wdm_device_parent) {
+            mm_warn ("Couldn't get udev device parent for cdc-wdm port '%s'",
+                     mm_port_get_device (MM_PORT (l->data)));
+            continue;
+        }
+
+        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
+                         g_udev_device_get_sysfs_path (cdc_wdm_device_parent)))
+            found = MM_PORT_SERIAL_AT (l->data);
+
+        g_object_unref (cdc_wdm_device_parent);
+    }
+
+out:
+
+    if (data_device_parent)
+        g_object_unref (data_device_parent);
+    if (data_device)
+        g_object_unref (data_device);
+    if (client)
+        g_object_unref (client);
+    if (cdc_wdm_at_ports)
+        g_list_free_full (cdc_wdm_at_ports, (GDestroyNotify)g_object_unref);
+
+    return found;
+}
+
+
+MMPortSerialAt *
+mm_broadband_modem_huawei_peek_port_at_for_data (MMBroadbandModemHuawei *self,
+                                                 MMPort *port)
+{
+    MMPortSerialAt *found;
+
+    g_assert (self->priv->ndisdup_support == FEATURE_SUPPORTED);
+
+    found = peek_port_at_for_data (self, port);
+    if (!found)
+        mm_warn ("Couldn't find associated cdc-wdm port for 'net/%s'",
+                 mm_port_get_device (port));
+    return found;
+}
+
+static void
+ensure_ndisdup_support_checked (MMBroadbandModemHuawei *self,
+                                MMPort *port)
+{
+    GUdevClient *client;
+    GUdevDevice *data_device;
+
+    /* Check NDISDUP support the first time we need it */
+    if (self->priv->ndisdup_support != FEATURE_SUPPORT_UNKNOWN)
+        return;
+
+    /* First, check for devices which support NDISDUP on any AT port. These
+     * devices are tagged by udev */
+    client = g_udev_client_new (NULL);
+    data_device = (g_udev_client_query_by_subsystem_and_name (
+                       client,
+                       "net",
+                       mm_port_get_device (port)));
+    if (data_device && g_udev_device_get_property_as_boolean (data_device, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+        mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
+        self->priv->ndisdup_support = FEATURE_SUPPORTED;
+        goto out;
+    }
+
+    /* Then, look for devices which have both a net port and a cdc-wdm
+     * AT-capable port. We assume that these devices allow NDISDUP only
+     * when issued in the cdc-wdm port. */
+    if (peek_port_at_for_data (self, port)) {
+        mm_dbg ("This device (%s) can support ndisdup feature on non-serial AT port",
+                mm_port_get_device (port));
+        self->priv->ndisdup_support = FEATURE_SUPPORTED;
+        goto out;
+    }
+
+    mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
+    self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
+
+out:
+    if (data_device)
+        g_object_unref (data_device);
+    if (client)
+        g_object_unref (client);
+}
 
 static void
 huawei_modem_create_bearer (MMIfaceModem *self,
@@ -2118,28 +2261,7 @@ huawei_modem_create_bearer (MMIfaceModem *self,
 
     port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET);
     if (port) {
-        /* Check NDISDUP support the first time we need it */
-        if (ctx->self->priv->ndisdup_support == FEATURE_SUPPORT_UNKNOWN) {
-            GUdevDevice *net_port;
-            GUdevClient *client;
-
-            client = g_udev_client_new (NULL);
-            net_port = (g_udev_client_query_by_subsystem_and_name (
-                            client,
-                            "net",
-                            mm_port_get_device (port)));
-            if (net_port && g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
-                mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
-                ctx->self->priv->ndisdup_support = FEATURE_SUPPORTED;
-            } else {
-                mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
-                ctx->self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
-            }
-            if (net_port)
-                g_object_unref (net_port);
-            g_object_unref (client);
-        }
-
+        ensure_ndisdup_support_checked (ctx->self, port);
         create_bearer_for_net_port (ctx);
         return;
     }
@@ -2151,7 +2273,6 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                              (GAsyncReadyCallback)broadband_bearer_new_ready,
                              ctx);
 }
-
 
 /*****************************************************************************/
 /* USSD encode/decode (3GPP-USSD interface) */

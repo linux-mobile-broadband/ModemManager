@@ -48,4 +48,7 @@ MMBroadbandModemHuawei *mm_broadband_modem_huawei_new (const gchar *device,
                                                        guint16 vendor_id,
                                                        guint16 product_id);
 
+MMPortSerialAt *mm_broadband_modem_huawei_peek_port_at_for_data (MMBroadbandModemHuawei *self,
+                                                                 MMPort *port);
+
 #endif /* MM_BROADBAND_MODEM_HUAWEI_H */

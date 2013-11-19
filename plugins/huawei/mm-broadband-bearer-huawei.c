@@ -42,6 +42,25 @@ struct _MMBroadbandBearerHuaweiPrivate {
 };
 
 /*****************************************************************************/
+
+static MMPortSerialAt *
+get_dial_port (MMBroadbandModemHuawei *modem,
+               MMPort                 *data,
+               MMPortSerialAt         *primary)
+{
+    MMPortSerialAt *dial_port;
+
+    /* See if we have a cdc-wdm AT port for the interface */
+    dial_port = (mm_broadband_modem_huawei_peek_port_at_for_data (
+                     MM_BROADBAND_MODEM_HUAWEI (modem), data));
+    if (dial_port)
+        return g_object_ref (dial_port);
+
+    /* Otherwise, fallback to using the primary port for dialing */
+    return g_object_ref (primary);
+}
+
+/*****************************************************************************/
 /* Connect 3GPP */
 
 typedef enum {
@@ -67,12 +86,15 @@ static void
 connect_3gpp_context_complete_and_free (Connect3gppContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
+
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->data);
-    g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
+
+    g_clear_object (&ctx->data);
+    g_clear_object (&ctx->primary);
+
     g_slice_free (Connect3gppContext, ctx);
 }
 
@@ -410,7 +432,6 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx = g_slice_new0 (Connect3gppContext);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
-    ctx->primary = g_object_ref (primary);
     ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -421,6 +442,9 @@ connect_3gpp (MMBroadbandBearer *self,
 
     g_assert (ctx->self->priv->connect_pending == NULL);
     g_assert (ctx->self->priv->disconnect_pending == NULL);
+
+    /* Get correct dial port to use */
+    ctx->primary = get_dial_port (MM_BROADBAND_MODEM_HUAWEI (ctx->modem), ctx->data, primary);
 
     /* Run! */
     connect_3gpp_context_step (ctx);
@@ -654,7 +678,6 @@ disconnect_3gpp (MMBroadbandBearer *self,
     ctx = g_slice_new0 (Disconnect3gppContext);
     ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
-    ctx->primary = g_object_ref (primary);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -663,6 +686,9 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
     g_assert (ctx->self->priv->connect_pending == NULL);
     g_assert (ctx->self->priv->disconnect_pending == NULL);
+
+    /* Get correct dial port to use */
+    ctx->primary = get_dial_port (MM_BROADBAND_MODEM_HUAWEI (ctx->modem), data, primary);
 
     /* Start! */
     disconnect_3gpp_context_step (ctx);
