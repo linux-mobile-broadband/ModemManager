@@ -1030,6 +1030,38 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
     return port_infos;
 }
 
+GList *
+mm_base_modem_find_ports (MMBaseModem *self,
+                          MMPortSubsys subsys,
+                          MMPortType type,
+                          const gchar *name)
+{
+    GList *out = NULL;
+    GHashTableIter iter;
+    gpointer value;
+    gpointer key;
+
+    /* We'll iterate the ht of ports, looking for any port which is matches
+     * the compare function */
+    g_hash_table_iter_init (&iter, self->priv->ports);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMPort *port = MM_PORT (value);
+
+        if (subsys != MM_PORT_SUBSYS_UNKNOWN && mm_port_get_subsys (port) != subsys)
+            continue;
+
+        if (type != MM_PORT_TYPE_UNKNOWN && mm_port_get_port_type (port) != type)
+            continue;
+
+        if (name != NULL && !g_str_equal (mm_port_get_device (port), name))
+            continue;
+
+        out = g_list_append (out, g_object_ref (port));
+    }
+
+    return out;
+}
+
 static void
 initialize_ready (MMBaseModem *self,
                   GAsyncResult *res)

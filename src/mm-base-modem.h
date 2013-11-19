@@ -161,6 +161,11 @@ GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
 MMModemPortInfo *mm_base_modem_get_port_infos         (MMBaseModem *self,
                                                        guint *n_port_infos);
 
+GList            *mm_base_modem_find_ports            (MMBaseModem *self,
+                                                       MMPortSubsys subsys,
+                                                       MMPortType type,
+                                                       const gchar *name);
+
 void     mm_base_modem_set_hotplugged (MMBaseModem *self,
                                        gboolean hotplugged);
 gboolean mm_base_modem_get_hotplugged (MMBaseModem *self);
