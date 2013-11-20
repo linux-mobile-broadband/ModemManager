@@ -8,7 +8,7 @@ udevrules_DATA = \
 	77-mm-usb-serial-adapters-greylist.rules \
 	80-mm-candidate.rules
 
-noinst_LTLIBRARIES = libmodem-helpers.la libserial.la
+noinst_LTLIBRARIES = libmodem-helpers.la libport.la
 
 libmodem_helpers_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
@@ -52,25 +52,25 @@ libmodem_helpers_la_SOURCES += \
 libmodem_helpers_la_CPPFLAGS += $(MBIM_CFLAGS)
 endif
 
-# libserial specific enum types
-SERIAL_ENUMS = \
+# libport specific enum types
+PORT_ENUMS = \
 	$(srcdir)/mm-port.h \
 	$(srcdir)/mm-port-serial-at.h
 
-mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
+mm-port-enums-types.h: Makefile.am $(PORT_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#ifndef __MM_PORT_ENUMS_TYPES_H__\n#define __MM_PORT_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
-		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
-		$(SERIAL_ENUMS) > $@
+		--ftail "#endif /* __MM_PORT_ENUMS_TYPES_H__ */\n" \
+		$(PORT_ENUMS) > $@
 
-mm-serial-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-serial-enums-types.h
+mm-port-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-port-enums-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-serial-enums-types.h\"" \
+		--fhead "#include \"mm-port-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
-		$(SERIAL_ENUMS) > $@
+		$(PORT_ENUMS) > $@
 
-libserial_la_CPPFLAGS = \
+libport_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
@@ -79,11 +79,11 @@ libserial_la_CPPFLAGS = \
 	-I${top_srcdir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated
 
-nodist_libserial_la_SOURCES = \
-	mm-serial-enums-types.h \
-	mm-serial-enums-types.c
+nodist_libport_la_SOURCES = \
+	mm-port-enums-types.h \
+	mm-port-enums-types.c
 
-libserial_la_SOURCES = \
+libport_la_SOURCES = \
 	mm-port.c \
 	mm-port.h \
 	mm-port-serial.c \
@@ -97,18 +97,18 @@ libserial_la_SOURCES = \
 
 # Additional QMI support in libserial
 if WITH_QMI
-libserial_la_SOURCES += \
+libport_la_SOURCES += \
 	mm-port-qmi.c \
 	mm-port-qmi.h
-libserial_la_CPPFLAGS += $(QMI_CFLAGS)
+libport_la_CPPFLAGS += $(QMI_CFLAGS)
 endif
 
 # Additional MBIM support in libserial
 if WITH_MBIM
-libserial_la_SOURCES += \
+libport_la_SOURCES += \
 	mm-port-mbim.c \
 	mm-port-mbim.h
-libserial_la_CPPFLAGS += $(MBIM_CFLAGS)
+libport_la_CPPFLAGS += $(MBIM_CFLAGS)
 endif
 
 # Daemon specific enum types
@@ -147,7 +147,7 @@ ModemManager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
 	$(builddir)/libmodem-helpers.la \
-	$(builddir)/libserial.la \
+	$(builddir)/libport.la \
 	$(top_builddir)/libqcdm/src/libqcdm.la
 
 nodist_ModemManager_SOURCES = \
@@ -269,5 +269,5 @@ EXTRA_DIST = \
 CLEANFILES = \
 	mm-daemon-enums-types.h \
 	mm-daemon-enums-types.c \
-	mm-serial-enums-types.h \
-	mm-serial-enums-types.c
+	mm-port-enums-types.h \
+	mm-port-enums-types.c

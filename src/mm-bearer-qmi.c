@@ -29,7 +29,7 @@
 #include "mm-iface-modem.h"
 #include "mm-bearer-qmi.h"
 #include "mm-modem-helpers-qmi.h"
-#include "mm-serial-enums-types.h"
+#include "mm-port-enums-types.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BEARER);

@@ -23,7 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-serial-enums-types.h"
+#include "mm-port-enums-types.h"
 #include "mm-log.h"
 #include "mm-plugin-huawei.h"
 #include "mm-broadband-modem-huawei.h"

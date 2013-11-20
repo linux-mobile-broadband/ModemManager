@@ -34,7 +34,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
-#include "mm-serial-enums-types.h"
+#include "mm-port-enums-types.h"
 
 static void async_initable_iface_init (GAsyncInitableIface *iface);
 

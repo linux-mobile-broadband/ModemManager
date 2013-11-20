@@ -28,7 +28,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-modem-helpers-mbim.h"
-#include "mm-serial-enums-types.h"
+#include "mm-port-enums-types.h"
 #include "mm-bearer-mbim.h"
 #include "mm-log.h"
 

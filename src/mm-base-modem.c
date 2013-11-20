@@ -30,7 +30,7 @@
 #include "mm-base-modem.h"
 
 #include "mm-log.h"
-#include "mm-serial-enums-types.h"
+#include "mm-port-enums-types.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 

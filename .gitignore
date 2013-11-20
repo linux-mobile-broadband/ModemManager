@@ -44,8 +44,8 @@ libmm-glib/*.typelib
 src/ModemManager
 src/mm-daemon-enums-types.c
 src/mm-daemon-enums-types.h
-src/mm-serial-enums-types.c
-src/mm-serial-enums-types.h
+src/mm-port-enums-types.c
+src/mm-port-enums-types.h
 src/mm-marshal.[ch]
 src/tests/test-modem-helpers
 src/tests/test-modem-helpers-qmi
