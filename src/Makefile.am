@@ -129,15 +129,6 @@ mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(DAEMON_ENUMS) > $@
 
-# Marshallers
-
-mm-marshal.h: mm-marshal.list
-	$(AM_V_GEN) $(GLIB_GENMARSHAL) $< --prefix=mm_marshal --header > $@
-
-mm-marshal.c: mm-marshal.list mm-marshal.h
-	$(AM_V_GEN) echo "#include \"mm-marshal.h\"" > $@ && \
-		$(GLIB_GENMARSHAL) $< --prefix=mm_marshal --body >> $@
-
 sbin_PROGRAMS = ModemManager
 
 ModemManager_CPPFLAGS = \
@@ -160,8 +151,6 @@ ModemManager_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la
 
 nodist_ModemManager_SOURCES = \
-	mm-marshal.h \
-	mm-marshal.c \
 	mm-daemon-enums-types.h \
 	mm-daemon-enums-types.c
 
@@ -234,8 +223,6 @@ ModemManager_SOURCES = \
 
 # Additional dependency rules
 mm-bearer.c: mm-daemon-enums-types.h
-mm-sms-list.c: mm-marshal.h
-mm-sim.c: mm-marshal.h
 
 # Additional Polkit support
 if WITH_POLKIT
@@ -277,12 +264,9 @@ ModemManager_LDADD += $(MBIM_LIBS)
 endif
 
 EXTRA_DIST = \
-	$(udevrules_DATA) \
-	mm-marshal.list
+	$(udevrules_DATA)
 
 CLEANFILES = \
-	mm-marshal.h \
-	mm-marshal.c \
 	mm-daemon-enums-types.h \
 	mm-daemon-enums-types.c \
 	mm-serial-enums-types.h \

@@ -33,7 +33,6 @@
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
-#include "mm-marshal.h"
 #include "mm-private-boxed-types.h"
 #include "mm-log.h"
 #include "mm-daemon-enums-types.h"

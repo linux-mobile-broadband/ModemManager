@@ -32,7 +32,6 @@
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
-#include "mm-marshal.h"
 
 static void async_initable_iface_init     (GAsyncInitableIface *iface);
 
@@ -1797,6 +1796,6 @@ mm_sim_class_init (MMSimClass *klass)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMSimClass, pin_lock_enabled),
                       NULL, NULL,
-                      mm_marshal_VOID__BOOLEAN,
+                      g_cclosure_marshal_generic,
                       G_TYPE_NONE, 1, G_TYPE_BOOLEAN);
 }

@@ -1800,12 +1800,12 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     /* Signals */
     signals[BUFFER_FULL] =
         g_signal_new ("buffer-full",
-                  G_OBJECT_CLASS_TYPE (object_class),
-                  G_SIGNAL_RUN_FIRST,
-                  G_STRUCT_OFFSET (MMSerialPortClass, buffer_full),
-                  NULL, NULL,
-                  g_cclosure_marshal_VOID__POINTER,
-                  G_TYPE_NONE, 1, G_TYPE_POINTER);
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSerialPortClass, buffer_full),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, G_TYPE_POINTER);
 
     signals[TIMED_OUT] =
         g_signal_new ("timed-out",
@@ -1813,15 +1813,15 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMSerialPortClass, timed_out),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__UINT,
+                      g_cclosure_marshal_generic,
 					  G_TYPE_NONE, 1, G_TYPE_UINT);
 
     signals[FORCED_CLOSE] =
         g_signal_new ("forced-close",
-                  G_OBJECT_CLASS_TYPE (object_class),
-                  G_SIGNAL_RUN_FIRST,
-                  G_STRUCT_OFFSET (MMSerialPortClass, forced_close),
-                  NULL, NULL,
-                  g_cclosure_marshal_VOID__VOID,
-                  G_TYPE_NONE, 0);
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSerialPortClass, forced_close),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 0);
 }
