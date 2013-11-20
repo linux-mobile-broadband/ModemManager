@@ -406,7 +406,7 @@ typedef struct {
 
 typedef struct {
     MMBaseModem *self;
-    MMQcdmSerialPort *port;
+    MMPortSerialQcdm *port;
     GSimpleAsyncResult *simple;
     MMModemAccessTechnology generic_act;
     guint mask;
@@ -451,7 +451,7 @@ snapshot_context_complete_and_free (SnapshotContext *ctx, guint hdr_revision)
 }
 
 static void
-nw_snapshot_old_cb (MMQcdmSerialPort *port,
+nw_snapshot_old_cb (MMPortSerialQcdm *port,
                     GByteArray *response,
                     GError *error,
                     gpointer user_data)
@@ -479,7 +479,7 @@ nw_snapshot_old_cb (MMQcdmSerialPort *port,
 }
 
 static void
-nw_snapshot_new_cb (MMQcdmSerialPort *port,
+nw_snapshot_new_cb (MMPortSerialQcdm *port,
                     GByteArray *response,
                     GError *error,
                     gpointer user_data)
@@ -510,7 +510,7 @@ nw_snapshot_new_cb (MMQcdmSerialPort *port,
     nwsnap = g_byte_array_sized_new (25);
     nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
     g_assert (nwsnap->len);
-    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, nw_snapshot_old_cb, ctx);
+    mm_port_serial_qcdm_queue_command (port, nwsnap, 3, NULL, nw_snapshot_old_cb, ctx);
 }
 
 static gboolean
@@ -521,7 +521,7 @@ get_nw_modem_snapshot (MMBaseModem *self,
 {
     SnapshotContext *ctx;
     GByteArray *nwsnap;
-    MMQcdmSerialPort *port;
+    MMPortSerialQcdm *port;
 
     port = mm_base_modem_peek_port_qcdm (self);
     if (!port)
@@ -539,7 +539,7 @@ get_nw_modem_snapshot (MMBaseModem *self,
     nwsnap = g_byte_array_sized_new (25);
     nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
     g_assert (nwsnap->len);
-    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, NULL, nw_snapshot_new_cb, ctx);
+    mm_port_serial_qcdm_queue_command (port, nwsnap, 3, NULL, nw_snapshot_new_cb, ctx);
     return TRUE;
 }
 
@@ -966,7 +966,7 @@ parse_modem_eri (DetailedRegistrationStateContext *ctx, QcdmResult *result)
 }
 
 static void
-reg_eri_6500_cb (MMQcdmSerialPort *port,
+reg_eri_6500_cb (MMPortSerialQcdm *port,
                  GByteArray *response,
                  GError *error,
                  gpointer user_data)
@@ -992,7 +992,7 @@ reg_eri_6500_cb (MMQcdmSerialPort *port,
 }
 
 static void
-reg_eri_6800_cb (MMQcdmSerialPort *port,
+reg_eri_6800_cb (MMPortSerialQcdm *port,
                  GByteArray *response,
                  GError *error,
                  gpointer user_data)
@@ -1016,7 +1016,7 @@ reg_eri_6800_cb (MMQcdmSerialPort *port,
             nweri = g_byte_array_sized_new (25);
             nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6500);
             g_assert (nweri->len);
-            mm_qcdm_serial_port_queue_command (port, nweri, 3, NULL, reg_eri_6500_cb, ctx);
+            mm_port_serial_qcdm_queue_command (port, nweri, 3, NULL, reg_eri_6500_cb, ctx);
             return;
         }
     }
@@ -1035,7 +1035,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
 {
     DetailedRegistrationStateContext *ctx;
     GByteArray *nweri;
-    MMQcdmSerialPort *port;
+    MMPortSerialQcdm *port;
 
     /* Setup context */
     ctx = g_new0 (DetailedRegistrationStateContext, 1);
@@ -1053,7 +1053,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     nweri = g_byte_array_sized_new (25);
     nweri->len = qcdm_cmd_nw_subsys_eri_new ((char *) nweri->data, 25, QCDM_NW_CHIPSET_6800);
     g_assert (nweri->len);
-    mm_qcdm_serial_port_queue_command (port, nweri, 3, NULL, reg_eri_6800_cb, ctx);
+    mm_port_serial_qcdm_queue_command (port, nweri, 3, NULL, reg_eri_6800_cb, ctx);
 }
 
 /*****************************************************************************/

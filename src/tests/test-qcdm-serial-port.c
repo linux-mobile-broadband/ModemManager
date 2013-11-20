@@ -29,7 +29,7 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
-#include "mm-qcdm-serial-port.h"
+#include "mm-port-serial-qcdm.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/com.h"
@@ -170,13 +170,13 @@ server_wait_request (int fd, char *buf, gsize len)
     return decap_len;
 }
 
-typedef void (*VerInfoCb) (MMQcdmSerialPort *port,
+typedef void (*VerInfoCb) (MMPortSerialQcdm *port,
                            GByteArray *response,
                            GError *error,
                            gpointer user_data);
 
 static void
-qcdm_verinfo_expect_success_cb (MMQcdmSerialPort *port,
+qcdm_verinfo_expect_success_cb (MMPortSerialQcdm *port,
                                 GByteArray *response,
                                 GError *error,
                                 gpointer user_data)
@@ -189,7 +189,7 @@ qcdm_verinfo_expect_success_cb (MMQcdmSerialPort *port,
 }
 
 static void
-qcdm_request_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
+qcdm_request_verinfo (MMPortSerialQcdm *port, VerInfoCb cb, GMainLoop *loop)
 {
     GByteArray *verinfo;
     gint len;
@@ -201,13 +201,13 @@ qcdm_request_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
         g_byte_array_free (verinfo, TRUE);
     verinfo->len = len;
 
-    mm_qcdm_serial_port_queue_command (port, verinfo, 3, NULL, cb, loop);
+    mm_port_serial_qcdm_queue_command (port, verinfo, 3, NULL, cb, loop);
 }
 
 static void
 qcdm_test_child (int fd, VerInfoCb cb)
 {
-    MMQcdmSerialPort *port;
+    MMPortSerialQcdm *port;
     GMainLoop *loop;
     gboolean success;
     GError *error = NULL;
@@ -217,7 +217,7 @@ qcdm_test_child (int fd, VerInfoCb cb)
 
     loop = g_main_loop_new (NULL, FALSE);
 
-    port = mm_qcdm_serial_port_new_fd (fd);
+    port = mm_port_serial_qcdm_new_fd (fd);
     g_assert (port);
 
     success = mm_port_serial_open (MM_PORT_SERIAL (port), &error);
@@ -270,7 +270,7 @@ test_verinfo (void *f)
 }
 
 static void
-qcdm_verinfo_expect_fail_cb (MMQcdmSerialPort *port,
+qcdm_verinfo_expect_fail_cb (MMPortSerialQcdm *port,
                              GByteArray *response,
                              GError *error,
                              gpointer user_data)

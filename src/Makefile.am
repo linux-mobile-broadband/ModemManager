@@ -90,8 +90,8 @@ libserial_la_SOURCES = \
 	mm-port-serial.h \
 	mm-at-serial-port.c \
 	mm-at-serial-port.h \
-	mm-qcdm-serial-port.c \
-	mm-qcdm-serial-port.h \
+	mm-port-serial-qcdm.c \
+	mm-port-serial-qcdm.h \
 	mm-port-serial-gps.c \
 	mm-port-serial-gps.h
 

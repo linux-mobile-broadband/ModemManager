@@ -79,7 +79,7 @@ struct _MMBaseModemPrivate {
     GHashTable *ports;
     MMAtSerialPort *primary;
     MMAtSerialPort *secondary;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
     GList *data;
 
     /* GPS-enabled modems will have an AT port for control, and a raw serial
@@ -203,7 +203,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
     if (g_str_equal (subsys, "tty")) {
         if (ptype == MM_PORT_TYPE_QCDM)
             /* QCDM port */
-            port = MM_PORT (mm_qcdm_serial_port_new (name));
+            port = MM_PORT (mm_port_serial_qcdm_new (name));
         else if (ptype == MM_PORT_TYPE_AT) {
             /* AT port */
             port = MM_PORT (mm_at_serial_port_new (name));
@@ -519,7 +519,7 @@ mm_base_modem_peek_port_secondary (MMBaseModem *self)
     return self->priv->secondary;
 }
 
-MMQcdmSerialPort *
+MMPortSerialQcdm *
 mm_base_modem_get_port_qcdm (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -527,7 +527,7 @@ mm_base_modem_get_port_qcdm (MMBaseModem *self)
     return (self->priv->qcdm ? g_object_ref (self->priv->qcdm) : NULL);
 }
 
-MMQcdmSerialPort *
+MMPortSerialQcdm *
 mm_base_modem_peek_port_qcdm (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -1069,7 +1069,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMAtSerialPort *primary = NULL;
     MMAtSerialPort *secondary = NULL;
     MMAtSerialPort *backup_secondary = NULL;
-    MMQcdmSerialPort *qcdm = NULL;
+    MMPortSerialQcdm *qcdm = NULL;
     MMAtSerialPort *gps_control = NULL;
     MMPortSerialGps *gps = NULL;
     MMPort *data_primary = NULL;
@@ -1138,9 +1138,9 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 
         case MM_PORT_TYPE_QCDM:
-            g_assert (MM_IS_QCDM_SERIAL_PORT (candidate));
+            g_assert (MM_IS_PORT_SERIAL_QCDM (candidate));
             if (!qcdm)
-                qcdm = MM_QCDM_SERIAL_PORT (candidate);
+                qcdm = MM_PORT_SERIAL_QCDM (candidate);
             break;
 
         case MM_PORT_TYPE_NET:

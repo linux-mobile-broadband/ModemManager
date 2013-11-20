@@ -14,55 +14,54 @@
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
-#ifndef MM_QCDM_SERIAL_PORT_H
-#define MM_QCDM_SERIAL_PORT_H
+#ifndef MM_PORT_SERIAL_QCDM_H
+#define MM_PORT_SERIAL_QCDM_H
 
 #include <glib.h>
 #include <glib-object.h>
 
 #include "mm-port-serial.h"
 
-#define MM_TYPE_QCDM_SERIAL_PORT            (mm_qcdm_serial_port_get_type ())
-#define MM_QCDM_SERIAL_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_QCDM_SERIAL_PORT, MMQcdmSerialPort))
-#define MM_QCDM_SERIAL_PORT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_QCDM_SERIAL_PORT, MMQcdmSerialPortClass))
-#define MM_IS_QCDM_SERIAL_PORT(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_QCDM_SERIAL_PORT))
-#define MM_IS_QCDM_SERIAL_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_QCDM_SERIAL_PORT))
-#define MM_QCDM_SERIAL_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_QCDM_SERIAL_PORT, MMQcdmSerialPortClass))
+#define MM_TYPE_PORT_SERIAL_QCDM            (mm_port_serial_qcdm_get_type ())
+#define MM_PORT_SERIAL_QCDM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_SERIAL_QCDM, MMPortSerialQcdm))
+#define MM_PORT_SERIAL_QCDM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_SERIAL_QCDM, MMPortSerialQcdmClass))
+#define MM_IS_PORT_SERIAL_QCDM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PORT_SERIAL_QCDM))
+#define MM_IS_PORT_SERIAL_QCDM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_SERIAL_QCDM))
+#define MM_PORT_SERIAL_QCDM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_SERIAL_QCDM, MMPortSerialQcdmClass))
 
-typedef struct _MMQcdmSerialPort MMQcdmSerialPort;
-typedef struct _MMQcdmSerialPortClass MMQcdmSerialPortClass;
+typedef struct _MMPortSerialQcdm MMPortSerialQcdm;
+typedef struct _MMPortSerialQcdmClass MMPortSerialQcdmClass;
 
-typedef void (*MMQcdmSerialResponseFn)     (MMQcdmSerialPort *port,
+typedef void (*MMPortSerialQcdmResponseFn) (MMPortSerialQcdm *port,
                                             GByteArray *response,
                                             GError *error,
                                             gpointer user_data);
 
-struct _MMQcdmSerialPort {
+struct _MMPortSerialQcdm {
     MMPortSerial parent;
 };
 
-struct _MMQcdmSerialPortClass {
+struct _MMPortSerialQcdmClass {
     MMPortSerialClass parent;
 };
 
-GType mm_qcdm_serial_port_get_type (void);
+GType mm_port_serial_qcdm_get_type (void);
 
-MMQcdmSerialPort *mm_qcdm_serial_port_new (const char *name);
+MMPortSerialQcdm *mm_port_serial_qcdm_new    (const char *name);
+MMPortSerialQcdm *mm_port_serial_qcdm_new_fd (int fd);
 
-MMQcdmSerialPort *mm_qcdm_serial_port_new_fd (int fd);
-
-void     mm_qcdm_serial_port_queue_command     (MMQcdmSerialPort *self,
+void     mm_port_serial_qcdm_queue_command     (MMPortSerialQcdm *self,
                                                 GByteArray *command,
                                                 guint32 timeout_seconds,
                                                 GCancellable *cancellable,
-                                                MMQcdmSerialResponseFn callback,
+                                                MMPortSerialQcdmResponseFn callback,
                                                 gpointer user_data);
 
-void     mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
+void     mm_port_serial_qcdm_queue_command_cached (MMPortSerialQcdm *self,
                                                    GByteArray *command,
                                                    guint32 timeout_seconds,
                                                    GCancellable *cancellable,
-                                                   MMQcdmSerialResponseFn callback,
+                                                   MMPortSerialQcdmResponseFn callback,
                                                    gpointer user_data);
 
-#endif /* MM_QCDM_SERIAL_PORT_H */
+#endif /* MM_PORT_SERIAL_QCDM_H */

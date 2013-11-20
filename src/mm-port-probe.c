@@ -33,7 +33,7 @@
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/errors.h"
-#include "mm-qcdm-serial-port.h"
+#include "mm-port-serial-qcdm.h"
 #include "mm-daemon-enums-types.h"
 
 #if defined WITH_QMI
@@ -575,7 +575,7 @@ wdm_probe (MMPortProbe *self)
 /* QCDM */
 
 static void
-serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
+serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
                                   GByteArray *response,
                                   GError *error,
                                   MMPortProbe *self)
@@ -619,11 +619,11 @@ serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
         cmd2 = g_object_steal_data (G_OBJECT (self), "cmd2");
         if (cmd2) {
             /* second try */
-            mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
+            mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (task->serial),
                                                cmd2,
                                                3,
                                                NULL,
-                                               (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
+                                               (MMPortSerialQcdmResponseFn)serial_probe_qcdm_parse_response,
                                                self);
             return;
         }
@@ -670,7 +670,7 @@ serial_probe_qcdm (MMPortProbe *self)
     }
 
     /* Open the QCDM port */
-    task->serial = MM_PORT_SERIAL (mm_qcdm_serial_port_new (g_udev_device_get_name (self->priv->port)));
+    task->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (g_udev_device_get_name (self->priv->port)));
     if (!task->serial) {
         port_probe_run_task_complete (
             task,
@@ -725,11 +725,11 @@ serial_probe_qcdm (MMPortProbe *self)
     g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
     g_object_set_data_full (G_OBJECT (self), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
 
-    mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
+    mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (task->serial),
                                        verinfo,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
+                                       (MMPortSerialQcdmResponseFn)serial_probe_qcdm_parse_response,
                                        self);
 
     return FALSE;

@@ -47,7 +47,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
-#include "mm-qcdm-serial-port.h"
+#include "mm-port-serial-qcdm.h"
 #include "libqcdm/src/errors.h"
 #include "libqcdm/src/commands.h"
 
@@ -321,7 +321,7 @@ typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     MMModemCapability caps;
-    MMQcdmSerialPort *qcdm_port;
+    MMPortSerialQcdm *qcdm_port;
 } LoadCapabilitiesContext;
 
 static void
@@ -580,7 +580,7 @@ load_current_capabilities_at (LoadCapabilitiesContext *ctx)
 }
 
 static void
-mode_pref_qcdm_ready (MMQcdmSerialPort *port,
+mode_pref_qcdm_ready (MMPortSerialQcdm *port,
                       GByteArray *response,
                       GError *error,
                       LoadCapabilitiesContext *ctx)
@@ -677,11 +677,11 @@ load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
     cmd->len = qcdm_cmd_nv_get_mode_pref_new ((char *) cmd->data, 300, 0);
     g_assert (cmd->len);
 
-    mm_qcdm_serial_port_queue_command (ctx->qcdm_port,
+    mm_port_serial_qcdm_queue_command (ctx->qcdm_port,
                                        cmd,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn) mode_pref_qcdm_ready,
+                                       (MMPortSerialQcdmResponseFn) mode_pref_qcdm_ready,
                                        ctx);
 }
 
@@ -997,7 +997,7 @@ modem_load_device_identifier (MMIfaceModem *self,
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
 } OwnNumbersContext;
 
 static void
@@ -1025,7 +1025,7 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
 }
 
 static void
-mdn_qcdm_ready (MMQcdmSerialPort *port,
+mdn_qcdm_ready (MMPortSerialQcdm *port,
                 GByteArray *response,
                 GError *error,
                 OwnNumbersContext *ctx)
@@ -1112,11 +1112,11 @@ modem_load_own_numbers_done (MMIfaceModem *self,
             mdn->len = qcdm_cmd_nv_get_mdn_new ((char *) mdn->data, 200, 0);
             g_assert (mdn->len);
 
-            mm_qcdm_serial_port_queue_command (ctx->qcdm,
+            mm_port_serial_qcdm_queue_command (ctx->qcdm,
                                                mdn,
                                                3,
                                                NULL,
-                                               (MMQcdmSerialResponseFn)mdn_qcdm_ready,
+                                               (MMPortSerialQcdmResponseFn)mdn_qcdm_ready,
                                                ctx);
             return;
         }
@@ -1888,7 +1888,7 @@ signal_quality_cind (SignalQualityContext *ctx)
 }
 
 static void
-signal_quality_qcdm_ready (MMQcdmSerialPort *port,
+signal_quality_qcdm_ready (MMPortSerialQcdm *port,
                            GByteArray *response,
                            GError *error,
                            SignalQualityContext *ctx)
@@ -1961,11 +1961,11 @@ signal_quality_qcdm (SignalQualityContext *ctx)
     pilot_sets->len = qcdm_cmd_pilot_sets_new ((char *) pilot_sets->data, 25);
     g_assert (pilot_sets->len);
 
-    mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (ctx->port),
+    mm_port_serial_qcdm_queue_command (MM_PORT_SERIAL_QCDM (ctx->port),
                                        pilot_sets,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn)signal_quality_qcdm_ready,
+                                       (MMPortSerialQcdmResponseFn)signal_quality_qcdm_ready,
                                        ctx);
 }
 
@@ -2040,7 +2040,7 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQcdmSerialPort *port;
+    MMPortSerialQcdm *port;
 
     guint32 opmode;
     guint32 sysmode;
@@ -2135,7 +2135,7 @@ done:
 }
 
 static void
-access_tech_qcdm_wcdma_ready (MMQcdmSerialPort *port,
+access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
                               GByteArray *response,
                               GError *error,
                               AccessTechContext *ctx)
@@ -2167,7 +2167,7 @@ access_tech_qcdm_wcdma_ready (MMQcdmSerialPort *port,
 }
 
 static void
-access_tech_qcdm_gsm_ready (MMQcdmSerialPort *port,
+access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
                             GByteArray *response,
                             GError *error,
                             AccessTechContext *ctx)
@@ -2208,16 +2208,16 @@ access_tech_qcdm_gsm_ready (MMQcdmSerialPort *port,
     cmd->len = qcdm_cmd_wcdma_subsys_state_info_new ((char *) cmd->data, 50);
     g_assert (cmd->len);
 
-    mm_qcdm_serial_port_queue_command (port,
+    mm_port_serial_qcdm_queue_command (port,
                                        cmd,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn) access_tech_qcdm_wcdma_ready,
+                                       (MMPortSerialQcdmResponseFn) access_tech_qcdm_wcdma_ready,
                                        ctx);
 }
 
 static void
-access_tech_qcdm_hdr_ready (MMQcdmSerialPort *port,
+access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
                             GByteArray *response,
                             GError *error,
                             AccessTechContext *ctx)
@@ -2251,7 +2251,7 @@ access_tech_qcdm_hdr_ready (MMQcdmSerialPort *port,
 }
 
 static void
-access_tech_qcdm_cdma_ready (MMQcdmSerialPort *port,
+access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
                              GByteArray *response,
                              GError *error,
                              AccessTechContext *ctx)
@@ -2291,11 +2291,11 @@ access_tech_qcdm_cdma_ready (MMQcdmSerialPort *port,
     cmd->len = qcdm_cmd_hdr_subsys_state_info_new ((char *) cmd->data, 50);
     g_assert (cmd->len);
 
-    mm_qcdm_serial_port_queue_command (port,
+    mm_port_serial_qcdm_queue_command (port,
                                        cmd,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn) access_tech_qcdm_hdr_ready,
+                                       (MMPortSerialQcdmResponseFn) access_tech_qcdm_hdr_ready,
                                        ctx);
 }
 
@@ -2373,22 +2373,22 @@ modem_load_access_technologies (MMIfaceModem *self,
         cmd->len = qcdm_cmd_gsm_subsys_state_info_new ((char *) cmd->data, 50);
         g_assert (cmd->len);
 
-        mm_qcdm_serial_port_queue_command (ctx->port,
+        mm_port_serial_qcdm_queue_command (ctx->port,
                                            cmd,
                                            3,
                                            NULL,
-                                           (MMQcdmSerialResponseFn) access_tech_qcdm_gsm_ready,
+                                           (MMPortSerialQcdmResponseFn) access_tech_qcdm_gsm_ready,
                                            ctx);
     } else if (mm_iface_modem_is_cdma (self)) {
         cmd = g_byte_array_sized_new (50);
         cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
         g_assert (cmd->len);
 
-        mm_qcdm_serial_port_queue_command (ctx->port,
+        mm_port_serial_qcdm_queue_command (ctx->port,
                                            cmd,
                                            3,
                                            NULL,
-                                           (MMQcdmSerialResponseFn) access_tech_qcdm_cdma_ready,
+                                           (MMPortSerialQcdmResponseFn) access_tech_qcdm_cdma_ready,
                                            ctx);
     } else
         g_assert_not_reached ();
@@ -6257,7 +6257,7 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
 } HdrStateContext;
 
 static void
@@ -6291,7 +6291,7 @@ modem_cdma_get_hdr_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-hdr_subsys_state_info_ready (MMQcdmSerialPort *port,
+hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
                              GByteArray *response,
                              GError *error,
                              HdrStateContext *ctx)
@@ -6338,7 +6338,7 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
     HdrStateContext *ctx;
     GByteArray *hdrstate;
 
@@ -6367,11 +6367,11 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
     hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((gchar *) hdrstate->data, 25);
     g_assert (hdrstate->len);
 
-    mm_qcdm_serial_port_queue_command (ctx->qcdm,
+    mm_port_serial_qcdm_queue_command (ctx->qcdm,
                                        hdrstate,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn)hdr_subsys_state_info_ready,
+                                       (MMPortSerialQcdmResponseFn)hdr_subsys_state_info_ready,
                                        ctx);
 }
 
@@ -6386,7 +6386,7 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
 } CallManagerStateContext;
 
 static void
@@ -6418,7 +6418,7 @@ modem_cdma_get_call_manager_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-cm_subsys_state_info_ready (MMQcdmSerialPort *port,
+cm_subsys_state_info_ready (MMPortSerialQcdm *port,
                             GByteArray *response,
                             GError *error,
                             CallManagerStateContext *ctx)
@@ -6462,7 +6462,7 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
     CallManagerStateContext *ctx;
     GByteArray *cmstate;
 
@@ -6491,11 +6491,11 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
     cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((gchar *) cmstate->data, 25);
     g_assert (cmstate->len);
 
-    mm_qcdm_serial_port_queue_command (ctx->qcdm,
+    mm_port_serial_qcdm_queue_command (ctx->qcdm,
                                        cmstate,
                                        3,
                                        NULL,
-                                       (MMQcdmSerialResponseFn)cm_subsys_state_info_ready,
+                                       (MMPortSerialQcdmResponseFn)cm_subsys_state_info_ready,
                                        ctx);
 }
 
@@ -6512,7 +6512,7 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
 } Cdma1xServingSystemContext;
 
 static void
@@ -6686,7 +6686,7 @@ css_query_ready (MMIfaceModemCdma *self,
 }
 
 static void
-qcdm_cdma_status_ready (MMQcdmSerialPort *port,
+qcdm_cdma_status_ready (MMPortSerialQcdm *port,
                         GByteArray *response,
                         GError *error,
                         Cdma1xServingSystemContext *ctx)
@@ -6764,11 +6764,11 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
         cdma_status = g_byte_array_sized_new (25);
         cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
         g_assert (cdma_status->len);
-        mm_qcdm_serial_port_queue_command (ctx->qcdm,
+        mm_port_serial_qcdm_queue_command (ctx->qcdm,
                                            cdma_status,
                                            3,
                                            NULL,
-                                           (MMQcdmSerialResponseFn)qcdm_cdma_status_ready,
+                                           (MMPortSerialQcdmResponseFn)qcdm_cdma_status_ready,
                                            ctx);
         return;
     }
@@ -7582,7 +7582,7 @@ struct _PortsContext {
     gboolean primary_open;
     MMAtSerialPort *secondary;
     gboolean secondary_open;
-    MMQcdmSerialPort *qcdm;
+    MMPortSerialQcdm *qcdm;
     gboolean qcdm_open;
 };
 
