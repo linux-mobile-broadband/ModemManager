@@ -92,8 +92,8 @@ libserial_la_SOURCES = \
 	mm-at-serial-port.h \
 	mm-qcdm-serial-port.c \
 	mm-qcdm-serial-port.h \
-	mm-gps-serial-port.c \
-	mm-gps-serial-port.h
+	mm-port-serial-gps.c \
+	mm-port-serial-gps.h
 
 # Additional QMI support in libserial
 if WITH_QMI

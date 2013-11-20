@@ -18,14 +18,14 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "mm-gps-serial-port.h"
+#include "mm-port-serial-gps.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMGpsSerialPort, mm_gps_serial_port, MM_TYPE_PORT_SERIAL)
+G_DEFINE_TYPE (MMPortSerialGps, mm_port_serial_gps, MM_TYPE_PORT_SERIAL)
 
-struct _MMGpsSerialPortPrivate {
+struct _MMPortSerialGpsPrivate {
     /* Trace handler data */
-    MMGpsSerialTraceFn callback;
+    MMPortSerialGpsTraceFn callback;
     gpointer user_data;
     GDestroyNotify notify;
 
@@ -36,12 +36,12 @@ struct _MMGpsSerialPortPrivate {
 /*****************************************************************************/
 
 void
-mm_gps_serial_port_add_trace_handler (MMGpsSerialPort *self,
-                                      MMGpsSerialTraceFn callback,
+mm_port_serial_gps_add_trace_handler (MMPortSerialGps *self,
+                                      MMPortSerialGpsTraceFn callback,
                                       gpointer user_data,
                                       GDestroyNotify notify)
 {
-    g_return_if_fail (MM_IS_GPS_SERIAL_PORT (self));
+    g_return_if_fail (MM_IS_PORT_SERIAL_GPS (self));
 
     if (self->priv->notify)
         self->priv->notify (self->priv->user_data);
@@ -73,7 +73,7 @@ parse_response (MMPortSerial *port,
                 GByteArray *response,
                 GError **error)
 {
-    MMGpsSerialPort *self = MM_GPS_SERIAL_PORT (port);
+    MMPortSerialGps *self = MM_PORT_SERIAL_GPS (port);
     gboolean matches;
     GMatchInfo *match_info;
     gchar *str;
@@ -164,10 +164,10 @@ debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
 
 /*****************************************************************************/
 
-MMGpsSerialPort *
-mm_gps_serial_port_new (const char *name)
+MMPortSerialGps *
+mm_port_serial_gps_new (const char *name)
 {
-    return MM_GPS_SERIAL_PORT (g_object_new (MM_TYPE_GPS_SERIAL_PORT,
+    return MM_PORT_SERIAL_GPS (g_object_new (MM_TYPE_PORT_SERIAL_GPS,
                                              MM_PORT_DEVICE, name,
                                              MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
                                              MM_PORT_TYPE, MM_PORT_TYPE_GPS,
@@ -175,11 +175,11 @@ mm_gps_serial_port_new (const char *name)
 }
 
 static void
-mm_gps_serial_port_init (MMGpsSerialPort *self)
+mm_port_serial_gps_init (MMPortSerialGps *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_GPS_SERIAL_PORT,
-                                              MMGpsSerialPortPrivate);
+                                              MM_TYPE_PORT_SERIAL_GPS,
+                                              MMPortSerialGpsPrivate);
 
     /* We'll assume that all traces start with the dollar sign and end with \r\n */
     self->priv->known_traces_regex =
@@ -192,23 +192,23 @@ mm_gps_serial_port_init (MMGpsSerialPort *self)
 static void
 finalize (GObject *object)
 {
-    MMGpsSerialPort *self = MM_GPS_SERIAL_PORT (object);
+    MMPortSerialGps *self = MM_PORT_SERIAL_GPS (object);
 
     if (self->priv->notify)
         self->priv->notify (self->priv->user_data);
 
     g_regex_unref (self->priv->known_traces_regex);
 
-    G_OBJECT_CLASS (mm_gps_serial_port_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_port_serial_gps_parent_class)->finalize (object);
 }
 
 static void
-mm_gps_serial_port_class_init (MMGpsSerialPortClass *klass)
+mm_port_serial_gps_class_init (MMPortSerialGpsClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMPortSerialClass *serial_class = MM_PORT_SERIAL_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMGpsSerialPortPrivate));
+    g_type_class_add_private (object_class, sizeof (MMPortSerialGpsPrivate));
 
     /* Virtual methods */
     object_class->finalize = finalize;

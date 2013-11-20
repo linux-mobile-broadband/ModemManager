@@ -32,7 +32,7 @@
 #include "mm-port.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
-#include "mm-gps-serial-port.h"
+#include "mm-port-serial-gps.h"
 
 #if defined WITH_QMI
 #include "mm-qmi-port.h"
@@ -128,7 +128,7 @@ MMAtSerialPort   *mm_base_modem_peek_port_primary      (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_peek_port_secondary    (MMBaseModem *self);
 MMQcdmSerialPort *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
-MMGpsSerialPort  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
+MMPortSerialGps  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
 #if defined WITH_QMI
 MMQmiPort        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
@@ -145,7 +145,7 @@ MMAtSerialPort   *mm_base_modem_get_port_primary      (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_secondary    (MMBaseModem *self);
 MMQcdmSerialPort *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
-MMGpsSerialPort  *mm_base_modem_get_port_gps          (MMBaseModem *self);
+MMPortSerialGps  *mm_base_modem_get_port_gps          (MMBaseModem *self);
 #if defined WITH_QMI
 MMQmiPort        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMQmiPort        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);

@@ -463,7 +463,7 @@ gps_disabled_ready (MMBaseModem *self,
                     GAsyncResult *res,
                     GSimpleAsyncResult *simple)
 {
-    MMGpsSerialPort *gps_port;
+    MMPortSerialGps *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error))
@@ -556,7 +556,7 @@ gps_enabled_ready (MMBaseModem *self,
                    GAsyncResult *res,
                    EnableLocationGatheringContext *ctx)
 {
-    MMGpsSerialPort *gps_port;
+    MMPortSerialGps *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
@@ -654,7 +654,7 @@ enable_location_gathering (MMIfaceModemLocation *self,
 /* Setup ports (Broadband modem class) */
 
 static void
-trace_received (MMGpsSerialPort *port,
+trace_received (MMPortSerialGps *port,
                 const gchar *trace,
                 MMIfaceModemLocation *self)
 {
@@ -686,7 +686,7 @@ static void
 setup_ports (MMBroadbandModem *self)
 {
     MMAtSerialPort *gps_control_port;
-    MMGpsSerialPort *gps_data_port;
+    MMPortSerialGps *gps_data_port;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_hso_parent_class)->setup_ports (self);
@@ -716,8 +716,8 @@ setup_ports (MMBroadbandModem *self)
                                        3, FALSE, FALSE, NULL, NULL, NULL);
 
         /* Add handler for the NMEA traces */
-        mm_gps_serial_port_add_trace_handler (gps_data_port,
-                                              (MMGpsSerialTraceFn)trace_received,
+        mm_port_serial_gps_add_trace_handler (gps_data_port,
+                                              (MMPortSerialGpsTraceFn)trace_received,
                                               self,
                                               NULL);
     }

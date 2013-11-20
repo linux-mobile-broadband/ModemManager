@@ -85,7 +85,7 @@ struct _MMBaseModemPrivate {
     /* GPS-enabled modems will have an AT port for control, and a raw serial
      * port to receive all GPS traces */
     MMAtSerialPort *gps_control;
-    MMGpsSerialPort *gps;
+    MMPortSerialGps *gps;
 
 #if defined WITH_QMI
     /* QMI ports */
@@ -217,7 +217,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
             mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
         } else if (ptype == MM_PORT_TYPE_GPS) {
             /* Raw GPS port */
-            port = MM_PORT (mm_gps_serial_port_new (name));
+            port = MM_PORT (mm_port_serial_gps_new (name));
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -551,7 +551,7 @@ mm_base_modem_peek_port_gps_control (MMBaseModem *self)
     return self->priv->gps_control;
 }
 
-MMGpsSerialPort *
+MMPortSerialGps *
 mm_base_modem_get_port_gps (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -559,7 +559,7 @@ mm_base_modem_get_port_gps (MMBaseModem *self)
     return (self->priv->gps ? g_object_ref (self->priv->gps) : NULL);
 }
 
-MMGpsSerialPort *
+MMPortSerialGps *
 mm_base_modem_peek_port_gps (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -1071,7 +1071,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMAtSerialPort *backup_secondary = NULL;
     MMQcdmSerialPort *qcdm = NULL;
     MMAtSerialPort *gps_control = NULL;
-    MMGpsSerialPort *gps = NULL;
+    MMPortSerialGps *gps = NULL;
     MMPort *data_primary = NULL;
     GList *data = NULL;
 #if defined WITH_QMI
@@ -1157,9 +1157,9 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 
         case MM_PORT_TYPE_GPS:
-            g_assert (MM_IS_GPS_SERIAL_PORT (candidate));
+            g_assert (MM_IS_PORT_SERIAL_GPS (candidate));
             if (!gps)
-                gps = MM_GPS_SERIAL_PORT (candidate);
+                gps = MM_PORT_SERIAL_GPS (candidate);
             break;
 
 #if defined WITH_QMI
