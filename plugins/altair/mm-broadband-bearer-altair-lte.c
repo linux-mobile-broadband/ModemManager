@@ -44,7 +44,7 @@ G_DEFINE_TYPE (MMBroadbandBearerAltairLte, mm_broadband_bearer_altair_lte, MM_TY
 typedef struct {
     MMBroadbandBearerAltairLte *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -53,7 +53,7 @@ typedef struct {
 static DetailedConnectContext *
 detailed_connect_context_new (MMBroadbandBearer *self,
                               MMBroadbandModem *modem,
-                              MMAtSerialPort *primary,
+                              MMPortSerialAt *primary,
                               MMPort *data,
                               GCancellable *cancellable,
                               GAsyncReadyCallback callback,
@@ -168,8 +168,8 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
 static void
 connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
-              MMAtSerialPort *primary,
-              MMAtSerialPort *secondary,
+              MMPortSerialAt *primary,
+              MMPortSerialAt *secondary,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -216,7 +216,7 @@ connect_3gpp (MMBroadbandBearer *self,
                                         user_data);
 
     config = mm_bearer_peek_config (MM_BEARER (self));
-    apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (config));
+    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
     command = g_strdup_printf ("%%APNN=%s",apn);
     g_free (apn);
     mm_base_modem_at_command_full (ctx->modem,
@@ -237,7 +237,7 @@ connect_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     MMPort *data;
     GSimpleAsyncResult *result;
 } DetailedDisconnectContext;
@@ -245,7 +245,7 @@ typedef struct {
 static DetailedDisconnectContext *
 detailed_disconnect_context_new (MMBroadbandBearer *self,
                                  MMBroadbandModem *modem,
-                                 MMAtSerialPort *primary,
+                                 MMPortSerialAt *primary,
                                  MMPort *data,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -307,8 +307,8 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,

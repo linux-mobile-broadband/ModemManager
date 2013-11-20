@@ -51,7 +51,7 @@ hso_custom_init_finish (MMPortProbe *probe,
 
 static void
 hso_custom_init (MMPortProbe *probe,
-                 MMAtSerialPort *port,
+                 MMPortSerialAt *port,
                  GCancellable *cancellable,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
@@ -135,7 +135,7 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     const gchar *name, *subsys;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType port_type;
 
     subsys = mm_port_probe_get_port_subsys (probe);
@@ -145,13 +145,13 @@ grab_port (MMPlugin *self,
     /* Detect AT port types */
     if (g_str_equal (subsys, "tty")) {
         if (g_object_get_data (G_OBJECT (probe), TAG_HSO_AT_CONTROL))
-            pflags = MM_AT_PORT_FLAG_PRIMARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
         else if (g_object_get_data (G_OBJECT (probe), TAG_HSO_AT_APP))
-            pflags = MM_AT_PORT_FLAG_SECONDARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
         else if (g_object_get_data (G_OBJECT (probe), TAG_HSO_AT_GPS_CONTROL))
-            pflags = MM_AT_PORT_FLAG_GPS_CONTROL;
+            pflags = MM_PORT_SERIAL_AT_FLAG_GPS_CONTROL;
         else if (g_object_get_data (G_OBJECT (probe), TAG_HSO_AT_MODEM))
-            pflags = MM_AT_PORT_FLAG_PPP;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
         else if (g_object_get_data (G_OBJECT (probe), TAG_HSO_GPS)) {
             /* Not an AT port, but the port to grab GPS traces */
             g_assert (port_type == MM_PORT_TYPE_UNKNOWN);

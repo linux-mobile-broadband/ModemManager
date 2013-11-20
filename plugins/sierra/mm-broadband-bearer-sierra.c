@@ -48,7 +48,7 @@ typedef enum {
 typedef struct {
     MMBroadbandBearerSierra *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -186,7 +186,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
         return;
 
     case DIAL_3GPP_STEP_AUTHENTICATE:
-        if (!MM_IS_AT_SERIAL_PORT (ctx->data)) {
+        if (!MM_IS_PORT_SERIAL_AT (ctx->data)) {
             gchar *command;
             const gchar *user;
             const gchar *password;
@@ -228,8 +228,8 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                     return;
                 }
 
-                quoted_user = mm_at_serial_port_quote_string (user);
-                quoted_password = mm_at_serial_port_quote_string (password);
+                quoted_user = mm_port_serial_at_quote_string (user);
+                quoted_password = mm_port_serial_at_quote_string (password);
                 command = g_strdup_printf ("$QCPDPP=%d,%u,%s,%s",
                                            ctx->cid,
                                            sierra_auth,
@@ -298,7 +298,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
 static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
-           MMAtSerialPort *primary,
+           MMPortSerialAt *primary,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -373,8 +373,8 @@ disconnect_scact_ready (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,
@@ -389,7 +389,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                         user_data,
                                         disconnect_3gpp);
 
-    if (!MM_IS_AT_SERIAL_PORT (data)) {
+    if (!MM_IS_PORT_SERIAL_AT (data)) {
         gchar *command;
 
         /* Use specific CID */

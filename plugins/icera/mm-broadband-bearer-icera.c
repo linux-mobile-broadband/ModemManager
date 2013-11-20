@@ -64,7 +64,7 @@ struct _MMBroadbandBearerIceraPrivate {
 typedef struct {
     MMBroadbandBearerIcera *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GSimpleAsyncResult *result;
 } GetIpConfig3gppContext;
@@ -72,7 +72,7 @@ typedef struct {
 static GetIpConfig3gppContext *
 get_ip_config_3gpp_context_new (MMBroadbandBearerIcera *self,
                                 MMBaseModem *modem,
-                                MMAtSerialPort *primary,
+                                MMPortSerialAt *primary,
                                 guint cid,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
@@ -265,8 +265,8 @@ ip_config_ready (MMBaseModem *modem,
 static void
 get_ip_config_3gpp (MMBroadbandBearer *self,
                     MMBroadbandModem *modem,
-                    MMAtSerialPort *primary,
-                    MMAtSerialPort *secondary,
+                    MMPortSerialAt *primary,
+                    MMPortSerialAt *secondary,
                     MMPort *data,
                     guint cid,
                     GAsyncReadyCallback callback,
@@ -439,8 +439,8 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *bearer,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,
@@ -486,7 +486,7 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
 typedef struct {
     MMBroadbandBearerIcera *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -960,8 +960,8 @@ authenticate (Dial3gppContext *ctx)
             return;
         }
 
-        quoted_user = mm_at_serial_port_quote_string (user);
-        quoted_password = mm_at_serial_port_quote_string (password);
+        quoted_user = mm_port_serial_at_quote_string (user);
+        quoted_password = mm_port_serial_at_quote_string (password);
         command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
                                    ctx->cid, icera_auth, quoted_user, quoted_password);
         g_free (quoted_user);
@@ -983,7 +983,7 @@ authenticate (Dial3gppContext *ctx)
 static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
-           MMAtSerialPort *primary,
+           MMPortSerialAt *primary,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,

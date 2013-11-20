@@ -55,7 +55,7 @@ struct _MMBroadbandBearerMbmPrivate {
 typedef struct {
     MMBroadbandBearerMbm *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GCancellable *cancellable;
     MMPort *data;
@@ -428,7 +428,7 @@ authenticate (Dial3gppContext *ctx)
 static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
-           MMAtSerialPort *primary,
+           MMPortSerialAt *primary,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -471,7 +471,7 @@ dial_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearerMbm *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     GSimpleAsyncResult *result;
 } DisconnectContext;
 
@@ -515,8 +515,8 @@ disconnect_enap_ready (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,

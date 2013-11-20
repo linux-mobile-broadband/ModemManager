@@ -48,7 +48,7 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 typedef struct {
     MMPortProbe *probe;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
 } CinterionCustomInitContext;
@@ -75,7 +75,7 @@ cinterion_custom_init_finish (MMPortProbe *probe,
 }
 
 static void
-sqport_ready (MMAtSerialPort *port,
+sqport_ready (MMPortSerialAt *port,
               GString *response,
               GError *error,
               CinterionCustomInitContext *ctx)
@@ -101,7 +101,7 @@ sqport_ready (MMAtSerialPort *port,
 
 static void
 cinterion_custom_init (MMPortProbe *probe,
-                       MMAtSerialPort *port,
+                       MMPortSerialAt *port,
                        GCancellable *cancellable,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
@@ -117,13 +117,13 @@ cinterion_custom_init (MMPortProbe *probe,
     ctx->port = g_object_ref (port);
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
 
-    mm_at_serial_port_queue_command (
+    mm_port_serial_at_queue_command (
         ctx->port,
         "AT^SQPORT?",
         3,
         FALSE, /* raw */
         ctx->cancellable,
-        (MMAtSerialResponseFn)sqport_ready,
+        (MMPortSerialAtResponseFn)sqport_ready,
         ctx);
 }
 
@@ -162,15 +162,15 @@ grab_port (MMPlugin *self,
            MMPortProbe *probe,
            GError **error)
 {
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType ptype;
 
     ptype = mm_port_probe_get_port_type (probe);
 
     if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT))
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
     else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT))
-        pflags = MM_AT_PORT_FLAG_PPP;
+        pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_get_port_subsys (probe),

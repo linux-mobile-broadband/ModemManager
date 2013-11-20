@@ -230,7 +230,7 @@ bearer_list_report_status_foreach (MMBearer *bearer,
 }
 
 static void
-hso_connection_status_changed (MMAtSerialPort *port,
+hso_connection_status_changed (MMPortSerialAt *port,
                                GMatchInfo *match_info,
                                MMBroadbandModemHso *self)
 {
@@ -299,10 +299,10 @@ parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
         g_simple_async_result_take_error (simple, error);
     else {
         /* Our own setup now */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
             MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
-            (MMAtSerialUnsolicitedMsgFn)hso_connection_status_changed,
+            (MMPortSerialAtUnsolicitedMsgFn)hso_connection_status_changed,
             self,
             NULL);
 
@@ -360,7 +360,7 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
                                         modem_3gpp_cleanup_unsolicited_events);
 
     /* Our own cleanup first */
-    mm_at_serial_port_add_unsolicited_msg_handler (
+    mm_port_serial_at_add_unsolicited_msg_handler (
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
         NULL, NULL, NULL);
@@ -685,14 +685,14 @@ trace_received (MMPortSerialGps *port,
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *gps_control_port;
+    MMPortSerialAt *gps_control_port;
     MMPortSerialGps *gps_data_port;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_hso_parent_class)->setup_ports (self);
 
     /* _OWANCALL unsolicited messages are only expected in the primary port. */
-    mm_at_serial_port_add_unsolicited_msg_handler (
+    mm_port_serial_at_add_unsolicited_msg_handler (
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
         NULL, NULL, NULL);
@@ -701,7 +701,7 @@ setup_ports (MMBroadbandModem *self)
                   MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                   /* built-in echo removal conflicts with unsolicited _OWANCALL
                    * messages, which are not <CR><LF> prefixed. */
-                  MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                  MM_PORT_SERIAL_AT_REMOVE_ECHO, FALSE,
                   NULL);
 
     gps_control_port = mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self));

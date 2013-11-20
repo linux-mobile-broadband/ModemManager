@@ -57,7 +57,7 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     GUdevDevice *port;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
 
     port = mm_port_probe_peek_port (probe);
 
@@ -67,12 +67,12 @@ grab_port (MMPlugin *self,
             mm_dbg ("MTK: AT port '%s/%s' flagged as secondary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_SECONDARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
         } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_MTK_MODEM_PORT")) {
             mm_dbg ("MTK: Modem port '%s/%s' flagged as primary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_PRIMARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
         }
     }
 

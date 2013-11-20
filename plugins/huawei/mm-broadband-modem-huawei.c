@@ -1485,7 +1485,7 @@ set_current_modes (MMIfaceModem *_self,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
-huawei_signal_changed (MMAtSerialPort *port,
+huawei_signal_changed (MMPortSerialAt *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemHuawei *self)
 {
@@ -1507,7 +1507,7 @@ huawei_signal_changed (MMAtSerialPort *port,
 }
 
 static void
-huawei_mode_changed (MMAtSerialPort *port,
+huawei_mode_changed (MMPortSerialAt *port,
                      GMatchInfo *match_info,
                      MMBroadbandModemHuawei *self)
 {
@@ -1599,7 +1599,7 @@ huawei_mode_changed (MMAtSerialPort *port,
 }
 
 static void
-huawei_status_changed (MMAtSerialPort *port,
+huawei_status_changed (MMPortSerialAt *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemHuawei *self)
 {
@@ -1639,7 +1639,7 @@ bearer_report_connection_status (MMBearer *bearer,
 }
 
 static void
-huawei_ndisstat_changed (MMAtSerialPort *port,
+huawei_ndisstat_changed (MMPortSerialAt *port,
                          GMatchInfo *match_info,
                          MMBroadbandModemHuawei *self)
 {
@@ -1687,7 +1687,7 @@ static void
 set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
                                       gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -1699,33 +1699,33 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             continue;
 
         /* Signal quality related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->rssi_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_signal_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->mode_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_mode_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_mode_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Connection status related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->dsflowrpt_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_status_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_status_changed : NULL,
             enable ? self : NULL,
             NULL);
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->ndisstat_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_ndisstat_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_ndisstat_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -2211,7 +2211,7 @@ decode (MMIfaceModem3gppUssd *self,
 /*****************************************************************************/
 
 static void
-huawei_1x_signal_changed (MMAtSerialPort *port,
+huawei_1x_signal_changed (MMPortSerialAt *port,
                           GMatchInfo *match_info,
                           MMBroadbandModemHuawei *self)
 {
@@ -2226,7 +2226,7 @@ huawei_1x_signal_changed (MMAtSerialPort *port,
 }
 
 static void
-huawei_evdo_signal_changed (MMAtSerialPort *port,
+huawei_evdo_signal_changed (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemHuawei *self)
 {
@@ -2370,7 +2370,7 @@ static void
 set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
                                       gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -2382,23 +2382,23 @@ set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             continue;
 
         /* Signal quality related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->rssilvl_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_1x_signal_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_1x_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->hrssilvl_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_evdo_signal_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_evdo_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->mode_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)huawei_mode_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_mode_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -2817,7 +2817,7 @@ static void
 enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
                                                    gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     mm_dbg ("%s ^RFSWITCH unsolicited event handler",
@@ -2828,7 +2828,7 @@ enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
 
     for (i = 0; i < 2; i++)
         if (ports[i])
-            mm_at_serial_port_enable_unsolicited_msg_handler (
+            mm_port_serial_at_enable_unsolicited_msg_handler (
                 ports[i],
                 self->priv->rfswitch_regex,
                 enable);
@@ -3121,7 +3121,7 @@ modem_time_check_support (MMIfaceModemTime *self,
 static void
 set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -3132,55 +3132,55 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
         if (!ports[i])
             continue;
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->boot_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->connect_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->csnr_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->cusatp_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->cusatend_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->dsdormant_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->simst_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->srvst_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->stin_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->hcsq_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->pdpdeact_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->ndisend_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->rfswitch_regex,
             NULL, NULL, NULL);

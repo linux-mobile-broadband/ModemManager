@@ -59,7 +59,7 @@ static const MMPortProbeAtCommand custom_at_probe[] = {
 
 typedef struct {
     MMPortProbe *probe;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     guint nwdmat_retries;
@@ -90,7 +90,7 @@ novatel_custom_init_finish (MMPortProbe *probe,
 static void custom_init_step (CustomInitContext *ctx);
 
 static void
-nwdmat_ready (MMAtSerialPort *port,
+nwdmat_ready (MMPortSerialAt *port,
               GString *response,
               GError *error,
               CustomInitContext *ctx)
@@ -147,12 +147,12 @@ custom_init_step (CustomInitContext *ctx)
 
     if (ctx->nwdmat_retries > 0) {
         ctx->nwdmat_retries--;
-        mm_at_serial_port_queue_command (ctx->port,
+        mm_port_serial_at_queue_command (ctx->port,
                                          "$NWDMAT=1",
                                          3,
                                          FALSE, /* raw */
                                          ctx->cancellable,
-                                         (MMAtSerialResponseFn)nwdmat_ready,
+                                         (MMPortSerialAtResponseFn)nwdmat_ready,
                                          ctx);
         return;
     }
@@ -166,7 +166,7 @@ custom_init_step (CustomInitContext *ctx)
 
 static void
 novatel_custom_init (MMPortProbe *probe,
-                     MMAtSerialPort *port,
+                     MMPortSerialAt *port,
                      GCancellable *cancellable,
                      GAsyncReadyCallback callback,
                      gpointer user_data)

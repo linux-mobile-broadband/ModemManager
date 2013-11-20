@@ -808,7 +808,7 @@ bearer_list_report_status_foreach (MMBearer *bearer,
 }
 
 static void
-e2nap_received (MMAtSerialPort *port,
+e2nap_received (MMPortSerialAt *port,
                 GMatchInfo *info,
                 MMBroadbandModemMbm *self)
 {
@@ -856,7 +856,7 @@ e2nap_received (MMAtSerialPort *port,
 }
 
 static void
-erinfo_received (MMAtSerialPort *port,
+erinfo_received (MMPortSerialAt *port,
                  GMatchInfo *info,
                  MMBroadbandModemMbm *self)
 {
@@ -902,7 +902,7 @@ static void
 set_unsolicited_events_handlers (MMBroadbandModemMbm *self,
                                  gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -914,24 +914,24 @@ set_unsolicited_events_handlers (MMBroadbandModemMbm *self,
             continue;
 
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->erinfo_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)erinfo_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)erinfo_received : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Connection related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->e2nap_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)e2nap_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)e2nap_received : NULL,
             enable ? self : NULL,
             NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->e2nap_ext_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)e2nap_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)e2nap_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -1179,7 +1179,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 /* Setup ports (Broadband modem class) */
 
 static void
-emrdy_received (MMAtSerialPort *port,
+emrdy_received (MMPortSerialAt *port,
                 GMatchInfo *info,
                 MMBroadbandModemMbm *self)
 {
@@ -1190,7 +1190,7 @@ static void
 setup_ports (MMBroadbandModem *_self)
 {
     MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     /* Call parent's setup ports first always */
@@ -1213,30 +1213,30 @@ setup_ports (MMBroadbandModem *_self)
                       MM_PORT_SERIAL_FLASH_OK, FALSE,
                       NULL);
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->emrdy_regex,
-            (MMAtSerialUnsolicitedMsgFn)emrdy_received,
+            (MMPortSerialAtUnsolicitedMsgFn)emrdy_received,
             self,
             NULL);
 
         /* Several unsolicited messages to always ignore... */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->pacsp_regex,
             NULL, NULL, NULL);
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->estksmenu_regex,
             NULL, NULL, NULL);
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->estksms_regex,
             NULL, NULL, NULL);
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->emwi_regex,
             NULL, NULL, NULL);

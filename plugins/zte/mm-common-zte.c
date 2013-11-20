@@ -76,7 +76,7 @@ mm_common_zte_unsolicited_setup_free (MMCommonZteUnsolicitedSetup *setup)
 }
 
 static void
-zpasr_received (MMAtSerialPort *port,
+zpasr_received (MMPortSerialAt *port,
                 GMatchInfo *info,
                 MMBroadbandModem *self)
 {
@@ -99,7 +99,7 @@ mm_common_zte_set_unsolicited_events_handlers (MMBroadbandModem *self,
                                                MMCommonZteUnsolicitedSetup *setup,
                                                gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -111,28 +111,28 @@ mm_common_zte_set_unsolicited_events_handlers (MMBroadbandModem *self,
             continue;
 
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             setup->zpasr_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)zpasr_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)zpasr_received : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Other unsolicited events to always ignore */
         if (!enable) {
-            mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_port_serial_at_add_unsolicited_msg_handler (
                 ports[i],
                 setup->zusimr_regex,
                 NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_port_serial_at_add_unsolicited_msg_handler (
                 ports[i],
                 setup->zdonr_regex,
                 NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_port_serial_at_add_unsolicited_msg_handler (
                 ports[i],
                 setup->zpstm_regex,
                 NULL, NULL, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_port_serial_at_add_unsolicited_msg_handler (
                 ports[i],
                 setup->zend_regex,
                 NULL, NULL, NULL);

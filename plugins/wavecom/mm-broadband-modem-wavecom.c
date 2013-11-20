@@ -1167,7 +1167,7 @@ static void
 setup_ports (MMBroadbandModem *self)
 {
     gpointer parser;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     GRegex *regex;
 
     /* Call parent's setup ports first always */
@@ -1187,7 +1187,7 @@ setup_ports (MMBroadbandModem *self)
     mm_serial_parser_v1_set_custom_regex (parser, regex, NULL);
     g_regex_unref (regex);
 
-    mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (primary),
+    mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (primary),
                                            mm_serial_parser_v1_parse,
                                            parser,
                                            mm_serial_parser_v1_destroy);

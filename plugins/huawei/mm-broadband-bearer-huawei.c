@@ -54,7 +54,7 @@ typedef enum {
 typedef struct {
     MMBroadbandBearerHuawei *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -369,8 +369,8 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
 static void
 connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
-              MMAtSerialPort *primary,
-              MMAtSerialPort *secondary,
+              MMPortSerialAt *primary,
+              MMPortSerialAt *secondary,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -425,7 +425,7 @@ typedef enum {
 typedef struct {
     MMBroadbandBearerHuawei *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     GSimpleAsyncResult *result;
     Disconnect3gppContextStep step;
     guint check_count;
@@ -626,8 +626,8 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,

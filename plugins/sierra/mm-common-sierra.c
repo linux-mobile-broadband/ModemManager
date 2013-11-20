@@ -268,7 +268,7 @@ mm_common_sierra_create_sim (MMIfaceModem *self,
 void
 mm_common_sierra_setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
     GRegex *pacsp_regex;
 
@@ -286,11 +286,11 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
              * parser, which doesn't always prefix responses with <CR><LF>.
              */
             g_object_set (ports[i],
-                          MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                          MM_PORT_SERIAL_AT_REMOVE_ECHO, FALSE,
                           NULL);
         }
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             pacsp_regex,
             NULL, NULL, NULL);

@@ -77,14 +77,14 @@ struct _MMBaseModemPrivate {
     GCancellable *authp_cancellable;
 
     GHashTable *ports;
-    MMAtSerialPort *primary;
-    MMAtSerialPort *secondary;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
     MMPortSerialQcdm *qcdm;
     GList *data;
 
     /* GPS-enabled modems will have an AT port for control, and a raw serial
      * port to receive all GPS traces */
-    MMAtSerialPort *gps_control;
+    MMPortSerialAt *gps_control;
     MMPortSerialGps *gps;
 
 #if defined WITH_QMI
@@ -162,7 +162,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                          const gchar *subsys,
                          const gchar *name,
                          MMPortType ptype,
-                         MMAtPortFlag at_pflags,
+                         MMPortSerialAtFlag at_pflags,
                          GError **error)
 {
     MMPort *port;
@@ -206,15 +206,15 @@ mm_base_modem_grab_port (MMBaseModem *self,
             port = MM_PORT (mm_port_serial_qcdm_new (name));
         else if (ptype == MM_PORT_TYPE_AT) {
             /* AT port */
-            port = MM_PORT (mm_at_serial_port_new (name));
+            port = MM_PORT (mm_port_serial_at_new (name));
 
             /* Set common response parser */
-            mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
+            mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),
                                                    mm_serial_parser_v1_parse,
                                                    mm_serial_parser_v1_new (),
                                                    mm_serial_parser_v1_destroy);
             /* Store flags already */
-            mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
+            mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
         } else if (ptype == MM_PORT_TYPE_GPS) {
             /* Raw GPS port */
             port = MM_PORT (mm_port_serial_gps_new (name));
@@ -487,7 +487,7 @@ mm_base_modem_get_cancellable  (MMBaseModem *self)
     return g_object_ref (self->priv->cancellable);
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_get_port_primary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -495,7 +495,7 @@ mm_base_modem_get_port_primary (MMBaseModem *self)
     return (self->priv->primary ? g_object_ref (self->priv->primary) : NULL);
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_peek_port_primary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -503,7 +503,7 @@ mm_base_modem_peek_port_primary (MMBaseModem *self)
     return self->priv->primary;
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_get_port_secondary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -511,7 +511,7 @@ mm_base_modem_get_port_secondary (MMBaseModem *self)
     return (self->priv->secondary ? g_object_ref (self->priv->secondary) : NULL);
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_peek_port_secondary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -535,7 +535,7 @@ mm_base_modem_peek_port_qcdm (MMBaseModem *self)
     return self->priv->qcdm;
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_get_port_gps_control (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -543,7 +543,7 @@ mm_base_modem_get_port_gps_control (MMBaseModem *self)
     return (self->priv->gps_control ? g_object_ref (self->priv->gps_control) : NULL);
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_peek_port_gps_control (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -919,17 +919,17 @@ mm_base_modem_peek_data_ports (MMBaseModem *self)
     return self->priv->data;
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_get_best_at_port (MMBaseModem *self,
                                 GError **error)
 {
-    MMAtSerialPort *best;
+    MMPortSerialAt *best;
 
     best = mm_base_modem_peek_best_at_port (self, error);
     return (best ? g_object_ref (best) : NULL);
 }
 
-MMAtSerialPort *
+MMPortSerialAt *
 mm_base_modem_peek_best_at_port (MMBaseModem *self,
                                  GError **error)
 {
@@ -962,7 +962,7 @@ mm_base_modem_has_at_port (MMBaseModem *self)
     /* We'll iterate the ht of ports, looking for any port which is AT */
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
-        if (MM_IS_AT_SERIAL_PORT (value))
+        if (MM_IS_PORT_SERIAL_AT (value))
             return TRUE;
     }
 
@@ -1064,13 +1064,13 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 {
     GHashTableIter iter;
     MMPort *candidate;
-    MMAtPortFlag flags;
-    MMAtSerialPort *backup_primary = NULL;
-    MMAtSerialPort *primary = NULL;
-    MMAtSerialPort *secondary = NULL;
-    MMAtSerialPort *backup_secondary = NULL;
+    MMPortSerialAtFlag flags;
+    MMPortSerialAt *backup_primary = NULL;
+    MMPortSerialAt *primary = NULL;
+    MMPortSerialAt *secondary = NULL;
+    MMPortSerialAt *backup_secondary = NULL;
     MMPortSerialQcdm *qcdm = NULL;
-    MMAtSerialPort *gps_control = NULL;
+    MMPortSerialAt *gps_control = NULL;
     MMPortSerialGps *gps = NULL;
     MMPort *data_primary = NULL;
     GList *data = NULL;
@@ -1095,22 +1095,22 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         switch (mm_port_get_port_type (candidate)) {
 
         case MM_PORT_TYPE_AT:
-            g_assert (MM_IS_AT_SERIAL_PORT (candidate));
-            flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (candidate));
+            g_assert (MM_IS_PORT_SERIAL_AT (candidate));
+            flags = mm_port_serial_at_get_flags (MM_PORT_SERIAL_AT (candidate));
 
-            if (flags & MM_AT_PORT_FLAG_PRIMARY) {
+            if (flags & MM_PORT_SERIAL_AT_FLAG_PRIMARY) {
                 if (!primary)
-                    primary = MM_AT_SERIAL_PORT (candidate);
+                    primary = MM_PORT_SERIAL_AT (candidate);
                 else if (!backup_primary) {
                     /* Just in case the plugin gave us more than one primary
                      * and no secondaries, treat additional primary ports as
                      * secondary.
                      */
-                    backup_primary = MM_AT_SERIAL_PORT (candidate);
+                    backup_primary = MM_PORT_SERIAL_AT (candidate);
                 }
             }
 
-            if (flags & MM_AT_PORT_FLAG_PPP) {
+            if (flags & MM_PORT_SERIAL_AT_FLAG_PPP) {
                 if (!data_primary)
                     data_primary = candidate;
                 else
@@ -1118,22 +1118,22 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             }
 
             /* Explicitly flagged secondary ports trump NONE ports for secondary */
-            if (flags & MM_AT_PORT_FLAG_SECONDARY) {
-                if (!secondary || !(mm_at_serial_port_get_flags (secondary) & MM_AT_PORT_FLAG_SECONDARY))
-                    secondary = MM_AT_SERIAL_PORT (candidate);
+            if (flags & MM_PORT_SERIAL_AT_FLAG_SECONDARY) {
+                if (!secondary || !(mm_port_serial_at_get_flags (secondary) & MM_PORT_SERIAL_AT_FLAG_SECONDARY))
+                    secondary = MM_PORT_SERIAL_AT (candidate);
             }
 
-            if (flags & MM_AT_PORT_FLAG_GPS_CONTROL) {
+            if (flags & MM_PORT_SERIAL_AT_FLAG_GPS_CONTROL) {
                 if (!gps_control)
-                    gps_control = MM_AT_SERIAL_PORT (candidate);
+                    gps_control = MM_PORT_SERIAL_AT (candidate);
             }
 
             /* Fallback secondary */
-            if (flags == MM_AT_PORT_FLAG_NONE) {
+            if (flags == MM_PORT_SERIAL_AT_FLAG_NONE) {
                 if (!secondary)
-                    secondary = MM_AT_SERIAL_PORT (candidate);
+                    secondary = MM_PORT_SERIAL_AT (candidate);
                 else if (!backup_secondary)
-                    backup_secondary = MM_AT_SERIAL_PORT (candidate);
+                    backup_secondary = MM_PORT_SERIAL_AT (candidate);
             }
             break;
 
@@ -1146,7 +1146,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         case MM_PORT_TYPE_NET:
             if (!data_primary)
                 data_primary = candidate;
-            else if (MM_IS_AT_SERIAL_PORT (data_primary)) {
+            else if (MM_IS_PORT_SERIAL_AT (data_primary)) {
                 /* Net device (if any) is the preferred data port */
                 data = g_list_append (data, data_primary);
                 data_primary = candidate;
@@ -1252,17 +1252,17 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     /* Reset flags on all ports; clear data port first since it might also
      * be the primary or secondary port.
      */
-    if (MM_IS_AT_SERIAL_PORT (data_primary))
-        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data_primary), MM_AT_PORT_FLAG_NONE);
+    if (MM_IS_PORT_SERIAL_AT (data_primary))
+        mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (data_primary), MM_PORT_SERIAL_AT_FLAG_NONE);
 
     if (primary)
-        mm_at_serial_port_set_flags (primary, MM_AT_PORT_FLAG_PRIMARY);
+        mm_port_serial_at_set_flags (primary, MM_PORT_SERIAL_AT_FLAG_PRIMARY);
     if (secondary)
-        mm_at_serial_port_set_flags (secondary, MM_AT_PORT_FLAG_SECONDARY);
+        mm_port_serial_at_set_flags (secondary, MM_PORT_SERIAL_AT_FLAG_SECONDARY);
 
-    if (MM_IS_AT_SERIAL_PORT (data_primary)) {
-        flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (data_primary));
-        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data_primary), flags | MM_AT_PORT_FLAG_PPP);
+    if (MM_IS_PORT_SERIAL_AT (data_primary)) {
+        flags = mm_port_serial_at_get_flags (MM_PORT_SERIAL_AT (data_primary));
+        mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (data_primary), flags | MM_PORT_SERIAL_AT_FLAG_PPP);
     }
 
     log_port (self, MM_PORT (primary),      "at (primary)");

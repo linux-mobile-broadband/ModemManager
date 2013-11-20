@@ -297,7 +297,7 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 /* Setup/Cleanup unsolicited events (CDMA interface) */
 
 static void
-handle_evdo_quality_change (MMAtSerialPort *port,
+handle_evdo_quality_change (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemVia *self)
 {
@@ -314,7 +314,7 @@ static void
 set_unsolicited_events_handlers (MMBroadbandModemVia *self,
                                  gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -326,10 +326,10 @@ set_unsolicited_events_handlers (MMBroadbandModemVia *self,
             continue;
 
         /* Signal quality related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->hrssilvl_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)handle_evdo_quality_change : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)handle_evdo_quality_change : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -424,7 +424,7 @@ modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
 static void
 set_ignored_unsolicited_events_handlers (MMBroadbandModemVia *self)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -435,39 +435,39 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemVia *self)
         if (!ports[i])
             continue;
 
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->mode_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->dosession_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->simst_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->vpon_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->creg_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->vrom_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->vser_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->ciev_regex,
             NULL, NULL, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->vpup_regex,
             NULL, NULL, NULL);

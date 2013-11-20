@@ -50,7 +50,7 @@ struct _MMBroadbandBearerHsoPrivate {
 typedef struct {
     MMBroadbandBearerHso *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GSimpleAsyncResult *result;
 } GetIpConfig3gppContext;
@@ -183,8 +183,8 @@ ip_config_ready (MMBaseModem *modem,
 static void
 get_ip_config_3gpp (MMBroadbandBearer *self,
                     MMBroadbandModem *modem,
-                    MMAtSerialPort *primary,
-                    MMAtSerialPort *secondary,
+                    MMPortSerialAt *primary,
+                    MMPortSerialAt *secondary,
                     MMPort *data,
                     guint cid,
                     GAsyncReadyCallback callback,
@@ -223,7 +223,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearerHso *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     guint cid;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -632,8 +632,8 @@ authenticate (Dial3gppContext *ctx)
             return;
         }
 
-        quoted_user = mm_at_serial_port_quote_string (user);
-        quoted_password = mm_at_serial_port_quote_string (password);
+        quoted_user = mm_port_serial_at_quote_string (user);
+        quoted_password = mm_port_serial_at_quote_string (password);
         command = g_strdup_printf ("%s=%d,%u,%s,%s",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid,
@@ -659,7 +659,7 @@ authenticate (Dial3gppContext *ctx)
 static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
-           MMAtSerialPort *primary,
+           MMPortSerialAt *primary,
            guint cid,
            GCancellable *cancellable,
            GAsyncReadyCallback callback,
@@ -705,7 +705,7 @@ dial_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearerHso *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     GSimpleAsyncResult *result;
 } DisconnectContext;
 
@@ -749,8 +749,8 @@ disconnect_owancall_ready (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,

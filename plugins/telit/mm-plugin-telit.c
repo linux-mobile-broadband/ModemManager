@@ -57,7 +57,7 @@ grab_port (MMPlugin *self,
 {
     GUdevDevice *port;
     MMPortType ptype;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
 
     port = mm_port_probe_peek_port (probe);
     ptype = mm_port_probe_get_port_type (probe);
@@ -70,12 +70,12 @@ grab_port (MMPlugin *self,
         mm_dbg ("telit: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
     } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_TELIT_PORT_TYPE_AUX")) {
         mm_dbg ("telit: AT port '%s/%s' flagged as secondary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
-        pflags = MM_AT_PORT_FLAG_SECONDARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
     } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_TELIT_PORT_TYPE_NMEA")) {
         mm_dbg ("telit: port '%s/%s' flagged as NMEA",
                 mm_port_probe_get_port_subsys (probe),

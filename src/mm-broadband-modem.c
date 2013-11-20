@@ -1784,7 +1784,7 @@ signal_quality_csq (SignalQualityContext *ctx)
 {
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (ctx->self),
-        MM_AT_SERIAL_PORT (ctx->port),
+        MM_PORT_SERIAL_AT (ctx->port),
         signal_quality_csq_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -1877,7 +1877,7 @@ static void
 signal_quality_cind (SignalQualityContext *ctx)
 {
     mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
-                                   MM_AT_SERIAL_PORT (ctx->port),
+                                   MM_PORT_SERIAL_AT (ctx->port),
                                    "+CIND?",
                                    3,
                                    FALSE,
@@ -2406,7 +2406,7 @@ modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-ciev_received (MMAtSerialPort *port,
+ciev_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
@@ -2447,7 +2447,7 @@ static void
 set_unsolicited_events_handlers (MMBroadbandModem *self,
                                  gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GRegex *ciev_regex;
     guint i;
 
@@ -2464,10 +2464,10 @@ set_unsolicited_events_handlers (MMBroadbandModem *self,
         mm_dbg ("(%s) %s 3GPP unsolicited events handlers",
                 mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             ciev_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn) ciev_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) ciev_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -2659,7 +2659,7 @@ unsolicited_events_setup_ready (MMBroadbandModem *self,
 static void
 run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 {
-    MMAtSerialPort *port = NULL;
+    MMPortSerialAt *port = NULL;
 
     if (!ctx->cmer_primary_done) {
         ctx->cmer_primary_done = TRUE;
@@ -3495,7 +3495,7 @@ modem_3gpp_setup_unsolicited_registration_events_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-registration_state_changed (MMAtSerialPort *port,
+registration_state_changed (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModem *self)
 {
@@ -3546,7 +3546,7 @@ modem_3gpp_setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                   gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GPtrArray *array;
     guint i;
     guint j;
@@ -3568,10 +3568,10 @@ modem_3gpp_setup_unsolicited_registration_events (MMIfaceModem3gpp *self,
         mm_dbg ("(%s) setting up 3GPP unsolicited registration messages handlers",
                 mm_port_get_device (MM_PORT (ports[i])));
         for (j = 0; j < array->len; j++) {
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                MM_AT_SERIAL_PORT (ports[i]),
+            mm_port_serial_at_add_unsolicited_msg_handler (
+                MM_PORT_SERIAL_AT (ports[i]),
                 (GRegex *) g_ptr_array_index (array, j),
-                (MMAtSerialUnsolicitedMsgFn)registration_state_changed,
+                (MMPortSerialAtUnsolicitedMsgFn)registration_state_changed,
                 self,
                 NULL);
         }
@@ -3600,7 +3600,7 @@ modem_3gpp_cleanup_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                     gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GPtrArray *array;
     guint i;
     guint j;
@@ -3623,8 +3623,8 @@ modem_3gpp_cleanup_unsolicited_registration_events (MMIfaceModem3gpp *self,
                 mm_port_get_device (MM_PORT (ports[i])));
 
         for (j = 0; j < array->len; j++) {
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                MM_AT_SERIAL_PORT (ports[i]),
+            mm_port_serial_at_add_unsolicited_msg_handler (
+                MM_PORT_SERIAL_AT (ports[i]),
                 (GRegex *) g_ptr_array_index (array, j),
                 NULL,
                 NULL,
@@ -4124,7 +4124,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
 {
     GError *error = NULL;
     GVariant *command;
-    MMAtSerialPort *secondary;
+    MMPortSerialAt *secondary;
 
     /* Only one must be running */
     g_assert ((ctx->running_cs ? 1 : 0) +
@@ -4841,7 +4841,7 @@ cusd_process_string (MMBroadbandModem *self,
 }
 
 static void
-cusd_received (MMAtSerialPort *port,
+cusd_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
@@ -4860,7 +4860,7 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
                                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GRegex *cusd_regex;
     guint i;
 
@@ -4881,10 +4881,10 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
         mm_dbg ("(%s) %s unsolicited result code handlers",
                 mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             cusd_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn) cusd_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) cusd_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -5657,7 +5657,7 @@ indication_lock_storages_ready (MMBroadbandModem *self,
 }
 
 static void
-cmti_received (MMAtSerialPort *port,
+cmti_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
@@ -5701,7 +5701,7 @@ cmti_received (MMAtSerialPort *port,
 }
 
 static void
-cds_received (MMAtSerialPort *port,
+cds_received (MMPortSerialAt *port,
               GMatchInfo *info,
               MMBroadbandModem *self)
 {
@@ -5740,7 +5740,7 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                            gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GRegex *cmti_regex;
     GRegex *cds_regex;
     guint i;
@@ -5764,16 +5764,16 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
         mm_dbg ("(%s) %s messaging unsolicited events handlers",
                 mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             cmti_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn) cmti_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) cmti_received : NULL,
             enable ? self : NULL,
             NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             cds_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn) cds_received : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) cds_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -6860,7 +6860,7 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
     GError *error;
@@ -7005,7 +7005,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data)
 {
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GError *error = NULL;
     DetailedRegistrationStateContext *ctx;
 
@@ -7493,7 +7493,7 @@ static const gchar *secondary_init_sequence[] = {
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GRegex *regex;
     GPtrArray *array;
     gint i, j;
@@ -7503,12 +7503,12 @@ setup_ports (MMBroadbandModem *self)
 
     if (ports[0])
         g_object_set (ports[0],
-                      MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE, primary_init_sequence,
                       NULL);
 
     if (ports[1])
         g_object_set (ports[1],
-                      MM_AT_SERIAL_PORT_INIT_SEQUENCE, secondary_init_sequence,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE, secondary_init_sequence,
                       NULL);
 
     /* Cleanup all unsolicited message handlers in all AT ports */
@@ -7520,7 +7520,7 @@ setup_ports (MMBroadbandModem *self)
             continue;
 
         for (j = 0; j < array->len; j++) {
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+            mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
                                                            (GRegex *)g_ptr_array_index (array, j),
                                                            NULL,
                                                            NULL,
@@ -7535,7 +7535,7 @@ setup_ports (MMBroadbandModem *self)
         if (!ports[i])
             continue;
 
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
                                                        regex,
                                                        NULL,
                                                        NULL,
@@ -7549,7 +7549,7 @@ setup_ports (MMBroadbandModem *self)
         if (!ports[i])
             continue;
 
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
                                                        regex,
                                                        NULL,
                                                        NULL,
@@ -7563,7 +7563,7 @@ setup_ports (MMBroadbandModem *self)
         if (!ports[i])
             continue;
 
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
                                                        regex,
                                                        NULL,
                                                        NULL,
@@ -7578,9 +7578,9 @@ setup_ports (MMBroadbandModem *self)
 struct _PortsContext {
     volatile gint ref_count;
 
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     gboolean primary_open;
-    MMAtSerialPort *secondary;
+    MMPortSerialAt *secondary;
     gboolean secondary_open;
     MMPortSerialQcdm *qcdm;
     gboolean qcdm_open;
@@ -7807,14 +7807,14 @@ enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
 {
     /* Reset init sequence enabled flags and run them explicitly */
     g_object_set (ctx->ports->primary,
-                  MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, TRUE,
+                  MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE,
                   NULL);
-    mm_at_serial_port_run_init_sequence (ctx->ports->primary);
+    mm_port_serial_at_run_init_sequence (ctx->ports->primary);
     if (ctx->ports->secondary) {
         g_object_set (ctx->ports->secondary,
-                      MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, TRUE,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE,
                       NULL);
-        mm_at_serial_port_run_init_sequence (ctx->ports->secondary);
+        mm_port_serial_at_run_init_sequence (ctx->ports->secondary);
     }
 
     /* Store enabled ports context and complete */
@@ -7891,7 +7891,7 @@ open_ports_enabling (MMBroadbandModem *self,
     /* If we'll need to run modem initialization, disable port init sequence */
     if (modem_init_required)
         g_object_set (ctx->primary,
-                      MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
                       NULL);
 
 
@@ -7908,7 +7908,7 @@ open_ports_enabling (MMBroadbandModem *self,
         /* If we'll need to run modem initialization, disable port init sequence */
         if (modem_init_required)
             g_object_set (ctx->secondary,
-                          MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE,
+                          MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
                           NULL);
         if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
             g_prefix_error (error, "Couldn't open secondary port: ");

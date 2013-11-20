@@ -40,7 +40,7 @@ typedef struct {
     MMBearerIridium *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     GError *saved_error;
 } ConnectContext;
 

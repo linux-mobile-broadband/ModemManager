@@ -23,8 +23,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-at-serial-port.h"
-
 #define MM_TYPE_IFACE_MODEM_3GPP_USSD               (mm_iface_modem_3gpp_ussd_get_type ())
 #define MM_IFACE_MODEM_3GPP_USSD(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD, MMIfaceModem3gppUssd))
 #define MM_IS_IFACE_MODEM_3GPP_USSD(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD))

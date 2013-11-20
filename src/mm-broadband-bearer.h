@@ -50,8 +50,8 @@ struct _MMBroadbandBearerClass {
     /* Full 3GPP connection sequence */
     void     (* connect_3gpp)        (MMBroadbandBearer *self,
                                       MMBroadbandModem *modem,
-                                      MMAtSerialPort *primary,
-                                      MMAtSerialPort *secondary,
+                                      MMPortSerialAt *primary,
+                                      MMPortSerialAt *secondary,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
@@ -62,7 +62,7 @@ struct _MMBroadbandBearerClass {
     /* Dialing sub-part of 3GPP connection */
     void     (* dial_3gpp)        (MMBroadbandBearer *self,
                                    MMBaseModem *modem,
-                                   MMAtSerialPort *primary,
+                                   MMPortSerialAt *primary,
                                    guint cid,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,
@@ -75,8 +75,8 @@ struct _MMBroadbandBearerClass {
      * Only really required when using net port + static IP address. */
     void     (* get_ip_config_3gpp) (MMBroadbandBearer *self,
                                      MMBroadbandModem *modem,
-                                     MMAtSerialPort *primary,
-                                     MMAtSerialPort *secondary,
+                                     MMPortSerialAt *primary,
+                                     MMPortSerialAt *secondary,
                                      MMPort *data,
                                      guint cid,
                                      GAsyncReadyCallback callback,
@@ -90,8 +90,8 @@ struct _MMBroadbandBearerClass {
     /* Full 3GPP disconnection sequence */
     void     (* disconnect_3gpp)        (MMBroadbandBearer *self,
                                          MMBroadbandModem *modem,
-                                         MMAtSerialPort *primary,
-                                         MMAtSerialPort *secondary,
+                                         MMPortSerialAt *primary,
+                                         MMPortSerialAt *secondary,
                                          MMPort *data,
                                          guint cid,
                                          GAsyncReadyCallback callback,
@@ -103,8 +103,8 @@ struct _MMBroadbandBearerClass {
     /* Full CDMA connection sequence */
     void     (* connect_cdma)        (MMBroadbandBearer *self,
                                       MMBroadbandModem *modem,
-                                      MMAtSerialPort *primary,
-                                      MMAtSerialPort *secondary,
+                                      MMPortSerialAt *primary,
+                                      MMPortSerialAt *secondary,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data);
@@ -115,8 +115,8 @@ struct _MMBroadbandBearerClass {
     /* Full CDMA disconnection sequence */
     void     (* disconnect_cdma)        (MMBroadbandBearer *self,
                                          MMBroadbandModem *modem,
-                                         MMAtSerialPort *primary,
-                                         MMAtSerialPort *secondary,
+                                         MMPortSerialAt *primary,
+                                         MMPortSerialAt *secondary,
                                          MMPort *data,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data);

@@ -55,11 +55,11 @@ endif
 # libserial specific enum types
 SERIAL_ENUMS = \
 	$(srcdir)/mm-port.h \
-	$(srcdir)/mm-at-serial-port.h
+	$(srcdir)/mm-port-serial-at.h
 
 mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-port.h\"\n#include \"mm-at-serial-port.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
 		$(SERIAL_ENUMS) > $@
@@ -88,8 +88,8 @@ libserial_la_SOURCES = \
 	mm-port.h \
 	mm-port-serial.c \
 	mm-port-serial.h \
-	mm-at-serial-port.c \
-	mm-at-serial-port.h \
+	mm-port-serial-at.c \
+	mm-port-serial-at.h \
 	mm-port-serial-qcdm.c \
 	mm-port-serial-qcdm.h \
 	mm-port-serial-gps.c \

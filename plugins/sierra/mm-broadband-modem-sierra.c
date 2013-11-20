@@ -753,7 +753,7 @@ load_current_modes (MMIfaceModem *self,
                     gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -830,7 +830,7 @@ set_current_modes (MMIfaceModem *self,
                    gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     gint idx = -1;
     gchar *command;
 

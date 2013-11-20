@@ -746,7 +746,7 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *self,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
-option_ossys_tech_changed (MMAtSerialPort *port,
+option_ossys_tech_changed (MMPortSerialAt *port,
                            GMatchInfo *info,
                            MMBroadbandModemOption *self)
 {
@@ -783,7 +783,7 @@ option_ossys_tech_changed (MMAtSerialPort *port,
 }
 
 static void
-option_2g_tech_changed (MMAtSerialPort *port,
+option_2g_tech_changed (MMPortSerialAt *port,
                         GMatchInfo *match_info,
                         MMBroadbandModemOption *self)
 {
@@ -799,7 +799,7 @@ option_2g_tech_changed (MMAtSerialPort *port,
 }
 
 static void
-option_3g_tech_changed (MMAtSerialPort *port,
+option_3g_tech_changed (MMPortSerialAt *port,
                         GMatchInfo *match_info,
                         MMBroadbandModemOption *self)
 {
@@ -815,7 +815,7 @@ option_3g_tech_changed (MMAtSerialPort *port,
 }
 
 static void
-option_signal_changed (MMAtSerialPort *port,
+option_signal_changed (MMPortSerialAt *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemOption *self)
 {
@@ -843,7 +843,7 @@ static void
 set_unsolicited_events_handlers (MMBroadbandModemOption *self,
                                  gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -855,36 +855,36 @@ set_unsolicited_events_handlers (MMBroadbandModemOption *self,
             continue;
 
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->_ossysi_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)option_ossys_tech_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)option_ossys_tech_changed : NULL,
             enable ? self : NULL,
             NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->_octi_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)option_2g_tech_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)option_2g_tech_changed : NULL,
             enable ? self : NULL,
             NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->_ouwcti_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)option_3g_tech_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)option_3g_tech_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Signal quality related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->_osigq_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)option_signal_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)option_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* Other unsolicited events to always ignore */
         if (!enable)
-            mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_port_serial_at_add_unsolicited_msg_handler (
                 ports[i],
                 self->priv->ignore_regex,
                 NULL, NULL, NULL);

@@ -111,7 +111,7 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     GUdevDevice *port;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType ptype;
 
     port = mm_port_probe_peek_port (probe);
@@ -132,12 +132,12 @@ grab_port (MMPlugin *self,
             mm_dbg ("ZTE: AT port '%s/%s' flagged as primary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_PRIMARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
         } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_ZTE_PORT_TYPE_AUX")) {
             mm_dbg ("ZTE: AT port '%s/%s' flagged as secondary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_SECONDARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
         }
     }
 

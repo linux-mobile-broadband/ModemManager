@@ -26,7 +26,7 @@
 
 #include "mm-port-probe.h"
 #include "mm-log.h"
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 #include "mm-port-serial.h"
 #include "mm-serial-parsers.h"
 #include "mm-port-probe-at.h"
@@ -329,7 +329,7 @@ port_probe_run_task_free (PortProbeRunTask *task)
 
     if (task->serial) {
         if (task->buffer_full_id) {
-            g_warn_if_fail (MM_IS_AT_SERIAL_PORT (task->serial));
+            g_warn_if_fail (MM_IS_PORT_SERIAL_AT (task->serial));
             g_signal_handler_disconnect (task->serial, task->buffer_full_id);
         }
         if (mm_port_serial_is_open (task->serial))
@@ -852,7 +852,7 @@ serial_probe_at_result_processor (MMPortProbe *self,
 }
 
 static void
-serial_probe_at_parse_response (MMAtSerialPort *port,
+serial_probe_at_parse_response (MMPortSerialAt *port,
                                 GString *response,
                                 GError *error,
                                 MMPortProbe *self)
@@ -943,13 +943,13 @@ serial_probe_at (MMPortProbe *self)
         return FALSE;
     }
 
-    mm_at_serial_port_queue_command (
-        MM_AT_SERIAL_PORT (task->serial),
+    mm_port_serial_at_queue_command (
+        MM_PORT_SERIAL_AT (task->serial),
         task->at_commands->command,
         task->at_commands->timeout,
         FALSE,
         task->at_probing_cancellable,
-        (MMAtSerialResponseFn)serial_probe_at_parse_response,
+        (MMPortSerialAtResponseFn)serial_probe_at_parse_response,
         self);
     return FALSE;
 }
@@ -1015,7 +1015,7 @@ serial_probe_schedule (MMPortProbe *self)
         task->at_custom_init &&
         task->at_custom_init_finish) {
         task->at_custom_init (self,
-                              MM_AT_SERIAL_PORT (task->serial),
+                              MM_PORT_SERIAL_AT (task->serial),
                               task->at_probing_cancellable,
                               (GAsyncReadyCallback)at_custom_init_ready,
                               NULL);
@@ -1136,7 +1136,7 @@ serial_open_at (MMPortProbe *self)
     if (!task->serial) {
         gpointer parser;
 
-        task->serial = MM_PORT_SERIAL (mm_at_serial_port_new (g_udev_device_get_name (self->priv->port)));
+        task->serial = MM_PORT_SERIAL (mm_port_serial_at_new (g_udev_device_get_name (self->priv->port)));
         if (!task->serial) {
             port_probe_run_task_complete (
                 task,
@@ -1152,15 +1152,15 @@ serial_open_at (MMPortProbe *self)
         g_object_set (task->serial,
                       MM_PORT_SERIAL_SPEW_CONTROL,   TRUE,
                       MM_PORT_SERIAL_SEND_DELAY,     task->at_send_delay,
-                      MM_AT_SERIAL_PORT_REMOVE_ECHO, task->at_remove_echo,
-                      MM_AT_SERIAL_PORT_SEND_LF,     task->at_send_lf,
+                      MM_PORT_SERIAL_AT_REMOVE_ECHO, task->at_remove_echo,
+                      MM_PORT_SERIAL_AT_SEND_LF,     task->at_send_lf,
                       NULL);
 
         parser = mm_serial_parser_v1_new ();
         mm_serial_parser_v1_add_filter (parser,
                                         serial_parser_filter_cb,
                                         NULL);
-        mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (task->serial),
+        mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (task->serial),
                                                mm_serial_parser_v1_parse,
                                                parser,
                                                mm_serial_parser_v1_destroy);

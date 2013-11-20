@@ -30,7 +30,7 @@
 
 #include "mm-plugin.h"
 #include "mm-device.h"
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 #include "mm-port-serial-qcdm.h"
 #include "mm-serial-parsers.h"
 #include "mm-private-boxed-types.h"
@@ -895,7 +895,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                    mm_port_probe_get_port_subsys (probe),
                                                    mm_port_probe_get_port_name (probe),
                                                    mm_port_probe_get_port_type (probe),
-                                                   MM_AT_PORT_FLAG_NONE,
+                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
             if (!grabbed) {
                 mm_warn ("Could not grab port (%s/%s): '%s'",

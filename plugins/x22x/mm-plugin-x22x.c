@@ -40,7 +40,7 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 typedef struct {
     MMPortProbe *probe;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     guint retries;
@@ -70,7 +70,7 @@ x22x_custom_init_finish (MMPortProbe *probe,
 static void x22x_custom_init_step (X22xCustomInitContext *ctx);
 
 static void
-gmr_ready (MMAtSerialPort *port,
+gmr_ready (MMPortSerialAt *port,
            GString *response,
            GError *error,
            X22xCustomInitContext *ctx)
@@ -127,22 +127,22 @@ x22x_custom_init_step (X22xCustomInitContext *ctx)
     }
 
     ctx->retries--;
-    mm_at_serial_port_queue_command (
+    mm_port_serial_at_queue_command (
         ctx->port,
         "AT+GMR",
         3,
         FALSE, /* raw */
         ctx->cancellable,
-        (MMAtSerialResponseFn)gmr_ready,
+        (MMPortSerialAtResponseFn)gmr_ready,
         ctx);
 }
 
 static void
 x22x_custom_init (MMPortProbe *probe,
-                       MMAtSerialPort *port,
-                       GCancellable *cancellable,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
+                  MMPortSerialAt *port,
+                  GCancellable *cancellable,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
 {
     MMDevice *device;
     X22xCustomInitContext *ctx;
@@ -215,7 +215,7 @@ grab_port (MMPlugin *self,
 {
     GUdevDevice *port;
     MMPortType ptype;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
 
     port = mm_port_probe_peek_port (probe);
     ptype = mm_port_probe_get_port_type (probe);
@@ -229,12 +229,12 @@ grab_port (MMPlugin *self,
             mm_dbg ("x22x: AT port '%s/%s' flagged as primary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_PRIMARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
         } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_X22X_PORT_TYPE_AUX")) {
             mm_dbg ("x22x: AT port '%s/%s' flagged as secondary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
-            pflags = MM_AT_PORT_FLAG_SECONDARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
         } else {
             /* If the port was tagged by the udev rules but isn't a primary or secondary,
              * then ignore it to guard against race conditions if a device just happens

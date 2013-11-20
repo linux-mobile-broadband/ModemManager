@@ -69,7 +69,7 @@ simtech_act_to_mm_act (int nsmod)
 }
 
 static void
-simtech_tech_changed (MMAtSerialPort *port,
+simtech_tech_changed (MMPortSerialAt *port,
                       GMatchInfo *match_info,
                       MMBroadbandModemSimtech *self)
 {
@@ -88,7 +88,7 @@ static void
 set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
                                  gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
     GRegex *regex;
 
@@ -104,10 +104,10 @@ set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
             continue;
 
         /* Access technology related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)simtech_tech_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)simtech_tech_changed : NULL,
             enable ? self : NULL,
             NULL);
     }

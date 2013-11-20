@@ -19,7 +19,7 @@
 #include <gio/gio.h>
 
 #include "mm-base-modem.h"
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 
 /*
  * The expected result depends on the specific operation, so the GVariant
@@ -79,7 +79,7 @@ GVariant *mm_base_modem_at_sequence_finish (MMBaseModem *self,
 /* Fully detailed AT sequence handling, when specific AT port and/or explicit
  * cancellations need to be used. */
 void     mm_base_modem_at_sequence_full         (MMBaseModem *self,
-                                                 MMAtSerialPort *port,
+                                                 MMPortSerialAt *port,
                                                  const MMBaseModemAtCommand *sequence,
                                                  gpointer response_processor_context,
                                                  GDestroyNotify response_processor_context_free,
@@ -152,7 +152,7 @@ const gchar *mm_base_modem_at_command_finish (MMBaseModem *self,
 /* Fully detailed AT command handling, when specific AT port and/or explicit
  * cancellations need to be used. */
 void mm_base_modem_at_command_full                (MMBaseModem *self,
-                                                   MMAtSerialPort *port,
+                                                   MMPortSerialAt *port,
                                                    const gchar *command,
                                                    guint timeout,
                                                    gboolean allow_cached,

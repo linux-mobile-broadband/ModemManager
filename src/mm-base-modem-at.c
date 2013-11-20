@@ -23,7 +23,7 @@
 
 static gboolean
 abort_async_if_port_unusable (MMBaseModem *self,
-                              MMAtSerialPort *port,
+                              MMPortSerialAt *port,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
@@ -56,8 +56,8 @@ abort_async_if_port_unusable (MMBaseModem *self,
 
     /* Temporarily disable init sequence if we're just sending a
      * command to a just opened port */
-    g_object_get (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, &init_sequence_enabled, NULL);
-    g_object_set (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
+    g_object_get (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, &init_sequence_enabled, NULL);
+    g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
 
     /* Ensure we have a port open during the sequence */
     if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
@@ -74,7 +74,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
     }
 
     /* Reset previous init sequence state */
-    g_object_set (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, init_sequence_enabled, NULL);
+    g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, init_sequence_enabled, NULL);
 
     return TRUE;
 }
@@ -91,7 +91,7 @@ modem_cancellable_cancelled (GCancellable *modem_cancellable,
 
 typedef struct {
     MMBaseModem *self;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     gulong cancelled_id;
     GCancellable *modem_cancellable;
@@ -153,7 +153,7 @@ mm_base_modem_at_sequence_full_finish (MMBaseModem *self,
 }
 
 static void
-at_sequence_parse_response (MMAtSerialPort *port,
+at_sequence_parse_response (MMPortSerialAt *port,
                             GString *response,
                             GError *error,
                             AtSequenceContext *ctx)
@@ -206,22 +206,22 @@ at_sequence_parse_response (MMAtSerialPort *port,
         if (ctx->current->command) {
             /* Schedule the next command in the probing group */
             if (ctx->current->allow_cached)
-                mm_at_serial_port_queue_command_cached (
+                mm_port_serial_at_queue_command_cached (
                     ctx->port,
                     ctx->current->command,
                     ctx->current->timeout,
                     FALSE,
                     ctx->cancellable,
-                    (MMAtSerialResponseFn)at_sequence_parse_response,
+                    (MMPortSerialAtResponseFn)at_sequence_parse_response,
                     ctx);
             else
-                mm_at_serial_port_queue_command (
+                mm_port_serial_at_queue_command (
                     ctx->port,
                     ctx->current->command,
                     ctx->current->timeout,
                     FALSE,
                     ctx->cancellable,
-                    (MMAtSerialResponseFn)at_sequence_parse_response,
+                    (MMPortSerialAtResponseFn)at_sequence_parse_response,
                     ctx);
             return;
         }
@@ -252,7 +252,7 @@ at_sequence_parse_response (MMAtSerialPort *port,
 
 void
 mm_base_modem_at_sequence_full (MMBaseModem *self,
-                                MMAtSerialPort *port,
+                                MMPortSerialAt *port,
                                 const MMBaseModemAtCommand *sequence,
                                 gpointer response_processor_context,
                                 GDestroyNotify response_processor_context_free,
@@ -295,13 +295,13 @@ mm_base_modem_at_sequence_full (MMBaseModem *self,
     }
 
     /* Go on with the first one in the sequence */
-    mm_at_serial_port_queue_command (
+    mm_port_serial_at_queue_command (
         ctx->port,
         ctx->current->command,
         ctx->current->timeout,
         FALSE,
         ctx->cancellable,
-        (MMAtSerialResponseFn)at_sequence_parse_response,
+        (MMPortSerialAtResponseFn)at_sequence_parse_response,
         ctx);
 }
 
@@ -326,7 +326,7 @@ mm_base_modem_at_sequence (MMBaseModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
@@ -431,7 +431,7 @@ mm_base_modem_response_processor_continue_on_error (MMBaseModem *self,
 
 typedef struct {
     MMBaseModem *self;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     gulong cancelled_id;
     GCancellable *modem_cancellable;
@@ -470,7 +470,7 @@ mm_base_modem_at_command_full_finish (MMBaseModem *self,
 }
 
 static void
-at_command_parse_response (MMAtSerialPort *port,
+at_command_parse_response (MMPortSerialAt *port,
                            GString *response,
                            GError *error,
                            AtCommandContext *ctx)
@@ -502,7 +502,7 @@ at_command_parse_response (MMAtSerialPort *port,
 
 void
 mm_base_modem_at_command_full (MMBaseModem *self,
-                               MMAtSerialPort *port,
+                               MMPortSerialAt *port,
                                const gchar *command,
                                guint timeout,
                                gboolean allow_cached,
@@ -543,22 +543,22 @@ mm_base_modem_at_command_full (MMBaseModem *self,
 
     /* Go on with the command */
     if (allow_cached)
-        mm_at_serial_port_queue_command_cached (
+        mm_port_serial_at_queue_command_cached (
             port,
             command,
             timeout,
             is_raw,
             ctx->cancellable,
-            (MMAtSerialResponseFn)at_command_parse_response,
+            (MMPortSerialAtResponseFn)at_command_parse_response,
             ctx);
     else
-        mm_at_serial_port_queue_command (
+        mm_port_serial_at_queue_command (
             port,
             command,
             timeout,
             is_raw,
             ctx->cancellable,
-            (MMAtSerialResponseFn)at_command_parse_response,
+            (MMPortSerialAtResponseFn)at_command_parse_response,
             ctx);
 }
 
@@ -579,7 +579,7 @@ _at_command (MMBaseModem *self,
              GAsyncReadyCallback callback,
              gpointer user_data)
 {
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */

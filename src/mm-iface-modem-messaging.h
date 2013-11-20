@@ -19,7 +19,6 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
-#include "mm-at-serial-port.h"
 #include "mm-sms-part.h"
 #include "mm-sms.h"
 

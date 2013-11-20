@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
     GError *error;
@@ -284,7 +284,7 @@ reset (MMIfaceModem *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     GRegex *regex;
     guint i;
 
@@ -303,17 +303,17 @@ setup_ports (MMBroadbandModem *self)
 
         /* Data call has connected */
         regex = g_regex_new ("\\r\\n\\*ACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Data call disconnected */
         regex = g_regex_new ("\\r\\n\\*INACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Modem is now dormant */
         regex = g_regex_new ("\\r\\n\\*DORMANT:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Abnormal state notifications
@@ -324,17 +324,17 @@ setup_ports (MMBroadbandModem *self)
 
         /* Network acquisition fail */
         regex = g_regex_new ("\\r\\n\\*OFFLINE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Registration fail */
         regex = g_regex_new ("\\r\\n\\*REGREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Authentication fail */
         regex = g_regex_new ("\\r\\n\\*AUTHREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
     }
 }

@@ -64,7 +64,7 @@ normalize_qmistatus (const gchar *status)
 typedef struct {
     MMBroadbandBearerNovatelLte *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -283,9 +283,9 @@ connect_3gpp_authenticate (DetailedConnectContext *ctx)
     gchar *command, *apn, *user, *password;
 
     config = mm_bearer_peek_config (MM_BEARER (ctx->self));
-    apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (config));
-    user = mm_at_serial_port_quote_string (mm_bearer_properties_get_user (config));
-    password = mm_at_serial_port_quote_string (mm_bearer_properties_get_password (config));
+    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
+    user = mm_port_serial_at_quote_string (mm_bearer_properties_get_user (config));
+    password = mm_port_serial_at_quote_string (mm_bearer_properties_get_password (config));
     command = g_strdup_printf ("$NWQMICONNECT=,,,,,,%s,,,%s,%s",
                                apn, user, password);
     g_free (apn);
@@ -307,8 +307,8 @@ connect_3gpp_authenticate (DetailedConnectContext *ctx)
 static void
 connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
-              MMAtSerialPort *primary,
-              MMAtSerialPort *secondary,
+              MMPortSerialAt *primary,
+              MMPortSerialAt *secondary,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
@@ -347,7 +347,7 @@ connect_3gpp (MMBroadbandBearer *self,
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
     MMPort *data;
     GSimpleAsyncResult *result;
     gint retries;
@@ -356,7 +356,7 @@ typedef struct {
 static DetailedDisconnectContext *
 detailed_disconnect_context_new (MMBroadbandBearer *self,
                                  MMBroadbandModem *modem,
-                                 MMAtSerialPort *primary,
+                                 MMPortSerialAt *primary,
                                  MMPort *data,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -486,8 +486,8 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
 static void
 disconnect_3gpp (MMBroadbandBearer *self,
                  MMBroadbandModem *modem,
-                 MMAtSerialPort *primary,
-                 MMAtSerialPort *secondary,
+                 MMPortSerialAt *primary,
+                 MMPortSerialAt *secondary,
                  MMPort *data,
                  guint cid,
                  GAsyncReadyCallback callback,

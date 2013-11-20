@@ -48,7 +48,7 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 typedef struct {
     MMPortProbe *probe;
-    MMAtSerialPort *port;
+    MMPortSerialAt *port;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     guint retries;
@@ -78,7 +78,7 @@ sierra_custom_init_finish (MMPortProbe *probe,
 static void sierra_custom_init_step (SierraCustomInitContext *ctx);
 
 static void
-gcap_ready (MMAtSerialPort *port,
+gcap_ready (MMPortSerialAt *port,
             GString *response,
             GError *error,
             SierraCustomInitContext *ctx)
@@ -166,19 +166,19 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
     }
 
     ctx->retries--;
-    mm_at_serial_port_queue_command (
+    mm_port_serial_at_queue_command (
         ctx->port,
         "ATI",
         3,
         FALSE, /* raw */
         ctx->cancellable,
-        (MMAtSerialResponseFn)gcap_ready,
+        (MMPortSerialAtResponseFn)gcap_ready,
         ctx);
 }
 
 static void
 sierra_custom_init (MMPortProbe *probe,
-                    MMAtSerialPort *port,
+                    MMPortSerialAt *port,
                     GCancellable *cancellable,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
@@ -268,7 +268,7 @@ grab_port (MMPlugin *self,
            MMPortProbe *probe,
            GError **error)
 {
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType ptype;
 
     ptype = mm_port_probe_get_port_type (probe);
@@ -276,11 +276,11 @@ grab_port (MMPlugin *self,
     /* Is it a GSM secondary port? */
     if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP_PORT)) {
         if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK))
-            pflags = MM_AT_PORT_FLAG_PPP;
+            pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
         else
-            pflags = MM_AT_PORT_FLAG_SECONDARY;
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
     } else if (ptype == MM_PORT_TYPE_AT)
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_get_port_subsys (probe),

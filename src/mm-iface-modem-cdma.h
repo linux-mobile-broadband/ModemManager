@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 
 #define MM_TYPE_IFACE_MODEM_CDMA               (mm_iface_modem_cdma_get_type ())
 #define MM_IFACE_MODEM_CDMA(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_CDMA, MMIfaceModemCdma))

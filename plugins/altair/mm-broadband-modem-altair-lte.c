@@ -709,7 +709,7 @@ altair_sim_refresh_timer_expired (MMBroadbandModemAltairLte *self)
 }
 
 static void
-altair_sim_refresh_changed (MMAtSerialPort *port,
+altair_sim_refresh_changed (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemAltairLte *self)
 {
@@ -742,7 +742,7 @@ bearer_list_report_disconnect_status_foreach (MMBearer *bearer,
 /* STATCM unsolicited event handler */
 
 static void
-altair_statcm_changed (MMAtSerialPort *port,
+altair_statcm_changed (MMPortSerialAt *port,
                        GMatchInfo *match_info,
                        MMBroadbandModemAltairLte *self)
 {
@@ -776,7 +776,7 @@ altair_statcm_changed (MMAtSerialPort *port,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
-altair_pco_info_changed (MMAtSerialPort *port,
+altair_pco_info_changed (MMPortSerialAt *port,
                          GMatchInfo *match_info,
                          MMBroadbandModemAltairLte *self);
 
@@ -784,7 +784,7 @@ static void
 set_3gpp_unsolicited_events_handlers (MMBroadbandModemAltairLte *self,
                                       gboolean enable)
 {
-    MMAtSerialPort *ports[2];
+    MMPortSerialAt *ports[2];
     guint i;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -796,26 +796,26 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemAltairLte *self,
             continue;
 
         /* SIM refresh handler */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->sim_refresh_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)altair_sim_refresh_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)altair_sim_refresh_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* bearer mode related */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->statcm_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)altair_statcm_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)altair_statcm_changed : NULL,
             enable ? self : NULL,
             NULL);
 
         /* PCO info handler */
-        mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             self->priv->pcoinfo_regex,
-            enable ? (MMAtSerialUnsolicitedMsgFn)altair_pco_info_changed : NULL,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)altair_pco_info_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -1337,7 +1337,7 @@ altair_get_subscription_state_ready (MMBroadbandModemAltairLte *self,
 }
 
 static void
-altair_pco_info_changed (MMAtSerialPort *port,
+altair_pco_info_changed (MMPortSerialAt *port,
                          GMatchInfo *match_info,
                          MMBroadbandModemAltairLte *self)
 {
@@ -1368,7 +1368,7 @@ static const gchar *primary_init_sequence[] = {
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_altair_lte_parent_class)->setup_ports (self);
@@ -1379,8 +1379,8 @@ setup_ports (MMBroadbandModem *self)
 
     g_object_set (primary,
                   MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
-                  MM_AT_SERIAL_PORT_SEND_LF, TRUE,
-                  MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
+                  MM_PORT_SERIAL_AT_SEND_LF, TRUE,
+                  MM_PORT_SERIAL_AT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);
 }
 

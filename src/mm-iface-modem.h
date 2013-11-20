@@ -23,7 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-charsets.h"
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 #include "mm-bearer.h"
 #include "mm-sim.h"
 

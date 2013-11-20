@@ -17,7 +17,7 @@
 #include <string.h>
 #include <glib.h>
 
-#include "mm-at-serial-port.h"
+#include "mm-port-serial-at.h"
 #include "mm-log.h"
 
 typedef struct {
@@ -56,7 +56,7 @@ at_serial_echo_removal (void)
                               (guint8 *)echo_removal_tests[i].original,
                               strlen (echo_removal_tests[i].original) + 1);
 
-        mm_at_serial_port_remove_echo (ba);
+        mm_port_serial_at_remove_echo (ba);
 
         g_assert_cmpstr ((gchar *)ba->data, ==, echo_removal_tests[i].without_echo);
 

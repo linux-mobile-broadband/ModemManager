@@ -331,7 +331,7 @@ static const gchar *primary_init_sequence[] = {
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMAtSerialPort *primary;
+    MMPortSerialAt *primary;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_iridium_parent_class)->setup_ports (self);
@@ -344,7 +344,7 @@ setup_ports (MMBroadbandModem *self)
 
     g_object_set (G_OBJECT (primary),
                   MM_PORT_SERIAL_BAUD, 9600,
-                  MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
+                  MM_PORT_SERIAL_AT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);
 }
 

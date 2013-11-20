@@ -56,7 +56,7 @@ grab_port (MMPlugin *self,
 {
     GUdevDevice *port;
     MMPortType ptype;
-    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
 
     /* The Simtech plugin cannot do anything with non-AT non-QCDM ports */
     if (!mm_port_probe_is_at (probe) &&
@@ -78,19 +78,19 @@ grab_port (MMPlugin *self,
         mm_dbg ("Simtech: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
     } else if (g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_PORT_TYPE_AUX")) {
         mm_dbg ("Simtech: AT port '%s/%s' flagged as secondary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
-        pflags = MM_AT_PORT_FLAG_SECONDARY;
+        pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
     }
 
     /* If the port was tagged by the udev rules but isn't a primary or secondary,
      * then ignore it to guard against race conditions if a device just happens
      * to show up with more than two AT-capable ports.
      */
-    if (pflags == MM_AT_PORT_FLAG_NONE &&
+    if (pflags == MM_PORT_SERIAL_AT_FLAG_NONE &&
         g_udev_device_get_property_as_boolean (port, "ID_MM_SIMTECH_TAGGED"))
         ptype = MM_PORT_TYPE_IGNORED;
     else
