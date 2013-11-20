@@ -1245,6 +1245,10 @@ port_serial_close_force (MMPortSerial *self)
 
     mm_dbg ("(%s) forced to close port", mm_port_get_device (MM_PORT (self)));
 
+    /* Mark as having forced the close, so that we don't warn about incorrect
+     * open counts */
+    self->priv->forced_close = TRUE;
+
     /* If already closed, done */
     if (!self->priv->open_count && !self->priv->reopen_ctx)
         return;
@@ -1255,10 +1259,6 @@ port_serial_close_force (MMPortSerial *self)
     /* Force the port to close */
     self->priv->open_count = 1;
     mm_port_serial_close (self);
-
-    /* Mark as having forced the close, so that we don't warn about incorrect
-     * open counts */
-    self->priv->forced_close = TRUE;
 
     /* Notify about the forced close status */
     g_signal_emit (self, signals[FORCED_CLOSE], 0);
