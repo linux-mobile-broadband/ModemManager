@@ -66,7 +66,7 @@ peek_ports (gpointer self,
     g_assert (MM_IS_BASE_MODEM (modem));
 
     if (o_device) {
-        MMMbimPort *port;
+        MMPortMbim *port;
 
         port = mm_base_modem_peek_port_mbim (modem);
         if (!port) {
@@ -80,7 +80,7 @@ peek_ports (gpointer self,
             return FALSE;
         }
 
-        *o_device = mm_mbim_port_peek_device (port);
+        *o_device = mm_port_mbim_peek_device (port);
     }
 
     if (o_data) {

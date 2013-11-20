@@ -81,7 +81,7 @@ peek_device (gpointer self,
              GAsyncReadyCallback callback,
              gpointer user_data)
 {
-    MMMbimPort *port;
+    MMPortMbim *port;
 
     port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     if (!port) {
@@ -94,7 +94,7 @@ peek_device (gpointer self,
         return FALSE;
     }
 
-    *o_device = mm_mbim_port_peek_device (port);
+    *o_device = mm_port_mbim_peek_device (port);
     return TRUE;
 }
 
@@ -1226,7 +1226,7 @@ enabling_started (MMBroadbandModem *self,
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMMbimPort *mbim;
+    MMPortMbim *mbim;
 } InitializationStartedContext;
 
 static void
@@ -1285,13 +1285,13 @@ parent_initialization_started (InitializationStartedContext *ctx)
 }
 
 static void
-mbim_port_open_ready (MMMbimPort *mbim,
+mbim_port_open_ready (MMPortMbim *mbim,
                       GAsyncResult *res,
                       InitializationStartedContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_mbim_port_open_finish (mbim, res, &error)) {
+    if (!mm_port_mbim_open_finish (mbim, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         initialization_started_context_complete_and_free (ctx);
         return;
@@ -1326,14 +1326,14 @@ initialization_started (MMBroadbandModem *self,
         return;
     }
 
-    if (mm_mbim_port_is_open (ctx->mbim)) {
+    if (mm_port_mbim_is_open (ctx->mbim)) {
         /* Nothing to be done, just launch parent's callback */
         parent_initialization_started (ctx);
         return;
     }
 
     /* Now open our MBIM port */
-    mm_mbim_port_open (ctx->mbim,
+    mm_port_mbim_open (ctx->mbim,
                        NULL,
                        (GAsyncReadyCallback)mbim_port_open_ready,
                        ctx);
@@ -1698,14 +1698,14 @@ static void
 sms_notification_read_alert_sms (MMBroadbandModemMbim *self,
                                  guint32 index)
 {
-    MMMbimPort *port;
+    MMPortMbim *port;
     MbimDevice *device;
     MbimMessage *message;
 
     port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     if (!port)
         return;
-    device = mm_mbim_port_peek_device (port);
+    device = mm_port_mbim_peek_device (port);
     if (!device)
         return;
 
@@ -2669,7 +2669,7 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
 static void
 finalize (GObject *object)
 {
-    MMMbimPort *mbim;
+    MMPortMbim *mbim;
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
     g_free (self->priv->caps_device_id);
@@ -2679,8 +2679,8 @@ finalize (GObject *object)
 
     mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     /* If we did open the MBIM port during initialization, close it now */
-    if (mbim && mm_mbim_port_is_open (mbim)) {
-        mm_mbim_port_close (mbim, NULL, NULL);
+    if (mbim && mm_port_mbim_is_open (mbim)) {
+        mm_port_mbim_close (mbim, NULL, NULL);
     }
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->finalize (object);

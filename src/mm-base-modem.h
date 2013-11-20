@@ -39,7 +39,7 @@
 #endif
 
 #if defined WITH_MBIM
-#include "mm-mbim-port.h"
+#include "mm-port-mbim.h"
 #endif
 
 #define MM_TYPE_BASE_MODEM            (mm_base_modem_get_type ())
@@ -134,8 +134,8 @@ MMPortQmi        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 #if defined WITH_MBIM
-MMMbimPort       *mm_base_modem_peek_port_mbim          (MMBaseModem *self);
-MMMbimPort       *mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
+MMPortMbim       *mm_base_modem_peek_port_mbim          (MMBaseModem *self);
+MMPortMbim       *mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 MMPortSerialAt   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self, MMPortType type);
@@ -151,8 +151,8 @@ MMPortQmi        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 #if defined WITH_MBIM
-MMMbimPort       *mm_base_modem_get_port_mbim          (MMBaseModem *self);
-MMMbimPort       *mm_base_modem_get_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
+MMPortMbim       *mm_base_modem_get_port_mbim          (MMBaseModem *self);
+MMPortMbim       *mm_base_modem_get_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 MMPortSerialAt   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self, MMPortType type);

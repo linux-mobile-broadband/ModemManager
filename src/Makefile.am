@@ -106,8 +106,8 @@ endif
 # Additional MBIM support in libserial
 if WITH_MBIM
 libserial_la_SOURCES += \
-	mm-mbim-port.c \
-	mm-mbim-port.h
+	mm-port-mbim.c \
+	mm-port-mbim.h
 libserial_la_CPPFLAGS += $(MBIM_CFLAGS)
 endif
 

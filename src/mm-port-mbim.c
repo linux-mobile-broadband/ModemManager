@@ -19,12 +19,12 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
-#include "mm-mbim-port.h"
+#include "mm-port-mbim.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMMbimPort, mm_mbim_port, MM_TYPE_PORT)
+G_DEFINE_TYPE (MMPortMbim, mm_port_mbim, MM_TYPE_PORT)
 
-struct _MMMbimPortPrivate {
+struct _MMPortMbimPrivate {
     gboolean in_progress;
     MbimDevice *mbim_device;
 };
@@ -32,7 +32,7 @@ struct _MMMbimPortPrivate {
 /*****************************************************************************/
 
 typedef struct {
-    MMMbimPort *self;
+    MMPortMbim *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
 } PortContext;
@@ -49,7 +49,7 @@ port_context_complete_and_free (PortContext *ctx)
 }
 
 static PortContext *
-port_context_new (MMMbimPort *self,
+port_context_new (MMPortMbim *self,
                   GCancellable *cancellable,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -69,7 +69,7 @@ port_context_new (MMMbimPort *self,
 /*****************************************************************************/
 
 gboolean
-mm_mbim_port_open_finish (MMMbimPort *self,
+mm_port_mbim_open_finish (MMPortMbim *self,
                           GAsyncResult *res,
                           GError **error)
 {
@@ -118,7 +118,7 @@ mbim_device_new_ready (GObject *unused,
 }
 
 void
-mm_mbim_port_open (MMMbimPort *self,
+mm_port_mbim_open (MMPortMbim *self,
                    GCancellable *cancellable,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
@@ -127,7 +127,7 @@ mm_mbim_port_open (MMMbimPort *self,
     gchar *fullpath;
     PortContext *ctx;
 
-    g_return_if_fail (MM_IS_MBIM_PORT (self));
+    g_return_if_fail (MM_IS_PORT_MBIM (self));
 
     ctx = port_context_new (self, cancellable, callback, user_data);
 
@@ -162,9 +162,9 @@ mm_mbim_port_open (MMMbimPort *self,
 /*****************************************************************************/
 
 gboolean
-mm_mbim_port_is_open (MMMbimPort *self)
+mm_port_mbim_is_open (MMPortMbim *self)
 {
-    g_return_val_if_fail (MM_IS_MBIM_PORT (self), FALSE);
+    g_return_val_if_fail (MM_IS_PORT_MBIM (self), FALSE);
 
     return !!self->priv->mbim_device;
 }
@@ -172,7 +172,7 @@ mm_mbim_port_is_open (MMMbimPort *self)
 /*****************************************************************************/
 
 gboolean
-mm_mbim_port_close_finish (MMMbimPort *self,
+mm_port_mbim_close_finish (MMPortMbim *self,
                            GAsyncResult *res,
                            GError **error)
 {
@@ -198,13 +198,13 @@ mbim_device_close_ready (MbimDevice *device,
 }
 
 void
-mm_mbim_port_close (MMMbimPort *self,
+mm_port_mbim_close (MMPortMbim *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
     PortContext *ctx;
 
-    g_return_if_fail (MM_IS_MBIM_PORT (self));
+    g_return_if_fail (MM_IS_PORT_MBIM (self));
 
     ctx = port_context_new (self, NULL, callback, user_data);
 
@@ -235,19 +235,19 @@ mm_mbim_port_close (MMMbimPort *self,
 /*****************************************************************************/
 
 MbimDevice *
-mm_mbim_port_peek_device (MMMbimPort *self)
+mm_port_mbim_peek_device (MMPortMbim *self)
 {
-    g_return_val_if_fail (MM_IS_MBIM_PORT (self), NULL);
+    g_return_val_if_fail (MM_IS_PORT_MBIM (self), NULL);
 
     return self->priv->mbim_device;
 }
 
 /*****************************************************************************/
 
-MMMbimPort *
-mm_mbim_port_new (const gchar *name)
+MMPortMbim *
+mm_port_mbim_new (const gchar *name)
 {
-    return MM_MBIM_PORT (g_object_new (MM_TYPE_MBIM_PORT,
+    return MM_PORT_MBIM (g_object_new (MM_TYPE_PORT_MBIM,
                                        MM_PORT_DEVICE, name,
                                        MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
                                        MM_PORT_TYPE, MM_PORT_TYPE_MBIM,
@@ -255,28 +255,28 @@ mm_mbim_port_new (const gchar *name)
 }
 
 static void
-mm_mbim_port_init (MMMbimPort *self)
+mm_port_mbim_init (MMPortMbim *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MBIM_PORT, MMMbimPortPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_MBIM, MMPortMbimPrivate);
 }
 
 static void
 dispose (GObject *object)
 {
-    MMMbimPort *self = MM_MBIM_PORT (object);
+    MMPortMbim *self = MM_PORT_MBIM (object);
 
     /* Clear device object */
     g_clear_object (&self->priv->mbim_device);
 
-    G_OBJECT_CLASS (mm_mbim_port_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_port_mbim_parent_class)->dispose (object);
 }
 
 static void
-mm_mbim_port_class_init (MMMbimPortClass *klass)
+mm_port_mbim_class_init (MMPortMbimClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMMbimPortPrivate));
+    g_type_class_add_private (object_class, sizeof (MMPortMbimPrivate));
 
     /* Virtual methods */
     object_class->dispose = dispose;

@@ -39,7 +39,7 @@ peek_device (gpointer self,
              gpointer user_data)
 {
     MMBaseModem *modem = NULL;
-    MMMbimPort *port;
+    MMPortMbim *port;
 
     g_object_get (G_OBJECT (self),
                   MM_SIM_MODEM, &modem,
@@ -59,7 +59,7 @@ peek_device (gpointer self,
         return FALSE;
     }
 
-    *o_device = mm_mbim_port_peek_device (port);
+    *o_device = mm_port_mbim_peek_device (port);
     return TRUE;
 }
 

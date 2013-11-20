@@ -13,8 +13,8 @@
  * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
-#ifndef MM_MBIM_PORT_H
-#define MM_MBIM_PORT_H
+#ifndef MM_PORT_MBIM_H
+#define MM_PORT_MBIM_H
 
 #include <glib.h>
 #include <glib-object.h>
@@ -24,45 +24,45 @@
 
 #include "mm-port.h"
 
-#define MM_TYPE_MBIM_PORT            (mm_mbim_port_get_type ())
-#define MM_MBIM_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MBIM_PORT, MMMbimPort))
-#define MM_MBIM_PORT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_MBIM_PORT, MMMbimPortClass))
-#define MM_IS_MBIM_PORT(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MBIM_PORT))
-#define MM_IS_MBIM_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_MBIM_PORT))
-#define MM_MBIM_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_MBIM_PORT, MMMbimPortClass))
+#define MM_TYPE_PORT_MBIM            (mm_port_mbim_get_type ())
+#define MM_PORT_MBIM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_MBIM, MMPortMbim))
+#define MM_PORT_MBIM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_MBIM, MMPortMbimClass))
+#define MM_IS_PORT_MBIM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PORT_MBIM))
+#define MM_IS_PORT_MBIM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_MBIM))
+#define MM_PORT_MBIM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_MBIM, MMPortMbimClass))
 
-typedef struct _MMMbimPort MMMbimPort;
-typedef struct _MMMbimPortClass MMMbimPortClass;
-typedef struct _MMMbimPortPrivate MMMbimPortPrivate;
+typedef struct _MMPortMbim MMPortMbim;
+typedef struct _MMPortMbimClass MMPortMbimClass;
+typedef struct _MMPortMbimPrivate MMPortMbimPrivate;
 
-struct _MMMbimPort {
+struct _MMPortMbim {
     MMPort parent;
-    MMMbimPortPrivate *priv;
+    MMPortMbimPrivate *priv;
 };
 
-struct _MMMbimPortClass {
+struct _MMPortMbimClass {
     MMPortClass parent;
 };
 
-GType mm_mbim_port_get_type (void);
+GType mm_port_mbim_get_type (void);
 
-MMMbimPort *mm_mbim_port_new (const gchar *name);
+MMPortMbim *mm_port_mbim_new (const gchar *name);
 
-void     mm_mbim_port_open         (MMMbimPort *self,
+void     mm_port_mbim_open         (MMPortMbim *self,
                                     GCancellable *cancellable,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data);
-gboolean mm_mbim_port_open_finish  (MMMbimPort *self,
+gboolean mm_port_mbim_open_finish  (MMPortMbim *self,
                                     GAsyncResult *res,
                                     GError **error);
-gboolean mm_mbim_port_is_open      (MMMbimPort *self);
-void     mm_mbim_port_close        (MMMbimPort *self,
+gboolean mm_port_mbim_is_open      (MMPortMbim *self);
+void     mm_port_mbim_close        (MMPortMbim *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data);
-gboolean mm_mbim_port_close_finish (MMMbimPort *self,
+gboolean mm_port_mbim_close_finish (MMPortMbim *self,
                                     GAsyncResult *res,
                                     GError **error);
 
-MbimDevice *mm_mbim_port_peek_device (MMMbimPort *self);
+MbimDevice *mm_port_mbim_peek_device (MMPortMbim *self);
 
-#endif /* MM_MBIM_PORT_H */
+#endif /* MM_PORT_MBIM_H */

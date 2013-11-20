@@ -252,7 +252,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
 #endif
 #if defined WITH_MBIM
         if (!port && ptype == MM_PORT_TYPE_MBIM)
-            port = MM_PORT (mm_mbim_port_new (name));
+            port = MM_PORT (mm_port_mbim_new (name));
 #endif
         if (!port) {
             g_set_error (error,
@@ -720,41 +720,41 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 
 #if defined WITH_MBIM
 
-MMMbimPort *
+MMPortMbim *
 mm_base_modem_get_port_mbim (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
     /* First MBIM port in the list is the primary one always */
-    return (self->priv->mbim ? ((MMMbimPort *)g_object_ref (self->priv->mbim->data)) : NULL);
+    return (self->priv->mbim ? ((MMPortMbim *)g_object_ref (self->priv->mbim->data)) : NULL);
 }
 
-MMMbimPort *
+MMPortMbim *
 mm_base_modem_peek_port_mbim (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
     /* First MBIM port in the list is the primary one always */
-    return (self->priv->mbim ? (MMMbimPort *)self->priv->mbim->data : NULL);
+    return (self->priv->mbim ? (MMPortMbim *)self->priv->mbim->data : NULL);
 }
 
-MMMbimPort *
+MMPortMbim *
 mm_base_modem_get_port_mbim_for_data (MMBaseModem *self,
                                       MMPort *data,
                                       GError **error)
 {
-    MMMbimPort *mbim;
+    MMPortMbim *mbim;
 
     mbim = mm_base_modem_peek_port_mbim_for_data (self, data, error);
-    return (mbim ? (MMMbimPort *)g_object_ref (mbim) : NULL);
+    return (mbim ? (MMPortMbim *)g_object_ref (mbim) : NULL);
 }
 
-MMMbimPort *
+MMPortMbim *
 mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
                                        MMPort *data,
                                        GError **error)
 {
-    MMMbimPort *found;
+    MMPortMbim *found;
     GUdevClient *client;
     GUdevDevice *data_device;
     GUdevDevice *data_device_parent;
@@ -834,7 +834,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
 
         if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
                          g_udev_device_get_sysfs_path (mbim_device_parent)))
-            found = MM_MBIM_PORT (l->data);
+            found = MM_PORT_MBIM (l->data);
 
         g_object_unref (mbim_device_parent);
     }
@@ -853,7 +853,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
             mm_info ("Assuming MBIM port '%s' is associated to net/%s",
                      mm_port_get_device (MM_PORT (self->priv->mbim->data)),
                      mm_port_get_device (data));
-            found = MM_MBIM_PORT (self->priv->mbim->data);
+            found = MM_PORT_MBIM (self->priv->mbim->data);
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -1599,7 +1599,7 @@ dispose (GObject *object)
 #endif
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
-    g_list_foreach (self->priv->mbim, (GFunc)mm_mbim_port_close, NULL);
+    g_list_foreach (self->priv->mbim, (GFunc)mm_port_mbim_close, NULL);
     g_list_free_full (self->priv->mbim, g_object_unref);
     self->priv->mbim = NULL;
 #endif
