@@ -130,7 +130,7 @@ peek_qmi_client (MMBroadbandModemQmi *self,
                  QmiService service,
                  GError **error)
 {
-    MMQmiPort *port;
+    MMPortQmi *port;
     QmiClient *client;
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
@@ -142,9 +142,9 @@ peek_qmi_client (MMBroadbandModemQmi *self,
         return NULL;
     }
 
-    client = mm_qmi_port_peek_client (port,
+    client = mm_port_qmi_peek_client (port,
                                       service,
-                                      MM_QMI_PORT_FLAG_DEFAULT);
+                                      MM_PORT_QMI_FLAG_DEFAULT);
     if (!client)
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -6557,7 +6557,7 @@ messaging_check_support (MMIfaceModemMessaging *self,
                          gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMQmiPort *port;
+    MMPortQmi *port;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -6566,7 +6566,7 @@ messaging_check_support (MMIfaceModemMessaging *self,
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the WMS client, messaging is supported */
-    if (!port || !mm_qmi_port_peek_client (port, QMI_SERVICE_WMS, MM_QMI_PORT_FLAG_DEFAULT)) {
+    if (!port || !mm_port_qmi_peek_client (port, QMI_SERVICE_WMS, MM_PORT_QMI_FLAG_DEFAULT)) {
         /* Try to fallback to AT support */
         iface_modem_messaging_parent->check_support (
             self,
@@ -7636,7 +7636,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 {
     MMModemLocationSource sources;
     GError *error = NULL;
-    MMQmiPort *port;
+    MMPortQmi *port;
 
     sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
     if (error) {
@@ -7651,9 +7651,9 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
     /* Now our own checks */
 
     /* If we have support for the PDS client, GPS location is supported */
-    if (port && mm_qmi_port_peek_client (port,
+    if (port && mm_port_qmi_peek_client (port,
                                          QMI_SERVICE_PDS,
-                                         MM_QMI_PORT_FLAG_DEFAULT))
+                                         MM_PORT_QMI_FLAG_DEFAULT))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
 
     /* If the modem is CDMA, we have support for CDMA BS location */
@@ -8116,7 +8116,7 @@ oma_check_support (MMIfaceModemOma *self,
                    gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMQmiPort *port;
+    MMPortQmi *port;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -8125,7 +8125,7 @@ oma_check_support (MMIfaceModemOma *self,
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the OMA client, OMA is supported */
-    if (!port || !mm_qmi_port_peek_client (port, QMI_SERVICE_OMA, MM_QMI_PORT_FLAG_DEFAULT)) {
+    if (!port || !mm_port_qmi_peek_client (port, QMI_SERVICE_OMA, MM_PORT_QMI_FLAG_DEFAULT)) {
         mm_dbg ("OMA capabilities not supported");
         g_simple_async_result_set_op_res_gboolean (result, FALSE);
     } else {
@@ -9398,7 +9398,7 @@ signal_check_support (MMIfaceModemSignal *self,
                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMQmiPort *port;
+    MMPortQmi *port;
     gboolean supported = FALSE;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -9410,7 +9410,7 @@ signal_check_support (MMIfaceModemSignal *self,
 
     /* If NAS service is available, assume either signal info or signal strength are supported */
     if (port)
-        supported = !!mm_qmi_port_peek_client (port, QMI_SERVICE_NAS, MM_QMI_PORT_FLAG_DEFAULT);
+        supported = !!mm_port_qmi_peek_client (port, QMI_SERVICE_NAS, MM_PORT_QMI_FLAG_DEFAULT);
 
     mm_dbg ("Extended signal capabilities %ssupported", supported ? "" : "not ");
     g_simple_async_result_set_op_res_gboolean (result, supported);
@@ -9911,7 +9911,7 @@ enabling_started (MMBroadbandModem *self,
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMQmiPort *qmi;
+    MMPortQmi *qmi;
     QmiService services[32];
     guint service_index;
 } InitializationStartedContext;
@@ -9974,13 +9974,13 @@ parent_initialization_started (InitializationStartedContext *ctx)
 static void allocate_next_client (InitializationStartedContext *ctx);
 
 static void
-qmi_port_allocate_client_ready (MMQmiPort *qmi,
+qmi_port_allocate_client_ready (MMPortQmi *qmi,
                                 GAsyncResult *res,
                                 InitializationStartedContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_qmi_port_allocate_client_finish (qmi, res, &error)) {
+    if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
         mm_dbg ("Couldn't allocate client for service '%s': %s",
                 qmi_service_get_string (ctx->services[ctx->service_index]),
                 error->message);
@@ -10001,9 +10001,9 @@ allocate_next_client (InitializationStartedContext *ctx)
     }
 
     /* Otherwise, allocate next client */
-    mm_qmi_port_allocate_client (ctx->qmi,
+    mm_port_qmi_allocate_client (ctx->qmi,
                                  ctx->services[ctx->service_index],
-                                 MM_QMI_PORT_FLAG_DEFAULT,
+                                 MM_PORT_QMI_FLAG_DEFAULT,
                                  NULL,
                                  (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                  ctx);
@@ -10011,13 +10011,13 @@ allocate_next_client (InitializationStartedContext *ctx)
 
 
 static void
-qmi_port_open_ready_no_data_format (MMQmiPort *qmi,
+qmi_port_open_ready_no_data_format (MMPortQmi *qmi,
                                     GAsyncResult *res,
                                     InitializationStartedContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_qmi_port_open_finish (qmi, res, &error)) {
+    if (!mm_port_qmi_open_finish (qmi, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         initialization_started_context_complete_and_free (ctx);
         return;
@@ -10027,19 +10027,19 @@ qmi_port_open_ready_no_data_format (MMQmiPort *qmi,
 }
 
 static void
-qmi_port_open_ready (MMQmiPort *qmi,
+qmi_port_open_ready (MMPortQmi *qmi,
                      GAsyncResult *res,
                      InitializationStartedContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_qmi_port_open_finish (qmi, res, &error)) {
+    if (!mm_port_qmi_open_finish (qmi, res, &error)) {
         /* Really, really old devices (Gobi 1K, 2008-era firmware) may not
          * support SetDataFormat, so if we get an error opening the port
          * try without it.  The qmi_wwan driver will fix up any issues that
          * the device might have between raw-ip and 802.3 mode anyway.
          */
-        mm_qmi_port_open (ctx->qmi,
+        mm_port_qmi_open (ctx->qmi,
                           FALSE,
                           NULL,
                           (GAsyncReadyCallback)qmi_port_open_ready_no_data_format,
@@ -10075,7 +10075,7 @@ initialization_started (MMBroadbandModem *self,
         return;
     }
 
-    if (mm_qmi_port_is_open (ctx->qmi)) {
+    if (mm_port_qmi_is_open (ctx->qmi)) {
         /* Nothing to be done, just launch parent's callback */
         parent_initialization_started (ctx);
         return;
@@ -10090,7 +10090,7 @@ initialization_started (MMBroadbandModem *self,
     ctx->services[5] = QMI_SERVICE_UNKNOWN;
 
     /* Now open our QMI port */
-    mm_qmi_port_open (ctx->qmi,
+    mm_port_qmi_open (ctx->qmi,
                       TRUE,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
@@ -10127,14 +10127,14 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
 static void
 finalize (GObject *object)
 {
-    MMQmiPort *qmi;
+    MMPortQmi *qmi;
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (object);
 
     qmi = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we did open the QMI port during initialization, close it now */
     if (qmi &&
-        mm_qmi_port_is_open (qmi)) {
-        mm_qmi_port_close (qmi);
+        mm_port_qmi_is_open (qmi)) {
+        mm_port_qmi_close (qmi);
     }
 
     g_free (self->priv->imei);

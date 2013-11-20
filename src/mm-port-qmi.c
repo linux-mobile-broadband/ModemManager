@@ -21,18 +21,18 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
-#include "mm-qmi-port.h"
+#include "mm-port-qmi.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMQmiPort, mm_qmi_port, MM_TYPE_PORT)
+G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
 typedef struct {
     QmiService service;
     QmiClient *client;
-    MMQmiPortFlag flag;
+    MMPortQmiFlag flag;
 } ServiceInfo;
 
-struct _MMQmiPortPrivate {
+struct _MMPortQmiPrivate {
     gboolean opening;
     QmiDevice *qmi_device;
     GList *services;
@@ -41,9 +41,9 @@ struct _MMQmiPortPrivate {
 /*****************************************************************************/
 
 QmiClient *
-mm_qmi_port_peek_client (MMQmiPort *self,
+mm_port_qmi_peek_client (MMPortQmi *self,
                          QmiService service,
-                         MMQmiPortFlag flag)
+                         MMPortQmiFlag flag)
 {
     GList *l;
 
@@ -59,20 +59,20 @@ mm_qmi_port_peek_client (MMQmiPort *self,
 }
 
 QmiClient *
-mm_qmi_port_get_client (MMQmiPort *self,
+mm_port_qmi_get_client (MMPortQmi *self,
                         QmiService service,
-                        MMQmiPortFlag flag)
+                        MMPortQmiFlag flag)
 {
     QmiClient *client;
 
-    client = mm_qmi_port_peek_client (self, service, flag);
+    client = mm_port_qmi_peek_client (self, service, flag);
     return (client ? g_object_ref (client) : NULL);
 }
 
 /*****************************************************************************/
 
 typedef struct {
-    MMQmiPort *self;
+    MMPortQmi *self;
     GSimpleAsyncResult *result;
     ServiceInfo *info;
 } AllocateClientContext;
@@ -91,7 +91,7 @@ allocate_client_context_complete_and_free (AllocateClientContext *ctx)
 }
 
 gboolean
-mm_qmi_port_allocate_client_finish (MMQmiPort *self,
+mm_port_qmi_allocate_client_finish (MMPortQmi *self,
                                     GAsyncResult *res,
                                     GError **error)
 {
@@ -122,16 +122,16 @@ allocate_client_ready (QmiDevice *qmi_device,
 }
 
 void
-mm_qmi_port_allocate_client (MMQmiPort *self,
+mm_port_qmi_allocate_client (MMPortQmi *self,
                              QmiService service,
-                             MMQmiPortFlag flag,
+                             MMPortQmiFlag flag,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
                              gpointer user_data)
 {
     AllocateClientContext *ctx;
 
-    if (!!mm_qmi_port_peek_client (self, service, flag)) {
+    if (!!mm_port_qmi_peek_client (self, service, flag)) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -147,7 +147,7 @@ mm_qmi_port_allocate_client (MMQmiPort *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_qmi_port_allocate_client);
+                                             mm_port_qmi_allocate_client);
     ctx->info = g_new0 (ServiceInfo, 1);
     ctx->info->service = service;
     ctx->info->flag = flag;
@@ -164,7 +164,7 @@ mm_qmi_port_allocate_client (MMQmiPort *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMQmiPort *self;
+    MMPortQmi *self;
     gboolean set_data_format;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
@@ -182,7 +182,7 @@ port_open_context_complete_and_free (PortOpenContext *ctx)
 }
 
 gboolean
-mm_qmi_port_open_finish (MMQmiPort *self,
+mm_port_qmi_open_finish (MMPortQmi *self,
                          GAsyncResult *res,
                          GError **error)
 {
@@ -242,7 +242,7 @@ qmi_device_new_ready (GObject *unused,
 }
 
 void
-mm_qmi_port_open (MMQmiPort *self,
+mm_port_qmi_open (MMPortQmi *self,
                   gboolean set_data_format,
                   GCancellable *cancellable,
                   GAsyncReadyCallback callback,
@@ -252,7 +252,7 @@ mm_qmi_port_open (MMQmiPort *self,
     gchar *fullpath;
     PortOpenContext *ctx;
 
-    g_return_if_fail (MM_IS_QMI_PORT (self));
+    g_return_if_fail (MM_IS_PORT_QMI (self));
 
     ctx = g_new0 (PortOpenContext, 1);
     ctx->self = g_object_ref (self);
@@ -260,7 +260,7 @@ mm_qmi_port_open (MMQmiPort *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_qmi_port_open);
+                                             mm_port_qmi_open);
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
 
     if (self->priv->opening) {
@@ -293,20 +293,20 @@ mm_qmi_port_open (MMQmiPort *self,
 }
 
 gboolean
-mm_qmi_port_is_open (MMQmiPort *self)
+mm_port_qmi_is_open (MMPortQmi *self)
 {
-    g_return_val_if_fail (MM_IS_QMI_PORT (self), FALSE);
+    g_return_val_if_fail (MM_IS_PORT_QMI (self), FALSE);
 
     return !!self->priv->qmi_device;
 }
 
 void
-mm_qmi_port_close (MMQmiPort *self)
+mm_port_qmi_close (MMPortQmi *self)
 {
     GList *l;
     GError *error = NULL;
 
-    g_return_if_fail (MM_IS_QMI_PORT (self));
+    g_return_if_fail (MM_IS_PORT_QMI (self));
 
     if (!self->priv->qmi_device)
         return;
@@ -337,10 +337,10 @@ mm_qmi_port_close (MMQmiPort *self)
 
 /*****************************************************************************/
 
-MMQmiPort *
-mm_qmi_port_new (const gchar *name)
+MMPortQmi *
+mm_port_qmi_new (const gchar *name)
 {
-    return MM_QMI_PORT (g_object_new (MM_TYPE_QMI_PORT,
+    return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
@@ -348,15 +348,15 @@ mm_qmi_port_new (const gchar *name)
 }
 
 static void
-mm_qmi_port_init (MMQmiPort *self)
+mm_port_qmi_init (MMPortQmi *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_QMI_PORT, MMQmiPortPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_QMI, MMPortQmiPrivate);
 }
 
 static void
 dispose (GObject *object)
 {
-    MMQmiPort *self = MM_QMI_PORT (object);
+    MMPortQmi *self = MM_PORT_QMI (object);
     GList *l;
 
     /* Deallocate all clients */
@@ -372,15 +372,15 @@ dispose (GObject *object)
     /* Clear device object */
     g_clear_object (&self->priv->qmi_device);
 
-    G_OBJECT_CLASS (mm_qmi_port_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_port_qmi_parent_class)->dispose (object);
 }
 
 static void
-mm_qmi_port_class_init (MMQmiPortClass *klass)
+mm_port_qmi_class_init (MMPortQmiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMQmiPortPrivate));
+    g_type_class_add_private (object_class, sizeof (MMPortQmiPrivate));
 
     /* Virtual methods */
     object_class->dispose = dispose;

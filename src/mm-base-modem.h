@@ -35,7 +35,7 @@
 #include "mm-port-serial-gps.h"
 
 #if defined WITH_QMI
-#include "mm-qmi-port.h"
+#include "mm-port-qmi.h"
 #endif
 
 #if defined WITH_MBIM
@@ -130,8 +130,8 @@ MMPortSerialQcdm *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
 #if defined WITH_QMI
-MMQmiPort        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
-MMQmiPort        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
+MMPortQmi        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
+MMPortQmi        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 #if defined WITH_MBIM
 MMMbimPort       *mm_base_modem_peek_port_mbim          (MMBaseModem *self);
@@ -147,8 +147,8 @@ MMPortSerialQcdm *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_get_port_gps          (MMBaseModem *self);
 #if defined WITH_QMI
-MMQmiPort        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
-MMQmiPort        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
+MMPortQmi        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
+MMPortQmi        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 #if defined WITH_MBIM
 MMMbimPort       *mm_base_modem_get_port_mbim          (MMBaseModem *self);

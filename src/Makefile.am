@@ -98,8 +98,8 @@ libserial_la_SOURCES = \
 # Additional QMI support in libserial
 if WITH_QMI
 libserial_la_SOURCES += \
-	mm-qmi-port.c \
-	mm-qmi-port.h
+	mm-port-qmi.c \
+	mm-port-qmi.h
 libserial_la_CPPFLAGS += $(QMI_CFLAGS)
 endif
 

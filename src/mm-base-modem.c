@@ -248,7 +248,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
              g_str_has_prefix (name, "cdc-wdm")) {
 #if defined WITH_QMI
         if (ptype == MM_PORT_TYPE_QMI)
-            port = MM_PORT (mm_qmi_port_new (name));
+            port = MM_PORT (mm_port_qmi_new (name));
 #endif
 #if defined WITH_MBIM
         if (!port && ptype == MM_PORT_TYPE_MBIM)
@@ -569,41 +569,41 @@ mm_base_modem_peek_port_gps (MMBaseModem *self)
 
 #if defined WITH_QMI
 
-MMQmiPort *
+MMPortQmi *
 mm_base_modem_get_port_qmi (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
     /* First QMI port in the list is the primary one always */
-    return (self->priv->qmi ? ((MMQmiPort *)g_object_ref (self->priv->qmi->data)) : NULL);
+    return (self->priv->qmi ? ((MMPortQmi *)g_object_ref (self->priv->qmi->data)) : NULL);
 }
 
-MMQmiPort *
+MMPortQmi *
 mm_base_modem_peek_port_qmi (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
     /* First QMI port in the list is the primary one always */
-    return (self->priv->qmi ? (MMQmiPort *)self->priv->qmi->data : NULL);
+    return (self->priv->qmi ? (MMPortQmi *)self->priv->qmi->data : NULL);
 }
 
-MMQmiPort *
+MMPortQmi *
 mm_base_modem_get_port_qmi_for_data (MMBaseModem *self,
                                      MMPort *data,
                                      GError **error)
 {
-    MMQmiPort *qmi;
+    MMPortQmi *qmi;
 
     qmi = mm_base_modem_peek_port_qmi_for_data (self, data, error);
-    return (qmi ? (MMQmiPort *)g_object_ref (qmi) : NULL);
+    return (qmi ? (MMPortQmi *)g_object_ref (qmi) : NULL);
 }
 
-MMQmiPort *
+MMPortQmi *
 mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
                                       MMPort *data,
                                       GError **error)
 {
-    MMQmiPort *found;
+    MMPortQmi *found;
     GUdevClient *client;
     GUdevDevice *data_device;
     GUdevDevice *data_device_parent;
@@ -683,7 +683,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 
         if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
                          g_udev_device_get_sysfs_path (qmi_device_parent)))
-            found = MM_QMI_PORT (l->data);
+            found = MM_PORT_QMI (l->data);
 
         g_object_unref (qmi_device_parent);
     }
@@ -702,7 +702,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
             mm_info ("Assuming QMI port '%s' is associated to net/%s",
                      mm_port_get_device (MM_PORT (self->priv->qmi->data)),
                      mm_port_get_device (data));
-            found = MM_QMI_PORT (self->priv->qmi->data);
+            found = MM_PORT_QMI (self->priv->qmi->data);
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -1593,7 +1593,7 @@ dispose (GObject *object)
      * otherwise the allocated CIDs will be kept allocated, and if we end up
      * allocating too many newer allocations will fail with client-ids-exhausted
      * errors. */
-    g_list_foreach (self->priv->qmi, (GFunc)mm_qmi_port_close, NULL);
+    g_list_foreach (self->priv->qmi, (GFunc)mm_port_qmi_close, NULL);
     g_list_free_full (self->priv->qmi, g_object_unref);
     self->priv->qmi = NULL;
 #endif

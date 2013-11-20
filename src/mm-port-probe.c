@@ -37,7 +37,7 @@
 #include "mm-daemon-enums-types.h"
 
 #if defined WITH_QMI
-#include "mm-qmi-port.h"
+#include "mm-port-qmi.h"
 #endif
 
 #if defined WITH_MBIM
@@ -109,7 +109,7 @@ typedef struct {
 
 #if defined WITH_QMI
     /* ---- QMI probing specific context ---- */
-    MMQmiPort *qmi_port;
+    MMPortQmi *port_qmi;
 #endif
 
 #if defined WITH_MBIM
@@ -338,10 +338,10 @@ port_probe_run_task_free (PortProbeRunTask *task)
     }
 
 #if defined WITH_QMI
-    if (task->qmi_port) {
-        if (mm_qmi_port_is_open (task->qmi_port))
-            mm_qmi_port_close (task->qmi_port);
-        g_object_unref (task->qmi_port);
+    if (task->port_qmi) {
+        if (mm_port_qmi_is_open (task->port_qmi))
+            mm_port_qmi_close (task->port_qmi);
+        g_object_unref (task->port_qmi);
     }
 #endif
 
@@ -416,7 +416,7 @@ static gboolean wdm_probe (MMPortProbe *self);
 #if defined WITH_QMI
 
 static void
-qmi_port_open_ready (MMQmiPort *qmi_port,
+port_qmi_open_ready (MMPortQmi *port_qmi,
                      GAsyncResult *res,
                      MMPortProbe *self)
 {
@@ -424,7 +424,7 @@ qmi_port_open_ready (MMQmiPort *qmi_port,
     GError *error = NULL;
     gboolean is_qmi;
 
-    is_qmi = mm_qmi_port_open_finish (qmi_port, res, &error);
+    is_qmi = mm_port_qmi_open_finish (port_qmi, res, &error);
     if (!is_qmi) {
         mm_dbg ("(%s/%s) error checking QMI support: '%s'",
                 g_udev_device_get_subsystem (self->priv->port),
@@ -436,7 +436,7 @@ qmi_port_open_ready (MMQmiPort *qmi_port,
     /* Set probing result */
     mm_port_probe_set_result_qmi (self, is_qmi);
 
-    mm_qmi_port_close (qmi_port);
+    mm_port_qmi_close (port_qmi);
 
     /* Keep on */
     task->source_id = g_idle_add ((GSourceFunc)wdm_probe, self);
@@ -455,11 +455,11 @@ wdm_probe_qmi (MMPortProbe *self)
             g_udev_device_get_name (self->priv->port));
 
     /* Create a port and try to open it */
-    task->qmi_port = mm_qmi_port_new (g_udev_device_get_name (self->priv->port));
-    mm_qmi_port_open (task->qmi_port,
+    task->port_qmi = mm_port_qmi_new (g_udev_device_get_name (self->priv->port));
+    mm_port_qmi_open (task->port_qmi,
                       FALSE,
                       NULL,
-                      (GAsyncReadyCallback)qmi_port_open_ready,
+                      (GAsyncReadyCallback)port_qmi_open_ready,
                       self);
 #else
     /* If not compiled with QMI support, just assume we won't have any QMI port */

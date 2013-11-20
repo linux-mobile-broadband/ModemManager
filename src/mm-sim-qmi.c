@@ -40,7 +40,7 @@ ensure_qmi_client (MMSimQmi *self,
 {
     MMBaseModem *modem = NULL;
     QmiClient *client;
-    MMQmiPort *port;
+    MMPortQmi *port;
 
     g_object_get (self,
                   MM_SIM_MODEM, &modem,
@@ -60,9 +60,9 @@ ensure_qmi_client (MMSimQmi *self,
         return FALSE;
     }
 
-    client = mm_qmi_port_peek_client (port,
+    client = mm_port_qmi_peek_client (port,
                                       service,
-                                      MM_QMI_PORT_FLAG_DEFAULT);
+                                      MM_PORT_QMI_FLAG_DEFAULT);
     if (!client) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,

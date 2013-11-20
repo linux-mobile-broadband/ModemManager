@@ -70,7 +70,7 @@ typedef struct {
     GCancellable *cancellable;
     ConnectStep step;
     MMPort *data;
-    MMQmiPort *qmi;
+    MMPortQmi *qmi;
     gchar *user;
     gchar *password;
     gchar *apn;
@@ -468,7 +468,7 @@ set_ip_family_ready (QmiClientWds *client,
 }
 
 static void
-qmi_port_allocate_client_ready (MMQmiPort *qmi,
+qmi_port_allocate_client_ready (MMPortQmi *qmi,
                                 GAsyncResult *res,
                                 ConnectContext *ctx)
 {
@@ -477,20 +477,20 @@ qmi_port_allocate_client_ready (MMQmiPort *qmi,
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
     g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
-    if (!mm_qmi_port_allocate_client_finish (qmi, res, &error)) {
+    if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
         return;
     }
 
     if (ctx->running_ipv4)
-        ctx->client_ipv4 = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
+        ctx->client_ipv4 = QMI_CLIENT_WDS (mm_port_qmi_get_client (qmi,
                                                                    QMI_SERVICE_WDS,
-                                                                   MM_QMI_PORT_FLAG_WDS_IPV4));
+                                                                   MM_PORT_QMI_FLAG_WDS_IPV4));
     else
-        ctx->client_ipv6 = QMI_CLIENT_WDS (mm_qmi_port_get_client (qmi,
+        ctx->client_ipv6 = QMI_CLIENT_WDS (mm_port_qmi_get_client (qmi,
                                                                    QMI_SERVICE_WDS,
-                                                                   MM_QMI_PORT_FLAG_WDS_IPV6));
+                                                                   MM_PORT_QMI_FLAG_WDS_IPV6));
 
     /* Keep on */
     ctx->step++;
@@ -498,13 +498,13 @@ qmi_port_allocate_client_ready (MMQmiPort *qmi,
 }
 
 static void
-qmi_port_open_ready (MMQmiPort *qmi,
+qmi_port_open_ready (MMPortQmi *qmi,
                      GAsyncResult *res,
                      ConnectContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_qmi_port_open_finish (qmi, res, &error)) {
+    if (!mm_port_qmi_open_finish (qmi, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
         return;
@@ -537,8 +537,8 @@ connect_context_step (ConnectContext *ctx)
         ctx->step++;
 
     case CONNECT_STEP_OPEN_QMI_PORT:
-        if (!mm_qmi_port_is_open (ctx->qmi)) {
-            mm_qmi_port_open (ctx->qmi,
+        if (!mm_port_qmi_is_open (ctx->qmi)) {
+            mm_port_qmi_open (ctx->qmi,
                               TRUE,
                               ctx->cancellable,
                               (GAsyncReadyCallback)qmi_port_open_ready,
@@ -567,14 +567,14 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_WDS_CLIENT_IPV4: {
         QmiClient *client;
 
-        client = mm_qmi_port_get_client (ctx->qmi,
+        client = mm_port_qmi_get_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_WDS_IPV4);
+                                         MM_PORT_QMI_FLAG_WDS_IPV4);
         if (!client) {
             mm_dbg ("Allocating IPv4-specific WDS client");
-            mm_qmi_port_allocate_client (ctx->qmi,
+            mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_WDS_IPV4,
+                                         MM_PORT_QMI_FLAG_WDS_IPV4,
                                          ctx->cancellable,
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          ctx);
@@ -654,14 +654,14 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_WDS_CLIENT_IPV6: {
         QmiClient *client;
 
-        client = mm_qmi_port_get_client (ctx->qmi,
+        client = mm_port_qmi_get_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_WDS_IPV6);
+                                         MM_PORT_QMI_FLAG_WDS_IPV6);
         if (!client) {
             mm_dbg ("Allocating IPv6-specific WDS client");
-            mm_qmi_port_allocate_client (ctx->qmi,
+            mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_QMI_PORT_FLAG_WDS_IPV6,
+                                         MM_PORT_QMI_FLAG_WDS_IPV6,
                                          ctx->cancellable,
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          ctx);
@@ -794,7 +794,7 @@ _connect (MMBearer *self,
     ConnectContext *ctx;
     MMBaseModem *modem  = NULL;
     MMPort *data;
-    MMQmiPort *qmi;
+    MMPortQmi *qmi;
     GError *error = NULL;
     const gchar *apn;
 

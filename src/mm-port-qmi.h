@@ -13,8 +13,8 @@
  * Copyright (C) 2012 Google, Inc.
  */
 
-#ifndef MM_QMI_PORT_H
-#define MM_QMI_PORT_H
+#ifndef MM_PORT_QMI_H
+#define MM_PORT_QMI_H
 
 #include <glib.h>
 #include <glib-object.h>
@@ -24,62 +24,62 @@
 
 #include "mm-port.h"
 
-#define MM_TYPE_QMI_PORT            (mm_qmi_port_get_type ())
-#define MM_QMI_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_QMI_PORT, MMQmiPort))
-#define MM_QMI_PORT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_QMI_PORT, MMQmiPortClass))
-#define MM_IS_QMI_PORT(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_QMI_PORT))
-#define MM_IS_QMI_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_QMI_PORT))
-#define MM_QMI_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_QMI_PORT, MMQmiPortClass))
+#define MM_TYPE_PORT_QMI            (mm_port_qmi_get_type ())
+#define MM_PORT_QMI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_QMI, MMPortQmi))
+#define MM_PORT_QMI_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_QMI, MMPortQmiClass))
+#define MM_IS_PORT_QMI(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PORT_QMI))
+#define MM_IS_PORT_QMI_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_QMI))
+#define MM_PORT_QMI_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_QMI, MMPortQmiClass))
 
-typedef struct _MMQmiPort MMQmiPort;
-typedef struct _MMQmiPortClass MMQmiPortClass;
-typedef struct _MMQmiPortPrivate MMQmiPortPrivate;
+typedef struct _MMPortQmi MMPortQmi;
+typedef struct _MMPortQmiClass MMPortQmiClass;
+typedef struct _MMPortQmiPrivate MMPortQmiPrivate;
 
-struct _MMQmiPort {
+struct _MMPortQmi {
     MMPort parent;
-    MMQmiPortPrivate *priv;
+    MMPortQmiPrivate *priv;
 };
 
-struct _MMQmiPortClass {
+struct _MMPortQmiClass {
     MMPortClass parent;
 };
 
-GType mm_qmi_port_get_type (void);
+GType mm_port_qmi_get_type (void);
 
-MMQmiPort *mm_qmi_port_new (const gchar *name);
+MMPortQmi *mm_port_qmi_new (const gchar *name);
 
-void     mm_qmi_port_open        (MMQmiPort *self,
+void     mm_port_qmi_open        (MMPortQmi *self,
                                   gboolean set_data_format,
                                   GCancellable *cancellable,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
-gboolean mm_qmi_port_open_finish (MMQmiPort *self,
+gboolean mm_port_qmi_open_finish (MMPortQmi *self,
                                   GAsyncResult *res,
                                   GError **error);
-gboolean mm_qmi_port_is_open     (MMQmiPort *self);
-void     mm_qmi_port_close       (MMQmiPort *self);
+gboolean mm_port_qmi_is_open     (MMPortQmi *self);
+void     mm_port_qmi_close       (MMPortQmi *self);
 
 typedef enum {
-    MM_QMI_PORT_FLAG_DEFAULT  = 0,
-    MM_QMI_PORT_FLAG_WDS_IPV4 = 100,
-    MM_QMI_PORT_FLAG_WDS_IPV6 = 101
-} MMQmiPortFlag;
+    MM_PORT_QMI_FLAG_DEFAULT  = 0,
+    MM_PORT_QMI_FLAG_WDS_IPV4 = 100,
+    MM_PORT_QMI_FLAG_WDS_IPV6 = 101
+} MMPortQmiFlag;
 
-void     mm_qmi_port_allocate_client        (MMQmiPort *self,
+void     mm_port_qmi_allocate_client        (MMPortQmi *self,
                                              QmiService service,
-                                             MMQmiPortFlag flag,
+                                             MMPortQmiFlag flag,
                                              GCancellable *cancellable,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data);
-gboolean mm_qmi_port_allocate_client_finish (MMQmiPort *self,
+gboolean mm_port_qmi_allocate_client_finish (MMPortQmi *self,
                                              GAsyncResult *res,
                                              GError **error);
 
-QmiClient *mm_qmi_port_peek_client (MMQmiPort *self,
+QmiClient *mm_port_qmi_peek_client (MMPortQmi *self,
                                     QmiService service,
-                                    MMQmiPortFlag flag);
-QmiClient *mm_qmi_port_get_client  (MMQmiPort *self,
+                                    MMPortQmiFlag flag);
+QmiClient *mm_port_qmi_get_client  (MMPortQmi *self,
                                     QmiService service,
-                                    MMQmiPortFlag flag);
+                                    MMPortQmiFlag flag);
 
-#endif /* MM_QMI_PORT_H */
+#endif /* MM_PORT_QMI_H */
