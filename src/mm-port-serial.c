@@ -77,7 +77,7 @@ struct _MMPortSerialPrivate {
     gboolean forced_close;
     int fd;
     GHashTable *reply_cache;
-    GIOChannel *channel;
+    GIOChannel *iochannel;
     GQueue *queue;
     GByteArray *response;
 
@@ -524,10 +524,12 @@ port_serial_process_command (MMPortSerial *self,
                              CommandContext *ctx,
                              GError **error)
 {
-    const guint8 *p;
-    int status, expected_status, send_len;
+    const gchar *p;
+    gsize written;
+    gssize send_len;
+    GIOStatus write_status;
 
-    if (self->priv->fd < 0) {
+    if (self->priv->fd < 0 || self->priv->iochannel == NULL) {
         g_set_error_literal (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                              "Sending command failed: device is not enabled");
         return FALSE;
@@ -547,37 +549,47 @@ port_serial_process_command (MMPortSerial *self,
 
     if (self->priv->send_delay == 0 || mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY) {
         /* Send the whole command in one write */
-        send_len = expected_status = ctx->command->len;
-        p = ctx->command->data;
+        send_len = (gssize)ctx->command->len;
+        p = (gchar *)ctx->command->data;
     } else {
         /* Send just one byte of the command */
-        send_len = expected_status = 1;
-        p = &ctx->command->data[ctx->idx];
+        send_len = 1;
+        p = (gchar *)&ctx->command->data[ctx->idx];
     }
 
-    /* Send a single byte of the command */
-    errno = 0;
-    status = write (self->priv->fd, p, send_len);
-    if (status > 0)
-        ctx->idx += status;
-    else {
-        /* Error or no bytes written */
-        if (errno == EAGAIN || status == 0) {
-            ctx->eagain_count--;
-            if (ctx->eagain_count <= 0) {
-                /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
-                self->priv->n_consecutive_timeouts++;
-                g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+    /* Send N bytes of the command */
+    write_status = g_io_channel_write_chars (self->priv->iochannel, p, send_len, &written, error);
+    switch (write_status) {
+    case G_IO_STATUS_ERROR:
+        g_prefix_error (error, "Sending command failed: ");
+        return FALSE;
 
-                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                             "Sending command failed: '%s'", strerror (errno));
-                return FALSE;
-            }
-        } else {
+    case G_IO_STATUS_EOF:
+        /* We shouldn't get EOF when writing */
+        g_assert_not_reached ();
+        break;
+
+    case G_IO_STATUS_NORMAL:
+        if (written > 0) {
+            ctx->idx += written;
+            break;
+        }
+        /* If written == 0, treat as EAGAIN, so fall down */
+
+    case G_IO_STATUS_AGAIN:
+        /* We're in a non-blocking channel and therefore we're up to receive
+         * EAGAIN; just retry in this case. */
+        ctx->eagain_count--;
+        if (ctx->eagain_count <= 0) {
+            /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
+            self->priv->n_consecutive_timeouts++;
+            g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+
             g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                          "Sending command failed: '%s'", strerror (errno));
             return FALSE;
         }
+        break;
     }
 
     if (ctx->idx >= ctx->command->len)
@@ -899,8 +911,8 @@ data_watch_enable (MMPortSerial *self, gboolean enable)
     }
 
     if (enable) {
-        g_return_if_fail (self->priv->channel != NULL);
-        self->priv->watch_id = g_io_add_watch (self->priv->channel,
+        g_return_if_fail (self->priv->iochannel != NULL);
+        self->priv->watch_id = g_io_add_watch (self->priv->iochannel,
                                                G_IO_IN | G_IO_ERR | G_IO_HUP,
                                                data_available,
                                                self);
@@ -1044,8 +1056,24 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
     if (tv_end.tv_sec - tv_start.tv_sec > 7)
         mm_warn ("(%s): open blocked by driver for more than 7 seconds!", device);
 
-    self->priv->channel = g_io_channel_unix_new (self->priv->fd);
-    g_io_channel_set_encoding (self->priv->channel, NULL, NULL);
+    /* Create new GIOChannel */
+    self->priv->iochannel = g_io_channel_unix_new (self->priv->fd);
+
+    /* We don't want UTF-8 encoding, we're playing with raw binary data */
+    g_io_channel_set_encoding (self->priv->iochannel, NULL, NULL);
+
+    /* We don't want to get the channel buffered */
+    g_io_channel_set_buffered (self->priv->iochannel, FALSE);
+
+    /* We don't want to get blocked while writing stuff */
+    if (!g_io_channel_set_flags (self->priv->iochannel,
+                                 G_IO_FLAG_NONBLOCK,
+                                 error)) {
+        g_prefix_error (error, "Cannot set non-blocking channel: ");
+        goto error;
+    }
+
+    /* Reading watch enable */
     data_watch_enable (self, TRUE);
 
     g_warn_if_fail (self->priv->connected_id == 0);
@@ -1066,6 +1094,13 @@ success:
 
 error:
     mm_warn ("(%s) failed to open serial device", device);
+
+    if (self->priv->iochannel) {
+        g_io_channel_shutdown (self->priv->iochannel, FALSE, NULL);
+        g_io_channel_unref (self->priv->iochannel);
+        self->priv->iochannel = NULL;
+    }
+
     close (self->priv->fd);
     self->priv->fd = -1;
     return FALSE;
@@ -1119,14 +1154,6 @@ mm_port_serial_close (MMPortSerial *self)
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
-        /* Destroy channel */
-        if (self->priv->channel) {
-            data_watch_enable (self, FALSE);
-            g_io_channel_shutdown (self->priv->channel, TRUE, NULL);
-            g_io_channel_unref (self->priv->channel);
-            self->priv->channel = NULL;
-        }
-
         g_get_current_time (&tv_start);
 
         /* Serial port specific setup */
@@ -1146,6 +1173,14 @@ mm_port_serial_close (MMPortSerial *self)
 
             tcsetattr (self->priv->fd, TCSANOW, &self->priv->old_t);
             tcflush (self->priv->fd, TCIOFLUSH);
+        }
+
+        /* Destroy channel */
+        if (self->priv->iochannel) {
+            data_watch_enable (self, FALSE);
+            g_io_channel_shutdown (self->priv->iochannel, TRUE, NULL);
+            g_io_channel_unref (self->priv->iochannel);
+            self->priv->iochannel = NULL;
         }
 
         close (self->priv->fd);
