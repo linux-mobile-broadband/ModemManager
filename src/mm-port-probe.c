@@ -27,7 +27,7 @@
 #include "mm-port-probe.h"
 #include "mm-log.h"
 #include "mm-at-serial-port.h"
-#include "mm-serial-port.h"
+#include "mm-port-serial.h"
 #include "mm-serial-parsers.h"
 #include "mm-port-probe-at.h"
 #include "libqcdm/src/commands.h"
@@ -82,7 +82,7 @@ typedef struct {
     /* ---- Serial probing specific context ---- */
 
     guint buffer_full_id;
-    MMSerialPort *serial;
+    MMPortSerial *serial;
 
     /* ---- AT probing specific context ---- */
 
@@ -332,8 +332,8 @@ port_probe_run_task_free (PortProbeRunTask *task)
             g_warn_if_fail (MM_IS_AT_SERIAL_PORT (task->serial));
             g_signal_handler_disconnect (task->serial, task->buffer_full_id);
         }
-        if (mm_serial_port_is_open (task->serial))
-            mm_serial_port_close (task->serial);
+        if (mm_port_serial_is_open (task->serial))
+            mm_port_serial_close (task->serial);
         g_object_unref (task->serial);
     }
 
@@ -665,12 +665,12 @@ serial_probe_qcdm (MMPortProbe *self)
             g_signal_handler_disconnect (task->serial, task->buffer_full_id);
             task->buffer_full_id = 0;
         }
-        mm_serial_port_close (task->serial);
+        mm_port_serial_close (task->serial);
         g_object_unref (task->serial);
     }
 
     /* Open the QCDM port */
-    task->serial = MM_SERIAL_PORT (mm_qcdm_serial_port_new (g_udev_device_get_name (self->priv->port)));
+    task->serial = MM_PORT_SERIAL (mm_qcdm_serial_port_new (g_udev_device_get_name (self->priv->port)));
     if (!task->serial) {
         port_probe_run_task_complete (
             task,
@@ -684,7 +684,7 @@ serial_probe_qcdm (MMPortProbe *self)
     }
 
     /* Try to open the port */
-    if (!mm_serial_port_open (task->serial, &error)) {
+    if (!mm_port_serial_open (task->serial, &error)) {
         port_probe_run_task_complete (
             task,
             FALSE,
@@ -1077,7 +1077,7 @@ serial_probe_schedule (MMPortProbe *self)
 }
 
 static void
-serial_flash_done (MMSerialPort *port,
+serial_flash_done (MMPortSerial *port,
                    GError *error,
                    MMPortProbe *self)
 {
@@ -1086,7 +1086,7 @@ serial_flash_done (MMSerialPort *port,
 }
 
 static void
-serial_buffer_full (MMSerialPort *serial,
+serial_buffer_full (MMPortSerial *serial,
                     GByteArray *buffer,
                     MMPortProbe *self)
 {
@@ -1136,7 +1136,7 @@ serial_open_at (MMPortProbe *self)
     if (!task->serial) {
         gpointer parser;
 
-        task->serial = MM_SERIAL_PORT (mm_at_serial_port_new (g_udev_device_get_name (self->priv->port)));
+        task->serial = MM_PORT_SERIAL (mm_at_serial_port_new (g_udev_device_get_name (self->priv->port)));
         if (!task->serial) {
             port_probe_run_task_complete (
                 task,
@@ -1150,10 +1150,10 @@ serial_open_at (MMPortProbe *self)
         }
 
         g_object_set (task->serial,
-                      MM_SERIAL_PORT_SEND_DELAY,     task->at_send_delay,
+                      MM_PORT_SERIAL_SPEW_CONTROL,   TRUE,
+                      MM_PORT_SERIAL_SEND_DELAY,     task->at_send_delay,
                       MM_AT_SERIAL_PORT_REMOVE_ECHO, task->at_remove_echo,
                       MM_AT_SERIAL_PORT_SEND_LF,     task->at_send_lf,
-                      MM_SERIAL_PORT_SPEW_CONTROL,   TRUE,
                       NULL);
 
         parser = mm_serial_parser_v1_new ();
@@ -1167,7 +1167,7 @@ serial_open_at (MMPortProbe *self)
     }
 
     /* Try to open the port */
-    if (!mm_serial_port_open (task->serial, &error)) {
+    if (!mm_port_serial_open (task->serial, &error)) {
         /* Abort if maximum number of open tries reached */
         if (++task->at_open_tries > 4) {
             /* took too long to open the port; give up */
@@ -1208,7 +1208,7 @@ serial_open_at (MMPortProbe *self)
                                              G_CALLBACK (serial_buffer_full),
                                              self);
 
-    mm_serial_port_flash (MM_SERIAL_PORT (task->serial),
+    mm_port_serial_flash (MM_PORT_SERIAL (task->serial),
                           100,
                           TRUE,
                           (MMSerialFlashFn)serial_flash_done,

@@ -462,7 +462,7 @@ connect_cancelled_cb (GCancellable *cancellable,
 }
 
 static void
-forced_close_cb (MMSerialPort *port,
+forced_close_cb (MMPortSerial *port,
                  MMBroadbandBearerHso *self)
 {
     /* Just treat the forced close event as any other unsolicited message */

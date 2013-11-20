@@ -343,7 +343,7 @@ setup_ports (MMBroadbandModem *self)
         return;
 
     g_object_set (G_OBJECT (primary),
-                  MM_SERIAL_PORT_BAUD, 9600,
+                  MM_PORT_SERIAL_BAUD, 9600,
                   MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);
 }

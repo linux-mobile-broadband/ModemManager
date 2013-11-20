@@ -14,8 +14,8 @@
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
-#ifndef MM_SERIAL_PORT_H
-#define MM_SERIAL_PORT_H
+#ifndef MM_PORT_SERIAL_H
+#define MM_PORT_SERIAL_H
 
 #include <glib.h>
 #include <glib-object.h>
@@ -23,52 +23,52 @@
 
 #include "mm-port.h"
 
-#define MM_TYPE_SERIAL_PORT            (mm_serial_port_get_type ())
-#define MM_SERIAL_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SERIAL_PORT, MMSerialPort))
-#define MM_SERIAL_PORT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_SERIAL_PORT, MMSerialPortClass))
-#define MM_IS_SERIAL_PORT(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SERIAL_PORT))
-#define MM_IS_SERIAL_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_SERIAL_PORT))
-#define MM_SERIAL_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_SERIAL_PORT, MMSerialPortClass))
+#define MM_TYPE_PORT_SERIAL            (mm_port_serial_get_type ())
+#define MM_PORT_SERIAL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_SERIAL, MMPortSerial))
+#define MM_PORT_SERIAL_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_SERIAL, MMPortSerialClass))
+#define MM_IS_PORT_SERIAL(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PORT_SERIAL))
+#define MM_IS_PORT_SERIAL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_SERIAL))
+#define MM_PORT_SERIAL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_SERIAL, MMPortSerialClass))
 
-#define MM_SERIAL_PORT_BAUD         "baud"
-#define MM_SERIAL_PORT_BITS         "bits"
-#define MM_SERIAL_PORT_PARITY       "parity"
-#define MM_SERIAL_PORT_STOPBITS     "stopbits"
-#define MM_SERIAL_PORT_SEND_DELAY   "send-delay"
-#define MM_SERIAL_PORT_RTS_CTS      "rts-cts"
-#define MM_SERIAL_PORT_FD           "fd" /* Construct-only */
-#define MM_SERIAL_PORT_SPEW_CONTROL "spew-control" /* Construct-only */
-#define MM_SERIAL_PORT_FLASH_OK     "flash-ok" /* Construct-only */
+#define MM_PORT_SERIAL_BAUD         "baud"
+#define MM_PORT_SERIAL_BITS         "bits"
+#define MM_PORT_SERIAL_PARITY       "parity"
+#define MM_PORT_SERIAL_STOPBITS     "stopbits"
+#define MM_PORT_SERIAL_SEND_DELAY   "send-delay"
+#define MM_PORT_SERIAL_RTS_CTS      "rts-cts"
+#define MM_PORT_SERIAL_FD           "fd" /* Construct-only */
+#define MM_PORT_SERIAL_SPEW_CONTROL "spew-control" /* Construct-only */
+#define MM_PORT_SERIAL_FLASH_OK     "flash-ok" /* Construct-only */
 
-typedef struct _MMSerialPort MMSerialPort;
-typedef struct _MMSerialPortClass MMSerialPortClass;
+typedef struct _MMPortSerial MMPortSerial;
+typedef struct _MMPortSerialClass MMPortSerialClass;
 
-typedef void (*MMSerialReopenFn)       (MMSerialPort *port,
+typedef void (*MMSerialReopenFn)       (MMPortSerial *port,
                                         GError *error,
                                         gpointer user_data);
 
-typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
+typedef void (*MMSerialFlashFn)        (MMPortSerial *port,
                                         GError *error,
                                         gpointer user_data);
 
-typedef void (*MMSerialResponseFn)     (MMSerialPort *port,
+typedef void (*MMSerialResponseFn)     (MMPortSerial *port,
                                         GByteArray *response,
                                         GError *error,
                                         gpointer user_data);
 
 
-struct _MMSerialPort {
+struct _MMPortSerial {
     MMPort parent;
 };
 
-struct _MMSerialPortClass {
+struct _MMPortSerialClass {
     MMPortClass parent;
 
     /* Called for subclasses to parse unsolicited responses.  If any recognized
      * unsolicited response is found, it should be removed from the 'response'
      * byte array before returning.
      */
-    void     (*parse_unsolicited) (MMSerialPort *self, GByteArray *response);
+    void     (*parse_unsolicited) (MMPortSerial *self, GByteArray *response);
 
     /* Called to parse the device's response to a command or determine if the
      * response was an error response.  If the response indicates an error, an
@@ -77,7 +77,7 @@ struct _MMSerialPortClass {
      * the device's reply (whether success *or* error), and should return TRUE
      * when the device's response has been recognized and parsed.
      */
-    gboolean (*parse_response)    (MMSerialPort *self,
+    gboolean (*parse_response)    (MMPortSerial *self,
                                    GByteArray *response,
                                    GError **error);
 
@@ -85,7 +85,7 @@ struct _MMSerialPortClass {
      * it's callback to be handled.  Returns the # of bytes of the response
      * consumed.
      */
-    gsize     (*handle_response)  (MMSerialPort *self,
+    gsize     (*handle_response)  (MMPortSerial *self,
                                    GByteArray *response,
                                    GError *error,
                                    GCallback callback,
@@ -94,54 +94,54 @@ struct _MMSerialPortClass {
     /* Called to configure the serial port fd after it's opened.  On error, should
      * return FALSE and set 'error' as appropriate.
      */
-    gboolean (*config_fd)         (MMSerialPort *self, int fd, GError **error);
+    gboolean (*config_fd)         (MMPortSerial *self, int fd, GError **error);
 
     /* Called to configure the serial port after it's opened. Errors, if any,
      * should get ignored. */
-    void     (*config)            (MMSerialPort *self);
+    void     (*config)            (MMPortSerial *self);
 
-    void (*debug_log)             (MMSerialPort *self,
+    void (*debug_log)             (MMPortSerial *self,
                                    const char *prefix,
                                    const char *buf,
                                    gsize len);
 
     /* Signals */
-    void (*buffer_full)           (MMSerialPort *port, const GByteArray *buffer);
-    void (*timed_out)             (MMSerialPort *port, guint n_consecutive_replies);
-    void (*forced_close)          (MMSerialPort *port);
+    void (*buffer_full)           (MMPortSerial *port, const GByteArray *buffer);
+    void (*timed_out)             (MMPortSerial *port, guint n_consecutive_replies);
+    void (*forced_close)          (MMPortSerial *port);
 };
 
-GType mm_serial_port_get_type (void);
+GType mm_port_serial_get_type (void);
 
-MMSerialPort *mm_serial_port_new (const char *name, MMPortType ptype);
+MMPortSerial *mm_port_serial_new (const char *name, MMPortType ptype);
 
 /* Keep in mind that port open/close is refcounted, so ensure that
  * open/close calls are properly balanced.
  */
 
-gboolean mm_serial_port_is_open           (MMSerialPort *self);
+gboolean mm_port_serial_is_open           (MMPortSerial *self);
 
-gboolean mm_serial_port_open              (MMSerialPort *self,
+gboolean mm_port_serial_open              (MMPortSerial *self,
                                            GError  **error);
 
-void     mm_serial_port_close             (MMSerialPort *self);
+void     mm_port_serial_close             (MMPortSerial *self);
 
-gboolean mm_serial_port_reopen            (MMSerialPort *self,
+gboolean mm_port_serial_reopen            (MMPortSerial *self,
                                            guint32 reopen_time,
                                            MMSerialReopenFn callback,
                                            gpointer user_data);
 
-gboolean mm_serial_port_flash             (MMSerialPort *self,
+gboolean mm_port_serial_flash             (MMPortSerial *self,
                                            guint32 flash_time,
                                            gboolean ignore_errors,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
 
-void     mm_serial_port_flash_cancel      (MMSerialPort *self);
+void     mm_port_serial_flash_cancel      (MMPortSerial *self);
 
-gboolean mm_serial_port_get_flash_ok      (MMSerialPort *self);
+gboolean mm_port_serial_get_flash_ok      (MMPortSerial *self);
 
-void     mm_serial_port_queue_command     (MMSerialPort *self,
+void     mm_port_serial_queue_command     (MMPortSerial *self,
                                            GByteArray *command,
                                            gboolean take_command,
                                            guint32 timeout_seconds,
@@ -149,7 +149,7 @@ void     mm_serial_port_queue_command     (MMSerialPort *self,
                                            MMSerialResponseFn callback,
                                            gpointer user_data);
 
-void     mm_serial_port_queue_command_cached (MMSerialPort *self,
+void     mm_port_serial_queue_command_cached (MMPortSerial *self,
                                               GByteArray *command,
                                               gboolean take_command,
                                               guint32 timeout_seconds,
@@ -157,4 +157,4 @@ void     mm_serial_port_queue_command_cached (MMSerialPort *self,
                                               MMSerialResponseFn callback,
                                               gpointer user_data);
 
-#endif /* MM_SERIAL_PORT_H */
+#endif /* MM_PORT_SERIAL_H */

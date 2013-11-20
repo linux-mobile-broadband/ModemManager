@@ -220,14 +220,14 @@ qcdm_test_child (int fd, VerInfoCb cb)
     port = mm_qcdm_serial_port_new_fd (fd);
     g_assert (port);
 
-    success = mm_serial_port_open (MM_SERIAL_PORT (port), &error);
+    success = mm_port_serial_open (MM_PORT_SERIAL (port), &error);
     g_assert_no_error (error);
     g_assert (success);
 
     qcdm_request_verinfo (port, cb, loop);
     g_main_loop_run (loop);
 
-    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_port_serial_close (MM_PORT_SERIAL (port));
     g_object_unref (port);
 }
 

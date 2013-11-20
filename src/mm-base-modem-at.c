@@ -60,7 +60,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
     g_object_set (port, MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
 
     /* Ensure we have a port open during the sequence */
-    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
@@ -107,7 +107,7 @@ typedef struct {
 static void
 at_sequence_context_free (AtSequenceContext *ctx)
 {
-    mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
     g_object_unref (ctx->port);
     g_object_unref (ctx->self);
 
@@ -442,7 +442,7 @@ typedef struct {
 static void
 at_command_context_free (AtCommandContext *ctx)
 {
-    mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
 
     if (ctx->cancelled_id)
         g_cancellable_disconnect (ctx->modem_cancellable,

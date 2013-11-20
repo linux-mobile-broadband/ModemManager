@@ -20,7 +20,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-serial-port.h"
+#include "mm-port-serial.h"
 
 #define MM_TYPE_AT_SERIAL_PORT            (mm_at_serial_port_get_type ())
 #define MM_AT_SERIAL_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_AT_SERIAL_PORT, MMAtSerialPort))
@@ -72,11 +72,11 @@ typedef void (*MMAtSerialResponseFn)     (MMAtSerialPort *port,
 #define MM_AT_SERIAL_PORT_SEND_LF "send-lf"
 
 struct _MMAtSerialPort {
-    MMSerialPort parent;
+    MMPortSerial parent;
 };
 
 struct _MMAtSerialPortClass {
-    MMSerialPortClass parent;
+    MMPortSerialClass parent;
 };
 
 GType mm_at_serial_port_get_type (void);

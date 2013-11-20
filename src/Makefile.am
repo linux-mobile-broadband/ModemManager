@@ -86,8 +86,8 @@ nodist_libserial_la_SOURCES = \
 libserial_la_SOURCES = \
 	mm-port.c \
 	mm-port.h \
-	mm-serial-port.c \
-	mm-serial-port.h \
+	mm-port-serial.c \
+	mm-port-serial.h \
 	mm-at-serial-port.c \
 	mm-at-serial-port.h \
 	mm-qcdm-serial-port.c \

@@ -28,7 +28,7 @@
 #include "libqcdm/src/errors.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMQcdmSerialPort, mm_qcdm_serial_port, MM_TYPE_SERIAL_PORT)
+G_DEFINE_TYPE (MMQcdmSerialPort, mm_qcdm_serial_port, MM_TYPE_PORT_SERIAL)
 
 #define MM_QCDM_SERIAL_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_QCDM_SERIAL_PORT, MMQcdmSerialPortPrivate))
 
@@ -67,13 +67,13 @@ find_qcdm_start (GByteArray *response, gsize *start)
 }
 
 static gboolean
-parse_response (MMSerialPort *port, GByteArray *response, GError **error)
+parse_response (MMPortSerial *port, GByteArray *response, GError **error)
 {
     return find_qcdm_start (response, NULL);
 }
 
 static gsize
-handle_response (MMSerialPort *port,
+handle_response (MMPortSerial *port,
                  GByteArray *response,
                  GError *error,
                  GCallback callback,
@@ -157,7 +157,7 @@ mm_qcdm_serial_port_queue_command (MMQcdmSerialPort *self,
     g_return_if_fail (command != NULL);
 
     /* 'command' is expected to be already CRC-ed and escaped */
-    mm_serial_port_queue_command (MM_SERIAL_PORT (self),
+    mm_port_serial_queue_command (MM_PORT_SERIAL (self),
                                   command,
                                   TRUE,
                                   timeout_seconds,
@@ -179,7 +179,7 @@ mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
     g_return_if_fail (command != NULL);
 
     /* 'command' is expected to be already CRC-ed and escaped */
-    mm_serial_port_queue_command_cached (MM_SERIAL_PORT (self),
+    mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
                                          command,
                                          TRUE,
                                          timeout_seconds,
@@ -189,7 +189,7 @@ mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
 }
 
 static void
-debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
+debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
 {
     static GString *debug = NULL;
     const char *s = buf;
@@ -209,7 +209,7 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
 /*****************************************************************************/
 
 static gboolean
-config_fd (MMSerialPort *port, int fd, GError **error)
+config_fd (MMPortSerial *port, int fd, GError **error)
 {
     int err;
 
@@ -231,7 +231,7 @@ mm_qcdm_serial_port_new (const char *name)
                                               MM_PORT_DEVICE, name,
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
                                               MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
-                                              MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                                              MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                                               NULL));
 }
 
@@ -246,8 +246,8 @@ mm_qcdm_serial_port_new_fd (int fd)
                                               MM_PORT_DEVICE, name,
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
                                               MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
-                                              MM_SERIAL_PORT_FD, fd,
-                                              MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                                              MM_PORT_SERIAL_FD, fd,
+                                              MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                                               NULL));
     g_free (name);
     return port;
@@ -268,7 +268,7 @@ static void
 mm_qcdm_serial_port_class_init (MMQcdmSerialPortClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMSerialPortClass *port_class = MM_SERIAL_PORT_CLASS (klass);
+    MMPortSerialClass *port_class = MM_PORT_SERIAL_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMQcdmSerialPortPrivate));
 

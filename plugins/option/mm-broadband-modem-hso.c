@@ -474,7 +474,7 @@ gps_disabled_ready (MMBaseModem *self,
     /* Even if we get an error here, we try to close the GPS port */
     gps_port = mm_base_modem_peek_port_gps (self);
     if (gps_port)
-        mm_serial_port_close (MM_SERIAL_PORT (gps_port));
+        mm_port_serial_close (MM_PORT_SERIAL (gps_port));
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -567,7 +567,7 @@ gps_enabled_ready (MMBaseModem *self,
 
     gps_port = mm_base_modem_peek_port_gps (self);
     if (!gps_port ||
-        !mm_serial_port_open (MM_SERIAL_PORT (gps_port), &error)) {
+        !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
         if (error)
             g_simple_async_result_take_error (ctx->result, error);
         else
@@ -698,7 +698,7 @@ setup_ports (MMBroadbandModem *self)
         NULL, NULL, NULL);
 
     g_object_set (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                  MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                   /* built-in echo removal conflicts with unsolicited _OWANCALL
                    * messages, which are not <CR><LF> prefixed. */
                   MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,

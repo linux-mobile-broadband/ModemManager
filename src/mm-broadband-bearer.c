@@ -111,7 +111,7 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
         g_object_unref (ctx->secondary);
     if (ctx->data) {
         if (ctx->close_data_on_exit)
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+            mm_port_serial_close (MM_PORT_SERIAL (ctx->data));
         g_object_unref (ctx->data);
     }
     g_object_unref (ctx->self);
@@ -206,7 +206,7 @@ common_get_at_data_port (MMBaseModem *modem,
 
     g_assert (MM_IS_AT_SERIAL_PORT (data));
 
-    if (!mm_serial_port_open (MM_SERIAL_PORT (data), error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (data), error)) {
         g_prefix_error (error, "Couldn't connect: cannot keep data port open.");
         return NULL;
     }
@@ -516,7 +516,7 @@ extended_error_ready (MMBaseModem *modem,
     const gchar *result;
 
     /* Close the dialling port as we got an error */
-    mm_serial_port_close (MM_SERIAL_PORT (ctx->dial_port));
+    mm_port_serial_close (MM_PORT_SERIAL (ctx->dial_port));
 
     /* If cancelled, complete */
     if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
@@ -1326,13 +1326,13 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
 /* CDMA disconnect */
 
 static void
-data_flash_cdma_ready (MMSerialPort *data,
+data_flash_cdma_ready (MMPortSerial *data,
                        GError *error,
                        DetailedDisconnectContext *ctx)
 {
     /* We kept the serial port open during connection, now we close that open
      * count */
-    mm_serial_port_close (data);
+    mm_port_serial_close (data);
 
     /* Port is disconnected; update the state */
     mm_port_set_connected (MM_PORT (data), FALSE);
@@ -1361,7 +1361,7 @@ data_flash_cdma_ready (MMSerialPort *data,
 }
 
 static void
-data_reopen_cdma_ready (MMSerialPort *data,
+data_reopen_cdma_ready (MMPortSerial *data,
                         GError *error,
                         DetailedDisconnectContext *ctx)
 {
@@ -1374,7 +1374,7 @@ data_reopen_cdma_ready (MMSerialPort *data,
 
     /* Just flash the data port */
     mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
-    mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
+    mm_port_serial_flash (MM_PORT_SERIAL (ctx->data),
                           1000,
                           TRUE,
                           (MMSerialFlashFn)data_flash_cdma_ready,
@@ -1395,7 +1395,7 @@ disconnect_cdma (MMBroadbandBearer *self,
     g_assert (primary != NULL);
 
     /* Generic CDMA plays only with SERIAL data ports */
-    g_assert (MM_IS_SERIAL_PORT (data));
+    g_assert (MM_IS_PORT_SERIAL (data));
 
     ctx = detailed_disconnect_context_new (self,
                                            modem,
@@ -1407,7 +1407,7 @@ disconnect_cdma (MMBroadbandBearer *self,
 
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
-    mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data),
+    mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
                            (MMSerialReopenFn)data_reopen_cdma_ready,
                            ctx);
@@ -1436,13 +1436,13 @@ cgact_data_ready (MMBaseModem *modem,
 }
 
 static void
-data_flash_3gpp_ready (MMSerialPort *data,
+data_flash_3gpp_ready (MMPortSerial *data,
                        GError *error,
                        DetailedDisconnectContext *ctx)
 {
     /* We kept the serial port open during connection, now we close that open
      * count */
-    mm_serial_port_close (data);
+    mm_port_serial_close (data);
 
     /* Port is disconnected; update the state */
     mm_port_set_connected (MM_PORT (data), FALSE);
@@ -1489,7 +1489,7 @@ data_flash_3gpp_ready (MMSerialPort *data,
 }
 
 static void
-data_reopen_3gpp_ready (MMSerialPort *data,
+data_reopen_3gpp_ready (MMPortSerial *data,
                         GError *error,
                         DetailedDisconnectContext *ctx)
 {
@@ -1502,7 +1502,7 @@ data_reopen_3gpp_ready (MMSerialPort *data,
 
     /* Just flash the data port */
     mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
-    mm_serial_port_flash (MM_SERIAL_PORT (ctx->data),
+    mm_port_serial_flash (MM_PORT_SERIAL (ctx->data),
                           1000,
                           TRUE,
                           (MMSerialFlashFn)data_flash_3gpp_ready,
@@ -1514,7 +1514,7 @@ data_reopen_3gpp (DetailedDisconnectContext *ctx)
 {
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
-    mm_serial_port_reopen (MM_SERIAL_PORT (ctx->data),
+    mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
                            (MMSerialReopenFn)data_reopen_3gpp_ready,
                            ctx);
@@ -1553,7 +1553,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     g_assert (primary != NULL);
 
     /* Generic 3GPP plays only with SERIAL data ports */
-    g_assert (MM_IS_SERIAL_PORT (data));
+    g_assert (MM_IS_PORT_SERIAL (data));
 
     ctx = detailed_disconnect_context_new (self,
                                            modem,
@@ -1824,7 +1824,7 @@ init_async_context_free (InitAsyncContext *ctx,
 {
     if (ctx->port) {
         if (close_port)
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+            mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
         g_object_unref (ctx->port);
     }
     g_object_unref (ctx->self);
@@ -1984,7 +1984,7 @@ initable_init_async (GAsyncInitable *initable,
         return;
     }
 
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         g_simple_async_result_complete_in_idle (ctx->result);
         init_async_context_free (ctx, FALSE);

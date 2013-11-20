@@ -1378,7 +1378,7 @@ setup_ports (MMBroadbandModem *self)
         return;
 
     g_object_set (primary,
-                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                  MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                   MM_AT_SERIAL_PORT_SEND_LF, TRUE,
                   MM_AT_SERIAL_PORT_INIT_SEQUENCE, primary_init_sequence,
                   NULL);

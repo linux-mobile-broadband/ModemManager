@@ -329,7 +329,7 @@ load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     if (ctx->qcdm_port) {
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm_port));
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm_port));
         g_object_unref (ctx->qcdm_port);
     }
     g_object_unref (ctx->result);
@@ -662,7 +662,7 @@ load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
     ctx->qcdm_port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (ctx->self));
     g_assert (ctx->qcdm_port);
 
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm_port), &error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm_port), &error)) {
         mm_dbg ("Failed to open QCDM port for NV ModePref request: %s",
                 error->message);
         g_error_free (error);
@@ -1007,7 +1007,7 @@ own_numbers_context_complete_and_free (OwnNumbersContext *ctx)
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     if (ctx->qcdm) {
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm));
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
         g_object_unref (ctx->qcdm);
     }
     g_free (ctx);
@@ -1148,7 +1148,7 @@ modem_load_own_numbers (MMIfaceModem *self,
                                              modem_load_own_numbers);
     ctx->qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (ctx->qcdm) {
-        if (mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm), &error)) {
+        if (mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), &error)) {
             ctx->qcdm = g_object_ref (ctx->qcdm);
         } else {
             mm_dbg ("Couldn't open QCDM port: (%d) %s",
@@ -1697,7 +1697,7 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMSerialPort *port;
+    MMPortSerial *port;
 } SignalQualityContext;
 
 static void
@@ -1986,7 +1986,7 @@ modem_load_signal_quality (MMIfaceModem *self,
                                              modem_load_signal_quality);
 
     /* Check whether we can get a non-connected AT port */
-    ctx->port = (MMSerialPort *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
+    ctx->port = (MMPortSerial *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (ctx->port) {
         if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported &&
             CIND_INDICATOR_IS_VALID (MM_BROADBAND_MODEM (self)->priv->modem_cind_indicator_signal_quality))
@@ -1997,7 +1997,7 @@ modem_load_signal_quality (MMIfaceModem *self,
     }
 
     /* If no best AT port available (all connected), try with QCDM ports */
-    ctx->port = (MMSerialPort *)mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    ctx->port = (MMPortSerial *)mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
     if (ctx->port) {
         g_error_free (error);
         signal_quality_qcdm (ctx);
@@ -7599,17 +7599,17 @@ ports_context_unref (PortsContext *ctx)
     if (g_atomic_int_dec_and_test (&ctx->ref_count)) {
         if (ctx->primary) {
             if (ctx->primary_open)
-                mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
             g_object_unref (ctx->primary);
         }
         if (ctx->secondary) {
             if (ctx->secondary_open)
-                mm_serial_port_close (MM_SERIAL_PORT (ctx->secondary));
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->secondary));
             g_object_unref (ctx->secondary);
         }
         if (ctx->qcdm) {
             if (ctx->qcdm_open)
-                mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm));
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
             g_object_unref (ctx->qcdm);
         }
         g_free (ctx);
@@ -7679,7 +7679,7 @@ open_ports_initialization (MMBroadbandModem *self,
      * We do keep the primary port open during the whole initialization
      * sequence. Note that this port is not really passed to the interfaces,
      * they will get the primary port themselves. */
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
         g_prefix_error (error, "Couldn't open primary port: ");
         return FALSE;
     }
@@ -7846,7 +7846,7 @@ enabling_modem_init_ready (MMBroadbandModem *self,
 }
 
 static void
-enabling_flash_done (MMSerialPort *port,
+enabling_flash_done (MMPortSerial *port,
                      GError *error,
                      EnablingStartedContext *ctx)
 {
@@ -7895,7 +7895,7 @@ open_ports_enabling (MMBroadbandModem *self,
                       NULL);
 
 
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), error)) {
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
         g_prefix_error (error, "Couldn't open primary port: ");
         return FALSE;
     }
@@ -7910,7 +7910,7 @@ open_ports_enabling (MMBroadbandModem *self,
             g_object_set (ctx->secondary,
                           MM_AT_SERIAL_PORT_INIT_SEQUENCE_ENABLED, FALSE,
                           NULL);
-        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->secondary), error)) {
+        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
             g_prefix_error (error, "Couldn't open secondary port: ");
             return FALSE;
         }
@@ -7920,7 +7920,7 @@ open_ports_enabling (MMBroadbandModem *self,
     /* Open qcdm (optional) */
     ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
     if (ctx->qcdm) {
-        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm), error)) {
+        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), error)) {
             g_prefix_error (error, "Couldn't open QCDM port: ");
             return FALSE;
         }
@@ -7971,7 +7971,7 @@ enabling_started (MMBroadbandModem *self,
 
     /* Ports were correctly opened, now flash the primary port */
     mm_dbg ("Flashing primary AT port before enabling...");
-    mm_serial_port_flash (MM_SERIAL_PORT (ctx->ports->primary),
+    mm_port_serial_flash (MM_PORT_SERIAL (ctx->ports->primary),
                           100,
                           FALSE,
                           (MMSerialFlashFn)enabling_flash_done,

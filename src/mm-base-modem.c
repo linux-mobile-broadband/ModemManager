@@ -138,7 +138,7 @@ mm_base_modem_owns_port (MMBaseModem *self,
 }
 
 static void
-serial_port_timed_out_cb (MMSerialPort *port,
+serial_port_timed_out_cb (MMPortSerial *port,
                           guint n_consecutive_timeouts,
                           gpointer user_data)
 {

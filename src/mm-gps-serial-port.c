@@ -21,7 +21,7 @@
 #include "mm-gps-serial-port.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMGpsSerialPort, mm_gps_serial_port, MM_TYPE_SERIAL_PORT)
+G_DEFINE_TYPE (MMGpsSerialPort, mm_gps_serial_port, MM_TYPE_PORT_SERIAL)
 
 struct _MMGpsSerialPortPrivate {
     /* Trace handler data */
@@ -69,7 +69,7 @@ remove_eval_cb (const GMatchInfo *match_info,
 }
 
 static gboolean
-parse_response (MMSerialPort *port,
+parse_response (MMPortSerial *port,
                 GByteArray *response,
                 GError **error)
 {
@@ -132,7 +132,7 @@ parse_response (MMSerialPort *port,
 /*****************************************************************************/
 
 static void
-debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
+debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
 {
     static GString *debug = NULL;
     const char *s;
@@ -206,13 +206,13 @@ static void
 mm_gps_serial_port_class_init (MMGpsSerialPortClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMSerialPortClass *port_class = MM_SERIAL_PORT_CLASS (klass);
+    MMPortSerialClass *serial_class = MM_PORT_SERIAL_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMGpsSerialPortPrivate));
 
     /* Virtual methods */
     object_class->finalize = finalize;
 
-    port_class->parse_response = parse_response;
-    port_class->debug_log = debug_log;
+    serial_class->parse_response = parse_response;
+    serial_class->debug_log = debug_log;
 }

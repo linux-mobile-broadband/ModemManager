@@ -24,7 +24,7 @@
 #include "mm-at-serial-port.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_SERIAL_PORT)
+G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_PORT_SERIAL)
 
 #define MM_AT_SERIAL_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_AT_SERIAL_PORT, MMAtSerialPortPrivate))
 
@@ -121,7 +121,7 @@ mm_at_serial_port_remove_echo (GByteArray *response)
 }
 
 static gboolean
-parse_response (MMSerialPort *port, GByteArray *response, GError **error)
+parse_response (MMPortSerial *port, GByteArray *response, GError **error)
 {
     MMAtSerialPort *self = MM_AT_SERIAL_PORT (port);
     MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
@@ -152,7 +152,7 @@ parse_response (MMSerialPort *port, GByteArray *response, GError **error)
 }
 
 static gsize
-handle_response (MMSerialPort *port,
+handle_response (MMPortSerial *port,
                  GByteArray *response,
                  GError *error,
                  GCallback callback,
@@ -264,7 +264,7 @@ remove_eval_cb (const GMatchInfo *match_info,
 }
 
 static void
-parse_unsolicited (MMSerialPort *port, GByteArray *response)
+parse_unsolicited (MMPortSerial *port, GByteArray *response)
 {
     MMAtSerialPort *self = MM_AT_SERIAL_PORT (port);
     MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
@@ -369,7 +369,7 @@ mm_at_serial_port_queue_command (MMAtSerialPort *self,
     buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
     g_return_if_fail (buf != NULL);
 
-    mm_serial_port_queue_command (MM_SERIAL_PORT (self),
+    mm_port_serial_queue_command (MM_PORT_SERIAL (self),
                                   buf,
                                   TRUE,
                                   timeout_seconds,
@@ -397,7 +397,7 @@ mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
     buf = at_command_to_byte_array (command, is_raw, priv->send_lf);
     g_return_if_fail (buf != NULL);
 
-    mm_serial_port_queue_command_cached (MM_SERIAL_PORT (self),
+    mm_port_serial_queue_command_cached (MM_PORT_SERIAL (self),
                                          buf,
                                          TRUE,
                                          timeout_seconds,
@@ -407,7 +407,7 @@ mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
 }
 
 static void
-debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
+debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
 {
     static GString *debug = NULL;
     const char *s;
@@ -485,7 +485,7 @@ mm_at_serial_port_run_init_sequence (MMAtSerialPort *self)
 }
 
 static void
-config (MMSerialPort *self)
+config (MMPortSerial *self)
 {
     MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
 
@@ -600,7 +600,7 @@ static void
 mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMSerialPortClass *port_class = MM_SERIAL_PORT_CLASS (klass);
+    MMPortSerialClass *serial_class = MM_PORT_SERIAL_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMAtSerialPortPrivate));
 
@@ -609,11 +609,11 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
     object_class->get_property = get_property;
     object_class->finalize = finalize;
 
-    port_class->parse_unsolicited = parse_unsolicited;
-    port_class->parse_response = parse_response;
-    port_class->handle_response = handle_response;
-    port_class->debug_log = debug_log;
-    port_class->config = config;
+    serial_class->parse_unsolicited = parse_unsolicited;
+    serial_class->parse_response = parse_response;
+    serial_class->handle_response = handle_response;
+    serial_class->debug_log = debug_log;
+    serial_class->config = config;
 
     g_object_class_install_property
         (object_class, PROP_REMOVE_ECHO,

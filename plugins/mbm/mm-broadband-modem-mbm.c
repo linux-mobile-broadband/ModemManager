@@ -1209,7 +1209,9 @@ setup_ports (MMBroadbandModem *_self)
          * command mode.  F5521gw R2A07 resets port properties like echo when
          * flashed, leading to confusion.  bgo #650740
          */
-        g_object_set (G_OBJECT (ports[i]), MM_SERIAL_PORT_FLASH_OK, FALSE, NULL);
+        g_object_set (G_OBJECT (ports[i]),
+                      MM_PORT_SERIAL_FLASH_OK, FALSE,
+                      NULL);
 
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
