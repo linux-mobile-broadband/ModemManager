@@ -73,6 +73,7 @@ data/ModemManager.service
 data/ModemManager.pc
 data/mm-common.pc
 data/mm-glib.pc
+data/tests/org.freedesktop.ModemManager1.service
 
 include/ModemManager-names.h
 

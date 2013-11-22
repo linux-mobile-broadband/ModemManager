@@ -276,6 +276,8 @@ data/Makefile
 data/ModemManager.pc
 data/mm-glib.pc
 data/org.freedesktop.ModemManager1.policy.in
+data/tests/Makefile
+data/tests/org.freedesktop.ModemManager1.service
 include/Makefile
 include/ModemManager-version.h
 build-aux/Makefile

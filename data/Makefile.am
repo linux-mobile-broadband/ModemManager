@@ -1,4 +1,6 @@
 
+SUBDIRS = . tests
+
 edit = @sed \
        -e 's|@sbindir[@]|$(sbindir)|g' \
        -e 's|@sysconfdir[@]|$(sysconfdir)|g' \

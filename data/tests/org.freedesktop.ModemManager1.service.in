@@ -1,0 +1,5 @@
+# This D-Bus service activation file is only TESTS
+
+[D-BUS Service]
+Name=org.freedesktop.ModemManager1
+Exec=@abs_top_builddir@/src/ModemManager
