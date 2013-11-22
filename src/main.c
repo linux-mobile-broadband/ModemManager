@@ -64,6 +64,7 @@ bus_acquired_cb (GDBusConnection *connection,
     g_assert (!manager);
     manager = mm_manager_new (connection,
                               !mm_context_get_test_no_auto_scan (),
+                              mm_context_get_test_enable (),
                               &error);
     if (!manager) {
         mm_warn ("Could not create manager: %s", error->message);

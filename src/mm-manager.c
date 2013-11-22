@@ -25,6 +25,7 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 #include <mm-gdbus-manager.h>
+#include <mm-gdbus-test.h>
 
 #include "mm-manager.h"
 #include "mm-device.h"
@@ -43,6 +44,7 @@ enum {
     PROP_0,
     PROP_CONNECTION,
     PROP_AUTO_SCAN,
+    PROP_ENABLE_TEST,
     LAST_PROP
 };
 
@@ -51,6 +53,8 @@ struct _MMManagerPrivate {
     GDBusConnection *connection;
     /* Whether auto-scanning is enabled */
     gboolean auto_scan;
+    /* Whether the test interface is enabled */
+    gboolean enable_test;
     /* The UDev client */
     GUdevClient *udev;
     /* The authorization provider */
@@ -62,6 +66,9 @@ struct _MMManagerPrivate {
     GHashTable *devices;
     /* The Object Manager server */
     GDBusObjectManagerServer *object_manager;
+
+    /* The Test interface support */
+    MmGdbusTest *test_skeleton;
 };
 
 /*****************************************************************************/
@@ -569,6 +576,7 @@ mm_manager_num_modems (MMManager *self)
 }
 
 /*****************************************************************************/
+/* Set logging */
 
 typedef struct {
     MMManager *self;
@@ -628,6 +636,7 @@ handle_set_logging (MmGdbusOrgFreedesktopModemManager1 *manager,
 }
 
 /*****************************************************************************/
+/* Manual scan */
 
 typedef struct {
     MMManager *self;
@@ -681,9 +690,28 @@ handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
     return TRUE;
 }
 
+/*****************************************************************************/
+/* Test profile setup */
+
+static gboolean
+handle_set_profile (MmGdbusTest *skeleton,
+                    GDBusMethodInvocation *invocation,
+                    const gchar *id,
+                    const gchar *plugin_name,
+                    const gchar *const *ports,
+                    MMManager *self)
+{
+    mm_info ("Test profile set to: %s", profile);
+    mm_gdbus_test_complete_set_profile (skeleton, invocation);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 MMManager *
 mm_manager_new (GDBusConnection *connection,
                 gboolean auto_scan,
+                gboolean enable_test,
                 GError **error)
 {
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
@@ -693,6 +721,7 @@ mm_manager_new (GDBusConnection *connection,
                            error,
                            MM_MANAGER_CONNECTION, connection,
                            MM_MANAGER_AUTO_SCAN, auto_scan,
+                           MM_MANAGER_ENABLE_TEST, enable_test,
                            NULL);
 }
 
@@ -712,6 +741,9 @@ set_property (GObject *object,
         break;
     case PROP_AUTO_SCAN:
         priv->auto_scan = g_value_get_boolean (value);
+        break;
+    case PROP_ENABLE_TEST:
+        priv->enable_test = g_value_get_boolean (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -733,6 +765,9 @@ get_property (GObject *object,
         break;
     case PROP_AUTO_SCAN:
         g_value_set_boolean (value, priv->auto_scan);
+        break;
+    case PROP_ENABLE_TEST:
+        g_value_set_boolean (value, priv->enable_test);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -763,6 +798,9 @@ mm_manager_init (MMManager *manager)
 
     /* By default, enable autoscan */
     priv->auto_scan = TRUE;
+
+    /* By default, no test interface */
+    priv->enable_test = FALSE;
 
     /* Setup Object Manager Server */
     priv->object_manager = g_dbus_object_manager_server_new (MM_DBUS_PATH);
@@ -805,6 +843,20 @@ initable_init (GInitable *initable,
     g_dbus_object_manager_server_set_connection (priv->object_manager,
                                                  priv->connection);
 
+    /* Setup the Test skeleton and export the interface */
+    if (priv->enable_test) {
+        priv->test_skeleton = mm_gdbus_test_skeleton_new ();
+        g_signal_connect (priv->test_skeleton,
+                          "handle-set-profile",
+                          G_CALLBACK (handle_set_profile),
+                          initable);
+        if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (priv->test_skeleton),
+                                               priv->connection,
+                                               MM_DBUS_PATH,
+                                               error))
+            return FALSE;
+    }
+
     /* All good */
     return TRUE;
 }
@@ -824,6 +876,9 @@ finalize (GObject *object)
 
     if (priv->object_manager)
         g_object_unref (priv->object_manager);
+
+    if (priv->test_skeleton)
+        g_object_unref (priv->test_skeleton);
 
     if (priv->connection)
         g_object_unref (priv->connection);
@@ -871,5 +926,13 @@ mm_manager_class_init (MMManagerClass *manager_class)
                                "Auto scan",
                                "Automatically look for new devices",
                                TRUE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ENABLE_TEST,
+         g_param_spec_boolean (MM_MANAGER_ENABLE_TEST,
+                               "Enable tests",
+                               "Enable the Test interface",
+                               FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

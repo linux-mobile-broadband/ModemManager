@@ -141,6 +141,8 @@ ModemManager_CPPFLAGS = \
 	-I$(top_builddir)/libmm-glib \
 	-I${top_srcdir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated \
+	-I${top_srcdir}/libmm-glib/generated/tests \
+	-I${top_builddir}/libmm-glib/generated/tests \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
 ModemManager_LDADD = \
@@ -148,7 +150,8 @@ ModemManager_LDADD = \
 	$(GUDEV_LIBS) \
 	$(builddir)/libmodem-helpers.la \
 	$(builddir)/libport.la \
-	$(top_builddir)/libqcdm/src/libqcdm.la
+	$(top_builddir)/libqcdm/src/libqcdm.la \
+	$(top_builddir)/libmm-glib/generated/tests/libmm-test-generated.la
 
 nodist_ModemManager_SOURCES = \
 	mm-daemon-enums-types.h \

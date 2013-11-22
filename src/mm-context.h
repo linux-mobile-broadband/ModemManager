@@ -30,5 +30,6 @@ gboolean     mm_context_get_relative_timestamps (void);
 /* Testing support */
 gboolean     mm_context_get_test_session        (void);
 gboolean     mm_context_get_test_no_auto_scan   (void);
+gboolean     mm_context_get_test_enable         (void);
 
 #endif /* MM_CONTEXT_H */
