@@ -27,4 +27,7 @@ const gchar *mm_context_get_log_file            (void);
 gboolean     mm_context_get_timestamps          (void);
 gboolean     mm_context_get_relative_timestamps (void);
 
+/* Testing support */
+gboolean     mm_context_get_test_session        (void);
+
 #endif /* MM_CONTEXT_H */

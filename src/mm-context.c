@@ -17,7 +17,9 @@
 
 #include "mm-context.h"
 
+/*****************************************************************************/
 /* Application context */
+
 static gboolean debug;
 static const gchar *log_level;
 static const gchar *log_file;
@@ -63,6 +65,38 @@ mm_context_get_relative_timestamps (void)
     return rel_ts;
 }
 
+/*****************************************************************************/
+/* Test context */
+
+static gboolean test_session;
+
+static const GOptionEntry test_entries[] = {
+    { "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session, "Run in session DBus", NULL },
+    { NULL }
+};
+
+static GOptionGroup *
+test_get_option_group (void)
+{
+    GOptionGroup *group;
+
+    group = g_option_group_new ("test",
+                                "Test options",
+                                "Show Test options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, test_entries);
+    return group;
+}
+
+gboolean
+mm_context_get_test_session (void)
+{
+    return test_session;
+}
+
+/*****************************************************************************/
+
 void
 mm_context_init (gint argc,
                  gchar **argv)
@@ -70,17 +104,18 @@ mm_context_init (gint argc,
     GError *error = NULL;
     GOptionContext *ctx;
 
-	ctx = g_option_context_new (NULL);
-	g_option_context_set_summary (ctx, "DBus system service to communicate with modems.");
-	g_option_context_add_main_entries (ctx, entries, NULL);
+    ctx = g_option_context_new (NULL);
+    g_option_context_set_summary (ctx, "DBus system service to communicate with modems.");
+    g_option_context_add_main_entries (ctx, entries, NULL);
+    g_option_context_add_group (ctx, test_get_option_group ());
 
     if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
-		g_warning ("%s\n", error->message);
-		g_error_free (error);
+        g_warning ("%s\n", error->message);
+        g_error_free (error);
         exit (1);
-	}
+    }
 
-	g_option_context_free (ctx);
+    g_option_context_free (ctx);
 
     /* Additional setup to be done on debug mode */
     if (debug) {
