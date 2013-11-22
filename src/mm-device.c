@@ -34,6 +34,7 @@ enum {
     PROP_UDEV_DEVICE,
     PROP_PLUGIN,
     PROP_MODEM,
+    PROP_HOTPLUGGED,
     PROP_LAST
 };
 
@@ -624,15 +625,13 @@ mm_device_get_hotplugged (MMDevice *self)
 /*****************************************************************************/
 
 MMDevice *
-mm_device_new (GUdevDevice *udev_device, gboolean hotplugged)
+mm_device_new (GUdevDevice *udev_device,
+               gboolean hotplugged)
 {
-    MMDevice *device;
-
-    device = MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
-                                      MM_DEVICE_UDEV_DEVICE, udev_device,
-                                      NULL));
-    device->priv->hotplugged = hotplugged;
-    return device;
+    return  MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
+                                     MM_DEVICE_UDEV_DEVICE, udev_device,
+                                     MM_DEVICE_HOTPLUGGED, hotplugged,
+                                     NULL));
 }
 
 static void
@@ -666,6 +665,9 @@ set_property (GObject *object,
         g_clear_object (&(self->priv->modem));
         self->priv->modem = g_value_dup_object (value);
         break;
+    case PROP_HOTPLUGGED:
+        self->priv->hotplugged = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -689,6 +691,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
+        break;
+    case PROP_HOTPLUGGED:
+        g_value_set_boolean (value, self->priv->hotplugged);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -757,6 +762,14 @@ mm_device_class_init (MMDeviceClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    properties[PROP_HOTPLUGGED] =
+        g_param_spec_boolean (MM_DEVICE_HOTPLUGGED,
+                              "Hotplugged",
+                              "Whether the modem was hotplugged",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_HOTPLUGGED, properties[PROP_HOTPLUGGED]);
 
     signals[SIGNAL_PORT_GRABBED] =
         g_signal_new (MM_DEVICE_PORT_GRABBED,

@@ -37,6 +37,7 @@ typedef struct _MMDevicePrivate MMDevicePrivate;
 #define MM_DEVICE_UDEV_DEVICE "udev-device"
 #define MM_DEVICE_PLUGIN      "plugin"
 #define MM_DEVICE_MODEM       "modem"
+#define MM_DEVICE_HOTPLUGGED  "hotplugged"
 
 #define MM_DEVICE_PORT_GRABBED  "port-grabbed"
 #define MM_DEVICE_PORT_RELEASED "port-released"
@@ -58,7 +59,8 @@ struct _MMDeviceClass {
 
 GType mm_device_get_type (void);
 
-MMDevice *mm_device_new (GUdevDevice *udev_device, gboolean hotplugged);
+MMDevice *mm_device_new (GUdevDevice *udev_device,
+                         gboolean hotplugged);
 
 void     mm_device_grab_port    (MMDevice    *self,
                                  GUdevDevice *udev_port);
