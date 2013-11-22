@@ -175,7 +175,8 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* Only allow 'tty', 'net' and 'cdc-wdm' ports */
     if (!g_str_equal (subsys, "net") &&
         !g_str_equal (subsys, "tty") &&
-        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm"))) {
+        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm")) &&
+        !g_str_equal (subsys, "virtual")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
@@ -279,6 +280,18 @@ mm_base_modem_grab_port (MMBaseModem *self,
             return FALSE;
         }
     }
+    /* Virtual ports... */
+    else if (g_str_equal (subsys, "virtual")) {
+        port = MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_UNIX));
+
+        /* Set common response parser */
+        mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),
+                                               mm_serial_parser_v1_parse,
+                                               mm_serial_parser_v1_new (),
+                                               mm_serial_parser_v1_destroy);
+        /* Store flags already */
+        mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
+    }
     else
         /* We already filter out before all non-tty, non-net, non-cdc-wdm ports */
         g_assert_not_reached();
@@ -310,7 +323,8 @@ mm_base_modem_release_port (MMBaseModem *self,
 
     if (!g_str_equal (subsys, "tty") &&
         !g_str_equal (subsys, "net") &&
-        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm")))
+        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm")) &&
+        !g_str_equal (subsys, "virtual"))
         return;
 
     key = get_hash_key (subsys, name);
