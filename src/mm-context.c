@@ -69,9 +69,11 @@ mm_context_get_relative_timestamps (void)
 /* Test context */
 
 static gboolean test_session;
+static gboolean test_no_auto_scan;
 
 static const GOptionEntry test_entries[] = {
     { "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session, "Run in session DBus", NULL },
+    { "test-no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &test_no_auto_scan, "Don't auto-scan looking for devices", NULL },
     { NULL }
 };
 
@@ -93,6 +95,12 @@ gboolean
 mm_context_get_test_session (void)
 {
     return test_session;
+}
+
+gboolean
+mm_context_get_test_no_auto_scan (void)
+{
+    return test_no_auto_scan;
 }
 
 /*****************************************************************************/

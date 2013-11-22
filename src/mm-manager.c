@@ -42,12 +42,15 @@ G_DEFINE_TYPE_EXTENDED (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MOD
 enum {
     PROP_0,
     PROP_CONNECTION,
+    PROP_AUTO_SCAN,
     LAST_PROP
 };
 
 struct _MMManagerPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    /* Whether auto-scanning is enabled */
+    gboolean auto_scan;
     /* The UDev client */
     GUdevClient *udev;
     /* The authorization provider */
@@ -453,6 +456,9 @@ mm_manager_start (MMManager *manager,
     g_return_if_fail (manager != NULL);
     g_return_if_fail (MM_IS_MANAGER (manager));
 
+    if (!manager->priv->auto_scan && !manual_scan)
+        return;
+
     mm_dbg ("Starting %s device scan...", manual_scan ? "manual" : "automatic");
 
     devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
@@ -677,6 +683,7 @@ handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
 
 MMManager *
 mm_manager_new (GDBusConnection *connection,
+                gboolean auto_scan,
                 GError **error)
 {
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
@@ -685,6 +692,7 @@ mm_manager_new (GDBusConnection *connection,
                            NULL, /* cancellable */
                            error,
                            MM_MANAGER_CONNECTION, connection,
+                           MM_MANAGER_AUTO_SCAN, auto_scan,
                            NULL);
 }
 
@@ -701,6 +709,9 @@ set_property (GObject *object,
         if (priv->connection)
             g_object_unref (priv->connection);
         priv->connection = g_value_dup_object (value);
+        break;
+    case PROP_AUTO_SCAN:
+        priv->auto_scan = g_value_get_boolean (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -719,6 +730,9 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_CONNECTION:
         g_value_set_object (value, priv->connection);
+        break;
+    case PROP_AUTO_SCAN:
+        g_value_set_boolean (value, priv->auto_scan);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -746,7 +760,9 @@ mm_manager_init (MMManager *manager)
 
     /* Setup UDev client */
     priv->udev = g_udev_client_new (subsys);
-    g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
+
+    /* By default, enable autoscan */
+    priv->auto_scan = TRUE;
 
     /* Setup Object Manager Server */
     priv->object_manager = g_dbus_object_manager_server_new (MM_DBUS_PATH);
@@ -768,6 +784,10 @@ initable_init (GInitable *initable,
                GError **error)
 {
     MMManagerPrivate *priv = MM_MANAGER (initable)->priv;
+
+    /* If autoscan enabled, list for udev events */
+    if (priv->auto_scan)
+        g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
 
     /* Create plugin manager */
     priv->plugin_manager = mm_plugin_manager_new (error);
@@ -836,6 +856,7 @@ mm_manager_class_init (MMManagerClass *manager_class)
     object_class->finalize = finalize;
 
     /* Properties */
+
     g_object_class_install_property
         (object_class, PROP_CONNECTION,
          g_param_spec_object (MM_MANAGER_CONNECTION,
@@ -843,4 +864,12 @@ mm_manager_class_init (MMManagerClass *manager_class)
                               "GDBus connection to the system bus.",
                               G_TYPE_DBUS_CONNECTION,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+
+    g_object_class_install_property
+        (object_class, PROP_AUTO_SCAN,
+         g_param_spec_boolean (MM_MANAGER_AUTO_SCAN,
+                               "Auto scan",
+                               "Automatically look for new devices",
+                               TRUE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
