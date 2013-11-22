@@ -51,6 +51,28 @@ struct _MMPluginManagerPrivate {
 };
 
 /*****************************************************************************/
+/* Look for plugin */
+
+MMPlugin *
+mm_plugin_manager_peek_plugin (MMPluginManager *self,
+                               const gchar *plugin_name)
+{
+    GList *l;
+
+    if (self->priv->generic && g_str_equal (plugin_name, mm_plugin_get_name (self->priv->generic)))
+        return self->priv->generic;
+
+    for (l = self->priv->plugins; l; l = g_list_next (l)) {
+        MMPlugin *plugin = MM_PLUGIN (l->data);
+
+        if (g_str_equal (plugin_name, mm_plugin_get_name (plugin)))
+            return plugin;
+    }
+
+    return NULL;
+}
+
+/*****************************************************************************/
 /* Find device support */
 
 typedef struct {
