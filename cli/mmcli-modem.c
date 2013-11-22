@@ -266,6 +266,7 @@ print_modem_info (void)
     MMUnlockRetries *unlock_retries;
     guint signal_quality = 0;
     gboolean signal_quality_recent = FALSE;
+    gchar *bearer_paths_string;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
@@ -350,6 +351,15 @@ print_modem_info (void)
 
     /* Get signal quality info */
     signal_quality = mm_modem_get_signal_quality (ctx->modem, &signal_quality_recent);
+
+    if (mm_modem_get_bearer_paths (ctx->modem)) {
+        bearer_paths_string = g_strjoinv (", ", (gchar **)mm_modem_get_bearer_paths (ctx->modem));
+        if (!bearer_paths_string[0]) {
+            g_free (bearer_paths_string);
+            bearer_paths_string = NULL;
+        }
+    } else
+        bearer_paths_string = NULL;
 
     /* Global IDs */
     g_print ("\n"
@@ -500,6 +510,12 @@ print_modem_info (void)
              VALIDATE_PATH (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
+    /* Bearers */
+    g_print ("  -------------------------\n"
+             "  Bearers  |          paths: '%s'\n",
+             VALIDATE_PATH (bearer_paths_string));
+    g_print ("\n");
+
     g_free (ports_string);
     g_free (supported_ip_families_string);
     g_free (current_bands_string);
@@ -514,6 +530,7 @@ print_modem_info (void)
     g_free (unlock_retries_string);
     g_free (own_numbers_string);
     g_free (drivers_string);
+    g_free (bearer_paths_string);
 }
 
 static void
