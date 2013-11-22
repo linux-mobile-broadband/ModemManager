@@ -836,10 +836,14 @@ mm_plugin_create_modem (MMPlugin  *self,
                         MMDevice *device,
                         GError   **error)
 {
-    MMBaseModem *modem = NULL;
-    GList *port_probes, *l;
+    MMBaseModem *modem;
+    GList *port_probes = NULL;
+    const gchar **virtual_ports = NULL;
 
-    port_probes = mm_device_peek_port_probe_list (device);
+    if (!mm_device_is_virtual (device))
+        port_probes = mm_device_peek_port_probe_list (device);
+    else
+        virtual_ports = mm_device_virtual_peek_ports (device);
 
     /* Let the plugin create the modem from the port probe results */
     modem = MM_PLUGIN_GET_CLASS (self)->create_modem (MM_PLUGIN (self),
@@ -849,8 +853,13 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                       mm_device_get_product (device),
                                                       port_probes,
                                                       error);
-    if (modem) {
-        mm_base_modem_set_hotplugged (modem, mm_device_get_hotplugged (device));
+    if (!modem)
+        return NULL;
+
+    mm_base_modem_set_hotplugged (modem, mm_device_get_hotplugged (device));
+
+    if (port_probes) {
+        GList *l;
 
         /* Grab each port */
         for (l = port_probes; l; l = g_list_next (l)) {
@@ -911,11 +920,29 @@ mm_plugin_create_modem (MMPlugin  *self,
                 g_clear_error (&inner_error);
             }
         }
+    } else if (virtual_ports) {
+        guint i;
 
-        /* If organizing ports fails, consider the modem invalid */
-        if (!mm_base_modem_organize_ports (modem, error))
-            g_clear_object (&modem);
+        for (i = 0; virtual_ports[i]; i++) {
+            GError *inner_error = NULL;
+
+            if (!mm_base_modem_grab_port (modem,
+                                          "virtual",
+                                          virtual_ports[i],
+                                          MM_PORT_TYPE_AT,
+                                          MM_PORT_SERIAL_AT_FLAG_NONE,
+                                          &inner_error)) {
+                mm_warn ("Could not grab port (virtual/%s): '%s'",
+                         virtual_ports[i],
+                         inner_error ? inner_error->message : "unknown error");
+                g_clear_error (&inner_error);
+            }
+        }
     }
+
+    /* If organizing ports fails, consider the modem invalid */
+    if (!mm_base_modem_organize_ports (modem, error))
+        g_clear_object (&modem);
 
     return modem;
 }
