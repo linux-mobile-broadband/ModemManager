@@ -295,7 +295,8 @@ mm_base_modem_release_port (MMBaseModem *self,
     g_return_if_fail (subsys != NULL);
 
     if (!g_str_equal (subsys, "tty") &&
-        !g_str_equal (subsys, "net"))
+        !g_str_equal (subsys, "net") &&
+        !(g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm")))
         return;
 
     key = get_hash_key (subsys, name);
