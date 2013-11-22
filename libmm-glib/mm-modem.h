@@ -87,6 +87,9 @@ guint              mm_modem_get_max_bearers          (MMModem *self);
 
 guint              mm_modem_get_max_active_bearers   (MMModem *self);
 
+const gchar * const *mm_modem_get_bearer_paths       (MMModem *self);
+gchar              **mm_modem_dup_bearer_paths       (MMModem *self);
+
 const gchar       *mm_modem_get_manufacturer         (MMModem *self);
 gchar             *mm_modem_dup_manufacturer         (MMModem *self);
 

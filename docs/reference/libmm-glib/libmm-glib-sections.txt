@@ -113,6 +113,8 @@ mm_modem_peek_unlock_retries
 mm_modem_get_unlock_retries
 mm_modem_get_max_bearers
 mm_modem_get_max_active_bearers
+mm_modem_get_bearer_paths
+mm_modem_dup_bearer_paths
 mm_modem_get_own_numbers
 mm_modem_dup_own_numbers
 mm_modem_peek_supported_modes

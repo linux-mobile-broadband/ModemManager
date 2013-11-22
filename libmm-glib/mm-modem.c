@@ -341,6 +341,45 @@ mm_modem_get_max_active_bearers (MMModem *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_bearer_paths:
+ * @self: A #MMModem.
+ *
+ * Gets the DBus paths of the #MMBearer handled in this #MMModem.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_dup_bearer_paths() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The DBus paths of the #MMBearer handled in this #MMModem, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar * const *
+mm_modem_get_bearer_paths (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    return mm_gdbus_modem_get_bearers (MM_GDBUS_MODEM (self));
+}
+
+/**
+ * mm_modem_dup_bearer_paths:
+ * @self: A #MMModem.
+ *
+ * Gets a copy of the DBus paths of the #MMBearer handled in this #MMModem.
+ *
+ * Returns: (transfer full): The DBus paths of the #MMBearer handled in this #MMModem, or %NULL if none available. The returned value should be freed with g_strfreev().
+ */
+gchar **
+mm_modem_dup_bearer_paths (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    return mm_gdbus_modem_dup_bearers (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_get_manufacturer:
  * @self: A #MMModem.
  *
