@@ -701,8 +701,58 @@ handle_set_profile (MmGdbusTest *skeleton,
                     const gchar *const *ports,
                     MMManager *self)
 {
-    mm_info ("Test profile set to: %s", profile);
-    mm_gdbus_test_complete_set_profile (skeleton, invocation);
+    MMPlugin *plugin;
+    MMDevice *device;
+    gchar *physdev;
+    GError *error = NULL;
+
+    mm_info ("Test profile set to: '%s'", id);
+
+    /* Create device and keep it listed in the Manager */
+    physdev = g_strdup_printf ("/virtual/%s", id);
+    device = mm_device_virtual_new (physdev, TRUE);
+    g_hash_table_insert (self->priv->devices,
+                         g_strdup (physdev),
+                         device);
+
+    /* Grab virtual ports */
+    mm_device_virtual_grab_ports (device, (const gchar **)ports);
+
+    /* Set plugin to use */
+    plugin = mm_plugin_manager_peek_plugin (self->priv->plugin_manager, plugin_name);
+    if (!plugin) {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_NOT_FOUND,
+                             "Requested plugin '%s' not found",
+                             plugin_name);
+        mm_warn ("Couldn't set plugin for virtual device at '%s': %s",
+                 mm_device_get_path (device),
+                 error->message);
+        goto out;
+    }
+    mm_device_set_plugin (device, G_OBJECT (plugin));
+
+    /* Create modem */
+    if (!mm_device_create_modem (device, self->priv->object_manager, &error)) {
+        mm_warn ("Couldn't create modem for virtual device at '%s': %s",
+                 mm_device_get_path (device),
+                 error->message);
+        goto out;
+    }
+
+    mm_info ("Modem for virtual device at '%s' successfully created",
+             mm_device_get_path (device));
+
+out:
+
+    if (error) {
+        mm_device_remove_modem (device);
+        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+        g_dbus_method_invocation_return_gerror (invocation, error);
+        g_error_free (error);
+    } else
+        mm_gdbus_test_complete_set_profile (skeleton, invocation);
+
     return TRUE;
 }
 
