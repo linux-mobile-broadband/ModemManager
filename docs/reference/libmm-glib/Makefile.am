@@ -28,6 +28,7 @@ CFILE_GLOB =
 IGNORE_HFILES = \
 	mm-helpers.h \
 	mm-common-helpers.h \
+	mm-gdbus-test.h \
 	$(NULL)
 
 # CFLAGS and LDFLAGS for compiling scan program. Only needed
@@ -45,7 +46,13 @@ GTKDOC_LIBS = \
 	$(NULL)
 
 # Extra options to supply to gtkdoc-mkdb
-MKDB_OPTIONS = --output-format=xml --sgml-mode --name-space=mm
+MKDB_OPTIONS = \
+	--output-format=xml \
+	--sgml-mode \
+	--name-space=mm \
+	--ignore-files=mm-gdbus-test.h \
+	--ignore-files=mm-gdbus-test.c \
+	$(NULL)
 
 # Images to copy into HTML directory
 HTML_IMAGES = \

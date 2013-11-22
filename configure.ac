@@ -302,6 +302,7 @@ docs/reference/libmm-glib/Makefile
 docs/reference/libmm-glib/version.xml
 libmm-glib/Makefile
 libmm-glib/generated/Makefile
+libmm-glib/generated/tests/Makefile
 libmm-glib/tests/Makefile
 vapi/Makefile
 cli/Makefile

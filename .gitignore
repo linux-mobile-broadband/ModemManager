@@ -37,6 +37,7 @@ libmm-glib/generated/mm-enums-types.[ch]
 libmm-glib/generated/mm-errors-types.[ch]
 libmm-glib/generated/mm-errors-quarks.c
 libmm-glib/generated/*.xml
+libmm-glib/generated/tests/mm-gdbus-*.[ch]
 libmm-glib/tests/test-common-helpers
 libmm-glib/*.gir
 libmm-glib/*.typelib

@@ -1,4 +1,6 @@
 
+SUBDIRS = . tests
+
 noinst_LTLIBRARIES = libmm-generated.la
 
 GENERATED_H = \
