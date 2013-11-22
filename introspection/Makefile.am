@@ -1,3 +1,6 @@
+
+SUBDIRS = . tests
+
 # DBus Introspection files
 XMLS = $(wildcard *.xml)
 xmldir = $(datadir)/dbus-1/interfaces

@@ -291,6 +291,7 @@ plugins/Makefile
 uml290/Makefile
 test/Makefile
 introspection/Makefile
+introspection/tests/Makefile
 po/Makefile.in
 docs/Makefile
 docs/man/Makefile

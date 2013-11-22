@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.1 Interface Specification
+
+   Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Test:
+      @short_description: The ModemManager TEST interface.
+
+      The TEST interface defines operations to run ModemManager in a test setup.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Test">
+
+    <!--
+        SetProfile:
+
+        If the message has not yet been sent, queue it for delivery.
+    -->
+    <method name="SetProfile">
+      <arg name="id"     type="s"  direction="in" />
+      <arg name="plugin" type="s"  direction="in" />
+      <arg name="ports"  type="as" direction="in" />
+    </method>
+
+  </interface>
+</node>
