@@ -63,6 +63,7 @@ bus_acquired_cb (GDBusConnection *connection,
     /* Create Manager object */
     g_assert (!manager);
     manager = mm_manager_new (connection,
+                              mm_context_get_test_plugin_dir (),
                               !mm_context_get_test_no_auto_scan (),
                               mm_context_get_test_enable (),
                               &error);

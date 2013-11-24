@@ -39,9 +39,18 @@ static void initable_iface_init (GInitableIface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
-                                               initable_iface_init));
+                                               initable_iface_init))
+
+enum {
+    PROP_0,
+    PROP_PLUGIN_DIR,
+    LAST_PROP
+};
 
 struct _MMPluginManagerPrivate {
+    /* Path to look for plugins */
+    gchar *plugin_dir;
+
     /* This list contains all plugins except for the generic one, order is not
      * important. It is loaded once when the program starts, and the list is NOT
      * expected to change after that.*/
@@ -805,10 +814,10 @@ load_plugins (MMPluginManager *self,
 	}
 
     /* Get printable UTF-8 string of the path */
-    plugindir_display = g_filename_display_name (PLUGINDIR);
+    plugindir_display = g_filename_display_name (self->priv->plugin_dir);
 
     mm_dbg ("Looking for plugins in '%s'", plugindir_display);
-    dir = g_dir_open (PLUGINDIR, 0, NULL);
+    dir = g_dir_open (self->priv->plugin_dir, 0, NULL);
     if (!dir) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -825,7 +834,7 @@ load_plugins (MMPluginManager *self,
         if (!g_str_has_suffix (fname, G_MODULE_SUFFIX))
             continue;
 
-        path = g_module_build_path (PLUGINDIR, fname);
+        path = g_module_build_path (self->priv->plugin_dir, fname);
         plugin = load_plugin (path);
         g_free (path);
 
@@ -869,11 +878,13 @@ out:
 }
 
 MMPluginManager *
-mm_plugin_manager_new (GError **error)
+mm_plugin_manager_new (const gchar *plugin_dir,
+                       GError **error)
 {
     return g_initable_new (MM_TYPE_PLUGIN_MANAGER,
                            NULL,
                            error,
+                           MM_PLUGIN_MANAGER_PLUGIN_DIR, plugin_dir,
                            NULL);
 }
 
@@ -884,6 +895,43 @@ mm_plugin_manager_init (MMPluginManager *manager)
     manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
                                                  MM_TYPE_PLUGIN_MANAGER,
                                                  MMPluginManagerPrivate);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMPluginManagerPrivate *priv = MM_PLUGIN_MANAGER (object)->priv;
+
+    switch (prop_id) {
+    case PROP_PLUGIN_DIR:
+        g_free (priv->plugin_dir);
+        priv->plugin_dir = g_value_dup_string (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMPluginManagerPrivate *priv = MM_PLUGIN_MANAGER (object)->priv;
+
+    switch (prop_id) {
+    case PROP_PLUGIN_DIR:
+        g_value_set_string (value, priv->plugin_dir);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static gboolean
@@ -907,6 +955,9 @@ dispose (GObject *object)
     }
     g_clear_object (&self->priv->generic);
 
+    g_free (self->priv->plugin_dir);
+    self->priv->plugin_dir = NULL;
+
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->dispose (object);
 }
 
@@ -925,4 +976,15 @@ mm_plugin_manager_class_init (MMPluginManagerClass *manager_class)
 
     /* Virtual methods */
     object_class->dispose = dispose;
+    object_class->set_property = set_property;
+    object_class->get_property = get_property;
+
+    /* Properties */
+    g_object_class_install_property
+        (object_class, PROP_PLUGIN_DIR,
+         g_param_spec_string (MM_PLUGIN_MANAGER_PLUGIN_DIR,
+                              "Plugin directory",
+                              "Where to look for plugins",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

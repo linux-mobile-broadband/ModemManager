@@ -45,6 +45,7 @@ enum {
     PROP_CONNECTION,
     PROP_AUTO_SCAN,
     PROP_ENABLE_TEST,
+    PROP_PLUGIN_DIR,
     LAST_PROP
 };
 
@@ -55,6 +56,8 @@ struct _MMManagerPrivate {
     gboolean auto_scan;
     /* Whether the test interface is enabled */
     gboolean enable_test;
+    /* Path to look for plugins */
+    gchar *plugin_dir;
     /* The UDev client */
     GUdevClient *udev;
     /* The authorization provider */
@@ -760,6 +763,7 @@ out:
 
 MMManager *
 mm_manager_new (GDBusConnection *connection,
+                const gchar *plugin_dir,
                 gboolean auto_scan,
                 gboolean enable_test,
                 GError **error)
@@ -770,6 +774,7 @@ mm_manager_new (GDBusConnection *connection,
                            NULL, /* cancellable */
                            error,
                            MM_MANAGER_CONNECTION, connection,
+                           MM_MANAGER_PLUGIN_DIR, plugin_dir,
                            MM_MANAGER_AUTO_SCAN, auto_scan,
                            MM_MANAGER_ENABLE_TEST, enable_test,
                            NULL);
@@ -795,6 +800,10 @@ set_property (GObject *object,
     case PROP_ENABLE_TEST:
         priv->enable_test = g_value_get_boolean (value);
         break;
+    case PROP_PLUGIN_DIR:
+        g_free (priv->plugin_dir);
+        priv->plugin_dir = g_value_dup_string (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -818,6 +827,9 @@ get_property (GObject *object,
         break;
     case PROP_ENABLE_TEST:
         g_value_set_boolean (value, priv->enable_test);
+        break;
+    case PROP_PLUGIN_DIR:
+        g_value_set_string (value, priv->plugin_dir);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -878,7 +890,7 @@ initable_init (GInitable *initable,
         g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
 
     /* Create plugin manager */
-    priv->plugin_manager = mm_plugin_manager_new (error);
+    priv->plugin_manager = mm_plugin_manager_new (priv->plugin_dir, error);
     if (!priv->plugin_manager)
         return FALSE;
 
@@ -915,6 +927,8 @@ static void
 finalize (GObject *object)
 {
     MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+
+    g_free (priv->plugin_dir);
 
     g_hash_table_destroy (priv->devices);
 
@@ -985,4 +999,12 @@ mm_manager_class_init (MMManagerClass *manager_class)
                                "Enable the Test interface",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_PLUGIN_DIR,
+         g_param_spec_string (MM_MANAGER_PLUGIN_DIR,
+                              "Plugin directory",
+                              "Where to look for plugins",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

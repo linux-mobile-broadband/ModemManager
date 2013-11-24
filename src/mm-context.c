@@ -71,11 +71,13 @@ mm_context_get_relative_timestamps (void)
 static gboolean test_session;
 static gboolean test_no_auto_scan;
 static gboolean test_enable;
+static gchar *test_plugin_dir;
 
 static const GOptionEntry test_entries[] = {
     { "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session, "Run in session DBus", NULL },
     { "test-no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &test_no_auto_scan, "Don't auto-scan looking for devices", NULL },
     { "test-enable", 0, 0, G_OPTION_ARG_NONE, &test_enable, "Enable the Test interface in the daemon", NULL },
+    { "test-plugin-dir", 0, 0, G_OPTION_ARG_STRING, &test_plugin_dir, "Path to look for plugins", "[PATH]" },
     { NULL }
 };
 
@@ -109,6 +111,12 @@ gboolean
 mm_context_get_test_enable (void)
 {
     return test_enable;
+}
+
+const gchar *
+mm_context_get_test_plugin_dir (void)
+{
+    return test_plugin_dir ? test_plugin_dir : PLUGINDIR;
 }
 
 /*****************************************************************************/
