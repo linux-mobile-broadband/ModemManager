@@ -37,10 +37,55 @@ udevrules_DATA =
 # Unit tests
 noinst_PROGRAMS =
 
+# Helper libs
+noinst_LTLIBRARIES =
+
+########################################
+
+# Common service test support
+
+noinst_LTLIBRARIES += libmm-test-common.la
+
+libmm_test_common_la_SOURCES = \
+	tests/test-fixture.h \
+	tests/test-fixture.c \
+	tests/test-port-context.h \
+	tests/test-port-context.c
+
+libmm_test_common_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_srcdir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated/tests \
+	-DTEST_SERVICES=\""$(abs_top_builddir)/data/tests"\"
+
+libmm_test_common_la_LIBADD = \
+	${top_builddir}/libmm-glib/generated/tests/libmm-test-generated.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la
+
+TEST_COMMON_COMPILER_FLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/plugins/tests \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-glib \
+	-I$(top_srcdir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated \
+	-I$(top_builddir)/libmm-glib/generated/tests \
+	-DCOMMON_GSM_PORT_CONF=\""$(abs_top_srcdir)/plugins/tests/gsm-port.conf"\"
+
+TEST_COMMON_LIBADD_FLAGS = \
+	$(builddir)/libmm-test-common.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la
+
+
 ########################################
 
 # Icera-specific support
-noinst_LTLIBRARIES = libmm-utils-icera.la
+noinst_LTLIBRARIES += libmm-utils-icera.la
 libmm_utils_icera_la_SOURCES = \
 	icera/mm-broadband-modem-icera.h \
 	icera/mm-broadband-modem-icera.c \
@@ -89,6 +134,12 @@ libmm_plugin_generic_la_SOURCES = \
 	generic/mm-plugin-generic.h
 libmm_plugin_generic_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+noinst_PROGRAMS += test-service-generic
+test_service_generic_SOURCES = generic/tests/test-service-generic.c
+test_service_generic_CPPFLAGS = $(TEST_COMMON_COMPILER_FLAGS)
+test_service_generic_LDADD = $(TEST_COMMON_LIBADD_FLAGS)
+test_service_generic_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ## Motorola
 libmm_plugin_motorola_la_SOURCES = \
