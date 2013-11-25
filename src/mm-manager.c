@@ -789,11 +789,28 @@ set_property (GObject *object,
     MMManagerPrivate *priv = MM_MANAGER (object)->priv;
 
     switch (prop_id) {
-    case PROP_CONNECTION:
-        if (priv->connection)
+    case PROP_CONNECTION: {
+        gboolean had_connection = FALSE;
+
+        if (priv->connection) {
+            had_connection = TRUE;
             g_object_unref (priv->connection);
+        }
         priv->connection = g_value_dup_object (value);
+        /* Propagate connection loss to subobjects */
+        if (had_connection && !priv->connection) {
+            if (priv->object_manager) {
+                mm_dbg ("Stopping connection in object manager server");
+                g_dbus_object_manager_server_set_connection (priv->object_manager, NULL);
+            }
+            if (priv->test_skeleton &&
+                g_dbus_interface_skeleton_get_connection (G_DBUS_INTERFACE_SKELETON (priv->test_skeleton))) {
+                mm_dbg ("Stopping connection in test skeleton");
+                g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (priv->test_skeleton));
+            }
+        }
         break;
+    }
     case PROP_AUTO_SCAN:
         priv->auto_scan = g_value_get_boolean (value);
         break;

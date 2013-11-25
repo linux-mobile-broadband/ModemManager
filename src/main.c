@@ -44,6 +44,10 @@ static gboolean
 quit_cb (gpointer user_data)
 {
 	mm_info ("Caught signal, shutting down...");
+
+    if (manager)
+        g_object_set (manager, MM_MANAGER_CONNECTION, NULL, NULL);
+
     if (loop)
         g_idle_add ((GSourceFunc) g_main_loop_quit, loop);
     else
@@ -99,6 +103,9 @@ name_lost_cb (GDBusConnection *connection,
                  "the message bus daemon is running!");
     else
         mm_warn ("Could not acquire the '%s' service name", name);
+
+    if (manager)
+        g_object_set (manager, MM_MANAGER_CONNECTION, NULL, NULL);
 
     g_main_loop_quit (loop);
 }
