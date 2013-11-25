@@ -27,6 +27,7 @@
 #include <mm-errors-types.h>
 #include <mm-gdbus-modem.h>
 
+#include "mm-context.h"
 #include "mm-base-modem.h"
 
 #include "mm-log.h"
@@ -1422,6 +1423,15 @@ mm_base_modem_authorize (MMBaseModem *self,
                                         callback,
                                         user_data,
                                         mm_base_modem_authorize);
+
+    /* When running in the session bus for tests, default to always allow */
+    if (mm_context_get_test_session ()) {
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
     mm_auth_provider_authorize (self->priv->authp,
                                 invocation,
                                 authorization,
