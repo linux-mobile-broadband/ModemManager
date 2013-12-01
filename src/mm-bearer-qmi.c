@@ -344,6 +344,9 @@ get_current_settings_ready (QmiClientWds *client,
             success = qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error);
             print_address4 (success, " DNS #2", addr, error);
             g_clear_error (&error);
+        } else {
+            /* no IPv4 configuration */
+            g_clear_error (&error);
         }
 
         /* If the message has an IPv6 address, print IPv6 settings */
@@ -367,6 +370,9 @@ get_current_settings_ready (QmiClientWds *client,
             /* IPv6 DNS #2 */
             success = qmi_message_wds_get_current_settings_output_get_ipv6_secondary_dns_address (output, &array, &error);
             print_address6 (success, " DNS #2", array, 0, error);
+            g_clear_error (&error);
+        } else {
+            /* no IPv6 configuration */
             g_clear_error (&error);
         }
 
