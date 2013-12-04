@@ -14,6 +14,7 @@
  */
 
 #include "mm-modem-helpers-mbim.h"
+#include "mm-modem-helpers.h"
 #include "mm-enums-types.h"
 #include "mm-errors-types.h"
 #include "mm-log.h"
@@ -123,6 +124,53 @@ mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
      */
 
     return mask;
+}
+
+/*****************************************************************************/
+
+MMModem3gppNetworkAvailability
+mm_modem_3gpp_network_availability_from_mbim_provider_state (MbimProviderState state)
+{
+    switch (state) {
+    case MBIM_PROVIDER_STATE_HOME:
+    case MBIM_PROVIDER_STATE_PREFERRED:
+    case MBIM_PROVIDER_STATE_VISIBLE:
+    case MBIM_PROVIDER_STATE_PREFERRED_MULTICARRIER:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE;
+    case MBIM_PROVIDER_STATE_REGISTERED:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT;
+    case MBIM_PROVIDER_STATE_FORBIDDEN:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN;
+    case MBIM_PROVIDER_STATE_UNKNOWN:
+    default:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
+GList *
+mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const *providers, guint n_providers)
+{
+    GList *info_list = NULL;
+    guint i;
+
+    g_return_val_if_fail (providers != NULL, NULL);
+
+    for (i = 0; i < n_providers; i++) {
+        MM3gppNetworkInfo *info;
+
+        info = g_new0 (MM3gppNetworkInfo, 1);
+        info->status = mm_modem_3gpp_network_availability_from_mbim_provider_state (providers[i]->provider_state);
+        info->operator_long = g_strdup (providers[i]->provider_name);
+        info->operator_short = g_strdup (providers[i]->provider_name);
+        info->operator_code = g_strdup (providers[i]->provider_id);
+        info->access_tech = mm_modem_access_technology_from_mbim_data_class (providers[i]->cellular_class);
+
+        info_list = g_list_append (info_list, info);
+    }
+
+    return info_list;
 }
 
 /*****************************************************************************/

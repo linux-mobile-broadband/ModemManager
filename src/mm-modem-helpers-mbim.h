@@ -30,6 +30,10 @@ MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_mbim_register
 
 MMModemAccessTechnology mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class);
 
+MMModem3gppNetworkAvailability mm_modem_3gpp_network_availability_from_mbim_provider_state (MbimProviderState state);
+
+GList *mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const *providers, guint n_providers);
+
 GError *mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error);
 
 /*****************************************************************************/
