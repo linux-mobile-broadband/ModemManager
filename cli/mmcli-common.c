@@ -476,7 +476,7 @@ mmcli_get_bearer (GDBusConnection *connection,
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
                                              callback,
                                              user_data,
-                                             mmcli_get_modem);
+                                             mmcli_get_bearer);
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_bearer_manager_ready,
@@ -714,7 +714,7 @@ mmcli_get_sim (GDBusConnection *connection,
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
                                              callback,
                                              user_data,
-                                             mmcli_get_modem);
+                                             mmcli_get_sim);
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_sim_manager_ready,
@@ -977,7 +977,7 @@ mmcli_get_sms (GDBusConnection *connection,
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
                                              callback,
                                              user_data,
-                                             mmcli_get_modem);
+                                             mmcli_get_sms);
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_sms_manager_ready,
