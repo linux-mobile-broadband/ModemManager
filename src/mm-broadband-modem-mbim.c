@@ -261,7 +261,7 @@ modem_load_model (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_load_manufacturer);
+                                        modem_load_model);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -1487,7 +1487,7 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_load_unlock_retries);
+                                        modem_3gpp_load_enabled_facility_locks);
 
     message = mbim_message_pin_list_query_new (NULL);
     mbim_device_command (device,
@@ -2277,7 +2277,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_3gpp_run_registration_checks);
+                                        modem_3gpp_register_in_network);
 
     if (operator_id && operator_id[0])
         message = (mbim_message_register_state_set_new (
