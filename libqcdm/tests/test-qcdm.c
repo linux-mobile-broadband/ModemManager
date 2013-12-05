@@ -100,6 +100,7 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_com_read_roam_pref, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_read_mode_pref, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_read_hybrid_pref, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_read_ipv6_enabled, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_read_hdr_rev_pref, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_status, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_sw_version, data->com_data));

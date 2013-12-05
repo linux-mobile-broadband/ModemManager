@@ -698,6 +698,61 @@ test_com_read_hybrid_pref (void *f, void *data)
 }
 
 void
+test_com_read_ipv6_enabled (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    int err = QCDM_SUCCESS;
+    char buf[512];
+    guint8 pref;
+    const char *msg;
+    gint len;
+    QcdmResult *result;
+    gsize reply_len;
+
+    len = qcdm_cmd_nv_get_ipv6_enabled_new (buf, sizeof (buf));
+    g_assert (len > 0);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nv_get_ipv6_enabled_result (buf, reply_len, &err);
+    if (!result) {
+        if (   err == -QCDM_ERROR_NVCMD_FAILED
+            || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE
+            || err == -QCDM_ERROR_NV_ERROR_BAD_PARAMETER)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
+    }
+
+    g_print ("\n");
+
+    err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_IPV6_ENABLED_ITEM_ENABLED, &pref);
+    g_assert_cmpint (err, ==, QCDM_SUCCESS);
+
+    switch (pref) {
+    case QCDM_CMD_NV_IPV6_ENABLED_OFF:
+        msg = "disabled";
+        break;
+    case QCDM_CMD_NV_IPV6_ENABLED_ON:
+        msg = "enabled";
+        break;
+    default:
+        msg = "unknown";
+        break;
+    }
+    g_message ("%s: IPv6 preference: 0x%02X (%s)", __func__, pref, msg);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_read_hdr_rev_pref (void *f, void *data)
 {
     TestComData *d = data;
