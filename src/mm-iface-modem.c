@@ -1494,7 +1494,7 @@ get_updated_consolidated_state (MMIfaceModem *self,
 
     /* Reported subsystem states will be REGISTRATION-related. This means
      * that we would only expect a subset of the states being reported for
-     * the subystem. Warn if we get others */
+     * the subsystem. Warn if we get others */
     g_warn_if_fail (subsystem_state == MM_MODEM_STATE_ENABLED ||
                     subsystem_state == MM_MODEM_STATE_SEARCHING ||
                     subsystem_state == MM_MODEM_STATE_REGISTERED);
@@ -2530,7 +2530,7 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
     supported = mm_common_mode_combinations_variant_to_garray (
         mm_gdbus_modem_get_supported_modes (ctx->skeleton));
 
-    /* Don't allow mode switchin if only one item given in the supported list */
+    /* Don't allow mode switching if only one item given in the supported list */
     if (supported->len == 1) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,

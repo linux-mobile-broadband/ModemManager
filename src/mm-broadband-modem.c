@@ -292,7 +292,7 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Create SIM (Modem inteface) */
+/* Create SIM (Modem interface) */
 
 static MMSim *
 modem_create_sim_finish (MMIfaceModem *self,
@@ -4288,7 +4288,7 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
 
     /* All done!
      * If we have any error reported, we'll propagate it. EPS errors take
-     * precendence over PS errors and PS errors take precendence over CS errors. */
+     * precedence over PS errors and PS errors take precedence over CS errors. */
     if (ctx->eps_error) {
         g_simple_async_result_take_error (ctx->result, ctx->eps_error);
         ctx->eps_error = NULL;

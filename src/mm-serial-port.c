@@ -1728,7 +1728,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
         (object_class, PROP_FD,
          g_param_spec_int (MM_SERIAL_PORT_FD,
                            "File descriptor",
-                           "Fiel descriptor",
+                           "File descriptor",
                            -1, G_MAXINT, -1,
                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
