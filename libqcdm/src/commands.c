@@ -1087,6 +1087,94 @@ qcdm_cmd_nv_set_hybrid_pref_result (const char *buf, size_t len, int *out_error)
 
 /**********************************************************************/
 
+size_t
+qcdm_cmd_nv_get_ipv6_enabled_new (char *buf, size_t len)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = htole16 (DIAG_NV_IPV6_ENABLED);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_nv_get_ipv6_enabled_result (const char *buf, size_t len, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemIPv6Enabled *ipv6;
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), out_error))
+        return NULL;
+
+    if (!check_nv_cmd (rsp, DIAG_NV_IPV6_ENABLED, out_error))
+        return NULL;
+
+    ipv6 = (DMNVItemIPv6Enabled *) &rsp->data[0];
+
+    if (ipv6->enabled > 1)
+        qcdm_warn (0, "Unknown ipv6 preference 0x%X", ipv6->enabled);
+
+    result = qcdm_result_new ();
+    qcdm_result_add_u8 (result, QCDM_CMD_NV_GET_IPV6_ENABLED_ITEM_ENABLED, ipv6->enabled);
+
+    return result;
+}
+
+size_t
+qcdm_cmd_nv_set_ipv6_enabled_new (char *buf,
+                                 size_t len,
+                                 u_int8_t enabled)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemIPv6Enabled *req;
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    if (enabled > QCDM_CMD_NV_IPV6_ENABLED_ON) {
+        qcdm_err (0, "Invalid ipv6 preference %d", enabled);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_WRITE;
+    cmd->nv_item = htole16 (DIAG_NV_IPV6_ENABLED);
+
+    req = (DMNVItemIPv6Enabled *) &cmd->data[0];
+    if (enabled == QCDM_CMD_NV_IPV6_ENABLED_OFF)
+        req->enabled = DIAG_NV_IPV6_ENABLED_OFF;
+    else if (enabled == QCDM_CMD_NV_IPV6_ENABLED_ON)
+        req->enabled = DIAG_NV_IPV6_ENABLED_ON;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_nv_set_ipv6_enabled_result (const char *buf, size_t len, int *out_error)
+{
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), out_error))
+        return NULL;
+
+    if (!check_nv_cmd ((DMCmdNVReadWrite *) buf, DIAG_NV_IPV6_ENABLED, out_error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
 static qcdmbool
 hdr_rev_pref_validate (u_int8_t dm)
 {

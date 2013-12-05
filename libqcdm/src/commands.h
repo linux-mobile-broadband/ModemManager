@@ -351,6 +351,29 @@ QcdmResult *qcdm_cmd_nv_set_hybrid_pref_result (const char *buf,
 
 /**********************************************************************/
 
+enum {
+    QCDM_CMD_NV_IPV6_ENABLED_OFF = 0x00,
+    QCDM_CMD_NV_IPV6_ENABLED_ON = 0x01,
+};
+
+#define QCDM_CMD_NV_GET_IPV6_ENABLED_ITEM_ENABLED "ipv6-enabled"
+
+size_t      qcdm_cmd_nv_get_ipv6_enabled_new    (char *buf, size_t len);
+
+QcdmResult *qcdm_cmd_nv_get_ipv6_enabled_result (const char *buf,
+                                                size_t len,
+                                                int *out_error);
+
+size_t      qcdm_cmd_nv_set_ipv6_enabled_new    (char *buf,
+                                                size_t len,
+                                                u_int8_t enabled);
+
+QcdmResult *qcdm_cmd_nv_set_ipv6_enabled_result (const char *buf,
+                                                size_t len,
+                                                int *out_error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF */
 enum {
     QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_0 = 0x00,

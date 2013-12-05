@@ -37,6 +37,7 @@ enum {
     DIAG_NV_DIR_NUMBER   = 178,  /* Mobile Directory Number (MDN) */
     DIAG_NV_ROAM_PREF    = 442,  /* Roaming preference */
     DIAG_NV_HYBRID_PREF  = 562,  /* Hybrid 1x + HDR preference */
+    DIAG_NV_IPV6_ENABLED = 1896, /* Enable IPv6 */
     DIAG_NV_HDR_REV_PREF = 4964, /* HDR mode preference(?): rev0, revA, eHRPD */
 };
 
@@ -113,6 +114,18 @@ struct DMNVItemHybridPref {
     u_int8_t hybrid_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemHybridPref DMNVItemHybridPref;
+
+/* IPv6 enable */
+enum {
+    DIAG_NV_IPV6_ENABLED_OFF   = 0x00,
+    DIAG_NV_IPV6_ENABLED_ON    = 0x01,
+};
+
+/* DIAG_NV_IPV6_ENABLED */
+struct DMNVItemIPv6Enabled {
+    u_int8_t enabled;
+} __attribute__ ((packed));
+typedef struct DMNVItemIPv6Enabled DMNVItemIPv6Enabled;
 
 #endif  /* LIBQCDM_NV_ITEMS_H */
 
