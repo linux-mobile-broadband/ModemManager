@@ -207,9 +207,13 @@ load_operator_identifier_finish (MMSim *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
+    MbimProvider *provider;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    provider = (MbimProvider *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_strdup (provider->provider_id);
 }
 
 static void
@@ -227,10 +231,9 @@ load_operator_identifier_ready (MbimDevice *device,
         mbim_message_home_provider_response_parse (
             response,
             &provider,
-            &error)) {
-        g_simple_async_result_set_op_res_gpointer (simple, g_strdup (provider->provider_id), NULL);
-        mbim_provider_free (provider);
-    } else
+            &error))
+        g_simple_async_result_set_op_res_gpointer (simple, provider, (GDestroyNotify)mbim_provider_free);
+    else
         g_simple_async_result_take_error (simple, error);
 
     if (response)
@@ -271,9 +274,13 @@ load_operator_name_finish (MMSim *self,
                            GAsyncResult *res,
                            GError **error)
 {
+    MbimProvider *provider;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    provider = (MbimProvider *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_strdup (provider->provider_name);
 }
 
 static void
@@ -291,10 +298,9 @@ load_operator_name_ready (MbimDevice *device,
         mbim_message_home_provider_response_parse (
             response,
             &provider,
-            &error)) {
-        g_simple_async_result_set_op_res_gpointer (simple, g_strdup (provider->provider_name), NULL);
-        mbim_provider_free (provider);
-    } else
+            &error))
+        g_simple_async_result_set_op_res_gpointer (simple, provider, (GDestroyNotify)mbim_provider_free);
+    else
         g_simple_async_result_take_error (simple, error);
 
     if (response)
