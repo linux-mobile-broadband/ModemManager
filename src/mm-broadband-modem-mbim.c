@@ -2308,10 +2308,25 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
+    MbimMessage *response;
+    MbimProvider **providers;
+    guint n_providers;
+    GList *info_list = NULL;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    response = (MbimMessage *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (mbim_message_command_done_get_result (response, error) &&
+        mbim_message_visible_providers_response_parse (response,
+                                                       &n_providers,
+                                                       &providers,
+                                                       error)) {
+        info_list = mm_3gpp_network_info_list_from_mbim_providers ((const MbimProvider *const *)providers,
+                                                                   n_providers);
+        mbim_provider_array_free (providers);
+    }
+    return info_list;
 }
 
 static void
@@ -2321,28 +2336,13 @@ visible_providers_query_ready (MbimDevice *device,
 {
     MbimMessage *response;
     GError *error = NULL;
-    MbimProvider **providers;
-    guint n_providers;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
-        mbim_message_visible_providers_response_parse (
-            response,
-            &n_providers,
-            &providers,
-            &error)) {
-        GList *info_list;
-
-        info_list = mm_3gpp_network_info_list_from_mbim_providers ((const MbimProvider *const *)providers,
-                                                                   n_providers);
-        g_simple_async_result_set_op_res_gpointer (simple, info_list, NULL);
-        mbim_provider_array_free (providers);
-    } else
+    if (response)
+        g_simple_async_result_set_op_res_gpointer (simple, response, (GDestroyNotify)mbim_message_unref);
+    else
         g_simple_async_result_take_error (simple, error);
 
-    if (response)
-        mbim_message_unref (response);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
