@@ -73,7 +73,7 @@ load_sim_identifier_finish (MMSim *self,
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_strdup ((gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
@@ -97,7 +97,7 @@ simid_subscriber_ready_state_ready (MbimDevice *device,
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
             &error))
-        g_simple_async_result_set_op_res_gpointer (simple, sim_iccid, NULL);
+        g_simple_async_result_set_op_res_gpointer (simple, sim_iccid, (GDestroyNotify)g_free);
     else
         g_simple_async_result_take_error (simple, error);
 
@@ -141,7 +141,7 @@ load_imsi_finish (MMSim *self,
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_strdup ((gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
@@ -165,7 +165,7 @@ imsi_subscriber_ready_state_ready (MbimDevice *device,
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
             &error))
-        g_simple_async_result_set_op_res_gpointer (simple, subscriber_id, NULL);
+        g_simple_async_result_set_op_res_gpointer (simple, subscriber_id, (GDestroyNotify)g_free);
     else
         g_simple_async_result_take_error (simple, error);
 
