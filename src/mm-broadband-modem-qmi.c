@@ -7447,7 +7447,7 @@ messaging_disable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
 
     /* Handle fallback */
-    if (self->priv->messaging_fallback_at) {
+    if (self->priv->messaging_fallback_at && iface_modem_messaging_parent->disable_unsolicited_events_finish) {
         return iface_modem_messaging_parent->disable_unsolicited_events_finish (_self, res, error);
     }
 
@@ -7556,6 +7556,21 @@ messaging_disable_unsolicited_events (MMIfaceModemMessaging *_self,
 
     /* Handle fallback */
     if (self->priv->messaging_fallback_at) {
+        /* Generic implementation doesn't actually have a method to disable
+         * unsolicited messaging events */
+        if (!iface_modem_messaging_parent->disable_unsolicited_events) {
+            GSimpleAsyncResult *result;
+
+            result = g_simple_async_result_new (G_OBJECT (self),
+                                                callback,
+                                                user_data,
+                                                messaging_disable_unsolicited_events);
+            g_simple_async_result_set_op_res_gboolean (result, TRUE);
+            g_simple_async_result_complete_in_idle (result);
+            g_object_unref (result);
+            return;
+        }
+
         return iface_modem_messaging_parent->disable_unsolicited_events (_self, callback, user_data);
     }
 
