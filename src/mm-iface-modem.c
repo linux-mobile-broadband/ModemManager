@@ -98,9 +98,14 @@ typedef struct {
 static void
 wait_for_final_state_context_complete_and_free (WaitForFinalStateContext *ctx)
 {
+    /* The callback associated with 'ctx->result' may update the modem state.
+     * Disconnect the signal handler for modem state changes before completing
+     * 'ctx->result' in order to prevent state_changed from being invoked, which
+     * invokes wait_for_final_state_context_complete_and_free (ctx) again. */
+    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
+
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
     g_source_remove (ctx->state_changed_wait_id);
     g_object_unref (ctx->self);
     g_slice_free (WaitForFinalStateContext, ctx);
