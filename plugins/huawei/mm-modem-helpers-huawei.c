@@ -341,6 +341,10 @@ mm_huawei_parse_prefmode_test (const gchar *response,
     /* No value */
     if (out->len == 0) {
         g_array_unref (out);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "^PREFMODE response contains no valid values");
         return NULL;
     }
 
