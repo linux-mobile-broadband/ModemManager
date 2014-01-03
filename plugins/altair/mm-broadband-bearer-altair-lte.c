@@ -110,9 +110,7 @@ connect_3gpp_connect_ready (MMBaseModem *modem,
     GError *error = NULL;
     MMBearerIpConfig *config;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (!result) {
         mm_warn ("connect failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -147,9 +145,7 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (!result) {
         mm_warn ("setting APN failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -298,9 +294,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (!result) {
         mm_warn ("Disconnect failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);

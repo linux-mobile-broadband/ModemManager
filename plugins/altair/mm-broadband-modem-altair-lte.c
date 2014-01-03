@@ -172,7 +172,7 @@ load_unlock_retries_ready (MMBaseModem *self,
     GError *error = NULL;
     gint pin1, puk1, pin2, puk2;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
         mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_simple_async_result_take_error (operation_result, error);
@@ -668,7 +668,7 @@ altair_deregister_ready (MMBaseModem *self,
 
     /* Register */
     mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
+        self,
         "%CMATT=1",
         10,
         FALSE, /* allow_cached */
