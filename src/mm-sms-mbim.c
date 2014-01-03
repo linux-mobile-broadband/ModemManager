@@ -171,7 +171,7 @@ sms_send_next_part (SmsSendContext *ctx)
                                              NULL);
     mbim_device_command (ctx->device,
                          message,
-                         10,
+                         30,
                          NULL,
                          (GAsyncReadyCallback)sms_send_set_ready,
                          ctx);
