@@ -65,7 +65,7 @@ detailed_connect_context_new (MMBroadbandBearer *self,
     ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->data = data;
+    ctx->data = g_object_ref (data);
     /* NOTE:
      * We don't currently support cancelling AT commands, so we'll just check
      * whether the operation is to be cancelled at each step. */
@@ -83,8 +83,7 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
-    if (ctx->data)
-        g_object_unref (ctx->data);
+    g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
@@ -181,6 +180,7 @@ connect_3gpp (MMBroadbandBearer *self,
     gchar *command, *apn;
     MMBearerProperties *config;
     MMModem3gppRegistrationState registration_state;
+    MMPort *data;
 
     /* There is a known firmware bug that can leave the modem unusable if a
      * connect attempt is made when out of coverage. So, fail without trying.
@@ -198,26 +198,24 @@ connect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
-    ctx = detailed_connect_context_new (
-        self,
-        modem,
-        primary,
-        /* Get a 'net' data port */
-        mm_base_modem_get_best_data_port (MM_BASE_MODEM (modem),
-                                          MM_PORT_TYPE_NET),
-        cancellable,
-        callback,
-        user_data);
-
-    if (!ctx->data) {
-        g_simple_async_result_set_error (
-            ctx->result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Couldn't connect: no available net port available");
-        detailed_connect_context_complete_and_free (ctx);
+    data = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
+    if (!data) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_CONNECTED,
+                                             "Couldn't connect: no available net port available");
         return;
     }
+
+    ctx = detailed_connect_context_new (self,
+                                        modem,
+                                        primary,
+                                        data,
+                                        cancellable,
+                                        callback,
+                                        user_data);
 
     config = mm_bearer_peek_config (MM_BEARER (self));
     apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (config));
