@@ -173,9 +173,7 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
     gchar *normalized_result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (ctx->modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
         if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
@@ -258,9 +256,7 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -325,8 +321,7 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx->retries = 60;
 
     /* Get a 'net' data port */
-    ctx->data = mm_base_modem_get_best_data_port (MM_BASE_MODEM (modem),
-                                                  MM_PORT_TYPE_NET);
+    ctx->data = mm_base_modem_get_best_data_port (ctx->modem, MM_PORT_TYPE_NET);
     if (!ctx->data) {
         g_simple_async_result_set_error (
             ctx->result,
@@ -411,9 +406,7 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
     GError *error = NULL;
     gboolean is_connected = FALSE;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                              res,
-                                              &error);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
     if (result) {
         mm_dbg ("QMI connection status: %s", result);
         if (is_qmistatus_disconnected (result)) {
@@ -478,9 +471,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
-                                     res,
-                                     &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         mm_dbg("Disconnection error: %s", error->message);
         g_error_free (error);

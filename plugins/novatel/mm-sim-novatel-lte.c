@@ -188,7 +188,7 @@ load_imsi (MMSim *self,
 
     mm_dbg ("loading (Novatel LTE) IMSI...");
     mm_base_modem_at_command (
-        MM_BASE_MODEM (modem),
+        modem,
         "+CRSM=176,28423,0,0,9",
         3,
         FALSE,
