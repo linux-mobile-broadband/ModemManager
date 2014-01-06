@@ -110,7 +110,7 @@ connect_3gpp_connect_ready (MMBaseModem *modem,
     GError *error = NULL;
     MMBearerIpConfig *config;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("connect failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -145,7 +145,7 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("setting APN failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -154,13 +154,15 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
     }
 
     mm_dbg ("APN set - connecting bearer");
-    mm_base_modem_at_command (
-        ctx->modem,
-        "%DPDNACT=1",
-        20, /* timeout */
-        FALSE, /* allow_cached */
-        (GAsyncReadyCallback)connect_3gpp_connect_ready, /* callback */
-        ctx); /* user_data */
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   "%DPDNACT=1",
+                                   20, /* timeout */
+                                   FALSE, /* allow_cached */
+                                   FALSE, /* is_raw */
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)connect_3gpp_connect_ready,
+                                   ctx); /* user_data */
 }
 
 static void
@@ -217,13 +219,15 @@ connect_3gpp (MMBroadbandBearer *self,
     apn = mm_at_serial_port_quote_string (mm_bearer_properties_get_apn (config));
     command = g_strdup_printf ("%%APNN=%s",apn);
     g_free (apn);
-    mm_base_modem_at_command (
-        ctx->modem,
-        command,
-        10, /* timeout */
-        FALSE, /* allow_cached */
-        (GAsyncReadyCallback)connect_3gpp_apnsettings_ready,
-        ctx); /* user_data */
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   command,
+                                   10, /* timeout */
+                                   FALSE, /* allow_cached */
+                                   FALSE, /* is_raw */
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)connect_3gpp_apnsettings_ready,
+                                   ctx); /* user_data */
     g_free (command);
 }
 
@@ -234,7 +238,6 @@ typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
-    MMAtSerialPort *secondary;
     MMPort *data;
     GSimpleAsyncResult *result;
 } DetailedDisconnectContext;
@@ -243,7 +246,6 @@ static DetailedDisconnectContext *
 detailed_disconnect_context_new (MMBroadbandBearer *self,
                                  MMBroadbandModem *modem,
                                  MMAtSerialPort *primary,
-                                 MMAtSerialPort *secondary,
                                  MMPort *data,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -254,7 +256,6 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
     ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
     ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -277,8 +278,6 @@ detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->data);
-    if (ctx->secondary)
-        g_object_unref (ctx->secondary);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
@@ -294,7 +293,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("Disconnect failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -334,16 +333,17 @@ disconnect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
-    ctx = detailed_disconnect_context_new (self, modem, primary, secondary,
-                                           data, callback, user_data);
+    ctx = detailed_disconnect_context_new (self, modem, primary, data, callback, user_data);
 
-    mm_base_modem_at_command (
-        ctx->modem,
-        "%DPDNACT=0",
-        20, /* timeout */
-        FALSE, /* allow_cached */
-        (GAsyncReadyCallback)disconnect_3gpp_check_status,
-        ctx); /* user_data */
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   "%DPDNACT=0",
+                                   20, /* timeout */
+                                   FALSE, /* allow_cached */
+                                   FALSE, /* is_raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)disconnect_3gpp_check_status,
+                                   ctx); /* user_data */
 }
 
 /*****************************************************************************/
