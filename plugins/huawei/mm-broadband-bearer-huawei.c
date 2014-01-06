@@ -696,7 +696,8 @@ report_connection_status (MMBearer *bearer,
         /* MM_BEARER_CONNECTION_STATUS_DISCONNECTING is used to indicate that the
          * reporting of disconnection should be delayed. See MMBroadbandModemHuawei's
          * bearer_report_connection_status for details. */
-        if (self->priv->network_disconnect_pending_id == 0) {
+        if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED &&
+            self->priv->network_disconnect_pending_id == 0) {
             mm_dbg ("Delay network-initiated disconnection of bearer '%s'",
                     mm_bearer_get_path (MM_BEARER (self)));
             self->priv->network_disconnect_pending_id = (g_timeout_add_seconds (
