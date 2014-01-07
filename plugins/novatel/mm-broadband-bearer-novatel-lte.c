@@ -173,7 +173,7 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
     gchar *normalized_result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
         if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
@@ -237,11 +237,14 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
 static gboolean
 connect_3gpp_qmistatus (DetailedConnectContext *ctx)
 {
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_full (
         ctx->modem,
+        ctx->primary,
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
+        FALSE, /* is_raw */
+        ctx->cancellable,
         (GAsyncReadyCallback)connect_3gpp_qmistatus_ready, /* callback */
         ctx); /* user_data */
 
@@ -256,7 +259,7 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
     const gchar *result;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -288,11 +291,14 @@ connect_3gpp_authenticate (DetailedConnectContext *ctx)
     g_free (apn);
     g_free (user);
     g_free (password);
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_full (
         ctx->modem,
+        ctx->primary,
         command,
         10, /* timeout */
         FALSE, /* allow_cached */
+        FALSE, /* is_raw */
+        ctx->cancellable,
         (GAsyncReadyCallback)connect_3gpp_qmiconnect_ready,
         ctx); /* user_data */
     g_free (command);
@@ -342,7 +348,6 @@ typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
-    MMAtSerialPort *secondary;
     MMPort *data;
     GSimpleAsyncResult *result;
     gint retries;
@@ -352,7 +357,6 @@ static DetailedDisconnectContext *
 detailed_disconnect_context_new (MMBroadbandBearer *self,
                                  MMBroadbandModem *modem,
                                  MMAtSerialPort *primary,
-                                 MMAtSerialPort *secondary,
                                  MMPort *data,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -363,7 +367,6 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
     ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
     ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -379,8 +382,6 @@ detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->data);
-    if (ctx->secondary)
-        g_object_unref (ctx->secondary);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
@@ -406,7 +407,7 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
     GError *error = NULL;
     gboolean is_connected = FALSE;
 
-    result = mm_base_modem_at_command_finish (modem, res, &error);
+    result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (result) {
         mm_dbg ("QMI connection status: %s", result);
         if (is_qmistatus_disconnected (result)) {
@@ -452,14 +453,16 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
 static gboolean
 disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
 {
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_full (
         ctx->modem,
+        ctx->primary,
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
-        (GAsyncReadyCallback)disconnect_3gpp_status_ready, /* callback */
+        FALSE, /* is_raw */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)disconnect_3gpp_status_ready,
         ctx); /* user_data */
-
     return FALSE;
 }
 
@@ -471,7 +474,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         mm_dbg("Disconnection error: %s", error->message);
         g_error_free (error);
@@ -498,14 +501,16 @@ disconnect_3gpp (MMBroadbandBearer *self,
         bearer->priv->connection_poller = 0;
     }
 
-    ctx = detailed_disconnect_context_new (self, modem, primary, secondary,
-                                           data, callback, user_data);
+    ctx = detailed_disconnect_context_new (self, modem, primary, data, callback, user_data);
 
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_full (
         ctx->modem,
+        ctx->primary,
         "$NWQMIDISCONNECT",
         10, /* timeout */
         FALSE, /* allow_cached */
+        FALSE, /* is_raw */
+        NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_check_status,
         ctx); /* user_data */
 }
