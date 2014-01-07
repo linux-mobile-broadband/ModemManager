@@ -868,7 +868,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     const char *device;
     struct serial_struct sinfo = { 0 };
     GTimeVal tv_start, tv_end;
-    int errno_save;
+    int errno_save = 0;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 

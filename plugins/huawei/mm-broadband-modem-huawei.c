@@ -793,7 +793,7 @@ load_current_bands_finish (MMIfaceModem *self,
                            GError **error)
 {
     const gchar *response;
-    GArray *bands_array;
+    GArray *bands_array = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
