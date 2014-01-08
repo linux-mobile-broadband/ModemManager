@@ -875,6 +875,15 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     device = mm_port_get_device (MM_PORT (self));
 
+    if (priv->forced_close) {
+        g_set_error (error,
+                     MM_SERIAL_ERROR,
+                     MM_SERIAL_ERROR_OPEN_FAILED,
+                     "Could not open serial device %s: it has been forced close",
+                     device);
+        return FALSE;
+    }
+
     if (priv->reopen_id) {
         g_set_error (error,
                      MM_SERIAL_ERROR,
@@ -1292,6 +1301,17 @@ mm_serial_port_reopen (MMSerialPort *self,
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->forced_close) {
+        GError *error;
+
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Serial port has been forced close.");
+        callback (self, error, user_data);
+        g_error_free (error);
+        return FALSE;
+    }
 
     if (priv->reopen_id > 0) {
         GError *error;
