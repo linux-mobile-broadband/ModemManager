@@ -34,9 +34,6 @@
 #define MM_IS_BROADBAND_BEARER_NOVATEL_LTE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE))
 #define MM_BROADBAND_BEARER_NOVATEL_LTE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE, MMBroadbandBearerNovatelLteClass))
 
-#define MM_BROADBAND_BEARER_NOVATEL_LTE_USER         "broadband-bearer-novatel-user"
-#define MM_BROADBAND_BEARER_NOVATEL_LTE_PASSWORD     "broadband-bearer-novatel-password"
-
 typedef struct _MMBroadbandBearerNovatelLte MMBroadbandBearerNovatelLte;
 typedef struct _MMBroadbandBearerNovatelLteClass MMBroadbandBearerNovatelLteClass;
 typedef struct _MMBroadbandBearerNovatelLtePrivate MMBroadbandBearerNovatelLtePrivate;
