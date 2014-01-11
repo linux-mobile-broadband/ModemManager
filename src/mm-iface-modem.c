@@ -4470,7 +4470,7 @@ interface_initialization_step (InitializationContext *ctx)
              * This will try to load any missing property value that couldn't be
              * retrieved before due to having the SIM locked. */
             mm_sim_initialize (sim,
-                               NULL, /* TODO: cancellable */
+                               ctx->cancellable,
                                (GAsyncReadyCallback)sim_reinit_ready,
                                ctx);
             g_object_unref (sim);

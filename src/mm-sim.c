@@ -1468,6 +1468,16 @@ STR_REPLY_READY_FN (operator_name, "Operator name")
 static void
 interface_initialization_step (InitAsyncContext *ctx)
 {
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Interface initialization cancelled");
+        g_simple_async_result_complete_in_idle (ctx->result);
+        init_async_context_free (ctx);
+        return;
+    }
+
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
         /* Fall down to next step */
