@@ -1,0 +1,95 @@
+# German translation of Modem Manager
+# Copyright (C) 2013 Free Software Foundation, Inc.
+# This file is distributed under the same license as the Modem Manager package.
+#
+# Mario Blättermann <mario.blaettermann@gmail.com>, 2013.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2014-01-06 21:12+0100\n"
+"PO-Revision-Date: 2014-01-06 21:23+0100\n"
+"Last-Translator: Mario Blättermann <mario.blaettermann@gmail.com>\n"
+"Language-Team: German <debian-l10n-german@lists.debian.org>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.5.4\n"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:1
+msgid "Control the Modem Manager daemon"
+msgstr "Den Modem-Manager-Daemon steuern"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:2
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Die Systemrichtlinien verhindern die Steuerung von ModemManager."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:3
+msgid "Unlock and control a mobile broadband device"
+msgstr "Ein mobiles Breitbandgerät entsperren und steuern"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:4
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Die Systemrichtlinien verhindern das Entsperren oder Steuern des mobilen "
+"Breitbandgerätes."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:5
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Kontakte für mobiles Breitband hinzufügen, ändern und löschen"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:6
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Die Systemrichtlinien verhindern das Hinzufügen, Ändern oder Löschen der "
+"Kontakte dieses Gerätes."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:7
+msgid "Send, save, modify, and delete text messages"
+msgstr "Textnachrichten senden, speichern, bearbeiten und löschen"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:8
+msgid ""
+"System policy prevents sending or maniuplating this device's text messages."
+msgstr ""
+"Die Systemrichtlinien verhindern das Senden oder Bearbeiten der "
+"Textnachrichten dieses Gerätes."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:9
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Informationen zum geografischen Standort und Positionierung aktivieren und "
+"anzeigen"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:10
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Die Systemrichtlinien verhindern das Aktivieren oder Ändern der "
+"Informationen zum geografischen Standort."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:11
+msgid "Query and utilize network information and services"
+msgstr "Netzwerkinformationen und -dienste abfragen und nutzen"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:12
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Die Systemrichtlinien verhindern die Abfrage der Netzwerkinformationen und -"
+"dienste."
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:13
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Firmware auf mobilen Breitbandgeräten abfragen und verwalten"
+
+#: ../data/org.freedesktop.ModemManager1.policy.in.in.h:14
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Die Systemrichtlinien verhindern die Abfrage oder Verwaltung der Firmware "
+"dieses Gerätes."
