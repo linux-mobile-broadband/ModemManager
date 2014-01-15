@@ -1236,6 +1236,7 @@ mm_iface_modem_3gpp_update_subscription_state (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
                   NULL);
     if (skeleton) {
+        mm_dbg ("Setting subscription state to: %s", mm_modem_3gpp_subscription_state_get_string (state));
         mm_gdbus_modem3gpp_set_subscription_state (skeleton, state);
         g_object_unref (skeleton);
     }

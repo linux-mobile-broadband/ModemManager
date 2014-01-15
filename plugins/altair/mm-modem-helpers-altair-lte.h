@@ -23,4 +23,12 @@
 gchar *mm_altair_parse_ceer_response (const gchar *response,
                                       GError **error);
 
+/* %CGINFO="cid",1 response parser */
+guint altair_parse_cid (const gchar *response, GError **error);
+
+/* %PCOINFO response parser */
+guint altair_parse_vendor_pco_info (const gchar *pco_info,
+                                    guint cid,
+                                    GError **error);
+
 #endif  /* MM_MODEM_HELPERS_ALTAIR_H */
