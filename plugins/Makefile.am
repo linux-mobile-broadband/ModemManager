@@ -15,7 +15,8 @@ PLUGIN_COMMON_COMPILER_FLAGS = \
 	-I$(top_builddir)/libmm-glib/generated
 
 PLUGIN_COMMON_LINKER_FLAGS = \
-	$(GUDEV_LDFLAGS) \
+	$(GUDEV_LIBS) \
+	$(MM_LIBS) \
 	-module \
 	-avoid-version
 
@@ -46,7 +47,7 @@ libmm_utils_icera_la_SOURCES = \
 	icera/mm-broadband-bearer-icera.h \
 	icera/mm-broadband-bearer-icera.c
 libmm_utils_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_utils_icera_la_LIBADD = $(GUDEV_LDFLAGS)
+libmm_utils_icera_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
 
 ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
 ICERA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-icera.la
