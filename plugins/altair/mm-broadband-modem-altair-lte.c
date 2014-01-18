@@ -1229,7 +1229,7 @@ altair_load_internet_cid_ready (MMIfaceModem3gpp *self,
         return;
     }
 
-    cid = altair_parse_cid (response, &error);
+    cid = mm_altair_parse_cid (response, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         load_subscription_state_context_complete_and_free (ctx);
@@ -1237,7 +1237,7 @@ altair_load_internet_cid_ready (MMIfaceModem3gpp *self,
     }
 
     mm_dbg ("Parsing vendor PCO info: %s", ctx->pco_info);
-    pco_value = altair_parse_vendor_pco_info (ctx->pco_info, cid, &error);
+    pco_value = mm_altair_parse_vendor_pco_info (ctx->pco_info, cid, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         load_subscription_state_context_complete_and_free (ctx);

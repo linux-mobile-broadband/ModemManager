@@ -71,7 +71,7 @@ mm_altair_parse_ceer_response (const gchar *response,
 /* %CGINFO="cid",1 response parser */
 
 guint
-altair_parse_cid (const gchar *response, GError **error)
+mm_altair_parse_cid (const gchar *response, GError **error)
 {
     GRegex *regex;
     GMatchInfo *match_info;
@@ -134,9 +134,9 @@ altair_extract_vzw_pco_value (const gchar *pco_payload, GError **error)
 }
 
 guint
-altair_parse_vendor_pco_info (const gchar *pco_info,
-                              guint cid,
-                              GError **error)
+mm_altair_parse_vendor_pco_info (const gchar *pco_info,
+                                 guint cid,
+                                 GError **error)
 {
     GRegex *regex;
     GMatchInfo *match_info;
