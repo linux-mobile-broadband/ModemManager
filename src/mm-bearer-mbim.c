@@ -399,6 +399,10 @@ ip_configuration_query_ready (MbimDevice *device,
                                                             ipv4_config,
                                                             ipv6_config);
 
+        if (ipv4_config)
+            g_object_unref (ipv4_config);
+        if (ipv6_config)
+            g_object_unref (ipv6_config);
         mbim_ipv4_element_array_free (ipv4address);
         mbim_ipv6_element_array_free (ipv6address);
         g_free (ipv4dnsserver);
