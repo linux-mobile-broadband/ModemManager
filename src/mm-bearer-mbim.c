@@ -404,6 +404,9 @@ ip_configuration_query_ready (MbimDevice *device,
         g_free (ipv6dnsserver);
     }
 
+    if (response)
+        mbim_message_unref (response);
+
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
@@ -462,6 +465,9 @@ connect_set_ready (MbimDevice *device,
         }
     }
 
+    if (response)
+        mbim_message_unref (response);
+
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
@@ -514,6 +520,9 @@ provisioned_contexts_query_ready (MbimDevice *device,
         mm_dbg ("Error listing provisioned contexts: %s", error->message);
         g_error_free (error);
     }
+
+    if (response)
+        mbim_message_unref (response);
 
     /* Keep on */
     ctx->step++;
@@ -570,6 +579,9 @@ packet_service_set_ready (MbimDevice *device,
                 g_error_free (inner_error);
         }
     }
+
+    if (response)
+        mbim_message_unref (response);
 
     if (error) {
         /* Don't make NoDeviceSupport errors fatal; just try to keep on the
@@ -955,6 +967,9 @@ disconnect_set_ready (MbimDevice *device,
                 g_error_free (inner_error);
         }
     }
+
+    if (response)
+        mbim_message_unref (response);
 
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
