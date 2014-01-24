@@ -139,6 +139,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
         mm_bearer_connect_result_unref (ctx->connect_result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->properties);
     g_object_unref (ctx->device);
     g_object_unref (ctx->self);
     g_slice_free (ConnectContext, ctx);
