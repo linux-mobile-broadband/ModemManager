@@ -1,4 +1,30 @@
 
+ModemManager 1.2.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+This version comes with the following updates in the interfaces:
+
+ * Signal interface: new interface for extended signal quality information
+ * OMA interface: new interface to expose the Device Management capabilities
+   defined by the Open Mobile Alliance
+ * Messaging interface: new 'Messages' property
+ * Modem interface: new 'Bearers' property
+ * 3GPP interface: new 'SubscriptionState' property
+
+Other notable changes include:
+
+ * QMI: Implemented Manual CDMA activation logic
+ * QMI: Implemented 3GPP2/CDMA SMS support
+ * QMI: Added support for QMI modems in the ZTE, x22x and Cinterion plugins.
+ * Huawei: multiple improvements and fixes for the ^NDISDUP support
+ * Huawei: new mode/switching logic with ^SYSCFGEX for LTE-capable devices
+ * Altair-LTE: set subscription state based on PCO
+ * MediaTek: new 'mtk' plugin added for MediaTek devices
+ * libmm-glib: Added GObject Introspection and Vala support
+ * and many more fixes...
+
+
 ModemManager 1.0.0
 -------------------------------------------
 
