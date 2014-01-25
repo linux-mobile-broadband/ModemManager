@@ -367,8 +367,8 @@ port_probe_run_task_complete (PortProbeRunTask *task,
 {
     /* As soon as we have the task completed, disable the buffer-full signal
      * handling, so that we do not get unwanted errors reported */
-    if (task->buffer_full_id) {
-        g_source_remove (task->buffer_full_id);
+    if (task->serial && task->buffer_full_id) {
+        g_signal_handler_disconnect (task->serial, task->buffer_full_id);
         task->buffer_full_id = 0;
     }
 
