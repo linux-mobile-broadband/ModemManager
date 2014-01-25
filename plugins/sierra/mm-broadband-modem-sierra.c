@@ -368,6 +368,8 @@ parse_status (const char *response,
         }
     }
 
+    g_strfreev (lines);
+
     return TRUE;
 }
 
