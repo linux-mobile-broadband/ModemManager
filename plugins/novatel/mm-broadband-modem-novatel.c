@@ -611,6 +611,7 @@ cnti_set_ready (MMBaseModem *self,
     snapshot_result_complete_simple (simple,
                                      mm_string_to_access_tech (p),
                                      MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    g_object_unref (simple);
 }
 
 static void
