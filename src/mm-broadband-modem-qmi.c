@@ -2290,7 +2290,7 @@ get_signal_info_ready (QmiClientNas *client,
 {
     QmiMessageNasGetSignalInfoOutput *output;
     GError *error = NULL;
-    guint quality = 0;
+    gint8 quality = 0;
 
     output = qmi_client_nas_get_signal_info_finish (client, res, &error);
     if (!output) {
