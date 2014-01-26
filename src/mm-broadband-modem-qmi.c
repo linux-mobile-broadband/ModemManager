@@ -4179,7 +4179,7 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* egprs support */
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_dbg ("No GSM service reported");
@@ -4203,7 +4203,7 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* egprs support */
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_dbg ("No GSM service reported");
