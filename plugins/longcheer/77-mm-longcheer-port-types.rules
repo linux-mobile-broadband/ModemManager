@@ -13,7 +13,7 @@
 # cannot be used for PPP.
 
 
-ACTION!="add|change", GOTO="mm_longcheer_port_types_end"
+ACTION!="add|change|move", GOTO="mm_longcheer_port_types_end"
 SUBSYSTEM!="tty", GOTO="mm_longcheer_port_types_end"
 
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1c9e", GOTO="mm_longcheer_vendorcheck"
