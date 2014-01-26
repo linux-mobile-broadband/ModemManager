@@ -2126,13 +2126,15 @@ huawei_modem_create_bearer (MMIfaceModem *self,
                             client,
                             "net",
                             mm_port_get_device (port)));
-            if (g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+            if (net_port && g_udev_device_get_property_as_boolean (net_port, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
                 mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
                 ctx->self->priv->ndisdup_support = FEATURE_SUPPORTED;
             } else {
                 mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
                 ctx->self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
             }
+            if (net_port)
+                g_object_unref (net_port);
             g_object_unref (client);
         }
 
