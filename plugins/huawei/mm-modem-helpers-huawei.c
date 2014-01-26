@@ -647,6 +647,8 @@ parse_syscfg_modes (const gchar *modes_str,
         }
     }
 
+    g_strfreev (split);
+
     /* If we didn't build a valid array of combinations, return an error */
     if (out->len == 0) {
         g_set_error (error,
@@ -882,6 +884,8 @@ parse_mode_combination_string_list (const gchar *modes_str,
             has_all = TRUE;
         }
     }
+
+    g_strfreev (mode_combinations);
 
     /* Add here the all_combination */
     if (has_all) {
