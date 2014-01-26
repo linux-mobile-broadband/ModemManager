@@ -328,8 +328,10 @@ port_probe_run_task_free (PortProbeRunTask *task)
         g_source_remove (task->source_id);
 
     if (task->serial) {
-        if (task->buffer_full_id)
+        if (task->buffer_full_id) {
+            g_warn_if_fail (MM_IS_AT_SERIAL_PORT (task->serial));
             g_signal_handler_disconnect (task->serial, task->buffer_full_id);
+        }
         if (mm_serial_port_is_open (task->serial))
             mm_serial_port_close (task->serial);
         g_object_unref (task->serial);
@@ -658,6 +660,11 @@ serial_probe_qcdm (MMPortProbe *self)
 
     /* If open, close the AT port */
     if (task->serial) {
+        /* Explicitly clear the buffer full signal handler */
+        if (task->buffer_full_id) {
+            g_signal_handler_disconnect (task->serial, task->buffer_full_id);
+            task->buffer_full_id = 0;
+        }
         mm_serial_port_close (task->serial);
         g_object_unref (task->serial);
     }
