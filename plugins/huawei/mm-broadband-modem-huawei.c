@@ -1658,8 +1658,10 @@ huawei_ndisstat_changed (MMAtSerialPort *port,
         mm_dbg ("Ignore invalid ^NDISSTAT unsolicited message: '%s' (error %s)",
                 str, error->message);
         g_error_free (error);
+        g_free (str);
         return;
     }
+    g_free (str);
 
     mm_dbg ("NDIS status: IPv4 %s, IPv6 %s",
             ndisstat_result.ipv4_available ?
