@@ -1855,7 +1855,7 @@ modem_load_current_bands (MMIfaceModem *self,
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* Introduced in NAS 1.19 */
-    if (qmi_client_check_version (ctx->client, 1, 19)) {
+    if (qmi_client_check_version (client, 1, 19)) {
         qmi_client_nas_get_rf_band_information (QMI_CLIENT_NAS (client),
                                                 NULL,
                                                 5,
