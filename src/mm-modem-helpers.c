@@ -1777,7 +1777,7 @@ mm_string_to_access_tech (const gchar *string)
     if (strcasestr (string, "HSDPA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
 
-    if (strcasestr (string, "UMTS"))
+    if (strcasestr (string, "UMTS") || strcasestr (string, "3G"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
 
     if (strcasestr (string, "EDGE"))
