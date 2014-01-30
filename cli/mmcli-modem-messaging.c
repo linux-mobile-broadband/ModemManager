@@ -36,6 +36,7 @@
 
 /* Context */
 typedef struct {
+    GDBusConnection *connection;
     MMManager *manager;
     GCancellable *cancellable;
     MMObject *object;
@@ -69,7 +70,7 @@ static GOptionEntry entries[] = {
     },
     { "messaging-delete-sms", 0, 0, G_OPTION_ARG_STRING, &delete_str,
       "Delete a SMS from a given modem",
-      "[PATH]"
+      "[PATH|INDEX]"
     },
     { NULL }
 };
@@ -135,6 +136,8 @@ context_free (Context *ctx)
         g_object_unref (ctx->object);
     if (ctx->manager)
         g_object_unref (ctx->manager);
+    if (ctx->connection)
+        g_object_unref (ctx->connection);
     g_free (ctx);
 }
 
@@ -336,6 +339,30 @@ delete_ready (MMModemMessaging *modem,
 }
 
 static void
+get_sms_to_delete_ready (GDBusConnection *connection,
+                         GAsyncResult *res)
+{
+    MMSms *sms;
+    MMObject *obj = NULL;
+
+    sms = mmcli_get_sms_finish (res, NULL, &obj);
+    if (!g_str_equal (mm_object_get_path (obj), mm_modem_messaging_get_path (ctx->modem_messaging))) {
+        g_printerr ("error: SMS '%s' not owned by modem '%s'",
+                    mm_sms_get_path (sms),
+                    mm_modem_messaging_get_path (ctx->modem_messaging));
+        exit (EXIT_FAILURE);
+    }
+
+    mm_modem_messaging_delete (ctx->modem_messaging,
+                               mm_sms_get_path (sms),
+                               ctx->cancellable,
+                               (GAsyncReadyCallback)delete_ready,
+                               NULL);
+    g_object_unref (sms);
+    g_object_unref (obj);
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -380,11 +407,11 @@ get_modem_ready (GObject      *source,
 
     /* Request to delete a given SMS? */
     if (delete_str) {
-        mm_modem_messaging_delete (ctx->modem_messaging,
-                                   delete_str,
-                                   ctx->cancellable,
-                                   (GAsyncReadyCallback)delete_ready,
-                                   NULL);
+        mmcli_get_sms (ctx->connection,
+                       delete_str,
+                       ctx->cancellable,
+                       (GAsyncReadyCallback)get_sms_to_delete_ready,
+                       NULL);
         return;
     }
 
@@ -399,6 +426,7 @@ mmcli_modem_messaging_run_asynchronous (GDBusConnection *connection,
     ctx = g_new0 (Context, 1);
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
+    ctx->connection = g_object_ref (connection);
 
     /* Get proper modem */
     mmcli_get_modem (connection,
@@ -465,11 +493,26 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
     /* Request to delete a given SMS? */
     if (delete_str) {
         gboolean result;
+        MMSms *sms;
+        MMObject *obj = NULL;
+
+        sms = mmcli_get_sms_sync (connection,
+                                  delete_str,
+                                  NULL,
+                                  &obj);
+        if (!g_str_equal (mm_object_get_path (obj), mm_modem_messaging_get_path (ctx->modem_messaging))) {
+            g_printerr ("error: SMS '%s' not owned by modem '%s'",
+                        mm_sms_get_path (sms),
+                        mm_modem_messaging_get_path (ctx->modem_messaging));
+            exit (EXIT_FAILURE);
+        }
 
         result = mm_modem_messaging_delete_sync (ctx->modem_messaging,
-                                                 delete_str,
+                                                 mm_sms_get_path (sms),
                                                  NULL,
                                                  &error);
+        g_object_unref (sms);
+        g_object_unref (obj);
 
         delete_process_reply (result, error);
         return;
