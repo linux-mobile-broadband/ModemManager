@@ -61,6 +61,7 @@ static gboolean get_cdma_bs_flag;
 static gboolean enable_gps_unmanaged_flag;
 static gboolean disable_gps_unmanaged_flag;
 static gboolean get_all_flag;
+static gchar *set_supl_server_str;
 
 static GOptionEntry entries[] = {
     { "location-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
@@ -127,6 +128,10 @@ static GOptionEntry entries[] = {
       "Disable unmanaged GPS location gathering.",
       NULL
     },
+    { "location-set-supl-server", 0, 0, G_OPTION_ARG_STRING, &set_supl_server_str,
+      "Set SUPL server address",
+      "[IP:PORT] or [URL]"
+    },
     { NULL }
 };
 
@@ -184,7 +189,8 @@ mmcli_modem_location_options_enabled (void)
                  !!(get_3gpp_flag +
                     get_gps_nmea_flag +
                     get_gps_raw_flag +
-                    get_cdma_bs_flag));
+                    get_cdma_bs_flag) +
+                 !!set_supl_server_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Location actions requested\n");
@@ -257,6 +263,13 @@ print_location_status (void)
              capabilities_str,
              enabled_str,
              mm_modem_location_signals_location (ctx->modem_location) ? "yes" : "no");
+
+    /* If A-GPS supported, show SUPL server setup */
+    if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS)
+        g_print ("  ----------------------------\n"
+                 "  A-GPS    |  SUPL server: '%s'\n",
+                 mm_modem_location_get_supl_server (ctx->modem_location));
+
     g_free (capabilities_str);
     g_free (enabled_str);
 }
@@ -283,6 +296,32 @@ setup_ready (MMModemLocation *modem_location,
 
     operation_result = mm_modem_location_setup_finish (modem_location, result, &error);
     setup_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+set_supl_server_process_reply (gboolean result,
+                               const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set SUPL servert address: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set SUPL server address\n");
+}
+
+static void
+set_supl_server_ready (MMModemLocation *modem_location,
+                       GAsyncResult    *result)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_location_set_supl_server_finish (modem_location, result, &error);
+    set_supl_server_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -517,6 +556,17 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to set SUPL server? */
+    if (set_supl_server_str) {
+        g_debug ("Asynchronously setting SUPL server...");
+        mm_modem_location_set_supl_server (ctx->modem_location,
+                                           set_supl_server_str,
+                                           ctx->cancellable,
+                                           (GAsyncReadyCallback)set_supl_server_ready,
+                                           NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -604,6 +654,19 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
                                          NULL,
                                          &error);
         get_location_process_reply (location_3gpp, location_gps_nmea, location_gps_raw, location_cdma_bs, error);
+        return;
+    }
+
+    /* Request to set SUPL server? */
+    if (set_supl_server_str) {
+        gboolean result;
+
+        g_debug ("Synchronously setting SUPL server...");
+        result = mm_modem_location_set_supl_server_sync (ctx->modem_location,
+                                                         set_supl_server_str,
+                                                         NULL,
+                                                         &error);
+        set_supl_server_process_reply (result, error);
         return;
     }
 
