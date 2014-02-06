@@ -7970,6 +7970,12 @@ typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientPds *client;
     GSimpleAsyncResult *result;
+    MMModemLocationSource source;
+    /* Default tracking session (for A-GPS disabling) */
+    QmiPdsOperatingMode session_operation;
+    guint8 data_timeout;
+    guint32 interval;
+    guint32 accuracy_threshold;
 } DisableLocationGatheringContext;
 
 static void
@@ -8023,13 +8029,109 @@ gps_service_state_stop_ready (QmiClientPds *client,
 
     qmi_message_pds_set_gps_service_state_output_unref (output);
 
-    mm_dbg ("Removing location event report indication handling");
     g_assert (ctx->self->priv->location_event_report_indication_id != 0);
     g_signal_handler_disconnect (client, ctx->self->priv->location_event_report_indication_id);
     ctx->self->priv->location_event_report_indication_id = 0;
 
+    mm_dbg ("GPS stopped");
+    ctx->self->priv->enabled_sources &= ~ctx->source;
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     disable_location_gathering_context_complete_and_free (ctx);
+}
+
+static void
+set_default_tracking_session_stop_ready (QmiClientPds *client,
+                                         GAsyncResult *res,
+                                         DisableLocationGatheringContext *ctx)
+{
+    QmiMessagePdsSetDefaultTrackingSessionOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_pds_set_default_tracking_session_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        disable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_set_default_tracking_session_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set default tracking session: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        disable_location_gathering_context_complete_and_free (ctx);
+        qmi_message_pds_set_default_tracking_session_output_unref (output);
+        return;
+    }
+
+    qmi_message_pds_set_default_tracking_session_output_unref (output);
+
+    /* Done */
+    mm_dbg ("A-GPS disabled");
+    ctx->self->priv->enabled_sources &= ~ctx->source;
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disable_location_gathering_context_complete_and_free (ctx);
+}
+
+static void
+get_default_tracking_session_stop_ready (QmiClientPds *client,
+                                         GAsyncResult *res,
+                                         DisableLocationGatheringContext *ctx)
+{
+    QmiMessagePdsSetDefaultTrackingSessionInput *input;
+    QmiMessagePdsGetDefaultTrackingSessionOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_pds_get_default_tracking_session_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        disable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_get_default_tracking_session_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get default tracking session: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        disable_location_gathering_context_complete_and_free (ctx);
+        qmi_message_pds_get_default_tracking_session_output_unref (output);
+        return;
+    }
+
+    qmi_message_pds_get_default_tracking_session_output_get_info (
+        output,
+        &ctx->session_operation,
+        &ctx->data_timeout,
+        &ctx->interval,
+        &ctx->accuracy_threshold,
+        NULL);
+
+    qmi_message_pds_get_default_tracking_session_output_unref (output);
+
+    if (ctx->session_operation == QMI_PDS_OPERATING_MODE_STANDALONE) {
+        /* Done */
+        mm_dbg ("A-GPS already disabled");
+        ctx->self->priv->enabled_sources &= ~ctx->source;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    input = qmi_message_pds_set_default_tracking_session_input_new ();
+    qmi_message_pds_set_default_tracking_session_input_set_info (
+        input,
+        QMI_PDS_OPERATING_MODE_STANDALONE,
+        ctx->data_timeout,
+        ctx->interval,
+        ctx->accuracy_threshold,
+        NULL);
+    qmi_client_pds_set_default_tracking_session (
+        ctx->client,
+        input,
+        10,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)set_default_tracking_session_stop_ready,
+        ctx);
+    qmi_message_pds_set_default_tracking_session_input_unref (input);
 }
 
 static void
@@ -8040,7 +8142,6 @@ disable_location_gathering (MMIfaceModemLocation *self,
 {
     DisableLocationGatheringContext *ctx;
     QmiClient *client = NULL;
-    gboolean stop_gps = FALSE;
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -8051,53 +8152,74 @@ disable_location_gathering (MMIfaceModemLocation *self,
     /* Nothing to be done to disable 3GPP or CDMA locations */
     if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI ||
         source == MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
+        /* Just mark it as disabled */
+        MM_BROADBAND_MODEM_QMI (self)->priv->enabled_sources &= ~source;
         g_simple_async_result_set_op_res_gboolean (result, TRUE);
         g_simple_async_result_complete_in_idle (result);
         g_object_unref (result);
         return;
     }
 
+    /* Setup context and client */
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         g_object_unref (result);
         return;
     }
-
     ctx = g_slice_new0 (DisableLocationGatheringContext);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->result = result;
+    ctx->source = source;
 
-    /* Only stop GPS engine if no GPS-related sources enabled */
-    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        ctx->self->priv->enabled_sources &= ~source;
-
-        if (!(ctx->self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
-            stop_gps = TRUE;
-    }
-
-    if (stop_gps) {
-        QmiMessagePdsSetGpsServiceStateInput *input;
-
-        input = qmi_message_pds_set_gps_service_state_input_new ();
-        qmi_message_pds_set_gps_service_state_input_set_state (input, FALSE, NULL);
-        qmi_client_pds_set_gps_service_state (
+    /* Disable A-GPS? */
+    if (source == MM_MODEM_LOCATION_SOURCE_AGPS) {
+        qmi_client_pds_get_default_tracking_session (
             ctx->client,
-            input,
+            NULL,
             10,
             NULL, /* cancellable */
-            (GAsyncReadyCallback)gps_service_state_stop_ready,
+            (GAsyncReadyCallback)get_default_tracking_session_stop_ready,
             ctx);
-        qmi_message_pds_set_gps_service_state_input_unref (input);
         return;
     }
 
-    /* If still some GPS needed, just return */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disable_location_gathering_context_complete_and_free (ctx);
+    /* Only stop GPS engine if no GPS-related sources enabled */
+    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        MMModemLocationSource tmp;
+
+        /* If no more GPS sources enabled, stop GPS */
+        tmp = ctx->self->priv->enabled_sources;
+        tmp &= ~source;
+        if (!(tmp & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
+            QmiMessagePdsSetGpsServiceStateInput *input;
+
+            input = qmi_message_pds_set_gps_service_state_input_new ();
+            qmi_message_pds_set_gps_service_state_input_set_state (input, FALSE, NULL);
+            qmi_client_pds_set_gps_service_state (
+                ctx->client,
+                input,
+                10,
+                NULL, /* cancellable */
+                (GAsyncReadyCallback)gps_service_state_stop_ready,
+                ctx);
+            qmi_message_pds_set_gps_service_state_input_unref (input);
+            return;
+        }
+
+        /* Otherwise, we have more GPS sources enabled, we shouldn't stop GPS, just
+         * return */
+        ctx->self->priv->enabled_sources &= ~source;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* The QMI implementation has a fixed set of capabilities supported. Arriving
+     * here means we tried to disable one which wasn't set as supported, which should
+     * not happen */
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -8133,6 +8255,11 @@ typedef struct {
     QmiClientPds *client;
     GSimpleAsyncResult *result;
     MMModemLocationSource source;
+    /* Default tracking session (for A-GPS enabling) */
+    QmiPdsOperatingMode session_operation;
+    guint8 data_timeout;
+    guint32 interval;
+    guint32 accuracy_threshold;
 } EnableLocationGatheringContext;
 
 static void
@@ -8188,6 +8315,9 @@ ser_location_ready (QmiClientPds *client,
                           G_CALLBACK (location_event_report_indication_cb),
                           ctx->self);
 
+    /* Done */
+    mm_dbg ("GPS started");
+    ctx->self->priv->enabled_sources |= ctx->source;
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     enable_location_gathering_context_complete_and_free (ctx);
 }
@@ -8283,12 +8413,107 @@ gps_service_state_start_ready (QmiClientPds *client,
 }
 
 static void
+set_default_tracking_session_start_ready (QmiClientPds *client,
+                                          GAsyncResult *res,
+                                          EnableLocationGatheringContext *ctx)
+{
+    QmiMessagePdsSetDefaultTrackingSessionOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_pds_set_default_tracking_session_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_set_default_tracking_session_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set default tracking session: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        qmi_message_pds_set_default_tracking_session_output_unref (output);
+        return;
+    }
+
+    qmi_message_pds_set_default_tracking_session_output_unref (output);
+
+    /* Done */
+    mm_dbg ("A-GPS enabled");
+    ctx->self->priv->enabled_sources |= ctx->source;
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    enable_location_gathering_context_complete_and_free (ctx);
+}
+
+static void
+get_default_tracking_session_start_ready (QmiClientPds *client,
+                                          GAsyncResult *res,
+                                          EnableLocationGatheringContext *ctx)
+{
+    QmiMessagePdsSetDefaultTrackingSessionInput *input;
+    QmiMessagePdsGetDefaultTrackingSessionOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_pds_get_default_tracking_session_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_pds_get_default_tracking_session_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get default tracking session: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        qmi_message_pds_get_default_tracking_session_output_unref (output);
+        return;
+    }
+
+    qmi_message_pds_get_default_tracking_session_output_get_info (
+        output,
+        &ctx->session_operation,
+        &ctx->data_timeout,
+        &ctx->interval,
+        &ctx->accuracy_threshold,
+        NULL);
+
+    qmi_message_pds_get_default_tracking_session_output_unref (output);
+
+    if (ctx->session_operation == QMI_PDS_OPERATING_MODE_MS_ASSISTED) {
+        /* Done */
+        mm_dbg ("A-GPS already enabled");
+        ctx->self->priv->enabled_sources |= ctx->source;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    input = qmi_message_pds_set_default_tracking_session_input_new ();
+    qmi_message_pds_set_default_tracking_session_input_set_info (
+        input,
+        QMI_PDS_OPERATING_MODE_MS_ASSISTED,
+        ctx->data_timeout,
+        ctx->interval,
+        ctx->accuracy_threshold,
+        NULL);
+    qmi_client_pds_set_default_tracking_session (
+        ctx->client,
+        input,
+        10,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)set_default_tracking_session_start_ready,
+        ctx);
+    qmi_message_pds_set_default_tracking_session_input_unref (input);
+}
+
+static void
 parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
                                         GAsyncResult *res,
                                         EnableLocationGatheringContext *ctx)
 {
-    gboolean start_gps = FALSE;
     GError *error = NULL;
+    QmiClient *client;
 
     if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
@@ -8296,58 +8521,81 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
         return;
     }
 
-    /* Now our own enabling */
+    /* Nothing else needed in the QMI side for LAC/CI */
+    if (ctx->source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
+        ctx->self->priv->enabled_sources |= ctx->source;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
 
     /* CDMA modems need to re-run registration checks when enabling the CDMA BS
      * location source, so that we get up to date BS location information.
      * Note that we don't care for when the registration checks get finished.
      */
     if (ctx->source == MM_MODEM_LOCATION_SOURCE_CDMA_BS &&
-        mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
+        mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
         /* Reload registration to get LAC/CI */
-        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (self), NULL, NULL);
-    }
-
-    /* NMEA and RAW are both enabled in the same way */
-    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        /* Only start GPS engine if not done already */
-        if (!(ctx->self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
-            start_gps = TRUE;
+        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (ctx->self), NULL, NULL);
+        /* Just mark it as enabled */
         ctx->self->priv->enabled_sources |= ctx->source;
-    }
-
-    if (start_gps) {
-        QmiMessagePdsSetGpsServiceStateInput *input;
-        QmiClient *client;
-
-        client = peek_qmi_client (ctx->self, QMI_SERVICE_PDS, &error);
-        if (!client) {
-            g_simple_async_result_take_error (ctx->result, error);
-            enable_location_gathering_context_complete_and_free (ctx);
-            return;
-        }
-
-        /* Keep a ref around */
-        ctx->client = g_object_ref (client);
-
-        input = qmi_message_pds_set_gps_service_state_input_new ();
-        qmi_message_pds_set_gps_service_state_input_set_state (input, TRUE, NULL);
-        qmi_client_pds_set_gps_service_state (
-            ctx->client,
-            input,
-            10,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)gps_service_state_start_ready,
-            ctx);
-        qmi_message_pds_set_gps_service_state_input_unref (input);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enable_location_gathering_context_complete_and_free (ctx);
         return;
     }
 
-    /* For any other location (e.g. 3GPP), or if GPS already running just return */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_location_gathering_context_complete_and_free (ctx);
+    /* Setup context and client */
+    client = peek_qmi_client (ctx->self, QMI_SERVICE_PDS, &error);
+    if (!client) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+    ctx->client = g_object_ref (client);
+
+    /* Enabling A-GPS? */
+    if (ctx->source == MM_MODEM_LOCATION_SOURCE_AGPS) {
+        qmi_client_pds_get_default_tracking_session (
+            ctx->client,
+            NULL,
+            10,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)get_default_tracking_session_start_ready,
+            ctx);
+        return;
+    }
+
+    /* NMEA and RAW are both enabled in the same way */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        /* Only start GPS engine if not done already */
+        if (!(ctx->self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
+            QmiMessagePdsSetGpsServiceStateInput *input;
+
+            input = qmi_message_pds_set_gps_service_state_input_new ();
+            qmi_message_pds_set_gps_service_state_input_set_state (input, TRUE, NULL);
+            qmi_client_pds_set_gps_service_state (
+                ctx->client,
+                input,
+                10,
+                NULL, /* cancellable */
+                (GAsyncReadyCallback)gps_service_state_start_ready,
+                ctx);
+            qmi_message_pds_set_gps_service_state_input_unref (input);
+            return;
+        }
+
+        /* GPS already started, we're done */
+        ctx->self->priv->enabled_sources |= ctx->source;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enable_location_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* The QMI implementation has a fixed set of capabilities supported. Arriving
+     * here means we tried to enable one which wasn't set as supported, which should
+     * not happen */
+    g_assert_not_reached ();
 }
 
 static void
@@ -8364,12 +8612,13 @@ enable_location_gathering (MMIfaceModemLocation *self,
                                              callback,
                                              user_data,
                                              enable_location_gathering);
+    /* Store source to enable, there will be only one! */
     ctx->source = source;
 
     /* Chain up parent's gathering enable */
     iface_modem_location_parent->enable_location_gathering (
-        self,
-        source,
+        MM_IFACE_MODEM_LOCATION (ctx->self),
+        ctx->source,
         (GAsyncReadyCallback)parent_enable_location_gathering_ready,
         ctx);
 }
