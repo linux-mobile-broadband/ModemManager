@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -7659,11 +7660,13 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Now our own checks */
 
-    /* If we have support for the PDS client, GPS location is supported */
+    /* If we have support for the PDS client, GPS and A-GPS location is supported */
     if (port && mm_port_qmi_peek_client (port,
                                          QMI_SERVICE_PDS,
                                          MM_PORT_QMI_FLAG_DEFAULT))
-        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
+        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                    MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                    MM_MODEM_LOCATION_SOURCE_AGPS);
 
     /* If the modem is CDMA, we have support for CDMA BS location */
     if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
