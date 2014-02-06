@@ -1441,7 +1441,7 @@ qcdm_cmd_ext_logmask_result (const char *buf, size_t len, int *out_error)
     if (len < 1) {
         qcdm_err (0, "DM command %d response not long enough (got %zu, expected "
                   "at least %d).", DIAG_CMD_EXT_LOGMASK, len, 3);
-        return FALSE;
+        return NULL;
     }
 
     /* Result of a 'set' operation will be only 1 byte in size; result of
@@ -1461,7 +1461,7 @@ qcdm_cmd_ext_logmask_result (const char *buf, size_t len, int *out_error)
         if (len < (masklen + 3)) {
             qcdm_err (0, "DM command %d response not long enough (got %zu, expected "
                       "at least %d).", DIAG_CMD_EXT_LOGMASK, len, masklen + 3);
-            return FALSE;
+            return NULL;
         }
         minlen = masklen + 3;
     }
