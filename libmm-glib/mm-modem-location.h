@@ -76,6 +76,9 @@ MMModemLocationSource mm_modem_location_get_enabled      (MMModemLocation *self)
 
 gboolean              mm_modem_location_signals_location (MMModemLocation *self);
 
+const gchar *mm_modem_location_get_supl_server (MMModemLocation *self);
+gchar       *mm_modem_location_dup_supl_server (MMModemLocation *self);
+
 void     mm_modem_location_setup        (MMModemLocation *self,
                                          MMModemLocationSource sources,
                                          gboolean signal_location,
@@ -90,6 +93,19 @@ gboolean mm_modem_location_setup_sync   (MMModemLocation *self,
                                          gboolean signal_location,
                                          GCancellable *cancellable,
                                          GError **error);
+
+void     mm_modem_location_set_supl_server        (MMModemLocation *self,
+                                                   const gchar *supl,
+                                                   GCancellable *cancellable,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data);
+gboolean mm_modem_location_set_supl_server_finish (MMModemLocation *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+gboolean mm_modem_location_set_supl_server_sync   (MMModemLocation *self,
+                                                   const gchar *supl,
+                                                   GCancellable *cancellable,
+                                                   GError **error);
 
 void            mm_modem_location_get_3gpp        (MMModemLocation *self,
                                                    GCancellable *cancellable,

@@ -225,6 +225,87 @@ mm_modem_location_setup_sync (MMModemLocation *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_location_set_supl_server_finish:
+ * @self: A #MMModemLocation.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_set_supl_server().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_location_set_supl_server().
+ *
+ * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_set_supl_server_finish (MMModemLocation *self,
+                                          GAsyncResult *res,
+                                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_set_supl_server_finish (MM_GDBUS_MODEM_LOCATION (self), res, error);
+}
+
+/**
+ * mm_modem_location_set_supl_server:
+ * @self: A #MMModemLocation.
+ * @supl: The SUPL server address, given as IP:PORT or with a full URL.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously configures the address of the SUPL server for A-GPS operation.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_location_set_supl_server_finish() to get the result of the operation.
+ *
+ * See mm_modem_location_set_supl_server_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_location_set_supl_server (MMModemLocation *self,
+                                   const gchar *supl,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_LOCATION (self));
+
+    mm_gdbus_modem_location_call_set_supl_server (MM_GDBUS_MODEM_LOCATION (self),
+                                                  supl,
+                                                  cancellable,
+                                                  callback,
+                                                  user_data);
+}
+
+/**
+ * mm_modem_location_set_supl_server_sync:
+ * @self: A #MMModemLocation.
+ * @supl: The SUPL server address, given as IP:PORT or with a full URL.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously configures the address of the SUPL server for A-GPS operation.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_location_set_supl_server()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_set_supl_server_sync (MMModemLocation *self,
+                                        const gchar *supl,
+                                        GCancellable *cancellable,
+                                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_set_supl_server_sync (MM_GDBUS_MODEM_LOCATION (self),
+                                                              supl,
+                                                              cancellable,
+                                                              error);
+}
+
+/*****************************************************************************/
+
 static gboolean
 build_locations (GVariant *dictionary,
                  MMLocation3gpp **location_3gpp,
@@ -665,6 +746,47 @@ mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,
     mm_modem_location_get_full_sync (self, NULL, NULL, NULL, &location, cancellable, error);
 
     return location;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_location_get_supl_server:
+ * @self: A #MMModemLocation.
+ *
+ * Gets the address of the SUPL server.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_dup_supl_server() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The SUPL server address, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar *
+mm_modem_location_get_supl_server (MMModemLocation *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_location_get_supl_server (MM_GDBUS_MODEM_LOCATION (self)));
+}
+
+/**
+ * mm_modem_location_dup_supl_server:
+ * @self: A #MMModemLocation.
+ *
+ * Gets the address of the SUPL server.
+ *
+ * Returns: (transfer full): The SUPL server address, or %NULL if none available. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_location_dup_supl_server (MMModemLocation *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_location_dup_supl_server (MM_GDBUS_MODEM_LOCATION (self)));
 }
 
 /*****************************************************************************/
