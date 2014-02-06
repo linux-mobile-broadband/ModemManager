@@ -915,6 +915,118 @@ typedef struct {
     MmGdbusModemLocation *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemLocation *self;
+    gchar *supl;
+} HandleSetSuplServerContext;
+
+static void
+handle_set_supl_server_context_free (HandleSetSuplServerContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->supl);
+    g_slice_free (HandleSetSuplServerContext, ctx);
+}
+
+static void
+set_supl_server_ready (MMIfaceModemLocation *self,
+                       GAsyncResult *res,
+                       HandleSetSuplServerContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_location_complete_set_supl_server (ctx->skeleton, ctx->invocation);
+
+    handle_set_supl_server_context_free (ctx);
+}
+
+static void
+handle_set_supl_server_auth_ready (MMBaseModem *self,
+                                   GAsyncResult *res,
+                                   HandleSetSuplServerContext *ctx)
+{
+    GError *error = NULL;
+    MMModemState modem_state;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_supl_server_context_free (ctx);
+        return;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot set SUPL server: "
+                                               "device not yet enabled");
+        handle_set_supl_server_context_free (ctx);
+        return;
+    }
+
+    /* If A-GPS is NOT supported, set error */
+    if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & MM_MODEM_LOCATION_SOURCE_AGPS)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set SUPL server: A-GPS not supported");
+        handle_set_supl_server_context_free (ctx);
+        return;
+    }
+
+    /* Check if plugin implements it */
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server ||
+        !MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set SUPL server: not implemented");
+        handle_set_supl_server_context_free (ctx);
+        return;
+    }
+
+    /* Request to change SUPL server */
+    MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server (ctx->self,
+                                                                   ctx->supl,
+                                                                   (GAsyncReadyCallback)set_supl_server_ready,
+                                                                   ctx);
+}
+
+static gboolean
+handle_set_supl_server (MmGdbusModemLocation *skeleton,
+                        GDBusMethodInvocation *invocation,
+                        const gchar *supl,
+                        MMIfaceModemLocation *self)
+{
+    HandleSetSuplServerContext *ctx;
+
+    ctx = g_slice_new (HandleSetSuplServerContext);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->supl = g_strdup (supl);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_supl_server_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemLocation *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemLocation *self;
 } HandleGetLocationContext;
 
 static void
@@ -1353,6 +1465,10 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-setup",
                           G_CALLBACK (handle_setup),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-supl-server",
+                          G_CALLBACK (handle_set_supl_server),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
                           "handle-get-location",

@@ -59,6 +59,15 @@ struct _MMIfaceModemLocation {
     gboolean (*disable_location_gathering_finish) (MMIfaceModemLocation *self,
                                                    GAsyncResult *res,
                                                    GError **error);
+
+    /* Set SUPL server (async) */
+    void (* set_supl_server) (MMIfaceModemLocation *self,
+                              const gchar *supl,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+    gboolean (*set_supl_server_finish) (MMIfaceModemLocation *self,
+                                        GAsyncResult *res,
+                                        GError **error);
 };
 
 GType mm_iface_modem_location_get_type (void);
