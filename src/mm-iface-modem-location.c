@@ -139,6 +139,8 @@ build_location_dictionary (GVariant *previous,
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
                 g_assert_not_reached ();
+            case MM_MODEM_LOCATION_SOURCE_AGPS:
+                g_assert_not_reached ();
             default:
                 g_warn_if_reached ();
                 break;
@@ -508,6 +510,7 @@ update_location_source_status (MMIfaceModemLocation *self,
             g_clear_object (&ctx->location_cdma_bs);
         break;
     case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
+    case MM_MODEM_LOCATION_SOURCE_AGPS:
         /* Nothing to setup in the context */
     default:
         break;
@@ -616,7 +619,7 @@ setup_gathering_step (SetupGatheringContext *ctx)
         return;
     }
 
-    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) {
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_AGPS) {
         gchar *source_str;
 
         if (ctx->to_enable & ctx->current) {
@@ -713,7 +716,7 @@ setup_gathering (MMIfaceModemLocation *self,
 
     /* Loop through all known bits in the bitmask to enable/disable specific location sources */
     for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-         source <= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
+         source <= MM_MODEM_LOCATION_SOURCE_AGPS;
          source = source << 1) {
         /* skip unsupported sources */
         if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
@@ -1184,7 +1187,8 @@ interface_enabling_step (EnablingContext *ctx)
         default_sources = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
         default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                              MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
+                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED |
+                             MM_MODEM_LOCATION_SOURCE_AGPS);
 
         setup_gathering (ctx->self,
                          default_sources,

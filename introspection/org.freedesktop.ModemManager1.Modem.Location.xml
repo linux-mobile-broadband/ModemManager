@@ -40,6 +40,14 @@
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>
         ) to get
         location information.
+
+        The optional
+        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS</link>
+        allows to request A-GPS operation, and it must be given along with either
+        <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-RAW:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_RAW</link>
+        or
+        <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-NMEA:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_NMEA</link>.
+
     -->
     <method name="Setup">
       <arg name="sources"         type="u" direction="in" />
@@ -59,6 +67,16 @@
     -->
     <method name="GetLocation">
       <arg name="Location" type="a{uv}" direction="out" />
+    </method>
+
+    <!--
+        SetSuplServer:
+        @supl: SUPL server configuration, given either as IP:PORT or with a full URL.
+
+        Configure the SUPL server for A-GPS.
+    -->
+    <method name="SetSuplServer">
+      <arg name="supl" type="s" direction="in" />
     </method>
 
     <!--
@@ -264,6 +282,13 @@
         </variablelist>
     -->
     <property name="Location" type="a{uv}" access="read" />
+
+    <!--
+        SuplServer:
+
+        SUPL server configuration for A-GPS, given either as IP:PORT or with a full URL.
+    -->
+    <property name="SuplServer" type="s" access="read" />
 
   </interface>
 </node>

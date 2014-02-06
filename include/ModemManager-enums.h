@@ -819,6 +819,7 @@ typedef enum { /*< underscore_name=mm_sms_cdma_service_category >*/
  * @MM_MODEM_LOCATION_SOURCE_GPS_NMEA: GPS location given as NMEA traces.
  * @MM_MODEM_LOCATION_SOURCE_CDMA_BS: CDMA base station position.
  * @MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED: No location given, just GPS module setup.
+ * @MM_MODEM_LOCATION_SOURCE_AGPS: A-GPS location requested.
  *
  * Sources of location information supported by the modem.
  */
@@ -829,6 +830,7 @@ typedef enum { /*< underscore_name=mm_modem_location_source >*/
     MM_MODEM_LOCATION_SOURCE_GPS_NMEA      = 1 << 2,
     MM_MODEM_LOCATION_SOURCE_CDMA_BS       = 1 << 3,
     MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED = 1 << 4,
+    MM_MODEM_LOCATION_SOURCE_AGPS          = 1 << 5,
 } MMModemLocationSource;
 
 /**
