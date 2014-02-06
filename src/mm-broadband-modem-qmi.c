@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <arpa/inet.h>
 
 #include "mm-broadband-modem-qmi.h"
 
@@ -7700,6 +7701,132 @@ location_load_capabilities (MMIfaceModemLocation *self,
 }
 
 /*****************************************************************************/
+/* Load SUPL server */
+
+static gchar *
+location_load_supl_server_finish (MMIfaceModemLocation *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+get_agps_config_ready (QmiClientPds *client,
+                       GAsyncResult *res,
+                       GSimpleAsyncResult *simple)
+{
+    QmiMessagePdsGetAgpsConfigOutput *output = NULL;
+    GError *error = NULL;
+    guint32 ip;
+    guint32 port;
+    GArray *url;
+    gchar *str;
+
+    output = qmi_client_pds_get_agps_config_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    if (!qmi_message_pds_get_agps_config_output_get_result (output, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    str = NULL;
+
+    /* Prefer IP/PORT to URL */
+    if (qmi_message_pds_get_agps_config_output_get_location_server_address (
+            output,
+            &ip,
+            &port,
+            NULL) &&
+        ip != 0 &&
+        port != 0) {
+        struct in_addr a = { .s_addr = ip };
+        gchar buf[INET_ADDRSTRLEN + 1];
+
+        memset (buf, 0, sizeof (buf));
+
+        if (!inet_ntop (AF_INET, &a, buf, sizeof (buf) - 1)) {
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Cannot convert numeric IP address to string");
+            g_simple_async_result_complete (simple);
+            g_object_unref (simple);
+            return;
+        }
+
+        str = g_strdup_printf ("%s:%u", buf, port);
+    }
+
+    if (!str &&
+        qmi_message_pds_get_agps_config_output_get_location_server_url (
+            output,
+            &url,
+            NULL)) {
+        str = g_convert (url->data, url->len, "UTF-8", "UTF-16BE", NULL, NULL, NULL);
+    }
+
+    if (!str)
+        str = g_strdup ("");
+
+    qmi_message_pds_get_agps_config_output_unref (output);
+
+    g_simple_async_result_set_op_res_gpointer (simple, str, g_free);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+location_load_supl_server (MMIfaceModemLocation *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    QmiClient *client = NULL;
+    GSimpleAsyncResult *simple;
+    QmiMessagePdsGetAgpsConfigInput *input;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_PDS, &client,
+                            callback, user_data)) {
+        return;
+    }
+
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        location_load_supl_server);
+
+    input = qmi_message_pds_get_agps_config_input_new ();
+
+    /* For multimode devices, prefer UMTS by default */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
+        qmi_message_pds_get_agps_config_input_set_network_mode (input, QMI_PDS_NETWORK_MODE_UMTS, NULL);
+    else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
+        qmi_message_pds_get_agps_config_input_set_network_mode (input, QMI_PDS_NETWORK_MODE_CDMA, NULL);
+
+    qmi_client_pds_get_agps_config (
+        QMI_CLIENT_PDS (client),
+        input,
+        10,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)get_agps_config_ready,
+        simple);
+    qmi_message_pds_get_agps_config_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Disable location gathering (Location interface) */
 
 typedef struct {
@@ -10365,6 +10492,8 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 
     iface->load_capabilities = location_load_capabilities;
     iface->load_capabilities_finish = location_load_capabilities_finish;
+    iface->load_supl_server = location_load_supl_server;
+    iface->load_supl_server_finish = location_load_supl_server_finish;
     iface->enable_location_gathering = enable_location_gathering;
     iface->enable_location_gathering_finish = enable_location_gathering_finish;
     iface->disable_location_gathering = disable_location_gathering;
