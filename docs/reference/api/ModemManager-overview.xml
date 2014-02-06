@@ -553,7 +553,7 @@ mm_plugin_create (void)
           <para>
             Modems with additional features will export feature-specific interfaces, such as
             the <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Location</link> or
-            the <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Messaging</link>
+            the <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Messaging">Messaging</link>
             ones.
           </para>
           <para>
@@ -616,7 +616,7 @@ mm_plugin_create (void)
             which are directly related to the purpose of the interface. For example, enabling the
             <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Location</link>
             interface will involve setting up the initial location information; and enabling the
-            <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Messaging</link>
+            <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Messaging">Messaging</link>
             interface will involve loading the initial list of SMS available in the SIM or Modem.
           </para>
         </listitem>
@@ -675,7 +675,7 @@ mm_plugin_create (void)
             which are directly related to the purpose of the interface. For example, disabling the
             <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Location</link>
             interface will involve shutting down the location gathering; and disabling the
-            <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Location">Messaging</link>
+            <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Messaging">Messaging</link>
             interface will involve unexporting all SMS objects from DBus.
           </para>
         </listitem>
