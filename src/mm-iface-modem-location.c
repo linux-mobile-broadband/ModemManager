@@ -937,8 +937,10 @@ set_supl_server_ready (MMIfaceModemLocation *self,
 
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        mm_gdbus_modem_location_set_supl_server (ctx->skeleton, ctx->supl);
         mm_gdbus_modem_location_complete_set_supl_server (ctx->skeleton, ctx->invocation);
+    }
 
     handle_set_supl_server_context_free (ctx);
 }
@@ -1359,6 +1361,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CAPABILITIES,
     INITIALIZATION_STEP_VALIDATE_CAPABILITIES,
+    INITIALIZATION_STEP_SUPL_SERVER,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1394,6 +1397,28 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
                                      "Interface initialization cancelled");
     initialization_context_complete_and_free (ctx);
     return TRUE;
+}
+
+static void
+load_supl_server_ready (MMIfaceModemLocation *self,
+                        GAsyncResult *res,
+                        InitializationContext *ctx)
+{
+    GError *error = NULL;
+    gchar *supl;
+
+    supl = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish (self, res, &error);
+    if (error) {
+        mm_warn ("couldn't load SUPL server: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    mm_gdbus_modem_location_set_supl_server (ctx->skeleton, supl ? supl : "");
+    g_free (supl);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
 }
 
 static void
@@ -1453,6 +1478,20 @@ interface_initialization_step (InitializationContext *ctx)
                                              MM_CORE_ERROR_UNSUPPORTED,
                                              "The modem doesn't have location capabilities");
             initialization_context_complete_and_free (ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_SUPL_SERVER:
+        /* If the modem supports A-GPS, load SUPL server */
+        if (ctx->capabilities & MM_MODEM_LOCATION_SOURCE_AGPS &&
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server &&
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server (
+                ctx->self,
+                (GAsyncReadyCallback)load_supl_server_ready,
+                ctx);
             return;
         }
         /* Fall down to next step */

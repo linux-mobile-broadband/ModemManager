@@ -42,6 +42,14 @@ struct _MMIfaceModemLocation {
                                                        GAsyncResult *res,
                                                        GError **error);
 
+    /* Loading of the SuplServer property */
+    void (* load_supl_server) (MMIfaceModemLocation *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
+    gchar * (* load_supl_server_finish) (MMIfaceModemLocation *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+
     /* Enable location gathering (async) */
     void (* enable_location_gathering) (MMIfaceModemLocation *self,
                                         MMModemLocationSource source,
