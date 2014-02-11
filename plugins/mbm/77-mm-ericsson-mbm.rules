@@ -123,4 +123,7 @@ ATTRS{idVendor}=="0930", ATTRS{idProduct}=="1314", ENV{ID_MM_ERICSSON_MBM}="1"
 # Toshiba H5321gw
 ATTRS{idVendor}=="0930", ATTRS{idProduct}=="1319", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# Lenovo N5321gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="193e", ENV{ID_MM_ERICSSON_MBM}="1"
+
 LABEL="mm_mbm_end"
