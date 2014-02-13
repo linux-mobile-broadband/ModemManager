@@ -606,10 +606,11 @@ port_serial_process_command (MMPortSerial *self,
     /* Socket based setup */
     else if (self->priv->socket) {
         GError *inner_error = NULL;
+        gssize bytes_sent;
 
         /* Send N bytes of the command */
-        written = g_socket_send (self->priv->socket, p, send_len, NULL, &inner_error);
-        if (written < 0) {
+        bytes_sent = g_socket_send (self->priv->socket, p, send_len, NULL, &inner_error);
+        if (bytes_sent < 0) {
             /* Non-EWOULDBLOCK error? */
             if (!g_error_matches (inner_error, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK)) {
                 g_propagate_error (error, inner_error);
@@ -634,7 +635,8 @@ port_serial_process_command (MMPortSerial *self,
 
             /* Just keep on, will retry... */
             written = 0;
-        }
+        } else
+          written = bytes_sent;
 
         ctx->idx += written;
     } else
