@@ -100,13 +100,13 @@ process_next_command (TestPortContext *ctx,
     static const gchar *error_response = "\r\nERROR\r\n";
 
     /* Find command end */
-    while (buffer->data[i] != '\r' && buffer->data[i] != '\n' && i < buffer->len)
+    while (i < buffer->len && buffer->data[i] != '\r' && buffer->data[i] != '\n')
         i++;
     if (i ==  buffer->len)
         /* no command */
         return NULL;
 
-    while ((buffer->data[i] == '\r' || buffer->data[i] == '\n') && i < buffer->len)
+    while (i < buffer->len && (buffer->data[i] == '\r' || buffer->data[i] == '\n'))
         buffer->data[i++] = '\0';
 
     /* Setup command and lookup response */
