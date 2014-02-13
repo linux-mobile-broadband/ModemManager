@@ -40,6 +40,95 @@ G_DEFINE_TYPE (MMPluginCinterion, mm_plugin_cinterion, MM_TYPE_PLUGIN)
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
+/*****************************************************************************/
+/* Custom init */
+
+#define TAG_CINTERION_APP_PORT   "cinterion-app-port"
+#define TAG_CINTERION_MODEM_PORT "cinterion-modem-port"
+
+typedef struct {
+    MMPortProbe *probe;
+    MMAtSerialPort *port;
+    GCancellable *cancellable;
+    GSimpleAsyncResult *result;
+} CinterionCustomInitContext;
+
+static void
+cinterion_custom_init_context_complete_and_free (CinterionCustomInitContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->port);
+    g_object_unref (ctx->probe);
+    g_object_unref (ctx->result);
+    g_slice_free (CinterionCustomInitContext, ctx);
+}
+
+static gboolean
+cinterion_custom_init_finish (MMPortProbe *probe,
+                           GAsyncResult *result,
+                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+}
+
+static void
+sqport_ready (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              CinterionCustomInitContext *ctx)
+{
+    /* Ignore errors, just avoid tagging */
+    if (error) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        cinterion_custom_init_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* A valid reply to AT^SQPORT tells us this is an AT port already */
+    mm_port_probe_set_result_at (ctx->probe, TRUE);
+
+    if (strstr (response->str, "Application"))
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_APP_PORT, GUINT_TO_POINTER (TRUE));
+    else if (strstr (response->str, "Modem"))
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_CINTERION_MODEM_PORT, GUINT_TO_POINTER (TRUE));
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    cinterion_custom_init_context_complete_and_free (ctx);
+}
+
+static void
+cinterion_custom_init (MMPortProbe *probe,
+                       MMAtSerialPort *port,
+                       GCancellable *cancellable,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    CinterionCustomInitContext *ctx;
+
+    ctx = g_slice_new (CinterionCustomInitContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (probe),
+                                             callback,
+                                             user_data,
+                                             cinterion_custom_init);
+    ctx->probe = g_object_ref (probe);
+    ctx->port = g_object_ref (port);
+    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
+
+    mm_at_serial_port_queue_command (
+        ctx->port,
+        "AT^SQPORT?",
+        3,
+        FALSE, /* raw */
+        ctx->cancellable,
+        (MMAtSerialResponseFn)sqport_ready,
+        ctx);
+}
+
+/*****************************************************************************/
+
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
@@ -67,6 +156,30 @@ create_modem (MMPlugin *self,
                                                             product));
 }
 
+static gboolean
+grab_port (MMPlugin *self,
+           MMBaseModem *modem,
+           MMPortProbe *probe,
+           GError **error)
+{
+    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
+    MMPortType ptype;
+
+    ptype = mm_port_probe_get_port_type (probe);
+
+    if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT))
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
+    else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT))
+        pflags = MM_AT_PORT_FLAG_PPP;
+
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    ptype,
+                                    pflags,
+                                    error);
+}
+
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -75,6 +188,10 @@ mm_plugin_create (void)
     static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const gchar *vendor_strings[] = { "cinterion", "siemens", NULL };
     static const guint16 vendor_ids[] = { 0x1e2d, 0x0681, 0 };
+    static const MMAsyncMethod custom_init = {
+        .async  = G_CALLBACK (cinterion_custom_init),
+        .finish = G_CALLBACK (cinterion_custom_init_finish),
+    };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_CINTERION,
@@ -84,6 +201,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
                       MM_PLUGIN_ALLOWED_AT,             TRUE,
                       MM_PLUGIN_ALLOWED_QMI,            TRUE,
+                      MM_PLUGIN_CUSTOM_INIT,            &custom_init,
                       NULL));
 }
 
@@ -98,4 +216,5 @@ mm_plugin_cinterion_class_init (MMPluginCinterionClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
+    plugin_class->grab_port = grab_port;
 }
