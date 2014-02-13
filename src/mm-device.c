@@ -232,6 +232,7 @@ const gchar *
 mm_device_utils_get_port_driver (GUdevDevice *udev_port)
 {
     const gchar *driver, *subsys;
+    const char *name = g_udev_device_get_name (udev_port);
 
     driver = g_udev_device_get_driver (udev_port);
     if (!driver) {
@@ -253,6 +254,12 @@ mm_device_utils_get_port_driver (GUdevDevice *udev_port)
         if (parent)
             g_object_unref (parent);
     }
+
+    /* Newer kernels don't set up the rfcomm port parent in sysfs,
+     * so we must infer it from the device name.
+     */
+    if (!driver && strncmp (name, "rfcomm", 6) == 0)
+        driver = "bluetooth";
 
     return driver;
 }

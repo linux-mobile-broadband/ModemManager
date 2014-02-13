@@ -170,12 +170,19 @@ find_physical_device (GUdevDevice *child)
 {
     GUdevDevice *iter, *old = NULL;
     GUdevDevice *physdev = NULL;
-    const char *subsys, *type;
+    const char *subsys, *type, *name;
     guint32 i = 0;
     gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE, is_platform = FALSE;
     gboolean is_pnp = FALSE;
 
     g_return_val_if_fail (child != NULL, NULL);
+
+    /* Bluetooth rfcomm devices are "virtual" and don't necessarily have
+     * parents at all.
+     */
+    name = g_udev_device_get_name (child);
+    if (name && strncmp (name, "rfcomm", 6) == 0)
+        return g_object_ref (child);
 
     iter = g_object_ref (child);
     while (iter && i++ < 8) {
