@@ -613,11 +613,8 @@ mode_pref_qcdm_ready (MMPortSerialQcdm *port,
     qcdm_result_unref (result);
     if (err) {
         mm_dbg ("Failed to read NV ModePref: %d", err);
-        qcdm_result_unref (result);
         goto at_caps;
     }
-
-    qcdm_result_unref (result);
 
     /* Only parse explicit modes; for 'auto' just fall back to whatever
      * the AT current capabilities probing figures out.
