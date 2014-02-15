@@ -221,10 +221,10 @@ print_bearer_info (MMBearer *bearer)
         guint i;
 
         dns = mm_bearer_ip_config_get_dns (ipv6_config);
-        g_print ("                   |  address: '%s'\n"
-                 "                   |   prefix: '%u'\n"
-                 "                   |  gateway: '%s'\n"
-                 "                   |      DNS: '%s'",
+        g_print ("                     |  address: '%s'\n"
+                 "                     |   prefix: '%u'\n"
+                 "                     |  gateway: '%s'\n"
+                 "                     |      DNS: '%s'",
                  VALIDATE_UNKNOWN(mm_bearer_ip_config_get_address (ipv6_config)),
                  mm_bearer_ip_config_get_prefix (ipv6_config),
                  VALIDATE_UNKNOWN(mm_bearer_ip_config_get_gateway (ipv6_config)),
