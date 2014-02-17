@@ -90,12 +90,27 @@ libmm_utils_icera_la_SOURCES = \
 	icera/mm-broadband-modem-icera.h \
 	icera/mm-broadband-modem-icera.c \
 	icera/mm-broadband-bearer-icera.h \
-	icera/mm-broadband-bearer-icera.c
+	icera/mm-broadband-bearer-icera.c \
+	icera/mm-modem-helpers-icera.c \
+	icera/mm-modem-helpers-icera.h
 libmm_utils_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_utils_icera_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
 
 ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
 ICERA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-icera.la
+
+noinst_PROGRAMS += test-modem-helpers-icera
+test_modem_helpers_icera_SOURCES = \
+	icera/mm-modem-helpers-icera.c \
+	icera/mm-modem-helpers-icera.h \
+	icera/tests/test-modem-helpers-icera.c
+test_modem_helpers_icera_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/icera \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_icera_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_icera_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ########################################
 
