@@ -457,7 +457,8 @@ udevrules_DATA += mtk/77-mm-mtk-port-types.rules
 
 # Additional files to include in the distribution
 EXTRA_DIST += \
-	$(udevrules_DATA)
+	$(udevrules_DATA) \
+	tests/gsm-port.conf
 
 # Unit tests
 TEST_PROGS += $(noinst_PROGRAMS)
