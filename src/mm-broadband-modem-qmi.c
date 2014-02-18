@@ -2482,9 +2482,9 @@ load_signal_quality (MMIfaceModem *self,
 /* Powering up the modem (Modem interface) */
 
 static gboolean
-modem_power_up_down_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
+modem_power_up_down_off_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -2502,7 +2502,7 @@ dms_set_operating_mode_ready (QmiClientDms *client,
         if (g_error_matches (error,
                              QMI_CORE_ERROR,
                              QMI_CORE_ERROR_UNSUPPORTED)) {
-            mm_dbg ("Device doesn't support operating mode setting. Ignoring power up/down");
+            mm_dbg ("Device doesn't support operating mode setting. Ignoring power update.");
             g_simple_async_result_set_op_res_gboolean (simple, TRUE);
             g_error_free (error);
         } else {
@@ -2524,10 +2524,10 @@ dms_set_operating_mode_ready (QmiClientDms *client,
 }
 
 static void
-common_power_up_down (MMIfaceModem *self,
-                      QmiDmsOperatingMode mode,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+common_power_up_down_off (MMIfaceModem *self,
+                          QmiDmsOperatingMode mode,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
 {
     QmiMessageDmsSetOperatingModeInput *input;
     GSimpleAsyncResult *result;
@@ -2542,7 +2542,7 @@ common_power_up_down (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        common_power_up_down);
+                                        common_power_up_down_off);
 
     input = qmi_message_dms_set_operating_mode_input_new ();
     if (!qmi_message_dms_set_operating_mode_input_set_mode (
@@ -2567,14 +2567,25 @@ common_power_up_down (MMIfaceModem *self,
 }
 
 static void
+modem_power_off (MMIfaceModem *self,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    common_power_up_down_off (self,
+                              QMI_DMS_OPERATING_MODE_OFFLINE,
+                              callback,
+                              user_data);
+}
+
+static void
 modem_power_down (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    common_power_up_down (self,
-                          QMI_DMS_OPERATING_MODE_LOW_POWER,
-                          callback,
-                          user_data);
+    common_power_up_down_off (self,
+                              QMI_DMS_OPERATING_MODE_LOW_POWER,
+                              callback,
+                              user_data);
 }
 
 static void
@@ -2582,10 +2593,10 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    common_power_up_down (self,
-                          QMI_DMS_OPERATING_MODE_ONLINE,
-                          callback,
-                          user_data);
+    common_power_up_down_off (self,
+                              QMI_DMS_OPERATING_MODE_ONLINE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -10200,11 +10211,13 @@ iface_modem_init (MMIfaceModem *iface)
 
     /* Enabling/disabling */
     iface->modem_power_up = modem_power_up;
-    iface->modem_power_up_finish = modem_power_up_down_finish;
+    iface->modem_power_up_finish = modem_power_up_down_off_finish;
     iface->modem_after_power_up = NULL;
     iface->modem_after_power_up_finish = NULL;
     iface->modem_power_down = modem_power_down;
-    iface->modem_power_down_finish = modem_power_up_down_finish;
+    iface->modem_power_down_finish = modem_power_up_down_off_finish;
+    iface->modem_power_off = modem_power_off;
+    iface->modem_power_off_finish = modem_power_up_down_off_finish;
     iface->setup_flow_control = NULL;
     iface->setup_flow_control_finish = NULL;
     iface->load_supported_charsets = NULL;
