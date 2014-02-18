@@ -52,6 +52,7 @@ static gboolean enable_flag;
 static gboolean disable_flag;
 static gboolean set_power_state_on_flag;
 static gboolean set_power_state_low_flag;
+static gboolean set_power_state_off_flag;
 static gboolean reset_flag;
 static gchar *factory_reset_str;
 static gchar *command_str;
@@ -82,6 +83,10 @@ static GOptionEntry entries[] = {
     },
     { "set-power-state-low", 0, 0, G_OPTION_ARG_NONE, &set_power_state_low_flag,
       "Set low power state in the modem",
+      NULL
+    },
+    { "set-power-state-off", 0, 0, G_OPTION_ARG_NONE, &set_power_state_off_flag,
+      "Power off the modem",
       NULL
     },
     { "reset", 'r', 0, G_OPTION_ARG_NONE, &reset_flag,
@@ -157,6 +162,7 @@ mmcli_modem_options_enabled (void)
                  disable_flag +
                  set_power_state_on_flag +
                  set_power_state_low_flag +
+                 set_power_state_off_flag +
                  reset_flag +
                  list_bearers_flag +
                  !!create_bearer_str +
@@ -1071,6 +1077,17 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to power off the modem? */
+    if (set_power_state_off_flag) {
+        g_debug ("Asynchronously powering off...");
+        mm_modem_set_power_state (ctx->modem,
+                                  MM_MODEM_POWER_STATE_OFF,
+                                  ctx->cancellable,
+                                  (GAsyncReadyCallback)set_power_state_ready,
+                                  NULL);
+        return;
+    }
+
     /* Request to reset the modem? */
     if (reset_flag) {
         g_debug ("Asynchronously reseting modem...");
@@ -1284,6 +1301,16 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
         g_debug ("Synchronously setting low power...");
         result = mm_modem_set_power_state_sync (ctx->modem, MM_MODEM_POWER_STATE_LOW, NULL, &error);
+        set_power_state_process_reply (result, error);
+        return;
+    }
+
+    /* Request to power off? */
+    if (set_power_state_off_flag) {
+        gboolean result;
+
+        g_debug ("Synchronously powering off...");
+        result = mm_modem_set_power_state_sync (ctx->modem, MM_MODEM_POWER_STATE_OFF, NULL, &error);
         set_power_state_process_reply (result, error);
         return;
     }
