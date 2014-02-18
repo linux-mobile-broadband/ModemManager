@@ -34,6 +34,16 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerSierra, mm_broadband_bearer_sierra, MM_TYPE_BROADBAND_BEARER);
 
+struct _MMBroadbandBearerSierraPrivate {
+    gboolean is_icera;
+};
+
+enum {
+    PROP_0,
+    PROP_IS_ICERA,
+    PROP_LAST
+};
+
 /*****************************************************************************/
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
 
@@ -198,7 +208,10 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
 
             if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
                 mm_dbg ("Not using authentication");
-                command = g_strdup_printf ("$QCPDPP=%d,0", ctx->cid);
+                if (ctx->self->priv->is_icera)
+                    command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
+                else
+                    command = g_strdup_printf ("$QCPDPP=%d,0", ctx->cid);
             } else {
                 gchar *quoted_user;
                 gchar *quoted_password;
@@ -230,11 +243,20 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
 
                 quoted_user = mm_port_serial_at_quote_string (user);
                 quoted_password = mm_port_serial_at_quote_string (password);
-                command = g_strdup_printf ("$QCPDPP=%d,%u,%s,%s",
-                                           ctx->cid,
-                                           sierra_auth,
-                                           quoted_password,
-                                           quoted_user);
+                if (ctx->self->priv->is_icera) {
+                    command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
+                                               ctx->cid,
+                                               sierra_auth,
+                                               quoted_user,
+                                               quoted_password);
+                } else {
+                    /* Yes, password comes first... */
+                    command = g_strdup_printf ("$QCPDPP=%d,%u,%s,%s",
+                                               ctx->cid,
+                                               sierra_auth,
+                                               quoted_password,
+                                               quoted_user);
+                }
                 g_free (quoted_user);
                 g_free (quoted_password);
             }
@@ -421,6 +443,8 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
+#define MM_BROADBAND_BEARER_SIERRA_IS_ICERA "is-icera"
+
 MMBearer *
 mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
                                        GError **error)
@@ -444,6 +468,7 @@ mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
 void
 mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
                                 MMBearerProperties *config,
+                                gboolean is_icera,
                                 GCancellable *cancellable,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
@@ -456,21 +481,74 @@ mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
         user_data,
         MM_BEARER_MODEM, modem,
         MM_BEARER_CONFIG, config,
+        MM_BROADBAND_BEARER_SIERRA_IS_ICERA, is_icera,
         NULL);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerSierra *self = MM_BROADBAND_BEARER_SIERRA (object);
+
+    switch (prop_id) {
+    case PROP_IS_ICERA:
+        self->priv->is_icera = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerSierra *self = MM_BROADBAND_BEARER_SIERRA (object);
+
+    switch (prop_id) {
+    case PROP_IS_ICERA:
+        g_value_set_boolean (value, self->priv->is_icera);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
 mm_broadband_bearer_sierra_init (MMBroadbandBearerSierra *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_BEARER_SIERRA,
+                                              MMBroadbandBearerSierraPrivate);
 }
 
 static void
 mm_broadband_bearer_sierra_class_init (MMBroadbandBearerSierraClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
+    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerSierraPrivate));
+
+    object_class->set_property = set_property;
+    object_class->get_property = get_property;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
+
+    g_object_class_install_property (object_class, PROP_IS_ICERA,
+        g_param_spec_boolean (MM_BROADBAND_BEARER_SIERRA_IS_ICERA,
+                              "IsIcera",
+                              "Whether the modem uses Icera commands or not.",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

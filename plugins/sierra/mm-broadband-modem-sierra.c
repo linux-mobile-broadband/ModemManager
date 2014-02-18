@@ -1136,6 +1136,7 @@ modem_create_bearer (MMIfaceModem *self,
     mm_dbg ("Creating Sierra bearer...");
     mm_broadband_bearer_sierra_new (MM_BROADBAND_MODEM (self),
                                     properties,
+                                    FALSE, /* is_icera */
                                     NULL, /* cancellable */
                                     (GAsyncReadyCallback)broadband_bearer_sierra_new_ready,
                                     result);
