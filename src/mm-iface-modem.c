@@ -1703,12 +1703,28 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* Error if we're not in disabled state */
+    /* Only 'off', 'low' or 'up' expected */
+    if (ctx->power_state != MM_MODEM_POWER_STATE_LOW &&
+        ctx->power_state != MM_MODEM_POWER_STATE_ON &&
+        ctx->power_state != MM_MODEM_POWER_STATE_OFF) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_INVALID_ARGS,
+                                               "Cannot set '%s' power state",
+                                               mm_modem_power_state_get_string (ctx->power_state));
+        handle_set_power_state_context_free (ctx);
+        return;
+    }
+
     modem_state = MM_MODEM_STATE_UNKNOWN;
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
-    if (modem_state != MM_MODEM_STATE_DISABLED) {
+
+    /* Going into LOW or ON only allowed in disabled state */
+    if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW ||
+         ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
+        modem_state != MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
@@ -1717,14 +1733,15 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* Only 'low' or 'up' expected */
-    if (ctx->power_state != MM_MODEM_POWER_STATE_LOW &&
-        ctx->power_state != MM_MODEM_POWER_STATE_ON) {
+    /* Going into OFF, only allowed if locked, disabled or failed */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_OFF &&
+        modem_state != MM_MODEM_STATE_FAILED &&
+        modem_state != MM_MODEM_STATE_LOCKED &&
+        modem_state != MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
-                                               MM_CORE_ERROR_INVALID_ARGS,
-                                               "Cannot set '%s' power state",
-                                               mm_modem_power_state_get_string (ctx->power_state));
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot set power state: modem either enabled or initializing");
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -3191,6 +3208,28 @@ modem_power_down_ready (MMIfaceModem *self,
 }
 
 static void
+modem_power_off_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        SetPowerStateContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_off_finish (self, res, &error);
+    if (error) {
+        /* If the real and cached ones are different, set the real one */
+        if (ctx->previous_cached_power_state != ctx->previous_real_power_state)
+            mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->previous_real_power_state);
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        mm_info ("Modem powered off... may no longer be accessible");
+        mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->power_state);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    set_power_state_context_complete_and_free (ctx);
+}
+
+static void
 set_power_state (SetPowerStateContext *ctx)
 {
     /* Already done if we're in the desired power state */
@@ -3205,10 +3244,41 @@ set_power_state (SetPowerStateContext *ctx)
         return;
     }
 
+    /* Don't allow trying to recover from a power off */
+    if (ctx->previous_real_power_state == MM_MODEM_POWER_STATE_OFF) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot recover from a power off");
+        set_power_state_context_complete_and_free (ctx);
+        return;
+    }
+
     /* Supported transitions:
-     * UNKNOWN|OFF|LOW --> ON
+     * UNKNOWN|LOW --> ON
      * ON --> LOW
+     * ON|LOW --> OFF
      */
+
+    /* Fully powering off the modem? */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_OFF) {
+        /* Error if unsupported */
+        if (!MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_off ||
+            !MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_off_finish) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Powering off is not supported by this modem");
+            set_power_state_context_complete_and_free (ctx);
+            return;
+        }
+
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_off (
+            MM_IFACE_MODEM (ctx->self),
+            (GAsyncReadyCallback)modem_power_off_ready,
+            ctx);
+        return;
+    }
 
     /* Going into low power mode? */
     if (ctx->power_state == MM_MODEM_POWER_STATE_LOW) {

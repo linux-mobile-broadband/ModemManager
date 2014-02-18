@@ -304,6 +304,13 @@ struct _MMIfaceModem {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Asynchronous modem power-off operation */
+    void (*modem_power_off) (MMIfaceModem *self,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data);
+    gboolean (*modem_power_off_finish) (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error);
     /* Create SIM */
     void (*create_sim) (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
