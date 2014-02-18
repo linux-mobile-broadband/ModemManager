@@ -442,7 +442,7 @@ mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
 }
 
 void
-mm_broadband_bearer_sierra_new (MMBroadbandModemSierra *modem,
+mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
                                 MMBearerProperties *config,
                                 GCancellable *cancellable,
                                 GAsyncReadyCallback callback,

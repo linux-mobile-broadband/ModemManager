@@ -48,7 +48,7 @@ struct _MMBroadbandBearerSierraClass {
 GType mm_broadband_bearer_sierra_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_sierra_new (MMBroadbandModemSierra *modem,
+void mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
                                      MMBearerProperties *config,
                                      GCancellable *cancellable,
                                      GAsyncReadyCallback callback,
