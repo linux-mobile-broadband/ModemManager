@@ -1163,6 +1163,32 @@ modem_power_down (MMIfaceModem *self,
                               user_data);
 }
 
+/*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_off_finish (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_power_off (MMIfaceModem *self,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CPOF=1",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+
 static void
 setup_ports (MMBroadbandModem *self)
 {
@@ -1243,6 +1269,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = modem_power_up_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
+    iface->modem_power_off = modem_power_off;
+    iface->modem_power_off_finish = modem_power_off_finish;
 }
 
 static void
