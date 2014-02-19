@@ -190,8 +190,7 @@ curc_ready (MMPortSerialAt *port,
                              MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
             goto out;
 
-        mm_dbg ("(Huawei) couldn't turn off unsolicited messages in"
-                "secondary ports: '%s'",
+        mm_dbg ("(Huawei) couldn't turn off unsolicited messages in secondary ports: '%s'",
                 error->message);
     }
 
