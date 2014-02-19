@@ -674,7 +674,9 @@ dial_3gpp_ready (MMBroadbandModem *modem,
                  GAsyncResult *res,
                  DetailedConnectContext *ctx)
 {
-    MMBearerIpConfig *config;
+    MMBearerIpMethod ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
+    MMBearerIpConfig *ipv4_config = NULL;
+    MMBearerIpConfig *ipv6_config = NULL;
     GError *error = NULL;
 
     ctx->data = MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self, res, &error);
@@ -715,19 +717,30 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 
     /* If no specific IP retrieval requested, set the default implementation
      * (PPP if data port is AT, DHCP otherwise) */
-    config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config,
-                                    (MM_IS_PORT_SERIAL_AT (ctx->data) ?
-                                     MM_BEARER_IP_METHOD_PPP :
-                                     MM_BEARER_IP_METHOD_DHCP));
+    ip_method = MM_IS_PORT_SERIAL_AT (ctx->data) ?
+                    MM_BEARER_IP_METHOD_PPP :
+                    MM_BEARER_IP_METHOD_DHCP;
+
+    if (ctx->ip_family & MM_BEARER_IP_FAMILY_IPV4 ||
+            ctx->ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
+        ipv4_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ipv4_config, ip_method);
+    }
+    if (ctx->ip_family & MM_BEARER_IP_FAMILY_IPV6 ||
+            ctx->ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
+        ipv6_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ipv6_config, ip_method);
+    }
+    g_assert (ipv4_config || ipv6_config);
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
-        mm_bearer_connect_result_new (ctx->data, config, NULL),
+        mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config),
         (GDestroyNotify)mm_bearer_connect_result_unref);
     detailed_connect_context_complete_and_free (ctx);
 
-    g_object_unref (config);
+    g_clear_object (&ipv4_config);
+    g_clear_object (&ipv6_config);
 }
 
 static void
