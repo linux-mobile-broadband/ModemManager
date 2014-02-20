@@ -701,6 +701,7 @@ dial_3gpp_ready (MMBroadbandModem *modem,
             ctx->secondary,
             ctx->data,
             ctx->cid,
+            ctx->ip_family,
             (GAsyncReadyCallback)get_ip_config_3gpp_ready,
             ctx);
         return;
