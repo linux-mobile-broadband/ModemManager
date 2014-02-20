@@ -200,7 +200,7 @@ deferred_3gpp_unregistration_cb (MMBearer *self)
     self->priv->deferred_3gpp_unregistration_id = 0;
 
     mm_dbg ("Forcing bearer disconnection, not registered in 3GPP network");
-    mm_bearer_disconnect_force (MM_BEARER (self));
+    mm_bearer_disconnect_force (self);
     return FALSE;
 }
 
@@ -226,7 +226,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self))))
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (self)))
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         else
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
@@ -246,7 +246,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
     if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
         reset_deferred_unregistration (self);
-        mm_bearer_disconnect_force (MM_BEARER (self));
+        mm_bearer_disconnect_force (self);
         return;
     }
 
@@ -259,7 +259,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
             mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
-            mm_bearer_disconnect_force (MM_BEARER (self));
+            mm_bearer_disconnect_force (self);
             return;
         }
 
@@ -282,7 +282,7 @@ deferred_cdma_unregistration_cb (MMBearer *self)
     self->priv->deferred_cdma_unregistration_id = 0;
 
     mm_dbg ("Forcing bearer disconnection, not registered in CDMA network");
-    mm_bearer_disconnect_force (MM_BEARER (self));
+    mm_bearer_disconnect_force (self);
     return FALSE;
 }
 
@@ -301,7 +301,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 
     if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
         evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self))))
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (self)))
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
         else
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_ROAMING;
@@ -325,7 +325,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
     if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
         reset_deferred_unregistration (self);
-        mm_bearer_disconnect_force (MM_BEARER (self));
+        mm_bearer_disconnect_force (self);
         return;
     }
 
@@ -338,7 +338,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
             mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
-            mm_bearer_disconnect_force (MM_BEARER (self));
+            mm_bearer_disconnect_force (self);
             return;
         }
 
