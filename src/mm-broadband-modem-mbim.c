@@ -1897,9 +1897,9 @@ common_enable_disable_unsolicited_events_finish (MMBroadbandModemMbim *self,
 }
 
 static void
-subscribe_list_set_ready_cb (MbimDevice *device,
-                             GAsyncResult *res,
-                             GSimpleAsyncResult *simple)
+subscriber_list_set_ready_cb (MbimDevice *device,
+                              GAsyncResult *res,
+                              GSimpleAsyncResult *simple)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -1970,7 +1970,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
         n_entries++;
     }
 
-    request = (mbim_message_device_service_subscribe_list_set_new (
+    request = (mbim_message_device_service_subscriber_list_set_new (
                    n_entries,
                    (const MbimEventEntry *const *)entries,
                    NULL));
@@ -1978,7 +1978,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                          request,
                          10,
                          NULL,
-                         (GAsyncReadyCallback)subscribe_list_set_ready_cb,
+                         (GAsyncReadyCallback)subscriber_list_set_ready_cb,
                          result);
     mbim_message_unref (request);
     mbim_event_entry_array_free (entries);
