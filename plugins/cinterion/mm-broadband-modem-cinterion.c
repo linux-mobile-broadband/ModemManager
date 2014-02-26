@@ -778,6 +778,8 @@ set_current_modes (MMIfaceModem *self,
 {
     GSimpleAsyncResult *result;
 
+    g_assert (preferred == MM_MODEM_MODE_NONE);
+
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
@@ -802,20 +804,10 @@ set_current_modes (MMIfaceModem *self,
             g_string_append (cmd, "2");
         } else if (allowed == MM_MODEM_MODE_2G) {
             g_string_append (cmd, "0");
-        } else {
-            gchar *allowed_str;
-            gchar *preferred_str;
-
+        } else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G)) {
             /* no AcT given, defaults to Auto */
-            allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-            preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-            mm_warn ("Requested mode (allowed: '%s', preferred: '%s') not "
-                     "supported by the modem. Defaulting to automatic mode.",
-                     allowed_str,
-                     preferred_str);
-            g_free (allowed_str);
-            g_free (preferred_str);
-        }
+        } else
+            g_assert_not_reached ();
 
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
@@ -828,30 +820,9 @@ set_current_modes (MMIfaceModem *self,
         return;
     }
 
-    /* For 3G-only devices, allow only 3G-related allowed modes.
-     * For 2G-only devices, allow only 2G-related allowed modes.
-     *
-     * Note that the common logic of the interface already limits the
-     * allowed/preferred modes that can be tried in these cases. */
-    if (mm_iface_modem_is_2g_only (self) ||
-        mm_iface_modem_is_3g_only (self)) {
-        gchar *allowed_str;
-        gchar *preferred_str;
-
-        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-        mm_dbg ("Not doing anything. Assuming requested mode "
-                "(allowed: '%s', preferred: '%s') is supported by "
-                "%s-only modem.",
-                allowed_str,
-                preferred_str,
-                mm_iface_modem_is_3g_only (self) ? "3G" : "2G");
-        g_free (allowed_str);
-        g_free (preferred_str);
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
+    /* For 2G-only and 3G-only devices, we already stated that we don't
+     * support mode switching. */
+    g_assert_not_reached ();
     }
 
     g_assert_not_reached ();
