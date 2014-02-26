@@ -51,6 +51,9 @@ struct _MMBroadbandModemCinterionPrivate {
 
     /* Command to go into sleep mode */
     gchar *sleep_mode_cmd;
+
+    /* Cached manual selection attempt */
+    gchar *manual_operator_id;
 };
 
 /* Setup relationship between the band bitmask in the modem and the bitmask
@@ -823,9 +826,88 @@ set_current_modes (MMIfaceModem *self,
     /* For 2G-only and 3G-only devices, we already stated that we don't
      * support mode switching. */
     g_assert_not_reached ();
+}
+
+/*****************************************************************************/
+/* Register in network (3GPP interface) */
+
+typedef struct {
+    MMBroadbandModemCinterion *self;
+    GSimpleAsyncResult *result;
+    gchar *operator_id;
+} RegisterInNetworkContext;
+
+static void
+register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx->operator_id);
+    g_slice_free (RegisterInNetworkContext, ctx);
+}
+
+static gboolean
+register_in_network_finish (MMIfaceModem3gpp *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cops_write_ready (MMBaseModem *self,
+                  GAsyncResult *res,
+                  RegisterInNetworkContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
+        g_simple_async_result_take_error (ctx->result, error);
+    else {
+        /* Update cached */
+        g_free (ctx->self->priv->manual_operator_id);
+        ctx->self->priv->manual_operator_id = g_strdup (ctx->operator_id);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     }
 
-    g_assert_not_reached ();
+    register_in_network_context_complete_and_free (ctx);
+}
+
+static void
+register_in_network (MMIfaceModem3gpp *self,
+                     const gchar *operator_id,
+                     GCancellable *cancellable,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    RegisterInNetworkContext *ctx;
+    gchar *command;
+
+    ctx = g_slice_new (RegisterInNetworkContext);
+    ctx->self = g_object_ref (self);
+    ctx->operator_id = g_strdup (operator_id);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             register_in_network);
+
+    /* If the user sent a specific network to use, lock it in. */
+    if (operator_id)
+        command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
+    else
+        command = g_strdup ("+COPS=0");
+
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                                   command,
+                                   120,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   cancellable,
+                                   (GAsyncReadyCallback)cops_write_ready,
+                                   ctx);
+    g_free (command);
 }
 
 /*****************************************************************************/
@@ -1381,6 +1463,7 @@ finalize (GObject *object)
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (object);
 
     g_free (self->priv->sleep_mode_cmd);
+    g_free (self->priv->manual_operator_id);
 
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
 }
@@ -1415,6 +1498,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface->enable_unsolicited_events = enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = enable_unsolicited_events_finish;
+    iface->register_in_network = register_in_network;
+    iface->register_in_network_finish = register_in_network_finish;
 }
 
 static void
