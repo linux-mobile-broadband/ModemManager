@@ -260,6 +260,8 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
     /* If we got registered, end registration checks */
     if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        /* Request immediate access tech update */
+        mm_iface_modem_refresh_access_technologies (MM_IFACE_MODEM (ctx->self));
         mm_dbg ("Modem is currently registered in a 3GPP network");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         register_in_network_context_complete_and_free (ctx);
