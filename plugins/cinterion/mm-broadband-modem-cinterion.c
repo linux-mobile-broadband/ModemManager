@@ -773,13 +773,14 @@ allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
 }
 
 static void
-set_current_modes (MMIfaceModem *self,
+set_current_modes (MMIfaceModem *_self,
                    MMModemMode allowed,
                    MMModemMode preferred,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
     GSimpleAsyncResult *result;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
 
     g_assert (preferred == MM_MODEM_MODE_NONE);
 
@@ -789,9 +790,9 @@ set_current_modes (MMIfaceModem *self,
                                         set_current_modes);
 
     /* For dual 2G/3G devices... */
-    if (mm_iface_modem_is_2g (self) &&
-        mm_iface_modem_is_3g (self)) {
-        GString *cmd;
+    if (mm_iface_modem_is_2g (_self) &&
+        mm_iface_modem_is_3g (_self)) {
+        gchar *command;
 
         /* We will try to simulate the possible allowed modes here. The
          * Cinterion devices do not seem to allow setting preferred access
@@ -802,24 +803,31 @@ set_current_modes (MMIfaceModem *self,
          * - for the remaining ones, we default to automatic selection of RAT,
          *   which is based on the quality of the connection.
          */
-        cmd = g_string_new ("+COPS=,,,");
-        if (allowed == MM_MODEM_MODE_3G) {
-            g_string_append (cmd, "2");
-        } else if (allowed == MM_MODEM_MODE_2G) {
-            g_string_append (cmd, "0");
-        } else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G)) {
-            /* no AcT given, defaults to Auto */
+
+        if (allowed == MM_MODEM_MODE_3G)
+            command = g_strdup ("+COPS=,,,2");
+        else if (allowed == MM_MODEM_MODE_2G)
+            command = g_strdup ("+COPS=,,,0");
+        else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G)) {
+            /* no AcT given, defaults to Auto. For this case, we cannot provide
+             * AT+COPS=,,, (i.e. just without a last value). Instead, we need to
+             * re-run the last manual/automatic selection command which succeeded,
+             * (or auto by default if none was launched) */
+            if (self->priv->manual_operator_id)
+                command = g_strdup_printf ("+COPS=1,2,\"%s\"", self->priv->manual_operator_id);
+            else
+                command = g_strdup ("+COPS=0");
         } else
             g_assert_not_reached ();
 
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
-            cmd->str,
+            command,
             20,
             FALSE,
             (GAsyncReadyCallback)allowed_access_technology_update_ready,
             result);
-        g_string_free (cmd, TRUE);
+        g_free (command);
         return;
     }
 
