@@ -44,7 +44,10 @@ common_test_scfg (const gchar *response,
     GError *error = NULL;
     gboolean res;
 
-    res = mm_cinterion_parse_scfg_3g_test (response, &bands, &error);
+    res = mm_cinterion_parse_scfg_test (response,
+                                        MM_MODEM_CHARSET_UNKNOWN,
+                                        &bands,
+                                        &error);
     g_assert_no_error (error);
     g_assert (res == TRUE);
     g_assert (bands != NULL);

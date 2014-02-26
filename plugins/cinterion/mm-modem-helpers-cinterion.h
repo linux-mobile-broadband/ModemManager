@@ -21,9 +21,10 @@
 /*****************************************************************************/
 /* ^SCFG test parser */
 
-gboolean mm_cinterion_parse_scfg_3g_test (const gchar *response,
-                                          GArray **supported_bands,
-                                          GError **error);
+gboolean mm_cinterion_parse_scfg_test (const gchar *response,
+                                       MMModemCharset charset,
+                                       GArray **supported_bands,
+                                       GError **error);
 
 /*****************************************************************************/
 /* ^SCFG response parser */

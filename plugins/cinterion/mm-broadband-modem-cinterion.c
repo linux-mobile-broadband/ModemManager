@@ -924,9 +924,9 @@ load_supported_bands_finish (MMIfaceModem *self,
 }
 
 static void
-scfg_3g_test_ready (MMBaseModem *_self,
-                    GAsyncResult *res,
-                    GSimpleAsyncResult *simple)
+scfg_test_ready (MMBaseModem *_self,
+                 GAsyncResult *res,
+                 GSimpleAsyncResult *simple)
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar *response;
@@ -936,7 +936,10 @@ scfg_3g_test_ready (MMBaseModem *_self,
     response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
         g_simple_async_result_take_error (simple, error);
-    else if (!mm_cinterion_parse_scfg_3g_test (response, &bands, &error))
+    else if (!mm_cinterion_parse_scfg_test (response,
+                                            mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                            &bands,
+                                            &error))
         g_simple_async_result_take_error (simple, error);
     else {
         mm_cinterion_build_band (bands, 0, &self->priv->supported_bands, NULL);
@@ -960,30 +963,11 @@ load_supported_bands (MMIfaceModem *self,
                                         user_data,
                                         load_supported_bands);
 
-    /* We do assume that we already know if the modem is 2G-only, 3G-only or
-     * 2G+3G. This is checked quite before trying to load supported bands. */
-    if (mm_iface_modem_is_2g_only (self)) {
-        GArray *bands;
-        MMModemBand single;
-
-        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-        single = MM_MODEM_BAND_EGSM,  g_array_append_val (bands, single);
-        single = MM_MODEM_BAND_DCS,   g_array_append_val (bands, single);
-        single = MM_MODEM_BAND_PCS,   g_array_append_val (bands, single);
-        single = MM_MODEM_BAND_G850,  g_array_append_val (bands, single);
-
-        g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    /* 2G+3G device, query AT^SCFG */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "AT^SCFG=?",
                               3,
                               FALSE,
-                              (GAsyncReadyCallback)scfg_3g_test_ready,
+                              (GAsyncReadyCallback)scfg_test_ready,
                               simple);
 }
 

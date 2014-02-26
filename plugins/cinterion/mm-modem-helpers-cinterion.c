@@ -20,6 +20,7 @@
 #include "ModemManager.h"
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
+#include "mm-charsets.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers-cinterion.h"
 
@@ -28,14 +29,14 @@
 typedef struct {
     guint32 cinterion_band_flag;
     MMModemBand mm_band;
-} CinterionBand3G;
+} CinterionBand;
 
 /* Table checked in HC25 and PHS8 references. This table includes both 2G and 3G
  * frequencies. Depending on which one is configured, one access technology or
  * the other will be used. This may conflict with the allowed mode configuration
  * set, so you shouldn't for example set 3G frequency bands, and then use a
  * 2G-only allowed mode. */
-static const CinterionBand3G bands_3g[] = {
+static const CinterionBand cinterion_bands[] = {
     { (1 << 0), MM_MODEM_BAND_EGSM  },
     { (1 << 1), MM_MODEM_BAND_DCS   },
     { (1 << 2), MM_MODEM_BAND_PCS   },
@@ -61,9 +62,10 @@ static const CinterionBand3G bands_3g[] = {
  */
 
 gboolean
-mm_cinterion_parse_scfg_3g_test (const gchar *response,
-                                 GArray **supported_bands,
-                                 GError **error)
+mm_cinterion_parse_scfg_test (const gchar *response,
+                              MMModemCharset charset,
+                              GArray **supported_bands,
+                              GError **error)
 {
     GRegex *r;
     GMatchInfo *match_info;
@@ -75,27 +77,37 @@ mm_cinterion_parse_scfg_3g_test (const gchar *response,
         return FALSE;
     }
 
-    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\(\"(\\d+)-(\\d+)\",.*\\)",
+    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\(\"([0-9a-fA-F]*)-([0-9a-fA-F]*)\",.*\\)",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, NULL);
     g_assert (r != NULL);
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     if (!inner_error && g_match_info_matches (match_info)) {
-        guint maxband;
+        gchar *maxbandstr;
+        guint maxband = 0;
 
-        if (!mm_get_uint_from_match_info (match_info, 2, &maxband)) {
+        maxbandstr = mm_get_string_unquoted_from_match_info (match_info, 2);
+        if (maxbandstr) {
+            /* Handle charset conversion if the number is given in UCS2 */
+            if (charset != MM_MODEM_CHARSET_UNKNOWN)
+                maxbandstr = mm_charset_take_and_convert_to_utf8 (maxbandstr, charset);
+
+            mm_get_uint_from_str (maxbandstr, &maxband);
+        }
+
+        if (maxband == 0) {
             inner_error = g_error_new (MM_CORE_ERROR,
                                        MM_CORE_ERROR_FAILED,
                                        "Couldn't parse ^SCFG=? response");
         } else {
             guint i;
 
-            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
-                if (maxband & bands_3g[i].cinterion_band_flag) {
+            for (i = 0; i < G_N_ELEMENTS (cinterion_bands); i++) {
+                if (maxband & cinterion_bands[i].cinterion_band_flag) {
                     if (G_UNLIKELY (!bands))
                         bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
-                    g_array_append_val (bands, bands_3g[i].mm_band);
+                    g_array_append_val (bands, cinterion_bands[i].mm_band);
                 }
             }
         }
@@ -159,11 +171,11 @@ mm_cinterion_parse_scfg_3g_response (const gchar *response,
 
             current_int = (guint32) atoi (current);
 
-            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
-                if (current_int & bands_3g[i].cinterion_band_flag) {
+            for (i = 0; i < G_N_ELEMENTS (cinterion_bands); i++) {
+                if (current_int & cinterion_bands[i].cinterion_band_flag) {
                     if (G_UNLIKELY (!bands))
                         bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-                    g_array_append_val (bands, bands_3g[i].mm_band);
+                    g_array_append_val (bands, cinterion_bands[i].mm_band);
                 }
             }
 
@@ -208,12 +220,12 @@ mm_cinterion_build_band (GArray *bands,
     } else {
         guint i;
 
-        for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+        for (i = 0; i < G_N_ELEMENTS (cinterion_bands); i++) {
             guint j;
 
             for (j = 0; j < bands->len; j++) {
-                if (g_array_index (bands, MMModemBand, j) == bands_3g[i].mm_band) {
-                    band |= bands_3g[i].cinterion_band_flag;
+                if (g_array_index (bands, MMModemBand, j) == cinterion_bands[i].mm_band) {
+                    band |= cinterion_bands[i].cinterion_band_flag;
                     break;
                 }
             }
