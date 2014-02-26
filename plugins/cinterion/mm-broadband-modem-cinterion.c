@@ -820,7 +820,7 @@ set_current_modes (MMIfaceModem *self,
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
             cmd->str,
-            3,
+            20,
             FALSE,
             (GAsyncReadyCallback)allowed_access_technology_update_ready,
             result);
