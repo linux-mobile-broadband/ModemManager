@@ -726,9 +726,13 @@ pin_query_unlock_retries_ready (MbimDevice *device,
         MMUnlockRetries *retries;
 
         retries = mm_unlock_retries_new ();
-        mm_unlock_retries_set (retries,
-                               mm_modem_lock_from_mbim_pin_type (pin_type),
-                               remaining_attempts);
+        /* According to the MBIM specification, RemainingAttempts is set to
+         * 0xffffffff if the device does not support this information. */
+        if (remaining_attempts != G_MAXUINT32) {
+            mm_unlock_retries_set (retries,
+                                   mm_modem_lock_from_mbim_pin_type (pin_type),
+                                   remaining_attempts);
+        }
         g_simple_async_result_set_op_res_gpointer (simple, retries, g_object_unref);
     } else
         g_simple_async_result_take_error (simple, error);
