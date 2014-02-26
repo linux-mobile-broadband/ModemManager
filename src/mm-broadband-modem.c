@@ -9296,6 +9296,12 @@ mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
     return mm_utf8_take_and_convert_to_charset (str, self->priv->modem_current_charset);
 }
 
+MMModemCharset
+mm_broadband_modem_get_current_charset (MMBroadbandModem *self)
+{
+    return self->priv->modem_current_charset;
+}
+
 gchar *
 mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                                              const gchar *ati,
