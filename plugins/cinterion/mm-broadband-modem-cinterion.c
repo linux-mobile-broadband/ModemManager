@@ -771,8 +771,11 @@ allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
     if (error)
         /* Let the error be critical. */
         g_simple_async_result_take_error (operation_result, error);
-    else
+    else {
+        /* Request immediate access tech update */
+        mm_iface_modem_refresh_access_technologies (MM_IFACE_MODEM (self));
         g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    }
     g_simple_async_result_complete (operation_result);
     g_object_unref (operation_result);
 }
