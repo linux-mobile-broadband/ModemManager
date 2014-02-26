@@ -29,9 +29,10 @@ gboolean mm_cinterion_parse_scfg_test (const gchar *response,
 /*****************************************************************************/
 /* ^SCFG response parser */
 
-gboolean mm_cinterion_parse_scfg_3g_response (const gchar *response,
-                                              GArray **bands,
-                                              GError **error);
+gboolean mm_cinterion_parse_scfg_response (const gchar *response,
+                                           MMModemCharset charset,
+                                           GArray **bands,
+                                           GError **error);
 
 /*****************************************************************************/
 /* Build Cinterion-specific band value */

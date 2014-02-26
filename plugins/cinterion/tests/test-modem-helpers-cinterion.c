@@ -122,6 +122,7 @@ test_scfg (void)
 
 static void
 common_test_scfg_response (const gchar *response,
+                           MMModemCharset charset,
                            GArray *expected_bands)
 {
     GArray *bands = NULL;
@@ -130,7 +131,7 @@ common_test_scfg_response (const gchar *response,
     GError *error = NULL;
     gboolean res;
 
-    res = mm_cinterion_parse_scfg_3g_response (response, &bands, &error);
+    res = mm_cinterion_parse_scfg_response (response, charset, &bands, &error);
     g_assert_no_error (error);
     g_assert (res == TRUE);
     g_assert (bands != NULL);
@@ -152,7 +153,42 @@ common_test_scfg_response (const gchar *response,
 }
 
 static void
-test_scfg_response (void)
+test_scfg_response_2g (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+    const gchar *response =
+        "^SCFG: \"Radio/Band\",\"3\",\"3\"\r\n"
+        "\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
+    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
+
+    common_test_scfg_response (response, MM_MODEM_CHARSET_UNKNOWN, expected_bands);
+
+    g_array_unref (expected_bands);
+}
+
+static void
+test_scfg_response_2g_ucs2 (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+    const gchar *response =
+        "^SCFG: \"Radio/Band\",\"0031\",\"0031\"\r\n"
+        "\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
+    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
+
+    common_test_scfg_response (response, MM_MODEM_CHARSET_UCS2, expected_bands);
+
+    g_array_unref (expected_bands);
+}
+
+static void
+test_scfg_response_3g (void)
 {
     GArray *expected_bands;
     MMModemBand single;
@@ -169,7 +205,7 @@ test_scfg_response (void)
     single = MM_MODEM_BAND_U1900, g_array_append_val (expected_bands, single);
     single = MM_MODEM_BAND_U850,  g_array_append_val (expected_bands, single);
 
-    common_test_scfg_response (response, expected_bands);
+    common_test_scfg_response (response, MM_MODEM_CHARSET_UNKNOWN, expected_bands);
 
     g_array_unref (expected_bands);
 }
@@ -203,8 +239,10 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/cinterion/scfg",          test_scfg);
-    g_test_add_func ("/MM/cinterion/scfg/response", test_scfg_response);
+    g_test_add_func ("/MM/cinterion/scfg",                  test_scfg);
+    g_test_add_func ("/MM/cinterion/scfg/response/3g",      test_scfg_response_3g);
+    g_test_add_func ("/MM/cinterion/scfg/response/2g",      test_scfg_response_2g);
+    g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2", test_scfg_response_2g_ucs2);
 
     return g_test_run ();
 }

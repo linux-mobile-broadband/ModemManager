@@ -136,17 +136,26 @@ mm_cinterion_parse_scfg_test (const gchar *response,
 }
 
 /*****************************************************************************/
-/* ^SCFG (3G) response parser
+/* ^SCFG response parser
  *
- * Example:
+ * Example (3G):
  *   AT^SCFG="Radio/Band"
  *     ^SCFG: "Radio/Band",127
+ *
+ * Example (2G, UCS-2):
+ *   AT+SCFG="Radio/Band"
+ *     ^SCFG: "Radio/Band","0031","0031"
+ *
+ * Example (2G):
+ *   AT+SCFG="Radio/Band"
+ *     ^SCFG: "Radio/Band","3","3"
  */
 
 gboolean
-mm_cinterion_parse_scfg_3g_response (const gchar *response,
-                                     GArray **current_bands,
-                                     GError **error)
+mm_cinterion_parse_scfg_response (const gchar *response,
+                                  MMModemCharset charset,
+                                  GArray **current_bands,
+                                  GError **error)
 {
     GRegex *r;
     GMatchInfo *match_info;
@@ -158,29 +167,39 @@ mm_cinterion_parse_scfg_3g_response (const gchar *response,
         return FALSE;
     }
 
-    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*(\\d*)", 0, 0, NULL);
+    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*\"?([0-9a-fA-F]*)\"?", 0, 0, NULL);
     g_assert (r != NULL);
 
     if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
-        gchar *current;
+        gchar *currentstr;
+        guint current = 0;
 
-        current = g_match_info_fetch (match_info, 1);
-        if (current) {
-            guint32 current_int;
+        currentstr = mm_get_string_unquoted_from_match_info (match_info, 1);
+        if (currentstr) {
+            /* Handle charset conversion if the number is given in UCS2 */
+            if (charset != MM_MODEM_CHARSET_UNKNOWN)
+                currentstr = mm_charset_take_and_convert_to_utf8 (currentstr, charset);
+
+            mm_get_uint_from_str (currentstr, &current);
+        }
+
+        if (current == 0) {
+            inner_error = g_error_new (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_FAILED,
+                                       "Couldn't parse ^SCFG response");
+        } else {
             guint i;
 
-            current_int = (guint32) atoi (current);
-
             for (i = 0; i < G_N_ELEMENTS (cinterion_bands); i++) {
-                if (current_int & cinterion_bands[i].cinterion_band_flag) {
+                if (current & cinterion_bands[i].cinterion_band_flag) {
                     if (G_UNLIKELY (!bands))
-                        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+                        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
                     g_array_append_val (bands, cinterion_bands[i].mm_band);
                 }
             }
-
-            g_free (current);
         }
+
+        g_free (currentstr);
     }
 
     if (match_info)
@@ -190,7 +209,7 @@ mm_cinterion_parse_scfg_3g_response (const gchar *response,
     if (!bands)
         inner_error = g_error_new (MM_CORE_ERROR,
                                    MM_CORE_ERROR_FAILED,
-                                   "No valid bands found in ^SCFG=? response");
+                                   "No valid bands found in ^SCFG response");
 
     if (inner_error) {
         g_propagate_error (error, inner_error);
