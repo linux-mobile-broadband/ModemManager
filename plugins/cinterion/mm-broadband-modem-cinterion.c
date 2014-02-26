@@ -551,22 +551,27 @@ static MMModemAccessTechnology
 get_access_technology_from_psinfo (const gchar *psinfo,
                                    GError **error)
 {
-    if (strlen (psinfo) == 1) {
-        switch (psinfo[0]) {
-        case '0':
+    guint psinfoval;
+
+    if (mm_get_uint_from_str (psinfo, &psinfoval)) {
+        switch (psinfoval) {
+        case 0:
             return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-        case '1':
-        case '2':
+        case 1:
+        case 2:
             return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
-        case '3':
-        case '4':
+        case 3:
+        case 4:
             return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-        case '5':
-        case '6':
+        case 5:
+        case 6:
             return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-        case '7':
-        case '8':
+        case 7:
+        case 8:
             return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+        case 9:
+        case 10:
+            return (MM_MODEM_ACCESS_TECHNOLOGY_HSDPA | MM_MODEM_ACCESS_TECHNOLOGY_HSUPA);
         default:
             break;
         }
