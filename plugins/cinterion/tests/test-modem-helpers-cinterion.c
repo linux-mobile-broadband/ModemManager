@@ -115,6 +115,63 @@ test_scfg (void)
 }
 
 /*****************************************************************************/
+/* Test ^SCFG responses */
+
+static void
+common_test_scfg_response (const gchar *response,
+                           GArray *expected_bands)
+{
+    GArray *bands = NULL;
+    gchar *expected_bands_str;
+    gchar *bands_str;
+    GError *error = NULL;
+    gboolean res;
+
+    res = mm_cinterion_parse_scfg_3g_response (response, &bands, &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (bands != NULL);
+
+    g_array_sort (bands, (GCompareFunc)sort_band);
+    g_array_sort (expected_bands, (GCompareFunc)sort_band);
+
+    expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)expected_bands->data,
+                                                       expected_bands->len);
+    bands_str = mm_common_build_bands_string ((const MMModemBand *)bands->data,
+                                              bands->len);
+
+    /* Instead of comparing the array one by one, compare the strings built from the mask
+     * (we get a nicer error if it fails) */
+    g_assert_cmpstr (bands_str, ==, expected_bands_str);
+
+    g_free (bands_str);
+    g_free (expected_bands_str);
+}
+
+static void
+test_scfg_response (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+    const gchar *response =
+        "^SCFG: \"Radio/Band\",127\r\n"
+        "\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
+    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_PCS,   g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_G850,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_U2100, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_U1900, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_U850,  g_array_append_val (expected_bands, single);
+
+    common_test_scfg_response (response, expected_bands);
+
+    g_array_unref (expected_bands);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -143,7 +200,8 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/cinterion/scfg", test_scfg);
+    g_test_add_func ("/MM/cinterion/scfg",          test_scfg);
+    g_test_add_func ("/MM/cinterion/scfg/response", test_scfg_response);
 
     return g_test_run ();
 }

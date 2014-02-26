@@ -1102,72 +1102,22 @@ get_2g_band_ready (MMBroadbandModemCinterion *self,
 static void
 get_3g_band_ready (MMBroadbandModemCinterion *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *operation_result)
+                   GSimpleAsyncResult *simple)
 {
     const gchar *response;
     GError *error = NULL;
-    GArray *bands_array = NULL;
-    GRegex *regex;
-    GMatchInfo *match_info = NULL;
+    GArray *bands = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
-
-    /* The AT^SCFG? command replies a list of several different config
-     * values. We will only look for 'Radio/Band".
-     *
-     * AT+SCFG="Radio/Band"
-     * ^SCFG: "Radio/Band",127
-     *
-     * Note that in this case, the <rba> replied is a number, not a string.
-     */
-    regex = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*(\\d*)", 0, 0, NULL);
-    g_assert (regex != NULL);
-
-    if (g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, NULL)) {
-        gchar *current;
-
-        current = g_match_info_fetch (match_info, 1);
-        if (current) {
-            guint32 current_int;
-            guint i;
-
-            current_int = (guint32) atoi (current);
-
-            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
-                if (current_int & bands_3g[i].cinterion_band_flag) {
-                    if (G_UNLIKELY (!bands_array))
-                        bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
-                    g_array_append_val (bands_array, bands_3g[i].mm_band);
-                }
-            }
-
-            g_free (current);
-        }
-    }
-
-    if (match_info)
-        g_match_info_free (match_info);
-    g_regex_unref (regex);
-
-    if (!bands_array)
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse current bands reply");
+    if (!response)
+        g_simple_async_result_take_error (simple, error);
+    else if (!mm_cinterion_parse_scfg_3g_response (response, &bands, &error))
+        g_simple_async_result_take_error (simple, error);
     else
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   bands_array,
-                                                   (GDestroyNotify)g_array_unref);
+        g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
 
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void

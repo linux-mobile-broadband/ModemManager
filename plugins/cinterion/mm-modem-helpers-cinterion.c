@@ -15,6 +15,7 @@
 
 #include <config.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "ModemManager.h"
 #define _LIBMM_INSIDE_MM
@@ -98,6 +99,8 @@ mm_cinterion_parse_scfg_3g_test (const gchar *response,
                 }
             }
         }
+
+        g_free (maxbandstr);
     }
 
     if (match_info)
@@ -116,6 +119,74 @@ mm_cinterion_parse_scfg_3g_test (const gchar *response,
 
     g_assert (bands != NULL && bands->len > 0);
     *supported_bands = bands;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* ^SCFG (3G) response parser
+ *
+ * Example:
+ *   AT^SCFG="Radio/Band"
+ *     ^SCFG: "Radio/Band",127
+ */
+
+gboolean
+mm_cinterion_parse_scfg_3g_response (const gchar *response,
+                                     GArray **current_bands,
+                                     GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    GError *inner_error = NULL;
+    GArray *bands = NULL;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*(\\d*)", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+        gchar *current;
+
+        current = g_match_info_fetch (match_info, 1);
+        if (current) {
+            guint32 current_int;
+            guint i;
+
+            current_int = (guint32) atoi (current);
+
+            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+                if (current_int & bands_3g[i].cinterion_band_flag) {
+                    if (G_UNLIKELY (!bands))
+                        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+                    g_array_append_val (bands, bands_3g[i].mm_band);
+                }
+            }
+
+            g_free (current);
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (!bands)
+        inner_error = g_error_new (MM_CORE_ERROR,
+                                   MM_CORE_ERROR_FAILED,
+                                   "No valid bands found in ^SCFG=? response");
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    g_assert (bands != NULL && bands->len > 0);
+    *current_bands = bands;
 
     return TRUE;
 }
