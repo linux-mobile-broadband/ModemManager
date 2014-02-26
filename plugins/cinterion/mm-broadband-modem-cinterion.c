@@ -55,6 +55,9 @@ struct _MMBroadbandModemCinterionPrivate {
 
     /* Cached manual selection attempt */
     gchar *manual_operator_id;
+
+    /* Cached supported bands in Cinterion format */
+    guint supported_bands;
 };
 
 /* Setup relationship between the band bitmask in the modem and the bitmask
@@ -79,28 +82,6 @@ static const CinterionBand2G bands_2g[] = {
     { "10", 2, { MM_MODEM_BAND_G850, MM_MODEM_BAND_DCS, 0, 0 }},
     { "12", 2, { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS, 0, 0 }},
     { "15", 4, { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS, MM_MODEM_BAND_G850 }}
-};
-
-/* Setup relationship between the 3G band bitmask in the modem and the bitmask
- * in ModemManager. */
-typedef struct {
-    guint32 cinterion_band_flag;
-    MMModemBand mm_band;
-} CinterionBand3G;
-
-/* Table checked in HC25 (3G) reference. This table includes both 2G and 3G
- * frequencies. Depending on which one is configured, one access technology or
- * the other will be used. This may conflict with the allowed mode configuration
- * set, so you shouldn't for example set 3G frequency bands, and then use a
- * 2G-only allowed mode. */
-static const CinterionBand3G bands_3g[] = {
-    { (1 << 0), MM_MODEM_BAND_EGSM  },
-    { (1 << 1), MM_MODEM_BAND_DCS   },
-    { (1 << 2), MM_MODEM_BAND_PCS   },
-    { (1 << 3), MM_MODEM_BAND_G850  },
-    { (1 << 4), MM_MODEM_BAND_U2100 },
-    { (1 << 5), MM_MODEM_BAND_U1900 },
-    { (1 << 6), MM_MODEM_BAND_U850  }
 };
 
 /*****************************************************************************/
@@ -943,21 +924,25 @@ load_supported_bands_finish (MMIfaceModem *self,
 }
 
 static void
-scfg_3g_test_ready (MMBaseModem *self,
+scfg_3g_test_ready (MMBaseModem *_self,
                     GAsyncResult *res,
                     GSimpleAsyncResult *simple)
 {
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar *response;
     GError *error = NULL;
     GArray *bands;
 
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
         g_simple_async_result_take_error (simple, error);
     else if (!mm_cinterion_parse_scfg_3g_test (response, &bands, &error))
         g_simple_async_result_take_error (simple, error);
-    else
+    else {
+        mm_cinterion_build_band (bands, 0, &self->priv->supported_bands, NULL);
+        g_assert (self->priv->supported_bands != 0);
         g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
+    }
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -1173,56 +1158,24 @@ scfg_set_ready (MMBaseModem *self,
 }
 
 static void
-set_bands_3g (MMIfaceModem *self,
+set_bands_3g (MMIfaceModem *_self,
               GArray *bands_array,
-              GSimpleAsyncResult *result)
+              GSimpleAsyncResult *simple)
 {
-    GArray *bands_array_final;
-    guint cinterion_band = 0;
-    guint i;
-    gchar *bands_string;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GError *error = NULL;
+    guint band = 0;
     gchar *cmd;
 
-    /* The special case of ANY should be treated separately. */
-    if (bands_array->len == 1 &&
-        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
-        /* We build an array with all bands to set; so that we use the same
-         * logic to build the cinterion_band, and so that we can log the list of
-         * bands being set properly */
-        bands_array_final = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), G_N_ELEMENTS (bands_3g));
-        for (i = 0; i < G_N_ELEMENTS (bands_3g); i++)
-            g_array_append_val (bands_array_final, bands_3g[i].mm_band);
-    } else
-        bands_array_final = g_array_ref (bands_array);
-
-    for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
-        guint j;
-
-        for (j = 0; j < bands_array_final->len; j++) {
-            if (g_array_index (bands_array_final, MMModemBand, j) == bands_3g[i].mm_band) {
-                cinterion_band |= bands_3g[i].cinterion_band_flag;
-                break;
-            }
-        }
-    }
-
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
-                                                 bands_array_final->len);
-    g_array_unref (bands_array_final);
-
-    if (!cinterion_band) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "The given band combination is not supported: '%s'",
-                                         bands_string);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        g_free (bands_string);
+    if (!mm_cinterion_build_band (bands_array,
+                                  self->priv->supported_bands,
+                                  &band,
+                                  &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
         return;
     }
-
-    mm_dbg ("Setting new bands to use: '%s'", bands_string);
 
     /* Following the setup:
      *  AT^SCFG="Radion/Band",<rba>
@@ -1230,15 +1183,14 @@ set_bands_3g (MMIfaceModem *self,
      * the modem to connect at that specific frequency only. Note that we will be
      * passing a number here!
      */
-    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u", cinterion_band);
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u", band);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
-                              result);
+                              simple);
     g_free (cmd);
-    g_free (bands_string);
 }
 
 static void

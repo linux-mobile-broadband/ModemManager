@@ -32,4 +32,12 @@ gboolean mm_cinterion_parse_scfg_3g_response (const gchar *response,
                                               GArray **bands,
                                               GError **error);
 
+/*****************************************************************************/
+/* Build Cinterion-specific band value */
+
+gboolean mm_cinterion_build_band (GArray *bands,
+                                  guint supported,
+                                  guint *out_band,
+                                  GError **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

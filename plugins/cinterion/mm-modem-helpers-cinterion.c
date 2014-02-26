@@ -190,3 +190,49 @@ mm_cinterion_parse_scfg_3g_response (const gchar *response,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* Build Cinterion-specific band value */
+
+gboolean
+mm_cinterion_build_band (GArray *bands,
+                         guint supported,
+                         guint *out_band,
+                         GError **error)
+{
+    guint band = 0;
+
+    /* The special case of ANY should be treated separately. */
+    if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        band = supported;
+    } else {
+        guint i;
+
+        for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+            guint j;
+
+            for (j = 0; j < bands->len; j++) {
+                if (g_array_index (bands, MMModemBand, j) == bands_3g[i].mm_band) {
+                    band |= bands_3g[i].cinterion_band_flag;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (band == 0) {
+        gchar *bands_string;
+
+        bands_string = mm_common_build_bands_string ((MMModemBand *)bands->data, bands->len);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "The given band combination is not supported: '%s'",
+                     bands_string);
+        g_free (bands_string);
+        return FALSE;
+    }
+
+    *out_band = band;
+    return TRUE;
+}
