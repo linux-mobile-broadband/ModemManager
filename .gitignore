@@ -156,6 +156,7 @@ uml290/uml290mode
 plugins/test-suite.log
 plugins/test-modem-helpers-huawei*
 plugins/test-modem-helpers-altair*
+plugins/test-modem-helpers-cinterion*
 plugins/test-service-*
 
 TAGS

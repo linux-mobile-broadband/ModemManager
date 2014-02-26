@@ -360,10 +360,25 @@ libmm_plugin_samsung_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
 libmm_plugin_cinterion_la_SOURCES = \
 	cinterion/mm-plugin-cinterion.c \
 	cinterion/mm-plugin-cinterion.h \
+	cinterion/mm-modem-helpers-cinterion.c \
+	cinterion/mm-modem-helpers-cinterion.h \
 	cinterion/mm-broadband-modem-cinterion.c \
 	cinterion/mm-broadband-modem-cinterion.h
 libmm_plugin_cinterion_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+noinst_PROGRAMS += test-modem-helpers-cinterion
+test_modem_helpers_cinterion_SOURCES = \
+	cinterion/mm-modem-helpers-cinterion.c \
+	cinterion/mm-modem-helpers-cinterion.h \
+	cinterion/tests/test-modem-helpers-cinterion.c
+test_modem_helpers_cinterion_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/cinterion \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_cinterion_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_cinterion_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Iridium modem
 libmm_plugin_iridium_la_SOURCES = \

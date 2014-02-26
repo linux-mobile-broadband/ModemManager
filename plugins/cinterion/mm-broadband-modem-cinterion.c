@@ -33,6 +33,7 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-cinterion.h"
+#include "mm-modem-helpers-cinterion.h"
 
 static void iface_modem_init      (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -927,16 +928,39 @@ register_in_network (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* SUPPORTED BANDS */
+/* Supported bands (Modem interface) */
 
 static GArray *
 load_supported_bands_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    /* Never fails */
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
     return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
                                        G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+scfg_3g_test_ready (MMBaseModem *self,
+                    GAsyncResult *res,
+                    GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GArray *bands;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        g_simple_async_result_take_error (simple, error);
+    else if (!mm_cinterion_parse_scfg_3g_test (response, &bands, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -944,41 +968,38 @@ load_supported_bands (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-    GArray *bands;
+    GSimpleAsyncResult *simple;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
+    simple = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         load_supported_bands);
 
     /* We do assume that we already know if the modem is 2G-only, 3G-only or
      * 2G+3G. This is checked quite before trying to load supported bands. */
+    if (mm_iface_modem_is_2g_only (self)) {
+        GArray *bands;
+        MMModemBand single;
 
-#define _g_array_insert_enum(array,index,type,val) do { \
-        type aux = (type)val;                           \
-        g_array_insert_val (array, index, aux);         \
-    } while (0)
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+        single = MM_MODEM_BAND_EGSM,  g_array_append_val (bands, single);
+        single = MM_MODEM_BAND_DCS,   g_array_append_val (bands, single);
+        single = MM_MODEM_BAND_PCS,   g_array_append_val (bands, single);
+        single = MM_MODEM_BAND_G850,  g_array_append_val (bands, single);
 
-    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-    _g_array_insert_enum (bands, 0, MMModemBand, MM_MODEM_BAND_EGSM);
-    _g_array_insert_enum (bands, 1, MMModemBand, MM_MODEM_BAND_DCS);
-    _g_array_insert_enum (bands, 2, MMModemBand, MM_MODEM_BAND_PCS);
-    _g_array_insert_enum (bands, 3, MMModemBand, MM_MODEM_BAND_G850);
-
-    /* Add 3G-specific bands */
-    if (mm_iface_modem_is_3g (self)) {
-        g_array_set_size (bands, 7);
-        _g_array_insert_enum (bands, 4, MMModemBand, MM_MODEM_BAND_U2100);
-        _g_array_insert_enum (bands, 5, MMModemBand, MM_MODEM_BAND_U1900);
-        _g_array_insert_enum (bands, 6, MMModemBand, MM_MODEM_BAND_U850);
+        g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
+        return;
     }
 
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    /* 2G+3G device, query AT^SCFG */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "AT^SCFG=?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)scfg_3g_test_ready,
+                              simple);
 }
 
 /*****************************************************************************/
