@@ -964,6 +964,30 @@ periodic_access_technologies_check (MMIfaceModem *self)
     return TRUE;
 }
 
+void
+mm_iface_modem_refresh_access_technologies (MMIfaceModem *self)
+{
+    AccessTechnologiesCheckContext *ctx;
+
+    if (G_UNLIKELY (!access_technologies_check_context_quark))
+        access_technologies_check_context_quark = (g_quark_from_static_string (
+                                                       ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
+    if (!ctx)
+        return;
+
+    /* Re-set timeout */
+    if (ctx->timeout_source)
+        g_source_remove (ctx->timeout_source);
+    ctx->timeout_source = g_timeout_add_seconds (ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC,
+                                                 (GSourceFunc)periodic_access_technologies_check,
+                                                 self);
+
+    /* Get first access technology value */
+    periodic_access_technologies_check (self);
+}
+
 static void
 periodic_access_technologies_check_disable (MMIfaceModem *self)
 {
@@ -1011,16 +1035,13 @@ periodic_access_technologies_check_enable (MMIfaceModem *self)
     /* Create context and keep it as object data */
     mm_dbg ("Periodic access technology checks enabled");
     ctx = g_new0 (AccessTechnologiesCheckContext, 1);
-    ctx->timeout_source = g_timeout_add_seconds (ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC,
-                                                 (GSourceFunc)periodic_access_technologies_check,
-                                                 self);
     g_object_set_qdata_full (G_OBJECT (self),
                              access_technologies_check_context_quark,
                              ctx,
                              (GDestroyNotify)access_technologies_check_context_free);
 
-    /* Get first access technology value */
-    periodic_access_technologies_check (self);
+    /* Get first and setup timeout */
+    mm_iface_modem_refresh_access_technologies (self);
 }
 
 /*****************************************************************************/
