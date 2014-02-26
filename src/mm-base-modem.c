@@ -1249,9 +1249,18 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         }
     }
 
-    /* Fall back to a secondary port if we didn't find a primary port */
     if (!primary) {
-        if (!secondary) {
+        /* Fall back to a secondary port if we didn't find a primary port */
+        if (secondary) {
+            primary = secondary;
+            secondary = NULL;
+        }
+        /* Fallback to a data port if no primary or secondary */
+        else if (data_primary && MM_IS_PORT_SERIAL_AT (data_primary)) {
+            primary = MM_PORT_SERIAL_AT (data_primary);
+            data_primary = NULL;
+        }
+        else {
             gboolean allow_modem_without_at_port = FALSE;
 
 #if defined WITH_QMI
@@ -1271,9 +1280,6 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                                      "Failed to find primary AT port");
                 return FALSE;
             }
-        } else  {
-            primary = secondary;
-            secondary = NULL;
         }
     }
 
