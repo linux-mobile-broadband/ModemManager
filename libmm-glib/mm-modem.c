@@ -752,6 +752,7 @@ ensure_internal_ports (MMModem *self,
                        guint *dup_ports_n)
 {
     gboolean ret;
+    guint i;
 
     g_mutex_lock (&self->priv->ports_mutex);
     {
@@ -783,7 +784,15 @@ ensure_internal_ports (MMModem *self,
                 *dup_ports_n = self->priv->ports->len;
                 if (self->priv->ports->len > 0) {
                     *dup_ports = g_malloc (sizeof (MMModemPortInfo) * self->priv->ports->len);
-                    memcpy (*dup_ports, self->priv->ports->data, sizeof (MMModemPortInfo) * self->priv->ports->len);
+
+                    /* Deep-copy the array */
+                    for (i = 0; i < self->priv->ports->len; i++) {
+                        MMModemPortInfo *dst = &(*dup_ports)[i];
+                        MMModemPortInfo *src = &g_array_index (self->priv->ports, MMModemPortInfo, i);
+
+                        dst->name = g_strdup (src->name);
+                        dst->type = src->type;
+                    }
                 } else
                     *dup_ports = NULL;
             }
@@ -795,7 +804,7 @@ ensure_internal_ports (MMModem *self,
 }
 
 /**
- * mm_modem_peek_current_ports:
+ * mm_modem_peek_ports:
  * @self: A #MMModem.
  * @ports: (out) (array length=n_ports) (transfer none): Return location for the array of #MMModemPortInfo values. Do not free the returned value, it is owned by @self.
  * @n_ports: (out): Return location for the number of values in @ports.
