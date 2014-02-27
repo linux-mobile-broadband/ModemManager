@@ -1084,8 +1084,11 @@ set_bands_3g (MMIfaceModem *_self,
      * We will set the preferred band equal to the allowed band, so that we force
      * the modem to connect at that specific frequency only. Note that we will be
      * passing a number here!
+     *
+     * The optional <rbe> field is set to 1, so that changes take effect
+     * immediately.
      */
-    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u", band);
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u,1", band);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               15,
