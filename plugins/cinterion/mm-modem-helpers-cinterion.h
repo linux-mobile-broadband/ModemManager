@@ -39,6 +39,7 @@ gboolean mm_cinterion_parse_scfg_response (const gchar *response,
 
 gboolean mm_cinterion_build_band (GArray *bands,
                                   guint supported,
+                                  gboolean only_2g,
                                   guint *out_band,
                                   GError **error);
 

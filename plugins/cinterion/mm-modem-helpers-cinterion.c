@@ -48,6 +48,18 @@ static const CinterionBand cinterion_bands[] = {
     { (1 << 8), MM_MODEM_BAND_U800  }
 };
 
+/* Check valid combinations in 2G-only devices */
+#define VALIDATE_2G_BAND(cinterion_mask) \
+    (cinterion_mask == 1  ||             \
+     cinterion_mask == 2  ||             \
+     cinterion_mask == 4  ||             \
+     cinterion_mask == 8  ||             \
+     cinterion_mask == 3  ||             \
+     cinterion_mask == 5  ||             \
+     cinterion_mask == 10 ||             \
+     cinterion_mask == 12 ||             \
+     cinterion_mask == 15)
+
 /*****************************************************************************/
 /* ^SCFG (3G) test parser
  *
@@ -228,6 +240,7 @@ mm_cinterion_parse_scfg_response (const gchar *response,
 gboolean
 mm_cinterion_build_band (GArray *bands,
                          guint supported,
+                         gboolean only_2g,
                          guint *out_band,
                          GError **error)
 {
@@ -249,6 +262,12 @@ mm_cinterion_build_band (GArray *bands,
                 }
             }
         }
+
+        /* 2G-only modems only support a subset of the possible band
+         * combinations. Detect it early and error out.
+         */
+        if (only_2g && !VALIDATE_2G_BAND (band))
+            band = 0;
     }
 
     if (band == 0) {

@@ -942,7 +942,7 @@ scfg_test_ready (MMBaseModem *_self,
                                             &error))
         g_simple_async_result_take_error (simple, error);
     else {
-        mm_cinterion_build_band (bands, 0, &self->priv->supported_bands, NULL);
+        mm_cinterion_build_band (bands, 0, FALSE, &self->priv->supported_bands, NULL);
         g_assert (self->priv->supported_bands != 0);
         g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
     }
@@ -1070,6 +1070,7 @@ set_bands_3g (MMIfaceModem *_self,
 
     if (!mm_cinterion_build_band (bands_array,
                                   self->priv->supported_bands,
+                                  FALSE, /* 2G and 3G */
                                   &band,
                                   &error)) {
         g_simple_async_result_take_error (simple, error);
@@ -1095,78 +1096,37 @@ set_bands_3g (MMIfaceModem *_self,
 }
 
 static void
-set_bands_2g (MMIfaceModem *self,
+set_bands_2g (MMIfaceModem *_self,
               GArray *bands_array,
-              GSimpleAsyncResult *result)
+              GSimpleAsyncResult *simple)
 {
-    GArray *bands_array_final;
-    gchar *cinterion_band = NULL;
-    guint i;
-    gchar *bands_string;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GError *error = NULL;
+    guint band = 0;
     gchar *cmd;
+    gchar *bandstr;
 
-    /* If the iface properly checked the given list against the supported bands,
-     * it's not possible to get an array longer than 4 here. */
-    g_assert (bands_array->len <= 4);
-
-    /* The special case of ANY should be treated separately. */
-    if (bands_array->len == 1 &&
-        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
-        const CinterionBand2G *all;
-
-        /* All bands is the last element in our 2G bands array */
-        all = &bands_2g[G_N_ELEMENTS (bands_2g) - 1];
-
-        /* We build an array with all bands to set; so that we use the same
-         * logic to build the cinterion_band, and so that we can log the list of
-         * bands being set properly */
-        bands_array_final = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-        g_array_append_vals (bands_array_final, all->mm_bands, all->n_mm_bands);
-    } else
-        bands_array_final = g_array_ref (bands_array);
-
-    for (i = 0; !cinterion_band && i < G_N_ELEMENTS (bands_2g); i++) {
-        GArray *supported_combination;
-
-        supported_combination = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), bands_2g[i].n_mm_bands);
-        g_array_append_vals (supported_combination, bands_2g[i].mm_bands, bands_2g[i].n_mm_bands);
-
-        /* Check if the given array is exactly one of the supported combinations */
-        if (mm_common_bands_garray_cmp (bands_array_final, supported_combination))
-            cinterion_band = g_strdup (bands_2g[i].cinterion_band);
-
-        g_array_unref (supported_combination);
-    }
-
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
-                                                 bands_array_final->len);
-    g_array_unref (bands_array_final);
-
-    if (!cinterion_band) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "The given band combination is not supported: '%s'",
-                                         bands_string);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        g_free (bands_string);
+    if (!mm_cinterion_build_band (bands_array,
+                                  self->priv->supported_bands,
+                                  TRUE, /* 2G only */
+                                  &band,
+                                  &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
         return;
     }
 
-
-    mm_dbg ("Setting new bands to use: '%s'", bands_string);
-    cinterion_band = (mm_broadband_modem_take_and_convert_to_current_charset (
-                          MM_BROADBAND_MODEM (self),
-                          cinterion_band));
-    if (!cinterion_band) {
-        g_simple_async_result_set_error (result,
+    /* Build string with the value, in the proper charset */
+    bandstr = g_strdup_printf ("%u", band);
+    bandstr = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr);
+    if (!bandstr) {
+        g_simple_async_result_set_error (simple,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_UNSUPPORTED,
                                          "Couldn't convert band set to current charset");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        g_free (bands_string);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
         return;
     }
 
@@ -1176,20 +1136,17 @@ set_bands_2g (MMIfaceModem *self,
      * the modem to connect at that specific frequency only. Note that we will be
      * passing double-quote enclosed strings here!
      */
-    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",\"%s\",\"%s\"",
-                           cinterion_band,
-                           cinterion_band);
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",\"%s\",\"%s\"", bandstr, bandstr);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
-                              result);
+                              simple);
 
     g_free (cmd);
-    g_free (cinterion_band);
-    g_free (bands_string);
+    g_free (bandstr);
 }
 
 static void
