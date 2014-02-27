@@ -186,10 +186,15 @@
           </varlistentry>
         </variablelist>
 
-        If the bearer specifies configuration via PPP or DHCP, only the
-        <literal>"method"</literal> item will be present.
+        If the bearer specifies configuration via PPP or DHCP, often only the
+        <literal>"method"</literal> item will be present.  IPv6 SLAAC should
+        be used to retrieve correct addressing and DNS information via Router
+        Advertisements and DHCPv6.  In some cases an IPv6 Link-Local
+        <literal>"address"</literal> item will be present, which should be
+        assigned to the data port before performing SLAAC, as the mobile network
+        may expect SLAAC setup to use this address.
 
-        Additional items which are only applicable when using the
+        Additional items which are usually only applicable when using the
         <link linkend="MM-BEARER-IP-METHOD-STATIC:CAPS">MM_BEARER_IP_METHOD_STATIC</link>
         method are:
         <variablelist>

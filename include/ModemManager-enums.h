@@ -849,8 +849,12 @@ typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
  * MMBearerIpMethod:
  * @MM_BEARER_IP_METHOD_UNKNOWN: Unknown method.
  * @MM_BEARER_IP_METHOD_PPP: Use PPP to get the address.
- * @MM_BEARER_IP_METHOD_STATIC: Use the provided static IP configuration given by the modem to configure the IP data interface.
- * @MM_BEARER_IP_METHOD_DHCP: Begin DHCP on the data interface to obtain necessary IP configuration details.
+ * @MM_BEARER_IP_METHOD_STATIC: Use the provided static IP configuration given
+ * by the modem to configure the IP data interface.
+ * @MM_BEARER_IP_METHOD_DHCP: Begin DHCP or IPv6 SLAAC on the data interface to
+ * obtain necessary IP configuration details.  For IPv4 bearers DHCP should
+ * be used.  For IPv6 bearers SLAAC should be used to determine the prefix and
+ * any additional details.
  *
  * Type of IP method configuration to be used in a given Bearer.
  */
