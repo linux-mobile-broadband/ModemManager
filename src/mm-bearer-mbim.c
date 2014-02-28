@@ -370,6 +370,14 @@ ip_configuration_query_ready (MbimDevice *device,
                 str = g_inet_address_to_string (addr);
                 mm_bearer_ip_config_set_address (ipv6_config, str);
                 g_free (str);
+
+                /* If the address is a link-local one, then SLAAC or DHCP must be used
+                 * to get the real prefix and address.  Change the method to DHCP to
+                 * indicate this to clients.
+                 */
+                if (g_inet_address_get_is_link_local (addr))
+                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+
                 g_object_unref (addr);
 
                 /* Netmask */
