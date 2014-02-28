@@ -4667,6 +4667,15 @@ interface_initialization_step (InitializationContext *ctx)
                           "handle-set-current-capabilities",
                           G_CALLBACK (handle_set_current_capabilities),
                           ctx->self);
+        /* Allow setting the power state to OFF even when the modem is in the
+         * FAILED state as this operation does not necessarily depend on the
+         * presence of a SIM. handle_set_power_state_auth_ready already ensures
+         * that the power state can only be set to OFF when the modem is in the
+         * FAILED state. */
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-power-state",
+                          G_CALLBACK (handle_set_power_state),
+                          ctx->self);
         /* Allow the reset and factory reset operation in FAILED state to rescue the modem.
          * Also, for a modem that doesn't support SIM hot swapping, a reset is needed to
          * force the modem to detect the newly inserted SIM. */
@@ -4704,10 +4713,6 @@ interface_initialization_step (InitializationContext *ctx)
             g_signal_connect (ctx->skeleton,
                               "handle-enable",
                               G_CALLBACK (handle_enable),
-                              ctx->self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-set-power-state",
-                              G_CALLBACK (handle_set_power_state),
                               ctx->self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-bands",
