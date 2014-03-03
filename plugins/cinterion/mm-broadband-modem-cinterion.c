@@ -1231,6 +1231,124 @@ setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemCinterion *self;
+    GSimpleAsyncResult *result;
+    MMUnlockRetries *retries;
+    guint i;
+} LoadUnlockRetriesContext;
+
+typedef struct {
+    MMModemLock lock;
+    const gchar *command;
+} UnlockRetriesMap;
+
+static const UnlockRetriesMap unlock_retries_map [] = {
+    { MM_MODEM_LOCK_SIM_PIN,     "^SPIC=\"SC\""   },
+    { MM_MODEM_LOCK_SIM_PUK,     "^SPIC=\"SC\",1" },
+    { MM_MODEM_LOCK_SIM_PIN2,    "^SPIC=\"P2\""   },
+    { MM_MODEM_LOCK_SIM_PUK2,    "^SPIC=\"P2\",1" },
+    { MM_MODEM_LOCK_PH_FSIM_PIN, "^SPIC=\"PS\""   },
+    { MM_MODEM_LOCK_PH_FSIM_PUK, "^SPIC=\"PS\",1" },
+    { MM_MODEM_LOCK_PH_NET_PIN,  "^SPIC=\"PN\""   },
+    { MM_MODEM_LOCK_PH_NET_PUK,  "^SPIC=\"PN\",1" },
+};
+
+static void
+load_unlock_retries_context_complete_and_free (LoadUnlockRetriesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->retries);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadUnlockRetriesContext, ctx);
+}
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    return (MMUnlockRetries *) g_object_ref (g_simple_async_result_get_op_res_gpointer (
+                                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void load_unlock_retries_context_step (LoadUnlockRetriesContext *ctx);
+
+static void
+spic_ready (MMBaseModem *self,
+            GAsyncResult *res,
+            LoadUnlockRetriesContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't load retry count for lock '%s': %s",
+                mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
+                error->message);
+        g_error_free (error);
+    } else {
+        guint val;
+
+        response = mm_strip_tag (response, "^SPIC:");
+        if (!mm_get_uint_from_str (response, &val))
+            mm_dbg ("Couldn't parse retry count value for lock '%s'",
+                    mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock));
+        else
+            mm_unlock_retries_set (ctx->retries, unlock_retries_map[ctx->i].lock, val);
+    }
+
+    /* Go to next lock value */
+    ctx->i++;
+    load_unlock_retries_context_step (ctx);
+}
+
+static void
+load_unlock_retries_context_step (LoadUnlockRetriesContext *ctx)
+{
+    if (ctx->i == G_N_ELEMENTS (unlock_retries_map)) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   g_object_ref (ctx->retries),
+                                                   (GDestroyNotify)g_object_unref);
+        load_unlock_retries_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (ctx->self),
+        unlock_retries_map[ctx->i].command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)spic_ready,
+        ctx);
+}
+
+static void
+load_unlock_retries (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    LoadUnlockRetriesContext *ctx;
+
+    ctx = g_slice_new0 (LoadUnlockRetriesContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_unlock_retries);
+    ctx->retries = mm_unlock_retries_new ();
+    ctx->i = 0;
+
+    load_unlock_retries_context_step (ctx);
+}
+
+/*****************************************************************************/
 /* After SIM unlock (Modem interface) */
 
 #define MAX_AFTER_SIM_UNLOCK_RETRIES 15
@@ -1406,6 +1524,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_after_sim_unlock = after_sim_unlock;
     iface->modem_after_sim_unlock_finish = after_sim_unlock_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->modem_power_off = modem_power_off;
