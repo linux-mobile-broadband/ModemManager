@@ -211,6 +211,42 @@ test_scfg_response_3g (void)
 }
 
 /*****************************************************************************/
+/* Test ^SIND responses */
+
+static void
+common_test_sind_response (const gchar *response,
+                           const gchar *expected_description,
+                           guint expected_mode,
+                           guint expected_value)
+{
+    GError *error = NULL;
+    gboolean res;
+    gchar *description;
+    guint mode;
+    guint value;
+
+    res = mm_cinterion_parse_sind_response (response,
+                                            &description,
+                                            &mode,
+                                            &value,
+                                            &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+
+    g_assert_cmpstr (description, ==, expected_description);
+    g_assert_cmpuint (mode, ==, expected_mode);
+    g_assert_cmpuint (value, ==, expected_value);
+
+    g_free (description);
+}
+
+static void
+test_sind_response_simstatus (void)
+{
+    common_test_sind_response ("^SIND: simstatus,1,5", "simstatus", 1, 5);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -239,10 +275,11 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/cinterion/scfg",                  test_scfg);
-    g_test_add_func ("/MM/cinterion/scfg/response/3g",      test_scfg_response_3g);
-    g_test_add_func ("/MM/cinterion/scfg/response/2g",      test_scfg_response_2g);
-    g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2", test_scfg_response_2g_ucs2);
+    g_test_add_func ("/MM/cinterion/scfg",                    test_scfg);
+    g_test_add_func ("/MM/cinterion/scfg/response/3g",        test_scfg_response_3g);
+    g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
+    g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
+    g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
 
     return g_test_run ();
 }

@@ -286,3 +286,50 @@ mm_cinterion_build_band (GArray *bands,
     *out_band = band;
     return TRUE;
 }
+
+/*****************************************************************************/
+/* Single ^SIND response parser */
+
+gboolean
+mm_cinterion_parse_sind_response (const gchar *response,
+                                  gchar **description,
+                                  guint *mode,
+                                  guint *value,
+                                  GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    guint errors = 0;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\^SIND:\\s*(.*),(\\d+),(\\d+)(\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+        if (description) {
+            *description = mm_get_string_unquoted_from_match_info (match_info, 1);
+            if (*description == NULL)
+                errors++;
+        }
+        if (mode && !mm_get_uint_from_match_info (match_info, 2, mode))
+            errors++;
+        if (value && !mm_get_uint_from_match_info (match_info, 3, value))
+            errors++;
+    } else
+        errors++;
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (errors > 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Failed parsing ^SIND response");
+        return FALSE;
+    }
+
+    return TRUE;
+}

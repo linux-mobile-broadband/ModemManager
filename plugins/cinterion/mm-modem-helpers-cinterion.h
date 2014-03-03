@@ -43,4 +43,13 @@ gboolean mm_cinterion_build_band (GArray *bands,
                                   guint *out_band,
                                   GError **error);
 
+/*****************************************************************************/
+/* Single ^SIND response parser */
+
+gboolean mm_cinterion_parse_sind_response (const gchar *response,
+                                           gchar **description,
+                                           guint *mode,
+                                           guint *value,
+                                           GError **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
