@@ -111,7 +111,7 @@ mbim_device_new_ready (GObject *unused,
 
     /* Now open the MBIM device */
     mbim_device_open (ctx->self->priv->mbim_device,
-                      10,
+                      30,
                       ctx->cancellable,
                       (GAsyncReadyCallback)mbim_device_open_ready,
                       ctx);
