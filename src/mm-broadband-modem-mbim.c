@@ -53,6 +53,7 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES = 1 << 1,
     PROCESS_NOTIFICATION_FLAG_SMS_READ             = 1 << 2,
     PROCESS_NOTIFICATION_FLAG_CONNECT              = 1 << 3,
+    PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO      = 1 << 4,
 } ProcessNotificationFlag;
 
 struct _MMBroadbandModemMbimPrivate {
@@ -1671,6 +1672,33 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
     g_object_unref (bearer_list);
 }
 
+static void
+basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
+                                                    MbimMessage *notification)
+{
+    MbimSubscriberReadyState ready_state;
+    gchar **telephone_numbers;
+
+    if (!mbim_message_subscriber_ready_status_notification_parse (
+            notification,
+            &ready_state,
+            NULL, /* subscriber_id */
+            NULL, /* sim_iccid */
+            NULL, /* ready_info */
+            NULL, /* telephone_numbers_count */
+            &telephone_numbers,
+            NULL)) {
+        return;
+    }
+
+    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED)
+        mm_iface_modem_update_own_numbers (MM_IFACE_MODEM (self), telephone_numbers);
+
+    /* TODO: handle SIM removal using MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED */
+
+    g_strfreev (telephone_numbers);
+}
+
 static void add_sms_part (MMBroadbandModemMbim *self,
                           const MbimSmsPduReadRecord *pdu);
 
@@ -1717,6 +1745,10 @@ basic_connect_notification (MMBroadbandModemMbim *self,
     case MBIM_CID_BASIC_CONNECT_CONNECT:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_CONNECT)
             basic_connect_notification_connect (self, notification);
+        break;
+    case MBIM_CID_BASIC_CONNECT_SUBSCRIBER_READY_STATUS:
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO)
+            basic_connect_notification_subscriber_ready_status (self, notification);
         break;
     default:
         /* Ignore */
@@ -1876,11 +1908,12 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
                                         user_data,
                                         common_setup_cleanup_unsolicited_events);
 
-    mm_dbg ("Supported notifications: signal (%s), registration (%s), sms (%s), connect (%s)",
+    mm_dbg ("Supported notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s)",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
-            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ? "yes" : "no");
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ? "yes" : "no",
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO ? "yes" : "no");
 
     if (setup) {
         /* Don't re-enable it if already there */
@@ -1922,6 +1955,7 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), FALSE, callback, user_data);
 }
 
@@ -1932,6 +1966,7 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), TRUE, callback, user_data);
 }
 
@@ -2009,28 +2044,32 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                                         user_data,
                                         common_enable_disable_unsolicited_events);
 
-    mm_dbg ("Enabled notifications: signal (%s), registration (%s), sms (%s), connect (%s)",
+    mm_dbg ("Enabled notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s)",
             self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
             self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
             self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
-            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ? "yes" : "no");
+            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ? "yes" : "no",
+            self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO ? "yes" : "no");
 
     entries = g_new0 (MbimEventEntry *, 3);
 
     /* Basic connect service */
     if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ||
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ||
-        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT) {
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ||
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
         memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_BASIC_CONNECT, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 0;
-        entries[n_entries]->cids = g_new0 (guint32, 3);
+        entries[n_entries]->cids = g_new0 (guint32, 4);
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SIGNAL_STATE;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_REGISTER_STATE;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_CONNECT;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SUBSCRIBER_READY_STATUS;
         n_entries++;
     }
 
@@ -2113,6 +2152,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
 }
 
@@ -2123,6 +2163,7 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
 }
 
