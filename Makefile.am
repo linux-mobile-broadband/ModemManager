@@ -20,6 +20,7 @@ DISTCLEANFILES = \
 EXTRA_DIST = \
 	$(INTLTOOL_FILES) \
 	autogen.sh \
-	gtester.make
+	gtester.make \
+	COPYING.LIB
 
 ACLOCAL_AMFLAGS = -I m4

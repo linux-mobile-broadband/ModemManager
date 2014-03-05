@@ -30,3 +30,7 @@ There are multiple fully working plugins in the plugins/ directory that can be
 used as an example for writing new plugins. Writing new plugins is highly
 encouraged! The plugin API is open for changes, so if you're writing a plugin
 and need to add or change some public method, feel free to suggest it!
+
+License.
+The ModemManager and mmcli binaries are both GPLv2+.
+The libmm-glib library is LGPLv2+.
