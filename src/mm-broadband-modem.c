@@ -6324,14 +6324,16 @@ modem_cdma_get_hdr_state_finish (MMIfaceModemCdma *self,
 
 static void
 hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
-                             GByteArray *response,
-                             GError *error,
+                             GAsyncResult *res,
                              HdrStateContext *ctx)
 {
     QcdmResult *result;
     HdrStateResults *results;
     gint err = QCDM_SUCCESS;
+    GError *error = NULL;
+    GByteArray *response;
 
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         g_simple_async_result_set_from_error (ctx->result, error);
         hdr_state_context_complete_and_free (ctx);
