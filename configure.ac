@@ -201,7 +201,7 @@ AC_ARG_WITH(mbim, AS_HELP_STRING([--without-mbim], [Build without MBIM support])
 AM_CONDITIONAL(WITH_MBIM, test "x$with_mbim" = "xyes")
 case $with_mbim in
     yes)
-        PKG_CHECK_MODULES(MBIM, [mbim-glib >= 1.4], [have_mbim=yes],[have_mbim=no])
+        PKG_CHECK_MODULES(MBIM, [mbim-glib >= 1.8], [have_mbim=yes],[have_mbim=no])
         if test "x$have_mbim" = "xno"; then
             AC_MSG_ERROR([Couldn't find libmbim-glib. Install it, or otherwise configure using --without-mbim to disable MBIM support.])
         else
