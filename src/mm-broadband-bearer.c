@@ -924,10 +924,20 @@ parse_pdp_list (MMBaseModem *modem,
         return FALSE;
     }
 
+    if (error) {
+        mm_dbg ("Unexpected +CGDCONT? error: '%s'", error->message);
+        return FALSE;
+    }
+
     pdp_list = mm_3gpp_parse_cgdcont_read_response (response, &inner_error);
     if (!pdp_list) {
-        /* No predefined PDP contexts found */
-        mm_dbg ("No PDP contexts found");
+        if (inner_error) {
+            mm_dbg ("%s", inner_error->message);
+            g_error_free (inner_error);
+        } else {
+            /* No predefined PDP contexts found */
+            mm_dbg ("No PDP contexts found");
+        }
         return FALSE;
     }
 

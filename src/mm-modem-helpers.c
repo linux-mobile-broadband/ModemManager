@@ -847,7 +847,7 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
     GMatchInfo *match_info;
     GList *list;
 
-    if (!reply[0])
+    if (!reply || !reply[0])
         /* No APNs configured, all done */
         return NULL;
 
