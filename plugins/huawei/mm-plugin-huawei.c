@@ -417,6 +417,7 @@ propagate_port_mode_results (GList *probes)
 {
     MMDevice *device;
     GList *l;
+    gboolean primary_flagged = FALSE;
 
     g_assert (probes != NULL);
     device = mm_port_probe_peek_device (MM_PORT_PROBE (probes->data));
@@ -429,9 +430,10 @@ propagate_port_mode_results (GList *probes)
         usbif = g_udev_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
 
         if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
-            if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT)))
+            if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-            else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
+                primary_flagged = TRUE;
+            } else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
             else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
                      usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT)))
@@ -451,6 +453,23 @@ propagate_port_mode_results (GList *probes)
         }
 
         g_object_set_data (G_OBJECT (l->data), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
+    }
+
+    if (primary_flagged)
+        return;
+
+    /* For devices exposing a cdc-wdm port, make sure it gets flagged as primary, if there is none
+     * already */
+    for (l = probes; l; l = g_list_next (l)) {
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (mm_port_probe_is_at (probe) &&
+            g_str_has_prefix (mm_port_probe_get_port_subsys (probe), "usb") &&
+            g_str_has_prefix (mm_port_probe_get_port_name (probe), "cdc-wdm")) {
+            /* Flag as PRIMARY and do nothing else */
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (MM_PORT_SERIAL_AT_FLAG_PRIMARY));
+            break;
+        }
     }
 }
 
