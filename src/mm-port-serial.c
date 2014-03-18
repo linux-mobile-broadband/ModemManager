@@ -1378,8 +1378,7 @@ mm_port_serial_close (MMPortSerial *self)
                                          MM_SERIAL_ERROR,
                                          MM_SERIAL_ERROR_SEND_FAILED,
                                          "Serial port is now closed");
-        g_simple_async_result_complete (ctx->result);
-        command_context_complete_and_free (ctx, FALSE);
+        command_context_complete_and_free (ctx, TRUE);
     }
     g_queue_clear (self->priv->queue);
 
