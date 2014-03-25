@@ -925,6 +925,7 @@ mm_bearer_ip_config_get_address
 mm_bearer_ip_config_get_prefix
 mm_bearer_ip_config_get_dns
 mm_bearer_ip_config_get_gateway
+mm_bearer_ip_config_get_mtu
 <SUBSECTION Private>
 mm_bearer_ip_config_get_dictionary
 mm_bearer_ip_config_new
@@ -934,6 +935,7 @@ mm_bearer_ip_config_set_dns
 mm_bearer_ip_config_set_gateway
 mm_bearer_ip_config_set_method
 mm_bearer_ip_config_set_prefix
+mm_bearer_ip_config_set_mtu
 mm_bearer_ip_config_dup
 <SUBSECTION Standard>
 MMBearerIpConfigClass
