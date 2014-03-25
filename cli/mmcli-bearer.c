@@ -189,24 +189,31 @@ print_bearer_info (MMBearer *bearer)
              (ipv4_config ?
               mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv4_config)) :
               "none"));
-    if (ipv4_config &&
-        mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_STATIC) {
-        const gchar **dns;
-        guint i;
+    if (ipv4_config) {
+        guint mtu;
 
-        dns = mm_bearer_ip_config_get_dns (ipv4_config);
-        g_print ("                     |  address: '%s'\n"
-                 "                     |   prefix: '%u'\n"
-                 "                     |  gateway: '%s'\n"
-                 "                     |      DNS: '%s'",
-                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_address (ipv4_config)),
-                 mm_bearer_ip_config_get_prefix (ipv4_config),
-                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_gateway (ipv4_config)),
-                 VALIDATE_UNKNOWN (dns[0]));
-        /* Additional DNS addresses */
-        for (i = 1; dns[i]; i++)
-            g_print (", '%s'", dns[i]);
-        g_print ("\n");
+        if (mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_STATIC) {
+            const gchar **dns;
+            guint i;
+
+            dns = mm_bearer_ip_config_get_dns (ipv4_config);
+            g_print ("                     |  address: '%s'\n"
+                     "                     |   prefix: '%u'\n"
+                     "                     |  gateway: '%s'\n"
+                     "                     |      DNS: '%s'",
+                     VALIDATE_UNKNOWN (mm_bearer_ip_config_get_address (ipv4_config)),
+                     mm_bearer_ip_config_get_prefix (ipv4_config),
+                     VALIDATE_UNKNOWN (mm_bearer_ip_config_get_gateway (ipv4_config)),
+                     VALIDATE_UNKNOWN (dns[0]));
+            /* Additional DNS addresses */
+            for (i = 1; dns[i]; i++)
+                g_print (", '%s'", dns[i]);
+            g_print ("\n");
+        }
+
+        mtu = mm_bearer_ip_config_get_mtu (ipv4_config);
+        if (mtu)
+            g_print ("                     |      MTU: '%u'\n", mtu);
     }
 
     /* IPv6 */
@@ -215,24 +222,31 @@ print_bearer_info (MMBearer *bearer)
              (ipv6_config ?
               mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv6_config)) :
               "none"));
-    if (ipv6_config &&
-        mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) {
-        const gchar **dns;
-        guint i;
+    if (ipv6_config) {
+        guint mtu;
 
-        dns = mm_bearer_ip_config_get_dns (ipv6_config);
-        g_print ("                     |  address: '%s'\n"
-                 "                     |   prefix: '%u'\n"
-                 "                     |  gateway: '%s'\n"
-                 "                     |      DNS: '%s'",
-                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_address (ipv6_config)),
-                 mm_bearer_ip_config_get_prefix (ipv6_config),
-                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_gateway (ipv6_config)),
-                 VALIDATE_UNKNOWN(dns[0]));
-        /* Additional DNS addresses */
-        for (i = 1; dns[i]; i++)
-            g_print (", '%s'", dns[i]);
-        g_print ("\n");
+        if (mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) {
+            const gchar **dns;
+            guint i;
+
+            dns = mm_bearer_ip_config_get_dns (ipv6_config);
+            g_print ("                     |  address: '%s'\n"
+                     "                     |   prefix: '%u'\n"
+                     "                     |  gateway: '%s'\n"
+                     "                     |      DNS: '%s'",
+                     VALIDATE_UNKNOWN(mm_bearer_ip_config_get_address (ipv6_config)),
+                     mm_bearer_ip_config_get_prefix (ipv6_config),
+                     VALIDATE_UNKNOWN(mm_bearer_ip_config_get_gateway (ipv6_config)),
+                     VALIDATE_UNKNOWN(dns[0]));
+            /* Additional DNS addresses */
+            for (i = 1; dns[i]; i++)
+                g_print (", '%s'", dns[i]);
+            g_print ("\n");
+        }
+
+        mtu = mm_bearer_ip_config_get_mtu (ipv6_config);
+        if (mtu)
+            g_print ("                     |      MTU: '%u'\n", mtu);
     }
 
     g_clear_object (&properties);
