@@ -342,6 +342,10 @@ ip_configuration_query_ready (MbimDevice *device,
                 g_strfreev (strarr);
             } else
                 mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+
+            /* MTU */
+            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
+                mm_bearer_ip_config_set_mtu (ipv4_config, ipv4mtu);
         } else
             ipv4_config = NULL;
 
@@ -391,6 +395,10 @@ ip_configuration_query_ready (MbimDevice *device,
                 g_strfreev (strarr);
             } else
                 mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+
+            /* MTU */
+            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
+                mm_bearer_ip_config_set_mtu (ipv6_config, ipv6mtu);
         } else
             ipv6_config = NULL;
 
