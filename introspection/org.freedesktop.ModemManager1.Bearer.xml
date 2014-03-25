@@ -157,6 +157,15 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        This property may also include the following items when such information is available:
+        <variablelist>
+          <varlistentry><term><literal>"mtu"</literal></term>
+            <listitem>
+              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
     -->
     <property name="Ip4Config" type="a{sv}" access="read" />
 
@@ -212,6 +221,15 @@
           <varlistentry><term><literal>"gateway"</literal></term>
             <listitem>
               IP address of the default gateway, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        This property may also include the following items when such information is available:
+        <variablelist>
+          <varlistentry><term><literal>"mtu"</literal></term>
+            <listitem>
+              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
         </variablelist>

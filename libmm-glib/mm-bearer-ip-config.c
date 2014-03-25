@@ -40,6 +40,7 @@ G_DEFINE_TYPE (MMBearerIpConfig, mm_bearer_ip_config, G_TYPE_OBJECT);
 #define PROPERTY_DNS2    "dns2"
 #define PROPERTY_DNS3    "dns3"
 #define PROPERTY_GATEWAY "gateway"
+#define PROPERTY_MTU     "mtu"
 
 struct _MMBearerIpConfigPrivate {
     MMBearerIpMethod method;
@@ -47,6 +48,7 @@ struct _MMBearerIpConfigPrivate {
     guint prefix;
     gchar **dns;
     gchar *gateway;
+    guint mtu;
 };
 
 /*****************************************************************************/
@@ -189,6 +191,33 @@ mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_get_mtu:
+ * @self: a #MMBearerIpConfig.
+ *
+ * Gets the MTU to be used with this bearer.
+ *
+ * Returns: the MTU.
+ */
+guint
+mm_bearer_ip_config_get_mtu (MMBearerIpConfig *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), 0);
+
+    return self->priv->mtu;
+}
+
+void
+mm_bearer_ip_config_set_mtu (MMBearerIpConfig *self,
+                             guint mtu)
+{
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
+    self->priv->mtu = mtu;
+}
+
+/*****************************************************************************/
+
 GVariant *
 mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
 {
@@ -246,6 +275,12 @@ mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
                                    "{sv}",
                                    PROPERTY_GATEWAY,
                                    g_variant_new_string (self->priv->gateway));
+
+        if (self->priv->mtu)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   PROPERTY_MTU,
+                                   g_variant_new_uint32 (self->priv->mtu));
     }
 
     return g_variant_builder_end (&builder);
@@ -306,6 +341,10 @@ mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
             mm_bearer_ip_config_set_gateway (
                 self,
                 g_variant_get_string (value, NULL));
+        else if (g_str_equal (key, PROPERTY_MTU))
+            mm_bearer_ip_config_set_mtu (
+                self,
+                g_variant_get_uint32 (value));
 
         g_free (key);
         g_variant_unref (value);

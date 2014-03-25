@@ -60,6 +60,7 @@ const gchar       *mm_bearer_ip_config_get_address (MMBearerIpConfig *self);
 guint              mm_bearer_ip_config_get_prefix  (MMBearerIpConfig *self);
 const gchar      **mm_bearer_ip_config_get_dns     (MMBearerIpConfig *self);
 const gchar       *mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self);
+guint              mm_bearer_ip_config_get_mtu     (MMBearerIpConfig *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -84,6 +85,8 @@ void mm_bearer_ip_config_set_dns     (MMBearerIpConfig *self,
                                       const gchar **dns);
 void mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
                                       const gchar *gateway);
+void mm_bearer_ip_config_set_mtu     (MMBearerIpConfig *self,
+                                      guint mtu);
 
 GVariant *mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self);
 
