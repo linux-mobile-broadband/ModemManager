@@ -345,7 +345,7 @@ ip_configuration_query_ready (MbimDevice *device,
         } else
             ipv4_config = NULL;
 
-        /* Build IPv6 config; always DHCP based */
+        /* Build IPv6 config */
         if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
             ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
             ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
