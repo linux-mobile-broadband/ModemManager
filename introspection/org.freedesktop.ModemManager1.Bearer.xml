@@ -77,7 +77,7 @@
         or
         <link linkend="MM-BEARER-IP-METHOD-DHCP:CAPS">MM_BEARER_IP_METHOD_DHCP</link>
         methods are given, the interface
-        will be an ethernet-style inteface suitable for DHCP or setting static
+        will be an ethernet-style interface suitable for DHCP or setting static
         IP configuration on, while if the
         <link linkend="MM-BEARER-IP-METHOD-PPP:CAPS">MM_BEARER_IP_METHOD_PPP</link>
         method is given, the interface
@@ -133,7 +133,7 @@
           </varlistentry>
           <varlistentry><term><literal>"prefix"</literal></term>
             <listitem>
-              Numeric CIDR network prefix (ie, 24, 32, etc), give as an unsigned integer value (signature <literal>"u"</literal>).
+              Numeric CIDR network prefix (ie, 24, 32, etc), given as an unsigned integer value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"dns1"</literal></term>
@@ -191,7 +191,7 @@
           </varlistentry>
           <varlistentry><term><literal>"prefix"</literal></term>
             <listitem>
-              Numeric CIDR network prefix (ie, 24, 32, etc), give as an unsigned integer value (signature <literal>"u"</literal>).
+              Numeric CIDR network prefix (ie, 24, 32, etc), given as an unsigned integer value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"dns1"</literal></term>

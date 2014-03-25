@@ -32,7 +32,7 @@
 
     <!--
         Scan:
-        @results: Array of dictionaries wih the found networks.
+        @results: Array of dictionaries with the found networks.
 
         Scan for available networks.
 
