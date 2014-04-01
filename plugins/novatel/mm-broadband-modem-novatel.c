@@ -815,6 +815,8 @@ nwrssi_ready (MMBaseModem *self,
         quality = get_one_quality (response, "1x RSSI=");
     if (quality < 0)
         quality = get_one_quality (response, "RX1=");
+    if (quality < 0)
+        quality = get_one_quality (response, "HDR RSSI=");
 
     if (quality >= 0)
         g_simple_async_result_set_op_res_gpointer (simple,
