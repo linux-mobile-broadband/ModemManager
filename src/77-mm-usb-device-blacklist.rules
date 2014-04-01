@@ -88,6 +88,12 @@ ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="239a", ATTRS{idProduct}=="0004", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="239a", ATTRS{idProduct}=="8004", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# All devices from Pololu Corporation
+# except some possible future products.
+ATTRS{idVendor}=="1ffb", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="00ad", ENV{ID_MM_DEVICE_IGNORE}="0"
+ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="00ae", ENV{ID_MM_DEVICE_IGNORE}="0"
+
 # Altair U-Boot device
 ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051", ENV{ID_MM_DEVICE_IGNORE}="1"
 
