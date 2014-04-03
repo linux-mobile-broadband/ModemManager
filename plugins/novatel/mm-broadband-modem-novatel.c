@@ -843,6 +843,80 @@ modem_load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Automatic activation (CDMA interface) */
+
+static gboolean
+modem_cdma_activate_finish (MMIfaceModemCdma  *self,
+                            GAsyncResult      *res,
+                            GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+qcmipgetp_ready (MMBaseModem  *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    GError      *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        g_task_return_error (task, error);
+    else {
+        mm_dbg ("Current profile information retrieved: %s", response);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+static void
+activate_cdv_ready (MMBaseModem  *self,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    GError      *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Let's query the MIP profile */
+    mm_base_modem_at_command (self,
+                              "$QCMIPGETP",
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)qcmipgetp_ready,
+                              task);
+}
+
+static void
+modem_cdma_activate (MMIfaceModemCdma    *self,
+                     const gchar         *carrier_code,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    GTask *task;
+    gchar *cmd;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    cmd = g_strdup_printf ("+CDV=%s", carrier_code);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)activate_cdv_ready,
+                              task);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 
 static gboolean
@@ -1297,6 +1371,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
     iface->get_detailed_registration_state = modem_cdma_get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = modem_cdma_get_detailed_registration_state_finish;
+    iface->activate = modem_cdma_activate;
+    iface->activate_finish = modem_cdma_activate_finish;
 }
 
 static void
