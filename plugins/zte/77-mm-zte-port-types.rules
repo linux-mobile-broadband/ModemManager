@@ -192,4 +192,9 @@ ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="2003", ENV{.MM_USBIFNUM}=="01", ENV{
 # Icera-based devices that use DHCP, not AT%IPDPADDR
 ATTRS{product}=="K3805-z", ENV{ID_MM_ZTE_ICERA_DHCP}="1"
 
+# MF60 exposes QMI, but it is unusable, fallback to AT+PPP
+ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="1402", SUBSYSTEM=="usb", KERNEL=="cdc-wdm*", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="1402", SUBSYSTEM=="usbmisc", KERNEL=="cdc-wdm*", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="19d2", ATTRS{idProduct}=="1402", SUBSYSTEM=="net", ENV{ID_MM_PORT_IGNORE}="1"
+
 LABEL="mm_zte_port_types_end"
