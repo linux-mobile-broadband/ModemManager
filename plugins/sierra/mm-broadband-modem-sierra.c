@@ -1473,6 +1473,161 @@ modem_cdma_activate (MMIfaceModemCdma    *self,
 }
 
 /*****************************************************************************/
+/* Manual activation (CDMA interface) */
+
+typedef enum {
+    CDMA_MANUAL_ACTIVATION_STEP_FIRST,
+    CDMA_MANUAL_ACTIVATION_STEP_SPC,
+    CDMA_MANUAL_ACTIVATION_STEP_MDN_MIN,
+    CDMA_MANUAL_ACTIVATION_STEP_OTASP,
+    CDMA_MANUAL_ACTIVATION_STEP_CHECK,
+    CDMA_MANUAL_ACTIVATION_STEP_LAST
+} CdmaManualActivationStep;
+
+typedef struct {
+    CdmaManualActivationStep          step;
+    MMCdmaManualActivationProperties *properties;
+} CdmaManualActivationContext;
+
+static void
+cdma_manual_activation_context_free (CdmaManualActivationContext *ctx)
+{
+    g_object_unref (ctx->properties);
+    g_slice_free (CdmaManualActivationContext, ctx);
+}
+
+static gboolean
+modem_cdma_activate_manual_finish (MMIfaceModemCdma  *self,
+                                   GAsyncResult      *res,
+                                   GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void cdma_manual_activation_step (GTask *task);
+
+static void
+manual_activation_command_ready (MMBaseModem  *self,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    GError                      *error = NULL;
+    const gchar                 *response;
+    CdmaManualActivationContext *ctx;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Keep on */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    cdma_manual_activation_step (task);
+}
+
+static void
+cdma_manual_activation_step (GTask *task)
+{
+    MMBroadbandModemSierra      *self;
+    CdmaManualActivationContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case CDMA_MANUAL_ACTIVATION_STEP_FIRST:
+        ctx->step++;
+        /* fall-through */
+
+    case CDMA_MANUAL_ACTIVATION_STEP_SPC: {
+        gchar *command;
+
+        mm_info ("Activation step [1/5]: unlocking device");
+        command = g_strdup_printf ("~NAMLCK=%s",
+                                   mm_cdma_manual_activation_properties_get_spc (ctx->properties));
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  command,
+                                  20,
+                                  FALSE,
+                                  (GAsyncReadyCallback)manual_activation_command_ready,
+                                  task);
+        g_free (command);
+        return;
+    }
+
+    case CDMA_MANUAL_ACTIVATION_STEP_MDN_MIN: {
+        gchar *command;
+
+        mm_info ("Activation step [2/5]: setting MDN/MIN/SID");
+        command = g_strdup_printf ("~NAMVAL=0,%s,%s,%" G_GUINT16_FORMAT ",65535",
+                                   mm_cdma_manual_activation_properties_get_mdn (ctx->properties),
+                                   mm_cdma_manual_activation_properties_get_min (ctx->properties),
+                                   mm_cdma_manual_activation_properties_get_sid (ctx->properties));
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  command,
+                                  120,
+                                  FALSE,
+                                  (GAsyncReadyCallback)manual_activation_command_ready,
+                                  task);
+        g_free (command);
+        return;
+    }
+
+    case CDMA_MANUAL_ACTIVATION_STEP_OTASP:
+        mm_info ("Activation step [3/5]: requesting OTASP");
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "!IOTASTART",
+                                  20,
+                                  FALSE,
+                                  (GAsyncReadyCallback)manual_activation_command_ready,
+                                  task);
+        return;
+
+    case CDMA_MANUAL_ACTIVATION_STEP_CHECK:
+        mm_info ("Activation step [4/5]: checking activation info");
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "~NAMVAL?0",
+                                  20,
+                                  FALSE,
+                                  (GAsyncReadyCallback)manual_activation_command_ready,
+                                  task);
+        return;
+
+    case CDMA_MANUAL_ACTIVATION_STEP_LAST:
+        mm_info ("Activation step [5/5]: activation process finished");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static void
+modem_cdma_activate_manual (MMIfaceModemCdma                 *self,
+                            MMCdmaManualActivationProperties *properties,
+                            GAsyncReadyCallback               callback,
+                            gpointer                          user_data)
+{
+    GTask                       *task;
+    CdmaManualActivationContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Setup context */
+    ctx = g_slice_new0 (CdmaManualActivationContext);
+    ctx->properties = g_object_ref (properties);
+    ctx->step = CDMA_MANUAL_ACTIVATION_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)cdma_automatic_activation_context_free);
+
+    /* And start it */
+    cdma_manual_activation_step (task);
+}
+
+/*****************************************************************************/
 /* Load network time (Time interface) */
 
 static gchar *
@@ -1758,6 +1913,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
     iface->activate = modem_cdma_activate;
     iface->activate_finish = modem_cdma_activate_finish;
+    iface->activate_manual = modem_cdma_activate_manual;
+    iface->activate_manual_finish = modem_cdma_activate_manual_finish;
 }
 
 static void
