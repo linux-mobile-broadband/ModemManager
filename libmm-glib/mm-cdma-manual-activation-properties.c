@@ -42,6 +42,7 @@ struct _MMCdmaManualActivationPropertiesPrivate {
     /* Mandatory parameters */
     gchar *spc;
     guint16 sid;
+    gboolean sid_set;
     gchar *mdn;
     gchar *min;
     /* Optional */
@@ -161,6 +162,7 @@ mm_cdma_manual_activation_properties_set_sid (MMCdmaManualActivationProperties *
 {
     g_return_if_fail (MM_IS_CDMA_MANUAL_ACTIVATION_PROPERTIES (self));
 
+    self->priv->sid_set = TRUE;
     self->priv->sid = sid;
 }
 
@@ -593,7 +595,7 @@ mm_cdma_manual_activation_properties_get_dictionary (MMCdmaManualActivationPrope
                                "{sv}",
                                PROPERTY_SPC,
                                g_variant_new_string (self->priv->spc));
-    if (self->priv->sid)
+    if (self->priv->sid_set)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_SID,
@@ -751,7 +753,7 @@ mm_cdma_manual_activation_properties_new_from_dictionary (GVariant *dictionary,
 
     /* If mandatory properties missing, destroy the object */
     if (!self->priv->spc ||
-        !self->priv->sid ||
+        !self->priv->sid_set ||
         !self->priv->mdn ||
         !self->priv->min) {
         g_set_error (error,
