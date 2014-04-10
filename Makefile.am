@@ -1,5 +1,5 @@
 
-SUBDIRS = . build-aux data include libqcdm libwmc libmm-glib src plugins cli vapi introspection uml290 po test docs
+SUBDIRS = . build-aux data include libqcdm libwmc libmm-glib src plugins cli vapi introspection uml290 po test examples docs
 
 DISTCHECK_CONFIGURE_FLAGS = \
 	--with-udev-base-dir="$$dc_install_base" \

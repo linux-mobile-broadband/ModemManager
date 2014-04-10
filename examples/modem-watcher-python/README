@@ -1,0 +1,22 @@
+
+The modem-watcher-python program makes use of the 'libmm-glib' library through
+GObject Introspection to talk to ModemManager.
+
+The program will just print in stdout whenever:
+ * ModemManager is found in the bus
+ * ModemManager is lost in the bus
+ * A new modem is added to ModemManager
+ * A modem is removed from ModemManager
+
+The output will look like this:
+
+$ ./modem-watcher-python
+[ModemWatcher] ModemManager service is available in bus
+[ModemWatcher] Vodafone (Huawei) (K3772) modem managed by ModemManager [861320000017897]: /org/freedesktop/ModemManager1/Modem/0
+[ModemWatcher] modem unmanaged by ModemManager: /org/freedesktop/ModemManager1/Modem/0
+[ModemWatcher] ModemManager service not available in bus
+
+Note that the program requires ModemManager and libmm-glib to be installed in
+the system and the introspection typelibs available in the standard paths.
+
+Have fun!

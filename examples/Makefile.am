@@ -1,0 +1,1 @@
+SUBDIRS = modem-watcher-python
