@@ -1,1 +1,1 @@
-SUBDIRS = modem-watcher-python
+SUBDIRS = modem-watcher-python modem-watcher-javascript
