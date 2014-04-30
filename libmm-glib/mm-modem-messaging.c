@@ -155,7 +155,7 @@ mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
                                            MMSmsStorage **storages,
                                            guint *n_storages)
 {
-    GArray *array;
+    GArray *array = NULL;
 
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), FALSE);
     g_return_val_if_fail (storages != NULL, FALSE);
