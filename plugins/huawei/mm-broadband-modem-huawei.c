@@ -2845,8 +2845,15 @@ parent_load_power_state_ready (MMIfaceModem *self,
     power_state = iface_modem_parent->load_power_state_finish (self, res, &error);
     if (error)
         g_simple_async_result_take_error (result, error);
-    else
+    else {
+        /* As modem_power_down uses +CFUN=0 to put the modem in low state, we treat
+         * CFUN 0 as 'LOW' power state instead of 'OFF'. Otherwise, MMIfaceModem
+         * would prevent the modem from transitioning back to the 'ON' power state. */
+        if (power_state == MM_MODEM_POWER_STATE_OFF)
+            power_state = MM_MODEM_POWER_STATE_LOW;
+
         g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (power_state), NULL);
+    }
 
     g_simple_async_result_complete (result);
     g_object_unref (result);
@@ -3023,6 +3030,8 @@ huawei_modem_power_down (MMIfaceModem *self,
 {
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
     case FEATURE_NOT_SUPPORTED:
+        /* +CFUN=0 is supported on all Huawei modems but +CFUN=4 isn't,
+         * thus we use +CFUN=0 to put the modem in low power state. */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CFUN=0",
                                   30,
