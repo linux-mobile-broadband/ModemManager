@@ -191,7 +191,7 @@ pcstate_query_ready (MMBaseModem *self,
     } else {
         switch (state) {
         case 0:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
             break;
         case 1:
             g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
