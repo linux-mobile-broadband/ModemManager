@@ -218,7 +218,7 @@ build_start_network_input (ConnectContext *ctx)
 
     input = qmi_message_wds_start_network_input_new ();
 
-    if (ctx->apn)
+    if (ctx->apn && ctx->apn[0])
         qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
 
     if (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
