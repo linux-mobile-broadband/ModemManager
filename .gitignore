@@ -63,6 +63,8 @@ vapi/libmm-glib.vapi
 libqcdm/tests/test-qcdm
 libqcdm/tests/modepref
 libqcdm/tests/ipv6pref
+libqcdm/tests/reset
+
 libwmc/tests/test-wmc
 
 data/org.freedesktop.ModemManager1.conf
