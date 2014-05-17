@@ -3232,7 +3232,7 @@ static void
 mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_HUAWEI,
                                               MMBroadbandModemHuaweiPrivate);
     /* Prepare regular expressions to setup */

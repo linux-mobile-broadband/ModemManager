@@ -193,16 +193,16 @@ static gint
 huawei_parse_auth_type (MMBearerAllowedAuth mm_auth)
 {
     switch (mm_auth) {
-        case MM_BEARER_ALLOWED_AUTH_NONE:
-            return MM_BEARER_HUAWEI_AUTH_NONE;
-        case MM_BEARER_ALLOWED_AUTH_PAP:
-            return MM_BEARER_HUAWEI_AUTH_PAP;
-        case MM_BEARER_ALLOWED_AUTH_CHAP:
-            return MM_BEARER_HUAWEI_AUTH_CHAP;
-        case MM_BEARER_ALLOWED_AUTH_MSCHAPV2:
-            return MM_BEARER_HUAWEI_AUTH_MSCHAPV2;
-        default:
-            return MM_BEARER_HUAWEI_AUTH_UNKNOWN;
+    case MM_BEARER_ALLOWED_AUTH_NONE:
+        return MM_BEARER_HUAWEI_AUTH_NONE;
+    case MM_BEARER_ALLOWED_AUTH_PAP:
+        return MM_BEARER_HUAWEI_AUTH_PAP;
+    case MM_BEARER_ALLOWED_AUTH_CHAP:
+        return MM_BEARER_HUAWEI_AUTH_CHAP;
+    case MM_BEARER_ALLOWED_AUTH_MSCHAPV2:
+        return MM_BEARER_HUAWEI_AUTH_MSCHAPV2;
+    default:
+        return MM_BEARER_HUAWEI_AUTH_UNKNOWN;
     }
 }
 
@@ -293,7 +293,7 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
             command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\"",
                                        apn == NULL ? "" : apn);
         else if (encoded_auth == MM_BEARER_HUAWEI_AUTH_NONE)
-		    command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\",\"%s\",\"%s\"",
+            command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\",\"%s\",\"%s\"",
                                        apn == NULL ? "" : apn,
                                        user == NULL ? "" : user,
                                        passwd == NULL ? "" : passwd);
@@ -786,7 +786,7 @@ static void
 mm_broadband_bearer_huawei_init (MMBroadbandBearerHuawei *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_BEARER_HUAWEI,
                                               MMBroadbandBearerHuaweiPrivate);
 }
