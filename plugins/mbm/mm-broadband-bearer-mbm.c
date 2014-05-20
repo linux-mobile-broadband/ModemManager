@@ -401,7 +401,7 @@ authenticate (Dial3gppContext *ctx)
         encoded_password = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (ctx->modem),
                                                                                    g_strdup (password));
 
-		command = g_strdup_printf ("AT*EIAAUW=%d,1,\"%s\",\"%s\"",
+        command = g_strdup_printf ("AT*EIAAUW=%d,1,\"%s\",\"%s\"",
                                    ctx->cid,
                                    encoded_user ? encoded_user : "",
                                    encoded_password ? encoded_password : "");
@@ -590,7 +590,7 @@ static void
 mm_broadband_bearer_mbm_init (MMBroadbandBearerMbm *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_BEARER_MBM,
                                               MMBroadbandBearerMbmPrivate);
 }

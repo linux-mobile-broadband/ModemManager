@@ -1268,7 +1268,7 @@ static void
 mm_broadband_modem_mbm_init (MMBroadbandModemMbm *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_MBM,
                                               MMBroadbandModemMbmPrivate);
 
