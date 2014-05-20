@@ -930,7 +930,7 @@ authenticate (Dial3gppContext *ctx)
     /* Both user and password are required; otherwise firmware returns an error */
     if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
         mm_dbg ("Not using authentication");
-		command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
+        command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
     } else {
         gchar *quoted_user;
         gchar *quoted_password;
@@ -1135,7 +1135,7 @@ static void
 mm_broadband_bearer_icera_init (MMBroadbandBearerIcera *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_BEARER_ICERA,
                                               MMBroadbandBearerIceraPrivate);
 
