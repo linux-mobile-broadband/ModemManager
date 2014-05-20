@@ -19,7 +19,7 @@ void
 test_fixture_setup (TestFixture *fixture)
 {
     GError *error = NULL;
-	GVariant *result;
+    GVariant *result;
 
     /* Create the global dbus-daemon for this test suite */
     fixture->dbus = g_test_dbus_new (G_TEST_DBUS_NONE);
