@@ -568,12 +568,12 @@ authenticate_ready (MMBaseModem *modem,
 }
 
 const gchar *auth_commands[] = {
-	"$QCPDPP",
-	/* Icera-based devices (GI0322/Quicksilver, iCON 505) don't implement
-	 * $QCPDPP, but instead use _OPDPP with the same arguments.
-	 */
-	"_OPDPP",
-	NULL
+    "$QCPDPP",
+    /* Icera-based devices (GI0322/Quicksilver, iCON 505) don't implement
+     * $QCPDPP, but instead use _OPDPP with the same arguments.
+     */
+    "_OPDPP",
+    NULL
 };
 
 static void
@@ -600,7 +600,7 @@ authenticate (Dial3gppContext *ctx)
     /* Both user and password are required; otherwise firmware returns an error */
     if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
         mm_dbg ("Not using authentication");
-		command = g_strdup_printf ("%s=%d,0",
+        command = g_strdup_printf ("%s=%d,0",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid);
     } else {
@@ -828,7 +828,7 @@ static void
 mm_broadband_bearer_hso_init (MMBroadbandBearerHso *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_BEARER_HSO,
                                               MMBroadbandBearerHsoPrivate);
 }

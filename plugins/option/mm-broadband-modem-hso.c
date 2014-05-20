@@ -755,7 +755,7 @@ static void
 mm_broadband_modem_hso_init (MMBroadbandModemHso *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_HSO,
                                               MMBroadbandModemHsoPrivate);
 

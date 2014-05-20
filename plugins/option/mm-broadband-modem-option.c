@@ -1203,7 +1203,7 @@ static void
 mm_broadband_modem_option_init (MMBroadbandModemOption *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_OPTION,
                                               MMBroadbandModemOptionPrivate);
     self->priv->after_power_up_wait_id = 0;
