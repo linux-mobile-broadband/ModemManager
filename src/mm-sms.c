@@ -874,7 +874,7 @@ store_msg_data_ready (MMBaseModem *modem,
     gint rv;
     gint idx;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_store_context_complete_and_free (ctx);
@@ -909,7 +909,7 @@ store_ready (MMBaseModem *modem,
     const gchar *response;
     GError *error = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_store_context_complete_and_free (ctx);
@@ -1093,7 +1093,7 @@ send_generic_msg_data_ready (MMBaseModem *modem,
     const gchar *response;
     gint message_reference;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_send_context_complete_and_free (ctx);
@@ -1121,7 +1121,7 @@ send_generic_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         sms_send_context_complete_and_free (ctx);
@@ -1146,7 +1146,7 @@ send_from_storage_ready (MMBaseModem *modem,
     const gchar *response;
     gint message_reference;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             g_simple_async_result_take_error (ctx->result, error);
@@ -1334,7 +1334,7 @@ delete_part_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         ctx->n_failed++;
         mm_dbg ("Couldn't delete SMS part with index %u: '%s'",
