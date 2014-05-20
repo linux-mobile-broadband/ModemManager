@@ -105,7 +105,7 @@ load_sim_identifier (MMSim *self,
 
     mm_dbg ("loading (Sierra) SIM identifier...");
     mm_base_modem_at_command (
-        MM_BASE_MODEM (modem),
+        modem,
         "!ICCID?",
         3,
         FALSE,

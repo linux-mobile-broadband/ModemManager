@@ -100,7 +100,7 @@ ip_config_ready (MMBaseModem *modem,
     guint i;
     guint dns_i;
 
-    response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         get_ip_config_context_complete_and_free (ctx);
@@ -736,7 +736,7 @@ disconnect_owancall_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     /* Ignore errors for now */
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         mm_dbg ("Disconnection failed (not fatal): %s", error->message);
         g_error_free (error);

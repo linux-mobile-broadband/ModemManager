@@ -136,7 +136,7 @@ ip_config_ready (MMBaseModem *modem,
     guint i;
     guint dns_i;
 
-    response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         get_ip_config_context_complete_and_free (ctx);
@@ -422,7 +422,7 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         self->priv->disconnect_pending = NULL;
         g_simple_async_result_take_error (ctx->result, error);

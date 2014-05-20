@@ -109,7 +109,7 @@ scact_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
@@ -127,7 +127,7 @@ authenticate_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
@@ -145,7 +145,7 @@ cgatt_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
@@ -174,7 +174,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
         ctx->step++;
 
     case DIAL_3GPP_STEP_PS_ATTACH:
-        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->modem),
+        mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
                                        "+CGATT=1",
                                        10,
@@ -359,7 +359,7 @@ disconnect_scact_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     /* Ignore errors for now */
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         mm_dbg ("Disconnection failed (not fatal): %s", error->message);
         g_error_free (error);
