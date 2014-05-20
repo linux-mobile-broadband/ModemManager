@@ -96,32 +96,32 @@ log_handler (const gchar *log_domain,
              gpointer user_data)
 {
     const gchar *log_level_str;
-	time_t now;
-	gchar time_str[64];
-	struct tm    *local_time;
+    time_t now;
+    gchar time_str[64];
+    struct tm    *local_time;
 
-	now = time ((time_t *) NULL);
-	local_time = localtime (&now);
-	strftime (time_str, 64, "%d %b %Y, %H:%M:%S", local_time);
+    now = time ((time_t *) NULL);
+    local_time = localtime (&now);
+    strftime (time_str, 64, "%d %b %Y, %H:%M:%S", local_time);
 
-	switch (log_level) {
-	case G_LOG_LEVEL_WARNING:
-		log_level_str = "-Warning **";
-		break;
+    switch (log_level) {
+    case G_LOG_LEVEL_WARNING:
+        log_level_str = "-Warning **";
+        break;
 
-	case G_LOG_LEVEL_CRITICAL:
+    case G_LOG_LEVEL_CRITICAL:
     case G_LOG_FLAG_FATAL:
-	case G_LOG_LEVEL_ERROR:
-		log_level_str = "-Error **";
-		break;
+    case G_LOG_LEVEL_ERROR:
+        log_level_str = "-Error **";
+        break;
 
-	case G_LOG_LEVEL_DEBUG:
-		log_level_str = "[Debug]";
-		break;
+    case G_LOG_LEVEL_DEBUG:
+        log_level_str = "[Debug]";
+        break;
 
     default:
-		log_level_str = "";
-		break;
+        log_level_str = "";
+        break;
     }
 
     g_print ("[%s] %s %s\n", time_str, log_level_str, message);
@@ -188,39 +188,39 @@ main (gint argc, gchar **argv)
 
     /* Setup option context, process it and destroy it */
     context = g_option_context_new ("- Control and monitor the ModemManager");
-	g_option_context_add_group (context,
-	                            mmcli_manager_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_manager_get_option_group ());
     g_option_context_add_group (context,
                                 mmcli_get_common_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_3gpp_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_cdma_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_simple_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_location_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_messaging_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_time_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_firmware_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_signal_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_modem_oma_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_sim_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_bearer_get_option_group ());
-	g_option_context_add_group (context,
-	                            mmcli_sms_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_3gpp_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_cdma_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_simple_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_location_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_messaging_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_time_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_firmware_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_signal_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_modem_oma_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_sim_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_bearer_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_sms_get_option_group ());
     g_option_context_add_main_entries (context, main_entries, NULL);
     g_option_context_parse (context, &argc, &argv, NULL);
-	g_option_context_free (context);
+    g_option_context_free (context);
 
     if (version_flag)
         print_version_and_exit ();

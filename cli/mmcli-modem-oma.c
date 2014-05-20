@@ -83,16 +83,16 @@ static GOptionEntry entries[] = {
 GOptionGroup *
 mmcli_modem_oma_get_option_group (void)
 {
-	GOptionGroup *group;
+    GOptionGroup *group;
 
-	group = g_option_group_new ("oma",
-	                            "OMA options",
-	                            "Show OMA options",
-	                            NULL,
-	                            NULL);
-	g_option_group_add_entries (group, entries);
+    group = g_option_group_new ("oma",
+                                "OMA options",
+                                "Show OMA options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, entries);
 
-	return group;
+    return group;
 }
 
 gboolean

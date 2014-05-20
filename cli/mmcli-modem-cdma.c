@@ -67,16 +67,16 @@ static GOptionEntry entries[] = {
 GOptionGroup *
 mmcli_modem_cdma_get_option_group (void)
 {
-	GOptionGroup *group;
+    GOptionGroup *group;
 
-	group = g_option_group_new ("cdma",
-	                            "CDMA options",
-	                            "Show CDMA related options",
-	                            NULL,
-	                            NULL);
-	g_option_group_add_entries (group, entries);
+    group = g_option_group_new ("cdma",
+                                "CDMA options",
+                                "Show CDMA related options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, entries);
 
-	return group;
+    return group;
 }
 
 gboolean

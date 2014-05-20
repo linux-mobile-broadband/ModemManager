@@ -63,17 +63,17 @@ static GOptionEntry entries[] = {
 GOptionGroup *
 mmcli_bearer_get_option_group (void)
 {
-	GOptionGroup *group;
+    GOptionGroup *group;
 
-	/* Status options */
-	group = g_option_group_new ("bearer",
-	                            "Bearer options",
-	                            "Show bearer options",
-	                            NULL,
-	                            NULL);
-	g_option_group_add_entries (group, entries);
+    /* Status options */
+    group = g_option_group_new ("bearer",
+                                "Bearer options",
+                                "Show bearer options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, entries);
 
-	return group;
+    return group;
 }
 
 gboolean

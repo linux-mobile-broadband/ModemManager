@@ -135,17 +135,17 @@ static GOptionEntry entries[] = {
 GOptionGroup *
 mmcli_modem_get_option_group (void)
 {
-	GOptionGroup *group;
+    GOptionGroup *group;
 
-	/* Status options */
-	group = g_option_group_new ("modem",
-	                            "Modem options",
-	                            "Show modem options",
-	                            NULL,
-	                            NULL);
-	g_option_group_add_entries (group, entries);
+    /* Status options */
+    group = g_option_group_new ("modem",
+                                "Modem options",
+                                "Show modem options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, entries);
 
-	return group;
+    return group;
 }
 
 gboolean

@@ -1100,17 +1100,17 @@ static GOptionEntry entries[] = {
 GOptionGroup *
 mmcli_get_common_option_group (void)
 {
-	GOptionGroup *group;
+    GOptionGroup *group;
 
-	/* Status options */
-	group = g_option_group_new ("common",
-	                            "Common options",
-	                            "Show common options",
-	                            NULL,
-	                            NULL);
-	g_option_group_add_entries (group, entries);
+    /* Status options */
+    group = g_option_group_new ("common",
+                                "Common options",
+                                "Show common options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, entries);
 
-	return group;
+    return group;
 }
 
 const gchar *
