@@ -1515,7 +1515,7 @@ static void
 mm_base_modem_init (MMBaseModem *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BASE_MODEM,
                                               MMBaseModemPrivate);
 

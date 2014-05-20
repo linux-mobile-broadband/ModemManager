@@ -177,7 +177,7 @@ mm_port_serial_gps_new (const char *name)
 static void
 mm_port_serial_gps_init (MMPortSerialGps *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_PORT_SERIAL_GPS,
                                               MMPortSerialGpsPrivate);
 

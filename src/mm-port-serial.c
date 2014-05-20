@@ -2086,7 +2086,7 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
                       G_STRUCT_OFFSET (MMPortSerialClass, timed_out),
                       NULL, NULL,
                       g_cclosure_marshal_generic,
-					  G_TYPE_NONE, 1, G_TYPE_UINT);
+                      G_TYPE_NONE, 1, G_TYPE_UINT);
 
     signals[FORCED_CLOSE] =
         g_signal_new ("forced-close",

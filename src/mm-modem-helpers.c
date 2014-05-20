@@ -1814,20 +1814,20 @@ mm_3gpp_parse_operator (const gchar *reply,
 
     if (reply && !strncmp (reply, "+COPS: ", 7)) {
         /* Got valid reply */
-		GRegex *r;
-		GMatchInfo *match_info;
+        GRegex *r;
+        GMatchInfo *match_info;
 
-		reply += 7;
-		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
-		if (!r)
+        reply += 7;
+        r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
+        if (!r)
             return NULL;
 
-		g_regex_match (r, reply, 0, &match_info);
-		if (g_match_info_matches (match_info))
+        g_regex_match (r, reply, 0, &match_info);
+        if (g_match_info_matches (match_info))
             operator = g_match_info_fetch (match_info, 3);
 
-		g_match_info_free (match_info);
-		g_regex_unref (r);
+        g_match_info_free (match_info);
+        g_regex_unref (r);
     }
 
     if (operator) {

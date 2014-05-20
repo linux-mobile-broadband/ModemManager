@@ -1661,8 +1661,8 @@ mm_port_probe_new (MMDevice *device,
 static void
 mm_port_probe_init (MMPortProbe *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),                  \
-                                              MM_TYPE_PORT_PROBE,      \
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_PORT_PROBE,
                                               MMPortProbePrivate);
 }
 

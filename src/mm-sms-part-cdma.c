@@ -358,14 +358,14 @@ read_teleservice_id (MMSmsPart *sms_part,
     teleservice_id = GUINT16_FROM_BE (teleservice_id);
 
     switch (teleservice_id){
-	case MM_SMS_CDMA_TELESERVICE_ID_CMT91:
-	case MM_SMS_CDMA_TELESERVICE_ID_WPT:
-	case MM_SMS_CDMA_TELESERVICE_ID_WMT:
-	case MM_SMS_CDMA_TELESERVICE_ID_VMN:
-	case MM_SMS_CDMA_TELESERVICE_ID_WAP:
-	case MM_SMS_CDMA_TELESERVICE_ID_WEMT:
-	case MM_SMS_CDMA_TELESERVICE_ID_SCPT:
-	case MM_SMS_CDMA_TELESERVICE_ID_CATPT:
+    case MM_SMS_CDMA_TELESERVICE_ID_CMT91:
+    case MM_SMS_CDMA_TELESERVICE_ID_WPT:
+    case MM_SMS_CDMA_TELESERVICE_ID_WMT:
+    case MM_SMS_CDMA_TELESERVICE_ID_VMN:
+    case MM_SMS_CDMA_TELESERVICE_ID_WAP:
+    case MM_SMS_CDMA_TELESERVICE_ID_WEMT:
+    case MM_SMS_CDMA_TELESERVICE_ID_SCPT:
+    case MM_SMS_CDMA_TELESERVICE_ID_CATPT:
         break;
     default:
         mm_dbg ("        invalid teleservice ID found (%u): ignoring", teleservice_id);

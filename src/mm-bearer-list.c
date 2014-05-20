@@ -334,7 +334,7 @@ static void
 mm_bearer_list_init (MMBearerList *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BEARER_LIST,
                                               MMBearerListPrivate);
 }

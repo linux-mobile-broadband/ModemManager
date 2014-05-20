@@ -805,13 +805,13 @@ load_plugins (MMPluginManager *self,
     const gchar *fname;
     gchar *plugindir_display = NULL;
 
-	if (!g_module_supported ()) {
+    if (!g_module_supported ()) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
                      "GModules are not supported on your platform!");
         goto out;
-	}
+    }
 
     /* Get printable UTF-8 string of the path */
     plugindir_display = g_filename_display_name (self->priv->plugin_dir);
@@ -964,7 +964,7 @@ dispose (GObject *object)
 static void
 initable_iface_init (GInitableIface *iface)
 {
-	iface->init = initable_init;
+    iface->init = initable_init;
 }
 
 static void

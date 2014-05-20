@@ -20,26 +20,26 @@
 
 /* Log levels */
 enum {
-	LOGL_ERR   = 0x00000001,
-	LOGL_WARN  = 0x00000002,
-	LOGL_INFO  = 0x00000004,
-	LOGL_DEBUG = 0x00000008
+    LOGL_ERR   = 0x00000001,
+    LOGL_WARN  = 0x00000002,
+    LOGL_INFO  = 0x00000004,
+    LOGL_DEBUG = 0x00000008
 };
 
 #define mm_err(...) \
-	_mm_log (G_STRLOC, G_STRFUNC, LOGL_ERR, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, LOGL_ERR, ## __VA_ARGS__ )
 
 #define mm_warn(...) \
-	_mm_log (G_STRLOC, G_STRFUNC, LOGL_WARN, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, LOGL_WARN, ## __VA_ARGS__ )
 
 #define mm_info(...) \
-	_mm_log (G_STRLOC, G_STRFUNC, LOGL_INFO, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, LOGL_INFO, ## __VA_ARGS__ )
 
 #define mm_dbg(...) \
-	_mm_log (G_STRLOC, G_STRFUNC, LOGL_DEBUG, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, LOGL_DEBUG, ## __VA_ARGS__ )
 
 #define mm_log(level, ...) \
-	_mm_log (G_STRLOC, G_STRFUNC, level, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, level, ## __VA_ARGS__ )
 
 void _mm_log (const char *loc,
               const char *func,

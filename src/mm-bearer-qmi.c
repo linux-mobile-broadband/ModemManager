@@ -1229,7 +1229,7 @@ static void
 mm_bearer_qmi_init (MMBearerQmi *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BEARER_QMI,
                                               MMBearerQmiPrivate);
 }

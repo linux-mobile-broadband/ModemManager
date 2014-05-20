@@ -1706,7 +1706,7 @@ static void
 mm_sim_init (MMSim *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_SIM,
                                               MMSimPrivate);
 }

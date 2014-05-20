@@ -612,7 +612,7 @@ set_logging_auth_ready (MMAuthProvider *authp,
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-	else if (!mm_log_set_level (ctx->level, &error))
+    else if (!mm_log_set_level(ctx->level, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_info ("logging: level '%s'", ctx->level);
@@ -868,7 +868,7 @@ mm_manager_init (MMManager *manager)
     const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
 
     /* Setup private data */
-    manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE ((manager),
+    manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
                                                         MM_TYPE_MANAGER,
                                                         MMManagerPrivate);
 
@@ -983,7 +983,7 @@ finalize (GObject *object)
 static void
 initable_iface_init (GInitableIface *iface)
 {
-	iface->init = initable_init;
+    iface->init = initable_init;
 }
 
 static void

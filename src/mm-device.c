@@ -723,7 +723,7 @@ static void
 mm_device_init (MMDevice *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_DEVICE,
                                               MMDevicePrivate);
 }

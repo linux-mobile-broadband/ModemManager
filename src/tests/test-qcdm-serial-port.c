@@ -401,7 +401,7 @@ test_leading_frame_markers (TestData *d)
 static void
 test_pty_create (TestData *d)
 {
-	struct termios stbuf;
+    struct termios stbuf;
     int ret, err;
 
     ret = openpty (&d->master, &d->slave, NULL, NULL, NULL);
@@ -409,11 +409,11 @@ test_pty_create (TestData *d)
     d->valid = TRUE;
 
     /* set raw mode on the slave using kernel default parameters */
-	memset (&stbuf, 0, sizeof (stbuf));
-	tcgetattr (d->slave, &stbuf);
-	tcflush (d->slave, TCIOFLUSH);
-	cfmakeraw (&stbuf);
-	tcsetattr (d->slave, TCSANOW, &stbuf);
+    memset (&stbuf, 0, sizeof (stbuf));
+    tcgetattr (d->slave, &stbuf);
+    tcflush (d->slave, TCIOFLUSH);
+    cfmakeraw (&stbuf);
+    tcsetattr (d->slave, TCSANOW, &stbuf);
     fcntl (d->slave, F_SETFL, O_NONBLOCK);
 
     fcntl (d->master, F_SETFL, O_NONBLOCK);

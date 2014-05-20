@@ -43,7 +43,7 @@ static MMManager *manager;
 static gboolean
 quit_cb (gpointer user_data)
 {
-	mm_info ("Caught signal, shutting down...");
+    mm_info ("Caught signal, shutting down...");
 
     if (manager)
         g_object_set (manager, MM_MANAGER_CONNECTION, NULL, NULL);

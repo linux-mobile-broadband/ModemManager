@@ -41,9 +41,9 @@ struct _MMBroadbandModemMbimClass{
 GType mm_broadband_modem_mbim_get_type (void);
 
 MMBroadbandModemMbim *mm_broadband_modem_mbim_new (const gchar *device,
-						   const gchar **drivers,
-						   const gchar *plugin,
-						   guint16 vendor_id,
-						   guint16 product_id);
+                                                   const gchar **drivers,
+                                                   const gchar *plugin,
+                                                   guint16 vendor_id,
+                                                   guint16 product_id);
 
 #endif /* MM_BROADBAND_MODEM_MBIM_H */

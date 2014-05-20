@@ -76,8 +76,8 @@ check_authorization_ready (PolkitAuthority *authority,
                            GAsyncResult *res,
                            AuthorizeContext *ctx)
 {
-	PolkitAuthorizationResult *pk_result;
-	GError *error = NULL;
+    PolkitAuthorizationResult *pk_result;
+    GError *error = NULL;
 
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
         g_simple_async_result_set_error (ctx->result,
@@ -171,7 +171,7 @@ mm_auth_provider_polkit_init (MMAuthProviderPolkit *self)
 {
     GError *error = NULL;
 
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_AUTH_PROVIDER_POLKIT,
                                               MMAuthProviderPolkitPrivate);
 
@@ -181,7 +181,7 @@ mm_auth_provider_polkit_init (MMAuthProviderPolkit *self)
          * our AuthProvider. Every request will fail, though. */
         mm_warn ("failed to create PolicyKit authority: '%s'",
                  error ? error->message : "unknown");
-		g_clear_error (&error);
+        g_clear_error (&error);
     }
 }
 
