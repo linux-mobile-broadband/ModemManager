@@ -48,4 +48,6 @@ MMBroadbandModemAltairLte *mm_broadband_modem_altair_lte_new (const gchar *devic
                                                               guint16 vendor_id,
                                                               guint16 product_id);
 
+gboolean mm_broadband_modem_altair_lte_is_sim_refresh_detach_in_progress (MMBroadbandModem *self);
+
 #endif /* MM_BROADBAND_MODEM_ALTAIR_LTE_H */

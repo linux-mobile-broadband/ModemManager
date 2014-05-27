@@ -196,6 +196,20 @@ connect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
+    /* Don't allow a connect while we detach from the network to process SIM
+     * refresh.
+     * */
+    if (mm_broadband_modem_altair_lte_is_sim_refresh_detach_in_progress (modem)) {
+        mm_dbg ("Detached from network to process SIM refresh, failing connect request");
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_RETRY,
+                                             "Detached from network to process SIM refresh, can't connect.");
+        return;
+    }
+
     data = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
     if (!data) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
