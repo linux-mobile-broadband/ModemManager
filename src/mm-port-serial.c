@@ -879,7 +879,7 @@ common_input_available (MMPortSerial *self,
 {
     char buf[SERIAL_BUF_SIZE + 1];
     gsize bytes_read;
-    GIOStatus status;
+    GIOStatus status = G_IO_STATUS_NORMAL;
     CommandContext *ctx;
     const char *device;
     GError *error = NULL;
