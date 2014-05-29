@@ -19,6 +19,9 @@
 
 #include <glib.h>
 
+/* Bands response parser */
+GArray *mm_altair_parse_bands_response (const gchar *response);
+
 /* +CEER response parser */
 gchar *mm_altair_parse_ceer_response (const gchar *response,
                                       GError **error);

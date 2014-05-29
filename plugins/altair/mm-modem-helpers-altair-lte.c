@@ -14,6 +14,7 @@
  *
  */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <ModemManager.h>
@@ -21,6 +22,44 @@
 #include <libmm-glib.h>
 
 #include "mm-modem-helpers-altair-lte.h"
+
+/*****************************************************************************/
+/* Bands response parser */
+
+GArray *
+mm_altair_parse_bands_response (const gchar *response)
+{
+    gchar **split;
+    GArray *bands;
+    guint i;
+
+    /*
+     * Response is "<band>[,<band>...]"
+     */
+    split = g_strsplit_set (response, ",", -1);
+    if (!split)
+        return NULL;
+
+    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), g_strv_length (split));
+
+    for (i = 0; split[i]; i++) {
+        guint32 band_value;
+        MMModemBand band;
+
+        band_value = (guint32)strtoul (split[i], NULL, 10);
+        band = MM_MODEM_BAND_EUTRAN_I - 1 + band_value;
+
+        /* Due to a firmware issue, the modem may incorrectly includes 0 in the
+         * bands response. We thus ignore any band value outside the range of
+         * E-UTRAN operating bands. */
+        if (band >= MM_MODEM_BAND_EUTRAN_I && band <= MM_MODEM_BAND_EUTRAN_XLIV)
+            g_array_append_val (bands, band);
+    }
+
+    g_strfreev (split);
+
+    return bands;
+}
 
 /*****************************************************************************/
 /* +CEER response parser */

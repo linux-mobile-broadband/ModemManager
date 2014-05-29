@@ -264,37 +264,6 @@ load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* supported/current Bands helpers*/
-
-static GArray *
-parse_bands_response (const gchar *response)
-{
-    guint32 bandval;
-    MMModemBand band;
-    gchar **split;
-    guint i, num_of_bands;
-    GArray *bands;
-
-    split = g_strsplit_set (response, ",", -1);
-    if (!split)
-        return NULL;
-
-    num_of_bands = g_strv_length (split);
-
-    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), num_of_bands);
-
-    for (i = 0; split[i]; i++) {
-        bandval = (guint32)strtoul (split[i], NULL, 10);
-        band = MM_MODEM_BAND_EUTRAN_I - 1 + bandval;
-        g_array_append_val (bands, band);
-    }
-
-    g_strfreev (split);
-
-    return bands;
-}
-
-/*****************************************************************************/
 /* Load supported bands (Modem interface) */
 
 static GArray *
@@ -334,7 +303,7 @@ load_supported_bands_done (MMIfaceModem *self,
      */
     response = mm_strip_tag (response, BANDCAP_TAG);
 
-    bands = parse_bands_response (response);
+    bands = mm_altair_parse_bands_response (response);
     if (!bands) {
         mm_dbg ("Failed to parse supported bands response");
         g_simple_async_result_set_error (
@@ -415,7 +384,7 @@ load_current_bands_done (MMIfaceModem *self,
      */
     response = mm_strip_tag (response, CFGBANDS_TAG);
 
-    bands = parse_bands_response (response);
+    bands = mm_altair_parse_bands_response (response);
     if (!bands) {
         mm_dbg ("Failed to parse current bands response");
         g_simple_async_result_set_error (

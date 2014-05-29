@@ -20,7 +20,35 @@
 #include <glib-object.h>
 #include <locale.h>
 
+#include <ModemManager.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-modem-helpers-altair-lte.h"
+
+/*****************************************************************************/
+/* Test bands response parsing */
+
+static void
+test_parse_bands (void)
+{
+    GArray *bands;
+
+    bands = mm_altair_parse_bands_response ("");
+    g_assert (bands != NULL);
+    g_assert_cmpuint (bands->len, ==, 0);
+    g_array_free (bands, TRUE);
+
+    /* 0 and 45 are outside the range of E-UTRAN operating bands and should be ignored. */
+    bands = mm_altair_parse_bands_response ("0, 0, 1, 4,13,44,45");
+    g_assert (bands != NULL);
+    g_assert_cmpuint (bands->len, ==, 4);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 0), ==, MM_MODEM_BAND_EUTRAN_I);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 1), ==, MM_MODEM_BAND_EUTRAN_IV);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 2), ==, MM_MODEM_BAND_EUTRAN_XIII);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 3), ==, MM_MODEM_BAND_EUTRAN_XLIV);
+    g_array_free (bands, TRUE);
+}
 
 /*****************************************************************************/
 /* Test +CEER responses */
@@ -105,6 +133,7 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
+    g_test_add_func ("/MM/altair/parse_bands", test_parse_bands);
     g_test_add_func ("/MM/altair/ceer", test_ceer);
     g_test_add_func ("/MM/altair/parse_cid", test_parse_cid);
     g_test_add_func ("/MM/altair/parse_vendor_pco_info", test_parse_vendor_pco_info);
