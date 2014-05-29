@@ -190,10 +190,15 @@ scan_devices_ready (MMManager    *manager,
 static void
 print_modem_short_info (MMObject *modem)
 {
+    const gchar *manufacturer, *model;
+
+    manufacturer = mm_modem_get_manufacturer (mm_object_peek_modem (modem));
+    model = mm_modem_get_model (mm_object_peek_modem (modem));
+
     g_print ("\t%s [%s] %s\n",
              mm_object_get_path (modem),
-             mm_modem_get_manufacturer (mm_object_peek_modem (modem)),
-             mm_modem_get_model (mm_object_peek_modem (modem)));
+             manufacturer ? manufacturer : "unknown",
+             model ? model : "unknown");
 }
 
 static void
