@@ -53,6 +53,8 @@ test_result_uint32 (void *f, void *data)
 
     qcdm_result_get_u32 (result, TEST_TAG, &tmp);
     g_assert_cmpint (tmp, ==, num);
+
+    qcdm_result_unref (result);
 }
 
 void
@@ -67,6 +69,8 @@ test_result_uint8 (void *f, void *data)
 
     qcdm_result_get_u8 (result, TEST_TAG, &tmp);
     g_assert (tmp == num);
+
+    qcdm_result_unref (result);
 }
 
 void
@@ -83,5 +87,7 @@ test_result_uint8_array (void *f, void *data)
     qcdm_result_get_u8_array (result, TEST_TAG, &tmp, &tmp_len);
     g_assert_cmpint (tmp_len, ==, sizeof (array));
     g_assert_cmpint (memcmp (tmp, array, tmp_len), ==, 0);
+
+    qcdm_result_unref (result);
 }
 
