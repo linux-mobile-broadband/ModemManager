@@ -293,6 +293,7 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_EUTRAN_XLI: E-UTRAN band XLI.
  * @MM_MODEM_BAND_EUTRAN_XLII: E-UTRAN band XLII.
  * @MM_MODEM_BAND_EUTRAN_XLIII: E-UTRAN band XLIII.
+ * @MM_MODEM_BAND_EUTRAN_XLIV: E-UTRAN band XLIV.
  * @MM_MODEM_BAND_CDMA_BC0_CELLULAR_800: CDMA Band Class 0 (US Cellular 850MHz).
  * @MM_MODEM_BAND_CDMA_BC1_PCS_1900: CDMA Band Class 1 (US PCS 1900MHz).
  * @MM_MODEM_BAND_CDMA_BC2_TACS: CDMA Band Class 2 (UK TACS 900MHz).
@@ -369,6 +370,7 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_EUTRAN_XLI     = 71,
     MM_MODEM_BAND_EUTRAN_XLII    = 72,
     MM_MODEM_BAND_EUTRAN_XLIII   = 73,
+    MM_MODEM_BAND_EUTRAN_XLIV    = 74,
     /* CDMA Band Classes (see 3GPP2 C.S0057-C) */
     MM_MODEM_BAND_CDMA_BC0_CELLULAR_800   = 128,
     MM_MODEM_BAND_CDMA_BC1_PCS_1900       = 129,

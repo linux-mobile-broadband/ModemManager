@@ -270,6 +270,7 @@ static const DmsLteBandsMap dms_lte_bands_map [] = {
      * - MM_MODEM_BAND_EUTRAN_XXII
      * - MM_MODEM_BAND_EUTRAN_XXIII
      * - MM_MODEM_BAND_EUTRAN_XXVI
+     * - MM_MODEM_BAND_EUTRAN_XLIV
      */
 };
 
@@ -446,6 +447,7 @@ static const NasLteBandsMap nas_lte_bands_map [] = {
      * - MM_MODEM_BAND_EUTRAN_XXII
      * - MM_MODEM_BAND_EUTRAN_XXIII
      * - MM_MODEM_BAND_EUTRAN_XXVI
+     * - MM_MODEM_BAND_EUTRAN_XLIV
      */
 };
 
@@ -493,7 +495,7 @@ mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
 
         band = g_array_index (mm_bands, MMModemBand, i);
 
-        if (band <= MM_MODEM_BAND_EUTRAN_XLIII &&
+        if (band <= MM_MODEM_BAND_EUTRAN_XLIV &&
             band >= MM_MODEM_BAND_EUTRAN_I) {
             /* Add LTE band preference */
             guint j;
