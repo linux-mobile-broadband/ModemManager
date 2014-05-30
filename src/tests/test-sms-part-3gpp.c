@@ -528,10 +528,12 @@ common_test_create_pdu (const gchar *smsc,
     if (number)
         mm_sms_part_set_number (part, number);
     if (text) {
+        gchar **out;
         MMSmsEncoding encoding = MM_SMS_ENCODING_UNKNOWN;
 
         /* Detect best encoding */
-        mm_sms_part_3gpp_util_split_text (text, &encoding);
+        out = mm_sms_part_3gpp_util_split_text (text, &encoding);
+        g_strfreev (out);
         mm_sms_part_set_text (part, text);
         mm_sms_part_set_encoding (part, encoding);
     }
@@ -544,6 +546,7 @@ common_test_create_pdu (const gchar *smsc,
                                            &len,
                                            &msgstart,
                                            &error);
+    mm_sms_part_free (part);
 
     trace_pdu (pdu, len);
 
@@ -726,6 +729,8 @@ common_test_text_split (const gchar *text,
     for (i = 0; out[i]; i++) {
         g_assert_cmpstr (out[i], ==, expected[i]);
     }
+
+    g_strfreev (out);
 }
 
 static void

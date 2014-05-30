@@ -711,6 +711,7 @@ test_creg_match (const char *test,
     g_assert_cmpuint (regex_num, ==, result->regex_num);
 
     success = mm_3gpp_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &cereg, &error);
+    g_match_info_free (info);
     g_assert (success);
     g_assert_no_error (error);
     g_assert_cmpuint (state, ==, result->state);
@@ -1445,6 +1446,7 @@ test_devid_item (void *f, gpointer d)
     if (strcmp (devid, item->devid))
         g_message ("%s", devid);
     g_assert (!strcmp (devid, item->devid));
+    g_free (devid);
 }
 
 /*****************************************************************************/
@@ -1536,6 +1538,7 @@ test_iccid_parse_quoted_swap_19_digit (void *f, gpointer d)
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
 }
 
 static void
@@ -1549,6 +1552,7 @@ test_iccid_parse_unquoted_swap_20_digit (void *f, gpointer d)
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
 }
 
 static void
@@ -1562,6 +1566,7 @@ test_iccid_parse_unquoted_unswapped_19_digit (void *f, gpointer d)
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
 }
 
 static void
@@ -1575,6 +1580,7 @@ test_iccid_parse_quoted_unswapped_20_digit (void *f, gpointer d)
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
 }
 
 static void
@@ -1586,6 +1592,7 @@ test_iccid_parse_short (void *f, gpointer d)
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_free (parsed);
 }
 
 static void
@@ -1597,6 +1604,7 @@ test_iccid_parse_invalid_chars (void *f, gpointer d)
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_free (parsed);
 }
 
 static void
@@ -1608,6 +1616,7 @@ test_iccid_parse_quoted_invalid_mii (void *f, gpointer d)
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_free (parsed);
 }
 
 static void
@@ -1619,6 +1628,7 @@ test_iccid_parse_unquoted_invalid_mii (void *f, gpointer d)
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_free (parsed);
 }
 
 /*****************************************************************************/

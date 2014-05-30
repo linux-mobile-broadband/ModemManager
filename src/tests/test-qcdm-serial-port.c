@@ -227,6 +227,7 @@ qcdm_test_child (int fd, GAsyncReadyCallback cb)
 
     qcdm_request_verinfo (port, cb, loop);
     g_main_loop_run (loop);
+    g_main_loop_unref (loop);
 
     mm_port_serial_close (MM_PORT_SERIAL (port));
     g_object_unref (port);
