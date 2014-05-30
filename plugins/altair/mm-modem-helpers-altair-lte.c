@@ -119,6 +119,7 @@ mm_altair_parse_cid (const gchar *response, GError **error)
     regex = g_regex_new ("\\%CGINFO:\\s*(\\d+)", G_REGEX_RAW, 0, NULL);
     g_assert (regex);
     if (!g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, error)) {
+        g_match_info_free (match_info);
         g_regex_unref (regex);
         return -1;
     }
@@ -155,8 +156,11 @@ altair_extract_vzw_pco_value (const gchar *pco_payload, GError **error)
                              0,
                              0,
                              &match_info,
-                             error))
+                             error)) {
+        g_match_info_free (match_info);
+        g_regex_unref (regex);
         return -1;
+    }
 
     if (!g_match_info_matches (match_info) ||
         !mm_get_uint_from_match_info (match_info, 1, &pco_value))
@@ -195,8 +199,11 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, NULL);
     g_assert (regex);
-    if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error))
+    if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error)) {
+        g_match_info_free (match_info);
+        g_regex_unref (regex);
         return -1;
+    }
 
     num_matches = g_match_info_get_match_count (match_info);
     if (num_matches != 5) {
@@ -205,6 +212,8 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
                      MM_CORE_ERROR_FAILED,
                      "Failed to parse substrings, number of matches: %d",
                      num_matches);
+        g_match_info_free (match_info);
+        g_regex_unref (regex);
         return -1;
     }
 
@@ -237,9 +246,11 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
         }
 
         if (g_strcmp0 (pco_id, "FF00")) {
+            g_free (pco_id);
             g_match_info_next (match_info, error);
             continue;
         }
+        g_free (pco_id);
 
         pco_payload = mm_get_string_unquoted_from_match_info (match_info, 4);
         if (!pco_payload) {
@@ -252,6 +263,7 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
         }
 
         pco_value = altair_extract_vzw_pco_value (pco_payload, error);
+        g_free (pco_payload);
         break;
     }
 
