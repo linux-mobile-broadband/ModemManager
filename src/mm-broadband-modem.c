@@ -8731,11 +8731,11 @@ enable (MMBaseModem *self,
     /* Check state before launching modem enabling */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_FAILED:
-        /* We should never have a UNKNOWN|FAILED->ENABLED transition */
+        /* We should never have a UNKNOWN->ENABLED transition */
         g_assert_not_reached ();
         break;
 
+    case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_INITIALIZING:
         g_simple_async_result_set_error (result,
                                          MM_CORE_ERROR,
