@@ -66,6 +66,7 @@ common_test_scfg (const gchar *response,
 
     g_free (bands_str);
     g_free (expected_bands_str);
+    g_array_unref (bands);
 }
 
 static void
@@ -150,6 +151,7 @@ common_test_scfg_response (const gchar *response,
 
     g_free (bands_str);
     g_free (expected_bands_str);
+    g_array_unref (bands);
 }
 
 static void
