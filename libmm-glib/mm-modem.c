@@ -2978,6 +2978,7 @@ finalize (GObject *object)
 
     g_mutex_clear (&self->priv->unlock_retries_mutex);
     g_mutex_clear (&self->priv->supported_modes_mutex);
+    g_mutex_clear (&self->priv->supported_capabilities_mutex);
     g_mutex_clear (&self->priv->supported_bands_mutex);
     g_mutex_clear (&self->priv->current_bands_mutex);
     g_mutex_clear (&self->priv->ports_mutex);
