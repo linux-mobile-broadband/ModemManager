@@ -399,6 +399,7 @@ common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
     }
 
     pdu = mm_sms_part_cdma_get_submit_pdu (part, &len, &error);
+    mm_sms_part_free (part);
 
     trace_pdu (pdu, len);
 

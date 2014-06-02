@@ -360,6 +360,7 @@ test_pdu_insufficient_data (void)
     g_assert (part == NULL);
     /* We don't care for the specific error type */
     g_assert (error != NULL);
+    g_error_free (error);
     g_free (hexpdu);
 }
 

@@ -1591,8 +1591,9 @@ test_iccid_parse_short (void *f, gpointer d)
     GError *error = NULL;
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert (parsed == NULL);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-    g_free (parsed);
+    g_error_free (error);
 }
 
 static void
@@ -1603,8 +1604,9 @@ test_iccid_parse_invalid_chars (void *f, gpointer d)
     GError *error = NULL;
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert (parsed == NULL);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-    g_free (parsed);
+    g_error_free (error);
 }
 
 static void
@@ -1615,8 +1617,9 @@ test_iccid_parse_quoted_invalid_mii (void *f, gpointer d)
     GError *error = NULL;
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert (parsed == NULL);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-    g_free (parsed);
+    g_error_free (error);
 }
 
 static void
@@ -1627,8 +1630,9 @@ test_iccid_parse_unquoted_invalid_mii (void *f, gpointer d)
     GError *error = NULL;
 
     parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert (parsed == NULL);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-    g_free (parsed);
+    g_error_free (error);
 }
 
 /*****************************************************************************/
@@ -1840,6 +1844,10 @@ test_cpms_response_cinterion (void *f, gpointer d)
     g_assert (mem3->len == 2);
     g_assert (is_storage_supported (mem3, MM_SMS_STORAGE_SM));
     g_assert (is_storage_supported (mem3, MM_SMS_STORAGE_MT));
+
+    g_array_unref (mem1);
+    g_array_unref (mem2);
+    g_array_unref (mem3);
 }
 
 /*****************************************************************************/
