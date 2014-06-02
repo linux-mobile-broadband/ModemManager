@@ -331,6 +331,84 @@ deferred_support_check_idle (PortProbeContext *port_probe_ctx)
 }
 
 static void
+suggest_single_port_probe_result (PortProbeContext *target_port_probe_ctx,
+                                  MMPlugin *suggested_plugin,
+                                  gboolean reschedule_deferred)
+{
+    gboolean forbidden_icera;
+
+    /* Plugin suggestions serve two different purposes here:
+     *  1) Finish all the probes which were deferred until suggested.
+     *  2) Suggest to other probes which plugin to test next.
+     *
+     * The exception here is when we suggest the GENERIC plugin.
+     * In this case, only purpose (1) is applied, this is, only
+     * the deferred until suggested probes get finished.
+     */
+
+    if (target_port_probe_ctx->best_plugin || target_port_probe_ctx->suggested_plugin)
+        return;
+
+    /* Complete tasks which were deferred until suggested */
+    if (target_port_probe_ctx->defer_until_suggested) {
+        /* Reset the defer until suggested flag; we consider this
+         * cancelled probe completed now. */
+        target_port_probe_ctx->defer_until_suggested = FALSE;
+
+        if (suggested_plugin) {
+            mm_dbg ("(Plugin Manager) (%s) [%s] deferred task completed, got suggested plugin",
+                    mm_plugin_get_name (suggested_plugin),
+                    g_udev_device_get_name (target_port_probe_ctx->port));
+            /* Advance to the suggested plugin and re-check support there */
+            target_port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
+            target_port_probe_ctx->current = g_list_find (target_port_probe_ctx->current,
+                                                          target_port_probe_ctx->suggested_plugin);
+        } else {
+            mm_dbg ("(Plugin Manager) [%s] deferred task cancelled, no suggested plugin",
+                    g_udev_device_get_name (target_port_probe_ctx->port));
+            target_port_probe_ctx->best_plugin = NULL;
+            target_port_probe_ctx->current = NULL;
+        }
+
+        /* Schedule checking support, which will end the operation */
+        if (reschedule_deferred) {
+            g_assert (target_port_probe_ctx->defer_id == 0);
+            target_port_probe_ctx->defer_id = g_idle_add ((GSourceFunc)deferred_support_check_idle,
+                                                          target_port_probe_ctx);
+        }
+        return;
+    }
+
+    /* If no plugin being suggested, done */
+    if (!suggested_plugin)
+        return;
+
+    /* The GENERIC plugin is NEVER suggested to others */
+    if (g_str_equal (mm_plugin_get_name (suggested_plugin), MM_PLUGIN_GENERIC_NAME))
+        return;
+
+    /* If the plugin has MM_PLUGIN_FORBIDDEN_ICERA set, we do *not* suggest
+     * the plugin to others. Icera devices may not reply to the icera probing
+     * in all ports, so if other ports need to be tested for icera support,
+     * they should all go on. */
+    g_object_get (suggested_plugin,
+                  MM_PLUGIN_FORBIDDEN_ICERA, &forbidden_icera,
+                  NULL);
+    if (forbidden_icera)
+        return;
+
+    /* We should *not* cancel probing in the port if the plugin being
+     * checked right now is not the one being suggested. Each port
+     * should run its probing independently, and we'll later decide
+     * which result applies to the whole device.
+     */
+    mm_dbg ("(Plugin Manager) (%s) [%s] suggested plugin for port",
+            mm_plugin_get_name (suggested_plugin),
+            g_udev_device_get_name (target_port_probe_ctx->port));
+    target_port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
+}
+
+static void
 suggest_port_probe_result (FindDeviceSupportContext *ctx,
                            PortProbeContext *origin,
                            MMPlugin *suggested_plugin)
@@ -340,72 +418,8 @@ suggest_port_probe_result (FindDeviceSupportContext *ctx,
     for (l = ctx->running_probes; l; l = g_list_next (l)) {
         PortProbeContext *port_probe_ctx = l->data;
 
-        /* Plugin suggestions serve two different purposes here:
-         *  1) Finish all the probes which were deferred until suggested.
-         *  2) Suggest to other probes which plugin to test next.
-         *
-         * The exception here is when we suggest the GENERIC plugin.
-         * In this case, only purpose (1) is applied, this is, only
-         * the deferred until suggested probes get finished.
-         */
-
-        if (port_probe_ctx != origin &&
-            !port_probe_ctx->best_plugin &&
-            !port_probe_ctx->suggested_plugin) {
-            /* If we got a task deferred until a suggestion comes,
-             * complete it */
-            if (port_probe_ctx->defer_until_suggested) {
-                /* Reset the defer until suggested flag; we consider this
-                 * cancelled probe completed now. */
-                port_probe_ctx->defer_until_suggested = FALSE;
-
-                if (suggested_plugin) {
-                    mm_dbg ("(Plugin Manager) (%s) [%s] deferred task completed, got suggested plugin",
-                            mm_plugin_get_name (suggested_plugin),
-                            g_udev_device_get_name (port_probe_ctx->port));
-                    /* Advance to the suggested plugin and re-check support there */
-                    port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
-                    port_probe_ctx->current = g_list_find (port_probe_ctx->current,
-                                                           port_probe_ctx->suggested_plugin);
-                } else {
-                    mm_dbg ("(Plugin Manager) [%s] deferred task cancelled, no suggested plugin",
-                            g_udev_device_get_name (port_probe_ctx->port));
-                    port_probe_ctx->best_plugin = NULL;
-                    port_probe_ctx->current = NULL;
-                }
-
-                /* Schedule checking support, which will end the operation */
-                g_assert (port_probe_ctx->defer_id == 0);
-                port_probe_ctx->defer_id = g_idle_add ((GSourceFunc)deferred_support_check_idle,
-                                                       port_probe_ctx);
-            }
-            /* We should *not* cancel probing in the port if the plugin being
-             * checked right now is not the one being suggested. Each port
-             * should run its probing independently, and we'll later decide
-             * which result applies to the whole device.
-             */
-            else if (suggested_plugin &&
-                     /* The GENERIC plugin is NEVER suggested to others */
-                     !g_str_equal (mm_plugin_get_name (suggested_plugin),
-                                   MM_PLUGIN_GENERIC_NAME)) {
-                gboolean forbidden_icera;
-
-                /* If the plugin has MM_PLUGIN_FORBIDDEN_ICERA set, we do *not* suggest
-                 * the plugin to others. Icera devices may not reply to the icera probing
-                 * in all ports, so if other ports need to be tested for icera support,
-                 * they should all go on. */
-                g_object_get (suggested_plugin,
-                              MM_PLUGIN_FORBIDDEN_ICERA, &forbidden_icera,
-                              NULL);
-
-                if (!forbidden_icera) {
-                    mm_dbg ("(Plugin Manager) (%s) [%s] suggested plugin for port",
-                            mm_plugin_get_name (suggested_plugin),
-                            g_udev_device_get_name (port_probe_ctx->port));
-                    port_probe_ctx->suggested_plugin = g_object_ref (suggested_plugin);
-                }
-            }
-        }
+        if (port_probe_ctx != origin)
+            suggest_single_port_probe_result (port_probe_ctx, suggested_plugin, TRUE);
     }
 }
 
@@ -508,6 +522,25 @@ plugin_supports_port_ready (MMPlugin *plugin,
 
 
     case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
+        /* If we're deferred until suggested, but there is already a plugin
+         * suggested in the parent device context, grab it. This may happen if
+         * e.g. a wwan interface arrives *after* a port has already been probed.
+         */
+        if (!port_probe_ctx->suggested_plugin) {
+            MMPlugin *device_plugin;
+
+            /* Get info about the currently scheduled plugin in the device */
+            device_plugin = (MMPlugin *)mm_device_peek_plugin (port_probe_ctx->parent_ctx->device);
+            if (device_plugin) {
+                mm_dbg ("(Plugin Manager) (%s) [%s] task deferred until result suggested and got suggested plugin",
+                        mm_plugin_get_name (device_plugin),
+                        g_udev_device_get_name (port_probe_ctx->port));
+                /* Flag it as deferred before suggesting probe result */
+                port_probe_ctx->defer_until_suggested = TRUE;
+                suggest_single_port_probe_result (port_probe_ctx, device_plugin, FALSE);
+            }
+        }
+
         /* If we arrived here and we already have a plugin suggested, use it */
         if (port_probe_ctx->suggested_plugin) {
             if (port_probe_ctx->suggested_plugin == plugin) {
