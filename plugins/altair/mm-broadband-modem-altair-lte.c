@@ -1402,7 +1402,7 @@ mm_broadband_modem_altair_lte_init (MMBroadbandModemAltairLte *self)
                                               MM_TYPE_BROADBAND_MODEM_ALTAIR_LTE,
                                               MMBroadbandModemAltairLtePrivate);
 
-    self->priv->sim_refresh_regex = g_regex_new ("\\r\\n\\%NOTIFYEV:\\s*SIMREFRESH,?(\\d*)\\r+\\n",
+    self->priv->sim_refresh_regex = g_regex_new ("\\r\\n\\%NOTIFYEV:\\s*\"?SIMREFRESH\"?,?(\\d*)\\r+\\n",
                                                  G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->sim_refresh_detach_in_progress = FALSE;
     self->priv->sim_refresh_timer_id = 0;
