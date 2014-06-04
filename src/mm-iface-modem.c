@@ -1160,9 +1160,9 @@ update_signal_quality (MMIfaceModem *self,
                                                       expire));
 
     dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_info ("Modem %s: signal quality updated (%u)",
-             dbus_path,
-             signal_quality);
+    mm_dbg ("Modem %s: signal quality updated (%u)",
+            dbus_path,
+            signal_quality);
 
     /* Remove any previous expiration refresh timeout */
     if (ctx->recent_timeout_source) {
