@@ -568,7 +568,7 @@ packet_service_set_ready (MbimDevice *device,
                 &highest_available_data_class,
                 &uplink_speed,
                 &downlink_speed,
-                &error)) {
+                &inner_error)) {
             if (nw_error) {
                 if (error)
                     g_error_free (error);
@@ -963,7 +963,7 @@ disconnect_set_ready (MbimDevice *device,
                 NULL, /* ip_type */
                 NULL, /* context_type */
                 &nw_error,
-                &error)) {
+                &inner_error)) {
             if (nw_error) {
                 if (error)
                     g_error_free (error);
