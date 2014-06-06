@@ -1190,33 +1190,15 @@ modem_3gpp_load_subscription_state_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-altair_load_internet_cid_ready (MMIfaceModem3gpp *self,
-                                GAsyncResult *res,
-                                LoadSubscriptionStateContext *ctx)
+altair_get_subscription_state (MMIfaceModem3gpp *self,
+                               LoadSubscriptionStateContext *ctx)
 {
-    const gchar *response;
-    GError *error = NULL;
-    guint cid;
     guint pco_value = -1;
+    GError *error = NULL;
     MMModem3gppSubscriptionState subscription_state;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        mm_dbg ("Failed to load internet CID.");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_subscription_state_context_complete_and_free (ctx);
-        return;
-    }
-
-    cid = mm_altair_parse_cid (response, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_subscription_state_context_complete_and_free (ctx);
-        return;
-    }
-
     mm_dbg ("Parsing vendor PCO info: %s", ctx->pco_info);
-    pco_value = mm_altair_parse_vendor_pco_info (ctx->pco_info, cid, &error);
+    pco_value = mm_altair_parse_vendor_pco_info (ctx->pco_info, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         load_subscription_state_context_complete_and_free (ctx);
@@ -1225,30 +1207,8 @@ altair_load_internet_cid_ready (MMIfaceModem3gpp *self,
     mm_dbg ("PCO value = %d", pco_value);
 
     subscription_state = altair_vzw_pco_value_to_mm_modem_3gpp_subscription_state (pco_value);
-    if (subscription_state == MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN) {
-        /* The PCO value is loaded after the modem has successfully registered
-         * with the network.  So even if the PCO value is unknown here,
-         * the successful registration indicates a provisioned SIM.
-         */
-        subscription_state = MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED;
-    }
-
     g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (subscription_state), NULL);
     load_subscription_state_context_complete_and_free (ctx);
-}
-
-static void
-altair_get_subscription_state (MMIfaceModem3gpp *self,
-                               LoadSubscriptionStateContext *ctx)
-{
-    /* Get the latest internet CID first */
-    mm_dbg ("Loading internet CID...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "%CGINFO=\"cid\",1",
-                              6,
-                              FALSE,
-                              (GAsyncReadyCallback)altair_load_internet_cid_ready,
-                              ctx);
 }
 
 static void
@@ -1312,7 +1272,8 @@ altair_get_subscription_state_ready (MMBroadbandModemAltairLte *self,
     }
 
     subscription_state = GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_iface_modem_3gpp_update_subscription_state (MM_IFACE_MODEM_3GPP (self), subscription_state);
+    if (subscription_state != MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN)
+        mm_iface_modem_3gpp_update_subscription_state (MM_IFACE_MODEM_3GPP (self), subscription_state);
 }
 
 static void

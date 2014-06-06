@@ -23,6 +23,9 @@
 
 #include "mm-modem-helpers-altair-lte.h"
 
+#define MM_ALTAIR_IMS_PDN_CID           1
+#define MM_ALTAIR_INTERNET_PDN_CID      3
+
 /*****************************************************************************/
 /* Bands response parser */
 
@@ -138,6 +141,13 @@ mm_altair_parse_cid (const gchar *response, GError **error)
 /*****************************************************************************/
 /* %PCOINFO response parser */
 
+typedef enum {
+    MM_VZW_PCO_PROVISIONED = 0,
+    MM_VZW_PCO_LIMIT_REACHED = 1,
+    MM_VZW_PCO_OUT_OF_DATA = 3,
+    MM_VZW_PCO_UNPROVISIONED = 5
+} MMVzwPco;
+
 static guint
 altair_extract_vzw_pco_value (const gchar *pco_payload, GError **error)
 {
@@ -177,9 +187,7 @@ altair_extract_vzw_pco_value (const gchar *pco_payload, GError **error)
 }
 
 guint
-mm_altair_parse_vendor_pco_info (const gchar *pco_info,
-                                 guint cid,
-                                 GError **error)
+mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 {
     GRegex *regex;
     GMatchInfo *match_info;
@@ -231,11 +239,6 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
             break;
         }
 
-        if (pco_cid != cid) {
-            g_match_info_next (match_info, error);
-            continue;
-        }
-
         pco_id = mm_get_string_unquoted_from_match_info (match_info, 3);
         if (!pco_id) {
             g_set_error (error,
@@ -264,7 +267,14 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info,
 
         pco_value = altair_extract_vzw_pco_value (pco_payload, error);
         g_free (pco_payload);
-        break;
+
+        /* We are only interested in IMS and Internet PDN PCO. */
+        if (pco_cid == MM_ALTAIR_IMS_PDN_CID || pco_cid == MM_ALTAIR_INTERNET_PDN_CID) {
+            break;
+        }
+
+        pco_value = -1;
+        g_match_info_next (match_info, error);
     }
 
     g_match_info_free (match_info);

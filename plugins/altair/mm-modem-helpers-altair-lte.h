@@ -30,8 +30,6 @@ gchar *mm_altair_parse_ceer_response (const gchar *response,
 guint mm_altair_parse_cid (const gchar *response, GError **error);
 
 /* %PCOINFO response parser */
-guint mm_altair_parse_vendor_pco_info (const gchar *pco_info,
-                                       guint cid,
-                                       GError **error);
+guint mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error);
 
 #endif  /* MM_MODEM_HELPERS_ALTAIR_H */

@@ -103,26 +103,38 @@ test_parse_vendor_pco_info (void)
     guint pco_value;
 
     /* Valid PCO values */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018400", 3, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018400", NULL);
     g_assert (pco_value == 0);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018403", 3, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018403", NULL);
     g_assert (pco_value == 3);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018405", 3, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018405", NULL);
+    g_assert (pco_value == 5);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018400", NULL);
+    g_assert (pco_value == 0);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018403", NULL);
+    g_assert (pco_value == 3);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018405", NULL);
+    g_assert (pco_value == 5);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018400", NULL);
+    g_assert (pco_value == 0);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018403", NULL);
+    g_assert (pco_value == 3);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018405", NULL);
     g_assert (pco_value == 5);
     /* Different container */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,F000,13018401", 3, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,F000,13018401", NULL);
     g_assert (pco_value == -1);
-    /* Different CID */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018401", 1, NULL);
+    /* Invalid CID */
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,2,FF00,13018401", NULL);
     g_assert (pco_value == -1);
     /* Different payload */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018501", 1, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018501", NULL);
     g_assert (pco_value == -1);
     /* Bad PCO info */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: blah,blah,FF00,13018401", 1, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: blah,blah,FF00,13018401", NULL);
     g_assert (pco_value == -1);
     /* Multiline PCO info */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018400\r\n%PCOINFO: 1,3,FF00,13018403", 3, NULL);
+    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,2,FF00,13018400\r\n%PCOINFO: 1,3,FF00,13018403", NULL);
     g_assert (pco_value == 3);
 }
 

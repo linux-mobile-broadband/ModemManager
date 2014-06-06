@@ -3499,16 +3499,9 @@ modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
                                         user_data,
                                         modem_3gpp_load_subscription_state);
 
-   /* Reloading subscription state only occurs on a successfully registered
-    * modem. (Although the 3GPP interface does not reflect this until after
-    * loading operator information completes.)
-    * By default, we can assume that successful registration implies a
-    * provisioned SIM.
-    */
-    mm_dbg ("Load subscription state: Marking the SIM as provisioned.");
     g_simple_async_result_set_op_res_gpointer (
         result,
-        GUINT_TO_POINTER (MM_MODEM_3GPP_SUBSCRIPTION_STATE_PROVISIONED),
+        GUINT_TO_POINTER (MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN),
         NULL);
 
     g_simple_async_result_complete_in_idle (result);
