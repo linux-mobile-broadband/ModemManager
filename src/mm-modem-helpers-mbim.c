@@ -183,6 +183,10 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR,
                             "IMSI unknown in HLR");
+    case MBIM_NW_ERROR_ILLEGAL_MS:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS,
+                            "Illegal MS");
     case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_VLR:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR,
@@ -227,6 +231,26 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION,
                             "Congestion");
+    case MBIM_NW_ERROR_GSM_AUTHENTICATION_UNACCEPTABLE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
+                            "GSM authentication unacceptable");
+    case MBIM_NW_ERROR_NOT_AUTHORIZED_FOR_CSG:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
+                            "Not authorized for this CSG");
+    case MBIM_NW_ERROR_SERVICE_OPTION_NOT_SUPPORTED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED,
+                            "Service option not supported");
+    case MBIM_NW_ERROR_REQUESTED_SERVICE_OPTION_NOT_SUBSCRIBED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED,
+                            "Requested service option not subscribed");
+    case MBIM_NW_ERROR_SERVICE_OPTION_TEMPORARILY_OUT_OF_ORDER:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER,
+                            "Service option temporarily out of order");
     default:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
