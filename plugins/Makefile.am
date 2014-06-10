@@ -1,3 +1,4 @@
+
 include $(top_srcdir)/gtester.make
 
 # Common CPPFLAGS and LDFLAGS
@@ -212,11 +213,26 @@ libmm_plugin_mbm_la_SOURCES = \
 	mbm/mm-broadband-modem-mbm.h \
 	mbm/mm-broadband-bearer-mbm.c \
 	mbm/mm-broadband-bearer-mbm.h \
+	mbm/mm-modem-helpers-mbm.c \
+	mbm/mm-modem-helpers-mbm.h \
 	mbm/mm-sim-mbm.c \
 	mbm/mm-sim-mbm.h
 libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
+
+noinst_PROGRAMS += test-modem-helpers-mbm
+test_modem_helpers_mbm_SOURCES = \
+	mbm/mm-modem-helpers-mbm.c \
+	mbm/mm-modem-helpers-mbm.h \
+	mbm/tests/test-modem-helpers-mbm.c
+test_modem_helpers_mbm_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/mbm \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_mbm_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_mbm_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Option
 libmm_plugin_option_la_SOURCES = \
