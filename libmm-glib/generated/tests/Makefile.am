@@ -12,7 +12,7 @@ mm_gdbus_test_generated = \
 	mm-gdbus-test.h \
 	mm-gdbus-test.c
 $(mm_gdbus_test_generated): $(top_srcdir)/introspection/tests/org.freedesktop.ModemManager1.Test.xml
-	$(AM_V_GEN) gdbus-codegen \
+	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
 		--generate-c-code mm-gdbus-test \

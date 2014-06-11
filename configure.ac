@@ -107,6 +107,8 @@ AC_SUBST(GUDEV_LIBS)
 # Some required utilities
 GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
 AC_SUBST(GLIB_MKENUMS)
+GDBUS_CODEGEN=`pkg-config --variable=gdbus_codegen gio-2.0`
+AC_SUBST(GDBUS_CODEGEN)
 
 # GObject Introspection
 GOBJECT_INTROSPECTION_CHECK([0.9.6])
