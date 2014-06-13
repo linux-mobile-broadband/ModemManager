@@ -79,6 +79,7 @@ struct _MMBroadbandBearerClass {
                                      MMPortSerialAt *secondary,
                                      MMPort *data,
                                      guint cid,
+                                     MMBearerIpFamily ip_family,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data);
     gboolean (* get_ip_config_3gpp_finish) (MMBroadbandBearer *self,

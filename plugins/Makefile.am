@@ -1,3 +1,4 @@
+
 include $(top_srcdir)/gtester.make
 
 # Common CPPFLAGS and LDFLAGS
@@ -90,12 +91,27 @@ libmm_utils_icera_la_SOURCES = \
 	icera/mm-broadband-modem-icera.h \
 	icera/mm-broadband-modem-icera.c \
 	icera/mm-broadband-bearer-icera.h \
-	icera/mm-broadband-bearer-icera.c
+	icera/mm-broadband-bearer-icera.c \
+	icera/mm-modem-helpers-icera.c \
+	icera/mm-modem-helpers-icera.h
 libmm_utils_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_utils_icera_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
 
 ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
 ICERA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-icera.la
+
+noinst_PROGRAMS += test-modem-helpers-icera
+test_modem_helpers_icera_SOURCES = \
+	icera/mm-modem-helpers-icera.c \
+	icera/mm-modem-helpers-icera.h \
+	icera/tests/test-modem-helpers-icera.c
+test_modem_helpers_icera_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/icera \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_icera_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_icera_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ########################################
 
@@ -197,11 +213,26 @@ libmm_plugin_mbm_la_SOURCES = \
 	mbm/mm-broadband-modem-mbm.h \
 	mbm/mm-broadband-bearer-mbm.c \
 	mbm/mm-broadband-bearer-mbm.h \
+	mbm/mm-modem-helpers-mbm.c \
+	mbm/mm-modem-helpers-mbm.h \
 	mbm/mm-sim-mbm.c \
 	mbm/mm-sim-mbm.h
 libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
+
+noinst_PROGRAMS += test-modem-helpers-mbm
+test_modem_helpers_mbm_SOURCES = \
+	mbm/mm-modem-helpers-mbm.c \
+	mbm/mm-modem-helpers-mbm.h \
+	mbm/tests/test-modem-helpers-mbm.c
+test_modem_helpers_mbm_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/mbm \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_mbm_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_mbm_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Option
 libmm_plugin_option_la_SOURCES = \

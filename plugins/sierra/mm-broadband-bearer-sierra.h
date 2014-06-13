@@ -36,9 +36,11 @@
 
 typedef struct _MMBroadbandBearerSierra MMBroadbandBearerSierra;
 typedef struct _MMBroadbandBearerSierraClass MMBroadbandBearerSierraClass;
+typedef struct _MMBroadbandBearerSierraPrivate MMBroadbandBearerSierraPrivate;
 
 struct _MMBroadbandBearerSierra {
     MMBroadbandBearer parent;
+    MMBroadbandBearerSierraPrivate *priv;
 };
 
 struct _MMBroadbandBearerSierraClass {
@@ -48,8 +50,9 @@ struct _MMBroadbandBearerSierraClass {
 GType mm_broadband_bearer_sierra_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_sierra_new (MMBroadbandModemSierra *modem,
+void mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
                                      MMBearerProperties *config,
+                                     gboolean is_icera,
                                      GCancellable *cancellable,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data);

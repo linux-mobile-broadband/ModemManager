@@ -31,6 +31,7 @@
 #include "mm-modem-helpers-qmi.h"
 #include "mm-port-enums-types.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BEARER);
 
@@ -82,12 +83,14 @@ typedef struct {
     gboolean running_ipv4;
     QmiClientWds *client_ipv4;
     guint32 packet_data_handle_ipv4;
+    MMBearerIpConfig *ipv4_config;
     GError *error_ipv4;
 
     gboolean ipv6;
     gboolean running_ipv6;
     QmiClientWds *client_ipv6;
     guint32 packet_data_handle_ipv6;
+    MMBearerIpConfig *ipv6_config;
     GError *error_ipv6;
 } ConnectContext;
 
@@ -99,14 +102,12 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_free (ctx->apn);
     g_free (ctx->user);
     g_free (ctx->password);
-    if (ctx->error_ipv4)
-        g_error_free (ctx->error_ipv4);
-    if (ctx->error_ipv6)
-        g_error_free (ctx->error_ipv6);
-    if (ctx->client_ipv4)
-        g_object_unref (ctx->client_ipv4);
-    if (ctx->client_ipv6)
-        g_object_unref (ctx->client_ipv6);
+    g_clear_error (&ctx->error_ipv4);
+    g_clear_error (&ctx->error_ipv6);
+    g_clear_object (&ctx->client_ipv4);
+    g_clear_object (&ctx->client_ipv6);
+    g_clear_object (&ctx->ipv4_config);
+    g_clear_object (&ctx->ipv6_config);
     g_object_unref (ctx->data);
     g_object_unref (ctx->qmi);
     g_object_unref (ctx->cancellable);
@@ -247,51 +248,191 @@ build_start_network_input (ConnectContext *ctx)
 }
 
 static void
-print_address4 (gboolean success, const char *tag, guint32 address, GError *error)
+qmi_inet4_ntop (guint32 address, char *buf, const gsize buflen)
 {
     struct in_addr a = { .s_addr = GUINT32_TO_BE (address) };
-    char buf[INET_ADDRSTRLEN + 1];
 
-    if (success) {
-        memset (buf, 0, sizeof (buf));
-        if (inet_ntop (AF_INET, &a, buf, sizeof (buf) - 1))
-            mm_dbg ("    %s: %s", tag, buf);
-        else
-            mm_dbg ("    %s: failed (address conversion error)", tag);
-        return;
+    g_assert (buflen >= INET_ADDRSTRLEN);
+
+    /* We can ignore inet_ntop() return value if 'buf' is
+     * at least INET_ADDRSTRLEN in size. */
+    memset (buf, 0, buflen);
+    g_assert (inet_ntop (AF_INET, &a, buf, buflen));
+}
+
+static MMBearerIpConfig *
+get_ipv4_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
+{
+    MMBearerIpConfig *config;
+    char buf[INET_ADDRSTRLEN];
+    char buf2[INET_ADDRSTRLEN];
+    const gchar *dns[3] = { 0 };
+    guint dns_idx = 0;
+    guint32 addr = 0;
+    GError *error = NULL;
+    guint32 prefix = 0;
+
+    /* IPv4 subnet mask */
+    if (!qmi_message_wds_get_current_settings_output_get_ipv4_gateway_subnet_mask (output, &addr, &error)) {
+        mm_dbg ("Failed to read IPv4 netmask (%s)", error->message);
+        g_clear_error (&error);
+        return NULL;
     }
-    mm_dbg ("    %s: failed (%s)", tag, error ? error->message : "unknown");
+    qmi_inet4_ntop (addr, buf, sizeof (buf));
+    prefix = mm_netmask_to_cidr (buf);
+
+    /* IPv4 address */
+    if (!qmi_message_wds_get_current_settings_output_get_ipv4_address (output, &addr, &error)) {
+        mm_dbg ("IPv4 family but no IPv4 address (%s)", error->message);
+        g_clear_error (&error);
+        return NULL;
+    }
+
+    mm_dbg ("QMI IPv4 Settings:");
+
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+
+    /* IPv4 address */
+    qmi_inet4_ntop (addr, buf, sizeof (buf));
+    mm_bearer_ip_config_set_address (config, buf);
+    mm_bearer_ip_config_set_prefix (config, prefix);
+    mm_dbg ("    Address: %s/%d", buf, prefix);
+
+    /* IPv4 gateway address */
+    if (qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error)) {
+        qmi_inet4_ntop (addr, buf, sizeof (buf));
+        mm_bearer_ip_config_set_gateway (config, buf);
+        mm_dbg ("    Gateway: %s", buf);
+    } else {
+        mm_dbg ("    Gateway: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    /* IPv4 DNS #1 */
+    if (qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error)) {
+        qmi_inet4_ntop (addr, buf, sizeof (buf));
+        dns[dns_idx++] = buf;
+        mm_dbg ("    DNS #1: %s", buf);
+    } else {
+        mm_dbg ("    DNS #1: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    /* IPv6 DNS #2 */
+    if (qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error)) {
+        qmi_inet4_ntop (addr, buf2, sizeof (buf2));
+        dns[dns_idx++] = buf2;
+        mm_dbg ("    DNS #2: %s", buf2);
+    } else {
+        mm_dbg ("    DNS #2: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    if (dns_idx > 0)
+        mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
+
+    if (mtu) {
+        mm_bearer_ip_config_set_mtu (config, mtu);
+        mm_dbg ("       MTU: %d", mtu);
+    }
+
+    return config;
 }
 
 static void
-print_address6 (gboolean success,
-                const char *tag,
-                GArray *array,
-                guint32 prefix,
-                GError *error)
+qmi_inet6_ntop (GArray *array, char *buf, const gsize buflen)
 {
     struct in6_addr a;
-    char buf[INET6_ADDRSTRLEN + 1];
     guint32 i;
 
-    if (success) {
-        g_assert (array);
-        g_assert (array->len == 8);
+    g_assert (array);
+    g_assert (array->len == 8);
+    g_assert (buflen >= INET6_ADDRSTRLEN);
 
-        memset (buf, 0, sizeof (buf));
-        for (i = 0; i < array->len; i++)
-            a.s6_addr16[i] = GUINT16_TO_BE (g_array_index (array, guint16, i));
+    for (i = 0; i < array->len; i++)
+        a.s6_addr16[i] = GUINT16_TO_BE (g_array_index (array, guint16, i));
 
-        if (inet_ntop (AF_INET6, &a, buf, sizeof (buf) - 1))
-            mm_dbg ("    %s: %s/%d", tag, buf, prefix);
-        else
-            mm_dbg ("    %s: failed (address conversion error)", tag);
+    /* We can ignore inet_ntop() return value if 'buf' is
+     * at least INET6_ADDRSTRLEN in size. */
+    memset (buf, 0, buflen);
+    g_assert (inet_ntop (AF_INET6, &a, buf, buflen));
+}
 
-        g_array_free (array, TRUE);
-        return;
+static MMBearerIpConfig *
+get_ipv6_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
+{
+    MMBearerIpConfig *config;
+    char buf[INET6_ADDRSTRLEN];
+    char buf2[INET6_ADDRSTRLEN];
+    const gchar *dns[3] = { 0 };
+    guint dns_idx = 0;
+    GArray *array;
+    GError *error = NULL;
+    guint8 prefix = 0;
+
+    /* If the message has an IPv6 address, create an IPv6 bearer config */
+    if (!qmi_message_wds_get_current_settings_output_get_ipv6_address (output, &array, &prefix, &error)) {
+        mm_dbg ("IPv6 family but no IPv6 address (%s)", error->message);
+        g_clear_error (&error);
+        return NULL;
     }
 
-    mm_dbg ("    %s: failed (%s)", tag, error ? error->message : "unknown");
+    mm_dbg ("QMI IPv6 Settings:");
+
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+
+    /* IPv6 address */
+    qmi_inet6_ntop (array, buf, sizeof (buf));
+    g_array_unref (array);
+
+    mm_bearer_ip_config_set_address (config, buf);
+    mm_bearer_ip_config_set_prefix (config, prefix);
+    mm_dbg ("    Address: %s/%d", buf, prefix);
+
+    /* IPv6 gateway address */
+    if (qmi_message_wds_get_current_settings_output_get_ipv6_gateway_address (output, &array, &prefix, &error)) {
+        qmi_inet6_ntop (array, buf, sizeof (buf));
+        mm_bearer_ip_config_set_gateway (config, buf);
+        mm_dbg ("    Gateway: %s", buf);
+        g_array_unref (array);
+    } else {
+        mm_dbg ("    Gateway: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    /* IPv6 DNS #1 */
+    if (qmi_message_wds_get_current_settings_output_get_ipv6_primary_dns_address (output, &array, &error)) {
+        qmi_inet6_ntop (array, buf, sizeof (buf));
+        dns[dns_idx++] = buf;
+        mm_dbg ("    DNS #1: %s", buf);
+        g_array_unref (array);
+    } else {
+        mm_dbg ("    DNS #1: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    /* IPv6 DNS #2 */
+    if (qmi_message_wds_get_current_settings_output_get_ipv6_secondary_dns_address (output, &array, &error)) {
+        qmi_inet6_ntop (array, buf2, sizeof (buf2));
+        dns[dns_idx++] = buf2;
+        mm_dbg ("    DNS #2: %s", buf2);
+        g_array_unref (array);
+    } else {
+        mm_dbg ("    DNS #2: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    if (dns_idx > 0)
+        mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
+
+    if (mtu) {
+        mm_bearer_ip_config_set_mtu (config, mtu);
+        mm_dbg ("       MTU: %d", mtu);
+    }
+
+    return config;
 }
 
 static void
@@ -312,73 +453,33 @@ get_current_settings_ready (QmiClientWds *client,
         mm_info ("error: couldn't get current settings: %s", error->message);
         g_error_free (error);
     } else {
-        gboolean success;
-        guint32 addr, mtu, i;
+        QmiWdsIpFamily ip_family = QMI_WDS_IP_FAMILY_UNSPECIFIED;
+        guint32 mtu = 0;
         GArray *array;
-        guint8 prefix;
 
-        /* If the message has an IPv4 address, print IPv4 settings */
-        if (qmi_message_wds_get_current_settings_output_get_ipv4_address (output, &addr, &error)) {
-            mm_dbg ("QMI IPv4 Settings:");
-
-            /* IPv4 address */
-            print_address4 (TRUE, "Address", addr, error);
+        if (!qmi_message_wds_get_current_settings_output_get_ip_family (output, &ip_family, &error)) {
+            mm_dbg (" IP Family: failed (%s); assuming IPv4", error->message);
             g_clear_error (&error);
+            ip_family = QMI_WDS_IP_FAMILY_IPV4;
+        }
+        mm_dbg (" IP Family: %s",
+                (ip_family == QMI_WDS_IP_FAMILY_IPV4) ? "IPv4" :
+                   (ip_family == QMI_WDS_IP_FAMILY_IPV6) ? "IPv6" : "unknown");
 
-            /* IPv4 gateway address */
-            success = qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error);
-            print_address4 (success, "Gateway", addr, error);
-            g_clear_error (&error);
-
-            /* IPv4 subnet mask */
-            success = qmi_message_wds_get_current_settings_output_get_ipv4_gateway_subnet_mask (output, &addr, &error);
-            print_address4 (success, "Netmask", addr, error);
-            g_clear_error (&error);
-
-            /* IPv4 DNS #1 */
-            success = qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error);
-            print_address4 (success, " DNS #1", addr, error);
-            g_clear_error (&error);
-
-            /* IPv4 DNS #2 */
-            success = qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error);
-            print_address4 (success, " DNS #2", addr, error);
-            g_clear_error (&error);
-        } else {
-            /* no IPv4 configuration */
+        if (!qmi_message_wds_get_current_settings_output_get_mtu (output, &mtu, &error)) {
+            mm_dbg ("       MTU: failed (%s)", error->message);
             g_clear_error (&error);
         }
 
-        /* If the message has an IPv6 address, print IPv6 settings */
-        if (qmi_message_wds_get_current_settings_output_get_ipv6_address (output, &array, &prefix, &error)) {
-            mm_dbg ("QMI IPv6 Settings:");
-
-            /* IPv6 address */
-            print_address6 (TRUE, "Address", array, prefix, error);
-            g_clear_error (&error);
-
-            /* IPv6 gateway address */
-            success = qmi_message_wds_get_current_settings_output_get_ipv6_gateway_address (output, &array, &prefix, &error);
-            print_address6 (success, "Gateway", array, prefix, error);
-            g_clear_error (&error);
-
-            /* IPv6 DNS #1 */
-            success = qmi_message_wds_get_current_settings_output_get_ipv6_primary_dns_address (output, &array, &error);
-            print_address6 (success, " DNS #1", array, 0, error);
-            g_clear_error (&error);
-
-            /* IPv6 DNS #2 */
-            success = qmi_message_wds_get_current_settings_output_get_ipv6_secondary_dns_address (output, &array, &error);
-            print_address6 (success, " DNS #2", array, 0, error);
-            g_clear_error (&error);
-        } else {
-            /* no IPv6 configuration */
-            g_clear_error (&error);
-        }
+        if (ip_family == QMI_WDS_IP_FAMILY_IPV4)
+            ctx->ipv4_config = get_ipv4_config (output, mtu);
+        else if (ip_family == QMI_WDS_IP_FAMILY_IPV6)
+            ctx->ipv6_config = get_ipv6_config (output, mtu);
 
         /* Domain names */
         if (qmi_message_wds_get_current_settings_output_get_domain_name_list (output, &array, &error)) {
             GString *s = g_string_sized_new (array ? (array->len * 20) : 1);
+            guint i;
 
             for (i = 0; array && (i < array->len); i++) {
                 if (s->len)
@@ -389,13 +490,6 @@ get_current_settings_ready (QmiClientWds *client,
             g_string_free (s, TRUE);
         } else {
             mm_dbg ("   Domains: failed (%s)", error ? error->message : "unknown");
-            g_clear_error (&error);
-        }
-
-        if (qmi_message_wds_get_current_settings_output_get_mtu (output, &mtu, &error))
-            mm_dbg ("       MTU: %d", mtu);
-        else {
-            mm_dbg ("       MTU: failed (%s)", error ? error->message : "unknown");
             g_clear_error (&error);
         }
     }
@@ -728,8 +822,6 @@ connect_context_step (ConnectContext *ctx)
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
         if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
-            MMBearerIpConfig *config;
-
             /* Port is connected; update the state */
             mm_port_set_connected (MM_PORT (ctx->data), TRUE);
 
@@ -751,19 +843,11 @@ connect_context_step (ConnectContext *ctx)
                 ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
             }
 
-            /* Build IP config; always DHCP based */
-            config = mm_bearer_ip_config_new ();
-            mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-
             /* Set operation result */
             g_simple_async_result_set_op_res_gpointer (
                 ctx->result,
-                mm_bearer_connect_result_new (
-                    ctx->data,
-                    ctx->packet_data_handle_ipv4 ? config : NULL,
-                    ctx->packet_data_handle_ipv6 ? config : NULL),
+                mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, ctx->ipv6_config),
                 (GDestroyNotify)mm_bearer_connect_result_unref);
-            g_object_unref (config);
         } else {
             GError *error;
 

@@ -234,10 +234,7 @@ mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
                            g_variant_new_uint32 (self ?
                                                  self->priv->method :
                                                  MM_BEARER_IP_METHOD_UNKNOWN));
-
-    /* If static IP method, report remaining configuration */
-    if (self &&
-        self->priv->method == MM_BEARER_IP_METHOD_STATIC) {
+    if (self) {
         if (self->priv->address)
             g_variant_builder_add (&builder,
                                    "{sv}",
