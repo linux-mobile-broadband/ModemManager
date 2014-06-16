@@ -808,10 +808,12 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
 
     if (!storage_ctx->supported_mem1 || ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
         all_loaded = TRUE;
-    /* We'll skip the 'MT' storage, as that is a combination of 'SM' and 'ME' */
-    else if (g_array_index (storage_ctx->supported_mem1,
-                            MMSmsStorage,
-                            ctx->mem1_storage_index) == MM_SMS_STORAGE_MT) {
+    /* We'll skip the 'MT' storage, as that is a combination of 'SM' and 'ME'; but only if
+     * this is not the only one in the list. */
+    else if ((g_array_index (storage_ctx->supported_mem1,
+                             MMSmsStorage,
+                             ctx->mem1_storage_index) == MM_SMS_STORAGE_MT) &&
+             (storage_ctx->supported_mem1->len > 1)) {
         ctx->mem1_storage_index++;
         if (ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
             all_loaded = TRUE;
