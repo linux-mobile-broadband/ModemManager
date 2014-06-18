@@ -203,7 +203,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
     MMBearerIpConfig *ip4_config = NULL;
     MMBearerIpConfig *ip6_config = NULL;
     GError *local = NULL;
-    gboolean success;
+    gboolean success = FALSE;
     char **items;
     guint num_items, i, first_free;
     gint num;
@@ -258,7 +258,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
         g_propagate_error (error, local);
         goto out;
     }
-    
+
     ip6_config = parse_ipdpaddr_v6 ((const gchar **) items, num_items, &local);
     if (local) {
         g_propagate_error (error, local);

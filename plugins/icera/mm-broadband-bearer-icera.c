@@ -218,7 +218,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
     /* Otherwise, DHCP */
     if (ctx->self->priv->default_ip_method == MM_BEARER_IP_METHOD_DHCP) {
         MMBearerConnectResult *connect_result;
-        MMBearerIpConfig *ipv4_config, *ipv6_config;
+        MMBearerIpConfig *ipv4_config = NULL, *ipv6_config = NULL;
 
         if (ip_family & MM_BEARER_IP_FAMILY_IPV4 || ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
             ipv4_config = mm_bearer_ip_config_new ();
