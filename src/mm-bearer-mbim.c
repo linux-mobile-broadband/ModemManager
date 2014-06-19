@@ -980,7 +980,7 @@ disconnect_set_ready (MbimDevice *device,
         }
 
         /* Now handle different response / error cases */
-        if (parsed_result) {
+        if (result && parsed_result) {
             mm_dbg ("Session ID '%u': %s",
                     session_id,
                     mbim_activation_state_get_string (activation_state));
