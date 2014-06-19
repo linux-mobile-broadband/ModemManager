@@ -239,6 +239,10 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
                             "Not authorized for this CSG");
+    case MBIM_NW_ERROR_MISSING_OR_UNKNOWN_APN:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN,
+                            "Missing or unknown APN");
     case MBIM_NW_ERROR_SERVICE_OPTION_NOT_SUPPORTED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED,
