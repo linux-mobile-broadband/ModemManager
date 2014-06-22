@@ -2129,84 +2129,31 @@ static MMPortSerialAt *
 peek_port_at_for_data (MMBroadbandModemHuawei *self,
                        MMPort *port)
 {
-    GUdevClient *client;
-    GUdevDevice *data_device;
-    GUdevDevice *data_device_parent = NULL;
-    GList *cdc_wdm_at_ports = NULL;
-    GList *l;
-    MMPortSerialAt *found = NULL;
+    GList *cdc_wdm_at_ports, *l;
+    const gchar *net_port_parent_path;
 
-    client = g_udev_client_new (NULL);
-    data_device = (g_udev_client_query_by_subsystem_and_name (
-                       client,
-                       "net",
-                       mm_port_get_device (port)));
+    g_warn_if_fail (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET);
+    net_port_parent_path = mm_port_get_parent_path (port);
+    if (!net_port_parent_path) {
+        g_warning ("(%s) no parent path for net port", mm_port_get_device (port));
+        return NULL;
+    }
 
+    /* Find the CDC-WDM port on the same USB interface as the given net port */
     cdc_wdm_at_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
                                                  MM_PORT_SUBSYS_USB,
                                                  MM_PORT_TYPE_AT,
                                                  NULL);
-
-    /* Get parent of the data device */
-    data_device_parent = g_udev_device_get_parent (data_device);
-    if (!data_device_parent) {
-        mm_dbg ("Cannot get parent device (%s)", mm_port_get_device (port));
-        goto out;
-    }
-
-    /* Now walk the list of cdc-wdm AT ports looking for a match */
-    for (l = cdc_wdm_at_ports; l && !found; l = g_list_next (l)) {
-        GUdevDevice *cdc_wdm_device;
-        GUdevDevice *cdc_wdm_device_parent;
+    for (l = cdc_wdm_at_ports; l; l = g_list_next (l)) {
+        const gchar  *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_SERIAL_AT (l->data));
-
-        /* Get udev device for the cdc-wdm port */
-        cdc_wdm_device = (g_udev_client_query_by_subsystem_and_name (
-                              client,
-                              "usb",
-                              mm_port_get_device (MM_PORT (l->data))));
-        if (!cdc_wdm_device) {
-            cdc_wdm_device = (g_udev_client_query_by_subsystem_and_name (
-                                  client,
-                                  "usbmisc",
-                                  mm_port_get_device (MM_PORT (l->data))));
-            if (!cdc_wdm_device) {
-                mm_warn ("Couldn't get udev device for cdc-wdm port '%s'",
-                         mm_port_get_device (MM_PORT (l->data)));
-                continue;
-            }
-        }
-
-        /* Get parent of the cdc-wdm device */
-        cdc_wdm_device_parent = g_udev_device_get_parent (cdc_wdm_device);
-        g_object_unref (cdc_wdm_device);
-
-        if (!cdc_wdm_device_parent) {
-            mm_warn ("Couldn't get udev device parent for cdc-wdm port '%s'",
-                     mm_port_get_device (MM_PORT (l->data)));
-            continue;
-        }
-
-        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
-                         g_udev_device_get_sysfs_path (cdc_wdm_device_parent)))
-            found = MM_PORT_SERIAL_AT (l->data);
-
-        g_object_unref (cdc_wdm_device_parent);
+        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
+            return MM_PORT_SERIAL_AT (l->data);
     }
 
-out:
-
-    if (data_device_parent)
-        g_object_unref (data_device_parent);
-    if (data_device)
-        g_object_unref (data_device);
-    if (client)
-        g_object_unref (client);
-    if (cdc_wdm_at_ports)
-        g_list_free_full (cdc_wdm_at_ports, (GDestroyNotify)g_object_unref);
-
-    return found;
+    return NULL;
 }
 
 
