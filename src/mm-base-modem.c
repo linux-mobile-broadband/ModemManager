@@ -638,117 +638,40 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
                                       MMPort *data,
                                       GError **error)
 {
-    MMPortQmi *found;
-    GUdevClient *client;
-    GUdevDevice *data_device;
-    GUdevDevice *data_device_parent;
-    GList *l;
+    GList *cdc_wdm_qmi_ports, *l;
+    const gchar *net_port_parent_path;
 
-    if (mm_port_get_subsys (data) != MM_PORT_SUBSYS_NET) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Cannot look for QMI port associated to a non-net data port");
-        return NULL;
-    }
-
-    /* don't listen for uevents */
-    client = g_udev_client_new (NULL);
-
-    /* Get udev device for the data port */
-    data_device = (g_udev_client_query_by_subsystem_and_name (
-                       client,
-                       "net",
-                       mm_port_get_device (data)));
-    if (!data_device) {
+    g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+    net_port_parent_path = mm_port_get_parent_path (data);
+    if (!net_port_parent_path) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
-                     "Couldn't find udev device for port 'net/%s'",
+                     "No parent path for 'net/%s'",
                      mm_port_get_device (data));
-        g_object_unref (client);
         return NULL;
     }
 
-    /* Get parent of the data device */
-    data_device_parent = g_udev_device_get_parent (data_device);
-    if (!data_device_parent) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't get udev device parent for port 'net/%s'",
-                     mm_port_get_device (data));
-        g_object_unref (data_device);
-        g_object_unref (client);
-        return NULL;
+    /* Find the CDC-WDM port on the same USB interface as the given net port */
+    cdc_wdm_qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                                  MM_PORT_SUBSYS_USB,
+                                                  MM_PORT_TYPE_QMI,
+                                                  NULL);
+    for (l = cdc_wdm_qmi_ports; l; l = g_list_next (l)) {
+        const gchar *wdm_port_parent_path;
+
+        g_assert (MM_IS_PORT_QMI (l->data));
+        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
+            return MM_PORT_QMI (l->data);
     }
 
-    /* Now walk the list of QMI ports looking for a match */
-    found = NULL;
-    for (l = self->priv->qmi; l && !found; l = g_list_next (l)) {
-        GUdevDevice *qmi_device;
-        GUdevDevice *qmi_device_parent;
-
-        /* Get udev device for the QMI port */
-        qmi_device = (g_udev_client_query_by_subsystem_and_name (
-                          client,
-                          "usb",
-                          mm_port_get_device (MM_PORT (l->data))));
-        if (!qmi_device) {
-            qmi_device = (g_udev_client_query_by_subsystem_and_name (
-                              client,
-                              "usbmisc",
-                              mm_port_get_device (MM_PORT (l->data))));
-            if (!qmi_device) {
-                mm_warn ("Couldn't get udev device for QMI port '%s'",
-                         mm_port_get_device (MM_PORT (l->data)));
-                continue;
-            }
-        }
-
-        /* Get parent of the QMI device */
-        qmi_device_parent = g_udev_device_get_parent (qmi_device);
-        g_object_unref (qmi_device);
-
-        if (!qmi_device_parent) {
-            mm_warn ("Couldn't get udev device parent for QMI port '%s'",
-                     mm_port_get_device (MM_PORT (l->data)));
-            continue;
-        }
-
-        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
-                         g_udev_device_get_sysfs_path (qmi_device_parent)))
-            found = MM_PORT_QMI (l->data);
-
-        g_object_unref (qmi_device_parent);
-    }
-
-    g_object_unref (data_device_parent);
-    g_object_unref (data_device);
-    g_object_unref (client);
-
-    if (!found) {
-        /* For the case where we have only 1 data port and 1 QMI port and they
-         * don't match with the previous rules (e.g. in some Huawei modems),
-         * just return the found one */
-        if (g_list_length (self->priv->data) == 1 &&
-            g_list_length (self->priv->qmi) == 1 &&
-            self->priv->data->data == data) {
-            mm_info ("Assuming QMI port '%s' is associated to net/%s",
-                     mm_port_get_device (MM_PORT (self->priv->qmi->data)),
-                     mm_port_get_device (data));
-            found = MM_PORT_QMI (self->priv->qmi->data);
-        } else {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_NOT_FOUND,
-                         "Couldn't find associated QMI port for 'net/%s'",
-                         mm_port_get_device (data));
-            return NULL;
-        }
-    }
-
-    return found;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_NOT_FOUND,
+                 "Couldn't find associated QMI port for 'net/%s'",
+                 mm_port_get_device (data));
+    return NULL;
 }
 
 #endif /* WITH_QMI */
@@ -789,117 +712,40 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
                                        MMPort *data,
                                        GError **error)
 {
-    MMPortMbim *found;
-    GUdevClient *client;
-    GUdevDevice *data_device;
-    GUdevDevice *data_device_parent;
-    GList *l;
+    GList *cdc_wdm_mbim_ports, *l;
+    const gchar *net_port_parent_path;
 
-    if (mm_port_get_subsys (data) != MM_PORT_SUBSYS_NET) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Cannot look for MBIM port associated to a non-net data port");
-        return NULL;
-    }
-
-    /* don't listen for uevents */
-    client = g_udev_client_new (NULL);
-
-    /* Get udev device for the data port */
-    data_device = (g_udev_client_query_by_subsystem_and_name (
-                       client,
-                       "net",
-                       mm_port_get_device (data)));
-    if (!data_device) {
+    g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+    net_port_parent_path = mm_port_get_parent_path (data);
+    if (!net_port_parent_path) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
-                     "Couldn't find udev device for port 'net/%s'",
+                     "No parent path for 'net/%s'",
                      mm_port_get_device (data));
-        g_object_unref (client);
         return NULL;
     }
 
-    /* Get parent of the data device */
-    data_device_parent = g_udev_device_get_parent (data_device);
-    if (!data_device_parent) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't get udev device parent for port 'net/%s'",
-                     mm_port_get_device (data));
-        g_object_unref (data_device);
-        g_object_unref (client);
-        return NULL;
+    /* Find the CDC-WDM port on the same USB interface as the given net port */
+    cdc_wdm_mbim_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                                  MM_PORT_SUBSYS_USB,
+                                                  MM_PORT_TYPE_MBIM,
+                                                  NULL);
+    for (l = cdc_wdm_mbim_ports; l; l = g_list_next (l)) {
+        const gchar *wdm_port_parent_path;
+
+        g_assert (MM_IS_PORT_MBIM (l->data));
+        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
+            return MM_PORT_MBIM (l->data);
     }
 
-    /* Now walk the list of MBIM ports looking for a match */
-    found = NULL;
-    for (l = self->priv->mbim; l && !found; l = g_list_next (l)) {
-        GUdevDevice *mbim_device;
-        GUdevDevice *mbim_device_parent;
-
-        /* Get udev device for the MBIM port */
-        mbim_device = (g_udev_client_query_by_subsystem_and_name (
-                          client,
-                          "usb",
-                          mm_port_get_device (MM_PORT (l->data))));
-        if (!mbim_device) {
-            mbim_device = (g_udev_client_query_by_subsystem_and_name (
-                              client,
-                              "usbmisc",
-                              mm_port_get_device (MM_PORT (l->data))));
-            if (!mbim_device) {
-                mm_warn ("Couldn't get udev device for MBIM port '%s'",
-                         mm_port_get_device (MM_PORT (l->data)));
-                continue;
-            }
-        }
-
-        /* Get parent of the MBIM device */
-        mbim_device_parent = g_udev_device_get_parent (mbim_device);
-        g_object_unref (mbim_device);
-
-        if (!mbim_device_parent) {
-            mm_warn ("Couldn't get udev device parent for MBIM port '%s'",
-                     mm_port_get_device (MM_PORT (l->data)));
-            continue;
-        }
-
-        if (g_str_equal (g_udev_device_get_sysfs_path (data_device_parent),
-                         g_udev_device_get_sysfs_path (mbim_device_parent)))
-            found = MM_PORT_MBIM (l->data);
-
-        g_object_unref (mbim_device_parent);
-    }
-
-    g_object_unref (data_device_parent);
-    g_object_unref (data_device);
-    g_object_unref (client);
-
-    if (!found) {
-        /* For the case where we have only 1 data port and 1 MBIM port and they
-         * don't match with the previous rules (e.g. in some Huawei modems),
-         * just return the found one */
-        if (g_list_length (self->priv->data) == 1 &&
-            g_list_length (self->priv->mbim) == 1 &&
-            self->priv->data->data == data) {
-            mm_info ("Assuming MBIM port '%s' is associated to net/%s",
-                     mm_port_get_device (MM_PORT (self->priv->mbim->data)),
-                     mm_port_get_device (data));
-            found = MM_PORT_MBIM (self->priv->mbim->data);
-        } else {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_NOT_FOUND,
-                         "Couldn't find associated MBIM port for 'net/%s'",
-                         mm_port_get_device (data));
-            return NULL;
-        }
-    }
-
-    return found;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_NOT_FOUND,
+                 "Couldn't find associated MBIM port for 'net/%s'",
+                 mm_port_get_device (data));
+    return NULL;
 }
 
 #endif /* WITH_MBIM */
