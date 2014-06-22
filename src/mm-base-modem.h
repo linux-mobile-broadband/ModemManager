@@ -106,6 +106,7 @@ GType mm_base_modem_get_type (void);
 gboolean  mm_base_modem_grab_port    (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name,
+                                      const gchar *parent_path,
                                       MMPortType ptype,
                                       MMPortSerialAtFlag at_pflags,
                                       GError **error);

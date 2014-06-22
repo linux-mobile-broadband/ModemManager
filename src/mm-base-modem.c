@@ -162,6 +162,7 @@ gboolean
 mm_base_modem_grab_port (MMBaseModem *self,
                          const gchar *subsys,
                          const gchar *name,
+                         const gchar *parent_path,
                          MMPortType ptype,
                          MMPortSerialAtFlag at_pflags,
                          GError **error)
@@ -305,6 +306,11 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* Add it to the tracking HT.
      * Note: 'key' and 'port' now owned by the HT. */
     g_hash_table_insert (self->priv->ports, key, port);
+
+    /* Store parent path */
+    g_object_set (port,
+                  MM_PORT_PARENT_PATH, parent_path,
+                  NULL);
 
     return TRUE;
 }

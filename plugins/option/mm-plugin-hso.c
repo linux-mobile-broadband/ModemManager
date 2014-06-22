@@ -134,12 +134,11 @@ grab_port (MMPlugin *self,
            MMPortProbe *probe,
            GError **error)
 {
-    const gchar *name, *subsys;
+    const gchar *subsys;
     MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType port_type;
 
     subsys = mm_port_probe_get_port_subsys (probe);
-    name = mm_port_probe_get_port_name (probe);
     port_type = mm_port_probe_get_port_type (probe);
 
     /* Detect AT port types */
@@ -161,7 +160,8 @@ grab_port (MMPlugin *self,
 
     return mm_base_modem_grab_port (modem,
                                     subsys,
-                                    name,
+                                    mm_port_probe_get_port_name (probe),
+                                    mm_port_probe_get_parent_path (probe),
                                     port_type,
                                     pflags,
                                     error);

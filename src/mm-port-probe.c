@@ -123,6 +123,7 @@ struct _MMPortProbePrivate {
     /* Properties */
     MMDevice *device;
     GUdevDevice *port;
+    GUdevDevice *parent;
 
     /* Probing results */
     guint32 flags;
@@ -1646,6 +1647,14 @@ mm_port_probe_get_port_subsys (MMPortProbe *self)
     return g_udev_device_get_subsystem (self->priv->port);
 }
 
+const gchar *
+mm_port_probe_get_parent_path (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return (self->priv->parent ? g_udev_device_get_sysfs_path (self->priv->parent) : NULL);
+}
+
 /*****************************************************************************/
 
 MMPortProbe *
@@ -1682,6 +1691,7 @@ set_property (GObject *object,
     case PROP_PORT:
         /* construct only */
         self->priv->port = g_value_dup_object (value);
+        self->priv->parent = g_udev_device_get_parent (self->priv->port);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1732,6 +1742,7 @@ dispose (GObject *object)
     /* We didn't get a reference to the device */
     self->priv->device = NULL;
 
+    g_clear_object (&self->priv->parent);
     g_clear_object (&self->priv->port);
 
     G_OBJECT_CLASS (mm_port_probe_parent_class)->dispose (object);

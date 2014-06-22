@@ -29,15 +29,17 @@ enum {
     PROP_SUBSYS,
     PROP_TYPE,
     PROP_CONNECTED,
+    PROP_PARENT_PATH,
 
     LAST_PROP
 };
 
 struct _MMPortPrivate {
-    char *device;
+    gchar *device;
     MMPortSubsys subsys;
     MMPortType ptype;
     gboolean connected;
+    gchar *parent_path;
 };
 
 /*****************************************************************************/
@@ -94,6 +96,14 @@ mm_port_set_connected (MMPort *self, gboolean connected)
     }
 }
 
+const gchar *
+mm_port_get_parent_path (MMPort *self)
+{
+    g_return_val_if_fail (MM_IS_PORT (self), NULL);
+
+    return self->priv->parent_path;
+}
+
 /*****************************************************************************/
 
 static void
@@ -126,6 +136,10 @@ set_property (GObject *object,
     case PROP_CONNECTED:
         self->priv->connected = g_value_get_boolean (value);
         break;
+    case PROP_PARENT_PATH:
+        g_free (self->priv->parent_path);
+        self->priv->parent_path = g_value_dup_string (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -151,6 +165,9 @@ get_property (GObject *object, guint prop_id,
     case PROP_CONNECTED:
         g_value_set_boolean (value, self->priv->connected);
         break;
+    case PROP_PARENT_PATH:
+        g_value_set_string (value, self->priv->parent_path);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -163,6 +180,7 @@ finalize (GObject *object)
     MMPort *self = MM_PORT (object);
 
     g_free (self->priv->device);
+    g_free (self->priv->parent_path);
 
     G_OBJECT_CLASS (mm_port_parent_class)->finalize (object);
 }
@@ -214,4 +232,12 @@ mm_port_class_init (MMPortClass *klass)
                                "Is connected for data and not usable for control",
                                FALSE,
                                G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_PARENT_PATH,
+         g_param_spec_string (MM_PORT_PARENT_PATH,
+                              "Parent path",
+                              "sysfs path of the parent device",
+                              NULL,
+                              G_PARAM_READWRITE));
 }
