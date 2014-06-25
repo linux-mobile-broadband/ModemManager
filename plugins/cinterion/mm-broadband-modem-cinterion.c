@@ -58,6 +58,13 @@ struct _MMBroadbandModemCinterionPrivate {
 
     /* Cached supported bands in Cinterion format */
     guint supported_bands;
+
+    /* Cached supported modes for SMS setup */
+    GArray *cnmi_supported_mode;
+    GArray *cnmi_supported_mt;
+    GArray *cnmi_supported_bm;
+    GArray *cnmi_supported_ds;
+    GArray *cnmi_supported_bfr;
 };
 
 /* Setup relationship between the band bitmask in the modem and the bitmask
@@ -120,24 +127,210 @@ messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+cnmi_test_ready (MMBaseModem *self,
+                 GAsyncResult *res,
+                 GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static gboolean
+value_supported (const GArray *array,
+                 const guint value)
+{
+    guint i;
+
+    if (!array)
+        return FALSE;
+
+    for (i = 0; i < array->len; i++) {
+        if (g_array_index (array, guint, i) == value)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
-    /* AT+CNMI=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
-     *  but <bfr> should be either not set, or equal to 1;
-     *  and <ds> can be only either 0 or 2 (EGS5)
-     */
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GString *cmd;
+    GError *error = NULL;
+    GSimpleAsyncResult *simple;
+
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_enable_unsolicited_events);
+
+    /* AT+CNMI=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]] */
+    cmd = g_string_new ("+CNMI=");
+
+    /* Mode 2 or 1 */
+    if (!error) {
+        if (value_supported (self->priv->cnmi_supported_mode, 2))
+            g_string_append_printf (cmd, "%u,", 2);
+        else if (value_supported (self->priv->cnmi_supported_mode, 1))
+            g_string_append_printf (cmd, "%u,", 1);
+        else
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SMS settings don't accept [2,1] <mode>");
+    }
+
+    /* mt 2 or 1 */
+    if (!error) {
+        if (value_supported (self->priv->cnmi_supported_mt, 2))
+            g_string_append_printf (cmd, "%u,", 2);
+        else if (value_supported (self->priv->cnmi_supported_mt, 1))
+            g_string_append_printf (cmd, "%u,", 1);
+        else
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SMS settings don't accept [2,1] <mt>");
+    }
+
+    /* bm 2 or 0 */
+    if (!error) {
+        if (value_supported (self->priv->cnmi_supported_bm, 2))
+            g_string_append_printf (cmd, "%u,", 2);
+        else if (value_supported (self->priv->cnmi_supported_bm, 0))
+            g_string_append_printf (cmd, "%u,", 0);
+        else
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SMS settings don't accept [2,0] <bm>");
+    }
+
+    /* ds 2, 1 or 0 */
+    if (!error) {
+        if (value_supported (self->priv->cnmi_supported_ds, 2))
+            g_string_append_printf (cmd, "%u,", 2);
+        if (value_supported (self->priv->cnmi_supported_ds, 1))
+            g_string_append_printf (cmd, "%u,", 1);
+        else if (value_supported (self->priv->cnmi_supported_ds, 0))
+            g_string_append_printf (cmd, "%u,", 0);
+        else
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SMS settings don't accept [2,1,0] <ds>");
+    }
+
+    /* bfr 1 */
+    if (!error) {
+        if (value_supported (self->priv->cnmi_supported_bfr, 1))
+            g_string_append_printf (cmd, "%u", 1);
+        /* otherwise, skip setting it */
+    }
+
+    /* Early error report */
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
+        g_string_free (cmd, TRUE);
+        return;
+    }
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CNMI=2,1,2,2,1",
+                              cmd->str,
                               3,
                               FALSE,
-                              callback,
-                              user_data);
+                              (GAsyncReadyCallback)cnmi_test_ready,
+                              simple);
+    g_string_free (cmd, TRUE);
+}
+
+/*****************************************************************************/
+/* Check if Messaging supported (Messaging interface) */
+
+static gboolean
+messaging_check_support_finish (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cnmi_format_check_ready (MMBroadbandModemCinterion *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Parse */
+    if (!mm_cinterion_parse_cnmi_test (response,
+                                       &self->priv->cnmi_supported_mode,
+                                       &self->priv->cnmi_supported_mt,
+                                       &self->priv->cnmi_supported_bm,
+                                       &self->priv->cnmi_supported_ds,
+                                       &self->priv->cnmi_supported_bfr,
+                                       &error)) {
+        mm_warn ("error reading SMS setup: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* CNMI command is supported; assume we have full messaging capabilities */
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+messaging_check_support (MMIfaceModemMessaging *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        messaging_check_support);
+
+    /* We assume that CDMA-only modems don't have messaging capabilities */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
+        g_simple_async_result_set_error (
+            result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_UNSUPPORTED,
+            "CDMA-only modems don't have messaging capabilities");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Check CNMI support */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)cnmi_format_check_ready,
+                              result);
 }
 
 /*****************************************************************************/
@@ -1500,6 +1693,17 @@ finalize (GObject *object)
     g_free (self->priv->sleep_mode_cmd);
     g_free (self->priv->manual_operator_id);
 
+    if (self->priv->cnmi_supported_mode)
+        g_array_unref (self->priv->cnmi_supported_mode);
+    if (self->priv->cnmi_supported_mt)
+        g_array_unref (self->priv->cnmi_supported_mt);
+    if (self->priv->cnmi_supported_bm)
+        g_array_unref (self->priv->cnmi_supported_bm);
+    if (self->priv->cnmi_supported_ds)
+        g_array_unref (self->priv->cnmi_supported_ds);
+    if (self->priv->cnmi_supported_bfr)
+        g_array_unref (self->priv->cnmi_supported_bfr);
+
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
 }
 
@@ -1544,6 +1748,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
+    iface->check_support = messaging_check_support;
+    iface->check_support_finish = messaging_check_support_finish;
     iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
 }
