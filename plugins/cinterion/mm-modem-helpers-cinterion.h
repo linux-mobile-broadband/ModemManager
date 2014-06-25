@@ -35,6 +35,17 @@ gboolean mm_cinterion_parse_scfg_response (const gchar *response,
                                            GError **error);
 
 /*****************************************************************************/
+/* +CNMI test parser */
+
+gboolean mm_cinterion_parse_cnmi_test (const gchar *response,
+                                       GArray **supported_mode,
+                                       GArray **supported_mt,
+                                       GArray **supported_bm,
+                                       GArray **supported_ds,
+                                       GArray **supported_bfr,
+                                       GError **error);
+
+/*****************************************************************************/
 /* Build Cinterion-specific band value */
 
 gboolean mm_cinterion_build_band (GArray *bands,

@@ -213,6 +213,123 @@ test_scfg_response_3g (void)
 }
 
 /*****************************************************************************/
+/* Test ^SCFG test */
+
+static void
+compare_arrays (const GArray *supported,
+                const GArray *expected)
+{
+    guint i;
+
+    g_assert_cmpuint (supported->len, ==, expected->len);
+    for (i = 0; i < supported->len; i++) {
+        gboolean found = FALSE;
+        guint j;
+
+        for (j = 0; j < expected->len && !found; j++) {
+            if (g_array_index (supported, guint, i) == g_array_index (expected, guint, j))
+                found = TRUE;
+        }
+        g_assert (found);
+    }
+}
+
+static void
+common_test_cnmi (const gchar *response,
+                  const GArray *expected_mode,
+                  const GArray *expected_mt,
+                  const GArray *expected_bm,
+                  const GArray *expected_ds,
+                  const GArray *expected_bfr)
+{
+    GArray *supported_mode = NULL;
+    GArray *supported_mt = NULL;
+    GArray *supported_bm = NULL;
+    GArray *supported_ds = NULL;
+    GArray *supported_bfr = NULL;
+    GError *error = NULL;
+    gboolean res;
+
+    g_assert (expected_mode != NULL);
+    g_assert (expected_mt != NULL);
+    g_assert (expected_bm != NULL);
+    g_assert (expected_ds != NULL);
+    g_assert (expected_bfr != NULL);
+
+    res = mm_cinterion_parse_cnmi_test (response,
+                                        &supported_mode,
+                                        &supported_mt,
+                                        &supported_bm,
+                                        &supported_ds,
+                                        &supported_bfr,
+                                        &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (supported_mode != NULL);
+    g_assert (supported_mt != NULL);
+    g_assert (supported_bm != NULL);
+    g_assert (supported_ds != NULL);
+    g_assert (supported_bfr != NULL);
+
+    compare_arrays (supported_mode, expected_mode);
+    compare_arrays (supported_mt,   expected_mt);
+    compare_arrays (supported_bm,   expected_bm);
+    compare_arrays (supported_ds,   expected_ds);
+    compare_arrays (supported_bfr,  expected_bfr);
+
+    g_array_unref (supported_mode);
+    g_array_unref (supported_mt);
+    g_array_unref (supported_bm);
+    g_array_unref (supported_ds);
+    g_array_unref (supported_bfr);
+}
+
+static void
+test_cnmi_phs8 (void)
+{
+    GArray *expected_mode;
+    GArray *expected_mt;
+    GArray *expected_bm;
+    GArray *expected_ds;
+    GArray *expected_bfr;
+    guint val;
+    const gchar *response =
+        "+CNMI: (0,1,2),(0,1),(0,2),(0),(1)\r\n"
+        "\r\n";
+
+    expected_mode = g_array_sized_new (FALSE, FALSE, sizeof (guint), 3);
+    val = 0, g_array_append_val (expected_mode, val);
+    val = 1, g_array_append_val (expected_mode, val);
+    val = 2, g_array_append_val (expected_mode, val);
+
+    expected_mt = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 0, g_array_append_val (expected_mt, val);
+    val = 1, g_array_append_val (expected_mt, val);
+
+    expected_bm = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 0, g_array_append_val (expected_bm, val);
+    val = 2, g_array_append_val (expected_bm, val);
+
+    expected_ds = g_array_sized_new (FALSE, FALSE, sizeof (guint), 1);
+    val = 0, g_array_append_val (expected_ds, val);
+
+    expected_bfr = g_array_sized_new (FALSE, FALSE, sizeof (guint), 1);
+    val = 1, g_array_append_val (expected_bfr, val);
+
+    common_test_cnmi (response,
+                      expected_mode,
+                      expected_mt,
+                      expected_bm,
+                      expected_ds,
+                      expected_bfr);
+
+    g_array_unref (expected_mode);
+    g_array_unref (expected_mt);
+    g_array_unref (expected_bm);
+    g_array_unref (expected_ds);
+    g_array_unref (expected_bfr);}
+
+/*****************************************************************************/
 /* Test ^SIND responses */
 
 static void
@@ -281,6 +398,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/scfg/response/3g",        test_scfg_response_3g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
+    g_test_add_func ("/MM/cinterion/cnmi/phs8",               test_cnmi_phs8);
     g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
 
     return g_test_run ();
