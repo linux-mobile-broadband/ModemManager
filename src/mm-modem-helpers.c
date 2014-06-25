@@ -495,7 +495,7 @@ mm_3gpp_cusd_regex_get (void)
 GRegex *
 mm_3gpp_cmti_regex_get (void)
 {
-    return g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n",
+    return g_regex_new ("\\r\\n\\+CMTI:\\s*\"(\\S+)\",\\s*(\\d+)\\r\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);
