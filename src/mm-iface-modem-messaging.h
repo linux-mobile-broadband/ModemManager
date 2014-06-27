@@ -19,6 +19,9 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-sms-part.h"
 #include "mm-sms.h"
 

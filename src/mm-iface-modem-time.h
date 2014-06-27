@@ -19,6 +19,9 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #define MM_TYPE_IFACE_MODEM_TIME               (mm_iface_modem_time_get_type ())
 #define MM_IFACE_MODEM_TIME(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_TIME, MMIfaceModemTime))
 #define MM_IS_IFACE_MODEM_TIME(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_TIME))
