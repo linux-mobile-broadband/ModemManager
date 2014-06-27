@@ -1188,6 +1188,9 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
     GRegex *r;
     gchar **split;
     guint i;
+    GArray *tmp1 = NULL;
+    GArray *tmp2 = NULL;
+    GArray *tmp3 = NULL;
 
     g_assert (mem1 != NULL);
     g_assert (mem2 != NULL);
@@ -1228,27 +1231,42 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
                 g_match_info_next (match_info, NULL);
             }
 
-            if (!*mem1)
-                *mem1 = array;
-            else if (!*mem2)
-                *mem2 = array;
-            else if (!*mem3)
-                *mem3 = array;
+            if (!tmp1)
+                tmp1 = array;
+            else if (!tmp2)
+                tmp2 = array;
+            else if (!tmp3)
+                tmp3 = array;
         }
         g_match_info_free (match_info);
 
-        if (*mem3 != NULL)
+        if (tmp3 != NULL)
             break; /* once we got the last group, exit... */
     }
 
     g_strfreev (split);
     g_regex_unref (r);
 
-    g_warn_if_fail (*mem1 != NULL);
-    g_warn_if_fail (*mem2 != NULL);
-    g_warn_if_fail (*mem3 != NULL);
+    g_warn_if_fail (tmp1 != NULL);
+    g_warn_if_fail (tmp2 != NULL);
+    g_warn_if_fail (tmp3 != NULL);
 
-    return (*mem1 && *mem2 && *mem3);
+    /* Only return TRUE if all sets have been parsed correctly */
+    if (tmp1 && tmp2 && tmp3) {
+        *mem1 = tmp1;
+        *mem2 = tmp2;
+        *mem3 = tmp3;
+        return TRUE;
+    }
+
+    /* Otherwise, cleanup and return FALSE */
+    if (tmp1)
+        g_array_unref (tmp1);
+    if (tmp2)
+        g_array_unref (tmp2);
+    if (tmp3)
+        g_array_unref (tmp3);
+    return FALSE;
 }
 
 /*************************************************************************/

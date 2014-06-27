@@ -1825,7 +1825,8 @@ is_storage_supported (GArray *supported,
 static void
 test_cpms_response_cinterion (void *f, gpointer d)
 {
-    const gchar *reply = "+CPMS: (\"ME\",\"SM\",\"MT\"),(\"ME\",\"SM\",\"MT\"),(\"SM\",\"MT\")";
+    /* Use different sets for each on purpose, even if weird */
+    const gchar *reply = "+CPMS: (\"ME\",\"MT\"),(\"ME\",\"SM\",\"MT\"),(\"SM\",\"MT\")";
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
@@ -1833,9 +1834,8 @@ test_cpms_response_cinterion (void *f, gpointer d)
     trace ("\nTesting Cinterion +CPMS=? response...\n");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
-    g_assert (mem1->len == 3);
+    g_assert (mem1->len == 2);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
-    g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_SM));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
     g_assert (mem2->len == 3);
     g_assert (is_storage_supported (mem2, MM_SMS_STORAGE_ME));
