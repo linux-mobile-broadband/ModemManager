@@ -137,6 +137,8 @@ build_location_dictionary (GVariant *previous,
             case MM_MODEM_LOCATION_SOURCE_CDMA_BS:
                 location_cdma_bs_value = value;
                 break;
+            case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
+                g_assert_not_reached ();
             default:
                 g_warn_if_reached ();
                 break;
@@ -505,6 +507,8 @@ update_location_source_status (MMIfaceModemLocation *self,
         } else
             g_clear_object (&ctx->location_cdma_bs);
         break;
+    case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
+        /* Nothing to setup in the context */
     default:
         break;
     }
@@ -612,7 +616,7 @@ setup_gathering_step (SetupGatheringContext *ctx)
         return;
     }
 
-    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) {
         gchar *source_str;
 
         if (ctx->to_enable & ctx->current) {
@@ -709,7 +713,7 @@ setup_gathering (MMIfaceModemLocation *self,
 
     /* Loop through all known bits in the bitmask to enable/disable specific location sources */
     for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-         source <= MM_MODEM_LOCATION_SOURCE_CDMA_BS;
+         source <= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
          source = source << 1) {
         /* skip unsupported sources */
         if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
@@ -732,6 +736,22 @@ setup_gathering (MMIfaceModemLocation *self,
         }
 
         g_free (str);
+    }
+
+    /* When standard GPS retrieval (RAW/NMEA) is enabled, we cannot enable the
+     * UNMANAGED setup, and viceversa. */
+    if ((ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED &&
+         currently_enabled & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) ||
+        (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
+         currently_enabled & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) ||
+        (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
+         ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Cannot have both unmanaged GPS and raw/nmea GPS enabled at the same time");
+        setup_gathering_context_complete_and_free (ctx);
+        return;
     }
 
     if (ctx->to_enable != MM_MODEM_LOCATION_SOURCE_NONE) {
@@ -1162,7 +1182,9 @@ interface_enabling_step (EnablingContext *ctx)
 
         /* By default, we'll enable all NON-GPS sources */
         default_sources = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
-        default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA);
+        default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                             MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
 
         setup_gathering (ctx->self,
                          default_sources,

@@ -58,6 +58,8 @@ static gboolean get_gps_raw_flag;
 static gboolean enable_cdma_bs_flag;
 static gboolean disable_cdma_bs_flag;
 static gboolean get_cdma_bs_flag;
+static gboolean enable_gps_unmanaged_flag;
+static gboolean disable_gps_unmanaged_flag;
 static gboolean get_all_flag;
 
 static GOptionEntry entries[] = {
@@ -117,6 +119,14 @@ static GOptionEntry entries[] = {
       "Get CDMA base station location.",
       NULL
     },
+    { "location-enable-gps-unmanaged", 0, 0, G_OPTION_ARG_NONE, &enable_gps_unmanaged_flag,
+      "Enable unmanaged GPS location gathering.",
+      NULL
+    },
+    { "location-disable-gps-unmanaged", 0, 0, G_OPTION_ARG_NONE, &disable_gps_unmanaged_flag,
+      "Disable unmanaged GPS location gathering.",
+      NULL
+    },
     { NULL }
 };
 
@@ -147,6 +157,7 @@ mmcli_modem_location_options_enabled (void)
     if ((enable_3gpp_flag && disable_3gpp_flag) ||
         (enable_gps_nmea_flag && disable_gps_nmea_flag) ||
         (enable_gps_raw_flag && disable_gps_raw_flag) ||
+        (enable_gps_unmanaged_flag && disable_gps_unmanaged_flag) ||
         (enable_cdma_bs_flag && disable_cdma_bs_flag)) {
         g_printerr ("error: cannot enable and disable the same source\n");
         exit (EXIT_FAILURE);
@@ -167,7 +178,9 @@ mmcli_modem_location_options_enabled (void)
                     enable_gps_raw_flag +
                     disable_gps_raw_flag +
                     enable_cdma_bs_flag +
-                    disable_cdma_bs_flag) +
+                    disable_cdma_bs_flag +
+                    enable_gps_unmanaged_flag +
+                    disable_gps_unmanaged_flag) +
                  !!(get_3gpp_flag +
                     get_gps_nmea_flag +
                     get_gps_raw_flag +
@@ -301,6 +314,11 @@ build_sources_from_flags (void)
         sources |= MM_MODEM_LOCATION_SOURCE_CDMA_BS;
     if (disable_cdma_bs_flag)
         sources &= ~MM_MODEM_LOCATION_SOURCE_CDMA_BS;
+
+    if (enable_gps_unmanaged_flag)
+        sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
+    if (disable_gps_unmanaged_flag)
+        sources &= ~MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
 
     return sources;
 }
@@ -473,7 +491,9 @@ get_modem_ready (GObject      *source,
         enable_gps_raw_flag ||
         disable_gps_raw_flag ||
         enable_cdma_bs_flag ||
-        disable_cdma_bs_flag) {
+        disable_cdma_bs_flag ||
+        enable_gps_unmanaged_flag ||
+        disable_gps_unmanaged_flag) {
         g_debug ("Asynchronously setting up location gathering...");
         mm_modem_location_setup (ctx->modem_location,
                                  build_sources_from_flags (),
@@ -550,7 +570,9 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
         enable_gps_raw_flag ||
         disable_gps_raw_flag ||
         enable_cdma_bs_flag ||
-        disable_cdma_bs_flag) {
+        disable_cdma_bs_flag ||
+        enable_gps_unmanaged_flag ||
+        disable_gps_unmanaged_flag) {
         gboolean result;
 
         g_debug ("Synchronously setting up location gathering...");
