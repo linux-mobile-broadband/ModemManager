@@ -166,10 +166,25 @@ grab_port (MMPlugin *self,
 
     ptype = mm_port_probe_get_port_type (probe);
 
-    if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT))
+    if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT)) {
+        mm_dbg ("(%s/%s)' Port flagged as primary",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT))
+    } else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT)) {
+        mm_dbg ("(%s/%s)' Port flagged as PPP",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
+    } else if (g_udev_device_get_property_as_boolean (mm_port_probe_peek_port (probe),
+                                                      "ID_MM_CINTERION_PORT_TYPE_GPS")) {
+        mm_dbg ("(%s/%s)' Port flagged as GPS",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
+        /* Not an AT port, but the port to grab GPS traces */
+        g_warn_if_fail (ptype == MM_PORT_TYPE_UNKNOWN);
+        ptype = MM_PORT_TYPE_GPS;
+    }
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_get_port_subsys (probe),

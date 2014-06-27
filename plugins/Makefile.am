@@ -398,6 +398,8 @@ libmm_plugin_cinterion_la_SOURCES = \
 libmm_plugin_cinterion_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
+udevrules_DATA += cinterion/77-mm-cinterion-port-types.rules
+
 noinst_PROGRAMS += test-modem-helpers-cinterion
 test_modem_helpers_cinterion_SOURCES = \
 	cinterion/mm-modem-helpers-cinterion.c \
