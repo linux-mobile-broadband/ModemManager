@@ -250,6 +250,7 @@ static void
 huawei_custom_init_step (HuaweiCustomInitContext *ctx)
 {
     FirstInterfaceContext *fi_ctx;
+    GUdevDevice *port;
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
@@ -286,7 +287,8 @@ huawei_custom_init_step (HuaweiCustomInitContext *ctx)
     }
 
     /* Try to get a port map from the modem */
-    if (!ctx->getportmode_done) {
+    port = mm_port_probe_peek_port (ctx->probe);
+    if (!ctx->getportmode_done && !g_udev_device_get_property_as_boolean (port, "ID_MM_HUAWEI_DISABLE_GETPORTMODE")) {
         if (ctx->getportmode_retries == 0) {
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
             huawei_custom_init_context_complete_and_free (ctx);
