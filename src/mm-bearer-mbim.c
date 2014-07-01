@@ -239,9 +239,11 @@ ip_configuration_query_ready (MbimDevice *device,
             mm_dbg ("  DNS addresses (%u)", ipv4dnsservercount);
             for (i = 0; i < ipv4dnsservercount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
-                str = g_inet_address_to_string (addr);
-                mm_dbg ("    DNS [%u]: '%s'", i, str);
-                g_free (str);
+                if (!g_inet_address_get_is_any (addr)) {
+                    str = g_inet_address_to_string (addr);
+                    mm_dbg ("    DNS [%u]: '%s'", i, str);
+                    g_free (str);
+                }
                 g_object_unref (addr);
             }
         }
@@ -283,9 +285,11 @@ ip_configuration_query_ready (MbimDevice *device,
             mm_dbg ("  DNS addresses (%u)", ipv6dnsservercount);
             for (i = 0; i < ipv6dnsservercount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
-                str = g_inet_address_to_string (addr);
-                mm_dbg ("    DNS [%u]: '%s'", i, str);
-                g_free (str);
+                if (!g_inet_address_get_is_any (addr)) {
+                    str = g_inet_address_to_string (addr);
+                    mm_dbg ("    DNS [%u]: '%s'", i, str);
+                    g_free (str);
+                }
                 g_object_unref (addr);
             }
         }
@@ -308,7 +312,7 @@ ip_configuration_query_ready (MbimDevice *device,
                 ipv4addresscount > 0 &&
                 ipv4dnsservercount > 0) {
                 gchar **strarr;
-                guint i;
+                guint i, n;
 
                 mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
 
@@ -333,9 +337,10 @@ ip_configuration_query_ready (MbimDevice *device,
 
                 /* DNS */
                 strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
-                for (i = 0; i < ipv4dnsservercount; i++) {
+                for (i = 0, n = 0; i < ipv4dnsservercount; i++) {
                     addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
-                    strarr[i] = g_inet_address_to_string (addr);
+                    if (!g_inet_address_get_is_any (addr))
+                        strarr[n++] = g_inet_address_to_string (addr);
                     g_object_unref (addr);
                 }
                 mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
@@ -361,7 +366,7 @@ ip_configuration_query_ready (MbimDevice *device,
                 ipv6addresscount > 0 &&
                 ipv6dnsservercount > 0) {
                 gchar **strarr;
-                guint i;
+                guint i, n;
 
                 mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
 
@@ -394,9 +399,10 @@ ip_configuration_query_ready (MbimDevice *device,
 
                 /* DNS */
                 strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
-                for (i = 0; i < ipv6dnsservercount; i++) {
+                for (i = 0, n = 0; i < ipv6dnsservercount; i++) {
                     addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
-                    strarr[i] = g_inet_address_to_string (addr);
+                    if (!g_inet_address_get_is_any (addr))
+                        strarr[n++] = g_inet_address_to_string (addr);
                     g_object_unref (addr);
                 }
                 mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
