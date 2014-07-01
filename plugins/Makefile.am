@@ -393,8 +393,17 @@ libmm_plugin_cinterion_la_SOURCES = \
 	cinterion/mm-plugin-cinterion.h \
 	cinterion/mm-modem-helpers-cinterion.c \
 	cinterion/mm-modem-helpers-cinterion.h \
+	cinterion/mm-common-cinterion.c \
+	cinterion/mm-common-cinterion.h \
 	cinterion/mm-broadband-modem-cinterion.c \
 	cinterion/mm-broadband-modem-cinterion.h
+
+if WITH_QMI
+libmm_plugin_cinterion_la_SOURCES += \
+	cinterion/mm-broadband-modem-qmi-cinterion.c \
+	cinterion/mm-broadband-modem-qmi-cinterion.h
+endif
+
 libmm_plugin_cinterion_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
