@@ -95,7 +95,9 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Now our own check. */
     if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)))
-        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
+        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                    MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                    MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
 
     /* So we're done, complete */
     g_simple_async_result_set_op_res_gpointer (simple,
@@ -158,7 +160,6 @@ gps_disabled_ready (MMBaseModem *self,
                     GAsyncResult *res,
                     LocationGatheringContext *ctx)
 {
-    MMPortSerialGps *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error))
@@ -166,10 +167,16 @@ gps_disabled_ready (MMBaseModem *self,
     else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
-    /* Even if we get an error here, we try to close the GPS port */
-    gps_port = mm_base_modem_peek_port_gps (self);
-    if (gps_port)
-        mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+    /* Only use the GPS port in NMEA/RAW setups */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        MMPortSerialGps *gps_port;
+
+        /* Even if we get an error here, we try to close the GPS port */
+        gps_port = mm_base_modem_peek_port_gps (self);
+        if (gps_port)
+            mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+    }
 
     location_gathering_context_complete_and_free (ctx);
 }
@@ -184,11 +191,13 @@ internal_disable_location_gathering (LocationGatheringContext *ctx)
 
     /* Only stop GPS engine if no GPS-related sources enabled */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                       MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
         location_ctx->enabled_sources &= ~ctx->source;
 
         if (!(location_ctx->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                               MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
+                                               MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                               MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
             stop_gps = TRUE;
     }
 
@@ -219,7 +228,9 @@ parent_disable_location_gathering_ready (MMIfaceModemLocation *self,
     GError *error = NULL;
 
     if (!iface_modem_location_parent->disable_location_gathering_finish (self, res, &error)) {
-        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                           MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                           MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
             /* Ignore errors when disabling GPS, we can try with AT commands */
             g_error_free (error);
         } else {
@@ -278,7 +289,6 @@ gps_enabled_ready (MMBaseModem *self,
                    GAsyncResult *res,
                    LocationGatheringContext *ctx)
 {
-    MMPortSerialGps *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
@@ -287,16 +297,23 @@ gps_enabled_ready (MMBaseModem *self,
         return;
     }
 
-    gps_port = mm_base_modem_peek_port_gps (self);
-    if (!gps_port ||
-        !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
-        if (error)
-            g_simple_async_result_take_error (ctx->result, error);
-        else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't open raw GPS serial port");
+    /* Only use the GPS port in NMEA/RAW setups */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        MMPortSerialGps *gps_port;
+
+        gps_port = mm_base_modem_peek_port_gps (self);
+        if (!gps_port ||
+            !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
+            if (error)
+                g_simple_async_result_take_error (ctx->result, error);
+            else
+                g_simple_async_result_set_error (ctx->result,
+                                                 MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_FAILED,
+                                                 "Couldn't open raw GPS serial port");
+        } else
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     } else
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
@@ -313,7 +330,9 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
     LocationContext *location_ctx;
 
     if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
-        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                           MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                           MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
             /* Ignore errors when enabling GPS, we can try with AT commands */
             g_error_free (error);
         } else {
@@ -330,10 +349,12 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
 
     /* NMEA and RAW are both enabled in the same way */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                       MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
         /* Only start GPS engine if not done already */
         if (!(location_ctx->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                               MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
+                                               MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                                               MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
             start_gps = TRUE;
         location_ctx->enabled_sources |= ctx->source;
     }
