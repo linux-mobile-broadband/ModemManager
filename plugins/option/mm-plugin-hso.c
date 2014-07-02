@@ -70,6 +70,7 @@ hso_custom_init (MMPortProbe *probe,
 
         hsotype_path = g_build_filename (sysfs_path, "hsotype", NULL);
         if (g_file_get_contents (hsotype_path, &contents, NULL, NULL)) {
+            mm_dbg ("HSO port type %s: %s", hsotype_path, contents);
             if (g_str_has_prefix (contents, "Control")) {
                 g_object_set_data (G_OBJECT (probe), TAG_HSO_AT_CONTROL, GUINT_TO_POINTER (TRUE));
                 mm_port_probe_set_result_at (probe, TRUE);
