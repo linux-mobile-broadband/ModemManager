@@ -3255,12 +3255,18 @@ gps_disabled_ready (MMBaseModem *self,
                     GAsyncResult *res,
                     GSimpleAsyncResult *simple)
 {
+    MMPortSerialGps *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error))
         g_simple_async_result_take_error (simple, error);
     else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    /* Even if we get an error here, we try to close the GPS port */
+    gps_port = mm_base_modem_peek_port_gps (self);
+    if (gps_port)
+        mm_port_serial_close (MM_PORT_SERIAL (gps_port));
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
