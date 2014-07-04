@@ -418,7 +418,9 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
      */
     if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)) &&
         mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)))
-        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
+        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                    MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                    MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
 
     /* So we're done, complete */
     g_simple_async_result_set_op_res_gpointer (simple,
