@@ -135,6 +135,17 @@ handle_activate_auth_ready (MMBaseModem *self,
         return;
     }
 
+    /* Error if carrier code is empty */
+    if (!ctx->carrier || !ctx->carrier[0]) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_INVALID_ARGS,
+                                               "Cannot perform OTA activation: "
+                                               "invalid empty carrier code");
+        handle_activate_context_free (ctx);
+        return;
+    }
+
     modem_state = MM_MODEM_STATE_UNKNOWN;
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
