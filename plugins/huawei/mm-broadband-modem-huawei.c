@@ -3158,7 +3158,7 @@ huawei_modem_power_down (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
 
-static MMSim *
+static MMBaseSim *
 huawei_modem_create_sim_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)

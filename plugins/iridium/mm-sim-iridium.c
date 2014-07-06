@@ -27,11 +27,11 @@
 
 #include "mm-sim-iridium.h"
 
-G_DEFINE_TYPE (MMSimIridium, mm_sim_iridium, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimIridium, mm_sim_iridium, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_iridium_new_finish (GAsyncResult  *res,
                            GError       **error)
 {
@@ -46,9 +46,9 @@ mm_sim_iridium_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -62,7 +62,7 @@ mm_sim_iridium_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -74,15 +74,15 @@ mm_sim_iridium_init (MMSimIridium *self)
 static void
 mm_sim_iridium_class_init (MMSimIridiumClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
     /* Skip querying the SIM card info, not supported by Iridium modems */
-    sim_class->load_sim_identifier = NULL;
-    sim_class->load_sim_identifier_finish = NULL;
-    sim_class->load_imsi = NULL;
-    sim_class->load_imsi_finish = NULL;
-    sim_class->load_operator_identifier = NULL;
-    sim_class->load_operator_identifier_finish = NULL;
-    sim_class->load_operator_name = NULL;
-    sim_class->load_operator_name_finish = NULL;
+    base_sim_class->load_sim_identifier = NULL;
+    base_sim_class->load_sim_identifier_finish = NULL;
+    base_sim_class->load_imsi = NULL;
+    base_sim_class->load_imsi_finish = NULL;
+    base_sim_class->load_operator_identifier = NULL;
+    base_sim_class->load_operator_identifier_finish = NULL;
+    base_sim_class->load_operator_name = NULL;
+    base_sim_class->load_operator_name_finish = NULL;
 }

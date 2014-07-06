@@ -257,7 +257,7 @@ load_supported_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create SIM (Modem inteface) */
 
-static MMSim *
+static MMBaseSim *
 create_sim_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)

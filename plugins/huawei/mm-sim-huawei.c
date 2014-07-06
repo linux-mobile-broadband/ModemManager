@@ -31,13 +31,13 @@
 
 #include "mm-sim-huawei.h"
 
-G_DEFINE_TYPE (MMSimHuawei, mm_sim_huawei, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimHuawei, mm_sim_huawei, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 /* SIM identifier loading */
 
 static gchar *
-load_sim_identifier_finish (MMSim *self,
+load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -59,7 +59,7 @@ parent_load_sim_identifier_ready (MMSimHuawei *self,
     GError *error = NULL;
     gchar *simid;
 
-    simid = MM_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier_finish (MM_SIM (self), res, &error);
+    simid = MM_BASE_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier_finish (MM_BASE_SIM (self), res, &error);
     if (simid)
         g_simple_async_result_set_op_res_gpointer (simple, simid, g_free);
     else
@@ -74,7 +74,7 @@ iccid_read_ready (MMBaseModem *modem,
                   GAsyncResult *res,
                   GSimpleAsyncResult *simple)
 {
-    MMSim *self;
+    MMBaseSim *self;
     const gchar *response;
     const gchar *p;
     char *parsed;
@@ -97,22 +97,22 @@ iccid_read_ready (MMBaseModem *modem,
 
 error:
     /* Chain up to parent method; older devices don't support ^ICCID */
-    self = MM_SIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
-    MM_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier (self,
-                                                                    (GAsyncReadyCallback) parent_load_sim_identifier_ready,
-                                                                    simple);
+    self = MM_BASE_SIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
+    MM_BASE_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier (self,
+                                                                         (GAsyncReadyCallback) parent_load_sim_identifier_ready,
+                                                                         simple);
     g_object_unref (self);
 }
 
 static void
-load_sim_identifier (MMSim *self,
+load_sim_identifier (MMBaseSim *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
     MMBaseModem *modem = NULL;
 
     g_object_get (self,
-                  MM_SIM_MODEM, &modem,
+                  MM_BASE_SIM_MODEM, &modem,
                   NULL);
 
     mm_dbg ("loading (Huawei) SIM identifier...");
@@ -131,7 +131,7 @@ load_sim_identifier (MMSim *self,
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_huawei_new_finish (GAsyncResult  *res,
                           GError       **error)
 {
@@ -146,9 +146,9 @@ mm_sim_huawei_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -162,7 +162,7 @@ mm_sim_huawei_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -174,8 +174,8 @@ mm_sim_huawei_init (MMSimHuawei *self)
 static void
 mm_sim_huawei_class_init (MMSimHuaweiClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
-    sim_class->load_sim_identifier = load_sim_identifier;
-    sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
+    base_sim_class->load_sim_identifier = load_sim_identifier;
+    base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
 }

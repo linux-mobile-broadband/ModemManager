@@ -27,7 +27,7 @@
 #include "mm-log.h"
 #include "mm-sim-qmi.h"
 
-G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 
@@ -43,7 +43,7 @@ ensure_qmi_client (MMSimQmi *self,
     MMPortQmi *port;
 
     g_object_get (self,
-                  MM_SIM_MODEM, &modem,
+                  MM_BASE_SIM_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
@@ -82,7 +82,7 @@ ensure_qmi_client (MMSimQmi *self,
 /* Load SIM ID (ICCID) */
 
 static gchar *
-load_sim_identifier_finish (MMSim *self,
+load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -128,7 +128,7 @@ dms_uim_get_iccid_ready (QmiClientDms *client,
 }
 
 static void
-load_sim_identifier (MMSim *self,
+load_sim_identifier (MMBaseSim *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
@@ -158,7 +158,7 @@ load_sim_identifier (MMSim *self,
 /* Load IMSI */
 
 static gchar *
-load_imsi_finish (MMSim *self,
+load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
@@ -204,7 +204,7 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
 }
 
 static void
-load_imsi (MMSim *self,
+load_imsi (MMBaseSim *self,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
@@ -261,7 +261,7 @@ pin_qmi_error_to_mobile_equipment_error (GError *qmi_error)
 }
 
 static gboolean
-send_pin_finish (MMSim *self,
+send_pin_finish (MMBaseSim *self,
                  GAsyncResult *res,
                  GError **error)
 {
@@ -296,7 +296,7 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
 }
 
 static void
-send_pin (MMSim *self,
+send_pin (MMBaseSim *self,
           const gchar *pin,
           GAsyncReadyCallback callback,
           gpointer user_data)
@@ -335,7 +335,7 @@ send_pin (MMSim *self,
 /* Send PUK */
 
 static gboolean
-send_puk_finish (MMSim *self,
+send_puk_finish (MMBaseSim *self,
                  GAsyncResult *res,
                  GError **error)
 {
@@ -370,7 +370,7 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
 }
 
 static void
-send_puk (MMSim *self,
+send_puk (MMBaseSim *self,
           const gchar *puk,
           const gchar *new_pin,
           GAsyncReadyCallback callback,
@@ -412,7 +412,7 @@ send_puk (MMSim *self,
 /* Change PIN */
 
 static gboolean
-change_pin_finish (MMSim *self,
+change_pin_finish (MMBaseSim *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -447,7 +447,7 @@ dms_uim_change_pin_ready (QmiClientDms *client,
 }
 
 static void
-change_pin (MMSim *self,
+change_pin (MMBaseSim *self,
             const gchar *old_pin,
             const gchar *new_pin,
             GAsyncReadyCallback callback,
@@ -489,7 +489,7 @@ change_pin (MMSim *self,
 /* Enable PIN */
 
 static gboolean
-enable_pin_finish (MMSim *self,
+enable_pin_finish (MMBaseSim *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -524,7 +524,7 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
 }
 
 static void
-enable_pin (MMSim *self,
+enable_pin (MMBaseSim *self,
             const gchar *pin,
             gboolean enabled,
             GAsyncReadyCallback callback,
@@ -565,7 +565,7 @@ enable_pin (MMSim *self,
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_qmi_new_finish (GAsyncResult  *res,
                        GError       **error)
 {
@@ -580,9 +580,9 @@ mm_sim_qmi_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -596,7 +596,7 @@ mm_sim_qmi_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -608,22 +608,22 @@ mm_sim_qmi_init (MMSimQmi *self)
 static void
 mm_sim_qmi_class_init (MMSimQmiClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
-    sim_class->load_sim_identifier = load_sim_identifier;
-    sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
-    sim_class->load_imsi = load_imsi;
-    sim_class->load_imsi_finish = load_imsi_finish;
-    sim_class->load_operator_identifier = NULL;
-    sim_class->load_operator_identifier_finish = NULL;
-    sim_class->load_operator_name = NULL;
-    sim_class->load_operator_name_finish = NULL;
-    sim_class->send_pin = send_pin;
-    sim_class->send_pin_finish = send_pin_finish;
-    sim_class->send_puk = send_puk;
-    sim_class->send_puk_finish = send_puk_finish;
-    sim_class->change_pin = change_pin;
-    sim_class->change_pin_finish = change_pin_finish;
-    sim_class->enable_pin = enable_pin;
-    sim_class->enable_pin_finish = enable_pin_finish;
+    base_sim_class->load_sim_identifier = load_sim_identifier;
+    base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
+    base_sim_class->load_imsi = load_imsi;
+    base_sim_class->load_imsi_finish = load_imsi_finish;
+    base_sim_class->load_operator_identifier = NULL;
+    base_sim_class->load_operator_identifier_finish = NULL;
+    base_sim_class->load_operator_name = NULL;
+    base_sim_class->load_operator_name_finish = NULL;
+    base_sim_class->send_pin = send_pin;
+    base_sim_class->send_pin_finish = send_pin_finish;
+    base_sim_class->send_puk = send_puk;
+    base_sim_class->send_puk_finish = send_puk_finish;
+    base_sim_class->change_pin = change_pin;
+    base_sim_class->change_pin_finish = change_pin_finish;
+    base_sim_class->enable_pin = enable_pin;
+    base_sim_class->enable_pin_finish = enable_pin_finish;
 }

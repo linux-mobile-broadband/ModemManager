@@ -43,7 +43,7 @@
 #include "mm-bearer-list.h"
 #include "mm-sms-list.h"
 #include "mm-sms-part-3gpp.h"
-#include "mm-sim.h"
+#include "mm-base-sim.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
@@ -122,7 +122,7 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem interface --->*/
     /* Properties */
     GObject *modem_dbus_skeleton;
-    MMSim *modem_sim;
+    MMBaseSim *modem_sim;
     MMBearerList *modem_bearer_list;
     MMModemState modem_state;
     /* Implementation helpers */
@@ -294,12 +294,12 @@ modem_create_bearer (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
 
-static MMSim *
+static MMBaseSim *
 modem_create_sim_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
+                         GAsyncResult *res,
+                         GError **error)
 {
-    return mm_sim_new_finish (res, error);
+    return mm_base_sim_new_finish (res, error);
 }
 
 static void
@@ -308,10 +308,10 @@ modem_create_sim (MMIfaceModem *self,
                   gpointer user_data)
 {
     /* New generic SIM */
-    mm_sim_new (MM_BASE_MODEM (self),
-                NULL, /* cancellable */
-                callback,
-                user_data);
+    mm_base_sim_new (MM_BASE_MODEM (self),
+                     NULL, /* cancellable */
+                     callback,
+                     user_data);
 }
 
 /*****************************************************************************/

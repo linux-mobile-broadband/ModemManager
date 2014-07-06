@@ -175,8 +175,8 @@ ModemManager_SOURCES = \
 	mm-device.h \
 	mm-plugin-manager.c \
 	mm-plugin-manager.h \
-	mm-sim.h \
-	mm-sim.c \
+	mm-base-sim.h \
+	mm-base-sim.c \
 	mm-base-bearer.h \
 	mm-base-bearer.c \
 	mm-broadband-bearer.h \

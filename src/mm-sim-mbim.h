@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-sim.h"
+#include "mm-base-sim.h"
 
 #define MM_TYPE_SIM_MBIM            (mm_sim_mbim_get_type ())
 #define MM_SIM_MBIM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SIM_MBIM, MMSimMbim))
@@ -32,20 +32,20 @@ typedef struct _MMSimMbim MMSimMbim;
 typedef struct _MMSimMbimClass MMSimMbimClass;
 
 struct _MMSimMbim {
-    MMSim parent;
+    MMBaseSim parent;
 };
 
 struct _MMSimMbimClass {
-    MMSimClass parent;
+    MMBaseSimClass parent;
 };
 
 GType mm_sim_mbim_get_type (void);
 
-void   mm_sim_mbim_new        (MMBaseModem *modem,
-                               GCancellable *cancellable,
-                               GAsyncReadyCallback callback,
-                               gpointer user_data);
-MMSim *mm_sim_mbim_new_finish (GAsyncResult  *res,
-                               GError       **error);
+void       mm_sim_mbim_new        (MMBaseModem *modem,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+MMBaseSim *mm_sim_mbim_new_finish (GAsyncResult  *res,
+                                   GError       **error);
 
 #endif /* MM_SIM_MBIM_H */

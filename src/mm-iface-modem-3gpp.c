@@ -1866,7 +1866,7 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
 }
 
 static void
-sim_pin_lock_enabled_cb (MMSim *self,
+sim_pin_lock_enabled_cb (MMBaseSim *self,
                          gboolean enabled,
                          MmGdbusModem3gpp *skeleton)
 {
@@ -1896,7 +1896,7 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
         mm_warn ("couldn't load facility locks: '%s'", error->message);
         g_error_free (error);
     } else {
-        MMSim *sim = NULL;
+        MMBaseSim *sim = NULL;
 
         /* We loaded the initial list of facility locks; but we do need to update
          * the SIM PIN lock status when that changes. We'll connect to the signal
@@ -1906,7 +1906,7 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
                       MM_IFACE_MODEM_SIM, &sim,
                       NULL);
         g_signal_connect (sim,
-                          MM_SIM_PIN_LOCK_ENABLED,
+                          MM_BASE_SIM_PIN_LOCK_ENABLED,
                           G_CALLBACK (sim_pin_lock_enabled_cb),
                           ctx->skeleton);
         g_object_unref (sim);

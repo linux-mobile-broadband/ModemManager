@@ -27,17 +27,17 @@
 #include <libmm-glib.h>
 
 #include "mm-iface-modem.h"
-#include "mm-sim.h"
+#include "mm-base-sim.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-static void async_initable_iface_init     (GAsyncInitableIface *iface);
+static void async_initable_iface_init (GAsyncInitableIface *iface);
 
-G_DEFINE_TYPE_EXTENDED (MMSim, mm_sim, MM_GDBUS_TYPE_SIM_SKELETON, 0,
+G_DEFINE_TYPE_EXTENDED (MMBaseSim, mm_base_sim, MM_GDBUS_TYPE_SIM_SKELETON, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE,
-                                               async_initable_iface_init));
+                                               async_initable_iface_init))
 
 enum {
     PROP_0,
@@ -54,7 +54,7 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
-struct _MMSimPrivate {
+struct _MMBaseSimPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     /* The modem which owns this SIM */
@@ -68,14 +68,14 @@ static guint signals[SIGNAL_LAST] = { 0 };
 /*****************************************************************************/
 
 void
-mm_sim_export (MMSim *self)
+mm_base_sim_export (MMBaseSim *self)
 {
     static guint id = 0;
     gchar *path;
 
     path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%d", id++);
     g_object_set (self,
-                  MM_SIM_PATH, path,
+                  MM_BASE_SIM_PATH, path,
                   NULL);
     g_free (path);
 }
@@ -84,7 +84,7 @@ mm_sim_export (MMSim *self)
 /* CHANGE PIN (Generic implementation) */
 
 static gboolean
-change_pin_finish (MMSim *self,
+change_pin_finish (MMBaseSim *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -108,7 +108,7 @@ change_pin_ready (MMBaseModem *modem,
 }
 
 static void
-change_pin (MMSim *self,
+change_pin (MMBaseSim *self,
             const gchar *old_pin,
             const gchar *new_pin,
             GAsyncReadyCallback callback,
@@ -138,7 +138,7 @@ change_pin (MMSim *self,
 /* CHANGE PIN (DBus call handling) */
 
 typedef struct {
-    MMSim *self;
+    MMBaseSim *self;
     GDBusMethodInvocation *invocation;
     gchar *old_pin;
     gchar *new_pin;
@@ -177,13 +177,13 @@ after_change_update_lock_info_ready (MMIfaceModem *self,
 }
 
 static void
-handle_change_pin_ready (MMSim *self,
+handle_change_pin_ready (MMBaseSim *self,
                          GAsyncResult *res,
                          HandleChangePinContext *ctx)
 {
     MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    if (!MM_SIM_GET_CLASS (self)->change_pin_finish (self, res, &ctx->save_error)) {
+    if (!MM_BASE_SIM_GET_CLASS (self)->change_pin_finish (self, res, &ctx->save_error)) {
         if (g_error_matches (ctx->save_error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
@@ -211,8 +211,8 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
     }
 
     /* If changing PIN is not implemented, report an error */
-    if (!MM_SIM_GET_CLASS (ctx->self)->change_pin ||
-        !MM_SIM_GET_CLASS (ctx->self)->change_pin_finish) {
+    if (!MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin ||
+        !MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
@@ -222,7 +222,7 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    MM_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
+    MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
                                               ctx->old_pin,
                                               ctx->new_pin,
                                               (GAsyncReadyCallback)handle_change_pin_ready,
@@ -230,7 +230,7 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
 }
 
 static gboolean
-handle_change_pin (MMSim *self,
+handle_change_pin (MMBaseSim *self,
                    GDBusMethodInvocation *invocation,
                    const gchar *old_pin,
                    const gchar *new_pin,
@@ -256,7 +256,7 @@ handle_change_pin (MMSim *self,
 /* ENABLE PIN (Generic implementation) */
 
 static gboolean
-enable_pin_finish (MMSim *self,
+enable_pin_finish (MMBaseSim *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -280,7 +280,7 @@ enable_pin_ready (MMBaseModem *modem,
 }
 
 static void
-enable_pin (MMSim *self,
+enable_pin (MMBaseSim *self,
             const gchar *pin,
             gboolean enabled,
             GAsyncReadyCallback callback,
@@ -310,7 +310,7 @@ enable_pin (MMSim *self,
 /* ENABLE PIN (DBus call handling) */
 
 typedef struct {
-    MMSim *self;
+    MMBaseSim *self;
     GDBusMethodInvocation *invocation;
     gchar *pin;
     gboolean enabled;
@@ -350,13 +350,13 @@ after_enable_update_lock_info_ready (MMIfaceModem *modem,
 }
 
 static void
-handle_enable_pin_ready (MMSim *self,
+handle_enable_pin_ready (MMBaseSim *self,
                          GAsyncResult *res,
                          HandleEnablePinContext *ctx)
 {
     MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    if (!MM_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &ctx->save_error)) {
+    if (!MM_BASE_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &ctx->save_error)) {
         if (g_error_matches (ctx->save_error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
@@ -384,8 +384,8 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
     }
 
     /* If changing PIN is not implemented, report an error */
-    if (!MM_SIM_GET_CLASS (ctx->self)->enable_pin ||
-        !MM_SIM_GET_CLASS (ctx->self)->enable_pin_finish) {
+    if (!MM_BASE_SIM_GET_CLASS (ctx->self)->enable_pin ||
+        !MM_BASE_SIM_GET_CLASS (ctx->self)->enable_pin_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
@@ -395,7 +395,7 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    MM_SIM_GET_CLASS (ctx->self)->enable_pin (ctx->self,
+    MM_BASE_SIM_GET_CLASS (ctx->self)->enable_pin (ctx->self,
                                               ctx->pin,
                                               ctx->enabled,
                                               (GAsyncReadyCallback)handle_enable_pin_ready,
@@ -403,7 +403,7 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
 }
 
 static gboolean
-handle_enable_pin (MMSim *self,
+handle_enable_pin (MMBaseSim *self,
                    GDBusMethodInvocation *invocation,
                    const gchar *pin,
                    gboolean enabled)
@@ -428,7 +428,7 @@ handle_enable_pin (MMSim *self,
 /* SEND PIN/PUK (Generic implementation) */
 
 static gboolean
-common_send_pin_puk_finish (MMSim *self,
+common_send_pin_puk_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -452,7 +452,7 @@ send_pin_puk_ready (MMBaseModem *modem,
 }
 
 static void
-common_send_pin_puk (MMSim *self,
+common_send_pin_puk (MMBaseSim *self,
                      const gchar *pin,
                      const gchar *puk,
                      GAsyncReadyCallback callback,
@@ -480,7 +480,7 @@ common_send_pin_puk (MMSim *self,
 }
 
 static void
-send_puk (MMSim *self,
+send_puk (MMBaseSim *self,
           const gchar *puk,
           const gchar *new_pin,
           GAsyncReadyCallback callback,
@@ -490,7 +490,7 @@ send_puk (MMSim *self,
 }
 
 static void
-send_pin (MMSim *self,
+send_pin (MMBaseSim *self,
           const gchar *pin,
           GAsyncReadyCallback callback,
           gpointer user_data)
@@ -502,7 +502,7 @@ send_pin (MMSim *self,
 /* SEND PIN/PUK (common logic) */
 
 typedef struct {
-    MMSim *self;
+    MMBaseSim *self;
     GSimpleAsyncResult *result;
     GError *save_error;
     gulong wait_for_unlock_id;
@@ -555,17 +555,17 @@ error_for_unlock_check (MMModemLock lock)
 }
 
 gboolean
-mm_sim_send_pin_finish (MMSim *self,
-                        GAsyncResult *res,
-                        GError **error)
+mm_base_sim_send_pin_finish (MMBaseSim *self,
+                             GAsyncResult *res,
+                             GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 gboolean
-mm_sim_send_puk_finish (MMSim *self,
-                        GAsyncResult *res,
-                        GError **error)
+mm_base_sim_send_puk_finish (MMBaseSim *self,
+                             GAsyncResult *res,
+                             GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -607,13 +607,13 @@ update_lock_info_ready (MMIfaceModem *modem,
 }
 
 static void
-send_pin_ready (MMSim *self,
+send_pin_ready (MMBaseSim *self,
                 GAsyncResult *res,
                 SendPinPukContext *ctx)
 {
     MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    if (!MM_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error)) {
+    if (!MM_BASE_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error)) {
         if (g_error_matches (ctx->save_error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
@@ -629,11 +629,11 @@ send_pin_ready (MMSim *self,
 }
 
 static void
-send_puk_ready (MMSim *self,
+send_puk_ready (MMBaseSim *self,
                 GAsyncResult *res,
                 SendPinPukContext *ctx)
 {
-    MM_SIM_GET_CLASS (self)->send_puk_finish (self, res, &ctx->save_error);
+    MM_BASE_SIM_GET_CLASS (self)->send_puk_finish (self, res, &ctx->save_error);
 
     /* Once pin/puk has been sent, recheck lock */
     mm_iface_modem_update_lock_info (MM_IFACE_MODEM (self->priv->modem),
@@ -643,16 +643,16 @@ send_puk_ready (MMSim *self,
 }
 
 void
-mm_sim_send_pin (MMSim *self,
-                 const gchar *pin,
-                 GAsyncReadyCallback callback,
-                 gpointer user_data)
+mm_base_sim_send_pin (MMBaseSim *self,
+                      const gchar *pin,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
 {
     SendPinPukContext *ctx;
 
     /* If sending PIN is not implemented, report an error */
-    if (!MM_SIM_GET_CLASS (self)->send_pin ||
-        !MM_SIM_GET_CLASS (self)->send_pin_finish) {
+    if (!MM_BASE_SIM_GET_CLASS (self)->send_pin ||
+        !MM_BASE_SIM_GET_CLASS (self)->send_pin_finish) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -668,26 +668,26 @@ mm_sim_send_pin (MMSim *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_sim_send_pin);
+                                             mm_base_sim_send_pin);
 
-    MM_SIM_GET_CLASS (self)->send_pin (self,
+    MM_BASE_SIM_GET_CLASS (self)->send_pin (self,
                                        pin,
                                        (GAsyncReadyCallback)send_pin_ready,
                                        ctx);
 }
 
 void
-mm_sim_send_puk (MMSim *self,
-                 const gchar *puk,
-                 const gchar *new_pin,
-                 GAsyncReadyCallback callback,
-                 gpointer user_data)
+mm_base_sim_send_puk (MMBaseSim *self,
+                      const gchar *puk,
+                      const gchar *new_pin,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
 {
     SendPinPukContext *ctx;
 
     /* If sending PIN is not implemented, report an error */
-    if (!MM_SIM_GET_CLASS (self)->send_puk ||
-        !MM_SIM_GET_CLASS (self)->send_puk_finish) {
+    if (!MM_BASE_SIM_GET_CLASS (self)->send_puk ||
+        !MM_BASE_SIM_GET_CLASS (self)->send_puk_finish) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -703,9 +703,9 @@ mm_sim_send_puk (MMSim *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_sim_send_puk);
+                                             mm_base_sim_send_puk);
 
-    MM_SIM_GET_CLASS (self)->send_puk (self,
+    MM_BASE_SIM_GET_CLASS (self)->send_puk (self,
                                        puk,
                                        new_pin,
                                        (GAsyncReadyCallback)send_puk_ready,
@@ -716,7 +716,7 @@ mm_sim_send_puk (MMSim *self,
 /* SEND PIN (DBus call handling) */
 
 typedef struct {
-    MMSim *self;
+    MMBaseSim *self;
     GDBusMethodInvocation *invocation;
     gchar *pin;
 } HandleSendPinContext;
@@ -731,13 +731,13 @@ handle_send_pin_context_free (HandleSendPinContext *ctx)
 }
 
 static void
-handle_send_pin_ready (MMSim *self,
+handle_send_pin_ready (MMBaseSim *self,
                        GAsyncResult *res,
                        HandleSendPinContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_sim_send_pin_finish (self, res, &error))
+    if (!mm_base_sim_send_pin_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (self), ctx->invocation);
@@ -758,14 +758,14 @@ handle_send_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_sim_send_pin (ctx->self,
-                     ctx->pin,
-                     (GAsyncReadyCallback)handle_send_pin_ready,
-                     ctx);
+    mm_base_sim_send_pin (ctx->self,
+                          ctx->pin,
+                          (GAsyncReadyCallback)handle_send_pin_ready,
+                          ctx);
 }
 
 static gboolean
-handle_send_pin (MMSim *self,
+handle_send_pin (MMBaseSim *self,
                  GDBusMethodInvocation *invocation,
                  const gchar *pin)
 {
@@ -788,7 +788,7 @@ handle_send_pin (MMSim *self,
 /* SEND PUK (DBus call handling) */
 
 typedef struct {
-    MMSim *self;
+    MMBaseSim *self;
     GDBusMethodInvocation *invocation;
     gchar *puk;
     gchar *new_pin;
@@ -805,13 +805,13 @@ handle_send_puk_context_free (HandleSendPukContext *ctx)
 }
 
 static void
-handle_send_puk_ready (MMSim *self,
+handle_send_puk_ready (MMBaseSim *self,
                        GAsyncResult *res,
                        HandleSendPukContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_sim_send_puk_finish (self, res, &error))
+    if (!mm_base_sim_send_puk_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (self), ctx->invocation);
@@ -832,15 +832,15 @@ handle_send_puk_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_sim_send_puk (ctx->self,
-                     ctx->puk,
-                     ctx->new_pin,
-                     (GAsyncReadyCallback)handle_send_puk_ready,
-                     ctx);
+    mm_base_sim_send_puk (ctx->self,
+                          ctx->puk,
+                          ctx->new_pin,
+                          (GAsyncReadyCallback)handle_send_puk_ready,
+                          ctx);
 }
 
 static gboolean
-handle_send_puk (MMSim *self,
+handle_send_puk (MMBaseSim *self,
                  GDBusMethodInvocation *invocation,
                  const gchar *puk,
                  const gchar *new_pin)
@@ -864,7 +864,7 @@ handle_send_puk (MMSim *self,
 /*****************************************************************************/
 
 static void
-mm_sim_dbus_export (MMSim *self)
+sim_dbus_export (MMBaseSim *self)
 {
     GError *error = NULL;
 
@@ -898,7 +898,7 @@ mm_sim_dbus_export (MMSim *self)
 }
 
 static void
-mm_sim_dbus_unexport (MMSim *self)
+sim_dbus_unexport (MMBaseSim *self)
 {
     /* Only unexport if currently exported */
     if (g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self)))
@@ -908,7 +908,7 @@ mm_sim_dbus_unexport (MMSim *self)
 /*****************************************************************************/
 
 const gchar *
-mm_sim_get_path (MMSim *self)
+mm_base_sim_get_path (MMBaseSim *self)
 {
     return self->priv->path;
 }
@@ -984,7 +984,7 @@ parse_iccid (const gchar *response,
 }
 
 static gchar *
-load_sim_identifier_finish (MMSim *self,
+load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -1006,7 +1006,7 @@ load_sim_identifier_finish (MMSim *self,
 STR_REPLY_READY_FN (load_sim_identifier)
 
 static void
-load_sim_identifier (MMSim *self,
+load_sim_identifier (MMBaseSim *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
@@ -1054,7 +1054,7 @@ parse_imsi (const gchar *response,
 }
 
 static gchar *
-load_imsi_finish (MMSim *self,
+load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
@@ -1076,7 +1076,7 @@ load_imsi_finish (MMSim *self,
 STR_REPLY_READY_FN (load_imsi)
 
 static void
-load_imsi (MMSim *self,
+load_imsi (MMBaseSim *self,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
@@ -1177,7 +1177,7 @@ parse_mnc_length (const gchar *response,
 }
 
 static gchar *
-load_operator_identifier_finish (MMSim *self,
+load_operator_identifier_finish (MMBaseSim *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
@@ -1212,7 +1212,7 @@ load_operator_identifier_finish (MMSim *self,
 STR_REPLY_READY_FN (load_operator_identifier)
 
 static void
-load_operator_identifier (MMSim *self,
+load_operator_identifier (MMBaseSim *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
@@ -1307,7 +1307,7 @@ parse_spn (const gchar *response,
 }
 
 static gchar *
-load_operator_name_finish (MMSim *self,
+load_operator_name_finish (MMBaseSim *self,
                            GAsyncResult *res,
                            GError **error)
 {
@@ -1323,7 +1323,7 @@ load_operator_name_finish (MMSim *self,
 STR_REPLY_READY_FN (load_operator_name)
 
 static void
-load_operator_name (MMSim *self,
+load_operator_name (MMBaseSim *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -1359,7 +1359,7 @@ typedef enum {
 struct _InitAsyncContext {
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
-    MMSim *self;
+    MMBaseSim *self;
     InitializationStep step;
     guint sim_identifier_tries;
 };
@@ -1374,9 +1374,9 @@ init_async_context_free (InitAsyncContext *ctx)
     g_free (ctx);
 }
 
-MMSim *
-mm_sim_new_finish (GAsyncResult  *res,
-                   GError       **error)
+MMBaseSim *
+mm_base_sim_new_finish (GAsyncResult  *res,
+                        GError       **error)
 {
     GObject *source;
     GObject *sim;
@@ -1389,9 +1389,9 @@ mm_sim_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 static gboolean
@@ -1403,14 +1403,14 @@ initable_init_finish (GAsyncInitable  *initable,
 }
 
 static void
-load_sim_identifier_ready (MMSim *self,
+load_sim_identifier_ready (MMBaseSim *self,
                            GAsyncResult *res,
                            InitAsyncContext *ctx)
 {
     GError *error = NULL;
     gchar *simid;
 
-    simid  = MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish (self, res, &error);
+    simid  = MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish (self, res, &error);
     if (!simid) {
         /* TODO: make the retries gobi-specific? */
 
@@ -1440,14 +1440,14 @@ load_sim_identifier_ready (MMSim *self,
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
     static void                                                         \
-    load_##NAME##_ready (MMSim *self,                                   \
+    load_##NAME##_ready (MMBaseSim *self,                                   \
                          GAsyncResult *res,                             \
                          InitAsyncContext *ctx)                         \
     {                                                                   \
         GError *error = NULL;                                           \
         gchar *val;                                                     \
                                                                         \
-        val = MM_SIM_GET_CLASS (ctx->self)->load_##NAME##_finish (self, res, &error); \
+        val = MM_BASE_SIM_GET_CLASS (ctx->self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);             \
         g_free (val);                                                   \
                                                                         \
@@ -1488,9 +1488,9 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier &&
-            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish) {
-            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier (
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier &&
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish) {
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_sim_identifier_ready,
                 ctx);
@@ -1504,9 +1504,9 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_SIM_GET_CLASS (ctx->self)->load_imsi &&
-            MM_SIM_GET_CLASS (ctx->self)->load_imsi_finish) {
-            MM_SIM_GET_CLASS (ctx->self)->load_imsi (
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi &&
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi_finish) {
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi (
                 ctx->self,
                 (GAsyncReadyCallback)load_imsi_ready,
                 ctx);
@@ -1520,9 +1520,9 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier &&
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier_finish) {
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier (
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier &&
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier_finish) {
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_identifier_ready,
                 ctx);
@@ -1536,9 +1536,9 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_name &&
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_name_finish) {
-            MM_SIM_GET_CLASS (ctx->self)->load_operator_name (
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name &&
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name_finish) {
+            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_name_ready,
                 ctx);
@@ -1599,33 +1599,33 @@ initable_init_async (GAsyncInitable *initable,
 }
 
 void
-mm_sim_new (MMBaseModem *modem,
-            GCancellable *cancellable,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+mm_base_sim_new (MMBaseModem *modem,
+                 GCancellable *cancellable,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
 {
-    g_async_initable_new_async (MM_TYPE_SIM,
+    g_async_initable_new_async (MM_TYPE_BASE_SIM,
                                 G_PRIORITY_DEFAULT,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
 gboolean
-mm_sim_initialize_finish (MMSim *self,
-                          GAsyncResult *result,
-                          GError **error)
+mm_base_sim_initialize_finish (MMBaseSim *self,
+                               GAsyncResult *result,
+                               GError **error)
 {
     return initable_init_finish (G_ASYNC_INITABLE (self), result, error);
 }
 
 void
-mm_sim_initialize (MMSim *self,
-                   GCancellable *cancellable,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+mm_base_sim_initialize (MMBaseSim *self,
+                        GCancellable *cancellable,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
 {
     common_init_async (G_ASYNC_INITABLE (self),
                        cancellable,
@@ -1639,7 +1639,7 @@ set_property (GObject *object,
               const GValue *value,
               GParamSpec *pspec)
 {
-    MMSim *self = MM_SIM (object);
+    MMBaseSim *self = MM_BASE_SIM (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1649,7 +1649,7 @@ set_property (GObject *object,
         /* Export when we get a DBus connection AND we have a path */
         if (self->priv->path &&
             self->priv->connection)
-            mm_sim_dbus_export (self);
+            sim_dbus_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
@@ -1657,9 +1657,9 @@ set_property (GObject *object,
 
         /* Export when we get a DBus connection AND we have a path */
         if (!self->priv->connection)
-            mm_sim_dbus_unexport (self);
+            sim_dbus_unexport (self);
         else if (self->priv->path)
-            mm_sim_dbus_export (self);
+            sim_dbus_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
@@ -1668,7 +1668,7 @@ set_property (GObject *object,
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the SIM's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_SIM_CONNECTION,
+                                    self, MM_BASE_SIM_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
@@ -1684,7 +1684,7 @@ get_property (GObject *object,
               GValue *value,
               GParamSpec *pspec)
 {
-    MMSim *self = MM_SIM (object);
+    MMBaseSim *self = MM_BASE_SIM (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1703,39 +1703,37 @@ get_property (GObject *object,
 }
 
 static void
-mm_sim_init (MMSim *self)
+mm_base_sim_init (MMBaseSim *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_SIM,
-                                              MMSimPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BASE_SIM, MMBaseSimPrivate);
 }
 
 static void
 finalize (GObject *object)
 {
-    MMSim *self = MM_SIM (object);
+    MMBaseSim *self = MM_BASE_SIM (object);
 
     g_free (self->priv->path);
 
-    G_OBJECT_CLASS (mm_sim_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_base_sim_parent_class)->finalize (object);
 }
 
 static void
 dispose (GObject *object)
 {
-    MMSim *self = MM_SIM (object);
+    MMBaseSim *self = MM_BASE_SIM (object);
 
     if (self->priv->connection) {
         /* If we arrived here with a valid connection, make sure we unexport
          * the object */
-        mm_sim_dbus_unexport (self);
+        sim_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
 
     g_clear_object (&self->priv->modem);
 
-    G_OBJECT_CLASS (mm_sim_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_base_sim_parent_class)->dispose (object);
 }
 
 static void
@@ -1746,11 +1744,11 @@ async_initable_iface_init (GAsyncInitableIface *iface)
 }
 
 static void
-mm_sim_class_init (MMSimClass *klass)
+mm_base_sim_class_init (MMBaseSimClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMSimPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBaseSimPrivate));
 
     /* Virtual methods */
     object_class->get_property = get_property;
@@ -1776,7 +1774,7 @@ mm_sim_class_init (MMSimClass *klass)
     klass->change_pin_finish = change_pin_finish;
 
     properties[PROP_CONNECTION] =
-        g_param_spec_object (MM_SIM_CONNECTION,
+        g_param_spec_object (MM_BASE_SIM_CONNECTION,
                              "Connection",
                              "GDBus connection to the system bus.",
                              G_TYPE_DBUS_CONNECTION,
@@ -1784,7 +1782,7 @@ mm_sim_class_init (MMSimClass *klass)
     g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 
     properties[PROP_PATH] =
-        g_param_spec_string (MM_SIM_PATH,
+        g_param_spec_string (MM_BASE_SIM_PATH,
                              "Path",
                              "DBus path of the SIM",
                              NULL,
@@ -1792,7 +1790,7 @@ mm_sim_class_init (MMSimClass *klass)
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     properties[PROP_MODEM] =
-        g_param_spec_object (MM_SIM_MODEM,
+        g_param_spec_object (MM_BASE_SIM_MODEM,
                              "Modem",
                              "The Modem which owns this SIM",
                              MM_TYPE_BASE_MODEM,
@@ -1801,10 +1799,10 @@ mm_sim_class_init (MMSimClass *klass)
 
     /* Signals */
     signals[SIGNAL_PIN_LOCK_ENABLED] =
-        g_signal_new (MM_SIM_PIN_LOCK_ENABLED,
+        g_signal_new (MM_BASE_SIM_PIN_LOCK_ENABLED,
                       G_OBJECT_CLASS_TYPE (object_class),
                       G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMSimClass, pin_lock_enabled),
+                      G_STRUCT_OFFSET (MMBaseSimClass, pin_lock_enabled),
                       NULL, NULL,
                       g_cclosure_marshal_generic,
                       G_TYPE_NONE, 1, G_TYPE_BOOLEAN);

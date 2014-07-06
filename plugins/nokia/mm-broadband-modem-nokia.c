@@ -47,7 +47,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNokia, mm_broadband_modem_nokia, MM_TYPE
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
 
-static MMSim *
+static MMBaseSim *
 create_sim_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)

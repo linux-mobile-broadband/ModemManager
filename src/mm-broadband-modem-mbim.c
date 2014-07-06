@@ -1161,7 +1161,7 @@ modem_create_bearer (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
 
-static MMSim *
+static MMBaseSim *
 create_sim_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)

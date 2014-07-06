@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-sim.h"
+#include "mm-base-sim.h"
 
 #define MM_TYPE_SIM_PANTECH            (mm_sim_pantech_get_type ())
 #define MM_SIM_PANTECH(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SIM_PANTECH, MMSimPantech))
@@ -32,20 +32,20 @@ typedef struct _MMSimPantech MMSimPantech;
 typedef struct _MMSimPantechClass MMSimPantechClass;
 
 struct _MMSimPantech {
-    MMSim parent;
+    MMBaseSim parent;
 };
 
 struct _MMSimPantechClass {
-    MMSimClass parent;
+    MMBaseSimClass parent;
 };
 
 GType mm_sim_pantech_get_type (void);
 
-void   mm_sim_pantech_new        (MMBaseModem *modem,
-                                  GCancellable *cancellable,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-MMSim *mm_sim_pantech_new_finish (GAsyncResult  *res,
-                                  GError       **error);
+void       mm_sim_pantech_new        (MMBaseModem *modem,
+                                      GCancellable *cancellable,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+MMBaseSim *mm_sim_pantech_new_finish (GAsyncResult  *res,
+                                      GError       **error);
 
 #endif /* MM_SIM_PANTECH_H */

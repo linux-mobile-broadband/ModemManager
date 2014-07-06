@@ -242,7 +242,7 @@ mm_common_sierra_load_power_state (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create SIM (Modem interface) */
 
-MMSim *
+MMBaseSim *
 mm_common_sierra_create_sim_finish (MMIfaceModem *self,
                                     GAsyncResult *res,
                                     GError **error)

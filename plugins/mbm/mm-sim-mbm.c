@@ -28,7 +28,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-sim-mbm.h"
 
-G_DEFINE_TYPE (MMSimMbm, mm_sim_mbm, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimMbm, mm_sim_mbm, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 /* SEND PIN/PUK (Generic implementation) */
@@ -52,7 +52,7 @@ send_pin_puk_context_complete_and_free (SendPinPukContext *ctx)
 }
 
 static gboolean
-common_send_pin_puk_finish (MMSim *self,
+common_send_pin_puk_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -133,7 +133,7 @@ send_pin_puk_ready (MMBaseModem *modem,
 }
 
 static void
-common_send_pin_puk (MMSim *self,
+common_send_pin_puk (MMBaseSim *self,
                      const gchar *pin,
                      const gchar *puk,
                      GAsyncReadyCallback callback,
@@ -149,7 +149,7 @@ common_send_pin_puk (MMSim *self,
                                              user_data,
                                              common_send_pin_puk);
     g_object_get (ctx->self,
-                  MM_SIM_MODEM, &ctx->modem,
+                  MM_BASE_SIM_MODEM, &ctx->modem,
                   NULL);
 
     command = (puk ?
@@ -165,7 +165,7 @@ common_send_pin_puk (MMSim *self,
 }
 
 static void
-send_puk (MMSim *self,
+send_puk (MMBaseSim *self,
           const gchar *puk,
           const gchar *new_pin,
           GAsyncReadyCallback callback,
@@ -175,7 +175,7 @@ send_puk (MMSim *self,
 }
 
 static void
-send_pin (MMSim *self,
+send_pin (MMBaseSim *self,
           const gchar *pin,
           GAsyncReadyCallback callback,
           gpointer user_data)
@@ -185,7 +185,7 @@ send_pin (MMSim *self,
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_mbm_new_finish (GAsyncResult  *res,
                        GError       **error)
 {
@@ -200,9 +200,9 @@ mm_sim_mbm_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -216,7 +216,7 @@ mm_sim_mbm_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -228,10 +228,10 @@ mm_sim_mbm_init (MMSimMbm *self)
 static void
 mm_sim_mbm_class_init (MMSimMbmClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
-    sim_class->send_pin = send_pin;
-    sim_class->send_pin_finish = common_send_pin_puk_finish;
-    sim_class->send_puk = send_puk;
-    sim_class->send_puk_finish = common_send_pin_puk_finish;
+    base_sim_class->send_pin = send_pin;
+    base_sim_class->send_pin_finish = common_send_pin_puk_finish;
+    base_sim_class->send_puk = send_puk;
+    base_sim_class->send_puk_finish = common_send_pin_puk_finish;
 }

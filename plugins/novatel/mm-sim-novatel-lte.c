@@ -29,13 +29,13 @@
 
 #include "mm-sim-novatel-lte.h"
 
-G_DEFINE_TYPE (MMSimNovatelLte, mm_sim_novatel_lte, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimNovatelLte, mm_sim_novatel_lte, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 /* IMSI loading */
 
 static gchar *
-load_imsi_finish (MMSim *self,
+load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
@@ -176,14 +176,14 @@ imsi_read_ready (MMBaseModem *modem,
 }
 
 static void
-load_imsi (MMSim *self,
+load_imsi (MMBaseSim *self,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
     MMBaseModem *modem = NULL;
 
     g_object_get (self,
-                  MM_SIM_MODEM, &modem,
+                  MM_BASE_SIM_MODEM, &modem,
                   NULL);
 
     mm_dbg ("loading (Novatel LTE) IMSI...");
@@ -202,7 +202,7 @@ load_imsi (MMSim *self,
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_novatel_lte_new_finish (GAsyncResult *res,
                                GError **error)
 {
@@ -217,9 +217,9 @@ mm_sim_novatel_lte_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -233,7 +233,7 @@ mm_sim_novatel_lte_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -245,8 +245,8 @@ mm_sim_novatel_lte_init (MMSimNovatelLte *self)
 static void
 mm_sim_novatel_lte_class_init (MMSimNovatelLteClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
-    sim_class->load_imsi = load_imsi;
-    sim_class->load_imsi_finish = load_imsi_finish;
+    base_sim_class->load_imsi = load_imsi;
+    base_sim_class->load_imsi_finish = load_imsi_finish;
 }

@@ -26,11 +26,11 @@
 
 #include "mm-sim-nokia.h"
 
-G_DEFINE_TYPE (MMSimNokia, mm_sim_nokia, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimNokia, mm_sim_nokia, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_nokia_new_finish (GAsyncResult  *res,
                          GError       **error)
 {
@@ -45,9 +45,9 @@ mm_sim_nokia_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -61,7 +61,7 @@ mm_sim_nokia_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -73,13 +73,13 @@ mm_sim_nokia_init (MMSimNokia *self)
 static void
 mm_sim_nokia_class_init (MMSimNokiaClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
     /* Skip querying most SIM card info, +CRSM not supported by Nokia modems */
-    sim_class->load_sim_identifier = NULL;
-    sim_class->load_sim_identifier_finish = NULL;
-    sim_class->load_operator_identifier = NULL;
-    sim_class->load_operator_identifier_finish = NULL;
-    sim_class->load_operator_name = NULL;
-    sim_class->load_operator_name_finish = NULL;
+    base_sim_class->load_sim_identifier = NULL;
+    base_sim_class->load_sim_identifier_finish = NULL;
+    base_sim_class->load_operator_identifier = NULL;
+    base_sim_class->load_operator_identifier_finish = NULL;
+    base_sim_class->load_operator_name = NULL;
+    base_sim_class->load_operator_name_finish = NULL;
 }

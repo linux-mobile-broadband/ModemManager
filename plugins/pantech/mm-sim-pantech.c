@@ -26,11 +26,11 @@
 
 #include "mm-sim-pantech.h"
 
-G_DEFINE_TYPE (MMSimPantech, mm_sim_pantech, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimPantech, mm_sim_pantech, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_pantech_new_finish (GAsyncResult  *res,
                            GError       **error)
 {
@@ -45,23 +45,23 @@ mm_sim_pantech_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
 mm_sim_pantech_new (MMBaseModem *modem,
-                  GCancellable *cancellable,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+                    GCancellable *cancellable,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
 {
     g_async_initable_new_async (MM_TYPE_SIM_PANTECH,
                                 G_PRIORITY_DEFAULT,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -73,14 +73,14 @@ mm_sim_pantech_init (MMSimPantech *self)
 static void
 mm_sim_pantech_class_init (MMSimPantechClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
     /* Skip querying most SIM card info, +CRSM just shoots the Pantech modems
      * (at least the UMW190) in the head */
-    sim_class->load_sim_identifier = NULL;
-    sim_class->load_sim_identifier_finish = NULL;
-    sim_class->load_operator_identifier = NULL;
-    sim_class->load_operator_identifier_finish = NULL;
-    sim_class->load_operator_name = NULL;
-    sim_class->load_operator_name_finish = NULL;
+    base_sim_class->load_sim_identifier = NULL;
+    base_sim_class->load_sim_identifier_finish = NULL;
+    base_sim_class->load_operator_identifier = NULL;
+    base_sim_class->load_operator_identifier_finish = NULL;
+    base_sim_class->load_operator_name = NULL;
+    base_sim_class->load_operator_name_finish = NULL;
 }

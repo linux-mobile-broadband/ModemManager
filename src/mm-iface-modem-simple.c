@@ -20,7 +20,7 @@
 #include <libmm-glib.h>
 
 #include "mm-bearer-list.h"
-#include "mm-sim.h"
+#include "mm-base-sim.h"
 #include "mm-error-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -336,13 +336,13 @@ wait_for_initialized_ready (MMIfaceModem *self,
 }
 
 static void
-send_pin_ready (MMSim *sim,
+send_pin_ready (MMBaseSim *sim,
                 GAsyncResult *res,
                 ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_sim_send_pin_finish (sim, res, &error)) {
+    if (!mm_base_sim_send_pin_finish (sim, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -360,7 +360,7 @@ update_lock_info_ready (MMIfaceModem *self,
 {
     GError *error = NULL;
     MMModemLock lock;
-    MMSim *sim;
+    MMBaseSim *sim;
 
     lock = mm_iface_modem_update_lock_info_finish (self, res, &error);
     if (error) {
@@ -407,10 +407,10 @@ update_lock_info_ready (MMIfaceModem *self,
         return;
     }
 
-    mm_sim_send_pin (sim,
-                     mm_simple_connect_properties_get_pin (ctx->properties),
-                     (GAsyncReadyCallback)send_pin_ready,
-                     ctx);
+    mm_base_sim_send_pin (sim,
+                          mm_simple_connect_properties_get_pin (ctx->properties),
+                          (GAsyncReadyCallback)send_pin_ready,
+                          ctx);
     g_object_unref (sim);
 }
 

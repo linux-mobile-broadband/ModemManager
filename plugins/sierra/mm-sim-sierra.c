@@ -31,13 +31,13 @@
 
 #include "mm-sim-sierra.h"
 
-G_DEFINE_TYPE (MMSimSierra, mm_sim_sierra, MM_TYPE_SIM);
+G_DEFINE_TYPE (MMSimSierra, mm_sim_sierra, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
 /* SIM identifier loading */
 
 static gchar *
-load_sim_identifier_finish (MMSim *self,
+load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
@@ -93,14 +93,14 @@ iccid_read_ready (MMBaseModem *modem,
 }
 
 static void
-load_sim_identifier (MMSim *self,
+load_sim_identifier (MMBaseSim *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
     MMBaseModem *modem = NULL;
 
     g_object_get (self,
-                  MM_SIM_MODEM, &modem,
+                  MM_BASE_SIM_MODEM, &modem,
                   NULL);
 
     mm_dbg ("loading (Sierra) SIM identifier...");
@@ -119,7 +119,7 @@ load_sim_identifier (MMSim *self,
 
 /*****************************************************************************/
 
-MMSim *
+MMBaseSim *
 mm_sim_sierra_new_finish (GAsyncResult  *res,
                           GError       **error)
 {
@@ -134,9 +134,9 @@ mm_sim_sierra_new_finish (GAsyncResult  *res,
         return NULL;
 
     /* Only export valid SIMs */
-    mm_sim_export (MM_SIM (sim));
+    mm_base_sim_export (MM_BASE_SIM (sim));
 
-    return MM_SIM (sim);
+    return MM_BASE_SIM (sim);
 }
 
 void
@@ -150,7 +150,7 @@ mm_sim_sierra_new (MMBaseModem *modem,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_MODEM, modem,
+                                MM_BASE_SIM_MODEM, modem,
                                 NULL);
 }
 
@@ -162,8 +162,8 @@ mm_sim_sierra_init (MMSimSierra *self)
 static void
 mm_sim_sierra_class_init (MMSimSierraClass *klass)
 {
-    MMSimClass *sim_class = MM_SIM_CLASS (klass);
+    MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
-    sim_class->load_sim_identifier = load_sim_identifier;
-    sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
+    base_sim_class->load_sim_identifier = load_sim_identifier;
+    base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
 }
