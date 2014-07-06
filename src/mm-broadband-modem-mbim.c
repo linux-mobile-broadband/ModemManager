@@ -2811,7 +2811,7 @@ enable_unsolicited_events_messaging (MMIfaceModemMessaging *self,
 /*****************************************************************************/
 /* Create SMS (Messaging interface) */
 
-static MMSms *
+static MMBaseSms *
 messaging_create_sms (MMIfaceModemMessaging *self)
 {
     return mm_sms_mbim_new (MM_BASE_MODEM (self));

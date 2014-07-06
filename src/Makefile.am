@@ -187,8 +187,8 @@ ModemManager_SOURCES = \
 	mm-base-modem-at.c \
 	mm-base-modem.h \
 	mm-base-modem.c \
-	mm-sms.h \
-	mm-sms.c \
+	mm-base-sms.h \
+	mm-base-sms.c \
 	mm-sms-list.h \
 	mm-sms-list.c \
 	mm-iface-modem.h \

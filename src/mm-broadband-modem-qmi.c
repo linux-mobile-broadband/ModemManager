@@ -7610,7 +7610,7 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
 /*****************************************************************************/
 /* Create SMS (Messaging interface) */
 
-static MMSms *
+static MMBaseSms *
 messaging_create_sms (MMIfaceModemMessaging *_self)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);

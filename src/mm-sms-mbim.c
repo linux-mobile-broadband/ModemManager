@@ -31,7 +31,7 @@
 #include "mm-log.h"
 #include "mm-sms-part-3gpp.h"
 
-G_DEFINE_TYPE (MMSmsMbim, mm_sms_mbim, MM_TYPE_SMS)
+G_DEFINE_TYPE (MMSmsMbim, mm_sms_mbim, MM_TYPE_BASE_SMS)
 
 /*****************************************************************************/
 
@@ -44,7 +44,7 @@ peek_device (gpointer self,
     MMBaseModem *modem = NULL;
 
     g_object_get (G_OBJECT (self),
-                  MM_SMS_MODEM, &modem,
+                  MM_BASE_SMS_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
@@ -74,7 +74,7 @@ peek_device (gpointer self,
 /* Send the SMS */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     MbimDevice *device;
     GSimpleAsyncResult *result;
@@ -93,7 +93,7 @@ sms_send_context_complete_and_free (SmsSendContext *ctx)
 }
 
 static gboolean
-sms_send_finish (MMSms *self,
+sms_send_finish (MMBaseSms *self,
                  GAsyncResult *res,
                  GError **error)
 {
@@ -180,7 +180,7 @@ sms_send_next_part (SmsSendContext *ctx)
 }
 
 static void
-sms_send (MMSms *self,
+sms_send (MMBaseSms *self,
           GAsyncReadyCallback callback,
           gpointer user_data)
 {
@@ -199,17 +199,17 @@ sms_send (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
-    ctx->current = mm_sms_get_parts (self);;
+    ctx->current = mm_base_sms_get_parts (self);;
     sms_send_next_part (ctx);
 }
 
 /*****************************************************************************/
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     MbimDevice *device;
     GSimpleAsyncResult *result;
@@ -229,7 +229,7 @@ sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 }
 
 static gboolean
-sms_delete_finish (MMSms *self,
+sms_delete_finish (MMBaseSms *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -308,7 +308,7 @@ delete_next_part (SmsDeletePartsContext *ctx)
 }
 
 static void
-sms_delete (MMSms *self,
+sms_delete (MMBaseSms *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -326,22 +326,22 @@ sms_delete (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
     /* Go on deleting parts */
-    ctx->current = mm_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (self);
     delete_next_part (ctx);
 }
 
 /*****************************************************************************/
 
-MMSms *
+MMBaseSms *
 mm_sms_mbim_new (MMBaseModem *modem)
 {
-    return MM_SMS (g_object_new (MM_TYPE_SMS_MBIM,
-                                 MM_SMS_MODEM, modem,
-                                 NULL));
+    return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_MBIM,
+                                      MM_BASE_SMS_MODEM, modem,
+                                      NULL));
 }
 
 static void
@@ -352,12 +352,12 @@ mm_sms_mbim_init (MMSmsMbim *self)
 static void
 mm_sms_mbim_class_init (MMSmsMbimClass *klass)
 {
-    MMSmsClass *sms_class = MM_SMS_CLASS (klass);
+    MMBaseSmsClass *base_sms_class = MM_BASE_SMS_CLASS (klass);
 
-    sms_class->store = NULL;
-    sms_class->store_finish = NULL;
-    sms_class->send = sms_send;
-    sms_class->send_finish = sms_send_finish;
-    sms_class->delete = sms_delete;
-    sms_class->delete_finish = sms_delete_finish;
+    base_sms_class->store = NULL;
+    base_sms_class->store_finish = NULL;
+    base_sms_class->send = sms_send;
+    base_sms_class->send_finish = sms_send_finish;
+    base_sms_class->delete = sms_delete;
+    base_sms_class->delete_finish = sms_delete_finish;
 }

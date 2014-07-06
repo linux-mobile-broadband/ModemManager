@@ -33,7 +33,7 @@
 #include "mm-sms-part-cdma.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMSmsQmi, mm_sms_qmi, MM_TYPE_SMS);
+G_DEFINE_TYPE (MMSmsQmi, mm_sms_qmi, MM_TYPE_BASE_SMS)
 
 /*****************************************************************************/
 
@@ -49,7 +49,7 @@ ensure_qmi_client (MMSmsQmi *self,
     MMPortQmi *port;
 
     g_object_get (self,
-                  MM_SMS_MODEM, &modem,
+                  MM_BASE_SMS_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
@@ -115,7 +115,7 @@ check_sms_type_support (MMSmsQmi *self,
 /* Store the SMS */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
     GSimpleAsyncResult *result;
@@ -135,7 +135,7 @@ sms_store_context_complete_and_free (SmsStoreContext *ctx)
 }
 
 static gboolean
-sms_store_finish (MMSms *self,
+sms_store_finish (MMBaseSms *self,
                   GAsyncResult *res,
                   GError **error)
 {
@@ -177,7 +177,7 @@ store_ready (QmiClientWms *client,
     qmi_message_wms_raw_write_output_unref (output);
 
     /* Set the index in the part we hold */
-    parts = mm_sms_get_parts (ctx->self);
+    parts = mm_base_sms_get_parts (ctx->self);
     mm_sms_part_set_index ((MMSmsPart *)parts->data, (guint)idx);
 
     /* Go on with next one */
@@ -250,7 +250,7 @@ sms_store_next_part (SmsStoreContext *ctx)
 }
 
 static void
-sms_store (MMSms *self,
+sms_store (MMBaseSms *self,
            MMSmsStorage storage,
            GAsyncReadyCallback callback,
            gpointer user_data)
@@ -275,10 +275,10 @@ sms_store (MMSms *self,
     ctx->client = g_object_ref (client);
     ctx->storage = storage;
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
-    ctx->current = mm_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (self);
 
     /* Check whether we support the given SMS type */
     if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
@@ -295,7 +295,7 @@ sms_store (MMSms *self,
 /* Send the SMS */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
     GSimpleAsyncResult *result;
@@ -315,7 +315,7 @@ sms_send_context_complete_and_free (SmsSendContext *ctx)
 }
 
 static gboolean
-sms_send_finish (MMSms *self,
+sms_send_finish (MMBaseSms *self,
                  GAsyncResult *res,
                  GError **error)
 {
@@ -534,7 +534,7 @@ sms_send_from_storage (SmsSendContext *ctx)
 
     qmi_message_wms_send_from_memory_storage_input_set_information (
         input,
-        mm_sms_storage_to_qmi_storage_type (mm_sms_get_storage (ctx->self)),
+        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (ctx->self)),
         mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
         (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
          QMI_WMS_MESSAGE_MODE_GSM_WCDMA :
@@ -569,7 +569,7 @@ sms_send_next_part (SmsSendContext *ctx)
 }
 
 static void
-sms_send (MMSms *self,
+sms_send (MMBaseSms *self,
           GAsyncReadyCallback callback,
           gpointer user_data)
 {
@@ -592,13 +592,13 @@ sms_send (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
     /* If the SMS is STORED, try to send from storage */
-    ctx->from_storage = (mm_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
+    ctx->from_storage = (mm_base_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
 
-    ctx->current = mm_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (self);
 
     /* Check whether we support the given SMS type */
     if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
@@ -613,7 +613,7 @@ sms_send (MMSms *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
     GSimpleAsyncResult *result;
@@ -633,7 +633,7 @@ sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 }
 
 static gboolean
-sms_delete_finish (MMSms *self,
+sms_delete_finish (MMBaseSms *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -703,7 +703,7 @@ delete_next_part (SmsDeletePartsContext *ctx)
     input = qmi_message_wms_delete_input_new ();
     qmi_message_wms_delete_input_set_memory_storage (
         input,
-        mm_sms_storage_to_qmi_storage_type (mm_sms_get_storage (ctx->self)),
+        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (ctx->self)),
         NULL);
     qmi_message_wms_delete_input_set_memory_index (
         input,
@@ -725,7 +725,7 @@ delete_next_part (SmsDeletePartsContext *ctx)
 }
 
 static void
-sms_delete (MMSms *self,
+sms_delete (MMBaseSms *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -746,22 +746,22 @@ sms_delete (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
     /* Go on deleting parts */
-    ctx->current = mm_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (self);
     delete_next_part (ctx);
 }
 
 /*****************************************************************************/
 
-MMSms *
+MMBaseSms *
 mm_sms_qmi_new (MMBaseModem *modem)
 {
-    return MM_SMS (g_object_new (MM_TYPE_SMS_QMI,
-                                 MM_SMS_MODEM, modem,
-                                 NULL));
+    return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_QMI,
+                                      MM_BASE_SMS_MODEM, modem,
+                                      NULL));
 }
 
 static void
@@ -772,12 +772,12 @@ mm_sms_qmi_init (MMSmsQmi *self)
 static void
 mm_sms_qmi_class_init (MMSmsQmiClass *klass)
 {
-    MMSmsClass *sms_class = MM_SMS_CLASS (klass);
+    MMBaseSmsClass *base_sms_class = MM_BASE_SMS_CLASS (klass);
 
-    sms_class->store = sms_store;
-    sms_class->store_finish = sms_store_finish;
-    sms_class->send = sms_send;
-    sms_class->send_finish = sms_send_finish;
-    sms_class->delete = sms_delete;
-    sms_class->delete_finish = sms_delete_finish;
+    base_sms_class->store = sms_store;
+    base_sms_class->store_finish = sms_store_finish;
+    base_sms_class->send = sms_send;
+    base_sms_class->send_finish = sms_send_finish;
+    base_sms_class->delete = sms_delete;
+    base_sms_class->delete_finish = sms_delete_finish;
 }

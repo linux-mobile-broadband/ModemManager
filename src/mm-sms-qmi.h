@@ -24,7 +24,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-sms.h"
+#include "mm-base-sms.h"
 
 #define MM_TYPE_SMS_QMI            (mm_sms_qmi_get_type ())
 #define MM_SMS_QMI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SMS_QMI, MMSmsQmi))
@@ -37,15 +37,15 @@ typedef struct _MMSmsQmi MMSmsQmi;
 typedef struct _MMSmsQmiClass MMSmsQmiClass;
 
 struct _MMSmsQmi {
-    MMSms parent;
+    MMBaseSms parent;
 };
 
 struct _MMSmsQmiClass {
-    MMSmsClass parent;
+    MMBaseSmsClass parent;
 };
 
 GType mm_sms_qmi_get_type (void);
 
-MMSms *mm_sms_qmi_new (MMBaseModem *modem);
+MMBaseSms *mm_sms_qmi_new (MMBaseModem *modem);
 
 #endif /* MM_SMS_QMI_H */

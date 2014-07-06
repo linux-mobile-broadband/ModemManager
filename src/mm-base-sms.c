@@ -26,17 +26,17 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-base-sms.h"
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
-#include "mm-sms.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-G_DEFINE_TYPE (MMSms, mm_sms, MM_GDBUS_TYPE_SMS_SKELETON);
+G_DEFINE_TYPE (MMBaseSms, mm_base_sms, MM_GDBUS_TYPE_SMS_SKELETON)
 
 enum {
     PROP_0,
@@ -51,7 +51,7 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
-struct _MMSmsPrivate {
+struct _MMBaseSmsPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     /* The modem which owns this SMS */
@@ -95,7 +95,7 @@ get_validity_relative (GVariant *tuple)
 }
 
 static gboolean
-generate_3gpp_submit_pdus (MMSms *self,
+generate_3gpp_submit_pdus (MMBaseSms *self,
                            GError **error)
 {
     guint i;
@@ -233,7 +233,7 @@ generate_3gpp_submit_pdus (MMSms *self,
 }
 
 static gboolean
-generate_cdma_submit_pdus (MMSms *self,
+generate_cdma_submit_pdus (MMBaseSms *self,
                            GError **error)
 {
     const gchar *text;
@@ -292,7 +292,7 @@ generate_cdma_submit_pdus (MMSms *self,
 }
 
 static gboolean
-generate_submit_pdus (MMSms *self,
+generate_submit_pdus (MMBaseSms *self,
                       GError **error)
 {
     MMBaseModem *modem;
@@ -301,7 +301,7 @@ generate_submit_pdus (MMSms *self,
     /* First; decide which kind of PDU we'll generate, based on the current modem caps */
 
     g_object_get (self,
-                  MM_SMS_MODEM, &modem,
+                  MM_BASE_SMS_MODEM, &modem,
                   NULL);
     g_assert (modem != NULL);
 
@@ -320,7 +320,7 @@ generate_submit_pdus (MMSms *self,
 /* Store SMS (DBus call handling) */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     MMSmsStorage storage;
@@ -336,13 +336,13 @@ handle_store_context_free (HandleStoreContext *ctx)
 }
 
 static void
-handle_store_ready (MMSms *self,
+handle_store_ready (MMBaseSms *self,
                     GAsyncResult *res,
                     HandleStoreContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_SMS_GET_CLASS (self)->store_finish (self, res, &error)) {
+    if (!MM_BASE_SMS_GET_CLASS (self)->store_finish (self, res, &error)) {
         /* On error, clear up the parts we generated */
         g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
         self->priv->parts = NULL;
@@ -361,7 +361,7 @@ handle_store_ready (MMSms *self,
 }
 
 static gboolean
-prepare_sms_to_be_stored (MMSms *self,
+prepare_sms_to_be_stored (MMBaseSms *self,
                           GError **error)
 {
     GList *l;
@@ -410,9 +410,9 @@ handle_store_auth_ready (MMBaseModem *modem,
     }
 
     /* First of all, check if we already have the SMS stored. */
-    if (mm_sms_get_storage (ctx->self) != MM_SMS_STORAGE_UNKNOWN) {
+    if (mm_base_sms_get_storage (ctx->self) != MM_SMS_STORAGE_UNKNOWN) {
         /* Check if SMS stored in some other storage */
-        if (mm_sms_get_storage (ctx->self) == ctx->storage)
+        if (mm_base_sms_get_storage (ctx->self) == ctx->storage)
             /* Good, same storage */
             mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
         else
@@ -421,7 +421,7 @@ handle_store_auth_ready (MMBaseModem *modem,
                 MM_CORE_ERROR,
                 MM_CORE_ERROR_FAILED,
                 "SMS is already stored in storage '%s', cannot store it in storage '%s'",
-                mm_sms_storage_get_string (mm_sms_get_storage (ctx->self)),
+                mm_sms_storage_get_string (mm_base_sms_get_storage (ctx->self)),
                 mm_sms_storage_get_string (ctx->storage));
         handle_store_context_free (ctx);
         return;
@@ -444,8 +444,8 @@ handle_store_auth_ready (MMBaseModem *modem,
     }
 
     /* If not stored, check if we do support doing it */
-    if (!MM_SMS_GET_CLASS (ctx->self)->store ||
-        !MM_SMS_GET_CLASS (ctx->self)->store_finish) {
+    if (!MM_BASE_SMS_GET_CLASS (ctx->self)->store ||
+        !MM_BASE_SMS_GET_CLASS (ctx->self)->store_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
@@ -454,14 +454,14 @@ handle_store_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    MM_SMS_GET_CLASS (ctx->self)->store (ctx->self,
-                                         ctx->storage,
-                                         (GAsyncReadyCallback)handle_store_ready,
-                                         ctx);
+    MM_BASE_SMS_GET_CLASS (ctx->self)->store (ctx->self,
+                                              ctx->storage,
+                                              (GAsyncReadyCallback)handle_store_ready,
+                                              ctx);
 }
 
 static gboolean
-handle_store (MMSms *self,
+handle_store (MMBaseSms *self,
               GDBusMethodInvocation *invocation,
               guint32 storage)
 {
@@ -471,7 +471,7 @@ handle_store (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
     ctx->storage = (MMSmsStorage)storage;
 
@@ -495,7 +495,7 @@ handle_store (MMSms *self,
 /* Send SMS (DBus call handling) */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleSendContext;
@@ -510,13 +510,13 @@ handle_send_context_free (HandleSendContext *ctx)
 }
 
 static void
-handle_send_ready (MMSms *self,
+handle_send_ready (MMBaseSms *self,
                    GAsyncResult *res,
                    HandleSendContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_SMS_GET_CLASS (self)->send_finish (self, res, &error)) {
+    if (!MM_BASE_SMS_GET_CLASS (self)->send_finish (self, res, &error)) {
         /* On error, clear up the parts we generated */
         g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
         self->priv->parts = NULL;
@@ -530,7 +530,7 @@ handle_send_ready (MMSms *self,
             /* Update state */
             mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
             /* Grab last message reference */
-            l = g_list_last (mm_sms_get_parts (ctx->self));
+            l = g_list_last (mm_base_sms_get_parts (ctx->self));
             mm_gdbus_sms_set_message_reference (MM_GDBUS_SMS (ctx->self),
                                                 mm_sms_part_get_message_reference ((MMSmsPart *)l->data));
         }
@@ -541,7 +541,7 @@ handle_send_ready (MMSms *self,
 }
 
 static gboolean
-prepare_sms_to_be_sent (MMSms *self,
+prepare_sms_to_be_sent (MMBaseSms *self,
                         GError **error)
 {
     GList *l;
@@ -612,8 +612,8 @@ handle_send_auth_ready (MMBaseModem *modem,
     }
 
     /* Check if we do support doing it */
-    if (!MM_SMS_GET_CLASS (ctx->self)->send ||
-        !MM_SMS_GET_CLASS (ctx->self)->send_finish) {
+    if (!MM_BASE_SMS_GET_CLASS (ctx->self)->send ||
+        !MM_BASE_SMS_GET_CLASS (ctx->self)->send_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
@@ -622,13 +622,13 @@ handle_send_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    MM_SMS_GET_CLASS (ctx->self)->send (ctx->self,
-                                        (GAsyncReadyCallback)handle_send_ready,
-                                        ctx);
+    MM_BASE_SMS_GET_CLASS (ctx->self)->send (ctx->self,
+                                             (GAsyncReadyCallback)handle_send_ready,
+                                             ctx);
 }
 
 static gboolean
-handle_send (MMSms *self,
+handle_send (MMBaseSms *self,
              GDBusMethodInvocation *invocation)
 {
     HandleSendContext *ctx;
@@ -637,7 +637,7 @@ handle_send (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
-                  MM_SMS_MODEM, &ctx->modem,
+                  MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
     mm_base_modem_authorize (ctx->modem,
@@ -651,30 +651,30 @@ handle_send (MMSms *self,
 /*****************************************************************************/
 
 void
-mm_sms_export (MMSms *self)
+mm_base_sms_export (MMBaseSms *self)
 {
     static guint id = 0;
     gchar *path;
 
     path = g_strdup_printf (MM_DBUS_SMS_PREFIX "/%d", id++);
     g_object_set (self,
-                  MM_SMS_PATH, path,
+                  MM_BASE_SMS_PATH, path,
                   NULL);
     g_free (path);
 }
 
 void
-mm_sms_unexport (MMSms *self)
+mm_base_sms_unexport (MMBaseSms *self)
 {
     g_object_set (self,
-                  MM_SMS_PATH, NULL,
+                  MM_BASE_SMS_PATH, NULL,
                   NULL);
 }
 
 /*****************************************************************************/
 
 static void
-mm_sms_dbus_export (MMSms *self)
+sms_dbus_export (MMBaseSms *self)
 {
     GError *error = NULL;
 
@@ -700,7 +700,7 @@ mm_sms_dbus_export (MMSms *self)
 }
 
 static void
-mm_sms_dbus_unexport (MMSms *self)
+sms_dbus_unexport (MMBaseSms *self)
 {
     /* Only unexport if currently exported */
     if (g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self)))
@@ -710,25 +710,25 @@ mm_sms_dbus_unexport (MMSms *self)
 /*****************************************************************************/
 
 const gchar *
-mm_sms_get_path (MMSms *self)
+mm_base_sms_get_path (MMBaseSms *self)
 {
     return self->priv->path;
 }
 
 MMSmsStorage
-mm_sms_get_storage (MMSms *self)
+mm_base_sms_get_storage (MMBaseSms *self)
 {
     return mm_gdbus_sms_get_storage (MM_GDBUS_SMS (self));
 }
 
 gboolean
-mm_sms_is_multipart (MMSms *self)
+mm_base_sms_is_multipart (MMBaseSms *self)
 {
     return self->priv->is_multipart;
 }
 
 guint
-mm_sms_get_multipart_reference (MMSms *self)
+mm_base_sms_get_multipart_reference (MMBaseSms *self)
 {
     g_return_val_if_fail (self->priv->is_multipart, 0);
 
@@ -736,13 +736,13 @@ mm_sms_get_multipart_reference (MMSms *self)
 }
 
 gboolean
-mm_sms_multipart_is_complete (MMSms *self)
+mm_base_sms_multipart_is_complete (MMBaseSms *self)
 {
     return (g_list_length (self->priv->parts) == self->priv->max_parts);
 }
 
 gboolean
-mm_sms_multipart_is_assembled (MMSms *self)
+mm_base_sms_multipart_is_assembled (MMBaseSms *self)
 {
     return self->priv->is_assembled;
 }
@@ -757,8 +757,8 @@ cmp_sms_part_index (MMSmsPart *part,
 }
 
 gboolean
-mm_sms_has_part_index (MMSms *self,
-                       guint index)
+mm_base_sms_has_part_index (MMBaseSms *self,
+                            guint index)
 {
     return !!g_list_find_custom (self->priv->parts,
                                  GUINT_TO_POINTER (index),
@@ -766,7 +766,7 @@ mm_sms_has_part_index (MMSms *self,
 }
 
 GList *
-mm_sms_get_parts (MMSms *self)
+mm_base_sms_get_parts (MMBaseSms *self)
 {
     return self->priv->parts;
 }
@@ -830,7 +830,7 @@ sms_get_store_or_send_command (MMSmsPart *part,
 /* Store the SMS */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
     MMSmsStorage storage;
@@ -855,7 +855,7 @@ sms_store_context_complete_and_free (SmsStoreContext *ctx)
 }
 
 static gboolean
-sms_store_finish (MMSms *self,
+sms_store_finish (MMBaseSms *self,
                   GAsyncResult *res,
                   GError **error)
 {
@@ -989,7 +989,7 @@ store_lock_sms_storages_ready (MMBroadbandModem *modem,
 }
 
 static void
-sms_store (MMSms *self,
+sms_store (MMBaseSms *self,
            MMSmsStorage storage,
            GAsyncReadyCallback callback,
            gpointer user_data)
@@ -1025,7 +1025,7 @@ sms_store (MMSms *self,
 /* Send the SMS */
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
     gboolean need_unlock;
@@ -1050,7 +1050,7 @@ sms_send_context_complete_and_free (SmsSendContext *ctx)
 }
 
 static gboolean
-sms_send_finish (MMSms *self,
+sms_send_finish (MMBaseSms *self,
                  GAsyncResult *res,
                  GError **error)
 {
@@ -1256,7 +1256,7 @@ send_lock_sms_storages_ready (MMBroadbandModem *modem,
 }
 
 static void
-sms_send (MMSms *self,
+sms_send (MMBaseSms *self,
           GAsyncReadyCallback callback,
           gpointer user_data)
 {
@@ -1272,14 +1272,14 @@ sms_send (MMSms *self,
     ctx->modem = g_object_ref (self->priv->modem);
 
     /* If the SMS is STORED, try to send from storage */
-    ctx->from_storage = (mm_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
+    ctx->from_storage = (mm_base_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
     if (ctx->from_storage) {
         /* When sending from storage, first lock storage to use */
         g_assert (MM_IS_BROADBAND_MODEM (self->priv->modem));
         mm_broadband_modem_lock_sms_storages (
             MM_BROADBAND_MODEM (self->priv->modem),
             MM_SMS_STORAGE_UNKNOWN, /* none required for mem1 */
-            mm_sms_get_storage (self),
+            mm_base_sms_get_storage (self),
             (GAsyncReadyCallback)send_lock_sms_storages_ready,
             ctx);
         return;
@@ -1296,7 +1296,7 @@ sms_send (MMSms *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMSms *self;
+    MMBaseSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
     gboolean need_unlock;
@@ -1318,7 +1318,7 @@ sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 }
 
 static gboolean
-sms_delete_finish (MMSms *self,
+sms_delete_finish (MMBaseSms *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -1409,7 +1409,7 @@ delete_lock_sms_storages_ready (MMBroadbandModem *modem,
 }
 
 static void
-sms_delete (MMSms *self,
+sms_delete (MMBaseSms *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -1423,7 +1423,7 @@ sms_delete (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    if (mm_sms_get_storage (self) == MM_SMS_STORAGE_UNKNOWN) {
+    if (mm_base_sms_get_storage (self) == MM_SMS_STORAGE_UNKNOWN) {
         mm_dbg ("Not removing parts from non-stored SMS");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         sms_delete_parts_context_complete_and_free (ctx);
@@ -1433,7 +1433,7 @@ sms_delete (MMSms *self,
     /* Select specific storage to delete from */
     mm_broadband_modem_lock_sms_storages (
         MM_BROADBAND_MODEM (self->priv->modem),
-        mm_sms_get_storage (self),
+        mm_base_sms_get_storage (self),
         MM_SMS_STORAGE_UNKNOWN, /* none required for mem2 */
         (GAsyncReadyCallback)delete_lock_sms_storages_ready,
         ctx);
@@ -1442,14 +1442,14 @@ sms_delete (MMSms *self,
 /*****************************************************************************/
 
 gboolean
-mm_sms_delete_finish (MMSms *self,
-                      GAsyncResult *res,
-                      GError **error)
+mm_base_sms_delete_finish (MMBaseSms *self,
+                           GAsyncResult *res,
+                           GError **error)
 {
-    if (MM_SMS_GET_CLASS (self)->delete_finish) {
+    if (MM_BASE_SMS_GET_CLASS (self)->delete_finish) {
         gboolean deleted;
 
-        deleted = MM_SMS_GET_CLASS (self)->delete_finish (self, res, error);
+        deleted = MM_BASE_SMS_GET_CLASS (self)->delete_finish (self, res, error);
         if (deleted)
             /* We do change the state of this SMS back to UNKNOWN, as it is no
              * longer stored in the device */
@@ -1462,13 +1462,13 @@ mm_sms_delete_finish (MMSms *self,
 }
 
 void
-mm_sms_delete (MMSms *self,
+mm_base_sms_delete (MMBaseSms *self,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
-    if (MM_SMS_GET_CLASS (self)->delete &&
-        MM_SMS_GET_CLASS (self)->delete_finish) {
-        MM_SMS_GET_CLASS (self)->delete (self, callback, user_data);
+    if (MM_BASE_SMS_GET_CLASS (self)->delete &&
+        MM_BASE_SMS_GET_CLASS (self)->delete_finish) {
+        MM_BASE_SMS_GET_CLASS (self)->delete (self, callback, user_data);
         return;
     }
 
@@ -1483,7 +1483,7 @@ mm_sms_delete (MMSms *self,
 /*****************************************************************************/
 
 static gboolean
-assemble_sms (MMSms *self,
+assemble_sms (MMBaseSms *self,
               GError **error)
 {
     GList *l;
@@ -1627,9 +1627,9 @@ cmp_sms_part_sequence (MMSmsPart *a,
 }
 
 gboolean
-mm_sms_multipart_take_part (MMSms *self,
-                            MMSmsPart *part,
-                            GError **error)
+mm_base_sms_multipart_take_part (MMBaseSms *self,
+                                 MMSmsPart *part,
+                                 GError **error)
 {
     if (!self->priv->is_multipart) {
         g_set_error (error,
@@ -1675,12 +1675,12 @@ mm_sms_multipart_take_part (MMSms *self,
                                               (GCompareFunc)cmp_sms_part_sequence);
 
     /* We only populate contents when the multipart SMS is complete */
-    if (mm_sms_multipart_is_complete (self)) {
+    if (mm_base_sms_multipart_is_complete (self)) {
         GError *inner_error = NULL;
 
         if (!assemble_sms (self, &inner_error)) {
             /* We DO NOT propagate the error. The part was properly taken
-             * so ownership passed to the MMSms object. */
+             * so ownership passed to the MMBaseSms object. */
             mm_warn ("Couldn't assemble SMS: '%s'",
                      inner_error->message);
             g_error_free (inner_error);
@@ -1695,22 +1695,22 @@ mm_sms_multipart_take_part (MMSms *self,
     return TRUE;
 }
 
-MMSms *
-mm_sms_new (MMBaseModem *modem)
+MMBaseSms *
+mm_base_sms_new (MMBaseModem *modem)
 {
-    return MM_SMS (g_object_new (MM_TYPE_SMS,
-                                 MM_SMS_MODEM, modem,
-                                 NULL));
+    return MM_BASE_SMS (g_object_new (MM_TYPE_BASE_SMS,
+                                      MM_BASE_SMS_MODEM, modem,
+                                      NULL));
 }
 
-MMSms *
-mm_sms_singlepart_new (MMBaseModem *modem,
-                       MMSmsState state,
-                       MMSmsStorage storage,
-                       MMSmsPart *part,
-                       GError **error)
+MMBaseSms *
+mm_base_sms_singlepart_new (MMBaseModem *modem,
+                            MMSmsState state,
+                            MMSmsStorage storage,
+                            MMSmsPart *part,
+                            GError **error)
 {
-    MMSms *self;
+    MMBaseSms *self;
 
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
 
@@ -1731,21 +1731,21 @@ mm_sms_singlepart_new (MMBaseModem *modem,
         g_clear_object (&self);
     } else
         /* Only export once properly created */
-        mm_sms_export (self);
+        mm_base_sms_export (self);
 
     return self;
 }
 
-MMSms *
-mm_sms_multipart_new (MMBaseModem *modem,
-                      MMSmsState state,
-                      MMSmsStorage storage,
-                      guint reference,
-                      guint max_parts,
-                      MMSmsPart *first_part,
-                      GError **error)
+MMBaseSms *
+mm_base_sms_multipart_new (MMBaseModem *modem,
+                           MMSmsState state,
+                           MMSmsStorage storage,
+                           guint reference,
+                           guint max_parts,
+                           MMSmsPart *first_part,
+                           GError **error)
 {
-    MMSms *self;
+    MMBaseSms *self;
 
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
 
@@ -1757,17 +1757,17 @@ mm_sms_multipart_new (MMBaseModem *modem,
     /* Create an SMS object as defined by the interface */
     self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
-                  MM_SMS_IS_MULTIPART,        TRUE,
-                  MM_SMS_MAX_PARTS,           max_parts,
-                  MM_SMS_MULTIPART_REFERENCE, reference,
-                  "state",                    state,
-                  "storage",                  storage,
-                  "validity",                 g_variant_new ("(uv)",
-                                                             MM_SMS_VALIDITY_TYPE_UNKNOWN,
-                                                             g_variant_new_boolean (FALSE)),
+                  MM_BASE_SMS_IS_MULTIPART,        TRUE,
+                  MM_BASE_SMS_MAX_PARTS,           max_parts,
+                  MM_BASE_SMS_MULTIPART_REFERENCE, reference,
+                  "state",                         state,
+                  "storage",                       storage,
+                  "validity",                      g_variant_new ("(uv)",
+                                                                  MM_SMS_VALIDITY_TYPE_UNKNOWN,
+                                                                  g_variant_new_boolean (FALSE)),
                   NULL);
 
-    if (!mm_sms_multipart_take_part (self, first_part, error))
+    if (!mm_base_sms_multipart_take_part (self, first_part, error))
         g_clear_object (&self);
 
     /* We do export uncomplete multipart messages, in order to be able to
@@ -1776,17 +1776,17 @@ mm_sms_multipart_new (MMBaseModem *modem,
      * Only the STATE of the SMS object will be valid in the exported DBus
      *  interface.*/
     if (self)
-        mm_sms_export (self);
+        mm_base_sms_export (self);
 
     return self;
 }
 
-MMSms *
-mm_sms_new_from_properties (MMBaseModem *modem,
-                            MMSmsProperties *properties,
-                            GError **error)
+MMBaseSms *
+mm_base_sms_new_from_properties (MMBaseModem *modem,
+                                 MMSmsProperties *properties,
+                                 GError **error)
 {
-    MMSms *self;
+    MMBaseSms *self;
     const gchar *text;
     GByteArray *data;
 
@@ -1846,7 +1846,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
                   NULL);
 
     /* Only export once properly created */
-    mm_sms_export (self);
+    mm_base_sms_export (self);
 
     return self;
 }
@@ -1859,7 +1859,7 @@ set_property (GObject *object,
               const GValue *value,
               GParamSpec *pspec)
 {
-    MMSms *self = MM_SMS (object);
+    MMBaseSms *self = MM_BASE_SMS (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1868,9 +1868,9 @@ set_property (GObject *object,
 
         /* Export when we get a DBus connection AND we have a path */
         if (!self->priv->path)
-            mm_sms_dbus_unexport (self);
+            sms_dbus_unexport (self);
         else if (self->priv->connection)
-            mm_sms_dbus_export (self);
+            sms_dbus_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
@@ -1878,9 +1878,9 @@ set_property (GObject *object,
 
         /* Export when we get a DBus connection AND we have a path */
         if (!self->priv->connection)
-            mm_sms_dbus_unexport (self);
+            sms_dbus_unexport (self);
         else if (self->priv->path)
-            mm_sms_dbus_export (self);
+            sms_dbus_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
@@ -1889,7 +1889,7 @@ set_property (GObject *object,
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the SMS's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_SMS_CONNECTION,
+                                    self, MM_BASE_SMS_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
@@ -1914,7 +1914,7 @@ get_property (GObject *object,
               GValue *value,
               GParamSpec *pspec)
 {
-    MMSms *self = MM_SMS (object);
+    MMBaseSms *self = MM_BASE_SMS (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1942,12 +1942,10 @@ get_property (GObject *object,
 }
 
 static void
-mm_sms_init (MMSms *self)
+mm_base_sms_init (MMBaseSms *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_SMS,
-                                              MMSmsPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BASE_SMS, MMBaseSmsPrivate);
     /* Defaults */
     self->priv->max_parts = 1;
 }
@@ -1955,37 +1953,37 @@ mm_sms_init (MMSms *self)
 static void
 finalize (GObject *object)
 {
-    MMSms *self = MM_SMS (object);
+    MMBaseSms *self = MM_BASE_SMS (object);
 
     g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
     g_free (self->priv->path);
 
-    G_OBJECT_CLASS (mm_sms_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_base_sms_parent_class)->finalize (object);
 }
 
 static void
 dispose (GObject *object)
 {
-    MMSms *self = MM_SMS (object);
+    MMBaseSms *self = MM_BASE_SMS (object);
 
     if (self->priv->connection) {
         /* If we arrived here with a valid connection, make sure we unexport
          * the object */
-        mm_sms_dbus_unexport (self);
+        sms_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
 
     g_clear_object (&self->priv->modem);
 
-    G_OBJECT_CLASS (mm_sms_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_base_sms_parent_class)->dispose (object);
 }
 
 static void
-mm_sms_class_init (MMSmsClass *klass)
+mm_base_sms_class_init (MMBaseSmsClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMSmsPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBaseSmsPrivate));
 
     /* Virtual methods */
     object_class->get_property = get_property;
@@ -2001,7 +1999,7 @@ mm_sms_class_init (MMSmsClass *klass)
     klass->delete_finish = sms_delete_finish;
 
     properties[PROP_CONNECTION] =
-        g_param_spec_object (MM_SMS_CONNECTION,
+        g_param_spec_object (MM_BASE_SMS_CONNECTION,
                              "Connection",
                              "GDBus connection to the system bus.",
                              G_TYPE_DBUS_CONNECTION,
@@ -2009,7 +2007,7 @@ mm_sms_class_init (MMSmsClass *klass)
     g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 
     properties[PROP_PATH] =
-        g_param_spec_string (MM_SMS_PATH,
+        g_param_spec_string (MM_BASE_SMS_PATH,
                              "Path",
                              "DBus path of the SMS",
                              NULL,
@@ -2017,7 +2015,7 @@ mm_sms_class_init (MMSmsClass *klass)
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     properties[PROP_MODEM] =
-        g_param_spec_object (MM_SMS_MODEM,
+        g_param_spec_object (MM_BASE_SMS_MODEM,
                              "Modem",
                              "The Modem which owns this SMS",
                              MM_TYPE_BASE_MODEM,
@@ -2025,7 +2023,7 @@ mm_sms_class_init (MMSmsClass *klass)
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 
     properties[PROP_IS_MULTIPART] =
-        g_param_spec_boolean (MM_SMS_IS_MULTIPART,
+        g_param_spec_boolean (MM_BASE_SMS_IS_MULTIPART,
                               "Is multipart",
                               "Flag specifying if the SMS is multipart",
                               FALSE,
@@ -2033,7 +2031,7 @@ mm_sms_class_init (MMSmsClass *klass)
     g_object_class_install_property (object_class, PROP_IS_MULTIPART, properties[PROP_IS_MULTIPART]);
 
     properties[PROP_MAX_PARTS] =
-        g_param_spec_uint (MM_SMS_MAX_PARTS,
+        g_param_spec_uint (MM_BASE_SMS_MAX_PARTS,
                            "Max parts",
                            "Maximum number of parts composing this SMS",
                            1,255, 1,
@@ -2041,7 +2039,7 @@ mm_sms_class_init (MMSmsClass *klass)
     g_object_class_install_property (object_class, PROP_MAX_PARTS, properties[PROP_MAX_PARTS]);
 
     properties[PROP_MULTIPART_REFERENCE] =
-        g_param_spec_uint (MM_SMS_MULTIPART_REFERENCE,
+        g_param_spec_uint (MM_BASE_SMS_MULTIPART_REFERENCE,
                            "Multipart reference",
                            "Common reference for all parts in the multipart SMS",
                            0, G_MAXUINT, 0,

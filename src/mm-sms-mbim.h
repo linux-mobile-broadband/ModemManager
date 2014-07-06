@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-sms.h"
+#include "mm-base-sms.h"
 
 #define MM_TYPE_SMS_MBIM            (mm_sms_mbim_get_type ())
 #define MM_SMS_MBIM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SMS_MBIM, MMSmsMbim))
@@ -35,15 +35,15 @@ typedef struct _MMSmsMbim MMSmsMbim;
 typedef struct _MMSmsMbimClass MMSmsMbimClass;
 
 struct _MMSmsMbim {
-    MMSms parent;
+    MMBaseSms parent;
 };
 
 struct _MMSmsMbimClass {
-    MMSmsClass parent;
+    MMBaseSmsClass parent;
 };
 
 GType mm_sms_mbim_get_type (void);
 
-MMSms *mm_sms_mbim_new (MMBaseModem *modem);
+MMBaseSms *mm_sms_mbim_new (MMBaseModem *modem);
 
 #endif /* MM_SMS_MBIM_H */

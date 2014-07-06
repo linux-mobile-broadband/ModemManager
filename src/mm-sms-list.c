@@ -26,7 +26,7 @@
 
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-list.h"
-#include "mm-sms.h"
+#include "mm-base-sms.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMSmsList, mm_sms_list, G_TYPE_OBJECT);
@@ -65,12 +65,12 @@ mm_sms_list_has_local_multipart_reference (MMSmsList *self,
     g_assert (reference != 0);
 
     for (l = self->priv->list; l; l = g_list_next (l)) {
-        MMSms *sms = MM_SMS (l->data);
+        MMBaseSms *sms = MM_BASE_SMS (l->data);
 
-        if (mm_sms_is_multipart (sms) &&
+        if (mm_base_sms_is_multipart (sms) &&
             mm_gdbus_sms_get_pdu_type (MM_GDBUS_SMS (sms)) == MM_SMS_PDU_TYPE_SUBMIT &&
-            mm_sms_get_storage (sms) != MM_SMS_STORAGE_UNKNOWN &&
-            mm_sms_get_multipart_reference (sms) == reference &&
+            mm_base_sms_get_storage (sms) != MM_SMS_STORAGE_UNKNOWN &&
+            mm_base_sms_get_multipart_reference (sms) == reference &&
             g_str_equal (mm_gdbus_sms_get_number (MM_GDBUS_SMS (sms)), number)) {
             /* Yes, the SMS list has an SMS with the same destination number
              * and multipart reference */
@@ -103,7 +103,7 @@ mm_sms_list_get_paths (MMSmsList *self)
         const gchar *path;
 
         /* Don't try to add NULL paths (not yet exported SMS objects) */
-        path = mm_sms_get_path (MM_SMS (l->data));
+        path = mm_base_sms_get_path (MM_BASE_SMS (l->data));
         if (path)
             path_list[i++] = g_strdup (path);
     }
@@ -138,21 +138,21 @@ mm_sms_list_delete_sms_finish (MMSmsList *self,
 }
 
 static guint
-cmp_sms_by_path (MMSms *sms,
+cmp_sms_by_path (MMBaseSms *sms,
                  const gchar *path)
 {
-    return g_strcmp0 (mm_sms_get_path (sms), path);
+    return g_strcmp0 (mm_base_sms_get_path (sms), path);
 }
 
 static void
-delete_ready (MMSms *sms,
+delete_ready (MMBaseSms *sms,
               GAsyncResult *res,
               DeleteSmsContext *ctx)
 {
     GError *error = NULL;
     GList *l;
 
-    if (!mm_sms_delete_finish (sms, res, &error)) {
+    if (!mm_base_sms_delete_finish (sms, res, &error)) {
         /* We report the error */
         g_simple_async_result_take_error (ctx->result, error);
         delete_sms_context_complete_and_free (ctx);
@@ -164,14 +164,14 @@ delete_ready (MMSms *sms,
                             ctx->path,
                             (GCompareFunc)cmp_sms_by_path);
     if (l) {
-        g_object_unref (MM_SMS (l->data));
+        g_object_unref (MM_BASE_SMS (l->data));
         ctx->self->priv->list = g_list_delete_link (ctx->self->priv->list, l);
     }
 
     /* We don't need to unref the SMS any more, but we can use the
      * reference we got in the method, which is the one kept alive
      * during the async operation. */
-    mm_sms_unexport (sms);
+    mm_base_sms_unexport (sms);
 
     g_signal_emit (ctx->self,
                    signals[SIGNAL_DELETED], 0,
@@ -213,33 +213,33 @@ mm_sms_list_delete_sms (MMSmsList *self,
                                              user_data,
                                              mm_sms_list_delete_sms);
 
-    mm_sms_delete (MM_SMS (l->data),
-                   (GAsyncReadyCallback)delete_ready,
-                   ctx);
+    mm_base_sms_delete (MM_BASE_SMS (l->data),
+                        (GAsyncReadyCallback)delete_ready,
+                        ctx);
 }
 
 /*****************************************************************************/
 
 void
 mm_sms_list_add_sms (MMSmsList *self,
-                     MMSms *sms)
+                     MMBaseSms *sms)
 {
     self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_sms_get_path (sms),
+                   mm_base_sms_get_path (sms),
                    FALSE);
 }
 
 /*****************************************************************************/
 
 static guint
-cmp_sms_by_concat_reference (MMSms *sms,
+cmp_sms_by_concat_reference (MMBaseSms *sms,
                              gpointer user_data)
 {
-    if (!mm_sms_is_multipart (sms))
+    if (!mm_base_sms_is_multipart (sms))
         return -1;
 
-    return (GPOINTER_TO_UINT (user_data) - mm_sms_get_multipart_reference (sms));
+    return (GPOINTER_TO_UINT (user_data) - mm_base_sms_get_multipart_reference (sms));
 }
 
 typedef struct {
@@ -248,11 +248,11 @@ typedef struct {
 } PartIndexAndStorage;
 
 static guint
-cmp_sms_by_part_index_and_storage (MMSms *sms,
+cmp_sms_by_part_index_and_storage (MMBaseSms *sms,
                                    PartIndexAndStorage *ctx)
 {
-    return !(mm_sms_get_storage (sms) == ctx->storage &&
-             mm_sms_has_part_index (sms, ctx->part_index));
+    return !(mm_base_sms_get_storage (sms) == ctx->storage &&
+             mm_base_sms_has_part_index (sms, ctx->part_index));
 }
 
 static gboolean
@@ -262,19 +262,19 @@ take_singlepart (MMSmsList *self,
                  MMSmsStorage storage,
                  GError **error)
 {
-    MMSms *sms;
+    MMBaseSms *sms;
 
-    sms = mm_sms_singlepart_new (self->priv->modem,
-                                 state,
-                                 storage,
-                                 part,
-                                 error);
+    sms = mm_base_sms_singlepart_new (self->priv->modem,
+                                      state,
+                                      storage,
+                                      part,
+                                      error);
     if (!sms)
         return FALSE;
 
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_sms_get_path (sms),
+                   mm_base_sms_get_path (sms),
                    state == MM_SMS_STATE_RECEIVED);
     return TRUE;
 }
@@ -287,7 +287,7 @@ take_multipart (MMSmsList *self,
                 GError **error)
 {
     GList *l;
-    MMSms *sms;
+    MMBaseSms *sms;
     guint concat_reference;
 
     concat_reference = mm_sms_part_get_concat_reference (part);
@@ -296,22 +296,22 @@ take_multipart (MMSmsList *self,
                             (GCompareFunc)cmp_sms_by_concat_reference);
     if (l)
         /* Try to take the part */
-        return mm_sms_multipart_take_part (MM_SMS (l->data), part, error);
+        return mm_base_sms_multipart_take_part (MM_BASE_SMS (l->data), part, error);
 
     /* Create new Multipart */
-    sms = mm_sms_multipart_new (self->priv->modem,
-                                state,
-                                storage,
-                                concat_reference,
-                                mm_sms_part_get_concat_max (part),
-                                part,
-                                error);
+    sms = mm_base_sms_multipart_new (self->priv->modem,
+                                     state,
+                                     storage,
+                                     concat_reference,
+                                     mm_sms_part_get_concat_max (part),
+                                     part,
+                                     error);
     if (!sms)
         return FALSE;
 
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_sms_get_path (sms),
+                   mm_base_sms_get_path (sms),
                    (state == MM_SMS_STATE_RECEIVED ||
                     state == MM_SMS_STATE_RECEIVING));
 
