@@ -32,7 +32,7 @@
 #include "mm-bearer-mbim.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BEARER)
+G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BASE_BEARER)
 
 enum {
     PROP_0,
@@ -61,7 +61,7 @@ peek_ports (gpointer self,
     MMBaseModem *modem = NULL;
 
     g_object_get (G_OBJECT (self),
-                  MM_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
@@ -146,7 +146,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
 }
 
 static MMBearerConnectResult *
-connect_finish (MMBearer *self,
+connect_finish (MMBaseBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
@@ -736,7 +736,7 @@ connect_context_step (ConnectContext *ctx)
             ip_family == MM_BEARER_IP_FAMILY_ANY) {
             gchar * str;
 
-            ip_family = mm_bearer_get_default_ip_family (MM_BEARER (ctx->self));
+            ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (ctx->self));
             str = mm_bearer_ip_family_build_string_from_mask (ip_family);
             mm_dbg ("No specific IP family requested, defaulting to %s", str);
             g_free (str);
@@ -855,7 +855,7 @@ connect_context_step (ConnectContext *ctx)
 }
 
 static void
-_connect (MMBearer *self,
+_connect (MMBaseBearer *self,
           GCancellable *cancellable,
           GAsyncReadyCallback callback,
           gpointer user_data)
@@ -870,12 +870,12 @@ _connect (MMBearer *self,
         return;
 
     g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (modem);
 
     /* Check whether we have an APN */
-    apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (self)));
+    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
     /* Is this a 3GPP only modem and no APN was given? If so, error */
     if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
@@ -908,7 +908,7 @@ _connect (MMBearer *self,
                                              _connect);
 
     g_object_get (self,
-                  MM_BEARER_CONFIG, &ctx->properties,
+                  MM_BASE_BEARER_CONFIG, &ctx->properties,
                   NULL);
 
     /* Run! */
@@ -943,7 +943,7 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
 }
 
 static gboolean
-disconnect_finish (MMBearer *self,
+disconnect_finish (MMBaseBearer *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -1074,7 +1074,7 @@ disconnect_context_step (DisconnectContext *ctx)
 }
 
 static void
-disconnect (MMBearer *_self,
+disconnect (MMBaseBearer *_self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -1126,24 +1126,24 @@ mm_bearer_mbim_get_session_id (MMBearerMbim *self)
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
                     MMBearerProperties *config,
                     guint32 session_id)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
-    /* The Mbim bearer inherits from MMBearer (so it's not a MMBroadbandBearer)
+    /* The Mbim bearer inherits from MMBaseBearer (so it's not a MMBroadbandBearer)
      * and that means that the object is not async-initable, so we just use
      * g_object_new() here */
     bearer = g_object_new (MM_TYPE_BEARER_MBIM,
-                           MM_BEARER_MODEM,           modem,
-                           MM_BEARER_CONFIG,          config,
+                           MM_BASE_BEARER_MODEM, modem,
+                           MM_BASE_BEARER_CONFIG, config,
                            MM_BEARER_MBIM_SESSION_ID, (guint)session_id,
                            NULL);
 
     /* Only export valid bearers */
-    mm_bearer_export (bearer);
+    mm_base_bearer_export (bearer);
 
     return bearer;
 }
@@ -1208,7 +1208,7 @@ static void
 mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBearerMbimPrivate));
 
@@ -1217,10 +1217,10 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
-    bearer_class->connect = _connect;
-    bearer_class->connect_finish = connect_finish;
-    bearer_class->disconnect = disconnect;
-    bearer_class->disconnect_finish = disconnect_finish;
+    base_bearer_class->connect = _connect;
+    base_bearer_class->connect_finish = connect_finish;
+    base_bearer_class->disconnect = disconnect;
+    base_bearer_class->disconnect_finish = disconnect_finish;
 
     properties[PROP_SESSION_ID] =
         g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,

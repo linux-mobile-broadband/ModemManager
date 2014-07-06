@@ -202,9 +202,9 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             const gchar *password;
             MMBearerAllowedAuth allowed_auth;
 
-            user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-            password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-            allowed_auth = mm_bearer_properties_get_allowed_auth (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+            user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+            password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+            allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
             if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
                 mm_dbg ("Not using authentication");
@@ -445,7 +445,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 #define MM_BROADBAND_BEARER_SIERRA_IS_ICERA "is-icera"
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
                                        GError **error)
 {
@@ -460,9 +460,9 @@ mm_broadband_bearer_sierra_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 void
@@ -479,8 +479,8 @@ mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM, modem,
-        MM_BEARER_CONFIG, config,
+        MM_BASE_BEARER_MODEM, modem,
+        MM_BASE_BEARER_CONFIG, config,
         MM_BROADBAND_BEARER_SIERRA_IS_ICERA, is_icera,
         NULL);
 }

@@ -24,7 +24,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-broadband-bearer.h"
+#include "mm-base-bearer.h"
 #include "mm-broadband-modem-iridium.h"
 
 #define MM_TYPE_BEARER_IRIDIUM            (mm_bearer_iridium_get_type ())
@@ -38,18 +38,18 @@ typedef struct _MMBearerIridium MMBearerIridium;
 typedef struct _MMBearerIridiumClass MMBearerIridiumClass;
 
 struct _MMBearerIridium {
-    MMBearer parent;
+    MMBaseBearer parent;
 };
 
 struct _MMBearerIridiumClass {
-    MMBearerClass parent;
+    MMBaseBearerClass parent;
 };
 
 GType mm_bearer_iridium_get_type (void);
 
 /* Iridium bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */
-MMBearer *mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
-                                 MMBearerProperties *config);
+MMBaseBearer *mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
+                                     MMBearerProperties *config);
 
 #endif /* MM_BEARER_IRIDIUM_H */

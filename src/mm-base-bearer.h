@@ -16,12 +16,13 @@
  * Copyright (C) 2011 - 2013 Aleksander Morgado <aleksander@gnu.org>
  */
 
-#ifndef MM_BEARER_H
-#define MM_BEARER_H
+#ifndef MM_BASE_BEARER_H
+#define MM_BASE_BEARER_H
 
 #include <glib.h>
 #include <glib-object.h>
 
+#include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
@@ -42,23 +43,23 @@ MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv6_config (MMBearerConnec
 
 /*****************************************************************************/
 
-#define MM_TYPE_BEARER            (mm_bearer_get_type ())
-#define MM_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER, MMBearer))
-#define MM_BEARER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_BEARER, MMBearerClass))
-#define MM_IS_BEARER(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_BEARER))
-#define MM_IS_BEARER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BEARER))
-#define MM_BEARER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER, MMBearerClass))
+#define MM_TYPE_BASE_BEARER            (mm_base_bearer_get_type ())
+#define MM_BASE_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_BEARER, MMBaseBearer))
+#define MM_BASE_BEARER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_BASE_BEARER, MMBaseBearerClass))
+#define MM_IS_BASE_BEARER(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_BASE_BEARER))
+#define MM_IS_BASE_BEARER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BASE_BEARER))
+#define MM_BASE_BEARER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BASE_BEARER, MMBaseBearerClass))
 
-typedef struct _MMBearer MMBearer;
-typedef struct _MMBearerClass MMBearerClass;
-typedef struct _MMBearerPrivate MMBearerPrivate;
+typedef struct _MMBaseBearer MMBaseBearer;
+typedef struct _MMBaseBearerClass MMBaseBearerClass;
+typedef struct _MMBaseBearerPrivate MMBaseBearerPrivate;
 
-#define MM_BEARER_PATH       "bearer-path"
-#define MM_BEARER_CONNECTION "bearer-connection"
-#define MM_BEARER_MODEM      "bearer-modem"
-#define MM_BEARER_STATUS     "bearer-status"
-#define MM_BEARER_CONFIG     "bearer-config"
-#define MM_BEARER_DEFAULT_IP_FAMILY "bearer-deafult-ip-family"
+#define MM_BASE_BEARER_PATH              "bearer-path"
+#define MM_BASE_BEARER_CONNECTION        "bearer-connection"
+#define MM_BASE_BEARER_MODEM             "bearer-modem"
+#define MM_BASE_BEARER_STATUS            "bearer-status"
+#define MM_BASE_BEARER_CONFIG            "bearer-config"
+#define MM_BASE_BEARER_DEFAULT_IP_FAMILY "bearer-deafult-ip-family"
 
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
@@ -75,64 +76,64 @@ typedef enum { /*< underscore_name=mm_bearer_connection_status >*/
     MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED,
 } MMBearerConnectionStatus;
 
-struct _MMBearer {
+struct _MMBaseBearer {
     MmGdbusBearerSkeleton parent;
-    MMBearerPrivate *priv;
+    MMBaseBearerPrivate *priv;
 };
 
-struct _MMBearerClass {
+struct _MMBaseBearerClass {
     MmGdbusBearerSkeletonClass parent;
 
     /* Connect this bearer */
-    void (* connect) (MMBearer *bearer,
+    void (* connect) (MMBaseBearer *bearer,
                       GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data);
-    MMBearerConnectResult * (* connect_finish) (MMBearer *bearer,
+    MMBearerConnectResult * (* connect_finish) (MMBaseBearer *bearer,
                                                 GAsyncResult *res,
                                                 GError **error);
 
     /* Disconnect this bearer */
-    void (* disconnect) (MMBearer *bearer,
+    void (* disconnect) (MMBaseBearer *bearer,
                          GAsyncReadyCallback callback,
                          gpointer user_data);
-    gboolean (* disconnect_finish) (MMBearer *bearer,
+    gboolean (* disconnect_finish) (MMBaseBearer *bearer,
                                     GAsyncResult *res,
                                     GError **error);
 
     /* Report connection status of this bearer */
-    void (* report_connection_status) (MMBearer *bearer,
+    void (* report_connection_status) (MMBaseBearer *bearer,
                                        MMBearerConnectionStatus status);
 };
 
-GType mm_bearer_get_type (void);
+GType mm_base_bearer_get_type (void);
 
-void         mm_bearer_export   (MMBearer *self);
+void         mm_base_bearer_export   (MMBaseBearer *self);
 
-const gchar        *mm_bearer_get_path    (MMBearer *bearer);
-MMBearerStatus      mm_bearer_get_status  (MMBearer *bearer);
-MMBearerProperties *mm_bearer_peek_config (MMBearer *self);
-MMBearerProperties *mm_bearer_get_config  (MMBearer *self);
-MMBearerIpFamily mm_bearer_get_default_ip_family (MMBearer *self);
+const gchar        *mm_base_bearer_get_path              (MMBaseBearer *self);
+MMBearerStatus      mm_base_bearer_get_status            (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_peek_config           (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_get_config            (MMBaseBearer *self);
+MMBearerIpFamily    mm_base_bearer_get_default_ip_family (MMBaseBearer *self);
 
 
-void     mm_bearer_connect        (MMBearer *self,
-                                   GAsyncReadyCallback callback,
-                                   gpointer user_data);
-gboolean mm_bearer_connect_finish (MMBearer *self,
-                                   GAsyncResult *res,
-                                   GError **error);
+void     mm_base_bearer_connect        (MMBaseBearer *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+gboolean mm_base_bearer_connect_finish (MMBaseBearer *self,
+                                        GAsyncResult *res,
+                                        GError **error);
 
-void     mm_bearer_disconnect        (MMBearer *self,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data);
-gboolean mm_bearer_disconnect_finish (MMBearer *self,
-                                      GAsyncResult *res,
-                                      GError **error);
+void     mm_base_bearer_disconnect        (MMBaseBearer *self,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data);
+gboolean mm_base_bearer_disconnect_finish (MMBaseBearer *self,
+                                           GAsyncResult *res,
+                                           GError **error);
 
-void mm_bearer_disconnect_force (MMBearer *self);
+void mm_base_bearer_disconnect_force (MMBaseBearer *self);
 
-void mm_bearer_report_connection_status (MMBearer *self,
-                                         MMBearerConnectionStatus status);
+void mm_base_bearer_report_connection_status (MMBaseBearer *self,
+                                              MMBearerConnectionStatus status);
 
-#endif /* MM_BEARER_H */
+#endif /* MM_BASE_BEARER_H */

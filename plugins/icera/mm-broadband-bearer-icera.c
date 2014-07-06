@@ -576,8 +576,8 @@ forced_close_cb (MMPortSerial *port,
                  MMBroadbandBearerIcera *self)
 {
     /* Just treat the forced close event as any other unsolicited message */
-    mm_bearer_report_connection_status (MM_BEARER (self),
-                                        MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED);
+    mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
+                                             MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED);
 }
 
 static void
@@ -855,9 +855,9 @@ authenticate (Dial3gppContext *ctx)
     const gchar *password;
     MMBearerAllowedAuth allowed_auth;
 
-    user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-    password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
@@ -954,7 +954,7 @@ dial_3gpp (MMBroadbandBearer *self,
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBearer *bearer,
+report_connection_status (MMBaseBearer *bearer,
                           MMBearerConnectionStatus status)
 {
     MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (bearer);
@@ -979,7 +979,7 @@ report_connection_status (MMBearer *bearer,
         status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
         /* If no connection/disconnection attempt on-going, make sure we mark ourselves as
          * disconnected. Make sure we only pass 'DISCONNECTED' to the parent */
-        MM_BEARER_CLASS (mm_broadband_bearer_icera_parent_class)->report_connection_status (
+        MM_BASE_BEARER_CLASS (mm_broadband_bearer_icera_parent_class)->report_connection_status (
             bearer,
             MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
     }
@@ -987,7 +987,7 @@ report_connection_status (MMBearer *bearer,
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
                                       GError **error)
 {
@@ -1002,9 +1002,9 @@ mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 void
@@ -1021,8 +1021,8 @@ mm_broadband_bearer_icera_new (MMBroadbandModem *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM, modem,
-        MM_BEARER_CONFIG, config,
+        MM_BASE_BEARER_MODEM, modem,
+        MM_BASE_BEARER_CONFIG, config,
         MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD, ip_method,
         NULL);
 }
@@ -1079,14 +1079,14 @@ static void
 mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerIceraPrivate));
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
-    bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;

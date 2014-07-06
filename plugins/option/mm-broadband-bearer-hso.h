@@ -48,12 +48,12 @@ struct _MMBroadbandBearerHsoClass {
 GType mm_broadband_bearer_hso_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_hso_new (MMBroadbandModemHso *modem,
-                                  MMBearerProperties *config,
-                                  GCancellable *cancellable,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-MMBearer *mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
-                                              GError **error);
+void          mm_broadband_bearer_hso_new        (MMBroadbandModemHso *modem,
+                                                  MMBearerProperties *config,
+                                                  GCancellable *cancellable,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+MMBaseBearer *mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
+                                                  GError **error);
 
 #endif /* MM_BROADBAND_BEARER_HSO_H */

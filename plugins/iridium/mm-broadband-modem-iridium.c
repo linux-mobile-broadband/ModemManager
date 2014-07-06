@@ -280,15 +280,15 @@ create_sim (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
-static MMBearer *
+static MMBaseBearer *
 create_bearer_finish (MMIfaceModem *self,
                       GAsyncResult *res,
                       GError **error)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
     bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New Iridium bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+    mm_dbg ("New Iridium bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
 
     return g_object_ref (bearer);
 }
@@ -299,7 +299,7 @@ create_bearer (MMIfaceModem *self,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),

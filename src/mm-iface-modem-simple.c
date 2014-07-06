@@ -191,7 +191,7 @@ typedef struct {
     MMSimpleConnectProperties *properties;
 
     /* Results to set */
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 } ConnectionContext;
 
 static void
@@ -211,13 +211,13 @@ connection_context_free (ConnectionContext *ctx)
 static void connection_step (ConnectionContext *ctx);
 
 static void
-connect_bearer_ready (MMBearer *bearer,
+connect_bearer_ready (MMBaseBearer *bearer,
                       GAsyncResult *res,
                       ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_bearer_connect_finish (bearer, res, &error)) {
+    if (!mm_base_bearer_connect_finish (bearer, res, &error)) {
         mm_dbg ("Couldn't connect bearer: '%s'", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
@@ -415,18 +415,18 @@ update_lock_info_ready (MMIfaceModem *self,
 }
 
 typedef struct {
-    MMBearer *found;
+    MMBaseBearer *found;
 } BearerListFindContext;
 
 static void
-bearer_list_find_disconnected (MMBearer *bearer,
+bearer_list_find_disconnected (MMBaseBearer *bearer,
                                BearerListFindContext *ctx)
 {
     /* If already marked one to remove, do nothing */
     if (ctx->found)
         return;
 
-    if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_DISCONNECTED)
+    if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_DISCONNECTED)
         ctx->found = g_object_ref (bearer);
 }
 
@@ -534,15 +534,15 @@ connection_step (ConnectionContext *ctx)
                     GError *error = NULL;
 
                     if (!mm_bearer_list_delete_bearer (list,
-                                                       mm_bearer_get_path (foreach_ctx.found),
+                                                       mm_base_bearer_get_path (foreach_ctx.found),
                                                        &error)) {
                         mm_dbg ("Couldn't delete disconnected bearer at '%s': '%s'",
-                                mm_bearer_get_path (foreach_ctx.found),
+                                mm_base_bearer_get_path (foreach_ctx.found),
                                 error->message);
                         g_error_free (error);
                     } else
                         mm_dbg ("Deleted disconnected bearer at '%s'",
-                                mm_bearer_get_path (foreach_ctx.found));
+                                mm_base_bearer_get_path (foreach_ctx.found));
                     g_object_unref (foreach_ctx.found);
                 }
 
@@ -571,7 +571,7 @@ connection_step (ConnectionContext *ctx)
         }
 
         mm_dbg ("Using already existing bearer at '%s'...",
-                mm_bearer_get_path (ctx->bearer));
+                mm_base_bearer_get_path (ctx->bearer));
         g_object_unref (list);
         g_object_unref (bearer_properties);
         /* Fall down to next step */
@@ -584,15 +584,15 @@ connection_step (ConnectionContext *ctx)
 
         /* Wait... if we're already using an existing bearer, we need to check if it is
          * already connected; and if so, just don't do anything else */
-        if (mm_bearer_get_status (ctx->bearer) != MM_BEARER_STATUS_CONNECTED) {
-            mm_bearer_connect (ctx->bearer,
-                               (GAsyncReadyCallback)connect_bearer_ready,
-                               ctx);
+        if (mm_base_bearer_get_status (ctx->bearer) != MM_BEARER_STATUS_CONNECTED) {
+            mm_base_bearer_connect (ctx->bearer,
+                                    (GAsyncReadyCallback)connect_bearer_ready,
+                                    ctx);
             return;
         }
 
         mm_dbg ("Bearer at '%s' is already connected...",
-                mm_bearer_get_path (ctx->bearer));
+                mm_base_bearer_get_path (ctx->bearer));
 
         /* Fall down to next step */
         ctx->step++;
@@ -604,7 +604,7 @@ connection_step (ConnectionContext *ctx)
         mm_gdbus_modem_simple_complete_connect (
             ctx->skeleton,
             ctx->invocation,
-            mm_bearer_get_path (ctx->bearer));
+            mm_base_bearer_get_path (ctx->bearer));
         connection_context_free (ctx);
         return;
     }
@@ -748,7 +748,7 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     gchar *bearer_path;
     GList *bearers;
-    MMBearer *current;
+    MMBaseBearer *current;
 } DisconnectionContext;
 
 static void
@@ -767,13 +767,13 @@ disconnection_context_free (DisconnectionContext *ctx)
 static void disconnect_next_bearer (DisconnectionContext *ctx);
 
 static void
-disconnect_ready (MMBearer *bearer,
+disconnect_ready (MMBaseBearer *bearer,
                   GAsyncResult *res,
                   DisconnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_bearer_disconnect_finish (bearer, res, &error)) {
+    if (!mm_base_bearer_disconnect_finish (bearer, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         disconnection_context_free (ctx);
         return;
@@ -796,20 +796,20 @@ disconnect_next_bearer (DisconnectionContext *ctx)
         return;
     }
 
-    ctx->current = MM_BEARER (ctx->bearers->data);
+    ctx->current = MM_BASE_BEARER (ctx->bearers->data);
     ctx->bearers = g_list_delete_link (ctx->bearers, ctx->bearers);
 
-    mm_bearer_disconnect (ctx->current,
-                          (GAsyncReadyCallback)disconnect_ready,
-                          ctx);
+    mm_base_bearer_disconnect (ctx->current,
+                               (GAsyncReadyCallback)disconnect_ready,
+                               ctx);
 }
 
 static void
-build_connected_bearer_list (MMBearer *bearer,
+build_connected_bearer_list (MMBaseBearer *bearer,
                              DisconnectionContext *ctx)
 {
     if (!ctx->bearer_path ||
-        g_str_equal (ctx->bearer_path, mm_bearer_get_path (bearer)))
+        g_str_equal (ctx->bearer_path, mm_base_bearer_get_path (bearer)))
         ctx->bearers = g_list_prepend (ctx->bearers, g_object_ref (bearer));
 }
 

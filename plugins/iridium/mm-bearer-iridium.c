@@ -29,9 +29,9 @@
 #include "mm-log.h"
 
 /* Allow up to 200s to get a proper IP connection */
-#define MM_BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT 200
+#define BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT 200
 
-G_DEFINE_TYPE (MMBearerIridium, mm_bearer_iridium, MM_TYPE_BEARER);
+G_DEFINE_TYPE (MMBearerIridium, mm_bearer_iridium, MM_TYPE_BASE_BEARER);
 
 /*****************************************************************************/
 /* Connect */
@@ -59,7 +59,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
 }
 
 static MMBearerConnectResult *
-connect_finish (MMBearer *self,
+connect_finish (MMBaseBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
@@ -192,7 +192,7 @@ service_type_ready (MMBaseModem *modem,
 }
 
 static void
-connect (MMBearer *self,
+connect (MMBaseBearer *self,
          GCancellable *cancellable,
          GAsyncReadyCallback callback,
          gpointer user_data)
@@ -201,7 +201,7 @@ connect (MMBearer *self,
     MMBaseModem *modem  = NULL;
 
     g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (modem);
 
@@ -236,23 +236,23 @@ connect (MMBearer *self,
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
                        MMBearerProperties *config)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
-    /* The Iridium bearer inherits from MMBearer (so it's not a MMBroadbandBearer)
+    /* The Iridium bearer inherits from MMBaseBearer (so it's not a MMBroadbandBearer)
      * and that means that the object is not async-initable, so we just use
      * g_object_get() here */
     bearer = g_object_new (MM_TYPE_BEARER_IRIDIUM,
-                           MM_BEARER_MODEM, modem,
-                           MM_BEARER_CONFIG, config,
-                           "ip-timeout", MM_BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT,
+                           MM_BASE_BEARER_MODEM, modem,
+                           MM_BASE_BEARER_CONFIG, config,
+                           "ip-timeout", BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT,
                            NULL);
 
     /* Only export valid bearers */
-    mm_bearer_export (bearer);
+    mm_base_bearer_export (bearer);
 
     return bearer;
 }
@@ -265,9 +265,9 @@ mm_bearer_iridium_init (MMBearerIridium *self)
 static void
 mm_bearer_iridium_class_init (MMBearerIridiumClass *klass)
 {
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
 
     /* Virtual methods */
-    bearer_class->connect = connect;
-    bearer_class->connect_finish = connect_finish;
+    base_bearer_class->connect = connect;
+    base_bearer_class->connect_finish = connect_finish;
 }

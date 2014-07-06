@@ -1656,7 +1656,7 @@ typedef struct {
 } NdisstatResult;
 
 static void
-bearer_report_connection_status (MMBearer *bearer,
+bearer_report_connection_status (MMBaseBearer *bearer,
                                  NdisstatResult *ndisstat_result)
 {
     if (ndisstat_result->ipv4_available) {
@@ -1665,10 +1665,10 @@ bearer_report_connection_status (MMBearer *bearer,
          *
          * Also, send DISCONNECTING so that we give some time before actually
          * disconnecting the connection */
-        mm_bearer_report_connection_status (bearer,
-                                            ndisstat_result->ipv4_connected ?
-                                            MM_BEARER_CONNECTION_STATUS_CONNECTED :
-                                            MM_BEARER_CONNECTION_STATUS_DISCONNECTING);
+        mm_base_bearer_report_connection_status (bearer,
+                                                 ndisstat_result->ipv4_connected ?
+                                                 MM_BEARER_CONNECTION_STATUS_CONNECTED :
+                                                 MM_BEARER_CONNECTION_STATUS_DISCONNECTING);
     }
 }
 
@@ -2059,18 +2059,18 @@ create_bearer_context_complete_and_free (CreateBearerContext *ctx)
     g_slice_free (CreateBearerContext, ctx);
 }
 
-static MMBearer *
+static MMBaseBearer *
 huawei_modem_create_bearer_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
     bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New huawei bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+    mm_dbg ("New huawei bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
     return g_object_ref (bearer);
 }
 
@@ -2079,7 +2079,7 @@ broadband_bearer_huawei_new_ready (GObject *source,
                                    GAsyncResult *res,
                                    CreateBearerContext *ctx)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_huawei_new_finish (res, &error);
@@ -2095,7 +2095,7 @@ broadband_bearer_new_ready (GObject *source,
                             GAsyncResult *res,
                             CreateBearerContext *ctx)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_new_finish (res, &error);

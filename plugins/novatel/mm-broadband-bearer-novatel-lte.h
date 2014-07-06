@@ -50,13 +50,13 @@ struct _MMBroadbandBearerNovatelLteClass {
 GType mm_broadband_bearer_novatel_lte_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
-                                          MMBearerProperties *properties,
-                                          GCancellable *cancellable,
-                                          GAsyncReadyCallback callback,
-                                          gpointer user_data);
-MMBearer *mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
-                                                      GError **error);
+void          mm_broadband_bearer_novatel_lte_new        (MMBroadbandModemNovatelLte *modem,
+                                                          MMBearerProperties *properties,
+                                                          GCancellable *cancellable,
+                                                          GAsyncReadyCallback callback,
+                                                          gpointer user_data);
+MMBaseBearer *mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
+                                                          GError **error);
 
 
 #endif /* MM_BROADBAND_BEARER_NOVATEL_LTE_H */

@@ -99,12 +99,12 @@ modem_power_down (MMIfaceModem *self,
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
-static MMBearer *
+static MMBaseBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
@@ -119,7 +119,7 @@ broadband_bearer_new_ready (GObject *source,
                             GAsyncResult *res,
                             GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_altair_lte_new_finish (res, &error);
@@ -710,11 +710,11 @@ typedef enum {
 } MMStatcmAltair;
 
 static void
-bearer_list_report_disconnect_status_foreach (MMBearer *bearer,
+bearer_list_report_disconnect_status_foreach (MMBaseBearer *bearer,
                                               gpointer *user_data)
 {
-    mm_bearer_report_connection_status (bearer,
-                                        MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    mm_base_bearer_report_connection_status (bearer,
+                                             MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 /*****************************************************************************/

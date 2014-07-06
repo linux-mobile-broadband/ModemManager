@@ -39,15 +39,15 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierraIcera, mm_broadband_modem_sierra_i
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
-static MMBearer *
+static MMBaseBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
     bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New Sierra bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+    mm_dbg ("New Sierra bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
 
     return g_object_ref (bearer);
 }
@@ -57,7 +57,7 @@ broadband_bearer_sierra_new_ready (GObject *source,
                                    GAsyncResult *res,
                                    GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_sierra_new_finish (res, &error);

@@ -48,14 +48,12 @@ struct _MMBroadbandBearerAltairLteClass {
 GType mm_broadband_bearer_altair_lte_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_altair_lte_new (MMBroadbandModemAltairLte *modem,
-                                         MMBearerProperties *properties,
-                                         GCancellable *cancellable,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data);
-
-MMBearer *mm_broadband_bearer_altair_lte_new_finish (GAsyncResult *res,
-                                                     GError **error);
-
+void          mm_broadband_bearer_altair_lte_new        (MMBroadbandModemAltairLte *modem,
+                                                         MMBearerProperties *properties,
+                                                         GCancellable *cancellable,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+MMBaseBearer *mm_broadband_bearer_altair_lte_new_finish (GAsyncResult *res,
+                                                         GError **error);
 
 #endif /* MM_BROADBAND_BEARER_ALTAIR_LTE_H */

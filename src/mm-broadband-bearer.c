@@ -38,7 +38,7 @@
 
 static void async_initable_iface_init (GAsyncInitableIface *iface);
 
-G_DEFINE_TYPE_EXTENDED (MMBroadbandBearer, mm_broadband_bearer, MM_TYPE_BEARER, 0,
+G_DEFINE_TYPE_EXTENDED (MMBroadbandBearer, mm_broadband_bearer, MM_TYPE_BASE_BEARER, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE,
                                                async_initable_iface_init));
 
@@ -167,12 +167,12 @@ detailed_connect_context_new (MMBroadbandBearer *self,
                                              user_data,
                                              detailed_connect_context_new);
 
-    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (self)));
+    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
     if (ctx->ip_family == MM_BEARER_IP_FAMILY_NONE ||
         ctx->ip_family == MM_BEARER_IP_FAMILY_ANY) {
         gchar *default_family;
 
-        ctx->ip_family = mm_bearer_get_default_ip_family (MM_BEARER (self));
+        ctx->ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
         default_family = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
         mm_dbg ("No specific IP family requested, defaulting to %s", default_family);
         g_free (default_family);
@@ -272,7 +272,7 @@ cdma_connect_context_dial (DetailedConnectContext *ctx)
     gchar *command;
     const gchar *number;
 
-    number = mm_bearer_properties_get_number (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    number = mm_bearer_properties_get_number (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
     /* If a number was given when creating the bearer, use that one.
      * Otherwise, use the default one, #777
@@ -351,14 +351,14 @@ current_rm_protocol_ready (MMBaseModem *self,
         return;
     }
 
-    if (current_rm != mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (self)))) {
+    if (current_rm != mm_bearer_properties_get_rm_protocol (mm_base_bearer_peek_config (MM_BASE_BEARER (self)))) {
         guint new_index;
         gchar *command;
 
         mm_dbg ("Setting requested RM protocol...");
 
         new_index = (mm_cdma_get_index_from_rm_protocol (
-                         mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (self))),
+                         mm_bearer_properties_get_rm_protocol (mm_base_bearer_peek_config (MM_BASE_BEARER (self))),
                          &error));
         if (error) {
             mm_warn ("Cannot set RM protocol: '%s'",
@@ -419,7 +419,7 @@ connect_cdma (MMBroadbandBearer *self,
     ctx->close_data_on_exit = TRUE;
 
     if (mm_bearer_properties_get_rm_protocol (
-            mm_bearer_peek_config (MM_BEARER (self))) !=
+            mm_base_bearer_peek_config (MM_BASE_BEARER (self))) !=
         MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
         /* Need to query current RM protocol */
         mm_dbg ("Querying current RM protocol set...");
@@ -828,7 +828,7 @@ find_cid_ready (MMBaseModem *modem,
     }
 
     /* Otherwise, initialize a new PDP context with our APN */
-    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
+    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self))));
     command = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
                                ctx->cid,
                                pdp_type,
@@ -984,7 +984,7 @@ parse_pdp_list (MMBaseModem *modem,
             } else {
                 const gchar *apn;
 
-                apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+                apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
                 if (apn && g_str_equal (pdp->apn, apn)) {
                     gchar *ip_family_str;
 
@@ -1070,7 +1070,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
 }
 
 static MMBearerConnectResult *
-connect_finish (MMBearer *self,
+connect_finish (MMBaseBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
@@ -1138,7 +1138,7 @@ connect_3gpp_ready (MMBroadbandBearer *self,
 }
 
 static void
-connect (MMBearer *self,
+connect (MMBaseBearer *self,
          GCancellable *cancellable,
          GAsyncReadyCallback callback,
          gpointer user_data)
@@ -1162,7 +1162,7 @@ connect (MMBearer *self,
 
     /* Get the owner modem object */
     g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (modem != NULL);
 
@@ -1213,7 +1213,7 @@ connect (MMBearer *self,
      */
 
     /* Check whether we have an APN */
-    apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (self)));
+    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
     /* Is this a 3GPP only modem and no APN was given? If so, error */
     if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
@@ -1665,7 +1665,7 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
 }
 
 static gboolean
-disconnect_finish (MMBearer *self,
+disconnect_finish (MMBaseBearer *self,
                    GAsyncResult *res,
                    GError **error)
 {
@@ -1742,7 +1742,7 @@ disconnect_3gpp_ready (MMBroadbandBearer *self,
 }
 
 static void
-disconnect (MMBearer *self,
+disconnect (MMBaseBearer *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -1762,7 +1762,7 @@ disconnect (MMBearer *self,
     }
 
     g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (modem != NULL);
 
@@ -1823,7 +1823,7 @@ disconnect (MMBearer *self,
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBearer *self,
+report_connection_status (MMBaseBearer *self,
                           MMBearerConnectionStatus status)
 {
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
@@ -1831,7 +1831,7 @@ report_connection_status (MMBearer *self,
         reset_bearer_connection (MM_BROADBAND_BEARER (self));
 
     /* Chain up parent's report_connection_status() */
-    MM_BEARER_CLASS (mm_broadband_bearer_parent_class)->report_connection_status (
+    MM_BASE_BEARER_CLASS (mm_broadband_bearer_parent_class)->report_connection_status (
         self,
         status);
 }
@@ -1873,7 +1873,7 @@ init_async_context_free (InitAsyncContext *ctx,
     g_free (ctx);
 }
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_new_finish (GAsyncResult *res,
                                 GError **error)
 {
@@ -1888,9 +1888,9 @@ mm_broadband_bearer_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 static gboolean
@@ -1923,7 +1923,7 @@ crm_range_ready (MMBaseModem *modem,
                                              &error)) {
             MMModemCdmaRmProtocol current;
 
-            current = mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+            current = mm_bearer_properties_get_rm_protocol (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
             /* Check if value within the range */
             if (current >= min &&
                 current <= max) {
@@ -1960,7 +1960,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * supported. */
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->modem)) &&
             mm_bearer_properties_get_rm_protocol (
-                mm_bearer_peek_config (MM_BEARER (ctx->self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+                mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->port,
                                            "+CRM=?",
@@ -2008,7 +2008,7 @@ initable_init_async (GAsyncInitable *initable,
                         NULL);
 
     g_object_get (initable,
-                  MM_BEARER_MODEM, &ctx->modem,
+                  MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
     ctx->port = mm_base_modem_get_port_primary (ctx->modem);
@@ -2045,8 +2045,8 @@ mm_broadband_bearer_new (MMBroadbandModem *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM,  modem,
-        MM_BEARER_CONFIG, properties,
+        MM_BASE_BEARER_MODEM,  modem,
+        MM_BASE_BEARER_CONFIG, properties,
         NULL);
 }
 
@@ -2083,18 +2083,18 @@ static void
 mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerPrivate));
 
     /* Virtual methods */
     object_class->dispose = dispose;
 
-    bearer_class->connect = connect;
-    bearer_class->connect_finish = connect_finish;
-    bearer_class->disconnect = disconnect;
-    bearer_class->disconnect_finish = disconnect_finish;
-    bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->connect = connect;
+    base_bearer_class->connect_finish = connect_finish;
+    base_bearer_class->disconnect = disconnect;
+    base_bearer_class->disconnect_finish = disconnect_finish;
+    base_bearer_class->report_connection_status = report_connection_status;
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;

@@ -21,7 +21,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-bearer.h"
+#include "mm-base-bearer.h"
 
 #define MM_TYPE_BEARER_LIST            (mm_bearer_list_get_type ())
 #define MM_BEARER_LIST(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER_LIST, MMBearerList))
@@ -60,21 +60,21 @@ guint mm_bearer_list_get_max (MMBearerList *self);
 guint mm_bearer_list_get_max_active (MMBearerList *self);
 
 gboolean mm_bearer_list_add_bearer (MMBearerList *self,
-                                    MMBearer *bearer,
+                                    MMBaseBearer *bearer,
                                     GError **error);
 gboolean mm_bearer_list_delete_bearer (MMBearerList *self,
                                        const gchar *path,
                                        GError **error);
 void mm_bearer_list_delete_all_bearers (MMBearerList *self);
 
-typedef void (*MMBearerListForeachFunc) (MMBearer *bearer,
+typedef void (*MMBearerListForeachFunc) (MMBaseBearer *bearer,
                                          gpointer user_data);
 void mm_bearer_list_foreach (MMBearerList *self,
                              MMBearerListForeachFunc func,
                              gpointer user_data);
 
-MMBearer *mm_bearer_list_find (MMBearerList *self,
-                               MMBearerProperties *properties);
+MMBaseBearer *mm_bearer_list_find (MMBearerList *self,
+                                   MMBearerProperties *properties);
 
 void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
                                                        GAsyncReadyCallback callback,

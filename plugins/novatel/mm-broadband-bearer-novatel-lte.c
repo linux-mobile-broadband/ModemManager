@@ -138,7 +138,7 @@ poll_connection_ready (MMBaseModem *modem,
     }
 
     if (is_qmistatus_disconnected (result)) {
-        mm_bearer_report_connection_status (MM_BEARER (bearer), MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        mm_base_bearer_report_connection_status (MM_BASE_BEARER (bearer), MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
         g_source_remove (bearer->priv->connection_poller);
         bearer->priv->connection_poller = 0;
     }
@@ -149,8 +149,8 @@ poll_connection (MMBroadbandBearerNovatelLte *bearer)
 {
     MMBaseModem *modem = NULL;
 
-    g_object_get (MM_BEARER (bearer),
-                  MM_BEARER_MODEM, &modem,
+    g_object_get (MM_BASE_BEARER (bearer),
+                  MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     mm_base_modem_at_command (
         modem,
@@ -282,7 +282,7 @@ connect_3gpp_authenticate (DetailedConnectContext *ctx)
     MMBearerProperties *config;
     gchar *command, *apn, *user, *password;
 
-    config = mm_bearer_peek_config (MM_BEARER (ctx->self));
+    config = mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self));
     apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
     user = mm_port_serial_at_quote_string (mm_bearer_properties_get_user (config));
     password = mm_port_serial_at_quote_string (mm_bearer_properties_get_password (config));
@@ -517,7 +517,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
                                             GError **error)
 {
@@ -532,9 +532,9 @@ mm_broadband_bearer_novatel_lte_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 void
@@ -550,15 +550,15 @@ mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM, modem,
-        MM_BEARER_CONFIG, config,
+        MM_BASE_BEARER_MODEM, modem,
+        MM_BASE_BEARER_CONFIG, config,
         NULL);
 }
 
 static void
 mm_broadband_bearer_novatel_lte_init (MMBroadbandBearerNovatelLte *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
                                               MMBroadbandBearerNovatelLtePrivate);
 

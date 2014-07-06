@@ -13,7 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
- * Copyright (C) 2011 - 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2014 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -31,19 +31,18 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
-#include "mm-bearer.h"
+#include "mm-base-bearer.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
-#define MM_BEARER_IP_TIMEOUT_DEFAULT 20
+#define BEARER_IP_TIMEOUT_DEFAULT 20
 
-#define MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT 15
+#define BEARER_DEFERRED_UNREGISTRATION_TIMEOUT 15
 
-G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
-
+G_DEFINE_TYPE (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
 
 typedef enum {
     CONNECTION_FORBIDDEN_REASON_NONE,
@@ -65,7 +64,7 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
-struct _MMBearerPrivate {
+struct _MMBaseBearerPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     /* The modem which owns this BEARER */
@@ -111,14 +110,14 @@ static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON
 /*****************************************************************************/
 
 void
-mm_bearer_export (MMBearer *self)
+mm_base_bearer_export (MMBaseBearer *self)
 {
     static guint id = 0;
     gchar *path;
 
     path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", id++);
     g_object_set (self,
-                  MM_BEARER_PATH, path,
+                  MM_BASE_BEARER_PATH, path,
                   NULL);
     g_free (path);
 }
@@ -126,7 +125,7 @@ mm_bearer_export (MMBearer *self)
 /*****************************************************************************/
 
 static void
-bearer_reset_interface_status (MMBearer *self)
+bearer_reset_interface_status (MMBaseBearer *self)
 {
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
@@ -140,7 +139,7 @@ bearer_reset_interface_status (MMBearer *self)
 }
 
 static void
-bearer_update_status (MMBearer *self,
+bearer_update_status (MMBaseBearer *self,
                       MMBearerStatus status)
 {
     /* NOTE: we do allow status 'CONNECTED' here; it may happen if we go into
@@ -157,7 +156,7 @@ bearer_update_status (MMBearer *self,
 }
 
 static void
-bearer_update_status_connected (MMBearer *self,
+bearer_update_status_connected (MMBaseBearer *self,
                                 const gchar *interface,
                                 MMBearerIpConfig *ipv4_config,
                                 MMBearerIpConfig *ipv6_config)
@@ -180,7 +179,7 @@ bearer_update_status_connected (MMBearer *self,
 /*****************************************************************************/
 
 static void
-reset_deferred_unregistration (MMBearer *self)
+reset_deferred_unregistration (MMBaseBearer *self)
 {
     if (self->priv->deferred_cdma_unregistration_id) {
         g_source_remove (self->priv->deferred_cdma_unregistration_id);
@@ -194,20 +193,20 @@ reset_deferred_unregistration (MMBearer *self)
 }
 
 static gboolean
-deferred_3gpp_unregistration_cb (MMBearer *self)
+deferred_3gpp_unregistration_cb (MMBaseBearer *self)
 {
     g_warn_if_fail (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
     self->priv->deferred_3gpp_unregistration_id = 0;
 
     mm_dbg ("Forcing bearer disconnection, not registered in 3GPP network");
-    mm_bearer_disconnect_force (self);
+    mm_base_bearer_disconnect_force (self);
     return FALSE;
 }
 
 static void
 modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
                                        GParamSpec *pspec,
-                                       MMBearer *self)
+                                       MMBaseBearer *self)
 {
     MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
@@ -226,7 +225,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (self)))
+        if (mm_bearer_properties_get_allow_roaming (mm_base_bearer_peek_config (self)))
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         else
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
@@ -246,7 +245,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
     if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
         reset_deferred_unregistration (self);
-        mm_bearer_disconnect_force (self);
+        mm_base_bearer_disconnect_force (self);
         return;
     }
 
@@ -259,14 +258,14 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
             mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
-            mm_bearer_disconnect_force (self);
+            mm_base_bearer_disconnect_force (self);
             return;
         }
 
         /* Otherwise, setup the new timeout */
         mm_dbg ("Connected bearer not registered in 3GPP network");
         self->priv->deferred_3gpp_unregistration_id =
-            g_timeout_add_seconds (MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
+            g_timeout_add_seconds (BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
                                    (GSourceFunc) deferred_3gpp_unregistration_cb,
                                    self);
         return;
@@ -276,20 +275,20 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
 }
 
 static gboolean
-deferred_cdma_unregistration_cb (MMBearer *self)
+deferred_cdma_unregistration_cb (MMBaseBearer *self)
 {
     g_warn_if_fail (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
     self->priv->deferred_cdma_unregistration_id = 0;
 
     mm_dbg ("Forcing bearer disconnection, not registered in CDMA network");
-    mm_bearer_disconnect_force (self);
+    mm_base_bearer_disconnect_force (self);
     return FALSE;
 }
 
 static void
 modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
                                        GParamSpec *pspec,
-                                       MMBearer *self)
+                                       MMBaseBearer *self)
 {
     MMModemCdmaRegistrationState cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -301,7 +300,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 
     if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
         evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
-        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (self)))
+        if (mm_bearer_properties_get_allow_roaming (mm_base_bearer_peek_config (self)))
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
         else
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_ROAMING;
@@ -325,7 +324,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
     if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
         reset_deferred_unregistration (self);
-        mm_bearer_disconnect_force (self);
+        mm_base_bearer_disconnect_force (self);
         return;
     }
 
@@ -338,14 +337,14 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
             mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
-            mm_bearer_disconnect_force (self);
+            mm_base_bearer_disconnect_force (self);
             return;
         }
 
         /* Otherwise, setup the new timeout */
         mm_dbg ("Connected bearer not registered in CDMA network");
         self->priv->deferred_cdma_unregistration_id =
-            g_timeout_add_seconds (MM_BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
+            g_timeout_add_seconds (BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
                                    (GSourceFunc) deferred_cdma_unregistration_cb,
                                    self);
         return;
@@ -355,7 +354,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 }
 
 static void
-set_signal_handlers (MMBearer *self)
+set_signal_handlers (MMBaseBearer *self)
 {
     g_assert (self->priv->modem != NULL);
     g_assert (self->priv->config != NULL);
@@ -392,7 +391,7 @@ set_signal_handlers (MMBearer *self)
 }
 
 static void
-reset_signal_handlers (MMBearer *self)
+reset_signal_handlers (MMBaseBearer *self)
 {
     if (!self->priv->modem)
         return;
@@ -418,20 +417,20 @@ reset_signal_handlers (MMBearer *self)
 /* CONNECT */
 
 gboolean
-mm_bearer_connect_finish (MMBearer *self,
-                          GAsyncResult *res,
-                          GError **error)
+mm_base_bearer_connect_finish (MMBaseBearer *self,
+                               GAsyncResult *res,
+                               GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-disconnect_after_cancel_ready (MMBearer *self,
+disconnect_after_cancel_ready (MMBaseBearer *self,
                                GAsyncResult *res)
 {
     GError *error = NULL;
 
-    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+    if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_warn ("Error disconnecting bearer '%s': '%s'. "
                  "Will assume disconnected anyway.",
                  self->priv->path,
@@ -446,11 +445,11 @@ disconnect_after_cancel_ready (MMBearer *self,
      * chance to correctly update their own connection state, in case this base
      * class ignores a failed disconnection attempt.
      */
-    mm_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    mm_base_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 static void
-connect_ready (MMBearer *self,
+connect_ready (MMBaseBearer *self,
                GAsyncResult *res,
                GSimpleAsyncResult *simple)
 {
@@ -459,7 +458,7 @@ connect_ready (MMBearer *self,
     MMBearerConnectResult *result;
 
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
-    result = MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
+    result = MM_BASE_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
     if (!result) {
         mm_dbg ("Couldn't connect bearer '%s': '%s'",
                 self->priv->path,
@@ -500,7 +499,7 @@ connect_ready (MMBearer *self,
 
     if (launch_disconnect) {
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
-        MM_BEARER_GET_CLASS (self)->disconnect (
+        MM_BASE_BEARER_GET_CLASS (self)->disconnect (
             self,
             (GAsyncReadyCallback)disconnect_after_cancel_ready,
             NULL);
@@ -512,14 +511,14 @@ connect_ready (MMBearer *self,
 }
 
 void
-mm_bearer_connect (MMBearer *self,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+mm_base_bearer_connect (MMBaseBearer *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
-    g_assert (MM_BEARER_GET_CLASS (self)->connect != NULL);
-    g_assert (MM_BEARER_GET_CLASS (self)->connect_finish != NULL);
+    g_assert (MM_BASE_BEARER_GET_CLASS (self)->connect != NULL);
+    g_assert (MM_BASE_BEARER_GET_CLASS (self)->connect_finish != NULL);
 
     /* If already connecting, return error, don't allow a second request. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
@@ -577,7 +576,7 @@ mm_bearer_connect (MMBearer *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        mm_bearer_connect);
+                                        mm_base_bearer_connect);
 
     /* If already connected, done */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTED) {
@@ -591,7 +590,7 @@ mm_bearer_connect (MMBearer *self,
     mm_dbg ("Connecting bearer '%s'", self->priv->path);
     self->priv->connect_cancellable = g_cancellable_new ();
     bearer_update_status (self, MM_BEARER_STATUS_CONNECTING);
-    MM_BEARER_GET_CLASS (self)->connect (
+    MM_BASE_BEARER_GET_CLASS (self)->connect (
         self,
         self->priv->connect_cancellable,
         (GAsyncReadyCallback)connect_ready,
@@ -599,7 +598,7 @@ mm_bearer_connect (MMBearer *self,
 }
 
 typedef struct {
-    MMBearer *self;
+    MMBaseBearer *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleConnectContext;
@@ -614,13 +613,13 @@ handle_connect_context_free (HandleConnectContext *ctx)
 }
 
 static void
-handle_connect_ready (MMBearer *self,
+handle_connect_ready (MMBaseBearer *self,
                       GAsyncResult *res,
                       HandleConnectContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_bearer_connect_finish (self, res, &error))
+    if (!mm_base_bearer_connect_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), ctx->invocation);
@@ -641,13 +640,13 @@ handle_connect_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_bearer_connect (ctx->self,
-                       (GAsyncReadyCallback)handle_connect_ready,
-                       ctx);
+    mm_base_bearer_connect (ctx->self,
+                            (GAsyncReadyCallback)handle_connect_ready,
+                            ctx);
 }
 
 static gboolean
-handle_connect (MMBearer *self,
+handle_connect (MMBaseBearer *self,
                 GDBusMethodInvocation *invocation)
 {
     HandleConnectContext *ctx;
@@ -656,7 +655,7 @@ handle_connect (MMBearer *self,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
-                  MM_BEARER_MODEM, &ctx->modem,
+                  MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
     mm_base_modem_authorize (ctx->modem,
@@ -671,21 +670,21 @@ handle_connect (MMBearer *self,
 /* DISCONNECT */
 
 gboolean
-mm_bearer_disconnect_finish (MMBearer *self,
-                             GAsyncResult *res,
-                             GError **error)
+mm_base_bearer_disconnect_finish (MMBaseBearer *self,
+                                  GAsyncResult *res,
+                                  GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-disconnect_ready (MMBearer *self,
+disconnect_ready (MMBaseBearer *self,
                   GAsyncResult *res,
                   GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
 
-    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+    if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
         bearer_update_status (self, MM_BEARER_STATUS_CONNECTED);
         g_simple_async_result_take_error (simple, error);
@@ -701,7 +700,7 @@ disconnect_ready (MMBearer *self,
 }
 
 static void
-status_changed_complete_disconnect (MMBearer *self,
+status_changed_complete_disconnect (MMBaseBearer *self,
                                     GParamSpec *pspec,
                                     GSimpleAsyncResult *simple)
 {
@@ -724,19 +723,19 @@ status_changed_complete_disconnect (MMBearer *self,
 }
 
 void
-mm_bearer_disconnect (MMBearer *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+mm_base_bearer_disconnect (MMBaseBearer *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
 {
     GSimpleAsyncResult *simple;
 
-    g_assert (MM_BEARER_GET_CLASS (self)->disconnect != NULL);
-    g_assert (MM_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
+    g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect != NULL);
+    g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
 
     simple = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        mm_bearer_disconnect);
+                                        mm_base_bearer_disconnect);
 
     /* If already disconnected, done */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
@@ -773,7 +772,7 @@ mm_bearer_disconnect (MMBearer *self,
          */
         self->priv->disconnect_signal_handler =
             g_signal_connect (self,
-                              "notify::" MM_BEARER_STATUS,
+                              "notify::" MM_BASE_BEARER_STATUS,
                               (GCallback)status_changed_complete_disconnect,
                               simple); /* takes ownership */
 
@@ -782,14 +781,14 @@ mm_bearer_disconnect (MMBearer *self,
 
     /* Disconnecting! */
     bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
-    MM_BEARER_GET_CLASS (self)->disconnect (
+    MM_BASE_BEARER_GET_CLASS (self)->disconnect (
         self,
         (GAsyncReadyCallback)disconnect_ready,
         simple); /* takes ownership */
 }
 
 typedef struct {
-    MMBearer *self;
+    MMBaseBearer *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleDisconnectContext;
@@ -804,13 +803,13 @@ handle_disconnect_context_free (HandleDisconnectContext *ctx)
 }
 
 static void
-handle_disconnect_ready (MMBearer *self,
+handle_disconnect_ready (MMBaseBearer *self,
                          GAsyncResult *res,
                          HandleDisconnectContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_bearer_disconnect_finish (self, res, &error))
+    if (!mm_base_bearer_disconnect_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), ctx->invocation);
@@ -831,13 +830,13 @@ handle_disconnect_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_bearer_disconnect (ctx->self,
-                          (GAsyncReadyCallback)handle_disconnect_ready,
-                          ctx);
+    mm_base_bearer_disconnect (ctx->self,
+                               (GAsyncReadyCallback)handle_disconnect_ready,
+                               ctx);
 }
 
 static gboolean
-handle_disconnect (MMBearer *self,
+handle_disconnect (MMBaseBearer *self,
                    GDBusMethodInvocation *invocation)
 {
     HandleDisconnectContext *ctx;
@@ -846,7 +845,7 @@ handle_disconnect (MMBearer *self,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
-                  MM_BEARER_MODEM, &ctx->modem,
+                  MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
     mm_base_modem_authorize (ctx->modem,
@@ -860,7 +859,7 @@ handle_disconnect (MMBearer *self,
 /*****************************************************************************/
 
 static void
-mm_bearer_dbus_export (MMBearer *self)
+base_bearer_dbus_export (MMBaseBearer *self)
 {
     GError *error = NULL;
 
@@ -886,7 +885,7 @@ mm_bearer_dbus_export (MMBearer *self)
 }
 
 static void
-mm_bearer_dbus_unexport (MMBearer *self)
+base_bearer_dbus_unexport (MMBaseBearer *self)
 {
     const gchar *path;
 
@@ -901,25 +900,25 @@ mm_bearer_dbus_unexport (MMBearer *self)
 /*****************************************************************************/
 
 MMBearerStatus
-mm_bearer_get_status (MMBearer *self)
+mm_base_bearer_get_status (MMBaseBearer *self)
 {
     return self->priv->status;
 }
 
 const gchar *
-mm_bearer_get_path (MMBearer *self)
+mm_base_bearer_get_path (MMBaseBearer *self)
 {
     return self->priv->path;
 }
 
 MMBearerProperties *
-mm_bearer_peek_config (MMBearer *self)
+mm_base_bearer_peek_config (MMBaseBearer *self)
 {
     return self->priv->config;
 }
 
 MMBearerProperties *
-mm_bearer_get_config (MMBearer *self)
+mm_base_bearer_get_config (MMBaseBearer *self)
 {
     return (self->priv->config ?
             g_object_ref (self->priv->config) :
@@ -927,7 +926,7 @@ mm_bearer_get_config (MMBearer *self)
 }
 
 MMBearerIpFamily
-mm_bearer_get_default_ip_family (MMBearer *self)
+mm_base_bearer_get_default_ip_family (MMBaseBearer *self)
 {
     return self->priv->default_ip_family;
 }
@@ -935,12 +934,12 @@ mm_bearer_get_default_ip_family (MMBearer *self)
 /*****************************************************************************/
 
 static void
-disconnect_force_ready (MMBearer *self,
+disconnect_force_ready (MMBaseBearer *self,
                         GAsyncResult *res)
 {
     GError *error = NULL;
 
-    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+    if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_warn ("Error disconnecting bearer '%s': '%s'. "
                  "Will assume disconnected anyway.",
                  self->priv->path,
@@ -955,11 +954,11 @@ disconnect_force_ready (MMBearer *self,
      * chance to correctly update their own connection state, in case this base
      * class ignores a failed disconnection attempt.
      */
-    mm_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    mm_base_bearer_report_connection_status (self, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 void
-mm_bearer_disconnect_force (MMBearer *self)
+mm_base_bearer_disconnect_force (MMBaseBearer *self)
 {
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING ||
         self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
@@ -975,7 +974,7 @@ mm_bearer_disconnect_force (MMBearer *self)
 
     /* Disconnecting! */
     bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
-    MM_BEARER_GET_CLASS (self)->disconnect (
+    MM_BASE_BEARER_GET_CLASS (self)->disconnect (
         self,
         (GAsyncReadyCallback)disconnect_force_ready,
         NULL);
@@ -984,7 +983,7 @@ mm_bearer_disconnect_force (MMBearer *self)
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBearer *self,
+report_connection_status (MMBaseBearer *self,
                           MMBearerConnectionStatus status)
 {
     /* The only status expected at this point is DISCONNECTED.
@@ -999,10 +998,10 @@ report_connection_status (MMBearer *self,
 }
 
 void
-mm_bearer_report_connection_status (MMBearer *self,
-                                    MMBearerConnectionStatus status)
+mm_base_bearer_report_connection_status (MMBaseBearer *self,
+                                         MMBearerConnectionStatus status)
 {
-    return MM_BEARER_GET_CLASS (self)->report_connection_status (self, status);
+    return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status);
 }
 
 static void
@@ -1011,7 +1010,7 @@ set_property (GObject *object,
               const GValue *value,
               GParamSpec *pspec)
 {
-    MMBearer *self = MM_BEARER (object);
+    MMBaseBearer *self = MM_BASE_BEARER (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1021,7 +1020,7 @@ set_property (GObject *object,
         /* Export when we get a DBus connection AND we have a path */
         if (self->priv->path &&
             self->priv->connection)
-            mm_bearer_dbus_export (self);
+            base_bearer_dbus_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
@@ -1029,9 +1028,9 @@ set_property (GObject *object,
 
         /* Export when we get a DBus connection AND we have a path */
         if (!self->priv->connection)
-            mm_bearer_dbus_unexport (self);
+            base_bearer_dbus_unexport (self);
         else if (self->priv->path)
-            mm_bearer_dbus_export (self);
+            base_bearer_dbus_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
@@ -1040,7 +1039,7 @@ set_property (GObject *object,
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the BEARER's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BEARER_CONNECTION,
+                                    self, MM_BASE_BEARER_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
             if (self->priv->config) {
                 /* Listen to 3GPP/CDMA registration state changes. We need both
@@ -1085,7 +1084,7 @@ get_property (GObject *object,
               GValue *value,
               GParamSpec *pspec)
 {
-    MMBearer *self = MM_BEARER (object);
+    MMBaseBearer *self = MM_BASE_BEARER (object);
 
     switch (prop_id) {
     case PROP_PATH:
@@ -1113,12 +1112,12 @@ get_property (GObject *object,
 }
 
 static void
-mm_bearer_init (MMBearer *self)
+mm_base_bearer_init (MMBaseBearer *self)
 {
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BEARER,
-                                              MMBearerPrivate);
+                                              MM_TYPE_BASE_BEARER,
+                                              MMBaseBearerPrivate);
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
@@ -1129,7 +1128,7 @@ mm_bearer_init (MMBearer *self)
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_ip_timeout (MM_GDBUS_BEARER (self), MM_BEARER_IP_TIMEOUT_DEFAULT);
+    mm_gdbus_bearer_set_ip_timeout (MM_GDBUS_BEARER (self), BEARER_IP_TIMEOUT_DEFAULT);
     mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self),
                                     mm_bearer_ip_config_get_dictionary (NULL));
     mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self),
@@ -1139,20 +1138,20 @@ mm_bearer_init (MMBearer *self)
 static void
 finalize (GObject *object)
 {
-    MMBearer *self = MM_BEARER (object);
+    MMBaseBearer *self = MM_BASE_BEARER (object);
 
     g_free (self->priv->path);
 
-    G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_base_bearer_parent_class)->finalize (object);
 }
 
 static void
 dispose (GObject *object)
 {
-    MMBearer *self = MM_BEARER (object);
+    MMBaseBearer *self = MM_BASE_BEARER (object);
 
     if (self->priv->connection) {
-        mm_bearer_dbus_unexport (self);
+        base_bearer_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
 
@@ -1162,15 +1161,15 @@ dispose (GObject *object)
     g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->config);
 
-    G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_base_bearer_parent_class)->dispose (object);
 }
 
 static void
-mm_bearer_class_init (MMBearerClass *klass)
+mm_base_bearer_class_init (MMBaseBearerClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMBearerPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBaseBearerPrivate));
 
     /* Virtual methods */
     object_class->get_property = get_property;
@@ -1181,7 +1180,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     klass->report_connection_status = report_connection_status;
 
     properties[PROP_CONNECTION] =
-        g_param_spec_object (MM_BEARER_CONNECTION,
+        g_param_spec_object (MM_BASE_BEARER_CONNECTION,
                              "Connection",
                              "GDBus connection to the system bus.",
                              G_TYPE_DBUS_CONNECTION,
@@ -1189,7 +1188,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 
     properties[PROP_PATH] =
-        g_param_spec_string (MM_BEARER_PATH,
+        g_param_spec_string (MM_BASE_BEARER_PATH,
                              "Path",
                              "DBus path of the Bearer",
                              NULL,
@@ -1197,7 +1196,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     properties[PROP_MODEM] =
-        g_param_spec_object (MM_BEARER_MODEM,
+        g_param_spec_object (MM_BASE_BEARER_MODEM,
                              "Modem",
                              "The Modem which owns this Bearer",
                              MM_TYPE_BASE_MODEM,
@@ -1205,7 +1204,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 
     properties[PROP_STATUS] =
-        g_param_spec_enum (MM_BEARER_STATUS,
+        g_param_spec_enum (MM_BASE_BEARER_STATUS,
                            "Bearer status",
                            "Status of the bearer",
                            MM_TYPE_BEARER_STATUS,
@@ -1214,7 +1213,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_STATUS, properties[PROP_STATUS]);
 
     properties[PROP_CONFIG] =
-        g_param_spec_object (MM_BEARER_CONFIG,
+        g_param_spec_object (MM_BASE_BEARER_CONFIG,
                              "Bearer configuration",
                              "List of user provided properties",
                              MM_TYPE_BEARER_PROPERTIES,
@@ -1222,7 +1221,7 @@ mm_bearer_class_init (MMBearerClass *klass)
     g_object_class_install_property (object_class, PROP_CONFIG, properties[PROP_CONFIG]);
 
     properties[PROP_DEFAULT_IP_FAMILY] =
-        g_param_spec_flags (MM_BEARER_DEFAULT_IP_FAMILY,
+        g_param_spec_flags (MM_BASE_BEARER_DEFAULT_IP_FAMILY,
                             "Bearer default IP family",
                             "IP family to use for this bearer when no IP family is specified",
                             MM_TYPE_BEARER_IP_FAMILY,

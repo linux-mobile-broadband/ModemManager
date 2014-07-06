@@ -25,7 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-bearer.h"
+#include "mm-base-bearer.h"
 #include "mm-broadband-modem.h"
 
 #define MM_TYPE_BROADBAND_BEARER            (mm_broadband_bearer_get_type ())
@@ -40,12 +40,12 @@ typedef struct _MMBroadbandBearerClass MMBroadbandBearerClass;
 typedef struct _MMBroadbandBearerPrivate MMBroadbandBearerPrivate;
 
 struct _MMBroadbandBearer {
-    MMBearer parent;
+    MMBaseBearer parent;
     MMBroadbandBearerPrivate *priv;
 };
 
 struct _MMBroadbandBearerClass {
-    MMBearerClass parent;
+    MMBaseBearerClass parent;
 
     /* Full 3GPP connection sequence */
     void     (* connect_3gpp)        (MMBroadbandBearer *self,
@@ -129,14 +129,14 @@ struct _MMBroadbandBearerClass {
 GType mm_broadband_bearer_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-void mm_broadband_bearer_new (MMBroadbandModem *modem,
-                              MMBearerProperties *properties,
-                              GCancellable *cancellable,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data);
-MMBearer *mm_broadband_bearer_new_finish (GAsyncResult *res,
-                                          GError **error);
+void          mm_broadband_bearer_new        (MMBroadbandModem *modem,
+                                              MMBearerProperties *properties,
+                                              GCancellable *cancellable,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+MMBaseBearer *mm_broadband_bearer_new_finish (GAsyncResult *res,
+                                              GError **error);
 
-guint        mm_broadband_bearer_get_3gpp_cid         (MMBroadbandBearer *self);
+guint        mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self);
 
 #endif /* MM_BROADBAND_BEARER_H */

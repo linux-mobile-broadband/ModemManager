@@ -57,17 +57,17 @@ struct _MMBroadbandModemHsoPrivate {
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
-static MMBearer *
+static MMBaseBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBearer *bearer;
+    MMBaseBearer *bearer;
 
     bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     mm_dbg ("New %s bearer created at DBus path '%s'",
             MM_IS_BROADBAND_BEARER_HSO (bearer) ? "HSO" : "Generic",
-            mm_bearer_get_path (bearer));
+            mm_base_bearer_get_path (bearer));
 
     return g_object_ref (bearer);
 }
@@ -77,7 +77,7 @@ broadband_bearer_new_ready (GObject *source,
                             GAsyncResult *res,
                             GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_new_finish (res, &error);
@@ -96,7 +96,7 @@ broadband_bearer_hso_new_ready (GObject *source,
                                 GAsyncResult *res,
                                 GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_hso_new_finish (res, &error);
@@ -220,13 +220,13 @@ typedef struct {
 } BearerListReportStatusForeachContext;
 
 static void
-bearer_list_report_status_foreach (MMBearer *bearer,
+bearer_list_report_status_foreach (MMBaseBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
     if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
         return;
 
-    mm_bearer_report_connection_status (MM_BEARER (bearer), ctx->status);
+    mm_base_bearer_report_connection_status (MM_BASE_BEARER (bearer), ctx->status);
 }
 
 static void

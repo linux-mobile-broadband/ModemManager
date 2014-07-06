@@ -401,7 +401,7 @@ typedef struct {
 } BearerListReportStatusForeachContext;
 
 static void
-bearer_list_report_status_foreach (MMBearer *bearer,
+bearer_list_report_status_foreach (MMBaseBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
     if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
@@ -410,7 +410,7 @@ bearer_list_report_status_foreach (MMBearer *bearer,
     if (!MM_IS_BROADBAND_BEARER_ICERA (bearer))
         return;
 
-    mm_bearer_report_connection_status (bearer, ctx->status);
+    mm_base_bearer_report_connection_status (bearer, ctx->status);
 }
 
 static void
@@ -856,7 +856,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Create bearer (Modem interface) */
 
-static MMBearer *
+static MMBaseBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
@@ -864,9 +864,9 @@ modem_create_bearer_finish (MMIfaceModem *self,
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    return MM_BEARER (g_object_ref (
-                          g_simple_async_result_get_op_res_gpointer (
-                              G_SIMPLE_ASYNC_RESULT (res))));
+    return MM_BASE_BEARER (g_object_ref (
+                               g_simple_async_result_get_op_res_gpointer (
+                                   G_SIMPLE_ASYNC_RESULT (res))));
 }
 
 static void
@@ -874,7 +874,7 @@ broadband_bearer_icera_new_ready (GObject *source,
                                   GAsyncResult *res,
                                   GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_icera_new_finish (res, &error);
@@ -893,7 +893,7 @@ broadband_bearer_new_ready (GObject *source,
                             GAsyncResult *res,
                             GSimpleAsyncResult *simple)
 {
-    MMBearer *bearer = NULL;
+    MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_new_finish (res, &error);

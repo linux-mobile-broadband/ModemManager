@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-bearer.h"
+#include "mm-base-bearer.h"
 #include "mm-broadband-modem-mbim.h"
 
 #define MM_TYPE_BEARER_MBIM            (mm_bearer_mbim_get_type ())
@@ -39,21 +39,21 @@ typedef struct _MMBearerMbimClass MMBearerMbimClass;
 typedef struct _MMBearerMbimPrivate MMBearerMbimPrivate;
 
 struct _MMBearerMbim {
-    MMBearer parent;
+    MMBaseBearer parent;
     MMBearerMbimPrivate *priv;
 };
 
 struct _MMBearerMbimClass {
-    MMBearerClass parent;
+    MMBaseBearerClass parent;
 };
 
 GType mm_bearer_mbim_get_type (void);
 
 /* MBIM bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */
-MMBearer *mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
-                              MMBearerProperties *config,
-                              guint32 session_id);
+MMBaseBearer *mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
+                                  MMBearerProperties *config,
+                                  guint32 session_id);
 
 guint32 mm_bearer_mbim_get_session_id (MMBearerMbim *self);
 

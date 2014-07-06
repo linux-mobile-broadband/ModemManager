@@ -117,7 +117,7 @@ dial_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void
-report_connection_status (MMBearer *bearer,
+report_connection_status (MMBaseBearer *bearer,
                           MMBearerConnectionStatus status)
 {
     MMBroadbandBearerMbm *self = MM_BROADBAND_BEARER_MBM (bearer);
@@ -140,7 +140,7 @@ report_connection_status (MMBearer *bearer,
         if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
             /* If no connection attempt on-going, make sure we mark ourselves as
              * disconnected */
-            MM_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
+            MM_BASE_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
                 bearer,
                 status);
         }
@@ -388,8 +388,8 @@ authenticate (Dial3gppContext *ctx)
     const gchar *user;
     const gchar *password;
 
-    user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-    password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (user || password) {
@@ -707,7 +707,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_mbm_new_finish (GAsyncResult *res,
                                     GError **error)
 {
@@ -722,9 +722,9 @@ mm_broadband_bearer_mbm_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 void
@@ -740,8 +740,8 @@ mm_broadband_bearer_mbm_new (MMBroadbandModemMbm *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM, modem,
-        MM_BEARER_CONFIG, config,
+        MM_BASE_BEARER_MODEM, modem,
+        MM_BASE_BEARER_CONFIG, config,
         NULL);
 }
 
@@ -759,12 +759,12 @@ mm_broadband_bearer_mbm_class_init (MMBroadbandBearerMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerMbmPrivate));
 
-    bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;

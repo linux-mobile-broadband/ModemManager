@@ -265,12 +265,12 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
     case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
         MMBearerIpFamily ip_family;
 
-        ip_family = mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+        ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
         if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
             ip_family == MM_BEARER_IP_FAMILY_ANY) {
             gchar *ip_family_str;
 
-            ip_family = mm_bearer_get_default_ip_family (MM_BEARER (ctx->self));
+            ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (ctx->self));
             ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
             mm_dbg ("No specific IP family requested, defaulting to %s",
                     ip_family_str);
@@ -301,10 +301,10 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         gint                 encoded_auth = MM_BEARER_HUAWEI_AUTH_UNKNOWN;
         gchar               *command;
 
-        apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-        user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-        passwd = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
-        auth = mm_bearer_properties_get_allowed_auth (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+        apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        passwd = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
         encoded_auth = huawei_parse_auth_type (auth);
 
         /* Default to no authentication if not specified */
@@ -700,16 +700,16 @@ static gboolean
 network_disconnect_3gpp_delayed (MMBroadbandBearerHuawei *self)
 {
     mm_dbg ("Disconnect bearer '%s' on network request.",
-            mm_bearer_get_path (MM_BEARER (self)));
+            mm_base_bearer_get_path (MM_BASE_BEARER (self)));
 
     self->priv->network_disconnect_pending_id = 0;
-    mm_bearer_report_connection_status (MM_BEARER (self),
-                                        MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
+                                             MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
     return FALSE;
 }
 
 static void
-report_connection_status (MMBearer *bearer,
+report_connection_status (MMBaseBearer *bearer,
                           MMBearerConnectionStatus status)
 {
     MMBroadbandBearerHuawei *self = MM_BROADBAND_BEARER_HUAWEI (bearer);
@@ -737,10 +737,10 @@ report_connection_status (MMBearer *bearer,
         /* MM_BEARER_CONNECTION_STATUS_DISCONNECTING is used to indicate that the
          * reporting of disconnection should be delayed. See MMBroadbandModemHuawei's
          * bearer_report_connection_status for details. */
-        if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED &&
+        if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED &&
             self->priv->network_disconnect_pending_id == 0) {
             mm_dbg ("Delay network-initiated disconnection of bearer '%s'",
-                    mm_bearer_get_path (MM_BEARER (self)));
+                    mm_base_bearer_get_path (MM_BASE_BEARER (self)));
             self->priv->network_disconnect_pending_id = (g_timeout_add_seconds (
                                                              4,
                                                              (GSourceFunc) network_disconnect_3gpp_delayed,
@@ -750,14 +750,14 @@ report_connection_status (MMBearer *bearer,
     }
 
     /* Report disconnected right away */
-    MM_BEARER_CLASS (mm_broadband_bearer_huawei_parent_class)->report_connection_status (
+    MM_BASE_BEARER_CLASS (mm_broadband_bearer_huawei_parent_class)->report_connection_status (
         bearer,
         MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
 /*****************************************************************************/
 
-MMBearer *
+MMBaseBearer *
 mm_broadband_bearer_huawei_new_finish (GAsyncResult *res,
                                        GError **error)
 {
@@ -772,9 +772,9 @@ mm_broadband_bearer_huawei_new_finish (GAsyncResult *res,
         return NULL;
 
     /* Only export valid bearers */
-    mm_bearer_export (MM_BEARER (bearer));
+    mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
-    return MM_BEARER (bearer);
+    return MM_BASE_BEARER (bearer);
 }
 
 static void
@@ -803,8 +803,8 @@ mm_broadband_bearer_huawei_new (MMBroadbandModemHuawei *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM, modem,
-        MM_BEARER_CONFIG, config,
+        MM_BASE_BEARER_MODEM, modem,
+        MM_BASE_BEARER_CONFIG, config,
         NULL);
 }
 
@@ -821,13 +821,13 @@ static void
 mm_broadband_bearer_huawei_class_init (MMBroadbandBearerHuaweiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHuaweiPrivate));
 
     object_class->dispose = dispose;
-    bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->report_connection_status = report_connection_status;
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
