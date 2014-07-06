@@ -27,7 +27,7 @@
 #include <mm-gdbus-manager.h>
 #include <mm-gdbus-test.h>
 
-#include "mm-manager.h"
+#include "mm-base-manager.h"
 #include "mm-device.h"
 #include "mm-plugin-manager.h"
 #include "mm-auth.h"
@@ -36,7 +36,7 @@
 
 static void initable_iface_init (GInitableIface *iface);
 
-G_DEFINE_TYPE_EXTENDED (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON, 0,
+G_DEFINE_TYPE_EXTENDED (MMBaseManager, mm_base_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
                                                initable_iface_init));
 
@@ -49,7 +49,7 @@ enum {
     LAST_PROP
 };
 
-struct _MMManagerPrivate {
+struct _MMBaseManagerPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     /* Whether auto-scanning is enabled */
@@ -77,7 +77,7 @@ struct _MMManagerPrivate {
 /*****************************************************************************/
 
 static MMDevice *
-find_device_by_modem (MMManager *manager,
+find_device_by_modem (MMBaseManager *manager,
                       MMBaseModem *modem)
 {
     GHashTableIter iter;
@@ -94,7 +94,7 @@ find_device_by_modem (MMManager *manager,
 }
 
 static MMDevice *
-find_device_by_port (MMManager *manager,
+find_device_by_port (MMBaseManager *manager,
                      GUdevDevice *port)
 {
     GHashTableIter iter;
@@ -111,7 +111,7 @@ find_device_by_port (MMManager *manager,
 }
 
 static MMDevice *
-find_device_by_sysfs_path (MMManager *self,
+find_device_by_sysfs_path (MMBaseManager *self,
                            const gchar *sysfs_path)
 {
     return g_hash_table_lookup (self->priv->devices,
@@ -119,7 +119,7 @@ find_device_by_sysfs_path (MMManager *self,
 }
 
 static MMDevice *
-find_device_by_udev_device (MMManager *manager,
+find_device_by_udev_device (MMBaseManager *manager,
                             GUdevDevice *udev_device)
 {
     return find_device_by_sysfs_path (manager, g_udev_device_get_sysfs_path (udev_device));
@@ -128,7 +128,7 @@ find_device_by_udev_device (MMManager *manager,
 /*****************************************************************************/
 
 typedef struct {
-    MMManager *self;
+    MMBaseManager *self;
     MMDevice *device;
 } FindDeviceSupportContext;
 
@@ -240,7 +240,7 @@ find_physical_device (GUdevDevice *child)
 }
 
 static void
-device_added (MMManager *manager,
+device_added (MMBaseManager *manager,
               GUdevDevice *port,
               gboolean hotplugged,
               gboolean manual_scan)
@@ -352,7 +352,7 @@ out:
 }
 
 static void
-device_removed (MMManager *self,
+device_removed (MMBaseManager *self,
                 GUdevDevice *udev_device)
 {
     MMDevice *device;
@@ -412,7 +412,7 @@ handle_uevent (GUdevClient *client,
                GUdevDevice *device,
                gpointer user_data)
 {
-    MMManager *self = MM_MANAGER (user_data);
+    MMBaseManager *self = MM_BASE_MANAGER (user_data);
     const gchar *subsys;
     const gchar *name;
 
@@ -435,7 +435,7 @@ handle_uevent (GUdevClient *client,
 }
 
 typedef struct {
-    MMManager *self;
+    MMBaseManager *self;
     GUdevDevice *device;
     gboolean manual_scan;
 } StartDeviceAdded;
@@ -451,7 +451,7 @@ start_device_added_idle (StartDeviceAdded *ctx)
 }
 
 static void
-start_device_added (MMManager *self,
+start_device_added (MMBaseManager *self,
                     GUdevDevice *device,
                     gboolean manual_scan)
 {
@@ -465,13 +465,13 @@ start_device_added (MMManager *self,
 }
 
 void
-mm_manager_start (MMManager *manager,
-                  gboolean manual_scan)
+mm_base_manager_start (MMBaseManager *manager,
+                       gboolean manual_scan)
 {
     GList *devices, *iter;
 
     g_return_if_fail (manager != NULL);
-    g_return_if_fail (MM_IS_MANAGER (manager));
+    g_return_if_fail (MM_IS_BASE_MANAGER (manager));
 
     if (!manager->priv->auto_scan && !manual_scan)
         return;
@@ -523,7 +523,7 @@ mm_manager_start (MMManager *manager,
 static void
 remove_disable_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      MMManager *self)
+                      MMBaseManager *self)
 {
     MMDevice *device;
 
@@ -540,7 +540,7 @@ remove_disable_ready (MMBaseModem *modem,
 static void
 foreach_disable (gpointer key,
                  MMDevice *device,
-                 MMManager *self)
+                 MMBaseManager *self)
 {
     MMBaseModem *modem;
 
@@ -550,10 +550,10 @@ foreach_disable (gpointer key,
 }
 
 void
-mm_manager_shutdown (MMManager *self)
+mm_base_manager_shutdown (MMBaseManager *self)
 {
     g_return_if_fail (self != NULL);
-    g_return_if_fail (MM_IS_MANAGER (self));
+    g_return_if_fail (MM_IS_BASE_MANAGER (self));
 
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
@@ -567,14 +567,14 @@ mm_manager_shutdown (MMManager *self)
 }
 
 guint32
-mm_manager_num_modems (MMManager *self)
+mm_base_manager_num_modems (MMBaseManager *self)
 {
     GHashTableIter iter;
     gpointer key, value;
     guint32 n;
 
     g_return_val_if_fail (self != NULL, 0);
-    g_return_val_if_fail (MM_IS_MANAGER (self), 0);
+    g_return_val_if_fail (MM_IS_BASE_MANAGER (self), 0);
 
     n = 0;
     g_hash_table_iter_init (&iter, self->priv->devices);
@@ -589,7 +589,7 @@ mm_manager_num_modems (MMManager *self)
 /* Set logging */
 
 typedef struct {
-    MMManager *self;
+    MMBaseManager *self;
     GDBusMethodInvocation *invocation;
     gchar *level;
 } SetLoggingContext;
@@ -649,7 +649,7 @@ handle_set_logging (MmGdbusOrgFreedesktopModemManager1 *manager,
 /* Manual scan */
 
 typedef struct {
-    MMManager *self;
+    MMBaseManager *self;
     GDBusMethodInvocation *invocation;
 } ScanDevicesContext;
 
@@ -672,7 +672,7 @@ scan_devices_auth_ready (MMAuthProvider *authp,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Otherwise relaunch device scan */
-        mm_manager_start (MM_MANAGER (ctx->self), TRUE);
+        mm_base_manager_start (MM_BASE_MANAGER (ctx->self), TRUE);
         mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
             ctx->invocation);
@@ -709,7 +709,7 @@ handle_set_profile (MmGdbusTest *skeleton,
                     const gchar *id,
                     const gchar *plugin_name,
                     const gchar *const *ports,
-                    MMManager *self)
+                    MMBaseManager *self)
 {
     MMPlugin *plugin;
     MMDevice *device;
@@ -768,22 +768,22 @@ out:
 
 /*****************************************************************************/
 
-MMManager *
-mm_manager_new (GDBusConnection *connection,
-                const gchar *plugin_dir,
-                gboolean auto_scan,
-                gboolean enable_test,
-                GError **error)
+MMBaseManager *
+mm_base_manager_new (GDBusConnection *connection,
+                     const gchar *plugin_dir,
+                     gboolean auto_scan,
+                     gboolean enable_test,
+                     GError **error)
 {
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 
-    return g_initable_new (MM_TYPE_MANAGER,
+    return g_initable_new (MM_TYPE_BASE_MANAGER,
                            NULL, /* cancellable */
                            error,
-                           MM_MANAGER_CONNECTION, connection,
-                           MM_MANAGER_PLUGIN_DIR, plugin_dir,
-                           MM_MANAGER_AUTO_SCAN, auto_scan,
-                           MM_MANAGER_ENABLE_TEST, enable_test,
+                           MM_BASE_MANAGER_CONNECTION, connection,
+                           MM_BASE_MANAGER_PLUGIN_DIR, plugin_dir,
+                           MM_BASE_MANAGER_AUTO_SCAN, auto_scan,
+                           MM_BASE_MANAGER_ENABLE_TEST, enable_test,
                            NULL);
 }
 
@@ -793,7 +793,7 @@ set_property (GObject *object,
               const GValue *value,
               GParamSpec *pspec)
 {
-    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+    MMBaseManagerPrivate *priv = MM_BASE_MANAGER (object)->priv;
 
     switch (prop_id) {
     case PROP_CONNECTION: {
@@ -840,7 +840,7 @@ get_property (GObject *object,
               GValue *value,
               GParamSpec *pspec)
 {
-    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+    MMBaseManagerPrivate *priv = MM_BASE_MANAGER (object)->priv;
 
     switch (prop_id) {
     case PROP_CONNECTION:
@@ -862,15 +862,15 @@ get_property (GObject *object,
 }
 
 static void
-mm_manager_init (MMManager *manager)
+mm_base_manager_init (MMBaseManager *manager)
 {
-    MMManagerPrivate *priv;
+    MMBaseManagerPrivate *priv;
     const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
 
     /* Setup private data */
     manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
-                                                        MM_TYPE_MANAGER,
-                                                        MMManagerPrivate);
+                                                        MM_TYPE_BASE_MANAGER,
+                                                        MMBaseManagerPrivate);
 
     /* Setup authorization provider */
     priv->authp = mm_auth_get_provider ();
@@ -907,7 +907,7 @@ initable_init (GInitable *initable,
                GCancellable *cancellable,
                GError **error)
 {
-    MMManagerPrivate *priv = MM_MANAGER (initable)->priv;
+    MMBaseManagerPrivate *priv = MM_BASE_MANAGER (initable)->priv;
 
     /* If autoscan enabled, list for udev events */
     if (priv->auto_scan)
@@ -950,7 +950,7 @@ initable_init (GInitable *initable,
 static void
 finalize (GObject *object)
 {
-    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+    MMBaseManagerPrivate *priv = MM_BASE_MANAGER (object)->priv;
 
     g_free (priv->plugin_dir);
 
@@ -977,7 +977,7 @@ finalize (GObject *object)
     if (priv->authp_cancellable)
         g_object_unref (priv->authp_cancellable);
 
-    G_OBJECT_CLASS (mm_manager_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_base_manager_parent_class)->finalize (object);
 }
 
 static void
@@ -987,11 +987,11 @@ initable_iface_init (GInitableIface *iface)
 }
 
 static void
-mm_manager_class_init (MMManagerClass *manager_class)
+mm_base_manager_class_init (MMBaseManagerClass *manager_class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (manager_class);
 
-    g_type_class_add_private (object_class, sizeof (MMManagerPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBaseManagerPrivate));
 
     /* Virtual methods */
     object_class->set_property = set_property;
@@ -1002,7 +1002,7 @@ mm_manager_class_init (MMManagerClass *manager_class)
 
     g_object_class_install_property
         (object_class, PROP_CONNECTION,
-         g_param_spec_object (MM_MANAGER_CONNECTION,
+         g_param_spec_object (MM_BASE_MANAGER_CONNECTION,
                               "Connection",
                               "GDBus connection to the system bus.",
                               G_TYPE_DBUS_CONNECTION,
@@ -1010,7 +1010,7 @@ mm_manager_class_init (MMManagerClass *manager_class)
 
     g_object_class_install_property
         (object_class, PROP_AUTO_SCAN,
-         g_param_spec_boolean (MM_MANAGER_AUTO_SCAN,
+         g_param_spec_boolean (MM_BASE_MANAGER_AUTO_SCAN,
                                "Auto scan",
                                "Automatically look for new devices",
                                TRUE,
@@ -1018,7 +1018,7 @@ mm_manager_class_init (MMManagerClass *manager_class)
 
     g_object_class_install_property
         (object_class, PROP_ENABLE_TEST,
-         g_param_spec_boolean (MM_MANAGER_ENABLE_TEST,
+         g_param_spec_boolean (MM_BASE_MANAGER_ENABLE_TEST,
                                "Enable tests",
                                "Enable the Test interface",
                                FALSE,
@@ -1026,7 +1026,7 @@ mm_manager_class_init (MMManagerClass *manager_class)
 
     g_object_class_install_property
         (object_class, PROP_PLUGIN_DIR,
-         g_param_spec_string (MM_MANAGER_PLUGIN_DIR,
+         g_param_spec_string (MM_BASE_MANAGER_PLUGIN_DIR,
                               "Plugin directory",
                               "Where to look for plugins",
                               NULL,

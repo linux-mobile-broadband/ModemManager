@@ -169,8 +169,8 @@ ModemManager_SOURCES = \
 	mm-auth.c \
 	mm-auth-provider.h \
 	mm-auth-provider.c \
-	mm-manager.c \
-	mm-manager.h \
+	mm-base-manager.c \
+	mm-base-manager.h \
 	mm-device.c \
 	mm-device.h \
 	mm-plugin-manager.c \

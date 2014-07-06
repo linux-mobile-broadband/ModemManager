@@ -26,7 +26,7 @@
 
 #include "ModemManager.h"
 
-#include "mm-manager.h"
+#include "mm-base-manager.h"
 #include "mm-log.h"
 #include "mm-context.h"
 
@@ -38,7 +38,7 @@
 #define MAX_SHUTDOWN_TIME_SECS 20
 
 static GMainLoop *loop;
-static MMManager *manager;
+static MMBaseManager *manager;
 
 static gboolean
 quit_cb (gpointer user_data)
@@ -46,7 +46,7 @@ quit_cb (gpointer user_data)
     mm_info ("Caught signal, shutting down...");
 
     if (manager)
-        g_object_set (manager, MM_MANAGER_CONNECTION, NULL, NULL);
+        g_object_set (manager, MM_BASE_MANAGER_CONNECTION, NULL, NULL);
 
     if (loop)
         g_idle_add ((GSourceFunc) g_main_loop_quit, loop);
@@ -66,11 +66,11 @@ bus_acquired_cb (GDBusConnection *connection,
 
     /* Create Manager object */
     g_assert (!manager);
-    manager = mm_manager_new (connection,
-                              mm_context_get_test_plugin_dir (),
-                              !mm_context_get_test_no_auto_scan (),
-                              mm_context_get_test_enable (),
-                              &error);
+    manager = mm_base_manager_new (connection,
+                                   mm_context_get_test_plugin_dir (),
+                                   !mm_context_get_test_no_auto_scan (),
+                                   mm_context_get_test_enable (),
+                                   &error);
     if (!manager) {
         mm_warn ("Could not create manager: %s", error->message);
         g_error_free (error);
@@ -88,7 +88,7 @@ name_acquired_cb (GDBusConnection *connection,
 
     /* Launch automatic scan for devices */
     g_assert (manager);
-    mm_manager_start (manager, FALSE);
+    mm_base_manager_start (manager, FALSE);
 }
 
 static void
@@ -105,7 +105,7 @@ name_lost_cb (GDBusConnection *connection,
         mm_warn ("Could not acquire the '%s' service name", name);
 
     if (manager)
-        g_object_set (manager, MM_MANAGER_CONNECTION, NULL, NULL);
+        g_object_set (manager, MM_BASE_MANAGER_CONNECTION, NULL, NULL);
 
     g_main_loop_quit (loop);
 }
@@ -161,13 +161,13 @@ main (int argc, char *argv[])
     if (manager) {
         GTimer *timer;
 
-        mm_manager_shutdown (manager);
+        mm_base_manager_shutdown (manager);
 
         /* Wait for all modems to be disabled and removed, but don't wait
          * forever: if disabling the modems takes longer than 20s, just
          * shutdown anyway. */
         timer = g_timer_new ();
-        while (mm_manager_num_modems (manager) &&
+        while (mm_base_manager_num_modems (manager) &&
                g_timer_elapsed (timer, NULL) < (gdouble)MAX_SHUTDOWN_TIME_SECS) {
             GMainContext *ctx = g_main_loop_get_context (inner);
 
@@ -175,10 +175,10 @@ main (int argc, char *argv[])
             g_usleep (50);
         }
 
-        if (mm_manager_num_modems (manager))
+        if (mm_base_manager_num_modems (manager))
             mm_warn ("Disabling modems took too long, "
                      "shutting down with '%u' modems around",
-                     mm_manager_num_modems (manager));
+                     mm_base_manager_num_modems (manager));
 
         g_object_unref (manager);
         g_timer_destroy (timer);
