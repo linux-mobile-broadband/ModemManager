@@ -1562,7 +1562,7 @@ update_registration_info (MMBroadbandModemMbim *self,
 
     if (reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         reg_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        if (self->priv->current_operator_id &&
+        if (self->priv->current_operator_id && operator_id_take &&
             g_str_equal (self->priv->current_operator_id, operator_id_take)) {
             g_free (operator_id_take);
         } else {
@@ -1570,7 +1570,7 @@ update_registration_info (MMBroadbandModemMbim *self,
             self->priv->current_operator_id = operator_id_take;
         }
 
-        if (self->priv->current_operator_name &&
+        if (self->priv->current_operator_name && operator_name_take &&
             g_str_equal (self->priv->current_operator_name, operator_name_take)) {
             g_free (operator_name_take);
         } else {
