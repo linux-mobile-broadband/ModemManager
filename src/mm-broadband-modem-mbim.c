@@ -1580,11 +1580,11 @@ update_registration_info (MMBroadbandModemMbim *self,
     } else {
         if (self->priv->current_operator_id) {
             g_free (self->priv->current_operator_id);
-            self->priv->current_operator_id = 0;
+            self->priv->current_operator_id = NULL;
         }
         if (self->priv->current_operator_name) {
             g_free (self->priv->current_operator_name);
-            self->priv->current_operator_name = 0;
+            self->priv->current_operator_name = NULL;
         }
         g_free (operator_id_take);
         g_free (operator_name_take);
