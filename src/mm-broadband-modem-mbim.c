@@ -553,7 +553,15 @@ pin_query_ready (MbimDevice *device,
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (unlock_required),
                                                    NULL);
-    } else
+    }
+    /* VZ20M reports an error when SIM-PIN is required... */
+    else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_PIN_REQUIRED)) {
+        g_error_free (error);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (MBIM_PIN_TYPE_PIN1),
+                                                   NULL);
+    }
+    else
         g_simple_async_result_take_error (ctx->result, error);
 
     if (response)
