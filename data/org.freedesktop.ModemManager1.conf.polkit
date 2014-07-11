@@ -158,7 +158,7 @@
     <!-- Protected by the Device.Control policy rule -->
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem.Location"
-           send_member="Enable"/>
+           send_member="Setup"/>
 
     <!-- Protected by the Location policy rule -->
     <allow send_destination="org.freedesktop.ModemManager1"
