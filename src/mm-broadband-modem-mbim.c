@@ -1036,7 +1036,7 @@ common_power_up_down (MMIfaceModem *self,
     message = mbim_message_radio_state_set_new (state, NULL);
     mbim_device_command (device,
                          message,
-                         10,
+                         20,
                          NULL,
                          ready_cb,
                          result);
