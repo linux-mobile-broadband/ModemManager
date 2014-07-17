@@ -1054,7 +1054,7 @@ disconnect_context_step (DisconnectContext *ctx)
 
         mbim_device_command (ctx->device,
                              message,
-                             10,
+                             30,
                              NULL,
                              (GAsyncReadyCallback)disconnect_set_ready,
                              ctx);
