@@ -632,21 +632,6 @@ mm_plugin_supports_port_finish (MMPlugin *self,
     return (MMPluginSupportsResult) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result)));
 }
 
-static gboolean
-find_driver_in_device (MMDevice *device,
-                       const gchar *driver)
-{
-    const gchar **device_drivers;
-    guint i;
-
-    device_drivers = mm_device_get_drivers (device);
-    for (i = 0; device_drivers[i]; i++) {
-        if (g_str_equal (driver, device_drivers[i]))
-            return TRUE;
-    }
-    return FALSE;
-}
-
 void
 mm_plugin_supports_port (MMPlugin *self,
                          MMDevice *device,
@@ -723,9 +708,9 @@ mm_plugin_supports_port (MMPlugin *self,
     } else {
         /* cdc-wdm ports... */
         probe_run_flags = MM_PORT_PROBE_NONE;
-        if (self->priv->qmi && find_driver_in_device (device, "qmi_wwan"))
+        if (self->priv->qmi && g_str_equal (mm_device_utils_get_port_driver (port), "qmi_wwan"))
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        else if (self->priv->mbim && find_driver_in_device (device, "cdc_mbim"))
+        else if (self->priv->mbim && g_str_equal (mm_device_utils_get_port_driver (port), "cdc_mbim"))
             probe_run_flags |= MM_PORT_PROBE_MBIM;
         else
             probe_run_flags |= MM_PORT_PROBE_AT;
