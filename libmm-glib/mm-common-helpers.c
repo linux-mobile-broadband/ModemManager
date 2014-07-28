@@ -1254,7 +1254,7 @@ mm_get_int_from_str (const gchar *str,
         return FALSE;
 
     for (num = 0; str[num]; num++) {
-        if (str[num] != '-' && !g_ascii_isdigit (str[num]))
+        if (str[num] != '+' && str[num] != '-' && !g_ascii_isdigit (str[num]))
             return FALSE;
     }
 
