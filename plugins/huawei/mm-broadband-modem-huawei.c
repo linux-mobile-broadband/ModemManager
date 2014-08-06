@@ -108,6 +108,8 @@ struct _MMBroadbandModemHuaweiPrivate {
     FeatureSupport syscfg_support;
     FeatureSupport syscfgex_support;
     FeatureSupport prefmode_support;
+    FeatureSupport time_support;
+    FeatureSupport nwtime_support;
 
     MMModemLocationSource enabled_sources;
 
@@ -2840,70 +2842,70 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 /*****************************************************************************/
 /* Load network time (Time interface) */
 
-static gchar *
-modem_time_load_network_time_finish (MMIfaceModemTime *self,
-                                     GAsyncResult *res,
-                                     GError **error)
+static MMNetworkTimezone *
+modem_time_load_network_timezone_finish (MMIfaceModemTime *_self,
+                                         GAsyncResult *res,
+                                         GError **error)
 {
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    MMNetworkTimezone *tz = NULL;
     const gchar *response;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint year, month, day, hour, minute, second;
-    gchar *result = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    g_assert (self->priv->nwtime_support == FEATURE_SUPPORTED ||
+              self->priv->time_support == FEATURE_SUPPORTED);
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (_self), res, error);
     if (!response)
         return NULL;
 
-    /* Already in ISO-8601 format, but verify just to be sure */
-    r = g_regex_new ("\\^TIME:\\s*(\\d+)/(\\d+)/(\\d+)\\s*(\\d+):(\\d+):(\\d*)$", 0, 0, NULL);
-    g_assert (r != NULL);
+    if (self->priv->nwtime_support == FEATURE_SUPPORTED)
+        mm_huawei_parse_nwtime_response (response, NULL, &tz, error);
+    else if (self->priv->time_support == FEATURE_SUPPORTED)
+        mm_huawei_parse_time_response (response, NULL, &tz, error);
+    return tz;
+}
 
-    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
-        if (match_error) {
-            g_propagate_error (error, match_error);
-            g_prefix_error (error, "Could not parse ^TIME results: ");
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't match ^TIME reply");
-        }
-    } else {
-        /* Remember that g_match_info_get_match_count() includes match #0 */
-        g_assert (g_match_info_get_match_count (match_info) >= 7);
 
-        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
-            mm_get_uint_from_match_info (match_info, 2, &month) &&
-            mm_get_uint_from_match_info (match_info, 3, &day) &&
-            mm_get_uint_from_match_info (match_info, 4, &hour) &&
-            mm_get_uint_from_match_info (match_info, 5, &minute) &&
-            mm_get_uint_from_match_info (match_info, 6, &second)) {
-            /* Return ISO-8601 format date/time string */
-            result = g_strdup_printf ("%04d/%02d/%02d %02d:%02d:%02d",
-                                      year, month, day, hour, minute, second);
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to parse ^TIME reply");
-        }
-    }
+static gchar *
+modem_time_load_network_time_finish (MMIfaceModemTime *_self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    const gchar *response;
+    gchar *iso8601 = NULL;
 
-    if (match_info)
-        g_match_info_free (match_info);
-    g_regex_unref (r);
-    return result;
+    g_assert (self->priv->nwtime_support == FEATURE_SUPPORTED ||
+              self->priv->time_support == FEATURE_SUPPORTED);
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (_self), res, error);
+    if (!response)
+        return NULL;
+
+    if (self->priv->nwtime_support == FEATURE_SUPPORTED)
+        mm_huawei_parse_nwtime_response (response, &iso8601, NULL, error);
+    else if (self->priv->time_support == FEATURE_SUPPORTED)
+        mm_huawei_parse_time_response (response, &iso8601, NULL, error);
+    return iso8601;
 }
 
 static void
-modem_time_load_network_time (MMIfaceModemTime *self,
+modem_time_load_network_time_or_zone (MMIfaceModemTime *_self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
+    const char *command = NULL;
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
+    if (self->priv->nwtime_support == FEATURE_SUPPORTED)
+        command = "^NWTIME?";
+    else if (self->priv->time_support == FEATURE_SUPPORTED)
+        command = "^TIME";
+
+    g_assert (command != NULL);
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^TIME",
+                              command,
                               3,
                               FALSE,
                               callback,
@@ -3487,27 +3489,60 @@ enable_location_gathering (MMIfaceModemLocation *self,
 /* Check support (Time interface) */
 
 static gboolean
-modem_time_check_support_finish (MMIfaceModemTime *self,
+modem_time_check_support_finish (MMIfaceModemTime *_self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    if (self->priv->nwtime_support == FEATURE_SUPPORTED)
+        return TRUE;
+    if (self->priv->time_support == FEATURE_SUPPORTED)
+        return TRUE;
+    return FALSE;
 }
 
 static void
-modem_time_check_ready (MMBroadbandModem *self,
+modem_time_check_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GSimpleAsyncResult *simple)
 {
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-
+    (void)mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
+
+static gboolean
+modem_check_time_reply (MMBaseModem *_self,
+                        gpointer none,
+                        const gchar *command,
+                        const gchar *response,
+                        gboolean last_command,
+                        const GError *error,
+                        GVariant **result,
+                        GError **result_error)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
+    if (!error) {
+        if (strstr (response, "^NTCT"))
+            self->priv->nwtime_support = FEATURE_SUPPORTED;
+        else if (strstr (response, "^TIME"))
+            self->priv->time_support = FEATURE_SUPPORTED;
+    } else {
+        if (strstr (command, "^NTCT"))
+            self->priv->nwtime_support = FEATURE_NOT_SUPPORTED;
+        else if (strstr (command, "^TIME"))
+            self->priv->time_support = FEATURE_NOT_SUPPORTED;
+    }
+
+    return FALSE;
+}
+
+static const MMBaseModemAtCommand time_cmd_sequence[] = {
+    { "^NTCT?", 3, FALSE, modem_check_time_reply }, /* 3GPP/LTE */
+    { "^TIME",  3, FALSE, modem_check_time_reply }, /* CDMA */
+    { NULL }
+};
 
 static void
 modem_time_check_support (MMIfaceModemTime *self,
@@ -3521,13 +3556,12 @@ modem_time_check_support (MMIfaceModemTime *self,
                                         user_data,
                                         modem_time_check_support);
 
-    /* Only CDMA devices support this at the moment */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "^TIME",
-                              3,
-                              TRUE,
-                              (GAsyncReadyCallback)modem_time_check_ready,
-                              result);
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               time_cmd_sequence,
+                               NULL, /* response_processor_context */
+                               NULL, /* response_processor_context_free */
+                               (GAsyncReadyCallback)modem_time_check_ready,
+                               result);
 }
 
 /*****************************************************************************/
@@ -3714,6 +3748,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->syscfg_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->syscfgex_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->prefmode_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->nwtime_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->time_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -3845,8 +3881,10 @@ iface_modem_time_init (MMIfaceModemTime *iface)
 {
     iface->check_support = modem_time_check_support;
     iface->check_support_finish = modem_time_check_support_finish;
-    iface->load_network_time = modem_time_load_network_time;
+    iface->load_network_time = modem_time_load_network_time_or_zone;
     iface->load_network_time_finish = modem_time_load_network_time_finish;
+    iface->load_network_timezone = modem_time_load_network_time_or_zone;
+    iface->load_network_timezone_finish = modem_time_load_network_timezone_finish;
 }
 
 static void

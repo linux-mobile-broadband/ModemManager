@@ -1002,6 +1002,138 @@ test_syscfgex_response (void)
 }
 
 /*****************************************************************************/
+/* Test ^NWTIME responses */
+
+typedef struct {
+    const gchar *str;
+    gboolean ret;
+    gboolean test_iso8601;
+    gboolean test_tz;
+    gchar *iso8601;
+    gint32 offset;
+    gint32 dst_offset;
+    gint32 leap_seconds;
+} NwtimeTest;
+
+#define NWT_UNKNOWN    MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN
+
+static const NwtimeTest nwtime_tests[] = {
+    { "^NWTIME: 14/08/05,04:00:21+40,00", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+10:00", 600, 0, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,00", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+10:00", 600, 0, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,00", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+10:00", 600, 0, NWT_UNKNOWN },
+
+    { "^NWTIME: 14/08/05,04:00:21+20,00", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+05:00", 300, 0, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+20,00", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+05:00", 300, 0, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+20,00", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+05:00", 300, 0, NWT_UNKNOWN },
+
+    { "^NWTIME: 14/08/05,04:00:21+40,01", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+11:00", 600, 60, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,01", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+11:00", 600, 60, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,01", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+11:00", 600, 60, NWT_UNKNOWN },
+
+    { "^NWTIME: 14/08/05,04:00:21+40,02", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+12:00", 600, 120, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,02", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+12:00", 600, 120, NWT_UNKNOWN },
+    { "^NWTIME: 14/08/05,04:00:21+40,02", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+12:00", 600, 120, NWT_UNKNOWN },
+
+    { "^TIME: XX/XX/XX,XX:XX:XX+XX,XX", FALSE, TRUE, FALSE,
+        NULL, NWT_UNKNOWN, NWT_UNKNOWN, NWT_UNKNOWN },
+
+    { "^TIME: 14/08/05,04:00:21+40,00", FALSE, TRUE, FALSE,
+        NULL, NWT_UNKNOWN, NWT_UNKNOWN, NWT_UNKNOWN },
+
+    { NULL, FALSE, FALSE, FALSE, NULL, NWT_UNKNOWN, NWT_UNKNOWN, NWT_UNKNOWN }
+};
+
+static void
+test_nwtime (void)
+{
+    guint i;
+
+    for (i = 0; nwtime_tests[i].str; i++) {
+        GError *error = NULL;
+        gchar *iso8601 = NULL;
+        MMNetworkTimezone *tz = NULL;
+        gboolean ret;
+
+        ret = mm_huawei_parse_nwtime_response (nwtime_tests[i].str,
+                                               nwtime_tests[i].test_iso8601 ? &iso8601 : NULL,
+                                               nwtime_tests[i].test_tz ? &tz : NULL,
+                                               &error);
+
+        g_assert (ret == nwtime_tests[i].ret);
+        g_assert (ret == (error ? FALSE : TRUE));
+
+        g_clear_error (&error);
+
+        if (nwtime_tests[i].test_iso8601)
+            g_assert_cmpstr (nwtime_tests[i].iso8601, ==, iso8601);
+
+        if (nwtime_tests[i].test_tz) {
+            g_assert (nwtime_tests[i].offset == mm_network_timezone_get_offset (tz));
+            g_assert (nwtime_tests[i].dst_offset == mm_network_timezone_get_dst_offset (tz));
+            g_assert (nwtime_tests[i].leap_seconds == mm_network_timezone_get_leap_seconds (tz));
+        }
+
+        if (iso8601)
+            g_free (iso8601);
+    }
+}
+
+/*****************************************************************************/
+/* Test ^TIME responses */
+
+typedef struct {
+    const gchar *str;
+    gboolean ret;
+    gchar *iso8601;
+} TimeTest;
+
+static const TimeTest time_tests[] = {
+    { "^TIME: 14/08/05 04:00:21", TRUE, "2014-08-05T04:00:21" },
+    { "^TIME: 2014/08/05 04:00:21", TRUE, "2014-08-05T04:00:21" },
+    { "^TIME: 14-08-05 04:00:21", FALSE, NULL },
+    { "^TIME: 14-08-05,04:00:21", FALSE, NULL },
+    { "^TIME: 14/08/05 04:00:21 AEST", FALSE, NULL },
+    { NULL, FALSE, NULL }
+};
+
+static void
+test_time (void)
+{
+    guint i;
+
+    for (i = 0; time_tests[i].str; i++) {
+        GError *error = NULL;
+        gchar *iso8601 = NULL;
+        gboolean ret;
+
+        ret = mm_huawei_parse_time_response (time_tests[i].str,
+                                             &iso8601,
+                                             NULL,
+                                             &error);
+
+        g_assert (ret == time_tests[i].ret);
+        g_assert (ret == (error ? FALSE : TRUE));
+
+        g_assert_cmpstr (time_tests[i].iso8601, ==, iso8601);
+
+        if (iso8601)
+            g_free (iso8601);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1039,6 +1171,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/syscfg/response", test_syscfg_response);
     g_test_add_func ("/MM/huawei/syscfgex", test_syscfgex);
     g_test_add_func ("/MM/huawei/syscfgex/response", test_syscfgex_response);
+    g_test_add_func ("/MM/huawei/nwtime", test_nwtime);
+    g_test_add_func ("/MM/huawei/time", test_time);
 
     return g_test_run ();
 }
