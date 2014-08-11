@@ -634,6 +634,8 @@ load_unlock_retries_finish (MMIfaceModem *self,
                          MM_CORE_ERROR_FAILED,
                          "Could not parse ^CPIN results: Response didn't match (%s)",
                          result);
+
+        g_match_info_free (match_info);
         g_regex_unref (r);
         return NULL;
     }

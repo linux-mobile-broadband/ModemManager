@@ -218,7 +218,7 @@ get_supported_modes_ready (MMBaseModem *self,
             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (r != NULL);
 
-    if(!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
         if (match_error) {
             g_propagate_error (&error, match_error);
         } else {
@@ -228,8 +228,9 @@ get_supported_modes_ready (MMBaseModem *self,
                          "Failed to match EGMR response: %s", response);
         }
 
+        g_match_info_free (match_info);
         g_regex_unref (r);
-            return;
+        return;
     }
 
     if (!mm_get_int_from_match_info (match_info, 1, &device_type)) {

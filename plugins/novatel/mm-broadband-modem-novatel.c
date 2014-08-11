@@ -195,6 +195,7 @@ nwrat_query_ready (MMBaseModem *self,
                                              response);
         g_simple_async_result_complete (simple);
         g_object_unref (simple);
+        g_match_info_free (match_info);
         g_regex_unref (r);
         return;
     }

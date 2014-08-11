@@ -145,6 +145,7 @@ load_current_modes_finish (MMIfaceModem *self,
                          "Couldn't match +SYSSEL reply: %s", response);
         }
 
+        g_match_info_free (match_info);
         g_regex_unref (r);
         return FALSE;
     }

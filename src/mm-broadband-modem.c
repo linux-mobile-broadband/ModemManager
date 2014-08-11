@@ -5981,6 +5981,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                                          MM_CORE_ERROR_INVALID_ARGS,
                                          "Couldn't parse SMS list response");
         list_parts_context_complete_and_free (ctx);
+        g_match_info_free (match_info);
         g_regex_unref (r);
         return;
     }
