@@ -888,10 +888,10 @@ mm_iface_modem_update_access_technologies (MMIfaceModem *self,
         /* Log */
         old_access_tech_string = mm_modem_access_technology_build_string_from_mask (old_access_tech);
         new_access_tech_string = mm_modem_access_technology_build_string_from_mask (built_access_tech);
-        mm_info ("Modem %s: access technology changed (%s -> %s)",
-                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
-                 old_access_tech_string,
-                 new_access_tech_string);
+        mm_dbg ("Modem %s: access technology changed (%s -> %s)",
+                g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
+                old_access_tech_string,
+                new_access_tech_string);
         g_free (old_access_tech_string);
         g_free (new_access_tech_string);
     }
