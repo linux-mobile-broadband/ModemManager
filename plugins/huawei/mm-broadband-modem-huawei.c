@@ -3494,6 +3494,7 @@ modem_time_check_support_finish (MMIfaceModemTime *_self,
                                  GError **error)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
     if (self->priv->nwtime_support == FEATURE_SUPPORTED)
         return TRUE;
     if (self->priv->time_support == FEATURE_SUPPORTED)
@@ -3506,7 +3507,8 @@ modem_time_check_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GSimpleAsyncResult *simple)
 {
-    (void)mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
+    /* Responses are checked in the sequence parser, ignore overall result */
+    mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
