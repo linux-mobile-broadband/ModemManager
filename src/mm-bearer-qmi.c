@@ -33,9 +33,17 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER);
+G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 
 #define GLOBAL_PACKET_DATA_HANDLE 0xFFFFFFFF
+
+enum {
+    PROP_0,
+    PROP_FORCE_DHCP,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
 
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
@@ -44,6 +52,7 @@ struct _MMBearerQmiPrivate {
     MMPort *data;
     guint32 packet_data_handle_ipv4;
     guint32 packet_data_handle_ipv6;
+    gboolean force_dhcp;
 };
 
 /*****************************************************************************/
@@ -261,7 +270,9 @@ qmi_inet4_ntop (guint32 address, char *buf, const gsize buflen)
 }
 
 static MMBearerIpConfig *
-get_ipv4_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
+get_ipv4_config (MMBearerQmi *self,
+                 QmiMessageWdsGetCurrentSettingsOutput *output,
+                 guint32 mtu)
 {
     MMBearerIpConfig *config;
     char buf[INET_ADDRSTRLEN];
@@ -291,46 +302,50 @@ get_ipv4_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
     mm_dbg ("QMI IPv4 Settings:");
 
     config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+    if (self->priv->force_dhcp)
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+    else {
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);        
 
-    /* IPv4 address */
-    qmi_inet4_ntop (addr, buf, sizeof (buf));
-    mm_bearer_ip_config_set_address (config, buf);
-    mm_bearer_ip_config_set_prefix (config, prefix);
-    mm_dbg ("    Address: %s/%d", buf, prefix);
-
-    /* IPv4 gateway address */
-    if (qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error)) {
+        /* IPv4 address */
         qmi_inet4_ntop (addr, buf, sizeof (buf));
-        mm_bearer_ip_config_set_gateway (config, buf);
-        mm_dbg ("    Gateway: %s", buf);
-    } else {
-        mm_dbg ("    Gateway: failed (%s)", error->message);
-        g_clear_error (&error);
-    }
+        mm_bearer_ip_config_set_address (config, buf);
+        mm_bearer_ip_config_set_prefix (config, prefix);
+        mm_dbg ("    Address: %s/%d", buf, prefix);
 
-    /* IPv4 DNS #1 */
-    if (qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error)) {
-        qmi_inet4_ntop (addr, buf, sizeof (buf));
-        dns[dns_idx++] = buf;
-        mm_dbg ("    DNS #1: %s", buf);
-    } else {
-        mm_dbg ("    DNS #1: failed (%s)", error->message);
-        g_clear_error (&error);
-    }
+        /* IPv4 gateway address */
+        if (qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error)) {
+            qmi_inet4_ntop (addr, buf, sizeof (buf));
+            mm_bearer_ip_config_set_gateway (config, buf);
+            mm_dbg ("    Gateway: %s", buf);
+        } else {
+            mm_dbg ("    Gateway: failed (%s)", error->message);
+            g_clear_error (&error);
+        }
 
-    /* IPv6 DNS #2 */
-    if (qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error)) {
-        qmi_inet4_ntop (addr, buf2, sizeof (buf2));
-        dns[dns_idx++] = buf2;
-        mm_dbg ("    DNS #2: %s", buf2);
-    } else {
-        mm_dbg ("    DNS #2: failed (%s)", error->message);
-        g_clear_error (&error);
-    }
+        /* IPv4 DNS #1 */
+        if (qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error)) {
+            qmi_inet4_ntop (addr, buf, sizeof (buf));
+            dns[dns_idx++] = buf;
+            mm_dbg ("    DNS #1: %s", buf);
+        } else {
+            mm_dbg ("    DNS #1: failed (%s)", error->message);
+            g_clear_error (&error);
+        }
 
-    if (dns_idx > 0)
-        mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
+        /* IPv6 DNS #2 */
+        if (qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error)) {
+            qmi_inet4_ntop (addr, buf2, sizeof (buf2));
+            dns[dns_idx++] = buf2;
+            mm_dbg ("    DNS #2: %s", buf2);
+        } else {
+            mm_dbg ("    DNS #2: failed (%s)", error->message);
+            g_clear_error (&error);
+        }
+
+        if (dns_idx > 0)
+            mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
+    }
 
     if (mtu) {
         mm_bearer_ip_config_set_mtu (config, mtu);
@@ -360,7 +375,9 @@ qmi_inet6_ntop (GArray *array, char *buf, const gsize buflen)
 }
 
 static MMBearerIpConfig *
-get_ipv6_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
+get_ipv6_config (MMBearerQmi *self,
+                 QmiMessageWdsGetCurrentSettingsOutput *output,
+                 guint32 mtu)
 {
     MMBearerIpConfig *config;
     char buf[INET6_ADDRSTRLEN];
@@ -381,7 +398,11 @@ get_ipv6_config (QmiMessageWdsGetCurrentSettingsOutput *output, guint32 mtu)
     mm_dbg ("QMI IPv6 Settings:");
 
     config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+    if (self->priv->force_dhcp)
+        /* Force DHCP, but still set the static IPv6 config details if we get them */
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+    else
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
 
     /* IPv6 address */
     qmi_inet6_ntop (array, buf, sizeof (buf));
@@ -472,9 +493,9 @@ get_current_settings_ready (QmiClientWds *client,
         }
 
         if (ip_family == QMI_WDS_IP_FAMILY_IPV4)
-            ctx->ipv4_config = get_ipv4_config (output, mtu);
+            ctx->ipv4_config = get_ipv4_config (ctx->self, output, mtu);
         else if (ip_family == QMI_WDS_IP_FAMILY_IPV6)
-            ctx->ipv6_config = get_ipv6_config (output, mtu);
+            ctx->ipv6_config = get_ipv6_config (ctx->self, output, mtu);
 
         /* Domain names */
         if (qmi_message_wds_get_current_settings_output_get_domain_name_list (output, &array, &error)) {
@@ -1291,7 +1312,8 @@ report_connection_status (MMBaseBearer *self,
 
 MMBaseBearer *
 mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
-                   MMBearerProperties *config)
+                   MMBearerProperties *config,
+                   gboolean force_dhcp)
 {
     MMBaseBearer *bearer;
 
@@ -1301,6 +1323,7 @@ mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
     bearer = g_object_new (MM_TYPE_BEARER_QMI,
                            MM_BASE_BEARER_MODEM, modem,
                            MM_BASE_BEARER_CONFIG, config,
+                           MM_BEARER_QMI_FORCE_DHCP, force_dhcp,
                            NULL);
 
     /* Only export valid bearers */
@@ -1316,6 +1339,42 @@ mm_bearer_qmi_init (MMBearerQmi *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BEARER_QMI,
                                               MMBearerQmiPrivate);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBearerQmi *self = MM_BEARER_QMI (object);
+
+    switch (prop_id) {
+    case PROP_FORCE_DHCP:
+        self->priv->force_dhcp = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBearerQmi *self = MM_BEARER_QMI (object);
+
+    switch (prop_id) {
+    case PROP_FORCE_DHCP:
+        g_value_set_boolean (value, self->priv->force_dhcp);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -1340,10 +1399,21 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
 
     /* Virtual methods */
     object_class->dispose = dispose;
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
 
     base_bearer_class->connect = _connect;
     base_bearer_class->connect_finish = connect_finish;
     base_bearer_class->disconnect = disconnect;
     base_bearer_class->disconnect_finish = disconnect_finish;
     base_bearer_class->report_connection_status = report_connection_status;
+
+    /* Properties */
+    properties[PROP_FORCE_DHCP] =
+        g_param_spec_boolean (MM_BEARER_QMI_FORCE_DHCP,
+                              "Force DHCP",
+                              "Never setup static IP config, always DHCP.",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_FORCE_DHCP, properties[PROP_FORCE_DHCP]);
 }
