@@ -318,7 +318,7 @@ modem_create_bearer (MMIfaceModem *self,
 
     /* We just create a MMBearerQmi */
     mm_dbg ("Creating QMI bearer in QMI modem");
-    bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties, FALSE);
+    bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties, TRUE);
     g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
