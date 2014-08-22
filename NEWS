@@ -1,4 +1,47 @@
 
+ModemManager 1.4.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+ * This version requires libmbim >= 1.10.0.
+
+This version comes with the following updates in the interfaces:
+
+ * Updated the logic around the IP configuration properties in the Bearer:
+   ** Setting DHCP as IP method in the IPv6 settings means that SLAAC should
+      be used to retrieve correct addressing and routing details.
+   ** DHCP IP method may now be combined with an explicit static IP address, as
+      IPv6 SLAAC may require the link-local address to be present.
+   ** MTU is now also included in the IP configuration properties, if specified
+      by the modem, and applicable to both DHCP and STATIC methods.
+ * New 'OFF' power state, which fully switches off the modem device. After
+   setting the modem in this state, no further use of it can be done. Currently
+   available in Wavecom and Cinterion.
+ * Location interface: new 'unmanaged GPS' support, which allows to start/stop
+   the GPS module in the modem, while leaving the location information retrieval
+   to other processes. Currently available in modems with independent GPS TTYs,
+   like Option/HSO, Cinterion and Huawei.
+ * New Test DBus interface: not to be installed, just for internal system tests.
+
+Other notable changes include:
+ * MBIM: support for ZTE and Sequans Communications modems.
+ * Ericsson MBM: Support for AT-capable /dev/cdc-wdm ports.
+ * Huawei: improved support for Network time retrieval.
+ * Huawei: implemented GPS support.
+ * Huawei: support for /dev/cdc-wdm AT ports via the new huawei-cdc-ncm driver.
+ * Cinterion: implemented GPS support.
+ * Cinterion: implemented unlock retries loading.
+ * Cinterion: gather port types for multi-tty devices.
+ * Cinterion: custom wait for SIM readiness after SIM-PIN unlock.
+ * Wavecom: custom wait for SIM readiness after SIM-PIN unlock.
+ * Probing: new flag to identify hotplugged devices which don't need full reset.
+ * Tests: internal refactor of the ports handling code, allowing test-driven
+   virtual ports and system tests run during 'make check'. This new feature also
+   comes with a new internal 'Test' DBus interface, as well as new --test-[*]
+   options in the ModemManager program.
+ * and many more fixes...
+
+
 ModemManager 1.2.0
 -------------------------------------------
 This is a new stable release of ModemManager.
