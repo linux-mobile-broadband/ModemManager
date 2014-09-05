@@ -270,6 +270,12 @@ device_added (MMBaseManager *manager,
     if (!is_candidate)
         return;
 
+    /* Is the port blacklisted? */
+    if (g_udev_device_get_property_as_boolean (port, "ID_MM_PORT_IGNORE")) {
+        mm_dbg ("(%s/%s): port is blacklisted", subsys, name);
+        return;
+    }
+
     if (find_device_by_port (manager, port))
         return;
 
