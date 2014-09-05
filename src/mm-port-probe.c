@@ -135,6 +135,9 @@ struct _MMPortProbePrivate {
     gboolean is_qmi;
     gboolean is_mbim;
 
+    /* From udev tags */
+    gboolean is_ignored;
+
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
 };
@@ -1404,7 +1407,9 @@ mm_port_probe_list_has_at_port (GList *list)
 
     for (l = list; l; l = g_list_next (l)){
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
-        if (probe->priv->flags & MM_PORT_PROBE_AT &&
+
+        if (!probe->priv->is_ignored &&
+            probe->priv->flags & MM_PORT_PROBE_AT &&
             probe->priv->is_at)
             return TRUE;
     }
@@ -1456,7 +1461,10 @@ mm_port_probe_list_has_qmi_port (GList *list)
     GList *l;
 
     for (l = list; l; l = g_list_next (l)) {
-        if (mm_port_probe_is_qmi (MM_PORT_PROBE (l->data)))
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (!probe->priv->is_ignored &&
+            mm_port_probe_is_qmi (probe))
             return TRUE;
     }
 
@@ -1487,7 +1495,10 @@ mm_port_probe_list_has_mbim_port (GList *list)
     GList *l;
 
     for (l = list; l; l = g_list_next (l)) {
-        if (mm_port_probe_is_mbim (MM_PORT_PROBE (l->data)))
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (!probe->priv->is_ignored &&
+            mm_port_probe_is_mbim (probe))
             return TRUE;
     }
 
@@ -1631,6 +1642,14 @@ mm_port_probe_list_is_icera (GList *probes)
     return FALSE;
 }
 
+gboolean
+mm_port_probe_is_ignored (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    return self->priv->is_ignored;
+}
+
 const gchar *
 mm_port_probe_get_port_name (MMPortProbe *self)
 {
@@ -1692,6 +1711,7 @@ set_property (GObject *object,
         /* construct only */
         self->priv->port = g_value_dup_object (value);
         self->priv->parent = g_udev_device_get_parent (self->priv->port);
+        self->priv->is_ignored = g_udev_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_IGNORE");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
