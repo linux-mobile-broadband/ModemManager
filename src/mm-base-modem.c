@@ -202,8 +202,16 @@ mm_base_modem_grab_port (MMBaseModem *self,
         return FALSE;
     }
 
+    /* Explicitly ignored ports, grab them but explicitly flag them as ignored
+     * right away, all the same way (i.e. regardless of subsystem). */
+    if (ptype == MM_PORT_TYPE_IGNORED) {
+        port = MM_PORT (g_object_new (MM_TYPE_PORT,
+                                      MM_PORT_DEVICE, name,
+                                      MM_PORT_TYPE, MM_PORT_TYPE_IGNORED,
+                                      NULL));
+    }
     /* Serial ports... */
-    if (g_str_equal (subsys, "tty")) {
+    else if (g_str_equal (subsys, "tty")) {
         if (ptype == MM_PORT_TYPE_QCDM)
             /* QCDM port */
             port = MM_PORT (mm_port_serial_qcdm_new (name));
