@@ -2,50 +2,74 @@
 .\"
 .\" Copyright (C) 2011 Aleksander Morgado
 .\"
-.TH MODEMMANAGER "8" "31 October 2011"
+
+.TH MODEMMANAGER "8" "5 September 2014"
+
 .SH NAME
-ModemManager \- modem management daemon
+ModemManager \- mobile broadband modem management daemon
+
 .SH SYNOPSIS
-.B ModemManager [\-\-version] | [\-\-help]
-.PP
-.B ModemManager [\-\-debug] [\-\-log\-level=<level>] [\-\-log\-file=<filename>] [\-\-timestamps] [\-\-relative\-timestamps]
+\fBModemManager\fR [\fIOPTION\fR...]
+
 .SH DESCRIPTION
-The ModemManager daemon provides a unified high level API
-for communicating with (mobile broadband) modems. While the basic commands are
-standardized, the more advanced operations (like signal quality monitoring
-while connected) varies a lot.
+ModemManager provides a unified high level API for communicating with mobile
+broadband modems, regardless of the protocol used to communicate with the
+actual device (Generic AT, vendor-specific AT, QCDM, QMI, MBIM...).
+
+ModemManager is a DBus-based system daemon and is not meant to be used directly
+from the command line.
+
+.SH HELP OPTIONS
 .TP
-ModemManager is a system daemon and is not meant to be used directly from the
-command line.
-.SH OPTIONS
-The following options are supported:
-.TP
-.I "\-\-version"
+.B \-V, \-\-version
 Print the ModemManager software version and exit.
 .TP
-.I "\-\-help"
-Print ModemManager's available options and exit.
+.B \-h, \-\-help
+Show application options.
 .TP
-.I "\-\-debug"
+.B \-\-help\-all
+Show application and test options.
+.TP
+.B \-\-help\-test
+Show test options.
+
+.SH APPLICATION OPTIONS
+.B \-\-debug
 Runs ModemManager with "DEBUG" log level and without daemonizing. This is useful
 for debugging, as it directs log output to the controlling terminal in addition to
 syslog.
 .TP
-.I "\-\-log\-level=<level>"
+.B \-\-log\-level=<level>
 Sets how much information ModemManager sends to the log destination (usually
 syslog's "daemon" facility). By default, only informational, warning, and error
 messages are logged. Given level must be one of "ERR", "WARN", "INFO" or "DEBUG".
 .TP
-.I "\-\-log\-file=<filename>"
+.B \-\-log\-file=<filename>
 Specify location of the file where ModemManager will dump its log messages,
 instead of syslog.
 .TP
-.I "\-\-timestamps"
+.B \-\-timestamps
 Include absolute timestamps in the log output.
 .TP
-.I "\-\-relative-timestamps"
+.B \-\-relative-timestamps
 Include timestamps, relative to the start time of the daemon, in the log output.
+
+.SH TEST OPTIONS
 .TP
+.B \-\-test\-session
+Run the ModemManager daemon in the Session bus instead of the System bus.
+.TP
+.B \-\-test\-no\-auto\-scan
+Fully disable udev-based auto-scan looking for devices.
+.TP
+.B \-\-test\-enable
+Enable the Test DBus interface in the daemon.
+.TP
+.B \-\-test\-plugin\-dir=[PATH]
+Specify an alternate directory where the daemon should look for vendor plugins.
+
+.SH AUTHOR
+Aleksander Morgado <aleksander@aleksander.es>
 
 .SH SEE ALSO
-.BR NetworkManager (8).
+\fBmmcli\fR(8), \fBNetworkManager\fR(8)
