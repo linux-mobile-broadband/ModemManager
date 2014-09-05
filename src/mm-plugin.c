@@ -869,20 +869,28 @@ mm_plugin_create_modem (MMPlugin  *self,
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
                      g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
                                   "qmi_wwan")) {
-                grabbed = FALSE;
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_UNSUPPORTED,
-                                           "ignoring QMI net port");
+                /* Try to generically grab the port, but flagged as ignored */
+                grabbed = mm_base_modem_grab_port (modem,
+                                                   mm_port_probe_get_port_subsys (probe),
+                                                   mm_port_probe_get_port_name (probe),
+                                                   mm_port_probe_get_parent_path (probe),
+                                                   MM_PORT_TYPE_IGNORED,
+                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
+                                                   &inner_error);
             }
 #endif
 #if !defined WITH_MBIM
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
                      g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
                                   "cdc_mbim")) {
-                grabbed = FALSE;
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_UNSUPPORTED,
-                                           "ignoring MBIM net port");
+                /* Try to generically grab the port, but flagged as ignored */
+                grabbed = mm_base_modem_grab_port (modem,
+                                                   mm_port_probe_get_port_subsys (probe),
+                                                   mm_port_probe_get_port_name (probe),
+                                                   mm_port_probe_get_parent_path (probe),
+                                                   MM_PORT_TYPE_IGNORED,
+                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
+                                                   &inner_error);
             }
 #endif
             else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
