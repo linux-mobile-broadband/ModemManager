@@ -20,6 +20,7 @@
 /*****************************************************************************/
 /* Application context */
 
+static gboolean version_flag;
 static gboolean debug;
 static const gchar *log_level;
 static const gchar *log_file;
@@ -27,6 +28,7 @@ static gboolean show_ts;
 static gboolean rel_ts;
 
 static const GOptionEntry entries[] = {
+    { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag, "Print version", NULL },
     { "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Run with extended debugging capabilities", NULL },
     { "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of [ERR, WARN, INFO, DEBUG]", "INFO" },
     { "log-file", 0, 0, G_OPTION_ARG_STRING, &log_file, "Path to log file", NULL },
@@ -121,6 +123,19 @@ mm_context_get_test_plugin_dir (void)
 
 /*****************************************************************************/
 
+static void
+print_version (void)
+{
+    g_print ("\n"
+             "ModemManager " MM_DIST_VERSION "\n"
+             "Copyright (2008 - 2014) The ModemManager authors\n"
+             "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl-2.0.html>\n"
+             "This is free software: you are free to change and redistribute it.\n"
+             "There is NO WARRANTY, to the extent permitted by law.\n"
+             "\n");
+    exit (EXIT_SUCCESS);
+}
+
 void
 mm_context_init (gint argc,
                  gchar **argv)
@@ -147,4 +162,8 @@ mm_context_init (gint argc,
         if (!show_ts && !rel_ts)
             show_ts = TRUE;
     }
+
+    /* If just version requested, print and exit */
+    if (version_flag)
+        print_version ();
 }
