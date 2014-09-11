@@ -2214,7 +2214,7 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
                          QmiMessageNasGetSignalInfoOutput *output,
                          gint8 *out_quality)
 {
-    gint8 rssi_max = 0;
+    gint8 rssi_max = -125;
     gint8 rssi;
 
     g_assert (out_quality != NULL);
@@ -2225,31 +2225,31 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
     if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (CDMA): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (HDR): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
         mm_dbg ("RSSI (GSM): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (LTE): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     /* This RSSI comes as negative dBms */
@@ -2257,7 +2257,7 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
 
     mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
 
-    return (rssi_max < 0);
+    return (rssi_max > -125);
 }
 
 static void
@@ -6035,7 +6035,7 @@ signal_info_indication_cb (QmiClientNas *client,
                            QmiIndicationNasSignalInfoOutput *output,
                            MMBroadbandModemQmi *self)
 {
-    gint8 rssi_max = 0;
+    gint8 rssi_max = -125;
     gint8 rssi;
     guint8 quality;
 
@@ -6048,31 +6048,31 @@ signal_info_indication_cb (QmiClientNas *client,
     if (qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (CDMA): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (HDR): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
         mm_dbg ("RSSI (GSM): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
         mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
         mm_dbg ("RSSI (LTE): %d dBm", rssi);
         if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
-            rssi = MAX (rssi, rssi_max);
+            rssi_max = MAX (rssi, rssi_max);
     }
 
     if (rssi_max < 0) {
