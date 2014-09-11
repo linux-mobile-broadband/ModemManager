@@ -4046,8 +4046,8 @@ process_common_info (QmiNasServiceStatus service_status,
                      gchar **mm_operator_id)
 {
     MMModem3gppRegistrationState tmp_registration_state;
-    gboolean apply_cs;
-    gboolean apply_ps;
+    gboolean apply_cs = TRUE;
+    gboolean apply_ps = TRUE;
 
     if (service_status != QMI_NAS_SERVICE_STATUS_LIMITED &&
         service_status != QMI_NAS_SERVICE_STATUS_AVAILABLE &&
@@ -4067,6 +4067,8 @@ process_common_info (QmiNasServiceStatus service_status,
             apply_ps = FALSE;
         else if (domain == QMI_NAS_NETWORK_SERVICE_DOMAIN_PS)
             apply_cs = FALSE;
+        else if (domain == QMI_NAS_NETWORK_SERVICE_DOMAIN_CS_PS)
+            /* both apply */ ;
 
         /* Check if we really are roaming or forbidden */
         if (forbidden_valid && forbidden)
@@ -4088,7 +4090,7 @@ process_common_info (QmiNasServiceStatus service_status,
     if (apply_cs)
         *mm_cs_registration_state = tmp_registration_state;
     if (apply_ps)
-        *mm_cs_registration_state = tmp_registration_state;
+        *mm_ps_registration_state = tmp_registration_state;
 
     if (network_id_valid) {
         *mm_operator_id = g_malloc (7);
