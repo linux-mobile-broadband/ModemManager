@@ -236,25 +236,6 @@ case $with_qmi in
         ;;
 esac
 
-dnl
-dnl Newest QMI commands
-dnl
-AC_ARG_WITH(newest_qmi_commands, AS_HELP_STRING([--with-newest-qmi-commands], [Try to avoid deprecated QMI commands]))
-AM_CONDITIONAL(WITH_NEWEST_QMI_COMMANDS, test "x$with_newest_qmi_commands" = "xyes")
-case $with_newest_qmi_commands in
-    yes)
-        if test "x$with_qmi" = "xno" ; then
-           AC_ERROR([Cannot enable newest QMI commands if QMI support is disabled])
-        fi
-
-        AC_DEFINE(WITH_NEWEST_QMI_COMMANDS, 1, [Define if we enable new QMI commands support])
-        with_newest_qmi_commands=yes
-        ;;
-    *)
-        with_newest_qmi_commands=no
-        ;;
-esac
-
 NM_COMPILER_WARNINGS
 
 
@@ -332,5 +313,4 @@ echo "
     Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}
-    Newest QMI commands:     ${with_newest_qmi_commands}
 "
