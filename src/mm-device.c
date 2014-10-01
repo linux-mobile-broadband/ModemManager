@@ -96,6 +96,11 @@ device_find_probe_with_device (MMDevice    *self,
     for (l = self->priv->port_probes; l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
+        if (   g_udev_device_has_property (udev_port, "DEVPATH_OLD")
+            && g_str_has_suffix (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
+                                 g_udev_device_get_property (udev_port, "DEVPATH_OLD")))
+            return probe;
+
         if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
                          g_udev_device_get_sysfs_path (udev_port)))
             return probe;
@@ -106,6 +111,11 @@ device_find_probe_with_device (MMDevice    *self,
 
     for (l = self->priv->ignored_port_probes; l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (   g_udev_device_has_property (udev_port, "DEVPATH_OLD")
+            && g_str_has_suffix (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
+                                 g_udev_device_get_property (udev_port, "DEVPATH_OLD")))
+            return probe;
 
         if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
                          g_udev_device_get_sysfs_path (udev_port)))
