@@ -240,6 +240,61 @@ find_physical_device (GUdevDevice *child)
 }
 
 static void
+device_removed (MMBaseManager *self,
+                GUdevDevice *udev_device)
+{
+    MMDevice *device;
+    const gchar *subsys;
+    const gchar *name;
+
+    g_return_if_fail (udev_device != NULL);
+
+    subsys = g_udev_device_get_subsystem (udev_device);
+    name = g_udev_device_get_name (udev_device);
+
+    if (!g_str_has_prefix (subsys, "usb") ||
+        (name && g_str_has_prefix (name, "cdc-wdm"))) {
+        /* Handle tty/net/wdm port removal */
+        device = find_device_by_port (self, udev_device);
+        if (device) {
+            mm_info ("(%s/%s): released by modem %s",
+                     subsys,
+                     name,
+                     g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
+            mm_device_release_port (device, udev_device);
+
+            /* If port probe list gets empty, remove the device object iself */
+            if (!mm_device_peek_port_probe_list (device)) {
+                mm_dbg ("Removing empty device '%s'", mm_device_get_path (device));
+                mm_device_remove_modem (device);
+                g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+            }
+        }
+
+        return;
+    }
+
+    /* This case is designed to handle the case where, at least with kernel 2.6.31, unplugging
+     * an in-use ttyACMx device results in udev generating remove events for the usb, but the
+     * ttyACMx device (subsystem tty) is not removed, since it was in-use.  So if we have not
+     * found a modem for the port (above), we're going to look here to see if we have a modem
+     * associated with the newly removed device.  If so, we'll remove the modem, since the
+     * device has been removed.  That way, if the device is reinserted later, we'll go through
+     * the process of exporting it.
+     */
+    device = find_device_by_udev_device (self, udev_device);
+    if (device) {
+        mm_dbg ("Removing device '%s'", mm_device_get_path (device));
+        mm_device_remove_modem (device);
+        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+        return;
+    }
+
+    /* Maybe a plugin is checking whether or not the port is supported.
+     * TODO: Cancel every possible supports check in this port. */
+}
+
+static void
 device_added (MMBaseManager *manager,
               GUdevDevice *port,
               gboolean hotplugged,
@@ -267,8 +322,14 @@ device_added (MMBaseManager *manager,
      * rules have been processed before handling a device.
      */
     is_candidate = g_udev_device_get_property_as_boolean (port, "ID_MM_CANDIDATE");
-    if (!is_candidate)
+    if (!is_candidate) {
+        /* This could mean that device changed, loosing its ID_MM_CANDIDATE
+         * flags (such as Bluetooth RFCOMM devices upon disconnect.
+         * Try to forget it. */
+        if (hotplugged && !manual_scan)
+            device_removed (manager, port);
         return;
+    }
 
     if (find_device_by_port (manager, port))
         return;
@@ -349,61 +410,6 @@ device_added (MMBaseManager *manager,
 out:
     if (physdev)
         g_object_unref (physdev);
-}
-
-static void
-device_removed (MMBaseManager *self,
-                GUdevDevice *udev_device)
-{
-    MMDevice *device;
-    const gchar *subsys;
-    const gchar *name;
-
-    g_return_if_fail (udev_device != NULL);
-
-    subsys = g_udev_device_get_subsystem (udev_device);
-    name = g_udev_device_get_name (udev_device);
-
-    if (!g_str_has_prefix (subsys, "usb") ||
-        (name && g_str_has_prefix (name, "cdc-wdm"))) {
-        /* Handle tty/net/wdm port removal */
-        device = find_device_by_port (self, udev_device);
-        if (device) {
-            mm_info ("(%s/%s): released by modem %s",
-                     subsys,
-                     name,
-                     g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
-            mm_device_release_port (device, udev_device);
-
-            /* If port probe list gets empty, remove the device object iself */
-            if (!mm_device_peek_port_probe_list (device)) {
-                mm_dbg ("Removing empty device '%s'", mm_device_get_path (device));
-                mm_device_remove_modem (device);
-                g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
-            }
-        }
-
-        return;
-    }
-
-    /* This case is designed to handle the case where, at least with kernel 2.6.31, unplugging
-     * an in-use ttyACMx device results in udev generating remove events for the usb, but the
-     * ttyACMx device (subsystem tty) is not removed, since it was in-use.  So if we have not
-     * found a modem for the port (above), we're going to look here to see if we have a modem
-     * associated with the newly removed device.  If so, we'll remove the modem, since the
-     * device has been removed.  That way, if the device is reinserted later, we'll go through
-     * the process of exporting it.
-     */
-    device = find_device_by_udev_device (self, udev_device);
-    if (device) {
-        mm_dbg ("Removing device '%s'", mm_device_get_path (device));
-        mm_device_remove_modem (device);
-        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
-        return;
-    }
-
-    /* Maybe a plugin is checking whether or not the port is supported.
-     * TODO: Cancel every possible supports check in this port. */
 }
 
 static void
