@@ -9,6 +9,10 @@
 
 ACTION!="add|change|move", GOTO="mm_candidate_end"
 
+# Opening bound but disconnected Bluetooth RFCOMM ttys would initiate the
+# connection. Don't do that.
+KERNEL=="rfcomm[0-9]*", DEVPATH=="*/virtual/*", GOTO="mm_candidate_end"
+
 SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
 KERNEL=="cdc-wdm*", SUBSYSTEM=="usb", ENV{ID_MM_CANDIDATE}="1"
