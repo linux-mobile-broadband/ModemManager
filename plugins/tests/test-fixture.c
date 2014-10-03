@@ -46,7 +46,7 @@ test_fixture_setup (TestFixture *fixture)
                                           NULL, /* inputs */
                                           NULL, /* outputs */
                                           G_DBUS_CALL_FLAGS_NONE,
-                                          3000, /* timeout, ms */
+                                          30000, /* timeout, ms */
                                           NULL, /* cancellable */
                                           &error);
     if (!result)
