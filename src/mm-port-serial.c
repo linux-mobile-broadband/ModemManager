@@ -1274,24 +1274,22 @@ mm_port_serial_is_open (MMPortSerial *self)
     return !!self->priv->open_count;
 }
 
-void
-mm_port_serial_close (MMPortSerial *self)
+static void
+_close_internal (MMPortSerial *self, gboolean force)
 {
     const char *device;
     int i;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
 
-    /* If we forced closing the port, open_count will be 0 already.
-     * Just return without issuing any warning */
-    if (self->priv->forced_close)
-        return;
-
-    g_return_if_fail (self->priv->open_count > 0);
+    if (force)
+        self->priv->open_count = 0;
+    else {
+        g_return_if_fail (self->priv->open_count > 0);
+        self->priv->open_count--;
+    }
 
     device = mm_port_get_device (MM_PORT (self));
-
-    self->priv->open_count--;
 
     mm_dbg ("(%s) device open count is %d (close)", device, self->priv->open_count);
 
@@ -1402,10 +1400,18 @@ mm_port_serial_close (MMPortSerial *self)
     g_clear_object (&self->priv->cancellable);
 }
 
+void
+mm_port_serial_close (MMPortSerial *self)
+{
+    g_return_if_fail (MM_IS_PORT_SERIAL (self));
+
+    if (!self->priv->forced_close)
+        _close_internal (self, FALSE);
+}
+
 static void
 port_serial_close_force (MMPortSerial *self)
 {
-    g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
 
     /* If already forced to close, return */
@@ -1418,19 +1424,16 @@ port_serial_close_force (MMPortSerial *self)
      * open counts */
     self->priv->forced_close = TRUE;
 
-    /* If already closed, done */
-    if (!self->priv->open_count && !self->priv->reopen_ctx)
-        return;
-
     /* Cancel port reopening if one is running */
     port_serial_reopen_cancel (self);
 
-    /* Force the port to close */
-    self->priv->open_count = 1;
-    mm_port_serial_close (self);
+    /* If already closed, done */
+    if (self->priv->open_count > 0) {
+        _close_internal (self, TRUE);
 
-    /* Notify about the forced close status */
-    g_signal_emit (self, signals[FORCED_CLOSE], 0);
+        /* Notify about the forced close status */
+        g_signal_emit (self, signals[FORCED_CLOSE], 0);
+    }
 }
 
 /*****************************************************************************/
