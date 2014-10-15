@@ -602,6 +602,9 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
             is_qcdm = TRUE;
             qcdm_result_unref (result);
         }
+    } else if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_PARSE_FAILED)) {
+        /* Failed to unescape QCDM packet: don't retry */
+        mm_dbg ("QCDM parsing error: %s", error->message);
     } else {
         if (!g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
             mm_dbg ("QCDM probe error: (%d) %s", error->code, error->message);

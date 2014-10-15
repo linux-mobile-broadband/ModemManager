@@ -100,9 +100,9 @@ serial_command_ready (MMPortSerial *port,
     /* Get the offset into the buffer of where the QCDM frame starts */
     start = 0;
     if (!find_qcdm_start (response_buffer, &start)) {
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Failed to parse QCDM packet");
+        error = g_error_new_literal (MM_SERIAL_ERROR,
+                                     MM_SERIAL_ERROR_FRAME_NOT_FOUND,
+                                     "QCDM frame start not found");
         /* Discard the unparsable data */
         used = response_buffer->len;
         goto out;
@@ -117,8 +117,8 @@ serial_command_ready (MMPortSerial *port,
                                      &used,
                                      &more);
     if (!success) {
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
+        error = g_error_new_literal (MM_SERIAL_ERROR,
+                                     MM_SERIAL_ERROR_PARSE_FAILED,
                                      "Failed to unescape QCDM packet");
         g_free (unescaped_buffer);
         unescaped_buffer = NULL;

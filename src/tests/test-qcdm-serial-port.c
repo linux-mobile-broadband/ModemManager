@@ -280,7 +280,8 @@ qcdm_verinfo_expect_fail_cb (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
 
-    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    /* Expect any kind of error */
+    g_assert (error != NULL);
     g_error_free (error);
     g_assert (response == NULL);
 
