@@ -37,7 +37,7 @@ test_fixture_setup (TestFixture *fixture)
     if (fixture->connection == NULL)
         g_error ("Error getting connection to test bus: %s", error->message);
 
-    /* Ping to autostart MM; wait up to 3s */
+    /* Ping to autostart MM; wait up to 30s */
     result = g_dbus_connection_call_sync (fixture->connection,
                                           "org.freedesktop.ModemManager1",
                                           "/org/freedesktop/ModemManager1",
