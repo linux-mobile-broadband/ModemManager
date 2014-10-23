@@ -950,6 +950,15 @@ disconnect_finish (MMBaseBearer *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static void
+reset_bearer_connection (MMBearerMbim *self)
+{
+    if (self->priv->data) {
+        mm_port_set_connected (self->priv->data, FALSE);
+        g_clear_object (&self->priv->data);
+    }
+}
+
 static void disconnect_context_step (DisconnectContext *ctx);
 
 static void
@@ -1064,8 +1073,7 @@ disconnect_context_step (DisconnectContext *ctx)
 
     case DISCONNECT_STEP_LAST:
         /* Port is disconnected; update the state */
-        mm_port_set_connected (ctx->self->priv->data, FALSE);
-        g_clear_object (&ctx->self->priv->data);
+        reset_bearer_connection (ctx->self);
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disconnect_context_complete_and_free (ctx);
@@ -1122,6 +1130,20 @@ mm_bearer_mbim_get_session_id (MMBearerMbim *self)
     g_return_val_if_fail (MM_IS_BEARER_MBIM (self), 0);
 
     return self->priv->session_id;
+}
+
+/*****************************************************************************/
+
+static void
+report_connection_status (MMBaseBearer *self,
+                          MMBearerConnectionStatus status)
+{
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+        /* Cleanup all connection related data */
+        reset_bearer_connection (MM_BEARER_MBIM (self));
+
+    /* Chain up parent's report_connection_status() */
+    MM_BASE_BEARER_CLASS (mm_bearer_mbim_parent_class)->report_connection_status (self, status);
 }
 
 /*****************************************************************************/
@@ -1221,6 +1243,7 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->connect_finish = connect_finish;
     base_bearer_class->disconnect = disconnect;
     base_bearer_class->disconnect_finish = disconnect_finish;
+    base_bearer_class->report_connection_status = report_connection_status;
 
     properties[PROP_SESSION_ID] =
         g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,
