@@ -87,4 +87,7 @@ ATTRS{idVendor}=="1b4f", ATTRS{idProduct}=="9208", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Altair U-Boot device
 ATTRS{idVendor}=="0216", ATTRS{idProduct}=="0051" ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# GW Instek AFG-2225 arbitrary function generator
+ATTRS{idVendor}=="2184", ATTRS{idProduct}=="001c", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
