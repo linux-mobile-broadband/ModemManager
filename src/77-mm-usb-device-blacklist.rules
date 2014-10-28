@@ -116,4 +116,7 @@ ATTRS{idVendor}=="1d50", ENV{ID_MM_DEVICE_IGNORE}="1"
 # All devices from 3D Robotics
 ATTRS{idVendor}=="26ac", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# GW Instek AFG-2225 arbitrary function generator
+ATTRS{idVendor}=="2184", ATTRS{idProduct}=="001c", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
