@@ -7776,7 +7776,8 @@ get_agps_config_ready (QmiClientPds *client,
         qmi_message_pds_get_agps_config_output_get_location_server_url (
             output,
             &url,
-            NULL)) {
+            NULL) &&
+        url->len > 0) {
         str = g_convert (url->data, url->len, "UTF-8", "UTF-16BE", NULL, NULL, NULL);
     }
 
