@@ -322,7 +322,6 @@ test_port_context_stop (TestPortContext *self)
     g_main_loop_quit (self->loop);
 
     g_thread_join (self->thread);
-    g_thread_unref (self->thread);
     self->thread = NULL;
 }
 
