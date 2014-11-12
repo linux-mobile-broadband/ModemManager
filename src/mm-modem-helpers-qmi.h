@@ -31,6 +31,7 @@ MMModemMode mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network
 MMModemLock mm_modem_lock_from_qmi_uim_pin_status (QmiDmsUimPinStatus status,
                                                        gboolean pin1);
 
+gboolean mm_pin_enabled_from_qmi_uim_pin_status (QmiDmsUimPinStatus status);
 QmiDmsUimFacility mm_3gpp_facility_to_qmi_uim_facility (MMModem3gppFacility mm);
 
 GArray *mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,

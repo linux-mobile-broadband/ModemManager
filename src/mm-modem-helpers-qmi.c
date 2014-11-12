@@ -98,6 +98,32 @@ mm_modem_lock_from_qmi_uim_pin_status (QmiDmsUimPinStatus status,
 
 /*****************************************************************************/
 
+gboolean
+mm_pin_enabled_from_qmi_uim_pin_status (QmiDmsUimPinStatus status)
+{
+    switch (status) {
+    case QMI_DMS_UIM_PIN_STATUS_ENABLED_NOT_VERIFIED:
+    case QMI_DMS_UIM_PIN_STATUS_ENABLED_VERIFIED:
+    case QMI_DMS_UIM_PIN_STATUS_BLOCKED:
+    case QMI_DMS_UIM_PIN_STATUS_PERMANENTLY_BLOCKED:
+    case QMI_DMS_UIM_PIN_STATUS_UNBLOCKED:
+    case QMI_DMS_UIM_PIN_STATUS_CHANGED:
+        /* assume the PIN to be enabled then */
+        return TRUE;
+
+    case QMI_DMS_UIM_PIN_STATUS_DISABLED:
+    case QMI_DMS_UIM_PIN_STATUS_NOT_INITIALIZED:
+        /* assume the PIN to be disabled then */
+        return FALSE;
+
+    default:
+        /* by default assume disabled */
+        return FALSE;
+    }
+}
+
+/*****************************************************************************/
+
 QmiDmsUimFacility
 mm_3gpp_facility_to_qmi_uim_facility (MMModem3gppFacility mm)
 {
