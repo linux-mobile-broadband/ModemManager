@@ -3347,6 +3347,68 @@ modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
 }
 
 static void
+get_sim_lock_status_via_pin_status_ready (QmiClientDms *client,
+                                          GAsyncResult *res,
+                                          LoadEnabledFacilityLocksContext *ctx)
+{
+    QmiMessageDmsUimGetPinStatusOutput *output;
+    gboolean enabled;
+
+    output = qmi_client_dms_uim_get_pin_status_finish (client, res, NULL);
+    if (!output ||
+        !qmi_message_dms_uim_get_pin_status_output_get_result (output, NULL)) {
+        mm_dbg ("Couldn't query PIN status, assuming SIM PIN is disabled");
+        enabled = FALSE;
+    } else {
+        QmiDmsUimPinStatus current_status;
+
+        if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
+            output,
+            &current_status,
+            NULL, /* verify_retries_left */
+            NULL, /* unblock_retries_left */
+            NULL)) {
+            enabled = mm_pin_enabled_from_qmi_uim_pin_status (current_status);
+            mm_dbg ("PIN is reported %s", (enabled ? "enabled" : "disabled"));
+        } else {
+            mm_dbg ("Couldn't find PIN1 status in the result, assuming SIM PIN is disabled");
+            enabled = FALSE;
+        }
+    }
+
+    if (output)
+        qmi_message_dms_uim_get_pin_status_output_unref (output);
+
+    if (enabled) {
+        ctx->locks |= (MM_MODEM_3GPP_FACILITY_SIM);
+    } else {
+        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_SIM);
+    }
+
+    /* No more facilities to query, all done */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (ctx->locks),
+                                               NULL);
+    load_enabled_facility_locks_context_complete_and_free (ctx);
+}
+
+/* the SIM lock cannot be queried with the qmi_get_ck_status function,
+ * therefore using the PIN status */
+static void
+get_sim_lock_status_via_pin_status (LoadEnabledFacilityLocksContext *ctx)
+{
+    mm_dbg ("Retrieving PIN status to check for enabled PIN");
+    /* if the SIM is locked or not can only be queried by locking at
+     * the PIN status */
+    qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (ctx->client),
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)get_sim_lock_status_via_pin_status_ready,
+                                       ctx);
+}
+
+static void
 dms_uim_get_ck_status_ready (QmiClientDms *client,
                              GAsyncResult *res,
                              LoadEnabledFacilityLocksContext *ctx)
@@ -3424,11 +3486,7 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
         }
     }
 
-    /* No more facilities to query, all done */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (ctx->locks),
-                                               NULL);
-    load_enabled_facility_locks_context_complete_and_free (ctx);
+    get_sim_lock_status_via_pin_status (ctx);
 }
 
 static void
