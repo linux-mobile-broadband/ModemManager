@@ -145,43 +145,53 @@ parse_ipdpaddr_v6 (const gchar **items, guint num_items, GError **error)
     if (num_items < 12)
         return NULL;
 
+    /* No IPv6 IP and no IPv6 DNS, return NULL without error. */
+    if (g_strcmp0 (items[9], "::") == 0 && g_strcmp0 (items[11], "::") == 0)
+        return NULL;
+
+    config = mm_bearer_ip_config_new ();
+
     /* It appears that for IPv6 %IPDPADDR returns only the expected
      * link-local address and a DNS address, and that to retrieve the
      * default router, extra DNS, and search domains, the host must listen
      * for IPv6 Router Advertisements on the net port.
      */
-
-    config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
-
-    /* IP address and prefix */
-    if (inet_pton (AF_INET6, items[9], &tmp6) != 1 ||
+    if (g_strcmp0 (items[9], "::") != 0) {
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+        /* IP address and prefix */
+        if (inet_pton (AF_INET6, items[9], &tmp6) != 1 ||
             IN6_IS_ADDR_UNSPECIFIED (&tmp6)) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Couldn't parse IPv6 address '%s'", items[9]);
-        goto error;
-    }
-    mm_bearer_ip_config_set_address (config, items[9]);
-    mm_bearer_ip_config_set_prefix (config, 64);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse IPv6 address '%s'", items[9]);
+            goto error;
+        }
+        mm_bearer_ip_config_set_address (config, items[9]);
+        mm_bearer_ip_config_set_prefix (config, 64);
 
-    /* If the address is a link-local one, then SLAAC or DHCP must be used
-     * to get the real prefix and address.  Change the method to DHCP to
-     * indicate this to clients.
-     */
-    if (IN6_IS_ADDR_LINKLOCAL (&tmp6))
+        /* If the address is a link-local one, then SLAAC or DHCP must be used
+         * to get the real prefix and address.  Change the method to DHCP to
+         * indicate this to clients.
+         */
+        if (IN6_IS_ADDR_LINKLOCAL (&tmp6))
+            mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+    } else {
+        /* No IPv6 given, but DNS will be available, try with DHCP */
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+    }
 
     /* DNS server */
-    memset (&tmp6, 0, sizeof (tmp6));
-    if (inet_pton (AF_INET6, items[11], &tmp6) == 1 &&
+    if (g_strcmp0 (items[11], "::") != 0) {
+        memset (&tmp6, 0, sizeof (tmp6));
+        if (inet_pton (AF_INET6, items[11], &tmp6) == 1 &&
             !IN6_IS_ADDR_UNSPECIFIED (&tmp6)) {
-        dns[0] = items[11];
-        dns[1] = NULL;
-        mm_bearer_ip_config_set_dns (config, (const gchar **) dns);
-    } else {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Couldn't parse DNS address '%s'", items[11]);
-        goto error;
+            dns[0] = items[11];
+            dns[1] = NULL;
+            mm_bearer_ip_config_set_dns (config, (const gchar **) dns);
+        } else {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse DNS address '%s'", items[11]);
+            goto error;
+        }
     }
 
     return config;
@@ -223,7 +233,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
      * Sierra USB305: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0
      * K3805-Z: %IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0, 255.0.0.0, 255.255.255.0, 21.93.217.10,
      * Nokia 21M: %IPDPADDR: 2, 33.196.7.127, 33.196.7.128, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0, 255.0.0.0, 33.196.7.128, fe80::f:9135:5901, ::, fd00:976a::9, ::, ::, ::, ::, ::
-     * Nokia 21M: %IPDPADDR: 3, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, fe80::2e:437b:7901, ::, fd00:976a::9, ::, ::, ::, ::, ::  
+     * Nokia 21M: %IPDPADDR: 3, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, fe80::2e:437b:7901, ::, fd00:976a::9, ::, ::, ::, ::, ::
      */
     response = mm_strip_tag (response, IPDPADDR_TAG);
     items = g_strsplit_set (response, ",", 0);
@@ -274,4 +284,3 @@ out:
     *out_ip6_config = ip6_config;
     return success;
 }
-
