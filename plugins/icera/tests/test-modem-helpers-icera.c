@@ -49,7 +49,7 @@ typedef struct {
 
 static const IpdpaddrTest ipdpaddr_tests[] = {
     /* Sierra USB305 */
-    { "%IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0\r\n", 
+    { "%IPDPADDR: 2, 21.93.217.11, 21.93.217.10, 10.177.0.34, 10.161.171.220, 0.0.0.0, 0.0.0.0\r\n",
         2, "21.93.217.11", 32, "21.93.217.10", "10.177.0.34", "10.161.171.220",
         NULL, NULL },
 
@@ -86,6 +86,18 @@ static const IpdpaddrTest ipdpaddr_tests[] = {
     { "%IPDPADDR: 2, 188.150.116.13, 188.150.116.14, 188.149.250.16, 0.0.0.0, 0.0.0.0, 0.0.0.0, 255.255.0.0, 188.150.116.14, fe80::1:e414:eb01, ::, 2a00:e18:0:3::6, ::, ::, ::, ::, ::\r\n",
         2, "188.150.116.13", 16, "188.150.116.14", "188.149.250.16", NULL,
         "fe80::1:e414:eb01", "2a00:e18:0:3::6" },
+
+    { "%IPDPADDR: 1, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, fe80::1f:fad1:4c01, ::, 2001:4600:4:fff::54, 2001:4600:4:1fff::54, ::, ::, ::, ::\r\n",
+      1, NULL, 0, NULL, NULL, NULL,
+      "fe80::1f:fad1:4c01", "2001:4600:4:fff::54" },
+
+    { "%IPDPADDR: 1, 46.157.76.179, 46.157.76.180, 193.213.112.4, 130.67.15.198, 0.0.0.0, 0.0.0.0, 255.0.0.0, 46.157.76.180, ::, ::, ::, ::, ::, ::, ::, ::\r\n",
+      1, "46.157.76.179", 32, "46.157.76.180", "193.213.112.4", "130.67.15.198",
+      NULL, NULL },
+
+    { "%IPDPADDR: 1, 0.0.0.0, 0.0.0.0, 193.213.112.4, 130.67.15.198, 0.0.0.0, 0.0.0.0, 0.0.0.0, 0.0.0.0, ::, ::, 2001:4600:4:fff::52, 2001:4600:4:1fff::52, ::, ::, ::, ::",
+      1, NULL, 0, NULL, NULL, NULL,
+      NULL, "2001:4600:4:fff::52" },
 
     { NULL }
 };
@@ -133,18 +145,21 @@ test_ipdpaddr (void)
             g_assert (ipv4 == NULL);
 
         /* IPv6 */
-        if (ipdpaddr_tests[i].ipv6_addr) {
+        if (ipdpaddr_tests[i].ipv6_addr || ipdpaddr_tests[i].ipv6_dns1) {
             struct in6_addr a6;
             g_assert (ipv6);
 
-            g_assert_cmpstr (mm_bearer_ip_config_get_address (ipv6), ==, ipdpaddr_tests[i].ipv6_addr);
-            g_assert_cmpint (mm_bearer_ip_config_get_prefix (ipv6), ==, 64);
+            if (ipdpaddr_tests[i].ipv6_addr) {
+                g_assert_cmpstr (mm_bearer_ip_config_get_address (ipv6), ==, ipdpaddr_tests[i].ipv6_addr);
+                g_assert_cmpint (mm_bearer_ip_config_get_prefix (ipv6), ==, 64);
 
-            g_assert (inet_pton (AF_INET6, mm_bearer_ip_config_get_address (ipv6), &a6));
-            if (IN6_IS_ADDR_LINKLOCAL (&a6))
+                g_assert (inet_pton (AF_INET6, mm_bearer_ip_config_get_address (ipv6), &a6));
+                if (IN6_IS_ADDR_LINKLOCAL (&a6))
+                    g_assert_cmpint (mm_bearer_ip_config_get_method (ipv6), ==, MM_BEARER_IP_METHOD_DHCP);
+                else
+                    g_assert_cmpint (mm_bearer_ip_config_get_method (ipv6), ==, MM_BEARER_IP_METHOD_STATIC);
+            } else
                 g_assert_cmpint (mm_bearer_ip_config_get_method (ipv6), ==, MM_BEARER_IP_METHOD_DHCP);
-            else
-                g_assert_cmpint (mm_bearer_ip_config_get_method (ipv6), ==, MM_BEARER_IP_METHOD_STATIC);
 
             dns = mm_bearer_ip_config_get_dns (ipv6);
             g_assert (dns);
