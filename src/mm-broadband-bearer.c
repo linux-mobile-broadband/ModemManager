@@ -985,7 +985,7 @@ parse_pdp_list (MMBaseModem *modem,
                 const gchar *apn;
 
                 apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-                if (apn && g_str_equal (pdp->apn, apn)) {
+                if (apn && !g_ascii_strcasecmp (pdp->apn, apn)) {
                     gchar *ip_family_str;
 
                     /* Found a PDP context with the same CID and PDP type, we'll use it. */
