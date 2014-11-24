@@ -159,6 +159,10 @@ getportmode_ready (MMPortSerialAt *port,
         cache_port_mode (device, response, "MDM:",  TAG_HUAWEI_MODEM_PORT);
         cache_port_mode (device, response, "NDIS:", TAG_HUAWEI_NDIS_PORT);
         cache_port_mode (device, response, "DIAG:", TAG_HUAWEI_DIAG_PORT);
+        /* GETPORTMODE response format in newer devices... (e.g. E3372) */
+        cache_port_mode (device, response, "pcui:",  TAG_HUAWEI_PCUI_PORT);
+        cache_port_mode (device, response, "modem:", TAG_HUAWEI_MODEM_PORT);
+
         g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
 
         /* Mark port as being AT already */
