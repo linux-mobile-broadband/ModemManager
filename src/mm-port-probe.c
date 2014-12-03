@@ -103,6 +103,8 @@ typedef struct {
     const MMPortProbeAtCommand *at_custom_probe;
     /* Current group of AT commands to be sent */
     const MMPortProbeAtCommand *at_commands;
+    /* Seconds between each AT command sent in the group */
+    guint at_commands_wait_secs;
     /* Current AT Result processor */
     void (* at_result_processor) (MMPortProbe *self,
                                   GVariant *result);
@@ -916,7 +918,15 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
         }
 
         /* Schedule the next command in the probing group */
-        task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
+        if (task->at_commands_wait_secs == 0)
+            task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
+        else {
+            mm_dbg ("(%s/%s) re-scheduling next command in probing group in %u seconds...",
+                    g_udev_device_get_subsystem (self->priv->port),
+                    g_udev_device_get_name (self->priv->port),
+                    task->at_commands_wait_secs);
+            task->source_id = g_timeout_add_seconds (task->at_commands_wait_secs, (GSourceFunc)serial_probe_at, self);
+        }
         goto out;
     }
 
@@ -992,6 +1002,8 @@ static const MMPortProbeAtCommand product_probing[] = {
 
 static const MMPortProbeAtCommand icera_probing[] = {
     { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
     { NULL }
 };
 
@@ -1040,6 +1052,7 @@ serial_probe_schedule (MMPortProbe *self)
     /* Cleanup */
     task->at_result_processor = NULL;
     task->at_commands = NULL;
+    task->at_commands_wait_secs = 0;
 
     /* AT check requested and not already probed? */
     if ((task->flags & MM_PORT_PROBE_AT) &&
@@ -1071,6 +1084,8 @@ serial_probe_schedule (MMPortProbe *self)
         /* Prepare AT product probing */
         task->at_result_processor = serial_probe_at_icera_result_processor;
         task->at_commands = icera_probing;
+        /* By default, wait 2 seconds between ICERA probing retries */
+        task->at_commands_wait_secs = 2;
     }
 
     /* If a next AT group detected, go for it */
