@@ -34,6 +34,21 @@ G_DEFINE_TYPE (MMPluginAltairLte, mm_plugin_altair_lte, MM_TYPE_PLUGIN)
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
+/*****************************************************************************/
+/* Custom commands for AT probing */
+
+/* Increase the response timeout for probe commands since some altair modems
+   take longer to respond after a reset.
+ */
+static const MMPortProbeAtCommand custom_at_probe[] = {
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { NULL }
+};
+
+/*****************************************************************************/
+
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *sysfs_path,
@@ -65,6 +80,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_NAME,                "Altair LTE",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
                       MM_PLUGIN_ALLOWED_PRODUCT_IDS, products,
+                      MM_PLUGIN_CUSTOM_AT_PROBE,     custom_at_probe,
                       MM_PLUGIN_ALLOWED_SINGLE_AT,   TRUE,
                       MM_PLUGIN_SEND_LF,             TRUE,
                       NULL));
