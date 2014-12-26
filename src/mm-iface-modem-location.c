@@ -218,8 +218,8 @@ notify_gps_location_update (MMIfaceModemLocation *self,
     const gchar *dbus_path;
 
     dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_info ("Modem %s: GPS location updated",
-             dbus_path);
+    mm_dbg ("Modem %s: GPS location updated",
+            dbus_path);
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -288,13 +288,13 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
     const gchar *dbus_path;
 
     dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_info ("Modem %s: 3GPP location updated "
-             "(MCC: '%u', MNC: '%u', Location area code: '%lX', Cell ID: '%lX')",
-             dbus_path,
-             mm_location_3gpp_get_mobile_country_code (location_3gpp),
-             mm_location_3gpp_get_mobile_network_code (location_3gpp),
-             mm_location_3gpp_get_location_area_code (location_3gpp),
-             mm_location_3gpp_get_cell_id (location_3gpp));
+    mm_dbg ("Modem %s: 3GPP location updated "
+            "(MCC: '%u', MNC: '%u', Location area code: '%lX', Cell ID: '%lX')",
+            dbus_path,
+            mm_location_3gpp_get_mobile_country_code (location_3gpp),
+            mm_location_3gpp_get_mobile_network_code (location_3gpp),
+            mm_location_3gpp_get_location_area_code (location_3gpp),
+            mm_location_3gpp_get_cell_id (location_3gpp));
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -405,11 +405,11 @@ notify_cdma_bs_location_update (MMIfaceModemLocation *self,
     const gchar *dbus_path;
 
     dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_info ("Modem %s: CDMA BS location updated "
-             "(Longitude: '%lf', Latitude: '%lf')",
-             dbus_path,
-             mm_location_cdma_bs_get_longitude (location_cdma_bs),
-             mm_location_cdma_bs_get_latitude (location_cdma_bs));
+    mm_dbg ("Modem %s: CDMA BS location updated "
+            "(Longitude: '%lf', Latitude: '%lf')",
+            dbus_path,
+            mm_location_cdma_bs_get_longitude (location_cdma_bs),
+            mm_location_cdma_bs_get_latitude (location_cdma_bs));
 
     /* We only update the property if we are supposed to signal
      * location */
