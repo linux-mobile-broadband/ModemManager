@@ -182,7 +182,7 @@ ip_configuration_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_ip_configuration_response_parse (
             response,
             NULL, /* sessionid */
@@ -459,7 +459,7 @@ connect_set_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        (mbim_message_command_done_get_result (response, &error) ||
+        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
          error->code == MBIM_STATUS_ERROR_FAILURE)) {
         GError *inner_error = NULL;
 
@@ -518,7 +518,7 @@ provisioned_contexts_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_provisioned_contexts_response_parse (
             response,
             &provisioned_contexts_count,
@@ -571,7 +571,7 @@ packet_service_set_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        (mbim_message_command_done_get_result (response, &error) ||
+        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
          error->code == MBIM_STATUS_ERROR_FAILURE)) {
         GError *inner_error = NULL;
 
@@ -977,7 +977,7 @@ disconnect_set_ready (MbimDevice *device,
         GError *inner_error = NULL;
         gboolean result = FALSE, parsed_result = FALSE;
 
-        result = mbim_message_command_done_get_result (response, &error);
+        result = mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
         /* Parse the response only for the cases we need to */
         if (result ||
             g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) ||

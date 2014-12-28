@@ -153,7 +153,7 @@ device_caps_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_device_caps_response_parse (
             response,
             NULL, /* device_type */
@@ -537,7 +537,7 @@ pin_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_pin_response_parse (
             response,
             &pin_type,
@@ -582,7 +582,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_subscriber_ready_status_response_parse (
             response,
             &ready_state,
@@ -730,7 +730,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_pin_response_parse (
             response,
             &pin_type,
@@ -809,7 +809,7 @@ own_numbers_subscriber_ready_state_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_subscriber_ready_status_response_parse (
             response,
             NULL, /* ready_state */
@@ -882,7 +882,7 @@ radio_state_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_radio_state_response_parse (
             response,
             &hardware_radio_state,
@@ -955,7 +955,7 @@ radio_state_set_down_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response)
-        mbim_message_command_done_get_result (response, &error);
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
 
     if (error)
         g_simple_async_result_take_error (simple, error);
@@ -980,7 +980,7 @@ radio_state_set_up_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_radio_state_response_parse (
             response,
             &hardware_radio_state,
@@ -1431,7 +1431,7 @@ pin_list_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_pin_list_response_parse (
             response,
             &pin_desc_pin1,
@@ -1827,7 +1827,7 @@ alert_sms_read_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_sms_read_response_parse (
             response,
             NULL,
@@ -2074,7 +2074,7 @@ subscribe_list_set_ready_cb (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response)
-        mbim_message_command_done_get_result (response, &error);
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
 
     if (error)
         g_simple_async_result_take_error (simple, error);
@@ -2334,7 +2334,7 @@ register_state_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_register_state_response_parse (
             response,
             NULL, /* nw_error */
@@ -2418,7 +2418,7 @@ register_state_set_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_register_state_response_parse (
             response,
             &nw_error,
@@ -2503,7 +2503,7 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
         return NULL;
 
     response = (MbimMessage *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    if (mbim_message_command_done_get_result (response, error) &&
+    if (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, error) &&
         mbim_message_visible_providers_response_parse (response,
                                                        &n_providers,
                                                        &providers,
@@ -2700,7 +2700,7 @@ sms_read_query_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
         mbim_message_sms_read_response_parse (
             response,
             NULL,
