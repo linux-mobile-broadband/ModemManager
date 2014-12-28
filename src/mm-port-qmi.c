@@ -214,13 +214,7 @@ qmi_device_new_ready (GObject *unused,
                       PortOpenContext *ctx)
 {
     GError *error = NULL;
-    QmiDeviceOpenFlags flags = QMI_DEVICE_OPEN_FLAGS_VERSION_INFO;
-
-    /* If possible, try to open the QMI port through the QMI proxy daemon, which
-     * allows other applications to also talk to the QMI port properly. */
-#if QMI_CHECK_VERSION (1,7,0)
-    flags |= QMI_DEVICE_OPEN_FLAGS_PROXY;
-#endif
+    QmiDeviceOpenFlags flags = (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO | QMI_DEVICE_OPEN_FLAGS_PROXY);
 
     ctx->self->priv->qmi_device = qmi_device_new_finish (res, &error);
     if (!ctx->self->priv->qmi_device) {
