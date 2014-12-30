@@ -281,3 +281,35 @@ mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 
     return MM_SMS_STATE_UNKNOWN;
 }
+
+/*****************************************************************************/
+
+gboolean
+mm_mbim_helper_response_get_result (const MbimMessage  *message,
+                                    GError            **error)
+{
+#if MBIM_CHECK_VERSION (1,11,1)
+    return mbim_message_response_get_result (message, MBIM_MESSAGE_TYPE_COMMAND_DONE, error);
+#else
+    MbimMessageType type;
+
+    g_return_val_if_fail (message != NULL, FALSE);
+
+    type = mbim_message_get_message_type (message);
+
+    if (type == MBIM_MESSAGE_TYPE_FUNCTION_ERROR) {
+        if (error)
+            *error = mbim_message_error_get_error (message);
+        return FALSE;
+    }
+
+    if (type == MBIM_MESSAGE_TYPE_COMMAND_DONE)
+        return mbim_message_command_done_get_result (message, error);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Unexpected response message type: 0x%04X", (guint32) type);
+    return FALSE;
+#endif
+}

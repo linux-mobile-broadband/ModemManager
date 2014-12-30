@@ -41,4 +41,10 @@ GError *mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error);
 
 MMSmsState mm_sms_state_from_mbim_message_status (MbimSmsStatus status);
 
+/*****************************************************************************/
+/* Other */
+
+gboolean mm_mbim_helper_response_get_result (const MbimMessage  *message,
+                                             GError            **error);
+
 #endif  /* MM_MODEM_HELPERS_MBIM_H */

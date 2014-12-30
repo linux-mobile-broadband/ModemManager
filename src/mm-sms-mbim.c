@@ -113,7 +113,7 @@ sms_send_set_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error) &&
+        mm_mbim_helper_response_get_result (response, &error) &&
         mbim_message_sms_send_response_parse (
             response,
             &message_reference,
@@ -248,7 +248,7 @@ sms_delete_set_ready (MbimDevice *device,
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        mbim_message_command_done_get_result (response, &error))
+        mm_mbim_helper_response_get_result (response, &error))
         mbim_message_sms_delete_response_parse (response, &error);
 
     if (response)
