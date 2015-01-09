@@ -7094,6 +7094,8 @@ wms_list_messages_ready (QmiClientWms *client,
         NULL);
 
     /* Keep a reference to the array ourselves */
+    if (ctx->message_array)
+        g_array_unref (ctx->message_array);
     ctx->message_array = g_array_ref (message_array);
 
     qmi_message_wms_list_messages_output_unref (output);
