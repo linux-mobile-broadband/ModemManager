@@ -47,7 +47,7 @@ quit_cb (gpointer user_data)
     if (loop)
         g_idle_add ((GSourceFunc) g_main_loop_quit, loop);
     else
-        _exit (0);
+        exit (0);
     return FALSE;
 }
 
