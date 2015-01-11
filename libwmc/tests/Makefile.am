@@ -1,5 +1,8 @@
 include $(top_srcdir)/gtester.make
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 noinst_PROGRAMS = test-wmc
 TEST_PROGS += $(noinst_PROGRAMS)
 

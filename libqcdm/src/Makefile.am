@@ -1,5 +1,7 @@
-noinst_LTLIBRARIES = libqcdm.la libqcdm-test.la
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
 
+noinst_LTLIBRARIES = libqcdm.la libqcdm-test.la
 
 libqcdm_la_CPPFLAGS = \
 	$(MM_CFLAGS)

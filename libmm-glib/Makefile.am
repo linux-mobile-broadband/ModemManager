@@ -1,5 +1,8 @@
 SUBDIRS = generated . tests
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 lib_LTLIBRARIES = libmm-glib.la
 
 libmm_glib_la_SOURCES = \
@@ -91,7 +94,8 @@ libmm_glib_la_LIBADD = \
 	$(LIBMM_GLIB_LIBS)
 
 libmm_glib_la_LDFLAGS = \
-	-version-info $(MM_GLIB_LT_CURRENT):$(MM_GLIB_LT_REVISION):$(MM_GLIB_LT_AGE)
+	-version-info $(MM_GLIB_LT_CURRENT):$(MM_GLIB_LT_REVISION):$(MM_GLIB_LT_AGE) \
+	$(AM_LDFLAGS)
 
 includedir = @includedir@/libmm-glib
 include_HEADERS = \

@@ -24,3 +24,10 @@ EXTRA_DIST = \
 	COPYING.LIB
 
 ACLOCAL_AMFLAGS = -I m4
+
+@CODE_COVERAGE_RULES@
+
+if CODE_COVERAGE_ENABLED
+clean-local:
+	-find $(top_builddir) -name "*.gcno" -delete
+endif

@@ -1,5 +1,7 @@
-noinst_LTLIBRARIES = libwmc.la
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
 
+noinst_LTLIBRARIES = libwmc.la
 
 libwmc_la_CPPFLAGS = \
 	$(MM_CFLAGS)

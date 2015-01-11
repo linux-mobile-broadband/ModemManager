@@ -1,6 +1,9 @@
 
 SUBDIRS = . tests
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 noinst_LTLIBRARIES = libmm-generated.la
 
 GENERATED_H = \

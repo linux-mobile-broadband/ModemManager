@@ -3,6 +3,9 @@ include $(top_srcdir)/gtester.make
 
 # Common CPPFLAGS and LDFLAGS
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 PLUGIN_COMMON_COMPILER_FLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS)	\
@@ -13,13 +16,15 @@ PLUGIN_COMMON_COMPILER_FLAGS = \
 	-I$(top_builddir)/include \
 	-I$(top_srcdir)/libmm-glib \
 	-I$(top_srcdir)/libmm-glib/generated \
-	-I$(top_builddir)/libmm-glib/generated
+	-I$(top_builddir)/libmm-glib/generated \
+	$(AM_CFLAGS)
 
 PLUGIN_COMMON_LINKER_FLAGS = \
 	$(GUDEV_LIBS) \
 	$(MM_LIBS) \
 	-module \
-	-avoid-version
+	-avoid-version \
+	$(AM_LDFLAGS)
 
 if WITH_QMI
 PLUGIN_COMMON_COMPILER_FLAGS += $(QMI_CFLAGS)

@@ -1,5 +1,8 @@
 include $(top_srcdir)/gtester.make
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 noinst_PROGRAMS = test-qcdm modepref ipv6pref reset
 TEST_PROGS += test-qcdm
 

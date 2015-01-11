@@ -18,6 +18,8 @@ gtk-doc.make
 *.lo
 *.la
 *.loT
+*.gcno
+*.gcda
 libtool
 .deps
 .libs
@@ -165,3 +167,6 @@ plugins/test-service-*
 
 TAGS
 ABOUT-NLS
+
+ModemManager-*-coverage.info
+ModemManager-*-coverage/

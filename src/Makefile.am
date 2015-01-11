@@ -8,6 +8,9 @@ udevrules_DATA = \
 	77-mm-usb-serial-adapters-greylist.rules \
 	80-mm-candidate.rules
 
+AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
 noinst_LTLIBRARIES = libmodem-helpers.la libport.la
 
 libmodem_helpers_la_CPPFLAGS = \
