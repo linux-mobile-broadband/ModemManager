@@ -1,4 +1,22 @@
 
+ModemManager 1.4.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * MBIM: update to handle 'Function Error' responses as per libmbim 1.12.
+ * MBIM: handle network-notified connection status messages.
+ * Bluetooth: Keep track of devices as they are move across sysfs
+ * Core: case insensitive matches in the APN list
+ * ZTE: avoid using QMI in the MF60.
+ * Huawei: updated port type hint strings.
+ * Icera: fix no IPv6 report response.
+ * Icera: retry Icera probing several times.
+ * Altair: increase AT probe command timeout.
+ * and some other minor fixes...
+
+
 ModemManager 1.4.0
 -------------------------------------------
 This is a new stable release of ModemManager.
