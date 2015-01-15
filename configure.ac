@@ -150,6 +150,27 @@ if test "x$with_systemdsystemunitdir" != xno; then
 fi
 AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
 
+# suspend/resume support
+AC_ARG_WITH(suspend-resume, AS_HELP_STRING([--with-suspend-resume=no|upower|systemd], [Build ModemManager with specific suspend/resume support]))
+if test "x$with_suspend_resume" = "x"; then
+   with_suspend_resume="none"
+fi
+
+case $with_suspend_resume in
+    none) ;;
+    upower) ;;
+    systemd)
+        PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd >= 209],,
+                          [PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd-login >= 183])])
+        ;;
+    *)
+        AC_MSG_ERROR(--with-suspend-resume must be one of [none, upower, systemd])
+        ;;
+esac
+
+AM_CONDITIONAL(SUSPEND_RESUME_UPOWER, test "x$with_suspend_resume" = "xupower")
+AM_CONDITIONAL(SUSPEND_RESUME_SYSTEMD, test "x$with_suspend_resume" = "xsystemd")
+
 # PolicyKit
 PKG_CHECK_MODULES(POLKIT, [polkit-gobject-1 >= 0.97], [have_polkit=yes],[have_polkit=no])
 AC_ARG_WITH(polkit,
@@ -322,4 +343,5 @@ echo "
     Documentation:           ${enable_gtk_doc}
     MBIM support:            ${with_mbim}
     QMI support:             ${with_qmi}
+    suspend/resume support:  ${with_suspend_resume}
 "
