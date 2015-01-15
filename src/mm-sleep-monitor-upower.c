@@ -16,6 +16,9 @@
  *
  * (C) Copyright 2012 Red Hat, Inc.
  * Author: Matthias Clasen <mclasen@redhat.com>
+ *
+ * Port to GDBus:
+ * (C) Copyright 2015 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "config.h"
@@ -23,19 +26,20 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <dbus/dbus-glib.h>
 #include <gio/gio.h>
 
 #include "mm-log.h"
 #include "mm-utils.h"
 #include "mm-sleep-monitor.h"
 
-#define UPOWER_DBUS_SERVICE "org.freedesktop.UPower"
+#define UPOWER_NAME       "org.freedesktop.UPower"
+#define UPOWER_PATH       "/org/freedesktop/UPower"
+#define UPOWER_INTERFACE  "org.freedesktop.UPower"
 
 struct _MMSleepMonitor {
     GObject parent_instance;
 
-    DBusGProxy *upower_proxy;
+    GDBusProxy *upower_proxy;
 };
 
 struct _MMSleepMonitorClass {
@@ -58,41 +62,50 @@ G_DEFINE_TYPE (MMSleepMonitor, mm_sleep_monitor, G_TYPE_OBJECT);
 /********************************************************************/
 
 static void
-upower_sleeping_cb (DBusGProxy *proxy, gpointer user_data)
+signal_cb (GDBusProxy  *proxy,
+           const gchar *sendername,
+           const gchar *signalname,
+           GVariant    *args,
+           gpointer     data)
 {
-    mm_dbg ("[sleep-monitor] received UPower sleeping signal");
-    g_signal_emit (user_data, signals[SLEEPING], 0);
+    MMSleepMonitor *self = data;
+
+    if (strcmp (signalname, "Sleeping") == 0) {
+        mm_dbg ("[sleep-monitor] received UPower sleeping signal");
+        g_signal_emit (self, signals[SLEEPING], 0);
+    } else if (strcmp (signalname, "Resuming") == 0) {
+        mm_dbg ("[sleep-monitor] received UPower resuming signal");
+        g_signal_emit (self, signals[RESUMING], 0);
+    }
 }
 
 static void
-upower_resuming_cb (DBusGProxy *proxy, gpointer user_data)
+on_proxy_acquired (GObject *object,
+                   GAsyncResult *res,
+                   MMSleepMonitor *self)
 {
-    mm_dbg ("[sleep-monitor] received UPower resuming signal");
-    g_signal_emit (user_data, signals[RESUMING], 0);
+    GError *error = NULL;
+
+    self->upower_proxy = g_dbus_proxy_new_for_bus_finish (res, &error);
+    if (!self->upower_proxy) {
+        mm_warn ("[sleep-monitor] failed to acquire UPower proxy: %s", error->message);
+        g_clear_error (&error);
+        return;
+    }
+
+    g_signal_connect (self->upower_proxy, "g-signal", G_CALLBACK (signal_cb), self);
 }
 
 static void
 mm_sleep_monitor_init (MMSleepMonitor *self)
 {
-    DBusGConnection *bus;
-
-    bus = mm_dbus_manager_get_connection (mm_dbus_manager_get ());
-    self->upower_proxy = dbus_g_proxy_new_for_name (bus,
-                                                    UPOWER_DBUS_SERVICE,
-                                                    "/org/freedesktop/UPower",
-                                                    "org.freedesktop.UPower");
-    if (self->upower_proxy) {
-        dbus_g_proxy_add_signal (self->upower_proxy, "Sleeping", G_TYPE_INVALID);
-        dbus_g_proxy_connect_signal (self->upower_proxy, "Sleeping",
-                                     G_CALLBACK (upower_sleeping_cb),
-                                     self, NULL);
-
-        dbus_g_proxy_add_signal (self->upower_proxy, "Resuming", G_TYPE_INVALID);
-        dbus_g_proxy_connect_signal (self->upower_proxy, "Resuming",
-                                     G_CALLBACK (upower_resuming_cb),
-                                     self, NULL);
-    } else
-        mm_warn ("could not initialize UPower D-Bus proxy");
+    g_dbus_proxy_new_for_bus (G_BUS_TYPE_SYSTEM,
+                              G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START |
+                              G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES,
+                              NULL,
+                              UPOWER_NAME, UPOWER_PATH, UPOWER_INTERFACE,
+                              NULL,
+                              (GAsyncReadyCallback) on_proxy_acquired, self);
 }
 
 static void
