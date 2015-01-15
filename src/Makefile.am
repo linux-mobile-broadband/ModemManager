@@ -166,6 +166,7 @@ ModemManager_SOURCES = \
 	mm-context.c \
 	mm-log.c \
 	mm-log.h \
+	mm-utils.h \
 	mm-private-boxed-types.h \
 	mm-private-boxed-types.c \
 	mm-auth.h \
