@@ -157,11 +157,16 @@ if test "x$with_suspend_resume" = "x"; then
 fi
 
 case $with_suspend_resume in
-    none) ;;
-    upower) ;;
+    none)
+        AC_DEFINE(WITH_SUSPEND_RESUME, 0, [Define if you have suspend-resume support])
+        ;;
+    upower)
+        AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have suspend-resume support])
+        ;;
     systemd)
         PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd >= 209],,
                           [PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd-login >= 183])])
+        AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have suspend-resume support])
         ;;
     *)
         AC_MSG_ERROR(--with-suspend-resume must be one of [none, upower, systemd])

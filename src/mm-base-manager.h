@@ -57,7 +57,8 @@ MMBaseManager   *mm_base_manager_new         (GDBusConnection *bus,
 void             mm_base_manager_start       (MMBaseManager *manager,
                                               gboolean manual_scan);
 
-void             mm_base_manager_shutdown    (MMBaseManager *manager);
+void             mm_base_manager_shutdown    (MMBaseManager *manager,
+                                              gboolean disable);
 
 guint32          mm_base_manager_num_modems  (MMBaseManager *manager);
 

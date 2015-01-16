@@ -30,6 +30,10 @@
 #include "mm-log.h"
 #include "mm-context.h"
 
+#if WITH_SUSPEND_RESUME
+# include "mm-sleep-monitor.h"
+#endif
+
 /* Maximum time to wait for all modems to get disabled and removed */
 #define MAX_SHUTDOWN_TIME_SECS 20
 
@@ -50,6 +54,24 @@ quit_cb (gpointer user_data)
         exit (0);
     return FALSE;
 }
+
+#if WITH_SUSPEND_RESUME
+
+static void
+sleeping_cb (MMSleepMonitor *sleep_monitor)
+{
+    mm_dbg ("Removing devices... (sleeping)");
+    mm_base_manager_shutdown (manager, FALSE);
+}
+
+static void
+resuming_cb (MMSleepMonitor *sleep_monitor)
+{
+    mm_dbg ("Re-scanning (resuming)");
+    mm_base_manager_start (manager, FALSE);
+}
+
+#endif
 
 static void
 bus_acquired_cb (GDBusConnection *connection,
@@ -144,6 +166,15 @@ main (int argc, char *argv[])
                               name_lost_cb,
                               NULL,
                               NULL);
+#if WITH_SUSPEND_RESUME
+    {
+        MMSleepMonitor *sleep_monitor;
+
+        sleep_monitor = mm_sleep_monitor_get ();
+        g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_SLEEPING, G_CALLBACK (sleeping_cb), NULL);
+        g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_cb), NULL);
+    }
+#endif
 
     /* Go into the main loop */
     loop = g_main_loop_new (NULL, FALSE);
@@ -157,7 +188,7 @@ main (int argc, char *argv[])
     if (manager) {
         GTimer *timer;
 
-        mm_base_manager_shutdown (manager);
+        mm_base_manager_shutdown (manager, TRUE);
 
         /* Wait for all modems to be disabled and removed, but don't wait
          * forever: if disabling the modems takes longer than 20s, just

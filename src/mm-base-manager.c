@@ -538,6 +538,7 @@ remove_disable_ready (MMBaseModem *modem,
 
     device = find_device_by_modem (self, modem);
     if (device) {
+        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
         mm_device_remove_modem (device);
         g_hash_table_remove (self->priv->devices, device);
     }
@@ -555,8 +556,23 @@ foreach_disable (gpointer key,
         mm_base_modem_disable (modem, (GAsyncReadyCallback)remove_disable_ready, self);
 }
 
+static gboolean
+foreach_remove (gpointer key,
+                MMDevice *device,
+                MMBaseManager *self)
+{
+    MMBaseModem *modem;
+
+    modem = mm_device_peek_modem (device);
+    if (modem)
+        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
+    mm_device_remove_modem (device);
+    return TRUE;
+}
+
 void
-mm_base_manager_shutdown (MMBaseManager *self)
+mm_base_manager_shutdown (MMBaseManager *self,
+                          gboolean disable)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
@@ -564,12 +580,18 @@ mm_base_manager_shutdown (MMBaseManager *self)
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
 
-    g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, self);
+    if (disable) {
+        g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, self);
 
-    /* Disabling may take a few iterations of the mainloop, so the caller
-     * has to iterate the mainloop until all devices have been disabled and
-     * removed.
-     */
+        /* Disabling may take a few iterations of the mainloop, so the caller
+         * has to iterate the mainloop until all devices have been disabled and
+         * removed.
+         */
+        return;
+    }
+
+    /* Otherwise, just remove directly */
+    g_hash_table_foreach_remove (self->priv->devices, (GHRFunc)foreach_remove, self);
 }
 
 guint32
