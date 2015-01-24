@@ -303,49 +303,49 @@ get_ipv4_config (MMBearerQmi *self,
 
     config = mm_bearer_ip_config_new ();
     if (self->priv->force_dhcp)
+        /* Force DHCP, but still set the static IPv4 config details if we get them */
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-    else {
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);        
+    else
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
 
-        /* IPv4 address */
+    /* IPv4 address */
+    qmi_inet4_ntop (addr, buf, sizeof (buf));
+    mm_bearer_ip_config_set_address (config, buf);
+    mm_bearer_ip_config_set_prefix (config, prefix);
+    mm_dbg ("    Address: %s/%d", buf, prefix);
+
+    /* IPv4 gateway address */
+    if (qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error)) {
         qmi_inet4_ntop (addr, buf, sizeof (buf));
-        mm_bearer_ip_config_set_address (config, buf);
-        mm_bearer_ip_config_set_prefix (config, prefix);
-        mm_dbg ("    Address: %s/%d", buf, prefix);
-
-        /* IPv4 gateway address */
-        if (qmi_message_wds_get_current_settings_output_get_ipv4_gateway_address (output, &addr, &error)) {
-            qmi_inet4_ntop (addr, buf, sizeof (buf));
-            mm_bearer_ip_config_set_gateway (config, buf);
-            mm_dbg ("    Gateway: %s", buf);
-        } else {
-            mm_dbg ("    Gateway: failed (%s)", error->message);
-            g_clear_error (&error);
-        }
-
-        /* IPv4 DNS #1 */
-        if (qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error)) {
-            qmi_inet4_ntop (addr, buf, sizeof (buf));
-            dns[dns_idx++] = buf;
-            mm_dbg ("    DNS #1: %s", buf);
-        } else {
-            mm_dbg ("    DNS #1: failed (%s)", error->message);
-            g_clear_error (&error);
-        }
-
-        /* IPv6 DNS #2 */
-        if (qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error)) {
-            qmi_inet4_ntop (addr, buf2, sizeof (buf2));
-            dns[dns_idx++] = buf2;
-            mm_dbg ("    DNS #2: %s", buf2);
-        } else {
-            mm_dbg ("    DNS #2: failed (%s)", error->message);
-            g_clear_error (&error);
-        }
-
-        if (dns_idx > 0)
-            mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
+        mm_bearer_ip_config_set_gateway (config, buf);
+        mm_dbg ("    Gateway: %s", buf);
+    } else {
+        mm_dbg ("    Gateway: failed (%s)", error->message);
+        g_clear_error (&error);
     }
+
+    /* IPv4 DNS #1 */
+    if (qmi_message_wds_get_current_settings_output_get_primary_ipv4_dns_address (output, &addr, &error)) {
+        qmi_inet4_ntop (addr, buf, sizeof (buf));
+        dns[dns_idx++] = buf;
+        mm_dbg ("    DNS #1: %s", buf);
+    } else {
+        mm_dbg ("    DNS #1: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    /* IPv4 DNS #2 */
+    if (qmi_message_wds_get_current_settings_output_get_secondary_ipv4_dns_address (output, &addr, &error)) {
+        qmi_inet4_ntop (addr, buf2, sizeof (buf2));
+        dns[dns_idx++] = buf2;
+        mm_dbg ("    DNS #2: %s", buf2);
+    } else {
+        mm_dbg ("    DNS #2: failed (%s)", error->message);
+        g_clear_error (&error);
+    }
+
+    if (dns_idx > 0)
+        mm_bearer_ip_config_set_dns (config, (const gchar **) &dns);
 
     if (mtu) {
         mm_bearer_ip_config_set_mtu (config, mtu);
