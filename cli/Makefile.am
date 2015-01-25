@@ -32,3 +32,15 @@ mmcli_SOURCES = \
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
 	$(top_builddir)/libmm-glib/libmm-glib.la
+
+
+completiondir = $(datadir)/bash-completion/completions
+
+install-data-hook:
+	$(mkinstalldirs) $(DESTDIR)$(completiondir)
+	$(INSTALL_DATA) $(srcdir)/mmcli-completion $(DESTDIR)$(completiondir)/mmcli
+
+uninstall-hook:
+	rm -f $(DESTDIR)$(completiondir)/mmcli
+
+EXTRA_DIST = mmcli-completion
