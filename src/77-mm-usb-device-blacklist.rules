@@ -131,4 +131,11 @@ ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0716", ENV{ID_MM_DEVICE_IGNORE}="1"
 # GW Instek AFG-2225 arbitrary function generator
 ATTRS{idVendor}=="2184", ATTRS{idProduct}=="001c", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# PalmOS devices - even though some are phones, they are so old they most
+# likely are not being used anymore
+DRIVERS=="visor", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Palmconnect
+ATTRS{idVendor}=="0830", ATTRS{idProduct}=="0080", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
