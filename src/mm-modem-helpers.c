@@ -1897,6 +1897,8 @@ mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family)
 MMBearerIpFamily
 mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 {
+    if (!pdp_type)
+        return MM_BEARER_IP_FAMILY_NONE;
     if (g_str_equal (pdp_type, "IP"))
         return MM_BEARER_IP_FAMILY_IPV4;
     if (g_str_equal (pdp_type, "IPV4"))
