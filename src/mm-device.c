@@ -271,6 +271,7 @@ mm_device_utils_get_port_driver (GUdevDevice *udev_port)
     if (!driver && strncmp (name, "rfcomm", 6) == 0)
         driver = "bluetooth";
 
+    /* Note: may return NULL! */
     return driver;
 }
 
