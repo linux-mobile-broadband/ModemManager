@@ -708,9 +708,9 @@ mm_plugin_supports_port (MMPlugin *self,
     } else {
         /* cdc-wdm ports... */
         probe_run_flags = MM_PORT_PROBE_NONE;
-        if (self->priv->qmi && g_str_equal (mm_device_utils_get_port_driver (port), "qmi_wwan"))
+        if (self->priv->qmi && !g_strcmp0 (mm_device_utils_get_port_driver (port), "qmi_wwan"))
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        else if (self->priv->mbim && g_str_equal (mm_device_utils_get_port_driver (port), "cdc_mbim"))
+        else if (self->priv->mbim && !g_strcmp0 (mm_device_utils_get_port_driver (port), "cdc_mbim"))
             probe_run_flags |= MM_PORT_PROBE_MBIM;
         else
             probe_run_flags |= MM_PORT_PROBE_AT;
@@ -880,8 +880,7 @@ mm_plugin_create_modem (MMPlugin  *self,
             }
 #if !defined WITH_QMI
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
-                                  "qmi_wwan")) {
+                     !g_strcmp0 (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)), "qmi_wwan")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_get_port_subsys (probe),
@@ -894,8 +893,7 @@ mm_plugin_create_modem (MMPlugin  *self,
 #endif
 #if !defined WITH_MBIM
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     g_str_equal (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)),
-                                  "cdc_mbim")) {
+                     !g_strcmp0 (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)), "cdc_mbim")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_get_port_subsys (probe),
