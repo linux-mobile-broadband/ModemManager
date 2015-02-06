@@ -130,6 +130,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-novatel-lte.la \
+	libmm-plugin-dell.la \
 	libmm-plugin-altair-lte.la \
 	libmm-plugin-samsung.la \
 	libmm-plugin-option.la \
@@ -502,6 +503,14 @@ libmm_plugin_novatel_la_SOURCES = \
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_novatel_la_LIBADD = $(NOVATEL_COMMON_LIBADD_FLAGS)
+
+# Dell (e.g. Novatel or Sierra) modem
+libmm_plugin_dell_la_SOURCES = \
+	dell/mm-plugin-dell.c \
+	dell/mm-plugin-dell.h
+libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
+libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_dell_la_LIBADD = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)
 
 # Altair LTE modem
 libmm_plugin_altair_lte_la_SOURCES = \
