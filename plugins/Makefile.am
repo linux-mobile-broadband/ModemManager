@@ -458,6 +458,8 @@ libmm_plugin_novatel_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-plugin-novatel.c \
 	novatel/mm-plugin-novatel.h \
+	novatel/mm-common-novatel.c \
+	novatel/mm-common-novatel.h \
 	novatel/mm-broadband-modem-novatel.c \
 	novatel/mm-broadband-modem-novatel.h
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
