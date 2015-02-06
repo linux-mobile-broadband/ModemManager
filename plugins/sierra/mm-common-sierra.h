@@ -18,9 +18,26 @@
 #ifndef MM_COMMON_SIERRA_H
 #define MM_COMMON_SIERRA_H
 
+#include "mm-plugin.h"
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-base-sim.h"
+
+gboolean mm_common_sierra_grab_port (MMPlugin *self,
+                                     MMBaseModem *modem,
+                                     MMPortProbe *probe,
+                                     GError **error);
+
+gboolean mm_common_sierra_port_probe_list_is_icera (GList *probes);
+
+void     mm_common_sierra_custom_init        (MMPortProbe *probe,
+                                              MMPortSerialAt *port,
+                                              GCancellable *cancellable,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+gboolean mm_common_sierra_custom_init_finish (MMPortProbe *probe,
+                                              GAsyncResult *result,
+                                              GError **error);
 
 void              mm_common_sierra_load_power_state        (MMIfaceModem *self,
                                                             GAsyncReadyCallback callback,

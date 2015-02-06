@@ -15,6 +15,9 @@
  * Copyright (C) 2012 Lanedo GmbH
  */
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "mm-common-sierra.h"
 #include "mm-base-modem-at.h"
 #include "mm-log.h"
@@ -22,6 +25,220 @@
 #include "mm-sim-sierra.h"
 
 static MMIfaceModem *iface_modem_parent;
+
+/*****************************************************************************/
+/* Custom init and port type hints */
+
+#define TAG_SIERRA_APP_PORT       "sierra-app-port"
+#define TAG_SIERRA_APP1_PPP_OK    "sierra-app1-ppp-ok"
+
+gboolean
+mm_common_sierra_grab_port (MMPlugin *self,
+                            MMBaseModem *modem,
+                            MMPortProbe *probe,
+                            GError **error)
+{
+    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
+    MMPortType ptype;
+
+    ptype = mm_port_probe_get_port_type (probe);
+
+    /* Is it a GSM secondary port? */
+    if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP_PORT)) {
+        if (g_object_get_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK))
+            pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
+        else
+            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
+    } else if (ptype == MM_PORT_TYPE_AT)
+        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    mm_port_probe_get_parent_path (probe),
+                                    ptype,
+                                    pflags,
+                                    error);
+}
+
+gboolean
+mm_common_sierra_port_probe_list_is_icera (GList *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        /* Only assume the Icera probing check is valid IF the port is not
+         * secondary. This will skip the stupid ports which reply OK to every
+         * AT command, even the one we use to check for Icera support */
+        if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)) &&
+            !g_object_get_data (G_OBJECT (l->data), TAG_SIERRA_APP_PORT))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+typedef struct {
+    MMPortProbe *probe;
+    MMPortSerialAt *port;
+    GCancellable *cancellable;
+    GSimpleAsyncResult *result;
+    guint retries;
+} SierraCustomInitContext;
+
+static void
+sierra_custom_init_context_complete_and_free (SierraCustomInitContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->port);
+    g_object_unref (ctx->probe);
+    g_object_unref (ctx->result);
+    g_slice_free (SierraCustomInitContext, ctx);
+}
+
+gboolean
+mm_common_sierra_custom_init_finish (MMPortProbe *probe,
+                                     GAsyncResult *result,
+                                     GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+}
+
+static void sierra_custom_init_step (SierraCustomInitContext *ctx);
+
+static void
+gcap_ready (MMPortSerialAt *port,
+            GAsyncResult *res,
+            SierraCustomInitContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_at_command_finish (port, res, &error);
+    if (error) {
+        /* If consumed all tries and the last error was a timeout, assume the
+         * port is not AT */
+        if (ctx->retries == 0 &&
+            g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
+            mm_port_probe_set_result_at (ctx->probe, FALSE);
+        }
+        /* If reported a hard parse error, this port is definitely not an AT
+         * port, skip trying. */
+        else if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_PARSE_FAILED)) {
+            mm_port_probe_set_result_at (ctx->probe, FALSE);
+            ctx->retries = 0;
+        }
+        /* Some Icera-based devices (eg, USB305) have an AT-style port that
+         * replies to everything with ERROR, so tag as unsupported; sometimes
+         * the real AT ports do this too, so let a retry tag the port as
+         * supported if it responds correctly later. */
+        else if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
+            mm_port_probe_set_result_at (ctx->probe, FALSE);
+        }
+
+        /* Just retry... */
+        sierra_custom_init_step (ctx);
+        goto out;
+    }
+
+    /* A valid reply to ATI tells us this is an AT port already */
+    mm_port_probe_set_result_at (ctx->probe, TRUE);
+
+    /* Sierra APPx ports have limited AT command parsers that just reply with
+     * "OK" to most commands.  These can sometimes be used for PPP while the
+     * main port is used for status and control, but older modems tend to crash
+     * or fail PPP.  So we whitelist modems that are known to allow PPP on the
+     * secondary APP ports.
+     */
+    if (strstr (response, "APP1")) {
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
+
+        /* PPP-on-APP1-port whitelist */
+        if (strstr (response, "C885") ||
+            strstr (response, "USB 306") ||
+            strstr (response, "MC8790"))
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
+
+        /* For debugging: let users figure out if their device supports PPP
+         * on the APP1 port or not.
+         */
+        if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
+            mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
+            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
+        }
+    } else if (strstr (response, "APP2") ||
+               strstr (response, "APP3") ||
+               strstr (response, "APP4")) {
+        /* Additional APP ports don't support most AT commands, so they cannot
+         * be used as the primary port.
+         */
+        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
+    }
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    sierra_custom_init_context_complete_and_free (ctx);
+
+out:
+    if (error)
+        g_error_free (error);
+}
+
+static void
+sierra_custom_init_step (SierraCustomInitContext *ctx)
+{
+    /* If cancelled, end */
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        mm_dbg ("(Sierra) no need to keep on running custom init in '%s'",
+                mm_port_get_device (MM_PORT (ctx->port)));
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        sierra_custom_init_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (ctx->retries == 0) {
+        mm_dbg ("(Sierra) Couldn't get port type hints from '%s'",
+                mm_port_get_device (MM_PORT (ctx->port)));
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        sierra_custom_init_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->retries--;
+    mm_port_serial_at_command (
+        ctx->port,
+        "ATI",
+        3,
+        FALSE, /* raw */
+        FALSE, /* allow_cached */
+        ctx->cancellable,
+        (GAsyncReadyCallback)gcap_ready,
+        ctx);
+}
+
+void
+mm_common_sierra_custom_init (MMPortProbe *probe,
+                              MMPortSerialAt *port,
+                              GCancellable *cancellable,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    SierraCustomInitContext *ctx;
+
+    ctx = g_slice_new (SierraCustomInitContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (probe),
+                                             callback,
+                                             user_data,
+                                             mm_common_sierra_custom_init);
+    ctx->probe = g_object_ref (probe);
+    ctx->port = g_object_ref (port);
+    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
+    ctx->retries = 3;
+
+    sierra_custom_init_step (ctx);
+}
 
 /*****************************************************************************/
 /* Modem power up (Modem interface) */
