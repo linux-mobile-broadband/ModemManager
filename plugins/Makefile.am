@@ -262,10 +262,9 @@ libmm_plugin_hso_la_SOURCES = \
 libmm_plugin_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-# Sierra
-libmm_plugin_sierra_la_SOURCES = \
-	sierra/mm-plugin-sierra.c \
-	sierra/mm-plugin-sierra.h \
+# Common Sierra modem support library
+noinst_LTLIBRARIES += libmm-utils-sierra.la
+libmm_utils_sierra_la_SOURCES = \
 	sierra/mm-common-sierra.c \
 	sierra/mm-common-sierra.h \
 	sierra/mm-sim-sierra.c \
@@ -273,12 +272,22 @@ libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-broadband-bearer-sierra.c \
 	sierra/mm-broadband-bearer-sierra.h \
 	sierra/mm-broadband-modem-sierra.c \
-	sierra/mm-broadband-modem-sierra.h \
+	sierra/mm-broadband-modem-sierra.h
+libmm_utils_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_utils_sierra_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
+
+SIERRA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/sierra
+SIERRA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-sierra.la
+
+# Sierra
+libmm_plugin_sierra_la_SOURCES = \
+	sierra/mm-plugin-sierra.c \
+	sierra/mm-plugin-sierra.h \
 	sierra/mm-broadband-modem-sierra-icera.c \
 	sierra/mm-broadband-modem-sierra-icera.h
-libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
+libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
 libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_sierra_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS)
+libmm_plugin_sierra_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS)
 
 # Wavecom (Sierra Airlink)
 libmm_plugin_wavecom_la_SOURCES = \
