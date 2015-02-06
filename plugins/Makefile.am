@@ -211,10 +211,9 @@ test_modem_helpers_huawei_LDADD = \
        $(top_builddir)/src/libmodem-helpers.la
 test_modem_helpers_huawei_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-# MBM
-libmm_plugin_mbm_la_SOURCES = \
-	mbm/mm-plugin-mbm.c \
-	mbm/mm-plugin-mbm.h \
+# Common Mbm modem support library
+noinst_LTLIBRARIES += libmm-utils-mbm.la
+libmm_utils_mbm_la_SOURCES = \
 	mbm/mm-broadband-modem-mbm.c \
 	mbm/mm-broadband-modem-mbm.h \
 	mbm/mm-broadband-bearer-mbm.c \
@@ -223,8 +222,20 @@ libmm_plugin_mbm_la_SOURCES = \
 	mbm/mm-modem-helpers-mbm.h \
 	mbm/mm-sim-mbm.c \
 	mbm/mm-sim-mbm.h
-libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_utils_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_utils_mbm_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
+
+MBM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/mbm
+MBM_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-mbm.la
+
+# MBM
+libmm_plugin_mbm_la_SOURCES = \
+	mbm/mm-plugin-mbm.c \
+	mbm/mm-plugin-mbm.h
+libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
 libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_mbm_la_LIBADD = $(MBM_COMMON_LIBADD_FLAGS)
+
 udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
 
 noinst_PROGRAMS += test-modem-helpers-mbm
