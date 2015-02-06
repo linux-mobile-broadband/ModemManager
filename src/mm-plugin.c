@@ -254,8 +254,9 @@ apply_pre_probing_filters (MMPlugin *self,
                 return TRUE;
             }
         }
+
         /* Filtering by forbidden drivers */
-        else {
+        if (self->priv->forbidden_drivers) {
             for (i = 0; self->priv->forbidden_drivers[i]; i++) {
                 guint j;
 
