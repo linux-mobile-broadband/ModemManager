@@ -144,6 +144,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-pantech.la \
 	libmm-plugin-zte.la \
 	libmm-plugin-sierra.la \
+	libmm-plugin-sierra-legacy.la \
 	libmm-plugin-mbm.la \
 	libmm-plugin-via.la \
 	libmm-plugin-telit.la \
@@ -290,15 +291,22 @@ libmm_utils_sierra_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
 SIERRA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/sierra
 SIERRA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-sierra.la
 
-# Sierra
+# Sierra (new QMI or MBIM modems)
 libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-plugin-sierra.c \
-	sierra/mm-plugin-sierra.h \
+	sierra/mm-plugin-sierra.h
+libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Sierra (legacy)
+libmm_plugin_sierra_legacy_la_SOURCES = \
+	sierra/mm-plugin-sierra-legacy.c \
+	sierra/mm-plugin-sierra-legacy.h \
 	sierra/mm-broadband-modem-sierra-icera.c \
 	sierra/mm-broadband-modem-sierra-icera.h
-libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
-libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_sierra_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS)
+libmm_plugin_sierra_legacy_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
+libmm_plugin_sierra_legacy_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_sierra_legacy_la_LIBADD = $(ICERA_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS)
 
 # Wavecom (Sierra Airlink)
 libmm_plugin_wavecom_la_SOURCES = \

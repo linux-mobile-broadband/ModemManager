@@ -13,6 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2012 Lanedo GmbH
+ * Copyright (C) 2015 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <stdlib.h>
@@ -23,9 +24,6 @@
 
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
-#include "mm-common-sierra.h"
-#include "mm-broadband-modem-sierra.h"
-#include "mm-broadband-modem-sierra-icera.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
@@ -73,18 +71,12 @@ create_modem (MMPlugin *self,
     }
 #endif
 
-    if (mm_common_sierra_port_probe_list_is_icera (probes))
-        return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
-                                                                   drivers,
-                                                                   mm_plugin_get_name (self),
-                                                                   vendor,
-                                                                   product));
-
-    return MM_BASE_MODEM (mm_broadband_modem_sierra_new (sysfs_path,
-                                                         drivers,
-                                                         mm_plugin_get_name (self),
-                                                         vendor,
-                                                         product));
+    /* Fallback to default modem in the worst case */
+    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
+                                                  drivers,
+                                                  mm_plugin_get_name (self),
+                                                  vendor,
+                                                  product));
 }
 
 /*****************************************************************************/
@@ -93,24 +85,19 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
-    static const gchar *drivers[] = { "sierra", "sierra_net", NULL };
-    static const MMAsyncMethod custom_init = {
-        .async  = G_CALLBACK (mm_common_sierra_custom_init),
-        .finish = G_CALLBACK (mm_common_sierra_custom_init_finish),
-    };
+    static const guint16 vendor_ids[] = { 0x1199, 0 };
+    static const gchar *drivers[] = { "qmi_wwan", "cdc_mbim", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_SIERRA,
                       MM_PLUGIN_NAME,               "Sierra",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                       MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_ALLOWED_QMI,        TRUE,
                       MM_PLUGIN_ALLOWED_MBIM,       TRUE,
-                      MM_PLUGIN_CUSTOM_INIT,        &custom_init,
-                      MM_PLUGIN_ICERA_PROBE,        TRUE,
-                      MM_PLUGIN_REMOVE_ECHO,        FALSE,
                       NULL));
 }
 
@@ -125,5 +112,4 @@ mm_plugin_sierra_class_init (MMPluginSierraClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = mm_common_sierra_grab_port;
 }
