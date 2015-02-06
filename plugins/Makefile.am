@@ -441,6 +441,19 @@ libmm_plugin_iridium_la_SOURCES = \
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
+# Common Novatel modem support library
+noinst_LTLIBRARIES += libmm-utils-novatel.la
+libmm_utils_novatel_la_SOURCES = \
+	novatel/mm-common-novatel.c \
+	novatel/mm-common-novatel.h \
+	novatel/mm-broadband-modem-novatel.c \
+	novatel/mm-broadband-modem-novatel.h
+libmm_utils_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_utils_novatel_la_LIBADD = $(GUDEV_LIBS) $(MM_LIBS)
+
+NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
+NOVATEL_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-novatel.la
+
 # Novatel LTE modem
 libmm_plugin_novatel_lte_la_SOURCES = \
 	novatel/mm-plugin-novatel-lte.c \
@@ -457,13 +470,10 @@ libmm_plugin_novatel_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 # Novatel non-LTE modem
 libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-plugin-novatel.c \
-	novatel/mm-plugin-novatel.h \
-	novatel/mm-common-novatel.c \
-	novatel/mm-common-novatel.h \
-	novatel/mm-broadband-modem-novatel.c \
-	novatel/mm-broadband-modem-novatel.h
-libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+	novatel/mm-plugin-novatel.h
+libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_novatel_la_LIBADD = $(NOVATEL_COMMON_LIBADD_FLAGS)
 
 # Altair LTE modem
 libmm_plugin_altair_lte_la_SOURCES = \
