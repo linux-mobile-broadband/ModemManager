@@ -308,6 +308,14 @@ apply_pre_probing_filters (MMPlugin *self,
             if (!self->priv->product_ids[i].l)
                 product_filtered = TRUE;
         }
+
+        /* When both vendor ids and product ids are given, it may be the case that
+         * we're allowing a full VID1 and only a subset of another VID2, so try to
+         * handle that properly. */
+        if (vendor_filtered && !product_filtered)
+            vendor_filtered = FALSE;
+        if (product_filtered && self->priv->vendor_ids && !vendor_filtered)
+            product_filtered = FALSE;
     }
 
     /* If we got filtered by vendor or product IDs; mark it as unsupported only if:
