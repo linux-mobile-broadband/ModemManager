@@ -32,8 +32,12 @@
 /* Default time to defer probing checks */
 #define DEFER_TIMEOUT_SECS 3
 
-/* Time to wait for other ports to appear once the first port is exposed */
-#define MIN_PROBING_TIME_SECS 2
+/* Time to wait for ports to appear before starting to probe the first one */
+#define MIN_WAIT_TIME_MSECS 1500
+
+/* Time to wait for other ports to appear once the first port is exposed
+ * (needs to be > MIN_WAIT_TIME_MSECS!!) */
+#define MIN_PROBING_TIME_MSECS 2500
 
 static void initable_iface_init (GInitableIface *iface);
 
@@ -93,12 +97,15 @@ typedef struct {
     gulong grabbed_id;
     gulong released_id;
 
+    gboolean min_wait_timeout_expired;
     GList *running_probes;
 } FindDeviceSupportContext;
 
 typedef struct {
     FindDeviceSupportContext *parent_ctx;
     GUdevDevice *port;
+
+    guint initial_timeout_id;
 
     GList *plugins;
     GList *current;
@@ -648,24 +655,18 @@ build_plugins_list (MMPluginManager *self,
 }
 
 static void
-device_port_grabbed_cb (MMDevice *device,
-                        GUdevDevice *port,
-                        FindDeviceSupportContext *ctx)
+port_probe_context_start (FindDeviceSupportContext *ctx,
+                          PortProbeContext *port_probe_ctx)
 {
-    PortProbeContext *port_probe_ctx;
-
-    /* Launch probing task on this port with the first plugin of the list */
-    port_probe_ctx = g_slice_new0 (PortProbeContext);
-    port_probe_ctx->parent_ctx = ctx;
-    port_probe_ctx->port = g_object_ref (port);
-
-    /* Setup plugins to probe and first one to check */
-    port_probe_ctx->plugins = build_plugins_list (ctx->self, device, port);
+    /* Setup plugins to probe and first one to check.
+     * Make sure this plugins list is built after the MIN WAIT TIME has been expired
+     * (so that per-driver filters work correctly) */
+    port_probe_ctx->plugins = build_plugins_list (ctx->self, ctx->device, port_probe_ctx->port);
     port_probe_ctx->current = port_probe_ctx->plugins;
 
     /* If we got one suggested, it will be the first one, unless it is the generic plugin */
-    port_probe_ctx->suggested_plugin = (!!mm_device_peek_plugin (device) ?
-                                        MM_PLUGIN (mm_device_get_plugin (device)) :
+    port_probe_ctx->suggested_plugin = (!!mm_device_peek_plugin (ctx->device) ?
+                                        MM_PLUGIN (mm_device_get_plugin (ctx->device)) :
                                         NULL);
     if (port_probe_ctx->suggested_plugin) {
         if (g_str_equal (mm_plugin_get_name (port_probe_ctx->suggested_plugin),
@@ -677,11 +678,27 @@ device_port_grabbed_cb (MMDevice *device,
                                                    port_probe_ctx->suggested_plugin);
     }
 
-    /* Set as running */
+    port_probe_context_step (port_probe_ctx);
+}
+
+static void
+device_port_grabbed_cb (MMDevice *device,
+                        GUdevDevice *port,
+                        FindDeviceSupportContext *ctx)
+{
+    PortProbeContext *port_probe_ctx;
+
+    /* Launch probing task on this port with the first plugin of the list */
+    port_probe_ctx = g_slice_new0 (PortProbeContext);
+    port_probe_ctx->parent_ctx = ctx;
+    port_probe_ctx->port = g_object_ref (port);
+
+    /* Schedule in the list of probes to run */
     ctx->running_probes = g_list_prepend (ctx->running_probes, port_probe_ctx);
 
-    /* Launch supports check in the Plugin Manager */
-    port_probe_context_step (port_probe_ctx);
+    /* If port grabbed after the min wait timeout expired, launch probing directly */
+    if (ctx->min_wait_timeout_expired)
+        port_probe_context_start (ctx, port_probe_ctx);
 }
 
 static void
@@ -727,6 +744,30 @@ min_probing_timeout_cb (FindDeviceSupportContext *ctx)
     return FALSE;
 }
 
+static gboolean
+min_wait_timeout_cb (FindDeviceSupportContext *ctx)
+{
+    GList *l;
+
+    ctx->min_wait_timeout_expired = TRUE;
+
+    /* Launch supports check for each port in the Plugin Manager */
+    for (l = ctx->running_probes; l; l = g_list_next (l))
+        port_probe_context_start (ctx, (PortProbeContext *)(l->data));
+
+    /* Schedule additional min probing timeout */
+
+    /* Set the initial timeout of 2s. We force the probing time of the device to
+     * be at least this amount of time, so that the kernel has enough time to
+     * bring up ports. Given that we launch this only when the first port of the
+     * device has been exposed in udev, this timeout effectively means that we
+     * leave up to 2s to the remaining ports to appear. */
+    ctx->timeout_id = g_timeout_add (MIN_PROBING_TIME_MSECS - MIN_WAIT_TIME_MSECS,
+                                     (GSourceFunc)min_probing_timeout_cb,
+                                     ctx);
+    return FALSE;
+}
+
 void
 mm_plugin_manager_find_device_support (MMPluginManager *self,
                                        MMDevice *device,
@@ -756,15 +797,15 @@ mm_plugin_manager_find_device_support (MMPluginManager *self,
                                          G_CALLBACK (device_port_released_cb),
                                          ctx);
 
-    /* Set the initial timeout of 2s. We force the probing time of the device to
-     * be at least this amount of time, so that the kernel has enough time to
-     * bring up ports. Given that we launch this only when the first port of the
-     * device has been exposed in udev, this timeout effectively means that we
-     * leave up to 2s to the remaining ports to appear. */
     ctx->timer = g_timer_new ();
-    ctx->timeout_id = g_timeout_add_seconds (MIN_PROBING_TIME_SECS,
-                                             (GSourceFunc)min_probing_timeout_cb,
-                                             ctx);
+
+    /* Set the initial waiting timeout. We don't want to probe any port before
+     * this timeout expires, so that we get as many ports added in the device
+     * as possible. If we don't do this, some plugin filters won't work properly,
+     * like the 'forbidden-drivers' one */
+    ctx->timeout_id = g_timeout_add (MIN_WAIT_TIME_MSECS,
+                                     (GSourceFunc)min_wait_timeout_cb,
+                                     ctx);
 }
 
 /*****************************************************************************/
