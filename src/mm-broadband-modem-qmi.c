@@ -2481,6 +2481,32 @@ load_signal_quality (MMIfaceModem *self,
 /*****************************************************************************/
 /* Powering up the modem (Modem interface) */
 
+typedef enum {
+    SET_OPERATING_MODE_STEP_FIRST,
+    SET_OPERATING_MODE_STEP_FCC_AUTH,
+    SET_OPERATING_MODE_STEP_RETRY,
+    SET_OPERATING_MODE_STEP_LAST
+} SetOperatingModeStep;
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientDms *client;
+    GSimpleAsyncResult *result;
+    QmiMessageDmsSetOperatingModeInput *input;
+    SetOperatingModeStep step;
+} SetOperatingModeContext;
+
+static void
+set_operating_mode_context_complete_and_free (SetOperatingModeContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    qmi_message_dms_set_operating_mode_input_unref (ctx->input);
+    g_slice_free (SetOperatingModeContext, ctx);
+}
+
 static gboolean
 modem_power_up_down_off_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
@@ -2489,38 +2515,125 @@ modem_power_up_down_off_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static void set_operating_mode_context_step (SetOperatingModeContext *ctx);
+
+static void
+dms_set_fcc_authentication_ready (QmiClientDms *client,
+                                  GAsyncResult *res,
+                                  SetOperatingModeContext *ctx)
+{
+    QmiMessageDmsSetFccAuthenticationOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
+    if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
+        /* No hard errors */
+        mm_dbg ("Couldn't set FCC authentication: %s", error->message);
+        g_error_free (error);
+    }
+
+    if (output)
+        qmi_message_dms_set_fcc_authentication_output_unref (output);
+
+    /* Retry Set Operating Mode */
+    ctx->step++;
+    set_operating_mode_context_step (ctx);
+}
+
 static void
 dms_set_operating_mode_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              GSimpleAsyncResult *simple)
+                              SetOperatingModeContext *ctx)
 {
     QmiMessageDmsSetOperatingModeOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
     if (!output) {
-        if (g_error_matches (error,
-                             QMI_CORE_ERROR,
-                             QMI_CORE_ERROR_UNSUPPORTED)) {
+        /* If unsupported, just go out without errors */
+        if (g_error_matches (error, QMI_CORE_ERROR, QMI_CORE_ERROR_UNSUPPORTED)) {
             mm_dbg ("Device doesn't support operating mode setting. Ignoring power update.");
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
             g_error_free (error);
-        } else {
-            g_prefix_error (&error, "QMI operation failed: ");
-            g_simple_async_result_take_error (simple, error);
+            ctx->step = SET_OPERATING_MODE_STEP_LAST;
+            set_operating_mode_context_step (ctx);
+            return;
         }
-    } else if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't set operating mode: ");
-        g_simple_async_result_take_error (simple, error);
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        set_operating_mode_context_complete_and_free (ctx);
+        return;
     }
 
-    if (output)
-        qmi_message_dms_set_operating_mode_output_unref (output);
+    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        QmiDmsOperatingMode mode;
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        /* Some new devices, like the Dell DW5770, will return an internal error when
+         * trying to bring the power mode to online. We can avoid this by sending the
+         * magic "DMS Set FCC Auth" message before trying. */
+        if (ctx->step == SET_OPERATING_MODE_STEP_FIRST &&
+            qmi_message_dms_set_operating_mode_input_get_mode (ctx->input, &mode, NULL) &&
+            mode == QMI_DMS_OPERATING_MODE_ONLINE &&
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INTERNAL)) {
+            g_error_free (error);
+            /* Go on to FCC auth */
+            ctx->step++;
+            set_operating_mode_context_step (ctx);
+            qmi_message_dms_set_operating_mode_output_unref (output);
+            return;
+        }
+
+        g_prefix_error (&error, "Couldn't set operating mode: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_dms_set_operating_mode_output_unref (output);
+        set_operating_mode_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Good! */
+    ctx->step++;
+    set_operating_mode_context_step (ctx);
+}
+
+static void
+set_operating_mode_context_step (SetOperatingModeContext *ctx)
+{
+    switch (ctx->step) {
+    case SET_OPERATING_MODE_STEP_FIRST:
+        mm_dbg ("Setting device operating mode...");
+        qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (ctx->client),
+                                           ctx->input,
+                                           20,
+                                           NULL,
+                                           (GAsyncReadyCallback)dms_set_operating_mode_ready,
+                                           ctx);
+        return;
+    case SET_OPERATING_MODE_STEP_FCC_AUTH:
+        mm_dbg ("Setting FCC auth...");
+        qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->client),
+                                               NULL,
+                                               5,
+                                               NULL,
+                                               (GAsyncReadyCallback)dms_set_fcc_authentication_ready,
+                                               ctx);
+        return;
+    case SET_OPERATING_MODE_STEP_RETRY:
+        mm_dbg ("Setting device operating mode (retry)...");
+        qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (ctx->client),
+                                           ctx->input,
+                                           20,
+                                           NULL,
+                                           (GAsyncReadyCallback)dms_set_operating_mode_ready,
+                                           ctx);
+        return;
+    case SET_OPERATING_MODE_STEP_LAST:
+        /* Good! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_operating_mode_context_complete_and_free (ctx);
+        return;
+    default:
+        g_assert_not_reached ();
+    }
 }
 
 static void
@@ -2529,41 +2642,27 @@ common_power_up_down_off (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    QmiMessageDmsSetOperatingModeInput *input;
-    GSimpleAsyncResult *result;
+    SetOperatingModeContext *ctx;
     QmiClient *client = NULL;
-    GError *error = NULL;
 
     if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_power_up_down_off);
+    /* Setup context */
+    ctx = g_slice_new0 (SetOperatingModeContext);
+    ctx->self = g_object_ref (self);
+    ctx->client = g_object_ref (client);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             common_power_up_down_off);
+    ctx->input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (ctx->input, mode, NULL);
+    ctx->step = SET_OPERATING_MODE_STEP_FIRST;
 
-    input = qmi_message_dms_set_operating_mode_input_new ();
-    if (!qmi_message_dms_set_operating_mode_input_set_mode (
-            input,
-            mode,
-            &error)) {
-        qmi_message_dms_set_operating_mode_input_unref (input);
-        g_simple_async_result_take_error (result, error);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
-    mm_dbg ("Setting device operating mode...");
-    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
-                                       input,
-                                       20,
-                                       NULL,
-                                       (GAsyncReadyCallback)dms_set_operating_mode_ready,
-                                       result);
-    qmi_message_dms_set_operating_mode_input_unref (input);
+    set_operating_mode_context_step (ctx);
 }
 
 static void
