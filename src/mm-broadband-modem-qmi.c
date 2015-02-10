@@ -2588,8 +2588,8 @@ dms_set_operating_mode_ready (QmiClientDms *client,
         return;
     }
 
-    /* Good! */
-    ctx->step++;
+    /* Good! we're done, go to last step */
+    ctx->step = SET_OPERATING_MODE_STEP_LAST;
     set_operating_mode_context_step (ctx);
 }
 
