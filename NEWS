@@ -1,4 +1,18 @@
 
+ModemManager 1.4.4
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Use 'DMS Set FCC Authentication' if online mode fails in QMI modems. This
+   change requires bumping the libqmi version to 1.12.4, which is the stable
+   release including the change.
+ * Fix segfault when empty pdp type string is given.
+ * Fix segfault when port driver is unknown.
+ * Blacklist: ignore PalmOS devices driven by 'visor'
+
+
 ModemManager 1.4.2
 -------------------------------------------
 This is a new bugfix release of ModemManager.
