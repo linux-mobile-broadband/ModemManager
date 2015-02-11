@@ -96,7 +96,9 @@ libport_la_SOURCES = \
 	mm-port-serial-qcdm.c \
 	mm-port-serial-qcdm.h \
 	mm-port-serial-gps.c \
-	mm-port-serial-gps.h
+	mm-port-serial-gps.h \
+	mm-serial-parsers.c \
+	mm-serial-parsers.h
 
 # Additional QMI support in libserial
 if WITH_QMI
@@ -219,8 +221,6 @@ ModemManager_SOURCES = \
 	mm-iface-modem-oma.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
-	mm-serial-parsers.c \
-	mm-serial-parsers.h \
 	mm-port-probe.h \
 	mm-port-probe.c \
 	mm-port-probe-at.h \
