@@ -30,7 +30,6 @@ libtool
 org.freedesktop.ModemManager.service
 org.freedesktop.ModemManager.conf
 callouts/mm-modem-probe
-test/lsudev
 
 include/ModemManager-version.h
 
@@ -164,6 +163,9 @@ plugins/test-modem-helpers-cinterion*
 plugins/test-modem-helpers-icera*
 plugins/test-modem-helpers-mbm*
 plugins/test-service-*
+
+test/lsudev
+test/mmtty
 
 TAGS
 ABOUT-NLS
