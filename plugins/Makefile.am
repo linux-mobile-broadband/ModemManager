@@ -126,7 +126,6 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-nokia-icera.la \
 	libmm-plugin-cinterion.la \
 	libmm-plugin-iridium.la \
-	libmm-plugin-gobi.la \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-novatel-lte.la \
@@ -173,15 +172,6 @@ libmm_plugin_motorola_la_SOURCES = \
 	motorola/mm-broadband-modem-motorola.h
 libmm_plugin_motorola_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_motorola_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-
-# Gobi
-libmm_plugin_gobi_la_SOURCES = \
-	gobi/mm-plugin-gobi.c \
-	gobi/mm-plugin-gobi.h \
-	gobi/mm-broadband-modem-gobi.c \
-	gobi/mm-broadband-modem-gobi.h
-libmm_plugin_gobi_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Huawei
 libmm_plugin_huawei_la_SOURCES = \
