@@ -214,9 +214,20 @@ apply_pre_probing_filters (MMPlugin *self,
     }
 
     /* The plugin may specify that only some drivers are supported, or that some
-     * drivers are not supported. If that is the case, filter by driver */
+     * drivers are not supported. If that is the case, filter by driver.
+     *
+     * The QMI and MBIM *forbidden* drivers filter is implicit. This is, if the
+     * plugin doesn't explicitly specify that QMI is allowed and we find a QMI
+     * port, the plugin will filter the device. Same for MBIM.
+     *
+     * The opposite, though, is not applicable. If the plugin specifies that QMI
+     * is allowed, we won't take that as a mandatory requirement to look for the
+     * QMI driver (as the plugin may handle non-QMI modems as well)
+     */
     if (self->priv->drivers ||
-        self->priv->forbidden_drivers) {
+        self->priv->forbidden_drivers ||
+        !self->priv->qmi ||
+        !self->priv->mbim) {
         static const gchar *virtual_drivers [] = { "virtual", NULL };
         const gchar **drivers;
 
@@ -268,6 +279,36 @@ apply_pre_probing_filters (MMPlugin *self,
                                 g_udev_device_get_name (port));
                         return TRUE;
                     }
+                }
+            }
+        }
+
+        /* Implicit filter for forbidden QMI driver */
+        if (!self->priv->qmi) {
+            guint j;
+
+            for (j = 0; drivers[j]; j++) {
+                /* If we match the QMI driver: unsupported */
+                if (g_str_equal (drivers[j], "qmi_wwan")) {
+                    mm_dbg ("(%s) [%s] filtered by implicit QMI driver",
+                            self->priv->name,
+                            g_udev_device_get_name (port));
+                    return TRUE;
+                }
+            }
+        }
+
+        /* Implicit filter for forbidden MBIM driver */
+        if (!self->priv->mbim) {
+            guint j;
+
+            for (j = 0; drivers[j]; j++) {
+                /* If we match the MBIM driver: unsupported */
+                if (g_str_equal (drivers[j], "cdc_mbim")) {
+                    mm_dbg ("(%s) [%s] filtered by implicit MBIM driver",
+                            self->priv->name,
+                            g_udev_device_get_name (port));
+                    return TRUE;
                 }
             }
         }
