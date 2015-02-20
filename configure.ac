@@ -21,9 +21,10 @@ m4_define([mm_glib_lt_age],      [2])
 
 
 AC_INIT([ModemManager],[mm_version],[modemmanager-devel@lists.freedesktop.org],[ModemManager])
-AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
+AM_INIT_AUTOMAKE([1.11 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_MAINTAINER_MODE([enable])
+AM_SILENT_RULES([yes])
 
 AC_CONFIG_MACRO_DIR([m4])
 
