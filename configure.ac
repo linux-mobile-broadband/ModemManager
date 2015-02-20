@@ -40,7 +40,7 @@ AC_PROG_INSTALL
 
 dnl Initialize libtool
 LT_PREREQ([2.2])
-LT_INIT
+LT_INIT([disable-static])
 
 dnl Version stuff
 MM_MAJOR_VERSION=mm_major_version
