@@ -1,6 +1,9 @@
 AC_PREREQ([2.63])
 
-dnl The MM version number
+dnl-----------------------------------------------------------------------------
+dnl Package and library versioning support
+dnl
+
 m4_define([mm_major_version], [1])
 m4_define([mm_minor_version], [5])
 m4_define([mm_micro_version], [0])
@@ -19,11 +22,15 @@ m4_define([mm_glib_lt_current],  [2])
 m4_define([mm_glib_lt_revision], [0])
 m4_define([mm_glib_lt_age],      [2])
 
-
+dnl-----------------------------------------------------------------------------
+dnl autoconf, automake, libtool initialization
+dnl
 AC_INIT([ModemManager],[mm_version],[modemmanager-devel@lists.freedesktop.org],[ModemManager])
 AM_INIT_AUTOMAKE([1.11 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
 AM_MAINTAINER_MODE([enable])
+
 AM_SILENT_RULES([yes])
 
 AC_CONFIG_MACRO_DIR([m4])
@@ -41,6 +48,10 @@ AC_PROG_INSTALL
 dnl Initialize libtool
 LT_PREREQ([2.2])
 LT_INIT([disable-static])
+
+dnl-----------------------------------------------------------------------------
+dnl Version definitions
+dnl
 
 dnl Version stuff
 MM_MAJOR_VERSION=mm_major_version
@@ -60,14 +71,16 @@ AC_SUBST(MM_GLIB_LT_CURRENT)
 AC_SUBST(MM_GLIB_LT_REVISION)
 AC_SUBST(MM_GLIB_LT_AGE)
 
-dnl
+dnl-----------------------------------------------------------------------------
 dnl Documentation
 dnl
+
 GTK_DOC_CHECK(1.0)
 
+dnl-----------------------------------------------------------------------------
+dnl i18n
 dnl
-dnl translation support
-dnl
+
 IT_PROG_INTLTOOL([0.40.0])
 
 AM_GNU_GETTEXT([external])
@@ -76,6 +89,10 @@ AM_GNU_GETTEXT_VERSION([0.17])
 GETTEXT_PACKAGE=ModemManager
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
+
+dnl-----------------------------------------------------------------------------
+dnl Build dependencies
+dnl
 
 PKG_CHECK_MODULES(MM,
                   glib-2.0 >= 2.32
@@ -105,27 +122,38 @@ PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= 147)
 AC_SUBST(GUDEV_CFLAGS)
 AC_SUBST(GUDEV_LIBS)
 
-# Some required utilities
+dnl Some required utilities
 GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
 AC_SUBST(GLIB_MKENUMS)
+
 GDBUS_CODEGEN=`$PKG_CONFIG --variable=gdbus_codegen gio-2.0`
 AC_SUBST(GDBUS_CODEGEN)
 
-# Code coverage (disabled by default)
+dnl-----------------------------------------------------------------------------
+dnl Testing support
+dnl
+
+dnl Code coverage (disabled by default)
 AX_CODE_COVERAGE
 
-# GObject Introspection
+dnl-----------------------------------------------------------------------------
+dnl Introspection and bindings
+dnl
+
+dnl GObject Introspection
 GOBJECT_INTROSPECTION_CHECK([0.9.6])
 
-# Vala bindings
+dnl Vala bindings
 VAPIGEN_CHECK(0.18)
-
-# Sanity check
 if test "x$enable_vala" = "xyes" -a ! -f "$VAPIGEN_MAKEFILE"; then
   AC_MSG_ERROR([Vala bindings enabled but Makefile.vapigen not found. Install vala-devel, or pass --disable-vala])
 fi
 
-# DBus system directory
+dnl-----------------------------------------------------------------------------
+dnl System paths
+dnl
+
+dnl DBus system directory
 AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
     DBUS_SYS_DIR="$with_dbus_sys_dir"
@@ -134,7 +162,7 @@ else
 fi
 AC_SUBST(DBUS_SYS_DIR)
 
-# udev base directory
+dnl udev base directory
 AC_ARG_WITH(udev-base-dir, AS_HELP_STRING([--with-udev-base-dir=DIR], [where udev base directory is]))
 if test -n "$with_udev_base_dir" ; then
     UDEV_BASE_DIR="$with_udev_base_dir"
@@ -143,7 +171,7 @@ else
 fi
 AC_SUBST(UDEV_BASE_DIR)
 
-# systemd system unit directory
+dnl systemd system unit directory
 AC_ARG_WITH([systemdsystemunitdir], AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [where systemd service files are]),
             [], [with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)])
 if test "x$with_systemdsystemunitdir" != xno; then
@@ -151,8 +179,12 @@ if test "x$with_systemdsystemunitdir" != xno; then
 fi
 AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
 
-# suspend/resume support
+dnl-----------------------------------------------------------------------------
+dnl Suspend/resume support
+dnl
+
 AC_ARG_WITH(suspend-resume, AS_HELP_STRING([--with-suspend-resume=no|upower|systemd], [Build ModemManager with specific suspend/resume support]))
+
 if test "x$with_suspend_resume" = "x"; then
    with_suspend_resume="none"
 fi
@@ -174,17 +206,19 @@ case $with_suspend_resume in
         ;;
 esac
 
-AM_CONDITIONAL(SUSPEND_RESUME_UPOWER, test "x$with_suspend_resume" = "xupower")
+AM_CONDITIONAL(SUSPEND_RESUME_UPOWER,  test "x$with_suspend_resume" = "xupower")
 AM_CONDITIONAL(SUSPEND_RESUME_SYSTEMD, test "x$with_suspend_resume" = "xsystemd")
 
-# PolicyKit
+dnl-----------------------------------------------------------------------------
+dnl PolicyKit
+dnl
+
 PKG_CHECK_MODULES(POLKIT, [polkit-gobject-1 >= 0.97], [have_polkit=yes],[have_polkit=no])
 AC_ARG_WITH(polkit,
             AS_HELP_STRING([--with-polkit=(strict|permissive|none)],
                            [Enable PolicyKit support [[default=auto]]]),,
             [with_polkit=auto])
-# Handle 'auto' ('strict' if polkit found, 'none' otherwise),
-#  'yes' ('strict') and 'no' ('none')
+
 if test "x$with_polkit" = "xauto"; then
 	if test "x$have_polkit" = "xno"; then
         with_polkit="none"
@@ -196,7 +230,7 @@ elif test "x$with_polkit" = "xno"; then
 elif test "x$with_polkit" = "xyes"; then
     with_polkit=strict
 fi
-# Build policies context
+
 if test "x$with_polkit" = "xnone"; then
     AC_DEFINE(WITH_POLKIT, 0, [Define if you have PolicyKit support])
 else
@@ -224,9 +258,10 @@ fi
 
 AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xnone" ])
 
-dnl
+dnl-----------------------------------------------------------------------------
 dnl MBIM support (enabled by default)
 dnl
+
 AC_ARG_WITH(mbim, AS_HELP_STRING([--without-mbim], [Build without MBIM support]), [], [with_mbim=yes])
 AM_CONDITIONAL(WITH_MBIM, test "x$with_mbim" = "xyes")
 case $with_mbim in
@@ -245,7 +280,7 @@ case $with_mbim in
         ;;
 esac
 
-dnl
+dnl-----------------------------------------------------------------------------
 dnl QMI support (enabled by default)
 dnl
 AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
@@ -268,8 +303,7 @@ esac
 
 NM_COMPILER_WARNINGS
 
-
-dnl
+dnl-----------------------------------------------------------------------------
 dnl Distribution version string
 dnl
 AC_ARG_WITH(dist-version, AS_HELP_STRING([--with-dist-version=<mm-dist-version>], [Define the custom version (like distribution package name and revision)]), ac_distver=$withval, ac_distver="")
@@ -277,9 +311,16 @@ if ! test x"$ac_distver" = x""; then
   AC_DEFINE_UNQUOTED(MM_DIST_VERSION, "$ac_distver", [Define the distribution version string])
 fi
 
-# Not building protocol libs standalone
+dnl-----------------------------------------------------------------------------
+dnl Protocol libs
+dnl
+
 AM_CONDITIONAL(QCDM_STANDALONE, test "yes" = "no")
 AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "no")
+
+dnl-----------------------------------------------------------------------------
+dnl Protocol libs
+dnl
 
 AC_CONFIG_FILES([
 Makefile
@@ -329,25 +370,31 @@ echo "
     ModemManager $VERSION
     ==============================================
 
-    compiler:                ${CC}
-    cflags:                  ${CFLAGS}
-    Maintainer mode:         ${USE_MAINTAINER_MODE}
-    Code coverage:           ${CODE_COVERAGE_ENABLED}"
+    Build:
+      compiler:                ${CC}
+      cflags:                  ${CFLAGS}
+      ldflags:                 ${LDFLAGS}
+      maintainer mode:         ${USE_MAINTAINER_MODE}
+
+    System paths:
+      prefix:                  ${prefix}
+      D-Bus system directory:  ${DBUS_SYS_DIR}
+      udev base directory:     ${UDEV_BASE_DIR}
+      systemd unit directory:  ${with_systemdsystemunitdir}
+
+    Features:
+      policykit support:       ${with_polkit}
+      mbim support:            ${with_mbim}
+      qmi support:             ${with_qmi}
+      suspend/resume support:  ${with_suspend_resume}
+
+    Miscellaneous:
+      gobject introspection:   ${found_introspection}
+      vala bindings:           ${enable_vala}
+      documentation:           ${enable_gtk_doc}
+      code coverage:           ${CODE_COVERAGE_ENABLED}"
 if test "x${CODE_COVERAGE_ENABLED}" = "xyes"; then
-	echo "    Code coverage cflags:    ${CODE_COVERAGE_CFLAGS}"
-	echo "    Code coverage ldflags:   ${CODE_COVERAGE_LDFLAGS}"
+   echo "      code coverage cflags:    ${CODE_COVERAGE_CFLAGS}"
+   echo "      code coverage ldflags:   ${CODE_COVERAGE_LDFLAGS}"
 fi
-
-echo "
-    D-Bus system directory:  ${DBUS_SYS_DIR}
-    udev base directory:     ${UDEV_BASE_DIR}
-    systemd unit directory:  ${with_systemdsystemunitdir}
-
-    PolicyKit support:       ${with_polkit}
-    GObject Introspection:   ${found_introspection}
-    Vala Bindings:           ${enable_vala}
-    Documentation:           ${enable_gtk_doc}
-    MBIM support:            ${with_mbim}
-    QMI support:             ${with_qmi}
-    suspend/resume support:  ${with_suspend_resume}
-"
+echo ""
