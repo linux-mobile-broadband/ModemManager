@@ -130,22 +130,32 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
         return ctx->cs;
-
     if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
         return ctx->ps;
-
     if (ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
         return ctx->eps;
 
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
         return ctx->cs;
-
     if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
         return ctx->ps;
-
     if (ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->eps;
+
+    /* If one state is DENIED and the others are UNKNOWN, use DENIED */
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)
+        return ctx->cs;
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)
+        return ctx->ps;
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
         return ctx->eps;
 
     return ctx->cs;
