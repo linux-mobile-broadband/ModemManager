@@ -406,7 +406,6 @@ get_ipv6_config (MMBearerQmi *self,
 
     /* IPv6 address */
     qmi_inet6_ntop (array, buf, sizeof (buf));
-    g_array_unref (array);
 
     mm_bearer_ip_config_set_address (config, buf);
     mm_bearer_ip_config_set_prefix (config, prefix);
@@ -417,7 +416,6 @@ get_ipv6_config (MMBearerQmi *self,
         qmi_inet6_ntop (array, buf, sizeof (buf));
         mm_bearer_ip_config_set_gateway (config, buf);
         mm_dbg ("    Gateway: %s", buf);
-        g_array_unref (array);
     } else {
         mm_dbg ("    Gateway: failed (%s)", error->message);
         g_clear_error (&error);
@@ -428,7 +426,6 @@ get_ipv6_config (MMBearerQmi *self,
         qmi_inet6_ntop (array, buf, sizeof (buf));
         dns[dns_idx++] = buf;
         mm_dbg ("    DNS #1: %s", buf);
-        g_array_unref (array);
     } else {
         mm_dbg ("    DNS #1: failed (%s)", error->message);
         g_clear_error (&error);
@@ -439,7 +436,6 @@ get_ipv6_config (MMBearerQmi *self,
         qmi_inet6_ntop (array, buf2, sizeof (buf2));
         dns[dns_idx++] = buf2;
         mm_dbg ("    DNS #2: %s", buf2);
-        g_array_unref (array);
     } else {
         mm_dbg ("    DNS #2: failed (%s)", error->message);
         g_clear_error (&error);
