@@ -425,7 +425,7 @@ get_ipv6_config (MMBearerQmi *self,
     if (qmi_message_wds_get_current_settings_output_get_ipv6_gateway_address (output, &array, &prefix, &error)) {
         qmi_inet6_ntop (array, buf, sizeof (buf));
         mm_bearer_ip_config_set_gateway (config, buf);
-        mm_dbg ("    Gateway: %s", buf);
+        mm_dbg ("    Gateway: %s/%d", buf, prefix);
     } else {
         mm_dbg ("    Gateway: failed (%s)", error->message);
         g_clear_error (&error);
