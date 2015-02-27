@@ -35,4 +35,14 @@ ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="204b", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 # Netchip Technology, Inc. Linux-USB Serial Gadget (CDC ACM mode)
 ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Cypress Serial-USB devices
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0002", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0003", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0004", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0005", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0006", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0007", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="0009", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+ATTRS{idVendor}=="04B4", ATTRS{idProduct}=="000A", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
 LABEL="mm_usb_serial_adapters_greylist_end"
