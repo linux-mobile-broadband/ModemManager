@@ -3265,22 +3265,6 @@ set_power_state (SetPowerStateContext *ctx)
         return;
     }
 
-    /* Don't allow trying to recover from a power off */
-    if (ctx->previous_real_power_state == MM_MODEM_POWER_STATE_OFF) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cannot recover from a power off");
-        set_power_state_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Supported transitions:
-     * UNKNOWN|LOW --> ON
-     * ON --> LOW
-     * ON|LOW --> OFF
-     */
-
     /* Fully powering off the modem? */
     if (ctx->power_state == MM_MODEM_POWER_STATE_OFF) {
         /* Error if unsupported */
