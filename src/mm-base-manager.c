@@ -148,7 +148,7 @@ find_device_support_ready (MMPluginManager *plugin_manager,
     GError *error = NULL;
 
     if (!mm_plugin_manager_find_device_support_finish (plugin_manager, result, &error)) {
-        mm_warn ("Couldn't find support for device at '%s': %s",
+        mm_info ("Couldn't find support for device at '%s': %s",
                  mm_device_get_path (ctx->device),
                  error->message);
         g_error_free (error);
