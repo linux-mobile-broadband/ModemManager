@@ -1231,7 +1231,7 @@ modem_time_check_support_finish (MMIfaceModemTime *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
 }
 
 static void
