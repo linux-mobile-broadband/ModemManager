@@ -2621,3 +2621,78 @@ mm_parse_gsn (const char *gsn,
 
     return success;
 }
+
+/*****************************************************************************/
+/* +CCLK response parser */
+
+gboolean
+mm_parse_cclk_response (const char *response,
+                        gchar **iso8601p,
+                        MMNetworkTimezone **tzp,
+                        GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+    guint year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+    gint tz = 0;
+    gboolean ret = FALSE;
+
+    g_assert (iso8601p || tzp); /* at least one */
+
+    /* Sample reply: +CCLK: "15/03/05,14:14:26-32" */
+    r = g_regex_new ("[+]CCLK: \"(\\d+)/(\\d+)/(\\d+),(\\d+):(\\d+):(\\d+)([-+]\\d+)\"", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse +CCLK results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match +CCLK reply");
+        }
+    } else {
+        /* Remember that g_match_info_get_match_count() includes match #0 */
+        g_assert (g_match_info_get_match_count (match_info) >= 8);
+
+        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+            mm_get_uint_from_match_info (match_info, 2, &month) &&
+            mm_get_uint_from_match_info (match_info, 3, &day) &&
+            mm_get_uint_from_match_info (match_info, 4, &hour) &&
+            mm_get_uint_from_match_info (match_info, 5, &minute) &&
+            mm_get_uint_from_match_info (match_info, 6, &second) &&
+            mm_get_int_from_match_info  (match_info, 7, &tz)) {
+            /* adjust year */
+            year += 2000;
+            /*
+             * tz = timezone offset in 15 minute intervals
+             */
+            if (iso8601p) {
+                /* Return ISO-8601 format date/time string */
+                *iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                                 minute, second,
+                                                 TRUE, (tz * 15));
+            }
+            if (tzp) {
+                *tzp = mm_network_timezone_new ();
+                mm_network_timezone_set_offset (*tzp, tz * 15);
+            }
+
+            ret = TRUE;
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse +CCLK reply");
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return ret;
+}

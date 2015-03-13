@@ -2341,6 +2341,77 @@ test_supported_capability_filter (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test +CCLK responses */
+
+typedef struct {
+    const gchar *str;
+    gboolean ret;
+    gboolean test_iso8601;
+    gboolean test_tz;
+    gchar *iso8601;
+    gint32 offset;
+} CclkTest;
+
+static const CclkTest cclk_tests[] = {
+    { "+CCLK: \"14/08/05,04:00:21+40\"", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+10:00", 600 },
+    { "+CCLK: \"14/08/05,04:00:21+40\"", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+10:00", 600 },
+    { "+CCLK: \"14/08/05,04:00:21+40\"", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+10:00", 600 },
+
+    { "+CCLK: \"15/02/28,20:30:40-32\"", TRUE, TRUE, FALSE,
+        "2015-02-28T20:30:40-08:00", -480 },
+    { "+CCLK: \"15/02/28,20:30:40-32\"", TRUE, FALSE, TRUE,
+        "2015-02-28T20:30:40-08:00", -480 },
+    { "+CCLK: \"15/02/28,20:30:40-32\"", TRUE, TRUE, TRUE,
+        "2015-02-28T20:30:40-08:00", -480 },
+
+    { "+CCLK: \"XX/XX/XX,XX:XX:XX+XX\"", FALSE, TRUE, FALSE,
+        NULL, MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN },
+
+    { NULL, FALSE, FALSE, FALSE, NULL, MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN }
+};
+
+static void
+test_cclk_response (void)
+{
+    guint i;
+
+    for (i = 0; cclk_tests[i].str; i++) {
+        GError *error = NULL;
+        gchar *iso8601 = NULL;
+        MMNetworkTimezone *tz = NULL;
+        gboolean ret;
+
+        ret = mm_parse_cclk_response (cclk_tests[i].str,
+                                      cclk_tests[i].test_iso8601 ? &iso8601 : NULL,
+                                      cclk_tests[i].test_tz ? &tz : NULL,
+                                      &error);
+
+        g_assert (ret == cclk_tests[i].ret);
+        g_assert (ret == (error ? FALSE : TRUE));
+
+        g_clear_error (&error);
+
+        if (cclk_tests[i].test_iso8601)
+            g_assert_cmpstr (cclk_tests[i].iso8601, ==, iso8601);
+
+        if (cclk_tests[i].test_tz) {
+            g_assert (mm_network_timezone_get_offset (tz) == cclk_tests[i].offset);
+            g_assert (mm_network_timezone_get_dst_offset (tz) == MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN);
+            g_assert (mm_network_timezone_get_leap_seconds (tz) == MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN);
+        }
+
+        if (iso8601)
+            g_free (iso8601);
+
+        if (tz)
+            g_object_unref (tz);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -2500,6 +2571,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_supported_mode_filter, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_supported_capability_filter, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cclk_response, NULL));
 
     result = g_test_run ();
 

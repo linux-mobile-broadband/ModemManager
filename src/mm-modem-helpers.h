@@ -20,6 +20,9 @@
 
 #include <ModemManager.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "glib-object.h"
 #include "mm-charsets.h"
 
@@ -245,5 +248,11 @@ gboolean mm_parse_gsn (const char *gsn,
                        gchar **out_imei,
                        gchar **out_meid,
                        gchar **out_esn);
+
+/* +CCLK response parser */
+gboolean mm_parse_cclk_response (const gchar *response,
+                                 gchar **iso8601p,
+                                 MMNetworkTimezone **tzp,
+                                 GError **error);
 
 #endif  /* MM_MODEM_HELPERS_H */
