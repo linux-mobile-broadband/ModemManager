@@ -1,4 +1,18 @@
 
+ModemManager 1.4.6
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * MBIM: by default use the new mbim-proxy setup.
+ * Telit: new support for HE910, UE910 and UL865.
+ * Location: avoid printing location info in syslog with info level.
+ * Greylist: add Cypress USB<->RS232 adapters
+ * QMI: avoid unref-ing arrays owned by the output bundles.
+ * and some other minor fixes...
+
+
 ModemManager 1.4.4
 -------------------------------------------
 This is a new bugfix release of ModemManager.
