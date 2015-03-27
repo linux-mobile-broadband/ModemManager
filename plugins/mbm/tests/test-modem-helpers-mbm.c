@@ -96,6 +96,7 @@ test_e2ipcfg (void)
                 g_assert_cmpint (dnslen, ==, 1);
             g_assert_cmpstr (dns[0], ==, tests[i].ipv4_dns1);
             g_assert_cmpstr (dns[1], ==, tests[i].ipv4_dns2);
+            g_object_unref (ipv4);
         } else
             g_assert (ipv4 == NULL);
 
@@ -122,6 +123,7 @@ test_e2ipcfg (void)
                 g_assert_cmpint (dnslen, ==, 1);
             g_assert_cmpstr (dns[0], ==, tests[i].ipv6_dns1);
             g_assert_cmpstr (dns[1], ==, tests[i].ipv6_dns2);
+            g_object_unref (ipv6);
         } else
             g_assert (ipv6 == NULL);
     }
