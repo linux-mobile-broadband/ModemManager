@@ -217,8 +217,8 @@ out:
 
 static void
 getportcfg_ready (MMPortSerialAt *port,
-                   GAsyncResult *res,
-                   TelitCustomInitContext *ctx)
+                  GAsyncResult *res,
+                  TelitCustomInitContext *ctx)
 {
     const gchar *response;
     GError *error = NULL;
@@ -237,6 +237,7 @@ getportcfg_ready (MMPortSerialAt *port,
             ctx->getportcfg_done = TRUE;
     } else {
         MMDevice *device;
+
         device = mm_port_probe_peek_device (ctx->probe);
 
         /* Results are cached in the parent device object */
@@ -313,10 +314,10 @@ out:
 
 static void
 telit_custom_init (MMPortProbe *probe,
-                    MMPortSerialAt *port,
-                    GCancellable *cancellable,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+                   MMPortSerialAt *port,
+                   GCancellable *cancellable,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
     MMDevice *device;
     GUdevDevice *udevDevice;
