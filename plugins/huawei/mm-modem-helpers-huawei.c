@@ -42,8 +42,8 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
     GError *inner_error = NULL;
 
     if (!response ||
-        !(g_str_has_prefix (response, "^NDISSTAT:") ||
-          g_str_has_prefix (response, "^NDISSTATQRY:"))) {
+        !(g_ascii_strncasecmp (response, "^NDISSTAT:", strlen ("^NDISSTAT:")) == 0 ||
+          g_ascii_strncasecmp (response, "^NDISSTATQRY:", strlen ("^NDISSTATQRY:")) == 0)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing ^NDISSTAT / ^NDISSTATQRY prefix");
         return FALSE;
     }
@@ -61,47 +61,81 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
      * Or, in newer firmwares:
      *     ^NDISSTATQRY:0,,,"IPV4",0,,,"IPV6"
      *     OK
+     *
+     * Or, even (handled separately):
+     *     ^NDISSTATQry:1
+     *     OK
      */
-    r = g_regex_new ("\\^NDISSTAT(?:QRY)?:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
-                     "(?:\\^NDISSTAT:|\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
-                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
-                     0, NULL);
-    g_assert (r != NULL);
 
-    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
-    if (!inner_error && g_match_info_matches (match_info)) {
-        guint ip_type_field = 4;
+    /* If multiple fields available, try first parsing method */
+    if (strchr (response, ',')) {
+        r = g_regex_new ("\\^NDISSTAT(?:QRY)?(?:Qry)?:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
+                         "(?:\\^NDISSTAT:|\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
+                         G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                         0, NULL);
+        g_assert (r != NULL);
 
-        /* IPv4 and IPv6 are fields 4 and (if available) 8 */
+        g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+        if (!inner_error && g_match_info_matches (match_info)) {
+            guint ip_type_field = 4;
 
-        while (!inner_error && ip_type_field <= 8) {
-            gchar *ip_type_str;
+            /* IPv4 and IPv6 are fields 4 and (if available) 8 */
+
+            while (!inner_error && ip_type_field <= 8) {
+                gchar *ip_type_str;
+                guint connected;
+
+                ip_type_str = mm_get_string_unquoted_from_match_info (match_info, ip_type_field);
+                if (!ip_type_str)
+                    break;
+
+                if (!mm_get_uint_from_match_info (match_info, (ip_type_field - 3), &connected) ||
+                    (connected != 0 && connected != 1)) {
+                    inner_error = g_error_new (MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "Couldn't parse ^NDISSTAT / ^NDISSTATQRY fields");
+                } else if (g_ascii_strcasecmp (ip_type_str, "IPV4") == 0) {
+                    *ipv4_available = TRUE;
+                    *ipv4_connected = (gboolean)connected;
+                } else if (g_ascii_strcasecmp (ip_type_str, "IPV6") == 0) {
+                    *ipv6_available = TRUE;
+                    *ipv6_connected = (gboolean)connected;
+                }
+
+                g_free (ip_type_str);
+                ip_type_field += 4;
+            }
+        }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+    /* No separate IPv4/IPv6 info given just connected/not connected */
+    else {
+        r = g_regex_new ("\\^NDISSTAT(?:QRY)?(?:Qry)?:\\s*(\\d)(?:\\r\\n)?",
+                         G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                         0, NULL);
+        g_assert (r != NULL);
+
+        g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+        if (!inner_error && g_match_info_matches (match_info)) {
             guint connected;
 
-            ip_type_str = mm_get_string_unquoted_from_match_info (match_info, ip_type_field);
-            if (!ip_type_str)
-                break;
-
-            if (!mm_get_uint_from_match_info (match_info, (ip_type_field - 3), &connected) ||
+            if (!mm_get_uint_from_match_info (match_info, 1, &connected) ||
                 (connected != 0 && connected != 1)) {
                 inner_error = g_error_new (MM_CORE_ERROR,
                                            MM_CORE_ERROR_FAILED,
                                            "Couldn't parse ^NDISSTAT / ^NDISSTATQRY fields");
-            } else if (g_ascii_strcasecmp (ip_type_str, "IPV4") == 0) {
+            } else {
+                /* We'll assume IPv4 */
                 *ipv4_available = TRUE;
                 *ipv4_connected = (gboolean)connected;
-            } else if (g_ascii_strcasecmp (ip_type_str, "IPV6") == 0) {
-                *ipv6_available = TRUE;
-                *ipv6_connected = (gboolean)connected;
             }
-
-            g_free (ip_type_str);
-            ip_type_field += 4;
         }
-    }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
 
     if (!ipv4_available && !ipv6_available) {
         inner_error = g_error_new (MM_CORE_ERROR,
@@ -1183,4 +1217,3 @@ gboolean mm_huawei_parse_time_response (const gchar *response,
 
     return ret;
 }
-
