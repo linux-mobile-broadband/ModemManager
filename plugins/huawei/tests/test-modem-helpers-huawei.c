@@ -101,6 +101,10 @@ static const NdisstatqryTest ndisstatqry_tests[] = {
     { "^NDISSTATQRY: 1,,,\"IPV4\",0,,,\"IPV6\"\r\n", TRUE,  TRUE,  TRUE,  FALSE },
     { "^NDISSTATQRY: 0,,,\"IPV4\",1,,,\"IPV6\"\r\n", TRUE,  FALSE, TRUE,  TRUE  },
     { "^NDISSTATQRY: 0,,,\"IPV4\",0,,,\"IPV6\"\r\n", TRUE,  FALSE, TRUE,  FALSE },
+    { "^NDISSTATQry:1",     TRUE, TRUE,  FALSE, FALSE },
+    { "^NDISSTATQry:1\r\n", TRUE, TRUE,  FALSE, FALSE },
+    { "^NDISSTATQry:0",     TRUE, FALSE, FALSE, FALSE },
+    { "^NDISSTATQry:0\r\n", TRUE, FALSE, FALSE, FALSE },
     { NULL, FALSE, FALSE, FALSE, FALSE }
 };
 
