@@ -59,7 +59,9 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191f", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1921", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson H5321gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_ERICSSON_MBM_GPS_PORT}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{ID_MM_ERICSSON_MBM}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1927", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_ERICSSON_MBM_GPS_PORT}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1927", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson C3304w
