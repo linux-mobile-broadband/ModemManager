@@ -109,6 +109,7 @@ ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="261d", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3a1d", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # HP hs2350 Mobile Broadband Module
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3d1d", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_ERICSSON_MBM_GPS_PORT}="1"
 ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3d1d", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # HP lc2000 Mobile Broadband Module
