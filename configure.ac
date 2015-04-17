@@ -110,6 +110,10 @@ AC_SUBST(GLIB_MKENUMS)
 GDBUS_CODEGEN=`$PKG_CONFIG --variable=gdbus_codegen gio-2.0`
 AC_SUBST(GDBUS_CODEGEN)
 
+# DBus testing support only with GIO 2.34
+PKG_CHECK_MODULES(DBUS_TEST_SUPPORT, [gio-2.0 >= 2.34], [have_dbus_test_support=yes], [have_dbus_test_support=no])
+AM_CONDITIONAL(BUILD_DBUS_TEST_SUPPORT, test "x$have_dbus_test_support" = "xyes")
+
 # GObject Introspection
 GOBJECT_INTROSPECTION_CHECK([0.9.6])
 
