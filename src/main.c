@@ -30,10 +30,6 @@
 #include "mm-log.h"
 #include "mm-context.h"
 
-#if !defined(MM_DIST_VERSION)
-# define MM_DIST_VERSION VERSION
-#endif
-
 /* Maximum time to wait for all modems to get disabled and removed */
 #define MAX_SHUTDOWN_TIME_SECS 20
 

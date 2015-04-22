@@ -16,7 +16,12 @@
 #ifndef MM_CONTEXT_H
 #define MM_CONTEXT_H
 
+#include <config.h>
 #include <glib.h>
+
+#if !defined(MM_DIST_VERSION)
+# define MM_DIST_VERSION VERSION
+#endif
 
 void mm_context_init (gint argc,
                       gchar **argv);
