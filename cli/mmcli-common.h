@@ -79,6 +79,20 @@ MMSms *mmcli_get_sms_sync   (GDBusConnection *connection,
                              MMManager **manager,
                              MMObject **object);
 
+void   mmcli_get_call       (GDBusConnection *connection,
+                             const gchar *path_or_index,
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data);
+MMCall *mmcli_get_call_finish (GAsyncResult *res,
+                             MMManager **manager,
+                             MMObject **object);
+MMCall *mmcli_get_call_sync   (GDBusConnection *connection,
+                             const gchar *path_or_index,
+                             MMManager **manager,
+                             MMObject **object);
+
+
 const gchar *mmcli_get_state_reason_string (MMModemStateChangeReason reason);
 
 GOptionGroup *mmcli_get_common_option_group (void);
@@ -86,6 +100,7 @@ const gchar  *mmcli_get_common_modem_string (void);
 const gchar  *mmcli_get_common_bearer_string (void);
 const gchar  *mmcli_get_common_sim_string (void);
 const gchar  *mmcli_get_common_sms_string (void);
+const gchar  *mmcli_get_common_call_string (void);
 
 gchar *mmcli_prefix_newlines (const gchar *prefix,
                               const gchar *str);

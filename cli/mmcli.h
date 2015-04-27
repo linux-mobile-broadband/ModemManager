@@ -85,6 +85,14 @@ void          mmcli_modem_messaging_run_asynchronous   (GDBusConnection *connect
 void          mmcli_modem_messaging_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_messaging_shutdown           (void);
 
+/* Voice group */
+GOptionGroup *mmcli_modem_voice_get_option_group   (void);
+gboolean      mmcli_modem_voice_options_enabled    (void);
+void          mmcli_modem_voice_run_asynchronous   (GDBusConnection *connection,
+                                                        GCancellable    *cancellable);
+void          mmcli_modem_voice_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_voice_shutdown           (void);
+
 /* Time group */
 GOptionGroup *mmcli_modem_time_get_option_group   (void);
 gboolean      mmcli_modem_time_options_enabled    (void);
@@ -140,5 +148,13 @@ void          mmcli_sms_run_asynchronous   (GDBusConnection *connection,
                                             GCancellable    *cancellable);
 void          mmcli_sms_run_synchronous    (GDBusConnection *connection);
 void          mmcli_sms_shutdown           (void);
+
+/* Call group */
+GOptionGroup *mmcli_call_get_option_group   (void);
+gboolean      mmcli_call_options_enabled    (void);
+void          mmcli_call_run_asynchronous   (GDBusConnection *connection,
+                                            GCancellable    *cancellable);
+void          mmcli_call_run_synchronous    (GDBusConnection *connection);
+void          mmcli_call_shutdown           (void);
 
 #endif /* __MMCLI_H__ */

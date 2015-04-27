@@ -21,13 +21,15 @@ mmcli_SOURCES = \
 	mmcli-modem-simple.c \
 	mmcli-modem-location.c \
 	mmcli-modem-messaging.c \
+	mmcli-modem-voice.c \
 	mmcli-modem-time.c \
 	mmcli-modem-firmware.c \
 	mmcli-modem-signal.c \
 	mmcli-modem-oma.c \
 	mmcli-bearer.c \
 	mmcli-sim.c \
-	mmcli-sms.c
+	mmcli-sms.c \
+	mmcli-call.c
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \

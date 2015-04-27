@@ -1071,11 +1071,282 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
     return NULL;
 }
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar *call_path;
+    MMManager *manager;
+    GList *modems;
+    MMObject *current;
+    MMCall *call;
+} GetVoiceContext;
+
+static void
+get_voice_context_free (GetVoiceContext *ctx)
+{
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    if (ctx->call)
+        g_object_unref (ctx->call);
+    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
+    g_free (ctx->call_path);
+    g_free (ctx);
+}
+
+static void
+get_voice_context_complete (GetVoiceContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    ctx->result = NULL;
+}
+
+
+static void look_for_call_in_modem (GetVoiceContext *ctx);
+
+static MMCall *
+find_call_in_list (GList *list,
+                  const gchar *call_path)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMCall *call = MM_CALL (l->data);
+
+        if (g_str_equal (mm_call_get_path (call), call_path)) {
+            g_debug ("Call found at '%s'\n", call_path);
+            return g_object_ref (call);
+        }
+    }
+
+    return NULL;
+}
+
+static void
+list_call_ready (MMModemVoice *modem,
+                GAsyncResult *res,
+                GetVoiceContext *ctx)
+{
+    GList *call_list;
+    GError *error = NULL;
+
+    call_list = mm_modem_voice_list_call_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't list call at '%s': '%s'\n",
+                    mm_modem_voice_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    ctx->call = find_call_in_list (call_list, ctx->call_path);
+    g_list_free_full (call_list, (GDestroyNotify) g_object_unref);
+
+    /* Found! */
+    if (ctx->call) {
+        g_simple_async_result_set_op_res_gpointer (
+            ctx->result,
+            ctx,
+            (GDestroyNotify)get_voice_context_free);
+        get_voice_context_complete (ctx);
+        return;
+    }
+
+    /* Not found, try with next modem */
+    look_for_call_in_modem (ctx);
+}
+
+static void
+look_for_call_in_modem (GetVoiceContext *ctx)
+{
+    MMModemVoice *modem;
+
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find call at '%s': 'not found in any modem'\n",
+                    ctx->call_path);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Loop looking for the call in each modem found */
+    ctx->current = MM_OBJECT (ctx->modems->data);
+    ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
+
+    modem = mm_object_get_modem_voice (ctx->current);
+    if (modem) {
+        g_debug ("Looking for call '%s' in modem '%s'...",
+                 ctx->call_path,
+                 mm_object_get_path (ctx->current));
+        mm_modem_voice_list_call (modem,
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)list_call_ready,
+                                 ctx);
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Current modem has no messaging capabilities, try with next modem */
+    look_for_call_in_modem (ctx);
+}
+
+static void
+get_voice_manager_ready (GDBusConnection *connection,
+                       GAsyncResult *res,
+                       GetVoiceContext *ctx)
+{
+    ctx->manager = mmcli_get_manager_finish (res);
+    ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find call at '%s': 'no modems found'\n",
+                    ctx->call_path);
+        exit (EXIT_FAILURE);
+    }
+
+    look_for_call_in_modem (ctx);
+}
+
+static gchar *
+get_call_path (const gchar *path_or_index)
+{
+    gchar *call_path;
+
+    /* We must have a given call specified */
+    if (!path_or_index) {
+        g_printerr ("error: no call was specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Call path may come in two ways: full DBus path or just call index.
+     * If it is a call index, we'll need to generate the DBus path ourselves */
+    if (g_str_has_prefix (path_or_index, MM_DBUS_CALL_PREFIX)) {
+        g_debug ("Assuming '%s' is the full call path", path_or_index);
+        call_path = g_strdup (path_or_index);
+    } else if (g_ascii_isdigit (path_or_index[0])) {
+        g_debug ("Assuming '%s' is the call index", path_or_index);
+        call_path = g_strdup_printf (MM_DBUS_CALL_PREFIX "/%s", path_or_index);
+    } else {
+        g_printerr ("error: invalid path or index string specified: '%s'\n",
+                    path_or_index);
+        exit (EXIT_FAILURE);
+    }
+
+    return call_path;
+}
+
+MMCall *
+mmcli_get_call_finish (GAsyncResult *res,
+                      MMManager **o_manager,
+                      MMObject **o_object)
+{
+    GetVoiceContext *ctx;
+
+    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (o_manager)
+        *o_manager = g_object_ref (ctx->manager);
+    if (o_object)
+        *o_object = g_object_ref (ctx->current);
+    return g_object_ref (ctx->call);
+}
+
+void   mmcli_get_call       (GDBusConnection *connection,
+                             const gchar *path_or_index,
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data) {
+
+    GetVoiceContext *ctx;
+
+    ctx = g_new0 (GetVoiceContext, 1);
+    ctx->call_path = get_call_path (path_or_index);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
+                                             callback,
+                                             user_data,
+                                             mmcli_get_call);
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_voice_manager_ready,
+                       ctx);
+}
+
+MMCall *mmcli_get_call_sync   (GDBusConnection *connection,
+                             const gchar *path_or_index,
+                             MMManager **o_manager,
+                             MMObject **o_object) {
+
+    MMManager *manager;
+    GList *modems;
+    GList *l;
+    MMCall *found = NULL;
+    gchar *call_path;
+
+    call_path = get_call_path (path_or_index);
+
+    manager = mmcli_get_manager_sync (connection);
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find sms at '%s': 'no modems found'\n",
+                    call_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; !found && l; l = g_list_next (l)) {
+        GError *error = NULL;
+        MMObject *object;
+        MMModemVoice *voice;
+        GList *call_list;
+
+        object = MM_OBJECT (l->data);
+        voice = mm_object_get_modem_voice (object);
+
+        /* If doesn't implement voice, continue to next one */
+        if (!voice)
+            continue;
+
+        call_list = mm_modem_voice_list_call_sync (voice, NULL, &error);
+        if (error) {
+            g_printerr ("error: couldn't list call at '%s': '%s'\n",
+                        mm_modem_voice_get_path (voice),
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        found = find_call_in_list (call_list, call_path);
+        g_list_free_full (call_list, (GDestroyNotify) g_object_unref);
+
+        if (found && o_object)
+            *o_object = g_object_ref (object);
+
+        g_object_unref (voice);
+    }
+
+    if (!found) {
+        g_printerr ("error: couldn't find call at '%s': 'not found in any modem'\n",
+                    call_path);
+        exit (EXIT_FAILURE);
+    }
+
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_free (call_path);
+
+    if (o_manager)
+        *o_manager = manager;
+    else
+        g_object_unref (manager);
+
+    return found;
+}
+
+
 /* Common options */
 static gchar *modem_str;
 static gchar *bearer_str;
 static gchar *sim_str;
 static gchar *sms_str;
+static gchar *call_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
@@ -1092,6 +1363,10 @@ static GOptionEntry entries[] = {
     },
     { "sms", 's', 0, G_OPTION_ARG_STRING, &sms_str,
       "Specify SMS by path or index. Shows SMS information if no action specified.",
+      "[PATH|INDEX]"
+    },
+    { "call", 'o', 0, G_OPTION_ARG_STRING, &call_str,
+      "Specify Call by path or index. Shows Call information if no action specified.",
       "[PATH|INDEX]"
     },
     { NULL }
@@ -1135,6 +1410,12 @@ const gchar *
 mmcli_get_common_sms_string (void)
 {
     return sms_str;
+}
+
+const gchar *
+mmcli_get_common_call_string (void)
+{
+    return call_str;
 }
 
 gchar *
