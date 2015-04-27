@@ -1168,4 +1168,60 @@ typedef enum { /*< underscore_name=mm_oma_session_state_failed_reason >*/
     MM_OMA_SESSION_STATE_FAILED_REASON_SESSION_CANCELLED     = 5
 } MMOmaSessionStateFailedReason;
 
+/**
+ * MMCallState:
+ * @MM_CALL_STATE_UNKNOWN: default state for a new outgoing call.
+ * @MM_CALL_STATE_DIALING: outgoing call started. Wait for free channel.
+ * @MM_CALL_STATE_RINGING_IN: outgoing call attached to GSM network, waiting for an answer.
+ * @MM_CALL_STATE_RINGING_OUT: incoming call is waiting for an answer.
+ * @MM_CALL_STATE_ACTIVE: call is active between two peers.
+ * @MM_CALL_STATE_HELD: held call (by +CHLD AT command).
+ * @MM_CALL_STATE_WAITING: waiting call (by +CCWA AT command).
+ * @MM_CALL_STATE_TERMINATED: call is terminated.
+ * 
+ * State of Call
+ */
+typedef enum { /*< underscore_name=mm_call_state >*/
+    MM_CALL_STATE_UNKNOWN       = 0,
+    MM_CALL_STATE_DIALING       = 1,
+    MM_CALL_STATE_RINGING_OUT   = 2,
+    MM_CALL_STATE_RINGING_IN    = 3,
+    MM_CALL_STATE_ACTIVE        = 4,
+    MM_CALL_STATE_HELD          = 5,
+    MM_CALL_STATE_WAITING       = 6,
+    MM_CALL_STATE_TERMINATED    = 7
+} MMCallState;
+
+/**
+ * MMCallStateReason:
+ * @MM_CALL_STATE_REASON_UNKNOWN: Default value for a new outgoing call.
+ * @MM_CALL_STATE_REASON_OUTGOING_STARTED: Outgoing call is started.
+ * @MM_CALL_STATE_REASON_INCOMING_NEW: Received a new incoming call.
+ * @MM_CALL_STATE_REASON_ACCEPTED: Dialing or Ringing call is accepted.
+ * @MM_CALL_STATE_REASON_TERMINATED: Call is correctly terminated.
+ * @MM_CALL_STATE_REASON_REFUSED_OR_BUSY: Remote peer is busy or refused call
+ * @MM_CALL_STATE_REASON_ERROR: Wrong number or generic network error.
+ */
+typedef enum { /*< underscore_name=mm_call_state_reason >*/
+    MM_CALL_STATE_REASON_UNKNOWN            = 0,
+    MM_CALL_STATE_REASON_OUTGOING_STARTED   = 1,
+    MM_CALL_STATE_REASON_INCOMING_NEW       = 2,
+    MM_CALL_STATE_REASON_ACCEPTED           = 3,
+    MM_CALL_STATE_REASON_TERMINATED         = 4,
+    MM_CALL_STATE_REASON_REFUSED_OR_BUSY    = 5,
+    MM_CALL_STATE_REASON_ERROR              = 6
+} MMCallStateReason;
+
+/**
+ * MMCallDirection:
+ * @MM_CALL_DIRECTION_UNKNOWN: unknown.
+ * @MM_CALL_DIRECTION_INCOMING: call from network.
+ * @MM_CALL_DIRECTION_OUTGOING: call to network.
+ */
+typedef enum { /*< underscore_name=mm_call_direction >*/
+    MM_CALL_DIRECTION_UNKNOWN   = 0,
+    MM_CALL_DIRECTION_INCOMING  = 1,
+    MM_CALL_DIRECTION_OUTGOING  = 2
+} MMCallDirection;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

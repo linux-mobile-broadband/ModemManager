@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
+   Copyright (C) 2015 Riccardo Vangelisti <riccardo.vangelisti@sadel.it>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Call:
+      @short_description: The ModemManager Call interface.
+
+      The Call interface Defines operations and properties of a single Call.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Call">
+
+    <!--
+        Start:
+
+        If the outgoing call has not yet been started, start it.
+        Applicable only if state is MM_CALL_STATE_UNKNOWN and direction is MM_CALL_DIRECTION_OUTGOING.
+    -->
+    <method name="Start" />
+
+    <!--
+        Accept:
+
+        Accept incoming call (answer).
+        Applicable only if state is MM_CALL_STATE_RINGING and direction is MM_CALL_DIRECTION_INCOMING
+    -->
+    <method name="Accept" />
+
+    <!--
+        Hangup:
+
+        Hangup the active call.
+        Applicable only if states are MM_CALL_STATE_RINGING and MM_CALL_STATE_ACCEPTED
+    -->
+    <method name="Hangup"/>
+
+    <!--
+        StateChanged:
+        @old: Old state MMCallState
+        @new: New state MMCallState
+        @reason: A <link linkend="MMCallStateReason">MMCallStateReason</link> value, specifying the reason for this state change.
+
+        Emitted when call changes state
+    -->
+    <signal name="StateChanged">
+      <arg name="old" type="i" />
+      <arg name="new" type="i" />
+      <arg name="reason" type="u" />
+    </signal>
+
+    <!--
+        State:
+
+        A <link linkend="MMCallState">MMCallState</link> value,
+        describing the state of the call.
+    -->
+    <property name="State" type="i" access="read" />
+
+    <!--
+        StateReason:
+
+        A <link linkend="MMCallStateReason">MMCallStateReason</link> value, describing why the state is changed.
+    -->
+    <property name="StateReason" type="i" access="read" />
+
+    <!--
+        Direction:
+
+        A <link linkend="MMCallDirection">MMCallDirection</link> value,
+        describing the direction of the call.
+    -->
+    <property name="Direction" type="i" access="read" />
+
+    <!--
+        Number:
+
+        The remote phone number.
+    -->
+    <property name="Number" type="s" access="read" />
+  </interface>
+</node>
