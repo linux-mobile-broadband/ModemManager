@@ -38,6 +38,7 @@
 #include "mm-modem-simple.h"
 #include "mm-modem-location.h"
 #include "mm-modem-messaging.h"
+#include "mm-modem-voice.h"
 #include "mm-modem-time.h"
 #include "mm-modem-firmware.h"
 #include "mm-modem-signal.h"
@@ -84,6 +85,7 @@ MMModemCdma      *mm_object_get_modem_cdma       (MMObject *self);
 MMModemSimple    *mm_object_get_modem_simple     (MMObject *self);
 MMModemLocation  *mm_object_get_modem_location   (MMObject *self);
 MMModemMessaging *mm_object_get_modem_messaging  (MMObject *self);
+MMModemVoice     *mm_object_get_modem_voice      (MMObject *self);
 MMModemTime      *mm_object_get_modem_time       (MMObject *self);
 MMModemFirmware  *mm_object_get_modem_firmware   (MMObject *self);
 MMModemSignal    *mm_object_get_modem_signal     (MMObject *self);
@@ -96,6 +98,7 @@ MMModemCdma      *mm_object_peek_modem_cdma      (MMObject *self);
 MMModemSimple    *mm_object_peek_modem_simple    (MMObject *self);
 MMModemLocation  *mm_object_peek_modem_location  (MMObject *self);
 MMModemMessaging *mm_object_peek_modem_messaging (MMObject *self);
+MMModemVoice     *mm_object_peek_modem_voice     (MMObject *self);
 MMModemTime      *mm_object_peek_modem_time      (MMObject *self);
 MMModemFirmware  *mm_object_peek_modem_firmware  (MMObject *self);
 MMModemSignal    *mm_object_peek_modem_signal    (MMObject *self);

@@ -12,6 +12,7 @@ GENERATED_H = \
 	mm-gdbus-manager.h \
 	mm-gdbus-sim.h \
 	mm-gdbus-sms.h \
+	mm-gdbus-call.h \
 	mm-gdbus-bearer.h \
 	mm-gdbus-modem.h
 
@@ -22,6 +23,7 @@ GENERATED_C = \
 	mm-gdbus-manager.c \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
+	mm-gdbus-call.c \
 	mm-gdbus-bearer.c \
 	mm-gdbus-modem.c
 
@@ -29,9 +31,11 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Voice.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
@@ -98,6 +102,7 @@ mm_gdbus_modem_generated = \
 	mm-gdbus-modem.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Voice.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
@@ -110,6 +115,7 @@ mm_gdbus_modem_generated = \
 mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Voice.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Location.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Time.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Firmware.xml \
@@ -172,6 +178,20 @@ $(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemMana
 		--generate-docbook mm-gdbus-doc \
 		--generate-c-code mm-gdbus-sms \
 		--annotate "org.freedesktop.ModemManager1.Sms:Data" org.gtk.GDBus.C.ForceGVariant True \
+		$< \
+		$(NULL)
+
+# Call interface
+mm_gdbus_call_generated = \
+	mm-gdbus-call.h \
+	mm-gdbus-call.c \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml
+$(mm_gdbus_call_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Call.xml
+	$(AM_V_GEN) $(GDBUS_CODEGEN) \
+		--interface-prefix org.freedesktop.ModemManager1. \
+		--c-namespace=MmGdbus \
+		--generate-docbook mm-gdbus-doc \
+		--generate-c-code mm-gdbus-call \
 		$< \
 		$(NULL)
 

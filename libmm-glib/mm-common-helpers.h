@@ -63,6 +63,14 @@ MMSmsCdmaTeleserviceId   mm_common_get_sms_cdma_teleservice_id_from_string   (co
                                                                               GError **error);
 MMSmsCdmaServiceCategory mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
                                                                               GError **error);
+
+MMCallDirection     mm_common_get_call_direction_from_string    (const gchar *str,
+                                                                 GError **error);
+MMCallState         mm_common_get_call_state_from_string        (const gchar *str,
+                                                                 GError **error);
+MMCallStateReason   mm_common_get_call_state_reason_from_string (const gchar *str,
+                                                                 GError **error);
+
 MMOmaFeature          mm_common_get_oma_features_from_string (const gchar *str,
                                                               GError **error);
 MMOmaSessionType      mm_common_get_oma_session_type_from_string (const gchar *str,

@@ -41,6 +41,7 @@
 # include <mm-modem-simple.h>
 # include <mm-modem-location.h>
 # include <mm-modem-messaging.h>
+# include <mm-modem-voice.h>
 # include <mm-modem-time.h>
 # include <mm-modem-firmware.h>
 # include <mm-modem-signal.h>

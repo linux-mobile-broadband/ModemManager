@@ -40,6 +40,10 @@ libmm_glib_la_SOURCES = \
 	mm-sms.c \
 	mm-modem-messaging.h \
 	mm-modem-messaging.c \
+	mm-modem-voice.h \
+	mm-modem-voice.c \
+	mm-call.h \
+	mm-call.c \
 	mm-bearer.h \
 	mm-bearer.c \
 	mm-common-helpers.h \
@@ -52,6 +56,8 @@ libmm_glib_la_SOURCES = \
 	mm-bearer-properties.c \
 	mm-sms-properties.h \
 	mm-sms-properties.c \
+	mm-call-properties.h \
+	mm-call-properties.c \
 	mm-bearer-ip-config.h \
 	mm-bearer-ip-config.c \
 	mm-location-common.h \
@@ -116,11 +122,14 @@ include_HEADERS = \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \
+	mm-modem-voice.h \
+	mm-call.h \
 	mm-bearer.h \
 	mm-simple-status.h \
 	mm-simple-connect-properties.h \
 	mm-bearer-properties.h \
 	mm-sms-properties.h \
+	mm-call-properties.h \
 	mm-bearer-ip-config.h \
 	mm-location-common.h \
 	mm-location-3gpp.h \

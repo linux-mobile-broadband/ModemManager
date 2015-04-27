@@ -120,6 +120,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2015 - Riccardo Vangelisti riccardo.vangelisti@sadel.it
+ * Copyright (C) 2015 - Marco Bascetta marco.bascetta@sadel.it
  */
 
 #ifndef _MODEM_MANAGER_NAMES_H_
@@ -133,6 +135,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearer"
 #define MM_DBUS_SIM_PREFIX    MM_DBUS_PATH "/SIM"
 #define MM_DBUS_SMS_PREFIX    MM_DBUS_PATH "/SMS"
+#define MM_DBUS_CALL_PREFIX   MM_DBUS_PATH "/Call"
 
 /* Prefix for DBus errors */
 #define MM_DBUS_ERROR_PREFIX "org.freedesktop.ModemManager1.Error"

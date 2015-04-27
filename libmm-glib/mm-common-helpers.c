@@ -1001,6 +1001,72 @@ mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
     return MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN;
 }
 
+MMCallDirection
+mm_common_get_call_direction_from_string (const gchar *str,
+                                          GError **error)
+{
+    GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_DIRECTION));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMCallDirection value",
+                 str);
+    return MM_CALL_DIRECTION_UNKNOWN;
+}
+
+MMCallState
+mm_common_get_call_state_from_string (const gchar *str,
+                                      GError **error)
+{
+    GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_STATE));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMCallState value",
+                 str);
+    return MM_CALL_STATE_UNKNOWN;
+}
+
+MMCallStateReason
+mm_common_get_call_state_reason_from_string (const gchar *str,
+                                             GError **error)
+{
+    GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_STATE_REASON));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMCallStateReason value",
+                 str);
+    return MM_CALL_STATE_REASON_UNKNOWN;
+}
+
 MMOmaFeature
 mm_common_get_oma_features_from_string (const gchar *str,
                                         GError **error)

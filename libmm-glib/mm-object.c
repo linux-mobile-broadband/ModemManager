@@ -341,6 +341,42 @@ mm_object_peek_modem_messaging (MMObject *self)
 /*****************************************************************************/
 
 /**
+ * mm_object_get_modem_voice:
+ * @self: A #MMObject.
+ *
+ * Gets the #MMModemVoice instance for the D-Bus interface org.freedesktop.ModemManager1.Modem.Modemvoice on @self, if any.
+ *
+ * Returns: (transfer full): A #MMModemVoice that must be freed with g_object_unref() or %NULL if @self does not implement the interface.
+ */
+MMModemVoice *
+mm_object_get_modem_voice (MMObject *self)
+{
+    g_return_val_if_fail (MM_IS_OBJECT (MM_GDBUS_OBJECT (self)), NULL);
+
+    return (MMModemVoice *)mm_gdbus_object_get_modem_voice (MM_GDBUS_OBJECT (self));
+}
+
+/**
+ * mm_object_peek_modem_voice: (skip)
+ * @self: A #MMObject.
+ *
+ * Like mm_object_get_modem_voice() but doesn't increase the reference count on the returned object.
+ *
+ * <warning>It is not safe to use the returned object if you are on another thread than the one where the #MMManager is running.</warning>
+ *
+ * Returns: (transfer none): A #MMModemVoice or %NULL if @self does not implement the interface. Do not free the returned object, it is owned by @self.
+ */
+MMModemVoice *
+mm_object_peek_modem_voice (MMObject *self)
+{
+    g_return_val_if_fail (MM_IS_OBJECT (MM_GDBUS_OBJECT (self)), NULL);
+
+    return (MMModemVoice *)mm_gdbus_object_peek_modem_voice (MM_GDBUS_OBJECT (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_object_get_modem_time:
  * @self: A #MMObject.
  *
