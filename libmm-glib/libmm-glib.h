@@ -59,6 +59,7 @@
 #include <mm-simple-status.h>
 #include <mm-simple-connect-properties.h>
 #include <mm-sms-properties.h>
+#include <mm-call-properties.h>
 #include <mm-bearer-properties.h>
 #include <mm-bearer-ip-config.h>
 #include <mm-location-common.h>
@@ -80,5 +81,6 @@
 #include <mm-gdbus-bearer.h>
 #include <mm-gdbus-sim.h>
 #include <mm-gdbus-sms.h>
+#include <mm-gdbus-call.h>
 
 #endif /* _LIBMM_GLIB_H_ */

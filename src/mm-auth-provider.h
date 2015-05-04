@@ -31,6 +31,7 @@
 #define MM_AUTHORIZATION_DEVICE_CONTROL  "org.freedesktop.ModemManager1.Device.Control"
 #define MM_AUTHORIZATION_CONTACTS        "org.freedesktop.ModemManager1.Contacts"
 #define MM_AUTHORIZATION_MESSAGING       "org.freedesktop.ModemManager1.Messaging"
+#define MM_AUTHORIZATION_VOICE           "org.freedesktop.ModemManager1.Voice"
 #define MM_AUTHORIZATION_USSD            "org.freedesktop.ModemManager1.USSD"
 #define MM_AUTHORIZATION_LOCATION        "org.freedesktop.ModemManager1.Location"
 #define MM_AUTHORIZATION_FIRMWARE        "org.freedesktop.ModemManager1.Firmware"
