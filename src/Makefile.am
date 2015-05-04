@@ -224,9 +224,6 @@ ModemManager_SOURCES = \
 	mm-plugin.c \
 	mm-plugin.h
 
-# Additional dependency rules
-mm-base-bearer.c: mm-daemon-enums-types.h
-
 # Additional Polkit support
 if WITH_POLKIT
 ModemManager_SOURCES += \
@@ -269,8 +266,11 @@ endif
 EXTRA_DIST = \
 	$(udevrules_DATA)
 
-CLEANFILES = \
+# Request to build enum types before anything else
+BUILT_SOURCES = \
 	mm-daemon-enums-types.h \
 	mm-daemon-enums-types.c \
 	mm-port-enums-types.h \
 	mm-port-enums-types.c
+
+CLEANFILES = $(BUILT_SOURCES)
