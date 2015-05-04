@@ -83,6 +83,13 @@ GArray *mm_filter_supported_capabilities (MMModemCapability all,
                                           const GArray *supported_combinations);
 
 /*****************************************************************************/
+/* VOICE specific helpers and utilities */
+/*****************************************************************************/
+GRegex    *mm_voice_ring_regex_get (void);
+GRegex    *mm_voice_cring_regex_get (void);
+GRegex    *mm_voice_dtmf_regex_get (void);
+
+/*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/
 

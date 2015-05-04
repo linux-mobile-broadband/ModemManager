@@ -323,6 +323,45 @@ mm_filter_supported_capabilities (MMModemCapability all,
 
 /*****************************************************************************/
 
+GRegex *
+mm_voice_ring_regex_get (void)
+{
+    /* Example:
+     * <CR><LF>RING<CR><LF>
+     */
+    return g_regex_new ("\\r\\nRING\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+GRegex *
+mm_voice_cring_regex_get (void)
+{
+    /* Example:
+     * <CR><LF>+CRING: VOICE<CR><LF>
+     * <CR><LF>+CRING: DATA<CR><LF>
+     */
+    return g_regex_new ("\\r\\n\\+CRING:\\s*(\\S+)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+GRegex *
+mm_voice_dtmf_regex_get (void)
+{
+    /* Example:
+     * <CR><LF>^DDTMF: 1<CR><LF>
+     */
+    return g_regex_new ("\\r\\n\\^DDTMF:\\s*([0-9A-D\\*\\#])\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+/*************************************************************************/
+
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
 #define CREG1 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])"
 

@@ -13,6 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2015 - Marco Bascetta <marco.bascetta@sadel.it>
  */
 
 #ifndef MM_BROADBAND_MODEM_H
