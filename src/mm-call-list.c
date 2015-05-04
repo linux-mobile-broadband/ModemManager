@@ -298,7 +298,7 @@ mm_call_list_class_init (MMCallListClass *klass)
                       G_STRUCT_OFFSET (MMCallListClass, call_added),
                       NULL, NULL,
                       g_cclosure_marshal_generic,
-                      G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_BOOLEAN);
+                      G_TYPE_NONE, 1, G_TYPE_STRING);
 
     signals[SIGNAL_CALL_DELETED] =
         g_signal_new (MM_CALL_DELETED,
