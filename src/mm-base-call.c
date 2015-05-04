@@ -488,6 +488,8 @@ call_start_ready (MMBaseModem *modem,
         return;
     }
     
+    mm_dbg ("%s: '%s'", __FUNCTION__, response);
+    
     /* check response for error */
     if( strstr(response, "OK")) {
         /* Update state */
@@ -771,13 +773,33 @@ call_hangup (MMBaseCall *self,
 }
 
 /*****************************************************************************/
+typedef struct {
+    MMBaseCall *self;
+    MMBaseModem *modem;
+    GSimpleAsyncResult *result;
+} CallDeleteContext;
 
 static void
 call_delete (MMBaseCall *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    // What should I do here ?
+    CallDeleteContext *ctx;
+
+    ctx = g_new0 (CallDeleteContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             call_delete);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (self->priv->modem);
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
 }
 
 static gboolean
