@@ -72,4 +72,7 @@ gboolean mm_call_list_delete_call_finish (MMCallList *self,
                                           GAsyncResult *res,
                                           GError **error);
 
+MMBaseCall* mm_call_list_get_new_incoming               (MMCallList *self);
+MMBaseCall* mm_call_list_get_first_non_terminated_call  (MMCallList *self);
+
 #endif /* MM_CALL_LIST_H */

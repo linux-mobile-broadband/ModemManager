@@ -46,6 +46,110 @@ mm_iface_modem_voice_create_call (MMIfaceModemVoice *self)
     return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self);
 }
 
+//BASCETTA:TODO: bisogna aggiungere la gestione degli errori.
+MMBaseCall *
+mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
+{
+    MMBaseCall  *call   = NULL;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+
+        call = mm_call_list_get_new_incoming(list);
+        if( !call ) {
+
+            mm_dbg("[%s:%d] Incoming call does not exist; create it", __func__, __LINE__);
+
+            call = mm_base_call_new (MM_BASE_MODEM (self));
+            g_object_set (call,
+                          "state",          MM_CALL_STATE_RINGING_IN,
+                          "state-reason",   MM_CALL_STATE_REASON_INCOMING_NEW,
+                          "direction",      MM_CALL_DIRECTION_INCOMING,
+                          NULL);
+
+            /* Only export once properly created */
+            mm_base_call_export (call);
+            mm_dbg ("[%s:%d] New call exported to DBUS", __func__, __LINE__);
+
+            mm_call_list_add_call(list, call);
+            mm_dbg ("[%s:%d] Call added to list", __func__, __LINE__);
+
+        } else {
+//            mm_dbg("[%s:%d] Incoming call already exist. Do nothing", __func__, __LINE__);
+        }
+
+        g_object_unref (list);
+    }
+
+    return call;
+}
+
+gboolean mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self, gchar *number, guint type, guint validity)
+{
+    gboolean    updated = FALSE;
+    MMBaseCall  *call   = NULL;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+
+        call = mm_call_list_get_new_incoming(list);
+        if( call ) {
+            g_object_set (call, "number", number, NULL);
+            mm_gdbus_call_set_number(MM_GDBUS_CALL (call), number);
+
+            //TODO: Maybe also this parameters should be used
+            (void)type;
+            (void)validity;
+
+            updated = TRUE;
+        } else {
+            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+        }
+    }
+
+    return updated;
+}
+
+gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
+{
+    gboolean    updated = FALSE;
+    MMBaseCall  *call   = NULL;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+
+        call = mm_call_list_get_first_non_terminated_call(list);
+        if( call ) {
+            //BASCETTA:TODO: Hang this call!
+            g_object_set (call,
+                          "state",          MM_CALL_STATE_TERMINATED,
+                          "state-reason",   MM_CALL_STATE_REASON_TERMINATED,
+                          NULL);
+            mm_gdbus_call_set_state(MM_GDBUS_CALL (call), MM_CALL_STATE_TERMINATED);
+            mm_gdbus_call_set_state_reason(MM_GDBUS_CALL (call), MM_CALL_STATE_REASON_TERMINATED);
+            updated = TRUE;
+
+            //BASCETTA:TODO: I have to signal state change...
+
+        } else {
+            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+        }
+    }
+
+    return updated;
+}
 /*****************************************************************************/
 
 typedef struct {

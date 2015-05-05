@@ -117,7 +117,13 @@ void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
                                               MMSimpleStatus *status);
 
 /* CALL creation */
-MMBaseCall *mm_iface_modem_voice_create_call (MMIfaceModemVoice *self);
+MMBaseCall *mm_iface_modem_voice_create_call                    (MMIfaceModemVoice *self);
+MMBaseCall *mm_iface_modem_voice_create_incoming_call           (MMIfaceModemVoice *self);
+gboolean    mm_iface_modem_voice_update_incoming_call_number    (MMIfaceModemVoice *self,
+                                                                 gchar *number,
+                                                                 guint type,
+                                                                 guint validity);
+gboolean    mm_iface_modem_voice_network_hangup                 (MMIfaceModemVoice *self);
 
 /* Look for a new valid multipart reference */
 guint8 mm_iface_modem_voice_get_local_multipart_reference (MMIfaceModemVoice *self,

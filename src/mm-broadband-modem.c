@@ -6285,7 +6285,7 @@ ring_received (MMPortSerialAt *port,
     //Do not match anything from regex
     (void)info;
 
-    mm_iface_modem_voice_create_call(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_create_incoming_call(MM_IFACE_MODEM_VOICE(self));
 }
 
 static void
@@ -6293,14 +6293,47 @@ cring_received (MMPortSerialAt *port,
                 GMatchInfo *info,
                 MMBroadbandModem *self)
 {
-    gchar *str;
-
     /* The match info gives us in which storage the index applies */
-    str = mm_get_string_unquoted_from_match_info (info, 1);
+    gchar *str = mm_get_string_unquoted_from_match_info (info, 1);
     //TODO: In str you could have "VOICE" or "DATA". Now consider only "VOICE"
     g_free (str);
 
-    mm_iface_modem_voice_create_call(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_create_incoming_call(MM_IFACE_MODEM_VOICE(self));
+}
+
+static void
+clip_received (MMPortSerialAt *port,
+               GMatchInfo *info,
+               MMBroadbandModem *self)
+{
+    /* The match info gives us in which storage the index applies */
+    gchar *str = mm_get_string_unquoted_from_match_info (info, 1);
+
+    if( !str  ) {
+        guint validity  = 0;
+        guint type      = 0;
+
+        mm_get_uint_from_match_info (info, 2, &type);
+        mm_get_uint_from_match_info (info, 3, &validity);
+
+        mm_dbg ("[%s:%d] CLIP regex => number:'%s', type:'%d', validity:'%d'", __func__, __LINE__, str, type, validity);
+
+        mm_iface_modem_voice_update_incoming_call_number(MM_IFACE_MODEM_VOICE(self), str, type, validity);
+
+        g_free(str);
+    }
+}
+
+static void
+nocarrier_received (MMPortSerialAt *port,
+                    GMatchInfo *info,
+                    MMBroadbandModem *self)
+{
+    //Do not match anything from regex
+    (void)info;
+
+    mm_dbg ("[%s:%d]", __func__, __LINE__);
+    mm_iface_modem_voice_network_hangup(MM_IFACE_MODEM_VOICE(self));
 }
 
 static void
@@ -6344,8 +6377,10 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
 {
     GSimpleAsyncResult *result;
     MMPortSerialAt *ports[2];
+    GRegex *nocarrier_regex;
     GRegex *cring_regex;
     GRegex *ring_regex;
+    GRegex *clip_regex;
     GRegex *dtmf_regex;
     guint i;
 
@@ -6354,8 +6389,10 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                         user_data,
                                         set_voice_unsolicited_events_handlers);
 
+    nocarrier_regex = mm_voice_nocarrier_regex_get ();
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
+    clip_regex  = mm_voice_clip_regex_get ();
     dtmf_regex  = mm_voice_dtmf_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
@@ -6379,6 +6416,18 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             ports[i],
             ring_regex,
             enable ? (MMPortSerialAtUnsolicitedMsgFn) ring_received : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            clip_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) clip_received : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            nocarrier_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) nocarrier_received : NULL,
             enable ? self : NULL,
             NULL);
         mm_port_serial_at_add_unsolicited_msg_handler (

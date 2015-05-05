@@ -84,6 +84,65 @@ mm_call_list_get_paths (MMCallList *self)
 
 /*****************************************************************************/
 
+MMBaseCall* mm_call_list_get_new_incoming(MMCallList *self)
+{
+    MMBaseCall *call = NULL;
+    GList *l;
+    guint i;
+
+    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+
+        MMCallState         state;
+        MMCallStateReason   reason;
+        MMCallDirection     direct;
+
+        g_object_get (MM_BASE_CALL (l->data),
+                      "state"       , &state,
+                      "state-reason", &reason,
+                      "direction"   , &direct,
+                      NULL);
+
+        if( direct  == MM_CALL_DIRECTION_INCOMING           &&
+            state   == MM_CALL_STATE_RINGING_IN             &&
+            reason  == MM_CALL_STATE_REASON_INCOMING_NEW    ) {
+
+            call = MM_BASE_CALL (l->data);
+            break;
+        }
+    }
+
+    return call;
+}
+
+MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
+{
+    MMBaseCall *call = NULL;
+    GList *l;
+    guint i;
+
+    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+
+        MMCallState         state;
+        MMCallStateReason   reason;
+        MMCallDirection     direct;
+
+        g_object_get (MM_BASE_CALL (l->data),
+                      "state"       , &state,
+                      "state-reason", &reason,
+                      "direction"   , &direct,
+                      NULL);
+
+        if( state != MM_CALL_STATE_TERMINATED ) {
+            call = MM_BASE_CALL (l->data);
+            break;
+        }
+    }
+
+    return call;
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MMCallList *self;
     GSimpleAsyncResult *result;
