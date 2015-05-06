@@ -2871,10 +2871,10 @@ huawei_voice_origination (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 2, &call_type))
         return;
 
-    mm_dbg ("[%s:%d][^ORIG] Origination call id '%u' of type '%u'", __func__, __LINE__, call_x, call_type);
+    mm_dbg ("[%s:%d][^ORIG] Origination call id '%u' of type '%u'", __func__, __LINE__, call_x, call_type); //Entrambi
 
-    //TODO: Handle this event
-    //mm_iface_modem_voice_xxx (MM_IFACE_MODEM (self), ...);
+    //TODO: Handle multiple calls
+    //mm_iface_modem_voice_set_call_id(MM_IFACE_MODEM_VOICE(self));
 }
 
 static void
@@ -2889,8 +2889,7 @@ huawei_voice_ringback_tone (MMPortSerialAt *port,
 
     mm_dbg ("[%s:%d][^CONF] Ringback tone from call id '%u'", __func__, __LINE__, call_x);
 
-    //TODO: Handle this event
-    //mm_iface_modem_voice_xxx (MM_IFACE_MODEM (self), ...);
+    mm_iface_modem_voice_call_dialing_to_ringing(MM_IFACE_MODEM_VOICE(self));
 }
 
 static void
@@ -2909,8 +2908,7 @@ huawei_voice_call_connection (MMPortSerialAt *port,
 
     mm_dbg ("[%s:%d][^CONN] Call id '%u' of type '%u' connected", __func__, __LINE__, call_x, call_type);
 
-    //TODO: Handle this event
-    //mm_iface_modem_voice_xxx (MM_IFACE_MODEM (self), ...);
+    mm_iface_modem_voice_call_ringing_to_active(MM_IFACE_MODEM_VOICE(self));
 }
 
 static void
@@ -2937,8 +2935,7 @@ huawei_voice_call_end (MMPortSerialAt *port,
 
     mm_dbg ("[%s:%d][^CEND] Call '%u' terminated with status '%u' and cause '%u'. Duration of call '%d'", __func__, __LINE__, call_x, end_status, cc_cause, duration);
 
-    //TODO: Handle this event
-    //mm_iface_modem_voice_xxx (MM_IFACE_MODEM (self), ...);
+    mm_iface_modem_voice_network_hangup(MM_IFACE_MODEM_VOICE(self));
 }
 
 

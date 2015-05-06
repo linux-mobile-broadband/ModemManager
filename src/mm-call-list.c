@@ -114,6 +114,58 @@ MMBaseCall* mm_call_list_get_new_incoming(MMCallList *self)
     return call;
 }
 
+MMBaseCall* mm_call_list_get_first_ringing_call(MMCallList *self)
+{
+    MMBaseCall *call = NULL;
+    GList *l;
+    guint i;
+
+    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+
+        MMCallState         state;
+
+        g_object_get (MM_BASE_CALL (l->data),
+                      "state"       , &state,
+                      NULL);
+
+        if( state == MM_CALL_STATE_RINGING_IN   ||
+            state == MM_CALL_STATE_RINGING_OUT  ) {
+
+            call = MM_BASE_CALL (l->data);
+            break;
+        }
+    }
+
+    return call;
+}
+
+MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self)
+{
+    MMBaseCall *call = NULL;
+    GList *l;
+    guint i;
+
+    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+
+        MMCallState         state;
+        MMCallDirection     direct;
+
+        g_object_get (MM_BASE_CALL (l->data),
+                      "state"       , &state,
+                      "direction"   , &direct,
+                      NULL);
+
+        if( direct == MM_CALL_DIRECTION_OUTGOING    &&
+            state  == MM_CALL_STATE_DIALING         ) {
+
+            call = MM_BASE_CALL (l->data);
+            break;
+        }
+    }
+
+    return call;
+}
+
 MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
 {
     MMBaseCall *call = NULL;
@@ -123,13 +175,9 @@ MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
     for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
 
         MMCallState         state;
-        MMCallStateReason   reason;
-        MMCallDirection     direct;
 
         g_object_get (MM_BASE_CALL (l->data),
                       "state"       , &state,
-                      "state-reason", &reason,
-                      "direction"   , &direct,
                       NULL);
 
         if( state != MM_CALL_STATE_TERMINATED ) {

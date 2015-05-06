@@ -118,6 +118,56 @@ gboolean mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *se
     return updated;
 }
 
+gboolean mm_iface_modem_voice_call_dialing_to_ringing(MMIfaceModemVoice *self)
+{
+    gboolean    updated = FALSE;
+    MMBaseCall  *call   = NULL;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+
+        call = mm_call_list_get_first_outgoing_dialing_call(list);
+        if( call ) {
+            mm_base_call_change_state(call, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+
+            updated = TRUE;
+        } else {
+            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+        }
+    }
+
+    return updated;
+}
+
+gboolean mm_iface_modem_voice_call_ringing_to_active(MMIfaceModemVoice *self)
+{
+    gboolean    updated = FALSE;
+    MMBaseCall  *call   = NULL;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+
+        call = mm_call_list_get_first_ringing_call(list);
+        if( call ) {
+            mm_base_call_change_state(call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+
+            updated = TRUE;
+        } else {
+            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+        }
+    }
+
+    return updated;
+}
+
 gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 {
     gboolean    updated = FALSE;
@@ -132,17 +182,9 @@ gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 
         call = mm_call_list_get_first_non_terminated_call(list);
         if( call ) {
-            //BASCETTA:TODO: Hang this call!
-            g_object_set (call,
-                          "state",          MM_CALL_STATE_TERMINATED,
-                          "state-reason",   MM_CALL_STATE_REASON_TERMINATED,
-                          NULL);
-            mm_gdbus_call_set_state(MM_GDBUS_CALL (call), MM_CALL_STATE_TERMINATED);
-            mm_gdbus_call_set_state_reason(MM_GDBUS_CALL (call), MM_CALL_STATE_REASON_TERMINATED);
+            mm_base_call_change_state(call, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+
             updated = TRUE;
-
-            //BASCETTA:TODO: I have to signal state change...
-
         } else {
             mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
         }
