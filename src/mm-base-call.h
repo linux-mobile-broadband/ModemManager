@@ -91,6 +91,7 @@ MMBaseCall *mm_base_call_new_from_properties (MMBaseModem *modem,
 void          mm_base_call_export      (MMBaseCall *self);
 void          mm_base_call_unexport    (MMBaseCall *self);
 const gchar  *mm_base_call_get_path    (MMBaseCall *self);
+void          mm_base_call_change_state(MMBaseCall *self, MMCallState new_state, MMCallStateReason reason);
 
 void     mm_base_call_delete        (MMBaseCall *self,
                                     GAsyncReadyCallback callback,
