@@ -115,7 +115,7 @@ handle_start_auth_ready (MMBaseModem *modem,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_FAILED,
-                                               "This CALL was received, cannot send it");
+                                               "This call was not in unknown state, cannot start it");
         handle_start_context_free (ctx);
         return;
     }
@@ -473,7 +473,7 @@ call_start_ready (MMBaseModem *modem,
                   CallStartContext *ctx)
 {
     GError *error = NULL;
-    const gchar *response;
+    const gchar *response = NULL;
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
@@ -488,18 +488,8 @@ call_start_ready (MMBaseModem *modem,
         return;
     }
     
-    mm_dbg ("%s: '%s'", __FUNCTION__, response);
-    
     /* check response for error */
-    if( strstr(response, "OK")) {
-        /* Update state */
-        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_ACTIVE);
-        mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
-                                         mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
-                                         MM_CALL_STATE_ACTIVE,
-                                         MM_CALL_STATE_REASON_ACCEPTED);
-    }
-    else if( strstr(response, "NO CARRIER") || strstr(response, "BUSY") ) {
+    if( response && strlen(response) > 0 ) {
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Couldn't start the call: "
                              "Modem response '%s'", response);
@@ -509,17 +499,13 @@ call_start_ready (MMBaseModem *modem,
                                          mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
                                          MM_CALL_STATE_TERMINATED,
                                          MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
-    } 
-    else {
-        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Couldn't start the call: "
-                                     "Unhandled response '%s'", response);
+    } else {
         /* Update state */
-        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_TERMINATED);
+        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_ACTIVE);
         mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
                                          mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
-                                         MM_CALL_STATE_TERMINATED,
-                                         MM_CALL_STATE_REASON_ERROR);
+                                         MM_CALL_STATE_ACTIVE,
+                                         MM_CALL_STATE_REASON_ACCEPTED);
     }
     
     if (error) {
@@ -549,13 +535,21 @@ call_start (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("ATD %s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)) );
+    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)) );
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              60,
+                              90,
                               FALSE,
                               (GAsyncReadyCallback)call_start_ready,
                               ctx);
+    
+    /* Update state */
+    mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_RINGING_OUT);
+    mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
+                                     mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
+                                     MM_CALL_STATE_RINGING_OUT,
+                                     MM_CALL_STATE_REASON_OUTGOING_STARTED);
+    
     g_free (cmd);
 }
 
@@ -609,14 +603,7 @@ call_accept_ready (MMBaseModem *modem,
     }
     
     /* check response for error */
-    if( strstr(response, "OK")) {
-        /* Update state */
-        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_ACTIVE);
-        mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
-                                         mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
-                                         MM_CALL_STATE_ACTIVE,
-                                         MM_CALL_STATE_REASON_ACCEPTED);
-    } else {
+    if( response && strlen(response) > 0 ) {
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                      "Couldn't accept the call: "
                                      "Unhandled response '%s'", response);
@@ -626,6 +613,13 @@ call_accept_ready (MMBaseModem *modem,
                                          mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
                                          MM_CALL_STATE_TERMINATED,
                                          MM_CALL_STATE_REASON_ERROR);
+    } else {
+        /* Update state */
+        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_ACTIVE);
+        mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
+                                         mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
+                                         MM_CALL_STATE_ACTIVE,
+                                         MM_CALL_STATE_REASON_ACCEPTED);
     }
     
     if (error) {
@@ -658,7 +652,7 @@ call_accept (MMBaseCall *self,
     cmd = g_strdup_printf ("ATA");
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              10,
+                              2,
                               FALSE,
                               (GAsyncReadyCallback)call_accept_ready,
                               ctx);
@@ -715,25 +709,12 @@ call_hangup_ready (MMBaseModem *modem,
         return;
     }
     
-    /* check response for error */
-    if( strstr(response, "OK")) {
-        /* Update state */
-        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_TERMINATED);
-        mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
-                                         mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
-                                         MM_CALL_STATE_TERMINATED,
-                                         MM_CALL_STATE_REASON_TERMINATED);
-    } else {
-        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Couldn't hangup the call: "
-                                     "Unhandled response '%s'", response);
-        /* Update state */
-        mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_TERMINATED);
-        mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
-                                         mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
-                                         MM_CALL_STATE_TERMINATED,
-                                         MM_CALL_STATE_REASON_ERROR);
-    }
+    /* Update state */
+    mm_gdbus_call_set_state (MM_GDBUS_CALL (ctx->self), MM_CALL_STATE_TERMINATED);
+    mm_gdbus_call_emit_state_changed(MM_GDBUS_CALL (ctx->self), 
+                                     mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)),
+                                     MM_CALL_STATE_TERMINATED,
+                                     MM_CALL_STATE_REASON_TERMINATED);
     
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
@@ -762,10 +743,10 @@ call_hangup (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("ATH");
+    cmd = g_strdup_printf ("+CHUP");
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              10,
+                              2,
                               FALSE,
                               (GAsyncReadyCallback)call_hangup_ready,
                               ctx);
