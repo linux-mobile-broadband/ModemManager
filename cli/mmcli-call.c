@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Copyright (C) 2015 Riccardo Vangelisti <riccardo.vangelisti@sadel.it>
+ * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
  */
 
 #include "config.h"
@@ -310,8 +311,8 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
                                    &ctx->manager,
                                    &ctx->object);
 
-    /* Setup operation timeout */
-    mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->call));
+    /* Setup operation timeout: 2 minutes */
+    g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (ctx->call), 2 * 60 * 1000);
 
     /* Request to get info from CALL? */
     if (info_flag) {
