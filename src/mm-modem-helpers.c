@@ -355,8 +355,7 @@ mm_voice_clip_regex_get (void)
      * <CR><LF>+CLIP: "+393351391306",145,,,,0<CR><LF>
      *                 \_ Number      \_ Type \_ Validity
      */
-
-    return g_regex_new ("\\r\\n\\+CLIP:\\s*\"(\\S+)\",\\s*(\\d+),\\s*,\\s*,\\s*,\\s*(\\d+)\\r\\n",
+    return g_regex_new ("\\r\\n\\+CLIP:\\s*(\\S+),\\s*(\\d+),\\s*,\\s*,\\s*,\\s*(\\d+)\\r\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);

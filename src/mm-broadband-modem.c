@@ -6309,7 +6309,7 @@ clip_received (MMPortSerialAt *port,
     /* The match info gives us in which storage the index applies */
     gchar *str = mm_get_string_unquoted_from_match_info (info, 1);
 
-    if( !str  ) {
+    if( str  ) {
         guint validity  = 0;
         guint type      = 0;
 
