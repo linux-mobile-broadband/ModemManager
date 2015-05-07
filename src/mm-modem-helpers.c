@@ -373,18 +373,6 @@ mm_voice_nocarrier_regex_get (void)
                         NULL);
 }
 
-GRegex *
-mm_voice_dtmf_regex_get (void)
-{
-    /* Example:
-     * <CR><LF>^DDTMF: 1<CR><LF>
-     */
-    return g_regex_new ("\\r\\n\\^DDTMF:\\s*([0-9A-D\\*\\#])\\r\\n",
-                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                        0,
-                        NULL);
-}
-
 /*************************************************************************/
 
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */

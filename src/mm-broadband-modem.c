@@ -6337,39 +6337,6 @@ nocarrier_received (MMPortSerialAt *port,
 }
 
 static void
-dtmf_received (MMPortSerialAt *port,
-               GMatchInfo *info,
-               MMBroadbandModem *self)
-{
-//    GError *error = NULL;
-//    MMCallPart *part;
-//    guint length;
-//    gchar *pdu;
-//
-//    mm_dbg ("Got new non-stored message indication");
-//
-//    if (!mm_get_uint_from_match_info (info, 1, &length))
-//        return;
-//
-//    pdu = g_match_info_fetch (info, 2);
-//    if (!pdu)
-//        return;
-//
-//    part = mm_call_part_3gpp_new_from_pdu (CALL_PART_INVALID_INDEX, pdu, &error);
-//    if (part) {
-//        mm_dbg ("Correctly parsed non-stored PDU");
-//        mm_iface_modem_voice_take_part (MM_IFACE_MODEM_VOICE (self),
-//                                            part,
-//                                            MM_CALL_STATE_RECEIVED,
-//                                            MM_CALL_STORAGE_UNKNOWN);
-//    } else {
-//        /* Don't treat the error as critical */
-//        mm_dbg ("Error parsing non-stored PDU: %s", error->message);
-//        g_error_free (error);
-//    }
-}
-
-static void
 set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                        gboolean enable,
                                        GAsyncReadyCallback callback,
@@ -6381,7 +6348,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
     GRegex *cring_regex;
     GRegex *ring_regex;
     GRegex *clip_regex;
-    GRegex *dtmf_regex;
     guint i;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -6393,7 +6359,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
     clip_regex  = mm_voice_clip_regex_get ();
-    dtmf_regex  = mm_voice_dtmf_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
@@ -6430,17 +6395,10 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             enable ? (MMPortSerialAtUnsolicitedMsgFn) nocarrier_received : NULL,
             enable ? self : NULL,
             NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            ports[i],
-            dtmf_regex,
-            enable ? (MMPortSerialAtUnsolicitedMsgFn) dtmf_received : NULL,
-            enable ? self : NULL,
-            NULL);
     }
 
     g_regex_unref (cring_regex);
     g_regex_unref (ring_regex);
-    g_regex_unref (dtmf_regex);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);

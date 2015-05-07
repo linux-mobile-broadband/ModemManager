@@ -98,6 +98,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *conf_regex;
     GRegex *conn_regex;
     GRegex *cend_regex;
+    GRegex *ddtmf_regex;
 
     /* Regex to ignore */
     GRegex *boot_regex;
@@ -2939,6 +2940,19 @@ huawei_voice_call_end (MMPortSerialAt *port,
     mm_iface_modem_voice_network_hangup(MM_IFACE_MODEM_VOICE(self));
 }
 
+static void
+huawei_voice_received_dtmf (MMPortSerialAt *port,
+                            GMatchInfo *match_info,
+                            MMBroadbandModemHuawei *self)
+{
+    gchar *key;
+
+    key = g_match_info_fetch (match_info, 1);
+
+    if( key && key[0] ) {
+        mm_dbg ("[%s:%d][^DDTMF] Received DTMF '%c'", __func__, __LINE__, key[0]);
+    }
+}
 
 static void
 set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
@@ -2974,6 +2988,12 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             port,
             self->priv->cend_regex,
             enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_voice_call_end : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->ddtmf_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_voice_received_dtmf: NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -3061,6 +3081,162 @@ modem_voice_cleanup_unsolicited_events (MMIfaceModemVoice *self,
     iface_modem_voice_parent->cleanup_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_voice_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
+/* Enabling unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice *self,
+                                              GAsyncResult *res,
+                                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+own_voice_enable_unsolicited_events_ready (MMBaseModem *self,
+                                           GAsyncResult *res,
+                                           GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static const MMBaseModemAtCommand unsolicited_voice_enable_sequence[] = {
+    /* With ^DDTMFCFG we active the DTMF Decoder */
+    { "^DDTMFCFG=0,1", 3, FALSE, NULL },
+    { NULL }
+};
+
+static void
+parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                              GAsyncResult *res,
+                                              GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->enable_unsolicited_events_finish (self, res, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+    }
+
+    /* Our own enable now */
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_voice_enable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_voice_enable_unsolicited_events_ready,
+        simple);
+}
+
+static void
+modem_voice_enable_unsolicited_events (MMIfaceModemVoice *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_voice_enable_unsolicited_events);
+
+    /* Chain up parent's enable */
+    iface_modem_voice_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_enable_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
+/* Disabling unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_disable_unsolicited_events_finish (MMIfaceModemVoice *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+own_voice_disable_unsolicited_events_ready (MMBaseModem *self,
+                                            GAsyncResult *res,
+                                            GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static const MMBaseModemAtCommand unsolicited_voice_disable_sequence[] = {
+    /* With ^DDTMFCFG we deactivate the DTMF Decoder */
+    { "^DDTMFCFG=1,0", 3, FALSE, NULL },
+    { NULL }
+};
+
+static void
+parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult *res,
+                                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+    }
+
+    /* Our own enable now */
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_voice_disable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_voice_disable_unsolicited_events_ready,
+        simple);
+}
+
+
+
+static void
+modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_voice_disable_unsolicited_events);
+
+    /* Chain up parent's enable */
+    iface_modem_voice_parent->disable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
         result);
 }
 
@@ -3997,6 +4173,13 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->cend_regex = g_regex_new ("\\r\\n\\^CEND:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),?\\s*(\\d*)\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
+    /* Voice: receive DTMF regex
+     * <CR><LF>^DDTMF: <key><CR><LF>
+     * Key should be 0-9, A-D, *, #
+     */
+    self->priv->ddtmf_regex = g_regex_new ("\\r\\n\\^DDTMF:\\s*([0-9A-D\\*\\#])\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
 
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
@@ -4038,6 +4221,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->conf_regex);
     g_regex_unref (self->priv->conn_regex);
     g_regex_unref (self->priv->cend_regex);
+    g_regex_unref (self->priv->ddtmf_regex);
 
     if (self->priv->syscfg_supported_modes)
         g_array_unref (self->priv->syscfg_supported_modes);
@@ -4176,5 +4360,10 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->setup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_voice_disable_unsolicited_events_finish;
+
     iface->create_call = create_call;
 }
