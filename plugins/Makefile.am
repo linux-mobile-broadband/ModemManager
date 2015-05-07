@@ -188,6 +188,8 @@ libmm_plugin_huawei_la_SOURCES = \
 	huawei/mm-modem-helpers-huawei.h \
 	huawei/mm-sim-huawei.c \
 	huawei/mm-sim-huawei.h \
+	huawei/mm-call-huawei.c \
+	huawei/mm-call-huawei.h \
 	huawei/mm-broadband-modem-huawei.c \
 	huawei/mm-broadband-modem-huawei.h \
 	huawei/mm-broadband-bearer-huawei.c \

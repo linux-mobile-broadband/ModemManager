@@ -49,6 +49,7 @@
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sim-huawei.h"
+#include "mm-call-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -4161,6 +4162,11 @@ mm_broadband_modem_huawei_class_init (MMBroadbandModemHuaweiClass *klass)
     broadband_modem_class->setup_ports = setup_ports;
 }
 
+static MMBaseCall *create_call(MMIfaceModemVoice *self) {
+    /* New Huawei Call*/
+    return mm_call_huawei_new(MM_BASE_MODEM (self));
+}
+
 static void
 iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
@@ -4170,4 +4176,5 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->setup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
+    iface->create_call = create_call;
 }
