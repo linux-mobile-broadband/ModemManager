@@ -49,6 +49,7 @@ static gboolean info_flag; /* set when no action found */
 static gboolean start_flag;
 static gboolean accept_flag;
 static gboolean hangup_flag;
+static gchar *tone_request;
 
 static GOptionEntry entries[] = {
     { "start", 0, 0, G_OPTION_ARG_NONE, &start_flag,
@@ -62,6 +63,10 @@ static GOptionEntry entries[] = {
     { "hangup", 0, 0, G_OPTION_ARG_NONE, &hangup_flag,
       "Hangup the call",
       NULL,
+    },
+    { "send-tone", 0, 0, G_OPTION_ARG_STRING, &tone_request,
+       "Send specified DTMF tone",
+       "[0-9A-D*#]"
     },
     { NULL }
 };
@@ -93,7 +98,8 @@ mmcli_call_options_enabled (void)
 
     n_actions = (start_flag +
                  accept_flag + 
-                 hangup_flag );
+                 hangup_flag +
+                 !!tone_request);
 
     if (n_actions == 0 && mmcli_get_common_call_string ()) {
         /* default to info */
@@ -239,6 +245,33 @@ hangup_ready (MMCall        *call,
 }
 
 static void
+send_tone_process_reply (gboolean      result,
+                         const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't send_tone to call: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully send tone\n");
+}
+
+static void
+send_tone_ready (MMCall        *call,
+                 GAsyncResult *result,
+                 gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_call_send_tone_finish (call, result, &error);
+    send_tone_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_call_ready (GObject      *source,
                GAsyncResult *result,
                gpointer      none)
@@ -278,6 +311,18 @@ get_call_ready (GObject      *source,
                       NULL);
         return;
     }
+
+    /* Requesting to send tone the call? */
+    if (tone_request) {
+        mm_call_send_tone(ctx->call,
+                          tone_request,
+                          ctx->cancellable,
+                          (GAsyncReadyCallback)send_tone_ready,
+                          NULL);
+        return;
+    }
+
+
 
     g_warn_if_reached ();
 }
@@ -354,5 +399,17 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
         return;
     }
     
+    /* Requesting to send a tone? */
+    if (tone_request) {
+        gboolean operation_result;
+
+        operation_result = mm_call_send_tone_sync (ctx->call,
+                                                   tone_request,
+                                                   NULL,
+                                                   &error);
+        send_tone_process_reply (operation_result, error);
+        return;
+    }
+
     g_warn_if_reached ();
 }
