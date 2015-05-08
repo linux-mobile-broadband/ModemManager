@@ -13,6 +13,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2015 Riccardo Vangelisti <riccardo.vangelisti@sadel.it>
+ * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
  */
 
 #ifndef _MM_CALL_H_
@@ -110,6 +111,22 @@ gboolean            mm_call_hangup_finish           (MMCall *self,
                                                      GError **error);
 
 gboolean            mm_call_hangup_sync             (MMCall *self,
+                                                     GCancellable *cancellable,
+                                                     GError **error);
+
+
+void                mm_call_send_tone               (MMCall *self,
+                                                     const gchar *tone,
+                                                     GCancellable *cancellable,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+
+gboolean            mm_call_send_tone_finish        (MMCall *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
+
+gboolean            mm_call_send_tone_sync          (MMCall *self,
+                                                     const gchar *tone,
                                                      GCancellable *cancellable,
                                                      GError **error);
 

@@ -13,6 +13,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2015 Riccardo Vangelisti <riccardo.vangelisti@sadel.it>
+ * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
  */
 
 #include "string.h"
@@ -260,7 +261,7 @@ mm_call_start_sync (MMCall *self,
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_call_accept().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation accepted with mm_call_accept().
+ * Finishes an operation started with mm_call_accept().
  *
  * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
  */
@@ -339,7 +340,7 @@ mm_call_accept_sync (MMCall *self,
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_call_hangup().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation hanguped with mm_call_hangup().
+ * Finishes an operation started with mm_call_hangup().
  *
  * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
  */
@@ -408,6 +409,89 @@ mm_call_hangup_sync (MMCall *self,
     return mm_gdbus_call_call_hangup_sync (MM_GDBUS_CALL (self),
                                         cancellable,
                                         error);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_call_send_tone_finish:
+ * @self: A #MMCall.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_call_send_tone().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_call_send_tone().
+ *
+ * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_call_send_tone_finish (MMCall *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    g_return_val_if_fail (MM_IS_CALL (self), FALSE);
+
+    return mm_gdbus_call_call_send_tone_finish (MM_GDBUS_CALL (self), res, error);
+}
+
+/**
+ * mm_call_send_tone:
+ * @self: A #MMCall.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to send_tone the call.
+ *
+ * Call objects can only be executed once.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_call_send_tone_finish() to get the result of the operation.
+ *
+ * See mm_call_send_tone_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_call_send_tone (MMCall *self,
+                   const gchar *tone,
+                   GCancellable *cancellable,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    g_return_if_fail (MM_IS_CALL (self));
+
+    mm_gdbus_call_call_send_tone (MM_GDBUS_CALL (self),
+                                  tone,
+                                  cancellable,
+                                  callback,
+                                  user_data);
+}
+
+/**
+ * mm_call_send_tone_sync:
+ * @self: A #MMCall.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to send_tone the call.
+ *
+ * Call objects can only be sent once.
+ *
+ * The calling thread is blocked until an incoming call is ready.
+ * See mm_call_send_tone() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_call_send_tone_sync (MMCall *self,
+                        const gchar *tone,
+                        GCancellable *cancellable,
+                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_CALL (self), FALSE);
+
+    return mm_gdbus_call_call_send_tone_sync (MM_GDBUS_CALL (self),
+                                              tone,
+                                              cancellable,
+                                              error);
 }
 
 /*****************************************************************************/

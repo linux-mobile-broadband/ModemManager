@@ -29,7 +29,7 @@
         Accept:
 
         Accept incoming call (answer).
-        Applicable only if state is MM_CALL_STATE_RINGING and direction is MM_CALL_DIRECTION_INCOMING
+        Applicable only if state is MM_CALL_STATE_RINGING_IN and direction is MM_CALL_DIRECTION_INCOMING
     -->
     <method name="Accept" />
 
@@ -37,9 +37,30 @@
         Hangup:
 
         Hangup the active call.
-        Applicable only if states are MM_CALL_STATE_RINGING and MM_CALL_STATE_ACCEPTED
+        Applicable only if state is not MM_CALL_STATE_UNKNOWN or MM_CALL_STATE_TERMINATED
     -->
     <method name="Hangup"/>
+
+    <!--
+        SendTone:
+        @tone: Tone identifier. (Admitter chars are [0-9A-D*#])
+
+        Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem)
+        Applicable only if state is MM_CALL_STATE_ACTIVE
+    -->
+    <method name="SendTone">
+      <arg name="tone" type="s" direction="in"/>
+    </method>
+
+    <!--
+        ToneReceived:
+        @tone: Tone identifier. (Admitter chars are [0-9A-D*#])
+
+        Emitted when a DTMF tone is received (only on supported modem)
+    -->
+    <signal name="ToneReceived">
+      <arg name="tone" type="s" />
+    </signal>
 
     <!--
         StateChanged:
