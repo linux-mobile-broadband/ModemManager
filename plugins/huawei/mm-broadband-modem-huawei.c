@@ -2945,12 +2945,12 @@ huawei_voice_received_dtmf (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemHuawei *self)
 {
-    gchar *key;
+    gchar *key = g_match_info_fetch (match_info, 1);
 
-    key = g_match_info_fetch (match_info, 1);
+    if( key ) {
+        mm_dbg ("[%s:%d][^DDTMF] Received DTMF '%s'", __func__, __LINE__, key);
 
-    if( key && key[0] ) {
-        mm_dbg ("[%s:%d][^DDTMF] Received DTMF '%c'", __func__, __LINE__, key[0]);
+        mm_iface_modem_voice_received_dtmf(MM_IFACE_MODEM_VOICE(self), key);
     }
 }
 
