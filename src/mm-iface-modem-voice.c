@@ -135,7 +135,7 @@ gboolean mm_iface_modem_voice_call_dialing_to_ringing(MMIfaceModemVoice *self)
 
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+            mm_dbg("[%s:%d] Outgoing dialing call does not exist", __func__, __LINE__);
         }
     }
 
@@ -160,7 +160,7 @@ gboolean mm_iface_modem_voice_call_ringing_to_active(MMIfaceModemVoice *self)
 
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+            mm_dbg("[%s:%d] Ringing call does not exist", __func__, __LINE__);
         }
     }
 
@@ -185,7 +185,7 @@ gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+            mm_dbg("[%s:%d] No call to hangup", __func__, __LINE__);
         }
     }
 
