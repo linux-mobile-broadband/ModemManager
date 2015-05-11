@@ -189,6 +189,29 @@ MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
     return call;
 }
 
+gboolean mm_call_list_send_dtmf_to_active_calls(MMCallList *self, gchar *tone)
+{
+    gboolean signaled = FALSE;
+    GList *l;
+    guint i;
+
+    for (i = 0, l = self->priv->list; l; l = g_list_next (l)) {
+
+        MMCallState         state;
+
+        g_object_get (MM_BASE_CALL (l->data),
+                      "state"       , &state,
+                      NULL);
+
+        if( state == MM_CALL_STATE_ACTIVE ) {
+            signaled = TRUE;
+            mm_base_call_received_dtmf(MM_BASE_CALL (l->data), tone);
+        }
+    }
+
+    return signaled;
+}
+
 /*****************************************************************************/
 
 typedef struct {

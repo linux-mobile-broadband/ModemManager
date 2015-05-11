@@ -46,7 +46,6 @@ mm_iface_modem_voice_create_call (MMIfaceModemVoice *self)
     return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self);
 }
 
-//BASCETTA:TODO: bisogna aggiungere la gestione degli errori.
 MMBaseCall *
 mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
 {
@@ -192,6 +191,23 @@ gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 
     return updated;
 }
+
+gboolean mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self, gchar *tone)
+{
+    gboolean    updated = FALSE;
+    MMCallList  *list   = NULL;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if( list ) {
+        updated = mm_call_list_send_dtmf_to_active_calls(list, tone);
+    }
+
+    return updated;
+}
+
 /*****************************************************************************/
 
 typedef struct {

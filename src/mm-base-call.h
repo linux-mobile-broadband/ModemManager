@@ -70,7 +70,16 @@ struct _MMBaseCallClass {
     gboolean (* hangup_finish) (MMBaseCall *self,
                               GAsyncResult *res,
                               GError **error);
-    
+
+    /* Send a DTMF tone */
+    void (* send_tone)            (MMBaseCall *self,
+                                   const gchar *tone,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+    gboolean (* send_tone_finish) (MMBaseCall *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+
     /* Delete the call */
     void (* delete) (MMBaseCall *self,
                      GAsyncReadyCallback callback,
@@ -88,10 +97,11 @@ MMBaseCall *mm_base_call_new_from_properties (MMBaseModem *modem,
                                             MMCallProperties *properties,
                                             GError **error);
 
-void          mm_base_call_export      (MMBaseCall *self);
-void          mm_base_call_unexport    (MMBaseCall *self);
-const gchar  *mm_base_call_get_path    (MMBaseCall *self);
-void          mm_base_call_change_state(MMBaseCall *self, MMCallState new_state, MMCallStateReason reason);
+void        mm_base_call_export         (MMBaseCall *self);
+void        mm_base_call_unexport       (MMBaseCall *self);
+const gchar *mm_base_call_get_path      (MMBaseCall *self);
+void        mm_base_call_change_state   (MMBaseCall *self, MMCallState new_state, MMCallStateReason reason);
+void        mm_base_call_received_dtmf  (MMBaseCall *self, gchar *tone);
 
 void     mm_base_call_delete        (MMBaseCall *self,
                                     GAsyncReadyCallback callback,

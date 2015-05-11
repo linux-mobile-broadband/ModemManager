@@ -76,5 +76,7 @@ MMBaseCall* mm_call_list_get_new_incoming               (MMCallList *self);
 MMBaseCall* mm_call_list_get_first_ringing_call         (MMCallList *self);
 MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self);
 MMBaseCall* mm_call_list_get_first_non_terminated_call  (MMCallList *self);
+gboolean    mm_call_list_send_dtmf_to_active_calls      (MMCallList *self,
+                                                         gchar *tone);
 
 #endif /* MM_CALL_LIST_H */
