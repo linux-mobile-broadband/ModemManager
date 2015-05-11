@@ -92,7 +92,7 @@ call_start_ready (MMBaseModem *modem,
         mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
     } else {
         /* Update state */
-        mm_base_call_change_state(ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_ACCEPTED);
+        mm_base_call_change_state(ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
     }
     
     if (error) {
