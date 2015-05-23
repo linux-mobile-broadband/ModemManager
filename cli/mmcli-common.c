@@ -1110,7 +1110,7 @@ static void look_for_call_in_modem (GetVoiceContext *ctx);
 
 static MMCall *
 find_call_in_list (GList *list,
-                  const gchar *call_path)
+                   const gchar *call_path)
 {
     GList *l;
 
@@ -1128,8 +1128,8 @@ find_call_in_list (GList *list,
 
 static void
 list_call_ready (MMModemVoice *modem,
-                GAsyncResult *res,
-                GetVoiceContext *ctx)
+                 GAsyncResult *res,
+                 GetVoiceContext *ctx)
 {
     GList *call_list;
     GError *error = NULL;
@@ -1180,9 +1180,9 @@ look_for_call_in_modem (GetVoiceContext *ctx)
                  ctx->call_path,
                  mm_object_get_path (ctx->current));
         mm_modem_voice_list_call (modem,
-                                 ctx->cancellable,
-                                 (GAsyncReadyCallback)list_call_ready,
-                                 ctx);
+                                  ctx->cancellable,
+                                  (GAsyncReadyCallback)list_call_ready,
+                                  ctx);
         g_object_unref (modem);
         return;
     }
@@ -1193,8 +1193,8 @@ look_for_call_in_modem (GetVoiceContext *ctx)
 
 static void
 get_voice_manager_ready (GDBusConnection *connection,
-                       GAsyncResult *res,
-                       GetVoiceContext *ctx)
+                         GAsyncResult *res,
+                         GetVoiceContext *ctx)
 {
     ctx->manager = mmcli_get_manager_finish (res);
     ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
@@ -1237,8 +1237,8 @@ get_call_path (const gchar *path_or_index)
 
 MMCall *
 mmcli_get_call_finish (GAsyncResult *res,
-                      MMManager **o_manager,
-                      MMObject **o_object)
+                       MMManager **o_manager,
+                       MMObject **o_object)
 {
     GetVoiceContext *ctx;
 
@@ -1250,12 +1250,13 @@ mmcli_get_call_finish (GAsyncResult *res,
     return g_object_ref (ctx->call);
 }
 
-void   mmcli_get_call       (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             GCancellable *cancellable,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data) {
-
+void
+mmcli_get_call (GDBusConnection *connection,
+                const gchar *path_or_index,
+                GCancellable *cancellable,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
     GetVoiceContext *ctx;
 
     ctx = g_new0 (GetVoiceContext, 1);
@@ -1272,11 +1273,12 @@ void   mmcli_get_call       (GDBusConnection *connection,
                        ctx);
 }
 
-MMCall *mmcli_get_call_sync   (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             MMManager **o_manager,
-                             MMObject **o_object) {
-
+MMCall *
+mmcli_get_call_sync (GDBusConnection *connection,
+                     const gchar *path_or_index,
+                     MMManager **o_manager,
+                     MMObject **o_object)
+{
     MMManager *manager;
     GList *modems;
     GList *l;
@@ -1339,7 +1341,6 @@ MMCall *mmcli_get_call_sync   (GDBusConnection *connection,
 
     return found;
 }
-
 
 /* Common options */
 static gchar *modem_str;

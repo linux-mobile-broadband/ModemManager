@@ -253,8 +253,8 @@ delete_process_reply (gboolean      result,
 
 static void
 delete_ready (MMModemVoice *modem,
-              GAsyncResult     *result,
-              gpointer          nothing)
+              GAsyncResult *result,
+              gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
@@ -267,7 +267,7 @@ delete_ready (MMModemVoice *modem,
 
 static void
 get_call_to_delete_ready (GDBusConnection *connection,
-                         GAsyncResult *res)
+                          GAsyncResult *res)
 {
     MMCall *call;
     MMObject *obj = NULL;
@@ -281,10 +281,10 @@ get_call_to_delete_ready (GDBusConnection *connection,
     }
 
     mm_modem_voice_delete_call (ctx->modem_voice,
-                               mm_call_get_path (call),
-                               ctx->cancellable,
-                               (GAsyncReadyCallback)delete_ready,
-                               NULL);
+                                mm_call_get_path (call),
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)delete_ready,
+                                NULL);
     g_object_unref (call);
     g_object_unref (obj);
 }
@@ -331,10 +331,10 @@ get_modem_ready (GObject      *source,
     /* Request to delete a given call? */
     if (delete_str) {
         mmcli_get_call (ctx->connection,
-                       delete_str,
-                       ctx->cancellable,
-                       (GAsyncReadyCallback)get_call_to_delete_ready,
-                       NULL);
+                        delete_str,
+                        ctx->cancellable,
+                        (GAsyncReadyCallback)get_call_to_delete_ready,
+                        NULL);
         return;
     }
 
@@ -343,7 +343,7 @@ get_modem_ready (GObject      *source,
 
 void
 mmcli_modem_voice_run_asynchronous (GDBusConnection *connection,
-                                        GCancellable    *cancellable)
+                                    GCancellable    *cancellable)
 {
     /* Initialize context */
     ctx = g_new0 (Context, 1);
@@ -394,7 +394,7 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         MMCallProperties *properties;
 
         properties = build_call_properties_from_input (create_str);
-        
+
         g_debug ("Synchronously creating new call in modem...");
         call = mm_modem_voice_create_call_sync (ctx->modem_voice,
                                                 properties,
@@ -413,9 +413,9 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         MMObject *obj = NULL;
 
         call = mmcli_get_call_sync (connection,
-                                  delete_str,
-                                  NULL,
-                                  &obj);
+                                    delete_str,
+                                    NULL,
+                                    &obj);
         if (!g_str_equal (mm_object_get_path (obj), mm_modem_voice_get_path (ctx->modem_voice))) {
             g_printerr ("error: call '%s' not owned by modem '%s'",
                         mm_call_get_path (call),

@@ -97,7 +97,7 @@ mmcli_call_options_enabled (void)
         return !!n_actions;
 
     n_actions = (start_flag +
-                 accept_flag + 
+                 accept_flag +
                  hangup_flag +
                  !!tone_request);
 
@@ -153,14 +153,14 @@ print_call_info (MMCall *call)
     g_print ("CALL '%s'\n", mm_call_get_path (call));
     g_print ("  -------------------------------\n"
              "  Global     |          number: '%s'\n", VALIDATE (mm_call_get_number (call)));
-    g_print ("             |       direction: '%s'\n", mm_call_direction_get_string( mm_call_get_direction (call) ) );
+    g_print ("             |       direction: '%s'\n", mm_call_direction_get_string (mm_call_get_direction (call)) );
 
     g_print ("  -------------------------------\n"
              "  Properties |        state: '%s'\n", mm_call_state_get_string (mm_call_get_state (call)));
 
     if (mm_call_get_state_reason(call) != MM_CALL_STATE_REASON_UNKNOWN)
         g_print ("             |    state reason: '%s'\n",
-                 mm_call_state_reason_get_string(mm_call_get_state_reason(call)));
+                 mm_call_state_reason_get_string(mm_call_get_state_reason (call)));
 }
 
 static void
@@ -277,8 +277,8 @@ get_call_ready (GObject      *source,
                gpointer      none)
 {
     ctx->call = mmcli_get_call_finish (result,
-                                     &ctx->manager,
-                                     &ctx->object);
+                                       &ctx->manager,
+                                       &ctx->object);
     /* Setup operation timeout */
     mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->call));
 
@@ -287,38 +287,38 @@ get_call_ready (GObject      *source,
 
     /* Requesting to start the call? */
     if (start_flag) {
-        mm_call_start(ctx->call,
-                     ctx->cancellable,
-                     (GAsyncReadyCallback)start_ready,
-                     NULL);
+        mm_call_start (ctx->call,
+                       ctx->cancellable,
+                       (GAsyncReadyCallback)start_ready,
+                       NULL);
         return;
     }
 
     /* Requesting to accept the call? */
     if (accept_flag) {
-        mm_call_accept(ctx->call,
-                      ctx->cancellable,
-                      (GAsyncReadyCallback)accept_ready,
-                      NULL);
+        mm_call_accept (ctx->call,
+                        ctx->cancellable,
+                        (GAsyncReadyCallback)accept_ready,
+                        NULL);
         return;
     }
 
     /* Requesting to hangup the call? */
     if (hangup_flag) {
-        mm_call_hangup(ctx->call,
-                      ctx->cancellable,
-                      (GAsyncReadyCallback)hangup_ready,
-                      NULL);
+        mm_call_hangup (ctx->call,
+                        ctx->cancellable,
+                        (GAsyncReadyCallback)hangup_ready,
+                        NULL);
         return;
     }
 
     /* Requesting to send tone the call? */
     if (tone_request) {
-        mm_call_send_tone(ctx->call,
-                          tone_request,
-                          ctx->cancellable,
-                          (GAsyncReadyCallback)send_tone_ready,
-                          NULL);
+        mm_call_send_tone (ctx->call,
+                           tone_request,
+                           ctx->cancellable,
+                           (GAsyncReadyCallback)send_tone_ready,
+                           NULL);
         return;
     }
 
@@ -329,7 +329,7 @@ get_call_ready (GObject      *source,
 
 void
 mmcli_call_run_asynchronous (GDBusConnection *connection,
-                            GCancellable    *cancellable)
+                             GCancellable    *cancellable)
 {
     /* Initialize context */
     ctx = g_new0 (Context, 1);
@@ -338,10 +338,10 @@ mmcli_call_run_asynchronous (GDBusConnection *connection,
 
     /* Get proper call */
     mmcli_get_call (connection,
-                   mmcli_get_common_call_string (),
-                   cancellable,
-                   (GAsyncReadyCallback)get_call_ready,
-                   NULL);
+                    mmcli_get_common_call_string (),
+                    cancellable,
+                    (GAsyncReadyCallback)get_call_ready,
+                    NULL);
 }
 
 void
@@ -352,9 +352,9 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
     /* Initialize context */
     ctx = g_new0 (Context, 1);
     ctx->call = mmcli_get_call_sync (connection,
-                                   mmcli_get_common_call_string (),
-                                   &ctx->manager,
-                                   &ctx->object);
+                                     mmcli_get_common_call_string (),
+                                     &ctx->manager,
+                                     &ctx->object);
 
     /* Setup operation timeout: 2 minutes */
     g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (ctx->call), 2 * 60 * 1000);
@@ -398,7 +398,7 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
         hangup_process_reply (operation_result, error);
         return;
     }
-    
+
     /* Requesting to send a tone? */
     if (tone_request) {
         gboolean operation_result;
