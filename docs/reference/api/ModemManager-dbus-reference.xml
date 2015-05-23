@@ -135,6 +135,7 @@
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Voice.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Oma.xml"/>
@@ -171,6 +172,16 @@
       will export one SMS object for each SMS stored in the device.
     </para>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-call">
+    <title>The <literal>/org/freedesktop/ModemManager/Calls</literal> objects</title>
+    <para>
+      Modems implementing the
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Voice">Voice interface</link>
+      will export one Call object for each Call managed in the device.
+    </para>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml"/>
   </chapter>
 
 </part>
