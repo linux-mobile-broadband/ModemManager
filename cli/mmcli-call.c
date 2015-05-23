@@ -156,7 +156,7 @@ print_call_info (MMCall *call)
     g_print ("             |       direction: '%s'\n", mm_call_direction_get_string (mm_call_get_direction (call)) );
 
     g_print ("  -------------------------------\n"
-             "  Properties |        state: '%s'\n", mm_call_state_get_string (mm_call_get_state (call)));
+             "  Properties |           state: '%s'\n", mm_call_state_get_string (mm_call_get_state (call)));
 
     if (mm_call_get_state_reason(call) != MM_CALL_STATE_REASON_UNKNOWN)
         g_print ("             |    state reason: '%s'\n",
