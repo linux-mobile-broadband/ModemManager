@@ -62,16 +62,15 @@ call_start_ready (MMBaseModem *modem,
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             /* something is wrong, serial timeout could never occurs */
         }
-        
+
         if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_DIALTONE)) {
             /* Update state */
             mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         }
-        
-        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)          || 
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER)     ||
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)    )
-        {
+
+        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)      ||
+            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER) ||
+            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)) {
             /* Update state */
             mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
         }
@@ -81,34 +80,34 @@ call_start_ready (MMBaseModem *modem,
         call_start_context_complete_and_free (ctx);
         return;
     }
-    
+
     /* check response for error */
-    if( response && strlen(response) > 0 ) {
-        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+    if (response && strlen (response) > 0 ) {
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Couldn't start the call: "
                              "Modem response '%s'", response);
-        
+
         /* Update state */
-        mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
     } else {
         /* Update state */
-        mm_base_call_change_state(ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
     }
-    
+
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         call_start_context_complete_and_free (ctx);
         return;
     }
-    
+
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     call_start_context_complete_and_free (ctx);
 }
 
 static void
 call_start (MMBaseCall *self,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+            GAsyncReadyCallback callback,
+            gpointer user_data)
 {
     CallStartContext *ctx;
     gchar *cmd;
@@ -124,7 +123,7 @@ call_start (MMBaseCall *self,
                   MM_BASE_CALL_MODEM, &ctx->modem,
                   NULL);
 
-    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)) );
+    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
     mm_base_modem_at_command (ctx->modem,
                               cmd,
                               3,
@@ -133,12 +132,15 @@ call_start (MMBaseCall *self,
                               ctx);
     g_free (cmd);
 }
+
 /*****************************************************************************/
-MMBaseCall *mm_call_huawei_new(MMBaseModem *modem)
+
+MMBaseCall *
+mm_call_huawei_new (MMBaseModem *modem)
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_CALL_HUAWEI,
-                                          MM_BASE_CALL_MODEM, modem,
-                                          NULL));
+                                       MM_BASE_CALL_MODEM, modem,
+                                       NULL));
 }
 
 static void

@@ -2873,10 +2873,10 @@ huawei_voice_origination (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 2, &call_type))
         return;
 
-    mm_dbg ("[%s:%d][^ORIG] Origination call id '%u' of type '%u'", __func__, __LINE__, call_x, call_type); //Entrambi
+    mm_dbg ("[^ORIG] Origination call id '%u' of type '%u'", call_x, call_type);
 
-    //TODO: Handle multiple calls
-    //mm_iface_modem_voice_set_call_id(MM_IFACE_MODEM_VOICE(self));
+    /* TODO: Handle multiple calls
+     * mm_iface_modem_voice_set_call_id (MM_IFACE_MODEM_VOICE (self)); */
 }
 
 static void
@@ -2889,9 +2889,9 @@ huawei_voice_ringback_tone (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 1, &call_x))
         return;
 
-    mm_dbg ("[%s:%d][^CONF] Ringback tone from call id '%u'", __func__, __LINE__, call_x);
+    mm_dbg ("[^CONF] Ringback tone from call id '%u'", call_x);
 
-    mm_iface_modem_voice_call_dialing_to_ringing(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_call_dialing_to_ringing (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -2908,15 +2908,15 @@ huawei_voice_call_connection (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 2, &call_type))
         return;
 
-    mm_dbg ("[%s:%d][^CONN] Call id '%u' of type '%u' connected", __func__, __LINE__, call_x, call_type);
+    mm_dbg ("[^CONN] Call id '%u' of type '%u' connected", call_x, call_type);
 
-    mm_iface_modem_voice_call_ringing_to_active(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_call_ringing_to_active (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
 huawei_voice_call_end (MMPortSerialAt *port,
-                          GMatchInfo *match_info,
-                          MMBroadbandModemHuawei *self)
+                       GMatchInfo *match_info,
+                       MMBroadbandModemHuawei *self)
 {
     guint call_x    = 0;
     guint duration  = 0;
@@ -2935,9 +2935,9 @@ huawei_voice_call_end (MMPortSerialAt *port,
     //This is optional
     mm_get_uint_from_match_info (match_info, 4, &cc_cause);
 
-    mm_dbg ("[%s:%d][^CEND] Call '%u' terminated with status '%u' and cause '%u'. Duration of call '%d'", __func__, __LINE__, call_x, end_status, cc_cause, duration);
+    mm_dbg ("[^CEND] Call '%u' terminated with status '%u' and cause '%u'. Duration of call '%d'", call_x, end_status, cc_cause, duration);
 
-    mm_iface_modem_voice_network_hangup(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_network_hangup (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -2945,18 +2945,19 @@ huawei_voice_received_dtmf (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemHuawei *self)
 {
-    gchar *key = g_match_info_fetch (match_info, 1);
+    gchar *key;
 
-    if( key ) {
-        mm_dbg ("[%s:%d][^DDTMF] Received DTMF '%s'", __func__, __LINE__, key);
+    key = g_match_info_fetch (match_info, 1);
 
-        mm_iface_modem_voice_received_dtmf(MM_IFACE_MODEM_VOICE(self), key);
+    if (key) {
+        mm_dbg ("[^DDTMF] Received DTMF '%s'", key);
+        mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), key);
     }
 }
 
 static void
 set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
-                                      gboolean enable)
+                                       gboolean enable)
 {
     GList *ports, *l;
 
@@ -3003,16 +3004,16 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
 
 static gboolean
 modem_voice_setup_cleanup_unsolicited_events_finish (MMIfaceModemVoice *self,
-                                                    GAsyncResult *res,
-                                                    GError **error)
+                                                     GAsyncResult *res,
+                                                     GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
 parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
-                                            GAsyncResult *res,
-                                            GSimpleAsyncResult *simple)
+                                             GAsyncResult *res,
+                                             GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
 
@@ -3030,8 +3031,8 @@ parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
 
 static void
 modem_voice_setup_unsolicited_events (MMIfaceModemVoice *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -3049,8 +3050,8 @@ modem_voice_setup_unsolicited_events (MMIfaceModemVoice *self,
 
 static void
 parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
-                                              GAsyncResult *res,
-                                              GSimpleAsyncResult *simple)
+                                               GAsyncResult *res,
+                                               GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
 
@@ -3064,8 +3065,8 @@ parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
 
 static void
 modem_voice_cleanup_unsolicited_events (MMIfaceModemVoice *self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data)
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -3144,8 +3145,8 @@ parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
 
 static void
 modem_voice_enable_unsolicited_events (MMIfaceModemVoice *self,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -3219,12 +3220,10 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
         simple);
 }
 
-
-
 static void
 modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data)
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -3238,6 +3237,16 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
         self,
         (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
         result);
+}
+
+/*****************************************************************************/
+/* Create call (Voice interface) */
+
+static MMBaseCall *
+create_call (MMIfaceModemVoice *self)
+{
+    /* New Huawei Call */
+    return mm_call_huawei_new (MM_BASE_MODEM (self));
 }
 
 /*****************************************************************************/
@@ -4334,24 +4343,6 @@ iface_modem_time_init (MMIfaceModemTime *iface)
 }
 
 static void
-mm_broadband_modem_huawei_class_init (MMBroadbandModemHuaweiClass *klass)
-{
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
-
-    g_type_class_add_private (object_class, sizeof (MMBroadbandModemHuaweiPrivate));
-
-    object_class->finalize = finalize;
-
-    broadband_modem_class->setup_ports = setup_ports;
-}
-
-static MMBaseCall *create_call(MMIfaceModemVoice *self) {
-    /* New Huawei Call*/
-    return mm_call_huawei_new(MM_BASE_MODEM (self));
-}
-
-static void
 iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
@@ -4366,4 +4357,17 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->disable_unsolicited_events_finish = modem_voice_disable_unsolicited_events_finish;
 
     iface->create_call = create_call;
+}
+
+static void
+mm_broadband_modem_huawei_class_init (MMBroadbandModemHuaweiClass *klass)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemHuaweiPrivate));
+
+    object_class->finalize = finalize;
+
+    broadband_modem_class->setup_ports = setup_ports;
 }

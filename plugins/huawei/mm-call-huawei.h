@@ -41,6 +41,6 @@ struct _MMCallHuaweiClass {
 
 GType mm_call_huawei_get_type (void);
 
-MMBaseCall *mm_call_huawei_new(MMBaseModem *modem);
+MMBaseCall *mm_call_huawei_new (MMBaseModem *modem);
 
 #endif /* MM_CALL_HUAWEI_H */
