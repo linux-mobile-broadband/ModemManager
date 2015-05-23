@@ -36,8 +36,9 @@
         DeleteCall:
         @path: The object path of the Call to delete.
 
-        Delete a Call from lists of calls.
-        If it is still active, Call.Hangup method is performed
+        Delete a Call from the list of calls.
+
+        The call will be hangup if it is still active.
     -->
     <method name="DeleteCall">
       <arg name="path" type="o" direction="in" />

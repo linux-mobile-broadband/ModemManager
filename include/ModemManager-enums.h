@@ -1178,7 +1178,7 @@ typedef enum { /*< underscore_name=mm_oma_session_state_failed_reason >*/
  * @MM_CALL_STATE_HELD: held call (by +CHLD AT command).
  * @MM_CALL_STATE_WAITING: waiting call (by +CCWA AT command).
  * @MM_CALL_STATE_TERMINATED: call is terminated.
- * 
+ *
  * State of Call
  */
 typedef enum { /*< underscore_name=mm_call_state >*/

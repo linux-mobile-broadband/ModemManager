@@ -21,7 +21,9 @@
         Start:
 
         If the outgoing call has not yet been started, start it.
-        Applicable only if state is MM_CALL_STATE_UNKNOWN and direction is MM_CALL_DIRECTION_OUTGOING.
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link> and direction is
+        <link linkend="MM-CALL-DIRECTION-OUTGOING:CAPS"><constant>MM_CALL_DIRECTION_OUTGOING</constant></link>.
     -->
     <method name="Start" />
 
@@ -29,7 +31,9 @@
         Accept:
 
         Accept incoming call (answer).
-        Applicable only if state is MM_CALL_STATE_RINGING_IN and direction is MM_CALL_DIRECTION_INCOMING
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-RINGING-IN:CAPS"><constant>MM_CALL_STATE_RINGING_IN</constant></link> and direction is
+        <link linkend="MM-CALL-DIRECTION-INCOMING:CAPS"><constant>MM_CALL_DIRECTION_INCOMING</constant></link>.
     -->
     <method name="Accept" />
 
@@ -37,7 +41,9 @@
         Hangup:
 
         Hangup the active call.
-        Applicable only if state is not MM_CALL_STATE_UNKNOWN or MM_CALL_STATE_TERMINATED
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link> and direction is
+        <link linkend="MM-CALL-DIRECTION-TERMINATED:CAPS"><constant>MM_CALL_DIRECTION_TERMINATED</constant></link>.
     -->
     <method name="Hangup"/>
 
@@ -45,8 +51,9 @@
         SendTone:
         @tone: Tone identifier. (Admitter chars are [0-9A-D*#])
 
-        Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem)
-        Applicable only if state is MM_CALL_STATE_ACTIVE
+        Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem).
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link>.
     -->
     <method name="SendTone">
       <arg name="tone" type="s" direction="in"/>
