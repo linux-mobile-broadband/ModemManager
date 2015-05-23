@@ -13,6 +13,9 @@ MM_CHECK_VERSION
 MMBearerIpFamily
 MMBearerIpMethod
 MMBearerAllowedAuth
+MMCallDirection
+MMCallState
+MMCallStateReason
 MMFirmwareImageType
 MMModem3gppFacility
 MMModem3gppNetworkAvailability
