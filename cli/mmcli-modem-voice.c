@@ -180,7 +180,7 @@ list_process_reply (GList        *result,
 
     g_print ("\n");
     if (!result) {
-        g_print ("No call were found\n");
+        g_print ("No calls were found\n");
     } else {
         GList *l;
 
