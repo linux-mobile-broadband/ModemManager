@@ -6212,12 +6212,12 @@ modem_messaging_create_sms (MMIfaceModemMessaging *self)
 }
 
 /*****************************************************************************/
-
 /* Check if Voice supported (Voice interface) */
+
 static gboolean
 modem_voice_check_support_finish (MMIfaceModemVoice *self,
-                                      GAsyncResult *res,
-                                      GError **error)
+                                  GAsyncResult *res,
+                                  GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -6255,7 +6255,7 @@ modem_voice_check_support (MMIfaceModemVoice *self,
                                         user_data,
                                         modem_voice_check_support);
 
-    /* We assume that all modems has voice capabilities, but ... */
+    /* We assume that all modems have voice capabilities, but ... */
 
     /* Check ATH support */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -6282,10 +6282,8 @@ ring_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
-    //Do not match anything from regex
-    (void)info;
-
-    mm_iface_modem_voice_create_incoming_call(MM_IFACE_MODEM_VOICE(self));
+    mm_dbg ("Ringing");
+    mm_iface_modem_voice_create_incoming_call (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -6294,11 +6292,15 @@ cring_received (MMPortSerialAt *port,
                 MMBroadbandModem *self)
 {
     /* The match info gives us in which storage the index applies */
-    gchar *str = mm_get_string_unquoted_from_match_info (info, 1);
-    //TODO: In str you could have "VOICE" or "DATA". Now consider only "VOICE"
+    gchar *str;
+
+    /* We could have "VOICE" or "DATA". Now consider only "VOICE" */
+
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+    mm_dbg ("Ringing (%s)", str);
     g_free (str);
 
-    mm_iface_modem_voice_create_incoming_call(MM_IFACE_MODEM_VOICE(self));
+    mm_iface_modem_voice_create_incoming_call (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -6307,20 +6309,22 @@ clip_received (MMPortSerialAt *port,
                MMBroadbandModem *self)
 {
     /* The match info gives us in which storage the index applies */
-    gchar *str = mm_get_string_unquoted_from_match_info (info, 1);
+    gchar *str;
 
-    if( str  ) {
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+
+    if (str) {
         guint validity  = 0;
         guint type      = 0;
 
         mm_get_uint_from_match_info (info, 2, &type);
         mm_get_uint_from_match_info (info, 3, &validity);
 
-        mm_dbg ("[%s:%d] CLIP regex => number:'%s', type:'%d', validity:'%d'", __func__, __LINE__, str, type, validity);
+        mm_dbg ("Caller ID received: number '%s', type '%d', validity '%d'", str, type, validity);
 
-        mm_iface_modem_voice_update_incoming_call_number(MM_IFACE_MODEM_VOICE(self), str, type, validity);
+        mm_iface_modem_voice_update_incoming_call_number (MM_IFACE_MODEM_VOICE (self), str, type, validity);
 
-        g_free(str);
+        g_free (str);
     }
 }
 
@@ -6329,11 +6333,8 @@ nocarrier_received (MMPortSerialAt *port,
                     GMatchInfo *info,
                     MMBroadbandModem *self)
 {
-    //Do not match anything from regex
-    (void)info;
-
-    mm_dbg ("[%s:%d]", __func__, __LINE__);
-    mm_iface_modem_voice_network_hangup(MM_IFACE_MODEM_VOICE(self));
+    mm_dbg ("No carrier");
+    mm_iface_modem_voice_network_hangup (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -6466,7 +6467,6 @@ ring_response_processor (MMBaseModem *self,
 static const MMBaseModemAtCommand ring_sequence[] = {
     /* Show caller number on RING. */
     { "+CLIP=1", 3, FALSE, ring_response_processor },
-
     /* Show difference between data call and voice call */
     { "+CRC=1", 3, FALSE, ring_response_processor },
     { NULL }

@@ -49,19 +49,18 @@ mm_iface_modem_voice_create_call (MMIfaceModemVoice *self)
 MMBaseCall *
 mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
 {
-    MMBaseCall  *call   = NULL;
-    MMCallList  *list   = NULL;
+    MMBaseCall *call = NULL;
+    MMCallList *list = NULL;
 
     g_object_get (MM_BASE_MODEM (self),
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
+    if (list) {
+        call = mm_call_list_get_new_incoming (list);
 
-        call = mm_call_list_get_new_incoming(list);
-        if( !call ) {
-
-            mm_dbg("[%s:%d] Incoming call does not exist; create it", __func__, __LINE__);
+        if (!call) {
+            mm_dbg("Incoming call does not exist; create it");
 
             call = mm_base_call_new (MM_BASE_MODEM (self));
             g_object_set (call,
@@ -72,13 +71,10 @@ mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
 
             /* Only export once properly created */
             mm_base_call_export (call);
-            mm_dbg ("[%s:%d] New call exported to DBUS", __func__, __LINE__);
+            mm_dbg ("New call exported to DBus");
 
-            mm_call_list_add_call(list, call);
-            mm_dbg ("[%s:%d] Call added to list", __func__, __LINE__);
-
-        } else {
-//            mm_dbg("[%s:%d] Incoming call already exist. Do nothing", __func__, __LINE__);
+            mm_call_list_add_call (list, call);
+            mm_dbg ("Call added to the list");
         }
 
         g_object_unref (list);
@@ -87,7 +83,11 @@ mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
     return call;
 }
 
-gboolean mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self, gchar *number, guint type, guint validity)
+gboolean
+mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self,
+                                                  gchar *number,
+                                                  guint type,
+                                                  guint validity)
 {
     gboolean    updated = FALSE;
     MMBaseCall  *call   = NULL;
@@ -97,27 +97,30 @@ gboolean mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *se
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
+    if (list) {
+        call = mm_call_list_get_new_incoming (list);
 
-        call = mm_call_list_get_new_incoming(list);
-        if( call ) {
+        if (call) {
             g_object_set (call, "number", number, NULL);
-            mm_gdbus_call_set_number(MM_GDBUS_CALL (call), number);
+            mm_gdbus_call_set_number (MM_GDBUS_CALL (call), number);
 
-            //TODO: Maybe also this parameters should be used
-            (void)type;
-            (void)validity;
+            /*
+             * TODO: Maybe also this parameters should be used:
+             *  - type
+             *  - validity
+             */
 
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Incoming call does not exist yet", __func__, __LINE__);
+            mm_dbg ("Incoming call does not exist yet");
         }
     }
 
     return updated;
 }
 
-gboolean mm_iface_modem_voice_call_dialing_to_ringing(MMIfaceModemVoice *self)
+gboolean
+mm_iface_modem_voice_call_dialing_to_ringing (MMIfaceModemVoice *self)
 {
     gboolean    updated = FALSE;
     MMBaseCall  *call   = NULL;
@@ -127,22 +130,22 @@ gboolean mm_iface_modem_voice_call_dialing_to_ringing(MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
+    if (list) {
+        call = mm_call_list_get_first_outgoing_dialing_call (list);
 
-        call = mm_call_list_get_first_outgoing_dialing_call(list);
-        if( call ) {
-            mm_base_call_change_state(call, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
-
+        if (call) {
+            mm_base_call_change_state (call, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Outgoing dialing call does not exist", __func__, __LINE__);
+            mm_dbg ("Outgoing dialing call does not exist");
         }
     }
 
     return updated;
 }
 
-gboolean mm_iface_modem_voice_call_ringing_to_active(MMIfaceModemVoice *self)
+gboolean
+mm_iface_modem_voice_call_ringing_to_active (MMIfaceModemVoice *self)
 {
     gboolean    updated = FALSE;
     MMBaseCall  *call   = NULL;
@@ -152,22 +155,22 @@ gboolean mm_iface_modem_voice_call_ringing_to_active(MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
+    if (list) {
+        call = mm_call_list_get_first_ringing_call (list);
 
-        call = mm_call_list_get_first_ringing_call(list);
-        if( call ) {
-            mm_base_call_change_state(call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
-
+        if (call) {
+            mm_base_call_change_state (call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] Ringing call does not exist", __func__, __LINE__);
+            mm_dbg ("Ringing call does not exist");
         }
     }
 
     return updated;
 }
 
-gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
+gboolean
+mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 {
     gboolean    updated = FALSE;
     MMBaseCall  *call   = NULL;
@@ -177,22 +180,23 @@ gboolean mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
+    if (list) {
+        call = mm_call_list_get_first_non_terminated_call (list);
 
-        call = mm_call_list_get_first_non_terminated_call(list);
-        if( call ) {
-            mm_base_call_change_state(call, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
-
+        if (call) {
+            mm_base_call_change_state (call, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
             updated = TRUE;
         } else {
-            mm_dbg("[%s:%d] No call to hangup", __func__, __LINE__);
+            mm_dbg ("No call to hangup");
         }
     }
 
     return updated;
 }
 
-gboolean mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self, gchar *tone)
+gboolean
+mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
+                                    gchar *tone)
 {
     gboolean    updated = FALSE;
     MMCallList  *list   = NULL;
@@ -201,8 +205,8 @@ gboolean mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self, gchar *ton
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if( list ) {
-        updated = mm_call_list_send_dtmf_to_active_calls(list, tone);
+    if (list) {
+        updated = mm_call_list_send_dtmf_to_active_calls (list, tone);
     }
 
     return updated;
@@ -369,8 +373,8 @@ handle_create_auth_ready (MMBaseModem *self,
     }
 
     call = mm_base_call_new_from_properties (MM_BASE_MODEM (self),
-                                           properties,
-                                           &error);
+                                             properties,
+                                             &error);
     if (!call) {
         g_object_unref (properties);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -397,8 +401,8 @@ handle_create_auth_ready (MMBaseModem *self,
 
     /* Complete the DBus call */
     mm_gdbus_modem_voice_complete_create_call (ctx->skeleton,
-                                              ctx->invocation,
-                                              mm_base_call_get_path (call));
+                                               ctx->invocation,
+                                               mm_base_call_get_path (call));
     g_object_unref (call);
 
     g_object_unref (properties);
@@ -466,9 +470,9 @@ handle_list (MmGdbusModemVoice *skeleton,
     }
 
     paths = mm_call_list_get_paths (list);
-    mm_gdbus_modem_voice_complete_list_calls(skeleton,
-                                            invocation,
-                                            (const gchar *const *)paths);
+    mm_gdbus_modem_voice_complete_list_calls (skeleton,
+                                              invocation,
+                                              (const gchar *const *)paths);
     g_strfreev (paths);
     g_object_unref (list);
     return TRUE;
@@ -483,7 +487,7 @@ update_message_list (MmGdbusModemVoice *skeleton,
     gchar **paths;
 
     paths = mm_call_list_get_paths (list);
-    mm_gdbus_modem_voice_set_calls(skeleton, (const gchar *const *)paths);
+    mm_gdbus_modem_voice_set_calls (skeleton, (const gchar *const *)paths);
     g_strfreev (paths);
 }
 
@@ -494,7 +498,7 @@ call_added (MMCallList *list,
 {
     mm_dbg ("Added CALL at '%s'", call_path);
     update_message_list (skeleton, list);
-    mm_gdbus_modem_voice_emit_call_added(skeleton, call_path);
+    mm_gdbus_modem_voice_emit_call_added (skeleton, call_path);
 }
 
 static void
@@ -504,7 +508,7 @@ call_deleted (MMCallList *list,
 {
     mm_dbg ("Deleted CALL at '%s'", call_path);
     update_message_list (skeleton, list);
-    mm_gdbus_modem_voice_emit_call_deleted(skeleton, call_path);
+    mm_gdbus_modem_voice_emit_call_deleted (skeleton, call_path);
 }
 
 /*****************************************************************************/
@@ -539,8 +543,8 @@ disabling_context_complete_and_free (DisablingContext *ctx)
 
 gboolean
 mm_iface_modem_voice_disable_finish (MMIfaceModemVoice *self,
-                                        GAsyncResult *res,
-                                        GError **error)
+                                     GAsyncResult *res,
+                                     GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -634,8 +638,8 @@ interface_disabling_step (DisablingContext *ctx)
 
 void
 mm_iface_modem_voice_disable (MMIfaceModemVoice *self,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
 {
     DisablingContext *ctx;
 
@@ -710,8 +714,8 @@ enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
 
 gboolean
 mm_iface_modem_voice_enable_finish (MMIfaceModemVoice *self,
-                                        GAsyncResult *res,
-                                        GError **error)
+                                    GAsyncResult *res,
+                                    GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -823,9 +827,9 @@ interface_enabling_step (EnablingContext *ctx)
 
 void
 mm_iface_modem_voice_enable (MMIfaceModemVoice *self,
-                                 GCancellable *cancellable,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
 {
     EnablingContext *ctx;
 
@@ -905,8 +909,8 @@ check_support_ready (MMIfaceModemVoice *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self,
-                                                                              res,
-                                                                              &error)) {
+                                                                          res,
+                                                                          &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_dbg ("Voice support check failed: '%s'", error->message);
@@ -1003,7 +1007,7 @@ interface_initialization_step (InitializationContext *ctx)
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem_voice (MM_GDBUS_OBJECT_SKELETON (ctx->self),
-                                                      MM_GDBUS_MODEM_VOICE (ctx->skeleton));
+                                                  MM_GDBUS_MODEM_VOICE (ctx->skeleton));
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         initialization_context_complete_and_free (ctx);
@@ -1015,17 +1019,17 @@ interface_initialization_step (InitializationContext *ctx)
 
 gboolean
 mm_iface_modem_voice_initialize_finish (MMIfaceModemVoice *self,
-                                            GAsyncResult *res,
-                                            GError **error)
+                                        GAsyncResult *res,
+                                        GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 void
 mm_iface_modem_voice_initialize (MMIfaceModemVoice *self,
-                                     GCancellable *cancellable,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
+                                 GCancellable *cancellable,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
     InitializationContext *ctx;
     MmGdbusModemVoice *skeleton = NULL;
@@ -1110,9 +1114,9 @@ mm_iface_modem_voice_get_type (void)
         };
 
         iface_modem_voice_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                             "MMIfaceModemVoice",
-                                                             &info,
-                                                             0);
+                                                         "MMIfaceModemVoice",
+                                                         &info,
+                                                         0);
 
         g_type_interface_add_prerequisite (iface_modem_voice_type, MM_TYPE_IFACE_MODEM);
     }

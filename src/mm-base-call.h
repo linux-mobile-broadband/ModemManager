@@ -35,9 +35,9 @@ typedef struct _MMBaseCall MMBaseCall;
 typedef struct _MMBaseCallClass MMBaseCallClass;
 typedef struct _MMBaseCallPrivate MMBaseCallPrivate;
 
-#define MM_BASE_CALL_PATH                "call-path"
-#define MM_BASE_CALL_CONNECTION          "call-connection"
-#define MM_BASE_CALL_MODEM               "call-modem"
+#define MM_BASE_CALL_PATH       "call-path"
+#define MM_BASE_CALL_CONNECTION "call-connection"
+#define MM_BASE_CALL_MODEM      "call-modem"
 
 struct _MMBaseCall {
     MmGdbusCallSkeleton parent;
@@ -48,31 +48,31 @@ struct _MMBaseCallClass {
     MmGdbusCallSkeletonClass parent;
 
     /* Start the call */
-    void (* start) (MMBaseCall *self,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data);
+    void     (* start)        (MMBaseCall *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
     gboolean (* start_finish) (MMBaseCall *self,
-                              GAsyncResult *res,
-                              GError **error);
+                               GAsyncResult *res,
+                               GError **error);
 
     /* Accept the call */
-    void (* accept) (MMBaseCall *self,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data);
+    void     (* accept)        (MMBaseCall *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
     gboolean (* accept_finish) (MMBaseCall *self,
-                              GAsyncResult *res,
-                              GError **error);
+                                GAsyncResult *res,
+                                GError **error);
 
     /* Hangup the call */
-    void (* hangup) (MMBaseCall *self,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data);
+    void     (* hangup)        (MMBaseCall *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
     gboolean (* hangup_finish) (MMBaseCall *self,
-                              GAsyncResult *res,
-                              GError **error);
+                                GAsyncResult *res,
+                                GError **error);
 
     /* Send a DTMF tone */
-    void (* send_tone)            (MMBaseCall *self,
+    void     (* send_tone)        (MMBaseCall *self,
                                    const gchar *tone,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
@@ -81,9 +81,9 @@ struct _MMBaseCallClass {
                                    GError **error);
 
     /* Delete the call */
-    void (* delete) (MMBaseCall *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data);
+    void     (* delete)        (MMBaseCall *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
     gboolean (* delete_finish) (MMBaseCall *self,
                                 GAsyncResult *res,
                                 GError **error);
@@ -94,20 +94,23 @@ GType mm_base_call_get_type (void);
 /* This one can be overriden by plugins */
 MMBaseCall *mm_base_call_new                 (MMBaseModem *modem);
 MMBaseCall *mm_base_call_new_from_properties (MMBaseModem *modem,
-                                            MMCallProperties *properties,
-                                            GError **error);
+                                              MMCallProperties *properties,
+                                              GError **error);
 
-void        mm_base_call_export         (MMBaseCall *self);
-void        mm_base_call_unexport       (MMBaseCall *self);
-const gchar *mm_base_call_get_path      (MMBaseCall *self);
-void        mm_base_call_change_state   (MMBaseCall *self, MMCallState new_state, MMCallStateReason reason);
-void        mm_base_call_received_dtmf  (MMBaseCall *self, gchar *tone);
+void         mm_base_call_export         (MMBaseCall *self);
+void         mm_base_call_unexport       (MMBaseCall *self);
+const gchar *mm_base_call_get_path       (MMBaseCall *self);
+void         mm_base_call_change_state   (MMBaseCall *self,
+                                          MMCallState new_state,
+                                          MMCallStateReason reason);
+void         mm_base_call_received_dtmf  (MMBaseCall *self,
+                                          gchar *tone);
 
-void     mm_base_call_delete        (MMBaseCall *self,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-gboolean mm_base_call_delete_finish (MMBaseCall *self,
-                                    GAsyncResult *res,
-                                    GError **error);
+void         mm_base_call_delete         (MMBaseCall *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+gboolean     mm_base_call_delete_finish  (MMBaseCall *self,
+                                          GAsyncResult *res,
+                                          GError **error);
 
 #endif /* MM_BASE_CALL_H */
