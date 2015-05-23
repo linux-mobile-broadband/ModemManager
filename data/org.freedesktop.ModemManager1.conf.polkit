@@ -193,6 +193,41 @@
            send_interface="org.freedesktop.ModemManager1.Sms"
            send_member="Send"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Voice.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="ListCalls"/>
+
+    <!-- Protected by the Voice policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="CreateCall"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="DeleteCall"/>
+
+    <!-- org.freedesktop.ModemManager1.Call.xml -->
+
+    <!-- Protected by the Voice policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="Start"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="Accept"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="Hangup"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="SendTone"/>
+
     <!-- org.freedesktop.ModemManager1.Modem.Signal.xml -->
 
     <!-- Allowed for everyone -->

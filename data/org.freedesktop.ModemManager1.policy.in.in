@@ -45,6 +45,15 @@
     </defaults>
   </action>
 
+  <action id="org.freedesktop.ModemManager1.Voice">
+    <_description>Accept incoming voice calls or start outgoing voice calls.</_description>
+    <_message>System policy prevents voice calls.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
+    </defaults>
+  </action>
+
   <action id="org.freedesktop.ModemManager1.Location">
     <_description>Enable and view geographic location and positioning information</_description>
     <_message>System policy prevents enabling or viewing geographic location information.</_message>
