@@ -57,20 +57,20 @@ GType mm_call_properties_get_type (void);
 
 MMCallProperties *mm_call_properties_new (void);
 
-void mm_call_properties_set_number                  (MMCallProperties *self,
-                                                    const gchar *text);
-void mm_call_properties_set_direction               (MMCallProperties *self,
-                                                    MMCallDirection direction);
-void mm_call_properties_set_state_reason            (MMCallProperties *self,
-                                                    MMCallStateReason state_reason);
-void mm_call_properties_set_state                   (MMCallProperties *self,
-                                                    MMCallState state);
+void mm_call_properties_set_number       (MMCallProperties *self,
+                                          const gchar *text);
+void mm_call_properties_set_direction    (MMCallProperties *self,
+                                          MMCallDirection direction);
+void mm_call_properties_set_state_reason (MMCallProperties *self,
+                                          MMCallStateReason state_reason);
+void mm_call_properties_set_state        (MMCallProperties *self,
+                                          MMCallState state);
 
 
-const gchar         *mm_call_properties_get_number      (MMCallProperties *self);
-MMCallDirection     mm_call_properties_get_direction   (MMCallProperties *self);
-MMCallStateReason   mm_call_properties_get_state_reason(MMCallProperties *self);
-MMCallState         mm_call_properties_get_state       (MMCallProperties *self);
+const gchar       *mm_call_properties_get_number      (MMCallProperties *self);
+MMCallDirection    mm_call_properties_get_direction   (MMCallProperties *self);
+MMCallStateReason  mm_call_properties_get_state_reason(MMCallProperties *self);
+MMCallState        mm_call_properties_get_state       (MMCallProperties *self);
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 
@@ -79,9 +79,9 @@ MMCallState         mm_call_properties_get_state       (MMCallProperties *self);
     defined (LIBMM_GLIB_COMPILATION)
 
 MMCallProperties *mm_call_properties_new_from_string (const gchar *str,
-                                                    GError **error);
+                                                      GError **error);
 MMCallProperties *mm_call_properties_new_from_dictionary (GVariant *dictionary,
-                                                        GError **error);
+                                                          GError **error);
 
 MMCallProperties *mm_call_properties_dup (MMCallProperties *orig);
 

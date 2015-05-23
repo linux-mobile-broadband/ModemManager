@@ -83,7 +83,7 @@ mm_call_dup_path (MMCall *self)
  * mm_call_get_number:
  * @self: A #MMCall.
  *
- * Gets the call number. In outgoing calls contains the dialing number or 
+ * Gets the call number. In outgoing calls contains the dialing number or
  * the remote number in incoming calls
  *
  * <warning>The returned value is only valid until the property changes so
@@ -106,7 +106,7 @@ mm_call_get_number (MMCall *self)
  * mm_call_dup_number:
  * @self: A #MMCall.
  *
- * Gets the call number. In outgoing calls contains the dialing number or 
+ * Gets the call number. In outgoing calls contains the dialing number or
  * the remote number in incoming calls
  *
  * Returns: (transfer full): The number, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
@@ -188,8 +188,8 @@ mm_call_get_state_reason (MMCall *self)
  */
 gboolean
 mm_call_start_finish (MMCall *self,
-                    GAsyncResult *res,
-                    GError **error)
+                      GAsyncResult *res,
+                      GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
@@ -214,16 +214,16 @@ mm_call_start_finish (MMCall *self,
  */
 void
 mm_call_start (MMCall *self,
-             GCancellable *cancellable,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+               GCancellable *cancellable,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
 {
     g_return_if_fail (MM_IS_CALL (self));
 
     mm_gdbus_call_call_start (MM_GDBUS_CALL (self),
-                            cancellable,
-                            callback,
-                            user_data);
+                              cancellable,
+                              callback,
+                              user_data);
 }
 
 /**
@@ -243,14 +243,14 @@ mm_call_start (MMCall *self,
  */
 gboolean
 mm_call_start_sync (MMCall *self,
-                  GCancellable *cancellable,
-                  GError **error)
+                    GCancellable *cancellable,
+                    GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
     return mm_gdbus_call_call_start_sync (MM_GDBUS_CALL (self),
-                                        cancellable,
-                                        error);
+                                          cancellable,
+                                          error);
 }
 
 /*****************************************************************************/
@@ -267,8 +267,8 @@ mm_call_start_sync (MMCall *self,
  */
 gboolean
 mm_call_accept_finish (MMCall *self,
-                    GAsyncResult *res,
-                    GError **error)
+                       GAsyncResult *res,
+                       GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
@@ -293,16 +293,16 @@ mm_call_accept_finish (MMCall *self,
  */
 void
 mm_call_accept (MMCall *self,
-             GCancellable *cancellable,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+                GCancellable *cancellable,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
 {
     g_return_if_fail (MM_IS_CALL (self));
 
     mm_gdbus_call_call_accept (MM_GDBUS_CALL (self),
-                            cancellable,
-                            callback,
-                            user_data);
+                               cancellable,
+                               callback,
+                               user_data);
 }
 
 /**
@@ -322,8 +322,8 @@ mm_call_accept (MMCall *self,
  */
 gboolean
 mm_call_accept_sync (MMCall *self,
-                  GCancellable *cancellable,
-                  GError **error)
+                     GCancellable *cancellable,
+                     GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
@@ -346,8 +346,8 @@ mm_call_accept_sync (MMCall *self,
  */
 gboolean
 mm_call_hangup_finish (MMCall *self,
-                    GAsyncResult *res,
-                    GError **error)
+                       GAsyncResult *res,
+                       GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
@@ -372,16 +372,16 @@ mm_call_hangup_finish (MMCall *self,
  */
 void
 mm_call_hangup (MMCall *self,
-             GCancellable *cancellable,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+                GCancellable *cancellable,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
 {
     g_return_if_fail (MM_IS_CALL (self));
 
     mm_gdbus_call_call_hangup (MM_GDBUS_CALL (self),
-                            cancellable,
-                            callback,
-                            user_data);
+                               cancellable,
+                               callback,
+                               user_data);
 }
 
 /**
@@ -401,14 +401,14 @@ mm_call_hangup (MMCall *self,
  */
 gboolean
 mm_call_hangup_sync (MMCall *self,
-                  GCancellable *cancellable,
-                  GError **error)
+                     GCancellable *cancellable,
+                     GError **error)
 {
     g_return_val_if_fail (MM_IS_CALL (self), FALSE);
 
     return mm_gdbus_call_call_hangup_sync (MM_GDBUS_CALL (self),
-                                        cancellable,
-                                        error);
+                                           cancellable,
+                                           error);
 }
 
 /*****************************************************************************/
@@ -440,7 +440,7 @@ mm_call_send_tone_finish (MMCall *self,
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously requests to send_tone the call.
+ * Asynchronously requests to send tone the call.
  *
  * Call objects can only be executed once.
  *
@@ -471,7 +471,7 @@ mm_call_send_tone (MMCall *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously requests to send_tone the call.
+ * Synchronously requests to send tone the call.
  *
  * Call objects can only be sent once.
  *

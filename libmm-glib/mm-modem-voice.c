@@ -124,8 +124,8 @@ list_call_context_complete_and_free (ListCallContext *ctx)
  */
 GList *
 mm_modem_voice_list_call_finish (MMModemVoice *self,
-                                GAsyncResult *res,
-                                GError **error)
+                                 GAsyncResult *res,
+                                 GError **error)
 {
     GList *list;
 
@@ -212,9 +212,9 @@ create_next_call (ListCallContext *ctx)
  */
 void
 mm_modem_voice_list_call (MMModemVoice *self,
-                         GCancellable *cancellable,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+                          GCancellable *cancellable,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
 {
     ListCallContext *ctx;
 
@@ -258,8 +258,8 @@ mm_modem_voice_list_call (MMModemVoice *self,
  */
 GList *
 mm_modem_voice_list_call_sync (MMModemVoice *self,
-                              GCancellable *cancellable,
-                              GError **error)
+                               GCancellable *cancellable,
+                               GError **error)
 {
     GList *call_objects = NULL;
     gchar **call_paths = NULL;
@@ -277,14 +277,14 @@ mm_modem_voice_list_call_sync (MMModemVoice *self,
         GObject *call;
 
         call = g_initable_new (MM_TYPE_CALL,
-                                 cancellable,
-                                 error,
-                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-                                 "g-name",           MM_DBUS_SERVICE,
-                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
-                                 "g-object-path",    call_paths[i],
-                                 "g-interface-name", "org.freedesktop.ModemManager1.Call",
-                              NULL);
+                               cancellable,
+                               error,
+                               "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                               "g-name",           MM_DBUS_SERVICE,
+                               "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                               "g-object-path",    call_paths[i],
+                               "g-interface-name", "org.freedesktop.ModemManager1.Call",
+                               NULL);
         if (!call) {
             call_object_list_free (call_objects);
             g_strfreev (call_paths);
@@ -371,9 +371,9 @@ create_call_ready (MMModemVoice *self,
     gchar *call_path = NULL;
 
     if (!mm_gdbus_modem_voice_call_create_call_finish (MM_GDBUS_MODEM_VOICE (self),
-                                                      &call_path,
-                                                      res,
-                                                      &error)) {
+                                                       &call_path,
+                                                       res,
+                                                       &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         create_call_context_complete_and_free (ctx);
         g_free (call_path);
@@ -411,10 +411,10 @@ create_call_ready (MMModemVoice *self,
  */
 void
 mm_modem_voice_create_call (MMModemVoice *self,
-                           MMCallProperties *properties,
-                           GCancellable *cancellable,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+                            MMCallProperties *properties,
+                            GCancellable *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     CreateCallContext *ctx;
     GVariant *dictionary;
@@ -456,9 +456,9 @@ mm_modem_voice_create_call (MMModemVoice *self,
  */
 MMCall *
 mm_modem_voice_create_call_sync (MMModemVoice *self,
-                                MMCallProperties *properties,
-                                GCancellable *cancellable,
-                                GError **error)
+                                 MMCallProperties *properties,
+                                 GCancellable *cancellable,
+                                 GError **error)
 {
     MMCall *call = NULL;
     gchar *call_path = NULL;
@@ -468,20 +468,20 @@ mm_modem_voice_create_call_sync (MMModemVoice *self,
 
     dictionary = (mm_call_properties_get_dictionary (properties));
     mm_gdbus_modem_voice_call_create_call_sync (MM_GDBUS_MODEM_VOICE (self),
-                                               dictionary,
-                                               &call_path,
-                                               cancellable,
-                                               error);
+                                                dictionary,
+                                                &call_path,
+                                                cancellable,
+                                                error);
     if (call_path) {
         call = g_initable_new (MM_TYPE_CALL,
-                              cancellable,
-                              error,
-                              "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-                              "g-name",           MM_DBUS_SERVICE,
-                              "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
-                              "g-object-path",    call_path,
-                              "g-interface-name", "org.freedesktop.ModemManager1.Call",
-                              NULL);
+                               cancellable,
+                               error,
+                               "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                               "g-name",           MM_DBUS_SERVICE,
+                               "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                               "g-object-path",    call_path,
+                               "g-interface-name", "org.freedesktop.ModemManager1.Call",
+                               NULL);
         g_free (call_path);
     }
 
@@ -504,8 +504,8 @@ mm_modem_voice_create_call_sync (MMModemVoice *self,
  */
 gboolean
 mm_modem_voice_delete_call_finish (MMModemVoice *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+                                   GAsyncResult *res,
+                                   GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
 
@@ -529,18 +529,18 @@ mm_modem_voice_delete_call_finish (MMModemVoice *self,
  */
 void
 mm_modem_voice_delete_call (MMModemVoice *self,
-                           const gchar *call,
-                           GCancellable *cancellable,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+                            const gchar *call,
+                            GCancellable *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_VOICE (self));
 
     mm_gdbus_modem_voice_call_delete_call (MM_GDBUS_MODEM_VOICE (self),
-                                          call,
-                                          cancellable,
-                                          callback,
-                                          user_data);
+                                           call,
+                                           cancellable,
+                                           callback,
+                                           user_data);
 }
 
 /**
@@ -559,16 +559,16 @@ mm_modem_voice_delete_call (MMModemVoice *self,
  */
 gboolean
 mm_modem_voice_delete_call_sync (MMModemVoice *self,
-                                const gchar *call,
-                                GCancellable *cancellable,
-                                GError **error)
+                                 const gchar *call,
+                                 GCancellable *cancellable,
+                                 GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
 
     return mm_gdbus_modem_voice_call_delete_call_sync (MM_GDBUS_MODEM_VOICE (self),
-                                                      call,
-                                                      cancellable,
-                                                      error);
+                                                       call,
+                                                       cancellable,
+                                                       error);
 }
 
 /*****************************************************************************/
@@ -576,24 +576,9 @@ mm_modem_voice_delete_call_sync (MMModemVoice *self,
 static void
 mm_modem_voice_init (MMModemVoice *self)
 {
-    /* Setup private data */
-}
-
-static void
-finalize (GObject *object)
-{
-    //MMModemVoice *self = MM_MODEM_VOICE (object);
-
-    G_OBJECT_CLASS (mm_modem_voice_parent_class)->finalize (object);
 }
 
 static void
 mm_modem_voice_class_init (MMModemVoiceClass *modem_class)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (modem_class);
-
-    //g_type_class_add_private (object_class, sizeof (MMModemVoicePrivate));
-
-    /* Virtual methods */
-    object_class->finalize = finalize;
 }

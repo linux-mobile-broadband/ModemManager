@@ -36,10 +36,10 @@
 
 G_DEFINE_TYPE (MMCallProperties, mm_call_properties, G_TYPE_OBJECT)
 
-#define PROPERTY_NUMBER                  "number"
-#define PROPERTY_DIRECTION               "direction"
-#define PROPERTY_STATE_REASON            "state-reason"
-#define PROPERTY_STATE                   "state"
+#define PROPERTY_NUMBER       "number"
+#define PROPERTY_DIRECTION    "direction"
+#define PROPERTY_STATE_REASON "state-reason"
+#define PROPERTY_STATE        "state"
 
 struct _MMCallPropertiesPrivate {
     gchar *number;
@@ -59,7 +59,7 @@ struct _MMCallPropertiesPrivate {
  */
 void
 mm_call_properties_set_number (MMCallProperties *self,
-                            const gchar *number)
+                               const gchar *number)
 {
     g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
 
@@ -94,7 +94,7 @@ mm_call_properties_get_number (MMCallProperties *self)
  */
 void
 mm_call_properties_set_direction (MMCallProperties *self,
-                                        MMCallDirection direction)
+                                  MMCallDirection direction)
 {
     g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
 
@@ -128,7 +128,7 @@ mm_call_properties_get_direction (MMCallProperties *self)
  */
 void
 mm_call_properties_set_state (MMCallProperties *self,
-                                        MMCallState state)
+                              MMCallState state)
 {
     g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
 
@@ -162,7 +162,7 @@ mm_call_properties_get_state (MMCallProperties *self)
  */
 void
 mm_call_properties_set_state_reason (MMCallProperties *self,
-                                        MMCallStateReason state_reason)
+                                     MMCallStateReason state_reason)
 {
     g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
 
@@ -211,18 +211,18 @@ mm_call_properties_get_dictionary (MMCallProperties *self)
                                "{sv}",
                                PROPERTY_STATE_REASON,
                                g_variant_new_uint32 (self->priv->state_reason));
-    
+
     if (self->priv->state != MM_CALL_STATE_UNKNOWN)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_STATE,
                                g_variant_new_uint32 (self->priv->state));
-    
+
     g_variant_builder_add (&builder,
                            "{sv}",
                            PROPERTY_DIRECTION,
                            g_variant_new_uint32 (self->priv->direction));
-    
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -267,7 +267,7 @@ consume_string (MMCallProperties *self,
             return FALSE;
         }
 
-        mm_call_properties_set_state_reason(self, state_reason);
+        mm_call_properties_set_state_reason (self, state_reason);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -451,10 +451,10 @@ mm_call_properties_init (MMCallProperties *self)
                                               MM_TYPE_CALL_PROPERTIES,
                                               MMCallPropertiesPrivate);
 
-    self->priv->number          = NULL;
-    self->priv->direction       = MM_CALL_DIRECTION_UNKNOWN;
-    self->priv->state           = MM_CALL_STATE_UNKNOWN;
-    self->priv->state_reason    = MM_CALL_STATE_REASON_UNKNOWN;
+    self->priv->number       = NULL;
+    self->priv->direction    = MM_CALL_DIRECTION_UNKNOWN;
+    self->priv->state        = MM_CALL_STATE_UNKNOWN;
+    self->priv->state_reason = MM_CALL_STATE_REASON_UNKNOWN;
 }
 
 static void

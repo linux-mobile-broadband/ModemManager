@@ -59,76 +59,76 @@ struct _MMCallClass {
 
 GType mm_call_get_type (void);
 
-const gchar         *mm_call_get_path               (MMCall *self);
-gchar               *mm_call_dup_path               (MMCall *self);
+const gchar       *mm_call_get_path         (MMCall *self);
+gchar             *mm_call_dup_path         (MMCall *self);
 
-const gchar         *mm_call_get_number             (MMCall *self);
-gchar               *mm_call_dup_number             (MMCall *self);
+const gchar       *mm_call_get_number       (MMCall *self);
+gchar             *mm_call_dup_number       (MMCall *self);
 
-MMCallState         mm_call_get_state               (MMCall *self);
+MMCallState        mm_call_get_state        (MMCall *self);
 
-MMCallStateReason   mm_call_get_state_reason        (MMCall *self);
+MMCallStateReason  mm_call_get_state_reason (MMCall *self);
 
-MMCallDirection     mm_call_get_direction           (MMCall *self);
-
-
-
-void                mm_call_start                   (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
-
-gboolean            mm_call_start_finish            (MMCall *self,
-                                                     GAsyncResult *res,
-                                                     GError **error);
-
-gboolean            mm_call_start_sync              (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GError **error);
+MMCallDirection    mm_call_get_direction    (MMCall *self);
 
 
-void                mm_call_accept                  (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
 
-gboolean            mm_call_accept_finish           (MMCall *self,
-                                                     GAsyncResult *res,
-                                                     GError **error);
+void               mm_call_start            (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
 
-gboolean            mm_call_accept_sync             (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GError **error);
+gboolean           mm_call_start_finish     (MMCall *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 
-
-void                mm_call_hangup                  (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
-
-gboolean            mm_call_hangup_finish           (MMCall *self,
-                                                     GAsyncResult *res,
-                                                     GError **error);
-
-gboolean            mm_call_hangup_sync             (MMCall *self,
-                                                     GCancellable *cancellable,
-                                                     GError **error);
+gboolean           mm_call_start_sync       (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GError **error);
 
 
-void                mm_call_send_tone               (MMCall *self,
-                                                     const gchar *tone,
-                                                     GCancellable *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
+void               mm_call_accept           (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
 
-gboolean            mm_call_send_tone_finish        (MMCall *self,
-                                                     GAsyncResult *res,
-                                                     GError **error);
+gboolean           mm_call_accept_finish    (MMCall *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 
-gboolean            mm_call_send_tone_sync          (MMCall *self,
-                                                     const gchar *tone,
-                                                     GCancellable *cancellable,
-                                                     GError **error);
+gboolean           mm_call_accept_sync      (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GError **error);
+
+
+void               mm_call_hangup           (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+
+gboolean           mm_call_hangup_finish    (MMCall *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
+gboolean           mm_call_hangup_sync      (MMCall *self,
+                                             GCancellable *cancellable,
+                                             GError **error);
+
+
+void               mm_call_send_tone        (MMCall *self,
+                                             const gchar *tone,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+
+gboolean           mm_call_send_tone_finish (MMCall *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
+gboolean           mm_call_send_tone_sync   (MMCall *self,
+                                             const gchar *tone,
+                                             GCancellable *cancellable,
+                                             GError **error);
 
 G_END_DECLS
 

@@ -70,41 +70,41 @@ const gchar *mm_modem_voice_get_path (MMModemVoice *self);
 gchar       *mm_modem_voice_dup_path (MMModemVoice *self);
 
 void    mm_modem_voice_create_call          (MMModemVoice *self,
-                                                 MMCallProperties *properties,
-                                                 GCancellable *cancellable,
-                                                 GAsyncReadyCallback callback,
-                                                 gpointer user_data);
+                                             MMCallProperties *properties,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
 MMCall *mm_modem_voice_create_call_finish   (MMModemVoice *self,
-                                                 GAsyncResult *res,
-                                                 GError **error);
+                                             GAsyncResult *res,
+                                             GError **error);
 MMCall *mm_modem_voice_create_call_sync     (MMModemVoice *self,
-                                                 MMCallProperties *properties,
-                                                 GCancellable *cancellable,
-                                                 GError **error);
+                                             MMCallProperties *properties,
+                                             GCancellable *cancellable,
+                                             GError **error);
 
 void   mm_modem_voice_list_call             (MMModemVoice *self,
-                                               GCancellable *cancellable,
-                                               GAsyncReadyCallback callback,
-                                               gpointer user_data);
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
 GList *mm_modem_voice_list_call_finish      (MMModemVoice *self,
-                                               GAsyncResult *res,
-                                               GError **error);
+                                             GAsyncResult *res,
+                                             GError **error);
 GList *mm_modem_voice_list_call_sync        (MMModemVoice *self,
-                                               GCancellable *cancellable,
-                                               GError **error);
+                                             GCancellable *cancellable,
+                                             GError **error);
 
 void     mm_modem_voice_delete_call         (MMModemVoice *self,
-                                               const gchar *call,
-                                               GCancellable *cancellable,
-                                               GAsyncReadyCallback callback,
-                                               gpointer user_data);
+                                             const gchar *call,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
 gboolean mm_modem_voice_delete_call_finish  (MMModemVoice *self,
-                                               GAsyncResult *res,
-                                               GError **error);
+                                             GAsyncResult *res,
+                                             GError **error);
 gboolean mm_modem_voice_delete_call_sync    (MMModemVoice *self,
-                                               const gchar *call,
-                                               GCancellable *cancellable,
-                                               GError **error);
+                                             const gchar *call,
+                                             GCancellable *cancellable,
+                                             GError **error);
 
 G_END_DECLS
 
