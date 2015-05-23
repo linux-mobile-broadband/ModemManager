@@ -88,7 +88,6 @@ GArray *mm_filter_supported_capabilities (MMModemCapability all,
 GRegex *mm_voice_ring_regex_get (void);
 GRegex *mm_voice_cring_regex_get(void);
 GRegex *mm_voice_clip_regex_get (void);
-GRegex *mm_voice_nocarrier_regex_get (void);
 
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */

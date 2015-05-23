@@ -361,18 +361,6 @@ mm_voice_clip_regex_get (void)
                         NULL);
 }
 
-GRegex *
-mm_voice_nocarrier_regex_get (void)
-{
-    /* Example:
-     * <CR><LF>NO CARRIER<CR><LF>
-     */
-    return g_regex_new ("\\r\\n\\NO CARRIER\\r\\n",
-                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                        0,
-                        NULL);
-}
-
 /*************************************************************************/
 
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */

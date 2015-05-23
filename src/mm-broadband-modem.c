@@ -6329,15 +6329,6 @@ clip_received (MMPortSerialAt *port,
 }
 
 static void
-nocarrier_received (MMPortSerialAt *port,
-                    GMatchInfo *info,
-                    MMBroadbandModem *self)
-{
-    mm_dbg ("No carrier");
-    mm_iface_modem_voice_network_hangup (MM_IFACE_MODEM_VOICE (self));
-}
-
-static void
 set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                        gboolean enable,
                                        GAsyncReadyCallback callback,
@@ -6345,7 +6336,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
 {
     GSimpleAsyncResult *result;
     MMPortSerialAt *ports[2];
-    GRegex *nocarrier_regex;
     GRegex *cring_regex;
     GRegex *ring_regex;
     GRegex *clip_regex;
@@ -6356,7 +6346,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                         user_data,
                                         set_voice_unsolicited_events_handlers);
 
-    nocarrier_regex = mm_voice_nocarrier_regex_get ();
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
     clip_regex  = mm_voice_clip_regex_get ();
@@ -6388,12 +6377,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             ports[i],
             clip_regex,
             enable ? (MMPortSerialAtUnsolicitedMsgFn) clip_received : NULL,
-            enable ? self : NULL,
-            NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            ports[i],
-            nocarrier_regex,
-            enable ? (MMPortSerialAtUnsolicitedMsgFn) nocarrier_received : NULL,
             enable ? self : NULL,
             NULL);
     }
