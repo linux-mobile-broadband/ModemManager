@@ -1223,13 +1223,13 @@ dms_get_ids_ready (QmiClientDms *client,
      */
 
     if (qmi_message_dms_get_ids_output_get_imei (output, &str, NULL) &&
-        str[0] != '\0' && str[0] != '0') {
+        str[0] != '\0') {
         g_free (ctx->self->priv->imei);
         ctx->self->priv->imei = g_strdup (str);
     }
 
     if (qmi_message_dms_get_ids_output_get_esn (output, &str, NULL) &&
-        str[0] != '\0' && str[0] != '0') {
+        str[0] != '\0') {
         g_free (ctx->self->priv->esn);
         len = strlen (str);
         if (len == 7)
@@ -1241,7 +1241,7 @@ dms_get_ids_ready (QmiClientDms *client,
     }
 
     if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
-        str[0] != '\0' && str[0] != '0') {
+        str[0] != '\0') {
         g_free (ctx->self->priv->meid);
         len = strlen (str);
         if (len == 14)
