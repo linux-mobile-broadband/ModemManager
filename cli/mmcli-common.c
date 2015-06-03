@@ -1134,7 +1134,7 @@ list_call_ready (MMModemVoice *modem,
     GList *call_list;
     GError *error = NULL;
 
-    call_list = mm_modem_voice_list_call_finish (modem, res, &error);
+    call_list = mm_modem_voice_list_calls_finish (modem, res, &error);
     if (error) {
         g_printerr ("error: couldn't list call at '%s': '%s'\n",
                     mm_modem_voice_get_path (modem),
@@ -1179,10 +1179,10 @@ look_for_call_in_modem (GetVoiceContext *ctx)
         g_debug ("Looking for call '%s' in modem '%s'...",
                  ctx->call_path,
                  mm_object_get_path (ctx->current));
-        mm_modem_voice_list_call (modem,
-                                  ctx->cancellable,
-                                  (GAsyncReadyCallback)list_call_ready,
-                                  ctx);
+        mm_modem_voice_list_calls (modem,
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)list_call_ready,
+                                   ctx);
         g_object_unref (modem);
         return;
     }
@@ -1308,7 +1308,7 @@ mmcli_get_call_sync (GDBusConnection *connection,
         if (!voice)
             continue;
 
-        call_list = mm_modem_voice_list_call_sync (voice, NULL, &error);
+        call_list = mm_modem_voice_list_calls_sync (voice, NULL, &error);
         if (error) {
             g_printerr ("error: couldn't list call at '%s': '%s'\n",
                         mm_modem_voice_get_path (voice),

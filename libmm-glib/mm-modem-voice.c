@@ -90,7 +90,7 @@ typedef struct {
     gchar **call_paths;
     GList *call_objects;
     guint i;
-} ListCallContext;
+} ListCallsContext;
 
 static void
 call_object_list_free (GList *list)
@@ -99,7 +99,7 @@ call_object_list_free (GList *list)
 }
 
 static void
-list_call_context_complete_and_free (ListCallContext *ctx)
+list_call_context_complete_and_free (ListCallsContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
 
@@ -109,23 +109,23 @@ list_call_context_complete_and_free (ListCallContext *ctx)
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
     g_object_ref (ctx->self);
-    g_slice_free (ListCallContext, ctx);
+    g_slice_free (ListCallsContext, ctx);
 }
 
 /**
- * mm_modem_voice_list_call_finish:
+ * mm_modem_voice_list_calls_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_voice_list_call().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_voice_list_calls().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_voice_list_call().
+ * Finishes an operation started with mm_modem_voice_list_calls().
  *
  * Returns: (element-type ModemManager.Call) (transfer full): A list of #MMCall objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
-mm_modem_voice_list_call_finish (MMModemVoice *self,
-                                 GAsyncResult *res,
-                                 GError **error)
+mm_modem_voice_list_calls_finish (MMModemVoice *self,
+                                  GAsyncResult *res,
+                                  GError **error)
 {
     GList *list;
 
@@ -142,12 +142,12 @@ mm_modem_voice_list_call_finish (MMModemVoice *self,
     return g_list_copy (list);
 }
 
-static void create_next_call (ListCallContext *ctx);
+static void create_next_call (ListCallsContext *ctx);
 
 static void
 list_build_object_ready (GDBusConnection *connection,
                          GAsyncResult *res,
-                         ListCallContext *ctx)
+                         ListCallsContext *ctx)
 {
     GError *error = NULL;
     GObject *call;
@@ -181,7 +181,7 @@ list_build_object_ready (GDBusConnection *connection,
 }
 
 static void
-create_next_call (ListCallContext *ctx)
+create_next_call (ListCallsContext *ctx)
 {
     g_async_initable_new_async (MM_TYPE_CALL,
                                 G_PRIORITY_DEFAULT,
@@ -197,7 +197,7 @@ create_next_call (ListCallContext *ctx)
 }
 
 /**
- * mm_modem_voice_list_call:
+ * mm_modem_voice_list_calls:
  * @self: A #MMModemVoice.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
@@ -206,26 +206,26 @@ create_next_call (ListCallContext *ctx)
  * Asynchronously lists the #MMCall objects in the modem.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_voice_list_call_finish() to get the result of the operation.
+ * You can then call mm_modem_voice_list_calls_finish() to get the result of the operation.
  *
- * See mm_modem_voice_list_call_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_voice_list_calls_sync() for the synchronous, blocking version of this method.
  */
 void
-mm_modem_voice_list_call (MMModemVoice *self,
-                          GCancellable *cancellable,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+mm_modem_voice_list_calls (MMModemVoice *self,
+                           GCancellable *cancellable,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
 {
-    ListCallContext *ctx;
+    ListCallsContext *ctx;
 
     g_return_if_fail (MM_IS_MODEM_VOICE (self));
 
-    ctx = g_slice_new0 (ListCallContext);
+    ctx = g_slice_new0 (ListCallsContext);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_modem_voice_list_call);
+                                             mm_modem_voice_list_calls);
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
@@ -244,22 +244,22 @@ mm_modem_voice_list_call (MMModemVoice *self,
 }
 
 /**
- * mm_modem_voice_list_call_sync:
+ * mm_modem_voice_list_calls_sync:
  * @self: A #MMModemVoice.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
  * Synchronously lists the #MMCall objects in the modem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_voice_list_call()
+ * The calling thread is blocked until a reply is received. See mm_modem_voice_list_calls()
  * for the asynchronous version of this method.
  *
  * Returns: (element-type MMCall) (transfer full): A list of #MMCall objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
-mm_modem_voice_list_call_sync (MMModemVoice *self,
-                               GCancellable *cancellable,
-                               GError **error)
+mm_modem_voice_list_calls_sync (MMModemVoice *self,
+                                GCancellable *cancellable,
+                                GError **error)
 {
     GList *call_objects = NULL;
     gchar **call_paths = NULL;
@@ -429,7 +429,7 @@ mm_modem_voice_create_call (MMModemVoice *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    dictionary = (mm_call_properties_get_dictionary (properties));
+    dictionary = mm_call_properties_get_dictionary (properties);
     mm_gdbus_modem_voice_call_create_call (
         MM_GDBUS_MODEM_VOICE (self),
         dictionary,
@@ -466,7 +466,7 @@ mm_modem_voice_create_call_sync (MMModemVoice *self,
 
     g_return_val_if_fail (MM_IS_MODEM_VOICE (self), NULL);
 
-    dictionary = (mm_call_properties_get_dictionary (properties));
+    dictionary = mm_call_properties_get_dictionary (properties);
     mm_gdbus_modem_voice_call_create_call_sync (MM_GDBUS_MODEM_VOICE (self),
                                                 dictionary,
                                                 &call_path,

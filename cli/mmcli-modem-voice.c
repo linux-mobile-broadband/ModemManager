@@ -51,8 +51,8 @@ static gchar *create_str;
 static gchar *delete_str;
 
 static GOptionEntry entries[] = {
-    { "voice-list-call", 0, 0, G_OPTION_ARG_NONE, &list_flag,
-      "List call available in a given modem",
+    { "voice-list-calls", 0, 0, G_OPTION_ARG_NONE, &list_flag,
+      "List calls available in a given modem",
       NULL
     },
     { "voice-create-call", 0, 0, G_OPTION_ARG_STRING, &create_str,
@@ -203,7 +203,7 @@ list_ready (MMModemVoice *modem,
     GList *operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_voice_list_call_finish (modem, result, &error);
+    operation_result = mm_modem_voice_list_calls_finish (modem, result, &error);
     list_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -305,11 +305,11 @@ get_modem_ready (GObject      *source,
 
     /* Request to list call? */
     if (list_flag) {
-        g_debug ("Asynchronously listing call in modem...");
-        mm_modem_voice_list_call (ctx->modem_voice,
-                                  ctx->cancellable,
-                                  (GAsyncReadyCallback)list_ready,
-                                  NULL);
+        g_debug ("Asynchronously listing calls in modem...");
+        mm_modem_voice_list_calls (ctx->modem_voice,
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)list_ready,
+                                   NULL);
         return;
     }
 
@@ -382,7 +382,7 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         GList *result;
 
         g_debug ("Synchronously listing call...");
-        result = mm_modem_voice_list_call_sync (ctx->modem_voice, NULL, &error);
+        result = mm_modem_voice_list_calls_sync (ctx->modem_voice, NULL, &error);
         list_process_reply (result, error);
         return;
     }

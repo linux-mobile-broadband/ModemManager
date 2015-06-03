@@ -82,14 +82,14 @@ MMCall *mm_modem_voice_create_call_sync     (MMModemVoice *self,
                                              GCancellable *cancellable,
                                              GError **error);
 
-void   mm_modem_voice_list_call             (MMModemVoice *self,
+void   mm_modem_voice_list_calls            (MMModemVoice *self,
                                              GCancellable *cancellable,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data);
-GList *mm_modem_voice_list_call_finish      (MMModemVoice *self,
+GList *mm_modem_voice_list_calls_finish     (MMModemVoice *self,
                                              GAsyncResult *res,
                                              GError **error);
-GList *mm_modem_voice_list_call_sync        (MMModemVoice *self,
+GList *mm_modem_voice_list_calls_sync       (MMModemVoice *self,
                                              GCancellable *cancellable,
                                              GError **error);
 
