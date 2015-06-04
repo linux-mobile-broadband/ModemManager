@@ -363,95 +363,95 @@ handle_hangup (MMBaseCall *self,
 }
 
 /*****************************************************************************/
-/* Send tone (DBus call handling) */
+/* Send dtmf (DBus call handling) */
 
 typedef struct {
     MMBaseCall *self;
     MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
-    gchar *tone;
-} HandleSendToneContext;
+    gchar *dtmf;
+} HandleSendDtmfContext;
 
 static void
-handle_send_tone_context_free (HandleSendToneContext *ctx)
+handle_send_dtmf_context_free (HandleSendDtmfContext *ctx)
 {
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free(ctx->tone);
+    g_free(ctx->dtmf);
     g_free (ctx);
 }
 
 static void
-handle_send_tone_ready (MMBaseCall *self,
+handle_send_dtmf_ready (MMBaseCall *self,
                         GAsyncResult *res,
-                        HandleSendToneContext *ctx)
+                        HandleSendDtmfContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_BASE_CALL_GET_CLASS (self)->send_tone_finish (self, res, &error)) {
+    if (!MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
-        mm_gdbus_call_complete_send_tone (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+        mm_gdbus_call_complete_send_dtmf (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
 
-    handle_send_tone_context_free (ctx);
+    handle_send_dtmf_context_free (ctx);
 }
 
 static void
-handle_send_tone_auth_ready (MMBaseModem *modem,
+handle_send_dtmf_auth_ready (MMBaseModem *modem,
                              GAsyncResult *res,
-                             HandleSendToneContext *ctx)
+                             HandleSendDtmfContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_send_tone_context_free (ctx);
+        handle_send_dtmf_context_free (ctx);
         return;
     }
 
     state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
 
     /* Check if we do support doing it */
-    if (!MM_BASE_CALL_GET_CLASS (ctx->self)->send_tone ||
-        !MM_BASE_CALL_GET_CLASS (ctx->self)->send_tone_finish) {
+    if (!MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf ||
+        !MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
-                                               "Sending tone is not supported by this modem");
-        handle_send_tone_context_free (ctx);
+                                               "Sending dtmf is not supported by this modem");
+        handle_send_dtmf_context_free (ctx);
         return;
     }
 
-    /* We can only send_tone when call is in ACTIVE state */
+    /* We can only send_dtmf when call is in ACTIVE state */
     if (state != MM_CALL_STATE_ACTIVE ){
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_FAILED,
-                                               "This call was not active, cannot send tone");
-        handle_send_tone_context_free (ctx);
+                                               "This call was not active, cannot send dtmf");
+        handle_send_dtmf_context_free (ctx);
         return;
     }
 
-    MM_BASE_CALL_GET_CLASS (ctx->self)->send_tone (ctx->self, ctx->tone,
-                                                   (GAsyncReadyCallback)handle_send_tone_ready,
+    MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf (ctx->self, ctx->dtmf,
+                                                   (GAsyncReadyCallback)handle_send_dtmf_ready,
                                                    ctx);
 }
 
 static gboolean
-handle_send_tone (MMBaseCall *self,
+handle_send_dtmf (MMBaseCall *self,
                   GDBusMethodInvocation *invocation,
-                  const gchar *tone)
+                  const gchar *dtmf)
 {
-    HandleSendToneContext *ctx;
+    HandleSendDtmfContext *ctx;
 
-    ctx = g_new0 (HandleSendToneContext, 1);
+    ctx = g_new0 (HandleSendDtmfContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
 
-    ctx->tone = g_strdup(tone);
+    ctx->dtmf = g_strdup(dtmf);
     g_object_get (self,
                   MM_BASE_CALL_MODEM, &ctx->modem,
                   NULL);
@@ -459,7 +459,7 @@ handle_send_tone (MMBaseCall *self,
     mm_base_modem_authorize (ctx->modem,
                              invocation,
                              MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_send_tone_auth_ready,
+                             (GAsyncReadyCallback)handle_send_dtmf_auth_ready,
                              ctx);
     return TRUE;
 }
@@ -508,8 +508,8 @@ call_dbus_export (MMBaseCall *self)
                       G_CALLBACK (handle_hangup),
                       NULL);
     g_signal_connect (self,
-                      "handle-send-tone",
-                      G_CALLBACK (handle_send_tone),
+                      "handle-send-dtmf",
+                      G_CALLBACK (handle_send_dtmf),
                       NULL);
 
 
@@ -559,9 +559,9 @@ mm_base_call_change_state(MMBaseCall *self, MMCallState new_state, MMCallStateRe
                                      reason);
 }
 
-void mm_base_call_received_dtmf  (MMBaseCall *self, gchar *tone)
+void mm_base_call_received_dtmf  (MMBaseCall *self, gchar *dtmf)
 {
-    mm_gdbus_call_emit_tone_received(MM_GDBUS_CALL (self), tone);
+    mm_gdbus_call_emit_dtmf_received(MM_GDBUS_CALL (self), dtmf);
 }
 
 /*****************************************************************************/
@@ -872,10 +872,10 @@ typedef struct {
     MMBaseCall *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
-} CallSendToneContext;
+} CallSendDtmfContext;
 
 static void
-call_send_tone_context_complete_and_free (CallSendToneContext *ctx)
+call_send_dtmf_context_complete_and_free (CallSendDtmfContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -885,7 +885,7 @@ call_send_tone_context_complete_and_free (CallSendToneContext *ctx)
 }
 
 static gboolean
-call_send_tone_finish (MMBaseCall *self,
+call_send_dtmf_finish (MMBaseCall *self,
                        GAsyncResult *res,
                        GError **error)
 {
@@ -893,49 +893,49 @@ call_send_tone_finish (MMBaseCall *self,
 }
 
 static void
-call_send_tone_ready (MMBaseModem *modem,
+call_send_dtmf_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      CallSendToneContext *ctx)
+                      CallSendDtmfContext *ctx)
 {
     GError *error = NULL;
     const gchar *response = NULL;
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
-        mm_dbg ("Couldn't send_tone: '%s'", error->message);
+        mm_dbg ("Couldn't send_dtmf: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
-        call_send_tone_context_complete_and_free (ctx);
+        call_send_dtmf_context_complete_and_free (ctx);
         return;
     }
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    call_send_tone_context_complete_and_free (ctx);
+    call_send_dtmf_context_complete_and_free (ctx);
 }
 
 static void
-call_send_tone (MMBaseCall *self,
-                const gchar *tone,
+call_send_dtmf (MMBaseCall *self,
+                const gchar *dtmf,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    CallSendToneContext *ctx;
+    CallSendDtmfContext *ctx;
     gchar *cmd;
 
     /* Setup the context */
-    ctx = g_new0 (CallSendToneContext, 1);
+    ctx = g_new0 (CallSendDtmfContext, 1);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             call_send_tone);
+                                             call_send_dtmf);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("AT+VTS=%c", tone[0]);
+    cmd = g_strdup_printf ("AT+VTS=%c", dtmf[0]);
     mm_base_modem_at_command (ctx->modem,
                               cmd,
                               3,
                               FALSE,
-                              (GAsyncReadyCallback)call_send_tone_ready,
+                              (GAsyncReadyCallback)call_send_dtmf_ready,
                               ctx);
 
     g_free (cmd);
@@ -1200,8 +1200,8 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     klass->hangup_finish    = call_hangup_finish;
     klass->delete           = call_delete;
     klass->delete_finish    = call_delete_finish;
-    klass->send_tone        = call_send_tone;
-    klass->send_tone_finish = call_send_tone_finish;
+    klass->send_dtmf        = call_send_dtmf;
+    klass->send_dtmf_finish = call_send_dtmf_finish;
 
 
     properties[PROP_CONNECTION] =

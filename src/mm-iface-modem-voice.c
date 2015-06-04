@@ -196,7 +196,7 @@ mm_iface_modem_voice_network_hangup (MMIfaceModemVoice *self)
 
 gboolean
 mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
-                                    gchar *tone)
+                                    gchar *dtmf)
 {
     gboolean    updated = FALSE;
     MMCallList  *list   = NULL;
@@ -206,7 +206,7 @@ mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
                   NULL);
 
     if (list) {
-        updated = mm_call_list_send_dtmf_to_active_calls (list, tone);
+        updated = mm_call_list_send_dtmf_to_active_calls (list, dtmf);
     }
 
     return updated;

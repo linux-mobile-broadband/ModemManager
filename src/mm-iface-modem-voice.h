@@ -127,7 +127,7 @@ gboolean    mm_iface_modem_voice_call_dialing_to_ringing        (MMIfaceModemVoi
 gboolean    mm_iface_modem_voice_call_ringing_to_active         (MMIfaceModemVoice *self);
 gboolean    mm_iface_modem_voice_network_hangup                 (MMIfaceModemVoice *self);
 gboolean    mm_iface_modem_voice_received_dtmf                  (MMIfaceModemVoice *self,
-                                                                 gchar *tone);
+                                                                 gchar *dtmf);
 
 /* Look for a new valid multipart reference */
 guint8 mm_iface_modem_voice_get_local_multipart_reference (MMIfaceModemVoice *self,

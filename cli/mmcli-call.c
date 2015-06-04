@@ -49,7 +49,7 @@ static gboolean info_flag; /* set when no action found */
 static gboolean start_flag;
 static gboolean accept_flag;
 static gboolean hangup_flag;
-static gchar *tone_request;
+static gchar *dtmf_request;
 
 static GOptionEntry entries[] = {
     { "start", 0, 0, G_OPTION_ARG_NONE, &start_flag,
@@ -64,7 +64,7 @@ static GOptionEntry entries[] = {
       "Hangup the call",
       NULL,
     },
-    { "send-tone", 0, 0, G_OPTION_ARG_STRING, &tone_request,
+    { "send-dtmf", 0, 0, G_OPTION_ARG_STRING, &dtmf_request,
        "Send specified DTMF tone",
        "[0-9A-D*#]"
     },
@@ -99,7 +99,7 @@ mmcli_call_options_enabled (void)
     n_actions = (start_flag +
                  accept_flag +
                  hangup_flag +
-                 !!tone_request);
+                 !!dtmf_request);
 
     if (n_actions == 0 && mmcli_get_common_call_string ()) {
         /* default to info */
@@ -245,28 +245,28 @@ hangup_ready (MMCall        *call,
 }
 
 static void
-send_tone_process_reply (gboolean      result,
+send_dtmf_process_reply (gboolean      result,
                          const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't send_tone to call: '%s'\n",
+        g_printerr ("error: couldn't send_dtmf to call: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully send tone\n");
+    g_print ("successfully send dtmf\n");
 }
 
 static void
-send_tone_ready (MMCall        *call,
+send_dtmf_ready (MMCall        *call,
                  GAsyncResult *result,
                  gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_call_send_tone_finish (call, result, &error);
-    send_tone_process_reply (operation_result, error);
+    operation_result = mm_call_send_dtmf_finish (call, result, &error);
+    send_dtmf_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -312,12 +312,12 @@ get_call_ready (GObject      *source,
         return;
     }
 
-    /* Requesting to send tone the call? */
-    if (tone_request) {
-        mm_call_send_tone (ctx->call,
-                           tone_request,
+    /* Requesting to send dtmf the call? */
+    if (dtmf_request) {
+        mm_call_send_dtmf (ctx->call,
+                           dtmf_request,
                            ctx->cancellable,
-                           (GAsyncReadyCallback)send_tone_ready,
+                           (GAsyncReadyCallback)send_dtmf_ready,
                            NULL);
         return;
     }
@@ -399,15 +399,15 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
         return;
     }
 
-    /* Requesting to send a tone? */
-    if (tone_request) {
+    /* Requesting to send a dtmf? */
+    if (dtmf_request) {
         gboolean operation_result;
 
-        operation_result = mm_call_send_tone_sync (ctx->call,
-                                                   tone_request,
+        operation_result = mm_call_send_dtmf_sync (ctx->call,
+                                                   dtmf_request,
                                                    NULL,
                                                    &error);
-        send_tone_process_reply (operation_result, error);
+        send_dtmf_process_reply (operation_result, error);
         return;
     }
 

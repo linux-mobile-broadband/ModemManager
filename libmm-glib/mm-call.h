@@ -115,18 +115,18 @@ gboolean           mm_call_hangup_sync      (MMCall *self,
                                              GError **error);
 
 
-void               mm_call_send_tone        (MMCall *self,
-                                             const gchar *tone,
+void               mm_call_send_dtmf        (MMCall *self,
+                                             const gchar *dtmf,
                                              GCancellable *cancellable,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data);
 
-gboolean           mm_call_send_tone_finish (MMCall *self,
+gboolean           mm_call_send_dtmf_finish (MMCall *self,
                                              GAsyncResult *res,
                                              GError **error);
 
-gboolean           mm_call_send_tone_sync   (MMCall *self,
-                                             const gchar *tone,
+gboolean           mm_call_send_dtmf_sync   (MMCall *self,
+                                             const gchar *dtmf,
                                              GCancellable *cancellable,
                                              GError **error);
 

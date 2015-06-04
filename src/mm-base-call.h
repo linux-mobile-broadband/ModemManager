@@ -72,11 +72,11 @@ struct _MMBaseCallClass {
                                 GError **error);
 
     /* Send a DTMF tone */
-    void     (* send_tone)        (MMBaseCall *self,
-                                   const gchar *tone,
+    void     (* send_dtmf)        (MMBaseCall *self,
+                                   const gchar *dtmf,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
-    gboolean (* send_tone_finish) (MMBaseCall *self,
+    gboolean (* send_dtmf_finish) (MMBaseCall *self,
                                    GAsyncResult *res,
                                    GError **error);
 
@@ -104,7 +104,7 @@ void         mm_base_call_change_state   (MMBaseCall *self,
                                           MMCallState new_state,
                                           MMCallStateReason reason);
 void         mm_base_call_received_dtmf  (MMBaseCall *self,
-                                          gchar *tone);
+                                          gchar *dtmf);
 
 void         mm_base_call_delete         (MMBaseCall *self,
                                           GAsyncReadyCallback callback,

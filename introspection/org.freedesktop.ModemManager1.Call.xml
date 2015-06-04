@@ -48,25 +48,25 @@
     <method name="Hangup"/>
 
     <!--
-        SendTone:
-        @tone: Tone identifier. (Admitter chars are [0-9A-D*#])
+        SendDtmf:
+        @dtmf: DTMF tone identifier. (Admitter chars are [0-9A-D*#])
 
         Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem).
 
         Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link>.
     -->
-    <method name="SendTone">
-      <arg name="tone" type="s" direction="in"/>
+    <method name="SendDtmf">
+      <arg name="dtmf" type="s" direction="in"/>
     </method>
 
     <!--
-        ToneReceived:
-        @tone: Tone identifier. (Admitter chars are [0-9A-D*#])
+        DtmfReceived:
+        @dtmf: DTMF tone identifier. (Admitter chars are [0-9A-D*#])
 
         Emitted when a DTMF tone is received (only on supported modem)
     -->
-    <signal name="ToneReceived">
-      <arg name="tone" type="s" />
+    <signal name="DtmfReceived">
+      <arg name="dtmf" type="s" />
     </signal>
 
     <!--
