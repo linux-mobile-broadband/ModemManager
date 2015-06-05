@@ -1444,22 +1444,13 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_simple_async_result_take_error (simple, error);
     } else if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
-        /* Fatal, so that we mark the modem unusable.*/
+        /* Internal and uim-uninitialized errors are retry-able before being fatal */
         if (g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INTERNAL) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
                              QMI_PROTOCOL_ERROR_UIM_UNINITIALIZED)) {
-            /* This error won't force a pin check retry */
-            g_simple_async_result_set_error (simple,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
-                                             "SIM failure: %s",
-                                             error->message);
-            g_error_free (error);
-        }
-        /* Internal errors are retry-able before being fatal */
-        else if (g_error_matches (error,
-                                  QMI_PROTOCOL_ERROR,
-                                  QMI_PROTOCOL_ERROR_INTERNAL)) {
             g_simple_async_result_set_error (simple,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_RETRY,
