@@ -101,6 +101,8 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *pdpdeact_regex;
     GRegex *ndisend_regex;
     GRegex *rfswitch_regex;
+    GRegex *position_regex;
+    GRegex *posend_regex;
 
     FeatureSupport ndisdup_support;
     FeatureSupport rfswitch_support;
@@ -133,7 +135,7 @@ get_at_port_list (MMBroadbandModemHuawei *self)
         out = g_list_append (out, port);
 
     /* Secondary */
-    port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
     if (port)
         out = g_list_append (out, port);
 
@@ -3634,6 +3636,14 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             port,
             self->priv->rfswitch_regex,
             NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->position_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->posend_regex,
+            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, (GDestroyNotify)g_object_unref);
@@ -3745,6 +3755,10 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->rfswitch_regex = g_regex_new ("\\r\\n\\^RFSWITCH:.+\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->position_regex = g_regex_new ("\\r\\n\\^POSITION:.+\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->posend_regex = g_regex_new ("\\r\\n\\^POSEND:.+\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
@@ -3780,6 +3794,8 @@ finalize (GObject *object)
     g_regex_unref (self->priv->pdpdeact_regex);
     g_regex_unref (self->priv->ndisend_regex);
     g_regex_unref (self->priv->rfswitch_regex);
+    g_regex_unref (self->priv->position_regex);
+    g_regex_unref (self->priv->posend_regex);
 
     if (self->priv->syscfg_supported_modes)
         g_array_unref (self->priv->syscfg_supported_modes);
