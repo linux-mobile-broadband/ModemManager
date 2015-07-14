@@ -1,4 +1,18 @@
 
+ModemManager 1.4.10
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * QMI: retry unlock check on 'UimUninitialized' errors.
+ * QMI: fix '0' prefixed IMEI/ESN/MEID.
+ * Huawei: fix secondary port unsolicited message handling.
+ * Huawei: ignore ^POSEND and ^POSITION unsolicited messages.
+ * Blacklist: ignore devices from Posnet Polska S.A.
+ * Blacklist: ignore Palm M5xx devices.
+
+
 ModemManager 1.4.8
 -------------------------------------------
 This is a new bugfix release of ModemManager.
