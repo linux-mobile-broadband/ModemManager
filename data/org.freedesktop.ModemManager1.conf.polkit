@@ -3,7 +3,8 @@
  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
 <busconfig>
   <policy context="default">
-    <deny send_destination="org.freedesktop.ModemManager1"/>
+    <deny send_destination="org.freedesktop.ModemManager1"
+          send_type="method_call"/>
 
     <!-- Methods listed here are explicitly allowed or PolicyKit protected.
          The rest are restricted to root for security.
