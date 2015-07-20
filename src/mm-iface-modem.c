@@ -2872,9 +2872,7 @@ update_lock_info_context_step (UpdateLockInfoContext *ctx)
     case UPDATE_LOCK_INFO_CONTEXT_STEP_LOCK:
         /* Don't re-ask if already known */
         if (ctx->lock == MM_MODEM_LOCK_UNKNOWN) {
-            /* If we're already unlocked, we're done */
-            if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
+            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
                     ctx->self,
