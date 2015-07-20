@@ -3025,16 +3025,11 @@ update_lock_info_context_step (UpdateLockInfoContext *ctx)
         /* Don't re-ask if already known */
         if (ctx->lock == MM_MODEM_LOCK_UNKNOWN) {
             /* If we're already unlocked, we're done */
-            if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
-                internal_load_unlock_required (
-                    ctx->self,
-                    (GAsyncReadyCallback)internal_load_unlock_required_ready,
-                    ctx);
-                return;
-            }
-
-            /* Just assume that no lock is required */
-            ctx->lock = MM_MODEM_LOCK_NONE;
+            internal_load_unlock_required (
+                ctx->self,
+                (GAsyncReadyCallback)internal_load_unlock_required_ready,
+                ctx);
+            return;
         }
 
         /* Fall down to next step */
