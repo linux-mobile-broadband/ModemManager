@@ -436,6 +436,7 @@ mm_call_send_dtmf_finish (MMCall *self,
 /**
  * mm_call_send_dtmf:
  * @self: A #MMCall.
+ * @dtmf: the DMTF tone.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -468,6 +469,7 @@ mm_call_send_dtmf (MMCall *self,
 /**
  * mm_call_send_dtmf_sync:
  * @self: A #MMCall.
+ * @dtmf: the DMTF tone.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
