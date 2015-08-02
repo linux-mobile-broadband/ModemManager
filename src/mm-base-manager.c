@@ -727,9 +727,7 @@ handle_set_profile (MmGdbusTest *skeleton,
     /* Create device and keep it listed in the Manager */
     physdev = g_strdup_printf ("/virtual/%s", id);
     device = mm_device_virtual_new (physdev, TRUE);
-    g_hash_table_insert (self->priv->devices,
-                         g_strdup (physdev),
-                         device);
+    g_hash_table_insert (self->priv->devices, physdev, device);
 
     /* Grab virtual ports */
     mm_device_virtual_grab_ports (device, (const gchar **)ports);
