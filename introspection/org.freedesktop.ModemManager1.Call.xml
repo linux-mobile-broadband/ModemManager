@@ -42,8 +42,7 @@
 
         Hangup the active call.
 
-        Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link> and direction is
-        <link linkend="MM-CALL-DIRECTION-TERMINATED:CAPS"><constant>MM_CALL_DIRECTION_TERMINATED</constant></link>.
+        Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link>.
     -->
     <method name="Hangup"/>
 
