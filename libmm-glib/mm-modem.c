@@ -1129,7 +1129,7 @@ mm_modem_get_power_state (MMModem *self)
 /*****************************************************************************/
 
 /**
- * mm_modem_get_access_technology:
+ * mm_modem_get_access_technologies:
  * @self: A #MMModem.
  *
  * Gets the current network access technology used by the #MMModem to communicate

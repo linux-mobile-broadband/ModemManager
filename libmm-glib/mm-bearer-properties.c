@@ -309,7 +309,7 @@ mm_bearer_properties_get_number (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
- * mm_simple_connect_properties_set_rm_protocol:
+ * mm_bearer_properties_set_rm_protocol:
  * @self: a #MMBearerProperties.
  * @protocol: a #MMModemCdmaRmProtocol.
  *
@@ -412,8 +412,8 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 /**
  * mm_bearer_properties_consume_string:
  * @self: a #MMBearerProperties
- * @key:
- * @value:
+ * @key: the key string.
+ * @value: the value string.
  * @error: (allow-none): Return location for error or %NULL.
  *
  * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
@@ -530,7 +530,7 @@ mm_bearer_properties_new_from_string (const gchar *str,
 /**
  * mm_bearer_properties_consume_variant:
  * @properties: a #MMBearerProperties
- * @key:
+ * @key: the key string.
  * @value: a #GVariant
  * @error: (allow-none): Return location for error or %NULL.
  *

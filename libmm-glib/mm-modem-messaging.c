@@ -530,7 +530,7 @@ create_sms_ready (MMModemMessaging *self,
 }
 
 /**
- * mm_modem_messaging_create_sms:
+ * mm_modem_messaging_create:
  * @self: A #MMModemMessaging.
  * @properties: A ##MMSmsProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
