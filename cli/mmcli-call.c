@@ -61,12 +61,12 @@ static GOptionEntry entries[] = {
       NULL,
     },
     { "hangup", 0, 0, G_OPTION_ARG_NONE, &hangup_flag,
-      "Hangup the call",
+      "Hang up the call",
       NULL,
     },
     { "send-dtmf", 0, 0, G_OPTION_ARG_STRING, &dtmf_request,
-       "Send specified DTMF tone",
-       "[0-9A-D*#]"
+      "Send specified DTMF tone",
+      "[0-9A-D*#]"
     },
     { NULL }
 };
@@ -165,7 +165,7 @@ print_call_info (MMCall *call)
 
 static void
 start_process_reply (gboolean      result,
-                    const GError *error)
+                     const GError *error)
 {
     if (!result) {
         g_printerr ("error: couldn't start the call: '%s'\n",
@@ -173,13 +173,13 @@ start_process_reply (gboolean      result,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully start the call\n");
+    g_print ("successfully started the call\n");
 }
 
 static void
 start_ready (MMCall        *call,
-            GAsyncResult *result,
-            gpointer      nothing)
+             GAsyncResult *result,
+             gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
@@ -192,7 +192,7 @@ start_ready (MMCall        *call,
 
 static void
 accept_process_reply (gboolean      result,
-                        const GError *error)
+                      const GError *error)
 {
     if (!result) {
         g_printerr ("error: couldn't accept the call: '%s'\n",
@@ -205,8 +205,8 @@ accept_process_reply (gboolean      result,
 
 static void
 accept_ready (MMCall        *call,
-            GAsyncResult *result,
-            gpointer      nothing)
+              GAsyncResult *result,
+              gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
@@ -219,21 +219,21 @@ accept_ready (MMCall        *call,
 
 static void
 hangup_process_reply (gboolean      result,
-                    const GError *error)
+                      const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't hangup the call: '%s'\n",
+        g_printerr ("error: couldn't hang up the call: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully hungup'd the call\n");
+    g_print ("successfully hung up the call\n");
 }
 
 static void
 hangup_ready (MMCall        *call,
-            GAsyncResult *result,
-            gpointer      nothing)
+              GAsyncResult *result,
+              gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
@@ -249,7 +249,7 @@ send_dtmf_process_reply (gboolean      result,
                          const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't send_dtmf to call: '%s'\n",
+        g_printerr ("error: couldn't send dtmf to call: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
@@ -258,7 +258,7 @@ send_dtmf_process_reply (gboolean      result,
 }
 
 static void
-send_dtmf_ready (MMCall        *call,
+send_dtmf_ready (MMCall       *call,
                  GAsyncResult *result,
                  gpointer      nothing)
 {
@@ -273,8 +273,8 @@ send_dtmf_ready (MMCall        *call,
 
 static void
 get_call_ready (GObject      *source,
-               GAsyncResult *result,
-               gpointer      none)
+                GAsyncResult *result,
+                gpointer      none)
 {
     ctx->call = mmcli_get_call_finish (result,
                                        &ctx->manager,
@@ -359,7 +359,7 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
     /* Setup operation timeout: 2 minutes */
     g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (ctx->call), 2 * 60 * 1000);
 
-    /* Request to get info from CALL? */
+    /* Request to get info from call? */
     if (info_flag) {
         g_debug ("Printing call info...");
         print_call_info (ctx->call);
