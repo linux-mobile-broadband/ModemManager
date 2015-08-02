@@ -119,6 +119,10 @@
         <title>OMA support</title>
         <xi:include href="xml/mm-modem-oma.xml"/>
       </section>
+      <section>
+        <title>Voice support</title>
+        <xi:include href="xml/mm-modem-voice.xml"/>
+      </section>
     </chapter>
 
     <chapter>
@@ -137,6 +141,12 @@
       <title>The SMS object</title>
       <xi:include href="xml/mm-sms.xml"/>
       <xi:include href="xml/mm-sms-properties.xml"/>
+    </chapter>
+
+    <chapter>
+      <title>The Call object</title>
+      <xi:include href="xml/mm-call.xml"/>
+      <xi:include href="xml/mm-call-properties.xml"/>
     </chapter>
 
   </part>
@@ -192,6 +202,10 @@
     <xi:include href="xml/MmGdbusModemOmaProxy.xml"/>
     <xi:include href="xml/MmGdbusModemOmaSkeleton.xml"/>
 
+    <xi:include href="xml/MmGdbusModemVoice.xml"/>
+    <xi:include href="xml/MmGdbusModemVoiceProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemVoiceSkeleton.xml"/>
+
     <!--xi:include href="xml/MmGdbusModemContacts.xml"/>
     <xi:include href="xml/MmGdbusModemContactsProxy.xml"/>
     <xi:include href="xml/MmGdbusModemContactsSkeleton.xml"/-->
@@ -212,6 +226,9 @@
     <xi:include href="xml/MmGdbusSmsProxy.xml"/>
     <xi:include href="xml/MmGdbusSmsSkeleton.xml"/>
 
+    <xi:include href="xml/MmGdbusCall.xml"/>
+    <xi:include href="xml/MmGdbusCallProxy.xml"/>
+    <xi:include href="xml/MmGdbusCallSkeleton.xml"/>
   </part>
 
   <chapter id="object-tree">
