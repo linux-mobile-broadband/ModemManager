@@ -4245,6 +4245,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->conn_regex);
     g_regex_unref (self->priv->cend_regex);
     g_regex_unref (self->priv->ddtmf_regex);
+    g_regex_unref (self->priv->cschannelinfo_regex);
 
     if (self->priv->syscfg_supported_modes)
         g_array_unref (self->priv->syscfg_supported_modes);
