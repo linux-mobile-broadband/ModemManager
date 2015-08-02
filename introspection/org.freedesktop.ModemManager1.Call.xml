@@ -49,7 +49,7 @@
 
     <!--
         SendDtmf:
-        @dtmf: DTMF tone identifier. (Admitter chars are [0-9A-D*#])
+        @dtmf: DTMF tone identifier [0-9A-D*#].
 
         Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem).
 
@@ -61,7 +61,7 @@
 
     <!--
         DtmfReceived:
-        @dtmf: DTMF tone identifier. (Admitter chars are [0-9A-D*#])
+        @dtmf: DTMF tone identifier [0-9A-D*#].
 
         Emitted when a DTMF tone is received (only on supported modem)
     -->
