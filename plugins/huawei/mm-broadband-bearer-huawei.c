@@ -67,6 +67,7 @@ typedef enum {
     CONNECT_3GPP_CONTEXT_STEP_FIRST = 0,
     CONNECT_3GPP_CONTEXT_STEP_NDISDUP,
     CONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY,
+    CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG,
     CONNECT_3GPP_CONTEXT_STEP_LAST
 } Connect3gppContextStep;
 
@@ -80,6 +81,7 @@ typedef struct {
     Connect3gppContextStep step;
     guint check_count;
     guint failed_ndisstatqry_count;
+    MMBearerIpConfig *ipv4_config;
 } Connect3gppContext;
 
 static void
@@ -92,6 +94,7 @@ connect_3gpp_context_complete_and_free (Connect3gppContext *ctx)
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
 
+    g_clear_object (&ctx->ipv4_config);
     g_clear_object (&ctx->data);
     g_clear_object (&ctx->primary);
 
@@ -110,6 +113,88 @@ connect_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void connect_3gpp_context_step (Connect3gppContext *ctx);
+
+static void
+connect_dhcp_check_ready (MMBaseModem *modem,
+                          GAsyncResult *res,
+                          MMBroadbandBearerHuawei *self)
+{
+    Connect3gppContext *ctx;
+    const gchar *response;
+    GError *error = NULL;
+
+    ctx = self->priv->connect_pending;
+    g_assert (ctx != NULL);
+
+    /* Balance refcount */
+    g_object_unref (self);
+
+    /* Default to automatic/DHCP addressing */
+    ctx->ipv4_config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+
+    /* Cache IPv4 details if available, otherwise clients will have to use DHCP */
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (response) {
+        guint address = 0;
+        guint prefix = 0;
+        guint gateway = 0;
+        guint dns1 = 0;
+        guint dns2 = 0;
+
+        if (mm_huawei_parse_dhcp_response (response,
+                                           &address,
+                                           &prefix,
+                                           &gateway,
+                                           &dns1,
+                                           &dns2,
+                                           &error)) {
+            GInetAddress *addr;
+            gchar *strarr[3] = { NULL, NULL, NULL };
+            guint n = 0;
+            gchar *str;
+
+            mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_STATIC);
+
+            addr = g_inet_address_new_from_bytes ((guint8 *)&address, G_SOCKET_FAMILY_IPV4);
+            str = g_inet_address_to_string (addr);
+            mm_bearer_ip_config_set_address (ctx->ipv4_config, str);
+            g_free (str);
+            g_object_unref (addr);
+
+            /* Netmask */
+            mm_bearer_ip_config_set_prefix (ctx->ipv4_config, prefix);
+
+            /* Gateway */
+            addr = g_inet_address_new_from_bytes ((guint8 *)&gateway, G_SOCKET_FAMILY_IPV4);
+            str = g_inet_address_to_string (addr);
+            mm_bearer_ip_config_set_gateway (ctx->ipv4_config, str);
+            g_free (str);
+            g_object_unref (addr);
+
+            /* DNS */
+            if (dns1) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&dns1, G_SOCKET_FAMILY_IPV4);
+                strarr[n++] = g_inet_address_to_string (addr);
+                g_object_unref (addr);
+            }
+            if (dns2) {
+                addr = g_inet_address_new_from_bytes ((guint8 *)&dns2, G_SOCKET_FAMILY_IPV4);
+                strarr[n++] = g_inet_address_to_string (addr);
+                g_object_unref (addr);
+            }
+            mm_bearer_ip_config_set_dns (ctx->ipv4_config, (const gchar **)strarr);
+            g_free (strarr[0]);
+            g_free (strarr[1]);
+        } else {
+            mm_dbg ("Unexpected response to ^DHCP command: %s", error->message);
+        }
+    }
+
+    g_clear_error (&error);
+    ctx->step++;
+    connect_3gpp_context_step (ctx);
+}
 
 static gboolean
 connect_retry_ndisstatqry_check_cb (MMBroadbandBearerHuawei *self)
@@ -380,21 +465,30 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
                                        g_object_ref (ctx->self));
         return;
 
+    case CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG:
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       "^DHCP?",
+                                       3,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)connect_dhcp_check_ready,
+                                       g_object_ref (ctx->self));
+        return;
+
     case CONNECT_3GPP_CONTEXT_STEP_LAST:
         /* Clear context */
         ctx->self->priv->connect_pending = NULL;
 
         /* Setup result */
         {
-            MMBearerIpConfig *ipv4_config;
-
-            ipv4_config = mm_bearer_ip_config_new ();
-            mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
-            g_simple_async_result_set_op_res_gpointer (
-                ctx->result,
-                mm_bearer_connect_result_new (ctx->data, ipv4_config, NULL),
-                (GDestroyNotify)mm_bearer_connect_result_unref);
-            g_object_unref (ipv4_config);
+            if (ctx->ipv4_config) {
+                g_simple_async_result_set_op_res_gpointer (
+                    ctx->result,
+                    mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
+                    (GDestroyNotify)mm_bearer_connect_result_unref);
+            }
         }
 
         connect_3gpp_context_complete_and_free (ctx);

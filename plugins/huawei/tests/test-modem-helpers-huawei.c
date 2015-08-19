@@ -16,6 +16,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <locale.h>
+#include <arpa/inet.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -135,6 +136,55 @@ test_ndisstatqry (void)
         g_assert (ipv6_available == ndisstatqry_tests[i].expected_ipv6_available);
         if (ipv6_available)
             g_assert (ipv6_connected == ndisstatqry_tests[i].expected_ipv6_connected);
+    }
+}
+
+/*****************************************************************************/
+/* Test ^DHCP responses */
+
+typedef struct {
+    const gchar *str;
+    const gchar *expected_addr;
+    guint expected_prefix;
+    const gchar *expected_gateway;
+    const gchar *expected_dns1;
+    const gchar *expected_dns2;
+} DhcpTest;
+
+static const DhcpTest dhcp_tests[] = {
+    { "^DHCP:a3ec5c64,f8ffffff,a1ec5c64,a1ec5c64,2200b10a,74bba80a,236800,236800\r\n",
+      "100.92.236.163", 29, "100.92.236.161", "10.177.0.34", "10.168.187.116" },
+    { "^DHCP: 1010A0A,FCFFFFFF,2010A0A,2010A0A,0,0,150000000,150000000\r\n",
+      "10.10.1.1", 30, "10.10.1.2", "0.0.0.0", "0.0.0.0" },
+    { "^DHCP: CCDB080A,F8FFFFFF,C9DB080A,C9DB080A,E67B59C0,E77B59C0,85600,85600\r\n",
+      "10.8.219.204", 29, "10.8.219.201", "192.89.123.230", "192.89.123.231" },
+    { NULL }
+};
+
+static void
+test_dhcp (void)
+{
+    guint i;
+
+    for (i = 0; dhcp_tests[i].str; i++) {
+        GError *error = NULL;
+        guint addr, prefix, gateway, dns1, dns2;
+
+        g_assert (mm_huawei_parse_dhcp_response (
+                      dhcp_tests[i].str,
+                      &addr,
+                      &prefix,
+                      &gateway,
+                      &dns1,
+                      &dns2,
+                      &error) == TRUE);
+        g_assert_no_error (error);
+
+        g_assert_cmpstr (inet_ntoa (*((struct in_addr *) &addr)), ==, dhcp_tests[i].expected_addr);
+        g_assert_cmpint (prefix, ==, dhcp_tests[i].expected_prefix);
+        g_assert_cmpstr (inet_ntoa (*((struct in_addr *) &gateway)), ==, dhcp_tests[i].expected_gateway);
+        g_assert_cmpstr (inet_ntoa (*((struct in_addr *) &dns1)), ==, dhcp_tests[i].expected_dns1);
+        g_assert_cmpstr (inet_ntoa (*((struct in_addr *) &dns2)), ==, dhcp_tests[i].expected_dns2);
     }
 }
 
@@ -1171,6 +1221,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/huawei/ndisstatqry", test_ndisstatqry);
+    g_test_add_func ("/MM/huawei/dhcp", test_dhcp);
     g_test_add_func ("/MM/huawei/sysinfo", test_sysinfo);
     g_test_add_func ("/MM/huawei/sysinfoex", test_sysinfoex);
     g_test_add_func ("/MM/huawei/prefmode", test_prefmode);

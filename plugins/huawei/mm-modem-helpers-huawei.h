@@ -29,6 +29,16 @@ gboolean mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                                GError **error);
 
 /*****************************************************************************/
+/* ^DHCP response parser */
+gboolean mm_huawei_parse_dhcp_response (const char *reply,
+                                        guint *out_address,
+                                        guint *out_prefix,
+                                        guint *out_gateway,
+                                        guint *out_dns1,
+                                        guint *out_dns2,
+                                        GError **error);
+
+/*****************************************************************************/
 /* ^SYSINFO response parser */
 gboolean mm_huawei_parse_sysinfo_response (const char *reply,
                                            guint *out_srv_status,
