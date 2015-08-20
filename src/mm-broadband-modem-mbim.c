@@ -173,8 +173,12 @@ device_caps_query_ready (MbimDevice *device,
         mask = 0;
         if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
             mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
+
+#if 0  /* Disable until we add MBIM CDMA support */
         if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
             mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+#endif
+
         if (ctx->self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
             mask |= MM_MODEM_CAPABILITY_LTE;
         g_simple_async_result_set_op_res_gpointer (ctx->result,
