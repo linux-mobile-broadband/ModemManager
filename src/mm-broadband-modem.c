@@ -5892,7 +5892,9 @@ modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem *self,
                                                            GSimpleAsyncResult *final_result)
 {
     GError *inner_error = NULL;
-    MMPortSerialAt *secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    MMPortSerialAt *secondary;
+
+    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Since the secondary is not required, we don't propagate the error anywhere */
     mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
@@ -5916,8 +5918,11 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
                                                          GSimpleAsyncResult *final_result)
 {
     GError *inner_error = NULL;
-    MMPortSerialAt *primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    MMPortSerialAt *secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
     if (inner_error) {
@@ -5932,7 +5937,7 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
 
     /* Try to enable unsolicited events for secondary port */
     if (secondary) {
-        mm_dbg ("(%s) Enabling messaging unsolicited events on modem secondary",
+        mm_dbg ("(%s) Enabling messaging unsolicited events on secondary port",
                 mm_port_get_device (MM_PORT (secondary)));
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
@@ -5943,10 +5948,11 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
             NULL,
             (GAsyncReadyCallback)modem_messaging_enable_unsolicited_events_secondary_ready,
             final_result);
-    } else {
-        g_simple_async_result_complete (final_result);
-        g_object_unref (final_result);
+        return;
     }
+
+    g_simple_async_result_complete (final_result);
+    g_object_unref (final_result);
 }
 
 static void
@@ -5954,14 +5960,18 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
-    GSimpleAsyncResult *result = g_simple_async_result_new (G_OBJECT (self),
-                                                            callback,
-                                                            user_data,
-                                                            modem_messaging_enable_unsolicited_events);
-    MMPortSerialAt *primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    GSimpleAsyncResult *result;
+    MMPortSerialAt *primary;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_enable_unsolicited_events);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events for primary port */
-    mm_dbg ("(%s) Enabling messaging unsolicited events on modem primary",
+    mm_dbg ("(%s) Enabling messaging unsolicited events on primary port",
             mm_port_get_device (MM_PORT (primary)));
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
