@@ -5886,9 +5886,10 @@ modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem *self,
     /* Since the secondary is not required, we don't propagate the error anywhere */
     mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
     if (inner_error) {
-        mm_warn("(%s) Unable to enable messaging unsolicited events on modem secondary",
-                mm_port_get_device (MM_PORT (secondary)));
-        g_error_free(inner_error);
+        mm_dbg ("(%s) Unable to enable messaging unsolicited events on modem secondary: %s",
+                mm_port_get_device (MM_PORT (secondary)),
+                inner_error->message);
+        g_error_free (inner_error);
     }
 
     mm_dbg ("(%s) Messaging unsolicited events enabled on secondary",
