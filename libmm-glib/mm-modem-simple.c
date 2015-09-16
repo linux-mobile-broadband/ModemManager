@@ -294,7 +294,7 @@ mm_modem_simple_disconnect_finish (MMModemSimple *self,
 /**
  * mm_modem_simple_disconnect:
  * @self: A #MMModemSimple.
- * @bearer: Path of the bearer to disconnect, or %NULL to disconnect all connected bearers.
+ * @bearer: (allow-none): Path of the bearer to disconnect, or %NULL to disconnect all connected bearers.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -325,7 +325,7 @@ mm_modem_simple_disconnect (MMModemSimple *self,
 /**
  * mm_modem_simple_disconnect_sync:
  * @self: A #MMModemSimple.
- * @bearer: Path of the bearer to disconnect, or %NULL to disconnect all connected bearers.
+ * @bearer: (allow-none): Path of the bearer to disconnect, or %NULL to disconnect all connected bearers.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
