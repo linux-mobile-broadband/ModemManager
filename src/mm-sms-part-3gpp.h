@@ -22,8 +22,6 @@
 
 #include "mm-sms-part.h"
 
-#define MM_SMS_PART_3GPP_MAX_PDU_LEN 344
-
 MMSmsPart *mm_sms_part_3gpp_new_from_pdu  (guint index,
                                            const gchar *hexpdu,
                                            GError **error);

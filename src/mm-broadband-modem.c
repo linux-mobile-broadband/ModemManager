@@ -5614,8 +5614,7 @@ sms_part_ready (MMBroadbandModem *self,
                 SmsPartContext *ctx)
 {
     MMSmsPart *part;
-    gint rv, status, tpdu_len;
-    gchar pdu[MM_SMS_PART_3GPP_MAX_PDU_LEN + 1];
+    MM3gppPduInfo *info;
     const gchar *response;
     GError *error = NULL;
 
@@ -5633,19 +5632,16 @@ sms_part_ready (MMBroadbandModem *self,
         return;
     }
 
-    rv = sscanf (response, "+CMGR: %d,,%d %" G_STRINGIFY (MM_SMS_PART_3GPP_MAX_PDU_LEN) "s",
-                 &status, &tpdu_len, pdu);
-    if (rv != 3) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Failed to parse CMGR response (parsed %d items)", rv);
-        mm_warn ("Couldn't retrieve SMS part: '%s'", error->message);
+    info = mm_3gpp_parse_cmgr_read_response (response, ctx->idx, &error);
+    if (!info) {
+        mm_warn ("Couldn't parse SMS part: '%s'",
+                 error->message);
         g_simple_async_result_take_error (ctx->result, error);
         sms_part_context_complete_and_free (ctx);
         return;
     }
 
-    part = mm_sms_part_3gpp_new_from_pdu (ctx->idx, pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, &error);
     if (part) {
         mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -5659,6 +5655,7 @@ sms_part_ready (MMBroadbandModem *self,
     }
 
     /* All done */
+    mm_3gpp_pdu_info_free (info);
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     sms_part_context_complete_and_free (ctx);
 }
