@@ -196,6 +196,67 @@ test_cmgl_response_pantech_multiple (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CMGR responses */
+
+static void
+test_cmgr_response (const gchar *str,
+                    const MM3gppPduInfo *expected)
+{
+    MM3gppPduInfo *info;
+    GError *error = NULL;
+
+    info = mm_3gpp_parse_cmgr_read_response (str, 0, &error);
+    g_assert_no_error (error);
+    g_assert (info != NULL);
+
+    /* Ignore index, it is not included in CMGR response */
+    g_assert_cmpint (info->status, ==, expected->status);
+    g_assert_cmpstr (info->pdu, ==, expected->pdu);
+}
+
+static void
+test_cmgr_response_generic (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGR: 1,,147 07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07";
+
+    const MM3gppPduInfo expected = {
+        .index = 0,
+        .status = 1,
+        .pdu = "07914306073011F00405812261F700003130916191314095C27"
+        "4D96D2FBBD3E437280CB2BEC961F3DB5D76818EF2F0381D9E83E06F39A8CC2E9FD372F"
+        "77BEE0249CBE37A594E0E83E2F532085E2F93CB73D0B93CA7A7DFEEB01C447F93DF731"
+        "0BD3E07CDCB727B7A9C7ECF41E432C8FC96B7C32079189E26874179D0F8DD7E93C3A0B"
+        "21B246AA641D637396C7EBBCB22D0FD7E77B5D376B3AB3C07"
+    };
+
+    test_cmgr_response (str, &expected);
+}
+
+/* Telit HE910 places empty quotation marks in the <alpha> field and a CR+LF
+ * before the PDU */
+static void
+test_cmgr_response_telit (void *f, gpointer d)
+{
+    const gchar *str =
+        "+CMGR: 0,\"\",50\r\n07916163838428F9040B916121021021F7000051905141642"
+        "20A23C4B0BCFD5E8740C4B0BCFD5E83C26E3248196687C9A0301D440DBBC3677918";
+
+    const MM3gppPduInfo expected = {
+        .index = 0,
+        .status = 0,
+        .pdu = "07916163838428F9040B916121021021F7000051905141642"
+        "20A23C4B0BCFD5E8740C4B0BCFD5E83C26E3248196687C9A0301D440DBBC3677918"
+    };
+
+    test_cmgr_response (str, &expected);
+}
+
+/*****************************************************************************/
 /* Test COPS responses */
 
 static void
@@ -2567,6 +2628,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_generic_multiple, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmgl_response_pantech_multiple, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cmgr_response_generic, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmgr_response_telit, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_supported_mode_filter, NULL));
 

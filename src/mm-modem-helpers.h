@@ -184,10 +184,15 @@ typedef struct {
     gint status;
     gchar *pdu;
 } MM3gppPduInfo;
+void   mm_3gpp_pdu_info_free           (MM3gppPduInfo *info);
 void   mm_3gpp_pdu_info_list_free      (GList *info_list);
 GList *mm_3gpp_parse_pdu_cmgl_response (const gchar *str,
                                         GError **error);
 
+/* AT+CMGR (Read message) response parser */
+MM3gppPduInfo *mm_3gpp_parse_cmgr_read_response (const gchar *reply,
+                                                 guint index,
+                                                 GError **error);
 
 /* Additional 3GPP-specific helpers */
 

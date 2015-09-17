@@ -1161,6 +1161,77 @@ mm_3gpp_parse_cmgf_test_response (const gchar *reply,
 
 /*************************************************************************/
 
+MM3gppPduInfo *
+mm_3gpp_parse_cmgr_read_response (const gchar *reply,
+                                  guint index,
+                                  GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    gint count;
+    gint status;
+    gchar *pdu;
+    MM3gppPduInfo *info = NULL;
+
+    /* +CMGR: <stat>,<alpha>,<length>(whitespace)<pdu> */
+    /* The <alpha> and <length> fields are matched, but not currently used */
+    r = g_regex_new ("\\+CMGR:\\s*(\\d+)\\s*,([^,]*),\\s*(\\d+)\\s*([^\\r\\n]*)", 0, 0, NULL);
+    g_assert (r);
+
+    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse CMGR read result: response didn't match '%s'",
+                     reply);
+        goto done;
+    }
+
+    /* g_match_info_get_match_count includes match #0 */
+    if ((count = g_match_info_get_match_count (match_info)) != 5) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to match CMGR fields (matched %d) '%s'",
+                     count,
+                     reply);
+        goto done;
+    }
+
+    if (!mm_get_int_from_match_info (match_info, 1, &status)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to extract CMGR status field '%s'",
+                     reply);
+        goto done;
+    }
+
+
+    pdu = mm_get_string_unquoted_from_match_info (match_info, 4);
+    if (!pdu) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to extract CMGR pdu field '%s'",
+                     reply);
+        goto done;
+    }
+
+    info = g_new0 (MM3gppPduInfo, 1);
+    info->index = index;
+    info->status = status;
+    info->pdu = pdu;
+
+done:
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return info;
+}
+
+/*************************************************************************/
+
 static MMSmsStorage
 storage_from_str (const gchar *str)
 {
@@ -1658,7 +1729,7 @@ done:
 
 /*************************************************************************/
 
-static void
+void
 mm_3gpp_pdu_info_free (MM3gppPduInfo *info)
 {
     g_free (info->pdu);
