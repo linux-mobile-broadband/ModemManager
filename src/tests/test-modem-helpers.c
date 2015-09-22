@@ -212,6 +212,8 @@ test_cmgr_response (const gchar *str,
     /* Ignore index, it is not included in CMGR response */
     g_assert_cmpint (info->status, ==, expected->status);
     g_assert_cmpstr (info->pdu, ==, expected->pdu);
+
+    mm_3gpp_pdu_info_free (info);
 }
 
 static void
