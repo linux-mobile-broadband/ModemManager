@@ -1235,7 +1235,7 @@ dms_get_ids_ready (QmiClientDms *client,
         else if (len == 8)
             ctx->self->priv->esn = g_strdup (str);
         else
-            g_warn_if_reached ();
+            g_debug ("Invalid ESN reported: '%s' (unexpected length)", str);
     }
 
     if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
@@ -1245,7 +1245,7 @@ dms_get_ids_ready (QmiClientDms *client,
         if (len == 14)
             ctx->self->priv->meid = g_strdup (str);
         else
-            g_warn_if_reached ();
+            g_debug ("Invalid MEID reported: '%s' (unexpected length)", str);
     }
 
     if (ctx->self->priv->imei)
