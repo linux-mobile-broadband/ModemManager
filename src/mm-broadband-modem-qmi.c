@@ -4276,10 +4276,10 @@ process_common_info (QmiNasServiceStatus service_status,
         *mm_operator_id = g_malloc (7);
         memcpy (*mm_operator_id, mcc, 3);
         if (mnc[2] == 0xFF) {
-            memcpy (*mm_operator_id, mnc, 2);
+            memcpy (&((*mm_operator_id)[3]), mnc, 2);
             (*mm_operator_id)[5] = '\0';
         } else {
-            memcpy (*mm_operator_id, mnc, 3);
+            memcpy (&((*mm_operator_id)[3]), mnc, 3);
             (*mm_operator_id)[6] = '\0';
         }
     }
