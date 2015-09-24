@@ -2210,54 +2210,97 @@ load_signal_quality_finish (MMIfaceModem *self,
 #if defined WITH_NEWEST_QMI_COMMANDS
 
 static gboolean
-signal_info_get_quality (MMBroadbandModemQmi *self,
-                         QmiMessageNasGetSignalInfoOutput *output,
-                         gint8 *out_quality)
+common_signal_info_get_quality (gint8 cdma1x_rssi,
+                                gint8 evdo_rssi,
+                                gint8 gsm_rssi,
+                                gint8 wcdma_rssi,
+                                gint8 lte_rssi,
+                                gint8 *out_quality,
+                                MMModemAccessTechnology *out_act)
 {
     gint8 rssi_max = -125;
-    gint8 rssi;
+    QmiNasRadioInterface signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
 
     g_assert (out_quality != NULL);
+    g_assert (out_act != NULL);
 
     /* We do not report per-technology signal quality, so just get the highest
-     * one of the ones reported. */
+     * one of the ones reported. TODO: When several technologies are in use, if
+     * the indication only contains the data of the one which passed a threshold
+     * value, we'll need to have an internal cache of per-technology values, in
+     * order to report always the one with the maximum value. */
 
-    if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
-        mm_dbg ("RSSI (CDMA): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
-            rssi_max = MAX (rssi, rssi_max);
+    if (cdma1x_rssi < 0) {
+        mm_dbg ("RSSI (CDMA): %d dBm", cdma1x_rssi);
+        if (qmi_dbm_valid (cdma1x_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X)) {
+            rssi_max = MAX (cdma1x_rssi, rssi_max);
+            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_CDMA_1X;
+        }
     }
 
-    if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
-        mm_dbg ("RSSI (HDR): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
-            rssi_max = MAX (rssi, rssi_max);
+    if (evdo_rssi < 0) {
+        mm_dbg ("RSSI (HDR): %d dBm", evdo_rssi);
+        if (qmi_dbm_valid (evdo_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO)) {
+            rssi_max = MAX (evdo_rssi, rssi_max);
+            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO;
+        }
     }
 
-    if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
-        mm_dbg ("RSSI (GSM): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
-            rssi_max = MAX (rssi, rssi_max);
+    if (gsm_rssi < 0) {
+        mm_dbg ("RSSI (GSM): %d dBm", gsm_rssi);
+        if (qmi_dbm_valid (gsm_rssi, QMI_NAS_RADIO_INTERFACE_GSM)) {
+            rssi_max = MAX (gsm_rssi, rssi_max);
+            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_GSM;
+        }
     }
 
-    if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
-        mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
-            rssi_max = MAX (rssi, rssi_max);
+    if (wcdma_rssi < 0) {
+        mm_dbg ("RSSI (WCDMA): %d dBm", wcdma_rssi);
+        if (qmi_dbm_valid (wcdma_rssi, QMI_NAS_RADIO_INTERFACE_UMTS)) {
+            rssi_max = MAX (wcdma_rssi, rssi_max);
+            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_UMTS;
+        }
     }
 
-    if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
-        mm_dbg ("RSSI (LTE): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
-            rssi_max = MAX (rssi, rssi_max);
+    if (lte_rssi < 0) {
+        mm_dbg ("RSSI (LTE): %d dBm", lte_rssi);
+        if (qmi_dbm_valid (lte_rssi, QMI_NAS_RADIO_INTERFACE_LTE)) {
+            rssi_max = MAX (lte_rssi, rssi_max);
+            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_LTE;
+        }
     }
 
-    /* This RSSI comes as negative dBms */
-    *out_quality = STRENGTH_TO_QUALITY (rssi_max);
+    if (rssi_max < 0 && rssi_max > -125) {
+        /* This RSSI comes as negative dBms */
+        *out_quality = STRENGTH_TO_QUALITY (rssi_max);
+        *out_act = mm_modem_access_technology_from_qmi_radio_interface (signal_info_radio_interface);
 
-    mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
+        mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
+        return TRUE;
+    }
 
-    return (rssi_max > -125);
+    return FALSE;
+}
+
+static gboolean
+signal_info_get_quality (MMBroadbandModemQmi *self,
+                         QmiMessageNasGetSignalInfoOutput *output,
+                         gint8 *out_quality,
+                         MMModemAccessTechnology *out_act)
+{
+    gint8 cdma1x_rssi = 0;
+    gint8 evdo_rssi = 0;
+    gint8 gsm_rssi = 0;
+    gint8 umts_rssi = 0;
+    gint8 lte_rssi = 0;
+
+    qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
+    qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &evdo_rssi, NULL, NULL, NULL, NULL);
+    qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &gsm_rssi, NULL);
+    qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
+    qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
+
+    return common_signal_info_get_quality (cdma1x_rssi, evdo_rssi, gsm_rssi, wcdma_rssi, lte_rssi, out_quality, out_act);
 }
 
 static void
@@ -6037,55 +6080,33 @@ signal_info_indication_cb (QmiClientNas *client,
                            QmiIndicationNasSignalInfoOutput *output,
                            MMBroadbandModemQmi *self)
 {
-    gint8 rssi_max = -125;
-    gint8 rssi;
+    gint8 cdma1x_rssi = 0;
+    gint8 evdo_rssi = 0;
+    gint8 gsm_rssi = 0;
+    gint8 umts_rssi = 0;
+    gint8 lte_rssi = 0;
     guint8 quality;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
-    /* We do not report per-technology signal quality, so just get the highest
-     * one of the ones reported. TODO: When several technologies are in use, if
-     * the indication only contains the data of the one which passed a threshold
-     * value, we'll need to have an internal cache of per-technology values, in
-     * order to report always the one with the maximum value. */
+    qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
+    qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &evdo_rssi, NULL, NULL, NULL, NULL);
+    qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &gsm_rssi, NULL);
+    qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
+    qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
 
-    if (qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &rssi, NULL, NULL)) {
-        mm_dbg ("RSSI (CDMA): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
-            rssi_max = MAX (rssi, rssi_max);
-    }
-
-    if (qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
-        mm_dbg ("RSSI (HDR): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
-            rssi_max = MAX (rssi, rssi_max);
-    }
-
-    if (qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &rssi, NULL)) {
-        mm_dbg ("RSSI (GSM): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_GSM))
-            rssi_max = MAX (rssi, rssi_max);
-    }
-
-    if (qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &rssi, NULL, NULL)) {
-        mm_dbg ("RSSI (WCDMA): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
-            rssi_max = MAX (rssi, rssi_max);
-    }
-
-    if (qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &rssi, NULL, NULL, NULL, NULL)) {
-        mm_dbg ("RSSI (LTE): %d dBm", rssi);
-        if (qmi_dbm_valid (rssi, QMI_NAS_RADIO_INTERFACE_LTE))
-            rssi_max = MAX (rssi, rssi_max);
-    }
-
-    if (rssi_max < 0) {
-        /* This RSSI comes as negative dBms */
-        quality = STRENGTH_TO_QUALITY (rssi_max);
-
-        mm_dbg ("RSSI: %d dBm --> %u%%", rssi_max, quality);
-
+    if (common_signal_info_get_quality (cdma1x_rssi,
+                                        evdo_rssi,
+                                        gsm_rssi,
+                                        wcdma_rssi,
+                                        lte_rssi,
+                                        &quality,
+                                        &access_technology)) {
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
-    } else
-        mm_dbg ("Ignoring invalid signal strength: %d dBm", rssi_max);
+        mm_iface_modem_update_access_technologies (
+            MM_IFACE_MODEM (self),
+            access_technology,
+            (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
+    }
 }
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
