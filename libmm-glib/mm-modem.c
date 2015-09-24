@@ -2830,7 +2830,7 @@ mm_modem_set_current_bands_sync (MMModem *self,
  *
  * Finishes an operation started with mm_modem_get_sim().
  *
- * Returns: (transfer full): a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
  */
 MMSim *
 mm_modem_get_sim_finish (MMModem *self,
@@ -2845,7 +2845,9 @@ mm_modem_get_sim_finish (MMModem *self,
         return NULL;
 
     sim = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    return (sim ? (MMSim *)g_object_ref (sim) : NULL);
+    g_return_val_if_fail (sim != NULL, NULL);
+
+    return MM_SIM (g_object_ref (sim));
 }
 
 static void
@@ -2903,8 +2905,11 @@ mm_modem_get_sim (MMModem *self,
                                         mm_modem_get_sim);
 
     sim_path = mm_modem_get_sim_path (self);
-    if (!sim_path) {
-        g_simple_async_result_set_op_res_gpointer (result, NULL, NULL);
+    if (!sim_path || g_str_equal (sim_path, "/")) {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_NOT_FOUND,
+                                         "No SIM object available");
         g_simple_async_result_complete_in_idle (result);
         g_object_unref (result);
         return;
@@ -2934,7 +2939,7 @@ mm_modem_get_sim (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_get_sim()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full): a #MMSim or #NULL if none available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
  */
 MMSim *
 mm_modem_get_sim_sync (MMModem *self,
@@ -2947,8 +2952,13 @@ mm_modem_get_sim_sync (MMModem *self,
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
 
     sim_path = mm_modem_get_sim_path (self);
-    if (!sim_path)
+    if (!sim_path || g_str_equal (sim_path, "/")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "No SIM object available");
         return NULL;
+    }
 
     sim = g_initable_new (MM_TYPE_SIM,
                           cancellable,
