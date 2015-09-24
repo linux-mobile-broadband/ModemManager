@@ -24,6 +24,7 @@
 
 #include "mm-log.h"
 #include "mm-plugin-sierra.h"
+#include "mm-broadband-modem.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
