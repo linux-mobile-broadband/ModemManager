@@ -985,11 +985,6 @@ mm_modem_capability_to_qmi_radio_technology_preference (MMModemCapability caps)
 {
     QmiNasRadioTechnologyPreference qmi = 0;
 
-    /* It is not expected to have a modem supporting 3GPP and 3GPP2 at the same
-     * time but not supporting SSP. */
-    g_warn_if_fail (caps & MM_MODEM_CAPABILITY_GSM_UMTS &&
-                    caps & MM_MODEM_CAPABILITY_CDMA_EVDO);
-
     if (caps & MM_MODEM_CAPABILITY_GSM_UMTS) {
         qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP;
         qmi |= QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM;
