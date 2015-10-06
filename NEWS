@@ -1,4 +1,29 @@
 
+ModemManager 1.4.12
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * MBM: implemented GPS support for Ericsson modems.
+ * MBM: enabled GPS port for H5321gw and HS2350.
+ * Telit: added udev rules for HE910/UE910/UL865.
+ * Telit: implemented dynamic port identification.
+ * QMI: expose IP config details in bearer object even if DHCP is requested.
+ * QMI: retrieve MM_MODEM_3GPP_FACILITY_SIM.
+ * MBIM: CDMA capabilities disabled by default (not yet supported).
+ * libmm-glib: if empty path (/) given, no SIM object will be created.
+ * libmm-glib: added missing introspection annotations to disconnect().
+ * Core: don't check the cache when explicitly asking for required unlocks.
+ * Core: initialize SMS messaging support also in the secondary port.
+ * Core: new +CGMR parser which covers the Telit HE910 specific format.
+ * Core: new AT-based generic implementation for the Time interface.
+ * Core: fix reporting DENIED state in 3GPP modems.
+ * Policy: remove rule which was preventing us from receiving signals.
+ * Blacklist: ignored MediaTek preloader.
+ * and some other minor fixes...
+
+
 ModemManager 1.4.10
 -------------------------------------------
 This is a new bugfix release of ModemManager.
