@@ -60,7 +60,6 @@ HTML_IMAGES = \
 	$(NULL)
 
 content_files = \
-	$(HTML_IMAGES) \
 	$(NULL)
 
 if ENABLE_GTK_DOC
