@@ -54,12 +54,7 @@ HTML_IMAGES = \
 	$(LOGOS_PNG) \
 	$(NULL)
 
-#  Note that PNG files are also added in content_files so that
-#  the documentation is not built before the PNGs.
-content_files = \
-	$(HTML_IMAGES) \
-	$(NULL)
-
+content_files =
 expand_content_files = \
 	ModemManager-overview.xml \
 	ModemManager-dbus-reference.xml \
