@@ -4196,21 +4196,22 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
                              mnc);
     }
 
-    /* Get 3GPP location LAC and CI */
-    lac = 0;
-    cid = 0;
-    if (response_output) {
-        qmi_message_nas_get_serving_system_output_get_lac_3gpp (response_output, &lac, NULL);
-        qmi_message_nas_get_serving_system_output_get_cid_3gpp (response_output, &cid, NULL);
-    } else {
-        qmi_indication_nas_serving_system_output_get_lac_3gpp (indication_output, &lac, NULL);
-        qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL);
-    }
-
     /* Report new registration states */
     mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state);
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
-    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
+
+    /* Get 3GPP location LAC and CI */
+    lac = 0;
+    cid = 0;
+    if ((response_output &&
+         qmi_message_nas_get_serving_system_output_get_lac_3gpp (response_output, &lac, NULL) &&
+         qmi_message_nas_get_serving_system_output_get_cid_3gpp (response_output, &cid, NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_serving_system_output_get_lac_3gpp (indication_output, &lac, NULL) &&
+         qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL))) {
+        /* Only update info in the interface if we get something */
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
+    }
 
     /* Note: don't update access technologies with the ones retrieved here; they
      * are not really the 'current' access technologies */
