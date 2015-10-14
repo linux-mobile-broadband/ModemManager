@@ -1551,7 +1551,6 @@ typedef enum {
     ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION_EVENTS,
     ENABLING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS,
-    ENABLING_STEP_RUN_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -1690,25 +1689,6 @@ enable_unsolicited_registration_events_ready (MMIfaceModem3gpp *self,
 }
 
 static void
-run_all_registration_checks_ready (MMIfaceModem3gpp *self,
-                                   GAsyncResult *res,
-                                   EnablingContext *ctx)
-{
-    GError *error = NULL;
-
-    mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Go on to next step */
-    ctx->step++;
-    interface_enabling_step (ctx);
-}
-
-static void
 interface_enabling_step (EnablingContext *ctx)
 {
     /* Don't run new steps if we're cancelled */
@@ -1781,13 +1761,6 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
-
-    case ENABLING_STEP_RUN_REGISTRATION_CHECKS:
-        mm_iface_modem_3gpp_run_registration_checks (
-            ctx->self,
-            (GAsyncReadyCallback)run_all_registration_checks_ready,
-            ctx);
-        return;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */

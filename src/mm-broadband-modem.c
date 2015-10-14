@@ -8185,6 +8185,59 @@ enabling_started (MMBroadbandModem *self,
 }
 
 /*****************************************************************************/
+/* First registration checks */
+
+static void
+modem_3gpp_run_registration_checks_ready (MMIfaceModem3gpp *self,
+                                          GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error)) {
+        mm_warn ("Initial 3GPP registration check failed: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+    mm_dbg ("Initial 3GPP registration checks finished");
+}
+
+static void
+modem_cdma_run_registration_checks_ready (MMIfaceModemCdma *self,
+                                          GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_cdma_run_registration_checks_finish (self, res, &error)) {
+        mm_warn ("Initial CDMA registration check failed: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+    mm_dbg ("Initial CDMA registration checks finished");
+}
+
+static gboolean
+schedule_initial_registration_checks_cb (MMBroadbandModem *self)
+{
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
+        mm_iface_modem_3gpp_run_registration_checks (MM_IFACE_MODEM_3GPP (self),
+                                                     (GAsyncReadyCallback) modem_3gpp_run_registration_checks_ready,
+                                                     NULL);
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
+        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (self),
+                                                     (GAsyncReadyCallback) modem_cdma_run_registration_checks_ready,
+                                                     NULL);
+    /* We got a full reference, so balance it out here */
+    g_object_unref (self);
+    return FALSE;
+}
+
+static void
+schedule_initial_registration_checks (MMBroadbandModem *self)
+{
+    g_idle_add ((GSourceFunc) schedule_initial_registration_checks_cb, g_object_ref (self));
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -8866,6 +8919,16 @@ enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_LAST:
         ctx->enabled = TRUE;
+
+        /* Once all interfaces have been enabled, trigger registration checks in
+         * 3GPP and CDMA modems. We have to do this at this point so that e.g.
+         * location interface gets proper registration related info reported.
+         *
+         * We do this in an idle so that we don't mess up the logs at this point
+         * with the new requests being triggered.
+         */
+        schedule_initial_registration_checks (ctx->self);
+
         /* All enabled without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         enabling_context_complete_and_free (ctx);
