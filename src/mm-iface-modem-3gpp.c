@@ -1052,6 +1052,10 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
                                      gulong cell_id)
 {
     MMModem3gppRegistrationState state;
+    RegistrationStateContext *ctx;
+
+    ctx = get_registration_state_context (self);
+    g_assert (ctx);
 
     if (!MM_IS_IFACE_MODEM_LOCATION (self))
         return;
@@ -1061,8 +1065,11 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
                   NULL);
 
     /* Even if registration state didn't change, report access technology or
-     * location updates, but only if something valid to report */
-    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+     * location updates, but only if something valid to report. For the case
+     * where we're registering (loading current registration info after a state
+     * change to registered), we also allow LAC/CID updates. */
+    if (ctx->reloading_registration_info ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
         state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
         if (location_area_code > 0 && cell_id > 0)
             mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
