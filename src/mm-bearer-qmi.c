@@ -222,6 +222,7 @@ static QmiMessageWdsStartNetworkInput *
 build_start_network_input (ConnectContext *ctx)
 {
     QmiMessageWdsStartNetworkInput *input;
+    gboolean has_user, has_password;
 
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
     g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
@@ -231,12 +232,21 @@ build_start_network_input (ConnectContext *ctx)
     if (ctx->apn && ctx->apn[0])
         qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
 
-    if (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
-        qmi_message_wds_start_network_input_set_authentication_preference (input, ctx->auth, NULL);
+    has_user     = (ctx->user     && ctx->user[0]);
+    has_password = (ctx->password && ctx->password[0]);
 
-        if (ctx->user)
+    /* Need to add auth info? */
+    if (has_user || has_password || ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
+        /* We define a valid auth preference if we have either user or password, or a explicit
+         * request for one to be set. If no explicit one was given, default to PAP. */
+        qmi_message_wds_start_network_input_set_authentication_preference (
+            input,
+            (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) ? ctx->auth : QMI_WDS_AUTHENTICATION_PAP,
+            NULL);
+
+        if (has_user)
             qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
-        if (ctx->password)
+        if (has_password)
             qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
     }
 
@@ -1032,8 +1042,8 @@ _connect (MMBaseBearer *self,
         g_object_unref (properties);
 
         if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            mm_dbg ("Using default (PAP) authentication method");
-            ctx->auth = QMI_WDS_AUTHENTICATION_PAP;
+            /* We'll default to PAP later if needed */
+            ctx->auth = QMI_WDS_AUTHENTICATION_NONE;
         } else if (auth & (MM_BEARER_ALLOWED_AUTH_PAP |
                            MM_BEARER_ALLOWED_AUTH_CHAP |
                            MM_BEARER_ALLOWED_AUTH_NONE)) {
