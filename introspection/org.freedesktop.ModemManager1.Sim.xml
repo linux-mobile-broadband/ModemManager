@@ -68,8 +68,7 @@
     <!--
         SimIdentifier:
 
-        An obfuscated SIM identifier based on the IMSI or the
-        ICCID.
+        The ICCID of the SIM card.
 
         This may be available before the PIN has been entered depending
         on the device itself.
