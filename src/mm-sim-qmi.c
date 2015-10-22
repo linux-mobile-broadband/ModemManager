@@ -231,6 +231,175 @@ load_imsi (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* Load operator identifier */
+
+static gboolean
+get_home_network (QmiClientNas *client,
+                  GAsyncResult *res,
+                  guint16      *out_mcc,
+                  guint16      *out_mnc,
+                  gchar        **out_operator_name,
+                  GError       **error)
+{
+    QmiMessageNasGetHomeNetworkOutput *output = NULL;
+    gboolean success = FALSE;
+
+    output = qmi_client_nas_get_home_network_finish (client, res, error);
+    if (!output) {
+        g_prefix_error (error, "QMI operation failed: ");
+    } else if (!qmi_message_nas_get_home_network_output_get_result (output, error)) {
+        g_prefix_error (error, "Couldn't get home network: ");
+    } else {
+        const gchar *name = NULL;
+
+        qmi_message_nas_get_home_network_output_get_home_network (
+            output,
+            out_mcc,
+            out_mnc,
+            &name,
+            NULL);
+        if (out_operator_name)
+            *out_operator_name = g_strdup (name);
+        success = TRUE;
+    }
+
+    if (output)
+        qmi_message_nas_get_home_network_output_unref (output);
+
+    return success;
+}
+
+static gchar *
+load_operator_identifier_finish (MMBaseSim *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    gchar *operator_identifier;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    operator_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded operator identifier: %s", operator_identifier);
+    return operator_identifier;
+}
+
+static void
+load_operator_identifier_ready (QmiClientNas *client,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *simple)
+{
+    guint16 mcc, mnc;
+    GError *error = NULL;
+
+    if (get_home_network (client, res, &mcc, &mnc, NULL, &error)) {
+        gchar *operator_id;
+
+        operator_id = g_strdup_printf ("%" G_GUINT16_FORMAT "%" G_GUINT16_FORMAT, mcc, mnc);
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   operator_id,
+                                                   (GDestroyNotify)g_free);
+    } else {
+        g_simple_async_result_take_error (simple, error);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_operator_identifier (MMBaseSim *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_operator_identifier);
+
+    mm_dbg ("loading SIM operator identifier...");
+    qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
+                                     NULL,
+                                     5,
+                                     NULL,
+                                     (GAsyncReadyCallback)load_operator_identifier_ready,
+                                     result);
+}
+
+/*****************************************************************************/
+/* Load operator name */
+
+static gchar *
+load_operator_name_finish (MMBaseSim *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    gchar *operator_name;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    operator_name = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded operator name: %s", operator_name);
+    return operator_name;
+}
+
+static void
+load_operator_name_ready (QmiClientNas *client,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    gchar *operator_name = NULL;
+    GError *error = NULL;
+
+    if (get_home_network (client, res, NULL, NULL, &operator_name, &error)) {
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   operator_name,
+                                                   (GDestroyNotify)g_free);
+    } else {
+        g_simple_async_result_take_error (simple, error);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_operator_name (MMBaseSim *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_operator_name);
+
+    mm_dbg ("loading SIM operator name...");
+    qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
+                                     NULL,
+                                     5,
+                                     NULL,
+                                     (GAsyncReadyCallback)load_operator_name_ready,
+                                     result);
+}
+
+/*****************************************************************************/
 /* Send PIN */
 
 static GError *
@@ -614,10 +783,10 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     base_sim_class->load_imsi = load_imsi;
     base_sim_class->load_imsi_finish = load_imsi_finish;
-    base_sim_class->load_operator_identifier = NULL;
-    base_sim_class->load_operator_identifier_finish = NULL;
-    base_sim_class->load_operator_name = NULL;
-    base_sim_class->load_operator_name_finish = NULL;
+    base_sim_class->load_operator_identifier = load_operator_identifier;
+    base_sim_class->load_operator_identifier_finish = load_operator_identifier_finish;
+    base_sim_class->load_operator_name = load_operator_name;
+    base_sim_class->load_operator_name_finish = load_operator_name_finish;
     base_sim_class->send_pin = send_pin;
     base_sim_class->send_pin_finish = send_pin_finish;
     base_sim_class->send_puk = send_puk;
