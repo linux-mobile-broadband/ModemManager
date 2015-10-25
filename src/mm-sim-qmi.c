@@ -293,11 +293,18 @@ load_operator_identifier_ready (QmiClientNas *client,
     GError *error = NULL;
 
     if (get_home_network (client, res, &mcc, &mnc, NULL, &error)) {
-        gchar *operator_id;
+        GString *aux;
 
-        operator_id = g_strdup_printf ("%" G_GUINT16_FORMAT "%" G_GUINT16_FORMAT, mcc, mnc);
+        aux = g_string_new ("");
+        /* MCC always 3 digits */
+        g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mcc);
+        /* Guess about MNC, if < 100 assume it's 2 digits, no PCS info here */
+        if (mnc >= 100)
+            g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
+        else
+            g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
         g_simple_async_result_set_op_res_gpointer (simple,
-                                                   operator_id,
+                                                   g_string_free (aux, FALSE),
                                                    (GDestroyNotify)g_free);
     } else {
         g_simple_async_result_take_error (simple, error);
