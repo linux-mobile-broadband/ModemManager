@@ -238,6 +238,7 @@ get_home_network (QmiClientNas *client,
                   GAsyncResult *res,
                   guint16      *out_mcc,
                   guint16      *out_mnc,
+                  gboolean     *out_mnc_with_pcs,
                   gchar        **out_operator_name,
                   GError       **error)
 {
@@ -260,6 +261,26 @@ get_home_network (QmiClientNas *client,
             NULL);
         if (out_operator_name)
             *out_operator_name = g_strdup (name);
+
+        if (out_mnc_with_pcs) {
+            gboolean is_3gpp;
+            gboolean mnc_includes_pcs_digit;
+
+            if (qmi_message_nas_get_home_network_output_get_home_network_3gpp_mnc (
+                    output,
+                    &is_3gpp,
+                    &mnc_includes_pcs_digit,
+                    NULL) &&
+                is_3gpp &&
+                mnc_includes_pcs_digit) {
+                /* MNC should include PCS digit */
+                *out_mnc_with_pcs = TRUE;
+            } else {
+                /* We default to NO PCS digit, unless of course the MNC is already > 99 */
+                *out_mnc_with_pcs = FALSE;
+            }
+        }
+
         success = TRUE;
     }
 
@@ -290,16 +311,17 @@ load_operator_identifier_ready (QmiClientNas *client,
                                 GSimpleAsyncResult *simple)
 {
     guint16 mcc, mnc;
+    gboolean mnc_with_pcs;
     GError *error = NULL;
 
-    if (get_home_network (client, res, &mcc, &mnc, NULL, &error)) {
+    if (get_home_network (client, res, &mcc, &mnc, &mnc_with_pcs, NULL, &error)) {
         GString *aux;
 
         aux = g_string_new ("");
         /* MCC always 3 digits */
         g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mcc);
         /* Guess about MNC, if < 100 assume it's 2 digits, no PCS info here */
-        if (mnc >= 100)
+        if (mnc >= 100 || mnc_with_pcs)
             g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
         else
             g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
@@ -367,7 +389,7 @@ load_operator_name_ready (QmiClientNas *client,
     gchar *operator_name = NULL;
     GError *error = NULL;
 
-    if (get_home_network (client, res, NULL, NULL, &operator_name, &error)) {
+    if (get_home_network (client, res, NULL, NULL, NULL, &operator_name, &error)) {
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    operator_name,
                                                    (GDestroyNotify)g_free);
