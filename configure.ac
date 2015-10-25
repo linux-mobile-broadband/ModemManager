@@ -266,13 +266,15 @@ dnl-----------------------------------------------------------------------------
 dnl MBIM support (enabled by default)
 dnl
 
+LIBMBIM_VERSION=1.11.1
+
 AC_ARG_WITH(mbim, AS_HELP_STRING([--without-mbim], [Build without MBIM support]), [], [with_mbim=yes])
 AM_CONDITIONAL(WITH_MBIM, test "x$with_mbim" = "xyes")
 case $with_mbim in
     yes)
-        PKG_CHECK_MODULES(MBIM, [mbim-glib >= 1.11.1], [have_mbim=yes],[have_mbim=no])
+        PKG_CHECK_MODULES(MBIM, [mbim-glib >= $LIBMBIM_VERSION], [have_mbim=yes],[have_mbim=no])
         if test "x$have_mbim" = "xno"; then
-            AC_MSG_ERROR([Couldn't find libmbim-glib. Install it, or otherwise configure using --without-mbim to disable MBIM support.])
+            AC_MSG_ERROR([Couldn't find libmbim-glib >= $LIBMBIM_VERSION. Install it, or otherwise configure using --without-mbim to disable MBIM support.])
         else
             AC_DEFINE(WITH_MBIM, 1, [Define if you want MBIM support])
             AC_SUBST(MBIM_CFLAGS)
@@ -287,13 +289,16 @@ esac
 dnl-----------------------------------------------------------------------------
 dnl QMI support (enabled by default)
 dnl
+
+LIBQMI_VERSION=1.13.5
+
 AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
 AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
 case $with_qmi in
     yes)
-        PKG_CHECK_MODULES(QMI, [qmi-glib >= 1.13.5], [have_qmi=yes],[have_qmi=no])
+        PKG_CHECK_MODULES(QMI, [qmi-glib >= $LIBQMI_VERSION], [have_qmi=yes],[have_qmi=no])
         if test "x$have_qmi" = "xno"; then
-            AC_MSG_ERROR([Couldn't find libqmi-glib. Install it, or otherwise configure using --without-qmi to disable QMI support.])
+            AC_MSG_ERROR([Couldn't find libqmi-glib >= $LIBQMI_VERSION. Install it, or otherwise configure using --without-qmi to disable QMI support.])
         else
             AC_DEFINE(WITH_QMI, 1, [Define if you want QMI support])
             AC_SUBST(QMI_CFLAGS)
