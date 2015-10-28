@@ -3315,7 +3315,7 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
     guint i;
 
     for (i = ctx->current; i < sizeof (MMModem3gppFacility) * 8; i++) {
-        guint32 facility = 1 << i;
+        guint32 facility = 1u << i;
 
         /* Found the next one to query! */
         if (ctx->facilities & facility) {
