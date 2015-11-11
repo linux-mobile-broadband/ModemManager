@@ -2802,6 +2802,53 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+modem_reset_finish (MMIfaceModem *self,
+                    GAsyncResult *res,
+                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+
+static void
+modem_reset_power_cycle_ready (MMBroadbandModemQmi *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!power_cycle_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+
+static void
+modem_reset (MMIfaceModem *self,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_reset);
+
+    /* Power cycle the modem */
+    power_cycle (MM_BROADBAND_MODEM_QMI (self),
+                 (GAsyncReadyCallback)modem_reset_power_cycle_ready,
+                 result);
+}
+
+/*****************************************************************************/
 /* Factory reset (Modem interface) */
 
 static gboolean
@@ -10401,6 +10448,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_bearer_finish = modem_create_bearer_finish;
 
     /* Other actions */
+    iface->reset = modem_reset;
+    iface->reset_finish = modem_reset_finish;
     iface->factory_reset = modem_factory_reset;
     iface->factory_reset_finish = modem_factory_reset_finish;
 }
