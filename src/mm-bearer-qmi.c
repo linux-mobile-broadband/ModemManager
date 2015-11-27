@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2015 Azimut Electronics
  */
 
 #include <config.h>
@@ -54,6 +55,161 @@ struct _MMBearerQmiPrivate {
     guint32 packet_data_handle_ipv6;
     gboolean force_dhcp;
 };
+
+/*****************************************************************************/
+/* Stats */
+
+typedef enum {
+    RELOAD_STATS_CONTEXT_STEP_FIRST,
+    RELOAD_STATS_CONTEXT_STEP_IPV4,
+    RELOAD_STATS_CONTEXT_STEP_IPV6,
+    RELOAD_STATS_CONTEXT_STEP_LAST,
+} ReloadStatsContextStep;
+
+typedef struct {
+    guint64 rx_bytes;
+    guint64 tx_bytes;
+} ReloadStatsResult;
+
+typedef struct {
+    MMBearerQmi *self;
+    GSimpleAsyncResult *result;
+    QmiMessageWdsGetPacketStatisticsInput *input;
+    ReloadStatsContextStep step;
+    ReloadStatsResult stats;
+} ReloadStatsContext;
+
+static gboolean
+reload_stats_finish (MMBaseBearer *bearer,
+                     guint64 *rx_bytes,
+                     guint64 *tx_bytes,
+                     GAsyncResult *res,
+                     GError **error)
+{
+    ReloadStatsResult *stats;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    stats = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (rx_bytes)
+        *rx_bytes = stats->rx_bytes;
+    if (tx_bytes)
+        *tx_bytes = stats->tx_bytes;
+    return TRUE;
+}
+
+static void
+reload_stats_context_complete_and_free (ReloadStatsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    qmi_message_wds_get_packet_statistics_input_unref (ctx->input);
+    g_slice_free (ReloadStatsContext, ctx);
+}
+
+static void reload_stats_context_step (ReloadStatsContext *ctx);
+
+static void
+get_packet_statistics_ready (QmiClientWds *client,
+                             GAsyncResult *res,
+                             ReloadStatsContext *ctx)
+{
+    GError *error = NULL;
+    QmiMessageWdsGetPacketStatisticsOutput *output;
+    guint64 tx_bytes_ok = 0;
+    guint64 rx_bytes_ok = 0;
+
+    output = qmi_client_wds_get_packet_statistics_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        reload_stats_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!qmi_message_wds_get_packet_statistics_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get packet statistics: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        qmi_message_wds_get_packet_statistics_output_unref (output);
+        reload_stats_context_complete_and_free (ctx);
+        return;
+    }
+
+    qmi_message_wds_get_packet_statistics_output_get_tx_bytes_ok (output, &tx_bytes_ok, NULL);
+    qmi_message_wds_get_packet_statistics_output_get_rx_bytes_ok (output, &rx_bytes_ok, NULL);
+    ctx->stats.rx_bytes += rx_bytes_ok;
+    ctx->stats.tx_bytes += tx_bytes_ok;
+
+    qmi_message_wds_get_packet_statistics_output_unref (output);
+
+    /* Go on */
+    ctx->step++;
+    reload_stats_context_step (ctx);
+}
+
+static void
+reload_stats_context_step (ReloadStatsContext *ctx)
+{
+    switch (ctx->step) {
+    case RELOAD_STATS_CONTEXT_STEP_FIRST:
+        /* Fall through */
+        ctx->step++;
+    case RELOAD_STATS_CONTEXT_STEP_IPV4:
+        if (ctx->self->priv->client_ipv4) {
+            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (ctx->self->priv->client_ipv4),
+                                                  ctx->input,
+                                                  10,
+                                                  NULL,
+                                                  (GAsyncReadyCallback)get_packet_statistics_ready,
+                                                  ctx);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+    case RELOAD_STATS_CONTEXT_STEP_IPV6:
+        if (ctx->self->priv->client_ipv6) {
+            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (ctx->self->priv->client_ipv6),
+                                                  ctx->input,
+                                                  10,
+                                                  NULL,
+                                                  (GAsyncReadyCallback)get_packet_statistics_ready,
+                                                  ctx);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+    case RELOAD_STATS_CONTEXT_STEP_LAST:
+        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->stats, NULL);
+        reload_stats_context_complete_and_free (ctx);
+        return;
+    }
+}
+
+static void
+reload_stats (MMBaseBearer *self,
+              GAsyncReadyCallback callback,
+              gpointer user_data)
+{
+    ReloadStatsContext *ctx;
+
+    ctx = g_slice_new0 (ReloadStatsContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             reload_stats);
+    ctx->input = qmi_message_wds_get_packet_statistics_input_new ();
+    qmi_message_wds_get_packet_statistics_input_set_mask (
+        ctx->input,
+        (QMI_WDS_PACKET_STATISTICS_MASK_FLAG_TX_BYTES_OK |
+         QMI_WDS_PACKET_STATISTICS_MASK_FLAG_RX_BYTES_OK),
+        NULL);
+    ctx->step = RELOAD_STATS_CONTEXT_STEP_FIRST;
+
+    reload_stats_context_step (ctx);
+}
 
 /*****************************************************************************/
 /* Connect */
@@ -1413,6 +1569,8 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->disconnect = disconnect;
     base_bearer_class->disconnect_finish = disconnect_finish;
     base_bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->reload_stats = reload_stats;
+    base_bearer_class->reload_stats_finish = reload_stats_finish;
 
     /* Properties */
     properties[PROP_FORCE_DHCP] =
