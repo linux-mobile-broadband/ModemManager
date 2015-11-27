@@ -13,7 +13,8 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
- * Copyright (C) 2011 - 2014 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2015 Azimut Electronics
+ * Copyright (C) 2011 - 2015 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -36,13 +37,16 @@
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-bearer-stats.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
 #define BEARER_IP_TIMEOUT_DEFAULT 20
 
 #define BEARER_DEFERRED_UNREGISTRATION_TIMEOUT 15
 
-G_DEFINE_TYPE (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
+#define BEARER_STATS_UPDATE_TIMEOUT 30
+
+G_DEFINE_TYPE (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON)
 
 typedef enum {
     CONNECTION_FORBIDDEN_REASON_NONE,
@@ -97,6 +101,13 @@ struct _MMBaseBearerPrivate {
     /* Handler IDs for the registration state change signals */
     guint id_cdma1x_registration_change;
     guint id_evdo_registration_change;
+
+    /* The stats object to expose */
+    MMBearerStats *stats;
+    /* Handler id for the stats update timeout */
+    guint stats_update_id;
+    /* Timer to measure the duration of the connection */
+    GTimer *duration_timer;
 };
 
 /*****************************************************************************/
@@ -120,6 +131,102 @@ mm_base_bearer_export (MMBaseBearer *self)
                   MM_BASE_BEARER_PATH, path,
                   NULL);
     g_free (path);
+}
+
+/*****************************************************************************/
+
+static void
+bearer_update_interface_stats (MMBaseBearer *self)
+{
+    mm_gdbus_bearer_set_stats (
+        MM_GDBUS_BEARER (self),
+        mm_bearer_stats_get_dictionary (self->priv->stats));
+}
+
+static void
+bearer_reset_interface_stats (MMBaseBearer *self)
+{
+    g_clear_object (&self->priv->stats);
+    mm_gdbus_bearer_set_stats (MM_GDBUS_BEARER (self), NULL);
+}
+
+static void
+bearer_stats_stop (MMBaseBearer *self)
+{
+    if (self->priv->duration_timer) {
+        if (self->priv->stats)
+            mm_bearer_stats_set_duration (self->priv->stats, (guint64) g_timer_elapsed (self->priv->duration_timer, NULL));
+        g_timer_destroy (self->priv->duration_timer);
+        self->priv->duration_timer = NULL;
+    }
+
+    if (self->priv->stats_update_id) {
+        g_source_remove (self->priv->stats_update_id);
+        self->priv->stats_update_id = 0;
+    }
+}
+
+static void
+reload_stats_ready (MMBaseBearer *self,
+                    GAsyncResult *res)
+{
+    GError *error = NULL;
+    guint64 rx_bytes = 0;
+    guint64 tx_bytes = 0;
+
+    if (!MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error)) {
+        g_warning ("Reloading stats failed: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    /* We only update stats if they were retrieved properly */
+    mm_bearer_stats_set_duration (self->priv->stats, (guint32) g_timer_elapsed (self->priv->duration_timer, NULL));
+    mm_bearer_stats_set_tx_bytes (self->priv->stats, rx_bytes);
+    mm_bearer_stats_set_rx_bytes (self->priv->stats, tx_bytes);
+    bearer_update_interface_stats (self);
+}
+
+static gboolean
+stats_update_cb (MMBaseBearer *self)
+{
+    /* If the implementation knows how to update stat values, run it */
+    if (MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
+        MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish) {
+        MM_BASE_BEARER_GET_CLASS (self)->reload_stats (
+            self,
+            (GAsyncReadyCallback)reload_stats_ready,
+            NULL);
+        return G_SOURCE_CONTINUE;
+    }
+
+    /* Otherwise, just update duration and we're done */
+    mm_bearer_stats_set_duration (self->priv->stats, (guint32) g_timer_elapsed (self->priv->duration_timer, NULL));
+    mm_bearer_stats_set_tx_bytes (self->priv->stats, 0);
+    mm_bearer_stats_set_rx_bytes (self->priv->stats, 0);
+    bearer_update_interface_stats (self);
+    return G_SOURCE_CONTINUE;
+}
+
+static void
+bearer_stats_start (MMBaseBearer *self)
+{
+    /* Allocate new stats object. If there was one already created from a
+     * previous run, deallocate it */
+    g_assert (!self->priv->stats);
+    self->priv->stats = mm_bearer_stats_new ();
+
+    /* Start duration timer */
+    g_assert (!self->priv->duration_timer);
+    self->priv->duration_timer = g_timer_new ();
+
+    /* Schedule */
+    g_assert (!self->priv->stats_update_id);
+    self->priv->stats_update_id = g_timeout_add_seconds (BEARER_STATS_UPDATE_TIMEOUT,
+                                                         (GSourceFunc) stats_update_cb,
+                                                         self);
+    /* Load initial values */
+    stats_update_cb (self);
 }
 
 /*****************************************************************************/
@@ -151,8 +258,11 @@ bearer_update_status (MMBaseBearer *self,
 
     /* Ensure that we don't expose any connection related data in the
      * interface when going into disconnected state. */
-    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
         bearer_reset_interface_status (self);
+        /* Stop statistics */
+        bearer_stats_stop (self);
+    }
 }
 
 static void
@@ -170,6 +280,9 @@ bearer_update_status_connected (MMBaseBearer *self,
     mm_gdbus_bearer_set_ip6_config (
         MM_GDBUS_BEARER (self),
         mm_bearer_ip_config_get_dictionary (ipv6_config));
+
+    /* Start statistics */
+    bearer_stats_start (self);
 
     /* Update the property value */
     self->priv->status = MM_BEARER_STATUS_CONNECTED;
@@ -590,6 +703,7 @@ mm_base_bearer_connect (MMBaseBearer *self,
     mm_dbg ("Connecting bearer '%s'", self->priv->path);
     self->priv->connect_cancellable = g_cancellable_new ();
     bearer_update_status (self, MM_BEARER_STATUS_CONNECTING);
+    bearer_reset_interface_stats (self);
     MM_BASE_BEARER_GET_CLASS (self)->connect (
         self,
         self->priv->connect_cancellable,
@@ -1149,6 +1263,9 @@ static void
 dispose (GObject *object)
 {
     MMBaseBearer *self = MM_BASE_BEARER (object);
+
+    bearer_stats_stop (self);
+    g_clear_object (&self->priv->stats);
 
     if (self->priv->connection) {
         base_bearer_dbus_unexport (self);
