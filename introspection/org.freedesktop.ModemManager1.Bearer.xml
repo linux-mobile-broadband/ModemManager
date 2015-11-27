@@ -242,6 +242,37 @@
     <property name="Ip6Config" type="a{sv}" access="read" />
 
     <!--
+        Stats:
+
+        If the modem supports it, this property will show statistics of the
+        ongoing connection.
+
+        When the connection is disconnected automatically or explicitly by the
+        user, the values in this property will show the last values cached.
+        The statistics are reset
+
+        The following items may appear in the list of statistics:
+        <variablelist>
+          <varlistentry><term><literal>"rx-bytes"</literal></term>
+            <listitem>
+              Number of bytes received without error, given as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"tx-bytes"</literal></term>
+            <listitem>
+              Number bytes transmitted without error, given as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+            </listitem>
+            </varlistentry>
+          <varlistentry><term><literal>"duration"</literal></term>
+            <listitem>
+              Duration of the connection, in seconds, given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+    -->
+    <property name="Stats" type="a{sv}" access="read" />
+
+    <!--
         IpTimeout:
 
         Maximum time to wait for a successful IP establishment, when PPP is used.
