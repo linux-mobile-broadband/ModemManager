@@ -53,6 +53,11 @@ struct _MMBearerPrivate {
     GMutex properties_mutex;
     guint properties_id;
     MMBearerProperties *properties;
+
+    /* Stats */
+    GMutex stats_mutex;
+    guint stats_id;
+    MMBearerStats *stats;
 };
 
 /*****************************************************************************/
@@ -531,6 +536,117 @@ mm_bearer_peek_properties (MMBearer *self)
 
     ensure_internal_properties (self, NULL);
     return self->priv->properties;
+}
+
+/*****************************************************************************/
+
+static void
+stats_updated (MMBearer *self,
+               GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->stats_mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->stats);
+
+        dictionary = mm_gdbus_bearer_get_stats (MM_GDBUS_BEARER (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->stats = mm_bearer_stats_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid bearer stats update received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->stats_mutex);
+}
+
+static void
+ensure_internal_stats (MMBearer *self,
+                       MMBearerStats **dup)
+{
+    g_mutex_lock (&self->priv->stats_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->stats_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_bearer_dup_stats (MM_GDBUS_BEARER (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->stats = mm_bearer_stats_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid initial bearer stats: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->stats_id =
+                g_signal_connect (self,
+                                  "notify::stats",
+                                  G_CALLBACK (stats_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->stats)
+            *dup = g_object_ref (self->priv->stats);
+    }
+    g_mutex_unlock (&self->priv->stats_mutex);
+}
+
+/**
+ * mm_bearer_get_stats:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerStats object specifying the statistics of the current bearer
+ * connection.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_bearer_get_stats() again to get a new #MMBearerStats with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full): A #MMBearerStats that must be freed with g_object_unref() or %NULL if unknown.
+ */
+MMBearerStats *
+mm_bearer_get_stats (MMBearer *self)
+{
+    MMBearerStats *config = NULL;
+
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_stats (self, &config);
+    return config;
+}
+
+/**
+ * mm_bearer_peek_stats:
+ * @self: A #MMBearer.
+ *
+ * Gets a #MMBearerStats object specifying the statistics of the current bearer
+ * connection.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_get_stats() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): A #MMBearerStats. Do not free the returned value, it belongs to @self.
+ */
+MMBearerStats *
+mm_bearer_peek_stats (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_stats (self, NULL);
+    return self->priv->stats;
 }
 
 /*****************************************************************************/

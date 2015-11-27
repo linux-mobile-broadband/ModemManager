@@ -33,6 +33,7 @@
 #include "mm-gdbus-bearer.h"
 #include "mm-bearer-properties.h"
 #include "mm-bearer-ip-config.h"
+#include "mm-bearer-stats.h"
 
 G_BEGIN_DECLS
 
@@ -108,6 +109,9 @@ MMBearerIpConfig   *mm_bearer_peek_ipv4_config (MMBearer *self);
 
 MMBearerIpConfig   *mm_bearer_get_ipv6_config  (MMBearer *self);
 MMBearerIpConfig   *mm_bearer_peek_ipv6_config (MMBearer *self);
+
+MMBearerStats      *mm_bearer_get_stats        (MMBearer *self);
+MMBearerStats      *mm_bearer_peek_stats       (MMBearer *self);
 
 G_END_DECLS
 
