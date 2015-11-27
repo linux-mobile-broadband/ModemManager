@@ -987,6 +987,33 @@ mm_bearer_ip_config_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-bearer-stats</FILE>
+<TITLE>MMBearerStats</TITLE>
+MMBearerStats
+<SUBSECTION Getters>
+mm_bearer_stats_get_duration
+mm_bearer_stats_get_rx_bytes
+mm_bearer_stats_get_tx_bytes
+<SUBSECTION Private>
+mm_bearer_stats_get_dictionary
+mm_bearer_stats_new
+mm_bearer_stats_new_from_dictionary
+mm_bearer_stats_set_duration
+mm_bearer_stats_set_rx_bytes
+mm_bearer_stats_set_tx_bytes
+<SUBSECTION Standard>
+MMBearerStatsClass
+MMBearerStatsPrivate
+MM_BEARER_STATS
+MM_BEARER_STATS_CLASS
+MM_BEARER_STATS_GET_CLASS
+MM_IS_BEARER_STATS
+MM_IS_BEARER_STATS_CLASS
+MM_TYPE_BEARER_STATS
+mm_bearer_stats_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-bearer-properties</FILE>
 <TITLE>MMBearerProperties</TITLE>
 MMBearerProperties
@@ -1439,6 +1466,8 @@ mm_gdbus_bearer_get_properties
 mm_gdbus_bearer_dup_properties
 mm_gdbus_bearer_get_connected
 mm_gdbus_bearer_get_suspended
+mm_gdbus_bearer_get_stats
+mm_gdbus_bearer_dup_stats
 <SUBSECTION Methods>
 mm_gdbus_bearer_call_connect
 mm_gdbus_bearer_call_connect_finish
@@ -1455,6 +1484,7 @@ mm_gdbus_bearer_set_ip6_config
 mm_gdbus_bearer_set_ip_timeout
 mm_gdbus_bearer_set_properties
 mm_gdbus_bearer_set_suspended
+mm_gdbus_bearer_set_stats
 mm_gdbus_bearer_override_properties
 mm_gdbus_bearer_complete_connect
 mm_gdbus_bearer_complete_disconnect

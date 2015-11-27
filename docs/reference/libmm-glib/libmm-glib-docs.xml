@@ -130,6 +130,7 @@
       <xi:include href="xml/mm-bearer.xml"/>
       <xi:include href="xml/mm-bearer-properties.xml"/>
       <xi:include href="xml/mm-bearer-ip-config.xml"/>
+      <xi:include href="xml/mm-bearer-stats.xml"/>
     </chapter>
 
     <chapter>
