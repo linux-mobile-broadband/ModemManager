@@ -675,7 +675,7 @@ after_power_up_wait_cb (GSimpleAsyncResult *result)
     option->priv->after_power_up_wait_id = 0;
     g_object_unref (option);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

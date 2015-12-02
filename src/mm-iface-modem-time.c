@@ -270,7 +270,7 @@ timezone_poll_cb (UpdateNetworkTimezoneContext *ctx)
         (GAsyncReadyCallback)load_network_timezone_ready,
         ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

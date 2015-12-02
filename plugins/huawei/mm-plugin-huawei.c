@@ -328,7 +328,7 @@ first_interface_missing_timeout_cb (MMDevice *device)
 
     /* Reload the timeout, just in case we end up not having the next interface to probe...
      * which is anyway very unlikely as we got it by looking at the real probe list, but anyway... */
-    return TRUE;
+    return G_SOURCE_CONTINUE;
 }
 
 static void

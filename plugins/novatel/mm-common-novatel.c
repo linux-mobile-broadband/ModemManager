@@ -84,7 +84,7 @@ static gboolean
 custom_init_wait_cb (CustomInitContext *ctx)
 {
     custom_init_step (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

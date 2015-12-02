@@ -5495,7 +5495,7 @@ static gboolean
 retry_msisdn_check_cb (CdmaActivationContext *ctx)
 {
     cdma_activation_context_step (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

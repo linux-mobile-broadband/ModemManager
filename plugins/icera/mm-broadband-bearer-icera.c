@@ -288,7 +288,7 @@ disconnect_3gpp_timed_out_cb (MMBroadbandBearerIcera *self)
                                      "Disconnection attempt timed out");
 
     disconnect_3gpp_context_complete_and_free (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -547,7 +547,7 @@ connect_timed_out_cb (MMBroadbandBearerIcera *self)
     /* It's probably pointless to try to reset this here, but anyway... */
     connect_reset (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -795,7 +795,7 @@ static gboolean
 retry_authentication_cb (Dial3gppContext *ctx)
 {
     authenticate (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

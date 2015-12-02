@@ -438,7 +438,7 @@ connect_timed_out_cb (MMBroadbandBearerHso *self)
     /* It's probably pointless to try to reset this here, but anyway... */
     connect_reset (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

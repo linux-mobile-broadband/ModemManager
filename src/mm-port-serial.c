@@ -762,7 +762,7 @@ port_serial_timed_out (gpointer data)
      * serial port */
     g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -795,7 +795,7 @@ port_serial_queue_process (gpointer data)
 
     ctx = (CommandContext *) g_queue_peek_head (self->priv->queue);
     if (!ctx)
-        return FALSE;
+        return G_SOURCE_REMOVE;
 
     if (ctx->allow_cached) {
         const GByteArray *cached;
@@ -814,7 +814,7 @@ port_serial_queue_process (gpointer data)
 
             g_byte_array_append (self->priv->response, cached->data, cached->len);
             port_serial_got_response (self, NULL);
-            return FALSE;
+            return G_SOURCE_REMOVE;
         }
 
         /* Cached reply wasn't found, keep on */
@@ -824,7 +824,7 @@ port_serial_queue_process (gpointer data)
     if (!port_serial_process_command (self, ctx, &error)) {
         port_serial_got_response (self, error);
         g_error_free (error);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     /* Schedule the next byte of the command to be sent */
@@ -833,7 +833,7 @@ port_serial_queue_process (gpointer data)
                                             (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY ?
                                              self->priv->send_delay / 1000 :
                                              0));
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     /* Setup the cancellable so that we can stop waiting for a response */
@@ -850,7 +850,7 @@ port_serial_queue_process (gpointer data)
                                  "Won't wait for the reply");
             port_serial_got_response (self, error);
             g_error_free (error);
-            return FALSE;
+            return G_SOURCE_REMOVE;
         }
     }
 
@@ -858,7 +858,7 @@ port_serial_queue_process (gpointer data)
     self->priv->timeout_id = g_timeout_add_seconds (ctx->timeout,
                                                     port_serial_timed_out,
                                                     self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static gboolean
@@ -1511,7 +1511,7 @@ reopen_do (MMPortSerial *self)
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     reopen_context_complete_and_free (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 void
@@ -1729,7 +1729,7 @@ flash_do (MMPortSerial *self)
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     flash_context_complete_and_free (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 void

@@ -453,7 +453,7 @@ start_device_added_idle (StartDeviceAdded *ctx)
     g_object_unref (ctx->self);
     g_object_unref (ctx->device);
     g_slice_free (StartDeviceAdded, ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

@@ -1160,7 +1160,7 @@ periodic_registration_check (MMIfaceModemCdma *self)
             (GAsyncReadyCallback)periodic_registration_checks_ready,
             NULL);
     }
-    return TRUE;
+    return G_SOURCE_CONTINUE;
 }
 
 static void

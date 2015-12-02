@@ -126,7 +126,7 @@ connect_retry_ndisstatqry_check_cb (MMBroadbandBearerHuawei *self)
     /* Retry same step */
     connect_3gpp_context_step (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -505,7 +505,7 @@ disconnect_retry_ndisstatqry_check_cb (MMBroadbandBearerHuawei *self)
 
     /* Retry same step */
     disconnect_3gpp_context_step (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -705,7 +705,7 @@ network_disconnect_3gpp_delayed (MMBroadbandBearerHuawei *self)
     self->priv->network_disconnect_pending_id = 0;
     mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
                                              MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

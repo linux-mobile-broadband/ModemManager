@@ -122,7 +122,7 @@ after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
 {
     g_simple_async_result_complete (result);
     g_object_unref (result);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

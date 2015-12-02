@@ -682,7 +682,7 @@ wait_for_sim_ready (LoadUnlockRequiredContext *ctx)
                          (GAsyncReadyCallback)unlock_required_subscriber_ready_state_ready,
                          ctx);
     mbim_message_unref (message);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

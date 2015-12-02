@@ -200,7 +200,7 @@ deferred_3gpp_unregistration_cb (MMBaseBearer *self)
 
     mm_dbg ("Forcing bearer disconnection, not registered in 3GPP network");
     mm_base_bearer_disconnect_force (self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -282,7 +282,7 @@ deferred_cdma_unregistration_cb (MMBaseBearer *self)
 
     mm_dbg ("Forcing bearer disconnection, not registered in CDMA network");
     mm_base_bearer_disconnect_force (self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

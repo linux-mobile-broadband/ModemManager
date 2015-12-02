@@ -1357,7 +1357,7 @@ base_modem_invalid_idle (MMBaseModem *self)
      * cancelled */
     mm_base_modem_set_valid (self, FALSE);
     g_object_unref (self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

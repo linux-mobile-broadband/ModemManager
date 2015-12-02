@@ -7666,7 +7666,7 @@ run_cdma_registration_checks_again (RegisterInCdmaNetworkContext *ctx)
         MM_IFACE_MODEM_CDMA (ctx->self),
         (GAsyncReadyCallback)run_cdma_registration_checks_ready,
         ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -8304,7 +8304,7 @@ enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
     ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     enabling_started_context_complete_and_free (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -8506,7 +8506,7 @@ schedule_initial_registration_checks_cb (MMBroadbandModem *self)
                                                      NULL);
     /* We got a full reference, so balance it out here */
     g_object_unref (self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

@@ -250,7 +250,7 @@ start_cb (void)
                           FALSE,
                           (GAsyncReadyCallback) flash_ready,
                           NULL);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 int main (int argc, char **argv)

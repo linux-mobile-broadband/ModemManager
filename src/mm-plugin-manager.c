@@ -334,7 +334,7 @@ deferred_support_check_idle (PortProbeContext *port_probe_ctx)
 {
     port_probe_ctx->defer_id = 0;
     port_probe_context_step (port_probe_ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -765,7 +765,7 @@ min_wait_timeout_cb (FindDeviceSupportContext *ctx)
     ctx->timeout_id = g_timeout_add (MIN_PROBING_TIME_MSECS - MIN_WAIT_TIME_MSECS,
                                      (GSourceFunc)min_probing_timeout_cb,
                                      ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 void

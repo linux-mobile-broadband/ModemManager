@@ -553,7 +553,7 @@ power_off_timeout_cb (PowerOffContext *ctx)
                                      "Power off operation timed out");
     power_off_context_complete_and_free (ctx);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -1588,7 +1588,7 @@ simstatus_timeout_cb (AfterSimUnlockContext *ctx)
 {
     ctx->timeout_id = 0;
     after_sim_unlock_context_step (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

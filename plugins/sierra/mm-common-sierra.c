@@ -257,7 +257,7 @@ sierra_power_up_wait_cb (GSimpleAsyncResult *result)
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete (result);
     g_object_unref (result);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

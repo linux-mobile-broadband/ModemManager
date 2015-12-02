@@ -157,7 +157,7 @@ refresh_context_cb (MMIfaceModemSignal *self)
         NULL,
         (GAsyncReadyCallback)load_values_ready,
         NULL);
-    return TRUE;
+    return G_SOURCE_CONTINUE;
 }
 
 static void

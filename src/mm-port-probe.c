@@ -563,7 +563,7 @@ wdm_probe (MMPortProbe *self)
         /* All done now */
         port_probe_run_task_complete (task, TRUE, NULL);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 /***************************************************************/
@@ -659,7 +659,7 @@ serial_probe_qcdm (MMPortProbe *self)
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
-        return FALSE;
+        return G_SOURCE_REMOVE;
 
     mm_dbg ("(%s/%s) probing QCDM...",
             g_udev_device_get_subsystem (self->priv->port),
@@ -687,7 +687,7 @@ serial_probe_qcdm (MMPortProbe *self)
                          "(%s/%s) Couldn't create QCDM port",
                          g_udev_device_get_subsystem (self->priv->port),
                          g_udev_device_get_name (self->priv->port)));
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     /* Try to open the port */
@@ -702,7 +702,7 @@ serial_probe_qcdm (MMPortProbe *self)
                          g_udev_device_get_name (self->priv->port),
                          (error ? error->message : "unknown error")));
         g_clear_error (&error);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     /* Build up the probe command; 0x7E is the frame marker, so put one at the
@@ -723,7 +723,7 @@ serial_probe_qcdm (MMPortProbe *self)
                          "(%s/%s) Failed to create QCDM versin info command",
                          g_udev_device_get_subsystem (self->priv->port),
                          g_udev_device_get_name (self->priv->port)));
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
     verinfo->len = len + 1;
 
@@ -740,7 +740,7 @@ serial_probe_qcdm (MMPortProbe *self)
                                  self);
     g_byte_array_unref (verinfo);
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 /***************************************************************/
@@ -955,7 +955,7 @@ serial_probe_at (MMPortProbe *self)
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
-        return FALSE;
+        return G_SOURCE_REMOVE;
 
     /* If AT probing cancelled, end this partial probing */
     if (g_cancellable_is_cancelled (task->at_probing_cancellable)) {
@@ -964,7 +964,7 @@ serial_probe_at (MMPortProbe *self)
                 g_udev_device_get_name (self->priv->port));
         task->at_result_processor (self, NULL);
         serial_probe_schedule (self);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     mm_port_serial_at_command (
@@ -976,7 +976,7 @@ serial_probe_at (MMPortProbe *self)
         task->at_probing_cancellable,
         (GAsyncReadyCallback)serial_probe_at_parse_response,
         self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static const MMPortProbeAtCommand at_probing[] = {
@@ -1162,7 +1162,7 @@ serial_open_at (MMPortProbe *self)
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
-        return FALSE;
+        return G_SOURCE_REMOVE;
 
     /* Create AT serial port if not done before */
     if (!task->serial) {
@@ -1183,7 +1183,7 @@ serial_open_at (MMPortProbe *self)
                              "(%s/%s) couldn't create AT port",
                              g_udev_device_get_subsystem (self->priv->port),
                              g_udev_device_get_name (self->priv->port)));
-            return FALSE;
+            return G_SOURCE_REMOVE;
         }
 
         g_object_set (task->serial,
@@ -1236,7 +1236,7 @@ serial_open_at (MMPortProbe *self)
         }
 
         g_clear_error (&error);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     /* success, start probing */
@@ -1250,7 +1250,7 @@ serial_open_at (MMPortProbe *self)
                           TRUE,
                           (GAsyncReadyCallback)serial_flash_ready,
                           self);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 gboolean

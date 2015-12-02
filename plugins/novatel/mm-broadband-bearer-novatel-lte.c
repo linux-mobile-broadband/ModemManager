@@ -161,7 +161,7 @@ poll_connection (MMBroadbandBearerNovatelLte *bearer)
         bearer);
     g_object_unref (modem);
 
-    return TRUE;
+    return G_SOURCE_CONTINUE;
 }
 
 static void
@@ -248,7 +248,7 @@ connect_3gpp_qmistatus (DetailedConnectContext *ctx)
         (GAsyncReadyCallback)connect_3gpp_qmistatus_ready, /* callback */
         ctx); /* user_data */
 
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -463,7 +463,7 @@ disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_status_ready,
         ctx); /* user_data */
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 

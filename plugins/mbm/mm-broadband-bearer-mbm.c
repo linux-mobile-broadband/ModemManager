@@ -272,7 +272,7 @@ poll_timeout_cb (MMBroadbandBearerMbm *self)
                                          MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
                                          "Connection attempt timed out");
         dial_3gpp_context_complete_and_free (ctx);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     ctx->poll_count++;
@@ -286,7 +286,7 @@ poll_timeout_cb (MMBroadbandBearerMbm *self)
                                    (GAsyncReadyCallback)poll_ready,
                                    g_object_ref (ctx->self)); /* we pass the bearer object! */
     self->priv->connect_pending_id = 0;
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

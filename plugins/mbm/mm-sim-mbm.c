@@ -90,7 +90,7 @@ cpin_query_cb (SendPinPukContext *ctx)
                               FALSE,
                               (GAsyncReadyCallback)cpin_query_ready,
                               ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

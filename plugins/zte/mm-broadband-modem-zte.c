@@ -150,7 +150,7 @@ cpms_timeout_cb (ModemAfterSimUnlockContext *ctx)
 {
     ctx->retries--;
     modem_after_sim_unlock_context_step (ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void

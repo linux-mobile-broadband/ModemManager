@@ -233,7 +233,7 @@ run_registration_checks_again (RegisterInNetworkContext *ctx)
         ctx->self,
         (GAsyncReadyCallback)run_registration_checks_ready,
         ctx);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -1309,7 +1309,7 @@ periodic_registration_check (MMIfaceModem3gpp *self)
             (GAsyncReadyCallback)periodic_registration_checks_ready,
             NULL);
     }
-    return TRUE;
+    return G_SOURCE_CONTINUE;
 }
 
 static void
