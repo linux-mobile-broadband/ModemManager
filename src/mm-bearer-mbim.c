@@ -107,6 +107,113 @@ peek_ports (gpointer self,
 }
 
 /*****************************************************************************/
+/* Stats */
+
+typedef struct {
+    guint64 rx_bytes;
+    guint64 tx_bytes;
+} ReloadStatsResult;
+
+typedef struct {
+    MMBearerMbim *self;
+    GSimpleAsyncResult *result;
+    ReloadStatsResult stats;
+} ReloadStatsContext;
+
+static void
+reload_stats_context_complete_and_free (ReloadStatsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (ReloadStatsContext, ctx);
+}
+
+static gboolean
+reload_stats_finish (MMBaseBearer *bearer,
+                     guint64 *rx_bytes,
+                     guint64 *tx_bytes,
+                     GAsyncResult *res,
+                     GError **error)
+{
+    ReloadStatsResult *stats;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    stats = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (rx_bytes)
+        *rx_bytes = stats->rx_bytes;
+    if (tx_bytes)
+        *tx_bytes = stats->tx_bytes;
+    return TRUE;
+}
+
+static void
+packet_statistics_query_ready (MbimDevice *device,
+                               GAsyncResult *res,
+                               ReloadStatsContext *ctx)
+{
+    GError      *error = NULL;
+    MbimMessage *response;
+    guint64      in_octets = 0;
+    guint64      out_octets = 0;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_packet_statistics_response_parse (
+            response,
+            NULL, /* in_discards */
+            NULL, /* in_errors */
+            &in_octets, /* in_octets */
+            NULL, /* in_packets */
+            &out_octets, /* out_octets */
+            NULL, /* out_packets */
+            NULL, /* out_errors */
+            NULL, /* out_discards */
+            &error)) {
+        /* Store results */
+        ctx->stats.rx_bytes = in_octets;
+        ctx->stats.tx_bytes = out_octets;
+        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->stats, NULL);
+    } else
+        g_simple_async_result_take_error (ctx->result, error);
+
+    reload_stats_context_complete_and_free (ctx);
+    mbim_message_unref (response);
+}
+
+static void
+reload_stats (MMBaseBearer *self,
+              GAsyncReadyCallback callback,
+              gpointer user_data)
+{
+    MbimDevice *device;
+    ReloadStatsContext *ctx;
+    MbimMessage *message;
+
+    if (!peek_ports (self, &device, NULL, callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (ReloadStatsContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             reload_stats);
+
+    message = (mbim_message_packet_statistics_query_new (NULL));
+    mbim_device_command (device,
+                         message,
+                         5,
+                         NULL,
+                         (GAsyncReadyCallback)packet_statistics_query_ready,
+                         ctx);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Connect */
 
 typedef enum {
@@ -1244,6 +1351,8 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->disconnect = disconnect;
     base_bearer_class->disconnect_finish = disconnect_finish;
     base_bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->reload_stats = reload_stats;
+    base_bearer_class->reload_stats_finish = reload_stats_finish;
 
     properties[PROP_SESSION_ID] =
         g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,
