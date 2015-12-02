@@ -1290,6 +1290,67 @@ storage_from_str (const gchar *str)
     return MM_SMS_STORAGE_UNKNOWN;
 }
 
+static gchar **
+helper_split_groups (const gchar *str)
+{
+    GPtrArray *array;
+    const gchar *start;
+    const gchar *next;
+
+    array = g_ptr_array_new ();
+
+    /*
+     * Manually parse splitting groups. Groups may be single elements, or otherwise
+     * lists given between parenthesis, e.g.:
+     *
+     *    ("SM","ME"),("SM","ME"),("SM","ME")
+     *    "SM","SM","SM"
+     *    "SM",("SM","ME"),("SM","ME")
+     */
+
+    /* Iterate string splitting groups */
+    for (start = str; start; start = next) {
+        gchar *item;
+        gssize len = -1;
+
+        /* skip leading whitespaces */
+        while (*start == ' ')
+            start++;
+
+        if (*start == '(') {
+            start++;
+            next = strchr (start, ')');
+            if (next) {
+                len = next - start;
+                next = strchr (next, ',');
+                if (next)
+                    next++;
+            }
+        } else {
+            next = strchr (start, ',');
+            if (next) {
+                len = next - start;
+                next++;
+            }
+        }
+
+        if (len < 0)
+            item = g_strdup (start);
+        else
+            item = g_strndup (start, len);
+
+        g_ptr_array_add (array, item);
+    }
+
+    if (array->len > 0) {
+        g_ptr_array_add (array, NULL);
+        return (gchar **) g_ptr_array_free (array, FALSE);
+    }
+
+    g_ptr_array_unref (array);
+    return NULL;
+}
+
 gboolean
 mm_3gpp_parse_cpms_test_response (const gchar *reply,
                                   GArray **mem1,
@@ -1307,32 +1368,37 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
     g_assert (mem2 != NULL);
     g_assert (mem3 != NULL);
 
-    /*
-     * +CPMS: ("SM","ME"),("SM","ME"),("SM","ME")
-     */
-    split = g_strsplit_set (mm_strip_tag (reply, "+CPMS:"), "()", -1);
+#define N_EXPECTED_GROUPS 3
+
+    split = helper_split_groups (mm_strip_tag (reply, "+CPMS:"));
     if (!split)
         return FALSE;
+
+    if (g_strv_length (split) != N_EXPECTED_GROUPS) {
+        mm_warn ("Cannot parse +CPMS test response: invalid number of groups (%u != %u)",
+                 g_strv_length (split), N_EXPECTED_GROUPS);
+        g_strfreev (split);
+        return FALSE;
+    }
 
     r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
     g_assert (r);
 
-    for (i = 0; split[i]; i++) {
-        GMatchInfo *match_info;
+    for (i = 0; i < N_EXPECTED_GROUPS; i++) {
+        GMatchInfo *match_info = NULL;
+        GArray *array;
+
+        /* We always return a valid array, even if it may be empty */
+        array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
 
         /* Got a range group to match */
         if (g_regex_match_full (r, split[i], strlen (split[i]), 0, 0, &match_info, NULL)) {
-            GArray *array = NULL;
-
             while (g_match_info_matches (match_info)) {
                 gchar *str;
 
                 str = g_match_info_fetch (match_info, 1);
                 if (str) {
                     MMSmsStorage storage;
-
-                    if (!array)
-                        array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
 
                     storage = storage_from_str (str);
                     g_array_append_val (array, storage);
@@ -1341,18 +1407,17 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
 
                 g_match_info_next (match_info, NULL);
             }
-
-            if (!tmp1)
-                tmp1 = array;
-            else if (!tmp2)
-                tmp2 = array;
-            else if (!tmp3)
-                tmp3 = array;
         }
         g_match_info_free (match_info);
 
-        if (tmp3 != NULL)
-            break; /* once we got the last group, exit... */
+        if (!tmp1)
+            tmp1 = array;
+        else if (!tmp2)
+            tmp2 = array;
+        else if (!tmp3)
+            tmp3 = array;
+        else
+            g_assert_not_reached ();
     }
 
     g_strfreev (split);
@@ -1362,7 +1427,8 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
     g_warn_if_fail (tmp2 != NULL);
     g_warn_if_fail (tmp3 != NULL);
 
-    /* Only return TRUE if all sets have been parsed correctly */
+    /* Only return TRUE if all sets have been parsed correctly
+     * (even if the arrays may be empty) */
     if (tmp1 && tmp2 && tmp3) {
         *mem1 = tmp1;
         *mem2 = tmp2;
