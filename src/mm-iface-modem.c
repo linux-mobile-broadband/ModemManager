@@ -760,11 +760,14 @@ typedef struct {
     MMIfaceModem *self;
     MMBearerList *list;
     gchar *bearer_path;
+    MMBaseBearer *bearer;
 } HandleDeleteBearerContext;
 
 static void
 handle_delete_bearer_context_free (HandleDeleteBearerContext *ctx)
 {
+    if (ctx->bearer)
+        g_object_unref (ctx->bearer);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
@@ -772,6 +775,26 @@ handle_delete_bearer_context_free (HandleDeleteBearerContext *ctx)
         g_object_unref (ctx->list);
     g_free (ctx->bearer_path);
     g_free (ctx);
+}
+
+static void
+delete_bearer_disconnect_ready (MMBaseBearer *bearer,
+                                GAsyncResult *res,
+                                HandleDeleteBearerContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_bearer_disconnect_finish (bearer, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_delete_bearer_context_free (ctx);
+        return;
+    }
+
+    if (!mm_bearer_list_delete_bearer (ctx->list, ctx->bearer_path, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
+    handle_delete_bearer_context_free (ctx);
 }
 
 static void
@@ -787,14 +810,30 @@ handle_delete_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (!ctx->list)
-        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
-    else if (!mm_bearer_list_delete_bearer (ctx->list, ctx->bearer_path, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
-        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
+    if (!g_str_has_prefix (ctx->bearer_path, MM_DBUS_BEARER_PREFIX)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_INVALID_ARGS,
+                                               "Cannot delete bearer: invalid path '%s'",
+                                               ctx->bearer_path);
+        handle_delete_bearer_context_free (ctx);
+        return;
+    }
 
-    handle_delete_bearer_context_free (ctx);
+    ctx->bearer = mm_bearer_list_find_by_path (ctx->list, ctx->bearer_path);
+    if (!ctx->bearer) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_INVALID_ARGS,
+                                               "Cannot delete bearer: no bearer found with path '%s'",
+                                               ctx->bearer_path);
+        handle_delete_bearer_context_free (ctx);
+        return;
+    }
+
+    mm_base_bearer_disconnect (ctx->bearer,
+                               (GAsyncReadyCallback)delete_bearer_disconnect_ready,
+                               ctx);
 }
 
 static gboolean

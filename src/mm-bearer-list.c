@@ -105,15 +105,6 @@ mm_bearer_list_delete_bearer (MMBearerList *self,
 {
     GList *l;
 
-    if (!g_str_has_prefix (path, MM_DBUS_BEARER_PREFIX)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Cannot delete bearer: invalid path '%s'",
-                     path);
-        return FALSE;
-    }
-
     for (l = self->priv->bearers; l; l = g_list_next (l)) {
         if (g_str_equal (path, mm_base_bearer_get_path (MM_BASE_BEARER (l->data)))) {
             g_object_unref (l->data);
@@ -163,6 +154,20 @@ mm_bearer_list_find_by_properties (MMBearerList *self,
 
     for (l = self->priv->bearers; l; l = g_list_next (l)) {
         if (mm_bearer_properties_cmp (mm_base_bearer_peek_config (MM_BASE_BEARER (l->data)), properties))
+            return g_object_ref (l->data);
+    }
+
+    return NULL;
+}
+
+MMBaseBearer *
+mm_bearer_list_find_by_path (MMBearerList *self,
+                             const gchar *path)
+{
+    GList *l;
+
+    for (l = self->priv->bearers; l; l = g_list_next (l)) {
+        if (g_str_equal (path, mm_base_bearer_get_path (MM_BASE_BEARER (l->data))))
             return g_object_ref (l->data);
     }
 
