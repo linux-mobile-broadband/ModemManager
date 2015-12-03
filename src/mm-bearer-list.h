@@ -72,8 +72,8 @@ void mm_bearer_list_foreach (MMBearerList *self,
                              MMBearerListForeachFunc func,
                              gpointer user_data);
 
-MMBaseBearer *mm_bearer_list_find (MMBearerList *self,
-                                   MMBearerProperties *properties);
+MMBaseBearer *mm_bearer_list_find_by_properties (MMBearerList *self,
+                                                 MMBearerProperties *properties);
 
 void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
                                                        GAsyncReadyCallback callback,

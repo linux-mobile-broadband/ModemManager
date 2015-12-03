@@ -516,7 +516,7 @@ connection_step (ConnectionContext *ctx)
         bearer_properties = mm_simple_connect_properties_get_bearer_properties (ctx->properties);
 
         /* Check if the bearer we want to create is already in the list */
-        ctx->bearer = mm_bearer_list_find (list, bearer_properties);
+        ctx->bearer = mm_bearer_list_find_by_properties (list, bearer_properties);
         if (!ctx->bearer) {
             mm_dbg ("Creating new bearer...");
             /* If we don't have enough space to create the bearer, try to remove
