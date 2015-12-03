@@ -79,6 +79,8 @@ gboolean              mm_modem_location_signals_location (MMModemLocation *self)
 const gchar *mm_modem_location_get_supl_server (MMModemLocation *self);
 gchar       *mm_modem_location_dup_supl_server (MMModemLocation *self);
 
+guint mm_modem_location_get_gps_refresh_rate (MMModemLocation *self);
+
 void     mm_modem_location_setup        (MMModemLocation *self,
                                          MMModemLocationSource sources,
                                          gboolean signal_location,
@@ -106,6 +108,19 @@ gboolean mm_modem_location_set_supl_server_sync   (MMModemLocation *self,
                                                    const gchar *supl,
                                                    GCancellable *cancellable,
                                                    GError **error);
+
+void     mm_modem_location_set_gps_refresh_rate        (MMModemLocation *self,
+                                                        guint rate,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+gboolean mm_modem_location_set_gps_refresh_rate_finish (MMModemLocation *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+gboolean mm_modem_location_set_gps_refresh_rate_sync   (MMModemLocation *self,
+                                                        guint rate,
+                                                        GCancellable *cancellable,
+                                                        GError **error);
 
 void            mm_modem_location_get_3gpp        (MMModemLocation *self,
                                                    GCancellable *cancellable,

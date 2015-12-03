@@ -64,6 +64,7 @@ static gboolean enable_gps_unmanaged_flag;
 static gboolean disable_gps_unmanaged_flag;
 static gboolean get_all_flag;
 static gchar *set_supl_server_str;
+static gchar *set_gps_refresh_rate_str;
 
 static GOptionEntry entries[] = {
     { "location-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
@@ -142,6 +143,10 @@ static GOptionEntry entries[] = {
       "Set SUPL server address",
       "[IP:PORT] or [URL]"
     },
+    { "location-set-gps-refresh-rate", 0, 0, G_OPTION_ARG_STRING, &set_gps_refresh_rate_str,
+      "Set GPS refresh rate in seconds, or 0 disable the explicit rate.",
+      "[RATE]"
+    },
     { NULL }
 };
 
@@ -203,7 +208,8 @@ mmcli_modem_location_options_enabled (void)
                     get_gps_nmea_flag +
                     get_gps_raw_flag +
                     get_cdma_bs_flag) +
-                 !!set_supl_server_str);
+                 !!set_supl_server_str +
+                 !!set_gps_refresh_rate_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Location actions requested\n");
@@ -269,9 +275,9 @@ print_location_status (void)
     g_print ("\n"
              "%s\n"
              "  ----------------------------\n"
-             "  Location | capabilities: '%s'\n"
-             "           |      enabled: '%s'\n"
-             "           |      signals: '%s'\n",
+             "  Location |   capabilities: '%s'\n"
+             "           |        enabled: '%s'\n"
+             "           |        signals: '%s'\n",
              mm_modem_location_get_path (ctx->modem_location),
              capabilities_str,
              enabled_str,
@@ -280,8 +286,21 @@ print_location_status (void)
     /* If A-GPS supported, show SUPL server setup */
     if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS)
         g_print ("  ----------------------------\n"
-                 "  A-GPS    |  SUPL server: '%s'\n",
+                 "  A-GPS    |    SUPL server: '%s'\n",
                  mm_modem_location_get_supl_server (ctx->modem_location));
+
+    /* If GPS supported, show GPS refresh rate */
+    if (mm_modem_location_get_capabilities (ctx->modem_location) & (MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                                                    MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) {
+        guint rate;
+
+        rate = mm_modem_location_get_gps_refresh_rate (ctx->modem_location);
+        g_print ("  ----------------------------\n");
+        if (rate > 0)
+            g_print ("  GPS      |  refresh rate: '%u'\n", rate);
+        else
+            g_print ("  GPS      |  refresh rate: disabled\n");
+    }
 
     g_free (capabilities_str);
     g_free (enabled_str);
@@ -335,6 +354,32 @@ set_supl_server_ready (MMModemLocation *modem_location,
 
     operation_result = mm_modem_location_set_supl_server_finish (modem_location, result, &error);
     set_supl_server_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+set_gps_refresh_rate_process_reply (gboolean result,
+                                    const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set GPS refresh rate: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set GPS refresh rate\n");
+}
+
+static void
+set_gps_refresh_rate_ready (MMModemLocation *modem_location,
+                            GAsyncResult    *result)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_location_set_gps_refresh_rate_finish (modem_location, result, &error);
+    set_gps_refresh_rate_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -587,6 +632,24 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to set GPS refresh rate? */
+    if (set_gps_refresh_rate_str) {
+        guint rate;
+
+        if (!mm_get_uint_from_str (set_gps_refresh_rate_str, &rate)) {
+            g_printerr ("error: couldn't set GPS refresh rate: invalid rate given: '%s'\n",
+                        set_gps_refresh_rate_str);
+            exit (EXIT_FAILURE);
+        }
+        g_debug ("Asynchronously setting GPS refresh rate...");
+        mm_modem_location_set_gps_refresh_rate (ctx->modem_location,
+                                                rate,
+                                                ctx->cancellable,
+                                                (GAsyncReadyCallback)set_gps_refresh_rate_ready,
+                                                NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -689,6 +752,26 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
                                                          NULL,
                                                          &error);
         set_supl_server_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set GPS refresh rate? */
+    if (set_gps_refresh_rate_str) {
+        gboolean result;
+        guint rate;
+
+        if (!mm_get_uint_from_str (set_gps_refresh_rate_str, &rate)) {
+            g_printerr ("error: couldn't set GPS refresh rate: invalid rate given: '%s'\n",
+                        set_gps_refresh_rate_str);
+            exit (EXIT_FAILURE);
+        }
+
+        g_debug ("Synchronously setting GPS refresh rate...");
+        result = mm_modem_location_set_gps_refresh_rate_sync (ctx->modem_location,
+                                                              rate,
+                                                              NULL,
+                                                              &error);
+        set_gps_refresh_rate_process_reply (result, error);
         return;
     }
 

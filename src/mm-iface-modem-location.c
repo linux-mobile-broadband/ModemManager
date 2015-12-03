@@ -253,7 +253,7 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
         g_assert (ctx->location_gps_nmea != NULL);
         if (mm_location_gps_nmea_add_trace (ctx->location_gps_nmea, nmea_trace) &&
             (ctx->location_gps_nmea_last_time == 0 ||
-             time (NULL) - ctx->location_gps_nmea_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS)) {
+             time (NULL) - ctx->location_gps_nmea_last_time >= mm_gdbus_modem_location_get_gps_refresh_rate (skeleton))) {
             ctx->location_gps_nmea_last_time = time (NULL);
             update_nmea = TRUE;
         }
@@ -263,7 +263,7 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
         g_assert (ctx->location_gps_raw != NULL);
         if (mm_location_gps_raw_add_trace (ctx->location_gps_raw, nmea_trace) &&
             (ctx->location_gps_raw_last_time == 0 ||
-             time (NULL) - ctx->location_gps_raw_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS)) {
+             time (NULL) - ctx->location_gps_raw_last_time >= mm_gdbus_modem_location_get_gps_refresh_rate (skeleton))) {
             ctx->location_gps_raw_last_time = time (NULL);
             update_raw = TRUE;
         }
@@ -1029,6 +1029,91 @@ typedef struct {
     MmGdbusModemLocation *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemLocation *self;
+    guint rate;
+} HandleSetGpsRefreshRateContext;
+
+static void
+handle_set_gps_refresh_rate_context_free (HandleSetGpsRefreshRateContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleSetGpsRefreshRateContext, ctx);
+}
+
+static void
+handle_set_gps_refresh_rate_auth_ready (MMBaseModem *self,
+                                        GAsyncResult *res,
+                                        HandleSetGpsRefreshRateContext *ctx)
+{
+    GError *error = NULL;
+    MMModemState modem_state;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_gps_refresh_rate_context_free (ctx);
+        return;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot set SUPL server: "
+                                               "device not yet enabled");
+        handle_set_gps_refresh_rate_context_free (ctx);
+        return;
+    }
+
+    /* If GPS is NOT supported, set error */
+    if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & ((MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                                                       MM_MODEM_LOCATION_SOURCE_GPS_NMEA)))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set GPS refresh rate: GPS not supported");
+        handle_set_gps_refresh_rate_context_free (ctx);
+        return;
+    }
+
+    /* Set the new rate in the interface */
+    mm_gdbus_modem_location_set_gps_refresh_rate (ctx->skeleton, ctx->rate);
+    mm_gdbus_modem_location_complete_set_gps_refresh_rate (ctx->skeleton, ctx->invocation);
+    handle_set_gps_refresh_rate_context_free (ctx);
+}
+
+static gboolean
+handle_set_gps_refresh_rate (MmGdbusModemLocation *skeleton,
+                             GDBusMethodInvocation *invocation,
+                             guint rate,
+                             MMIfaceModemLocation *self)
+{
+    HandleSetGpsRefreshRateContext *ctx;
+
+    ctx = g_slice_new (HandleSetGpsRefreshRateContext);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->rate = rate;
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_gps_refresh_rate_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemLocation *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemLocation *self;
 } HandleGetLocationContext;
 
 static void
@@ -1362,6 +1447,7 @@ typedef enum {
     INITIALIZATION_STEP_CAPABILITIES,
     INITIALIZATION_STEP_VALIDATE_CAPABILITIES,
     INITIALIZATION_STEP_SUPL_SERVER,
+    INITIALIZATION_STEP_GPS_REFRESH_RATE,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1497,6 +1583,16 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case INITIALIZATION_STEP_GPS_REFRESH_RATE:
+        /* If we have GPS capabilities, expose the GPS refresh rate */
+        if (ctx->capabilities & ((MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                  MM_MODEM_LOCATION_SOURCE_GPS_NMEA)))
+            /* Set the default rate in the interface */
+            mm_gdbus_modem_location_set_gps_refresh_rate (ctx->skeleton, MM_LOCATION_GPS_REFRESH_TIME_SECS);
+
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
 
@@ -1508,6 +1604,10 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-set-supl-server",
                           G_CALLBACK (handle_set_supl_server),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-gps-refresh-rate",
+                          G_CALLBACK (handle_set_gps_refresh_rate),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
                           "handle-get-location",

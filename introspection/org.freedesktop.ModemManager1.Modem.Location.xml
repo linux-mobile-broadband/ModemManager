@@ -80,6 +80,20 @@
     </method>
 
     <!--
+        SetGpsRefreshRate:
+        @rate: Rate, in seconds.
+
+        Set the refresh rate of the GPS information in the API. If not explicitly
+        set, a default of 30s will be used.
+
+        The refresh rate can be set to 0 to disable it, so that every update reported by
+        the modem is published in the interface.
+    -->
+    <method name="SetGpsRefreshRate">
+      <arg name="rate" type="u" direction="in" />
+    </method>
+
+    <!--
         Capabilities:
 
         Bitmask of <link linkend="MMModemLocationSource">MMModemLocationSource</link>
@@ -289,6 +303,13 @@
         SUPL server configuration for A-GPS, given either as IP:PORT or with a full URL.
     -->
     <property name="SuplServer" type="s" access="read" />
+
+    <!--
+        GpsRefreshRate:
+
+        Rate of refresh of the GPS information in the interface.
+    -->
+    <property name="GpsRefreshRate" type="u" access="read" />
 
   </interface>
 </node>

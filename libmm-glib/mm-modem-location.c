@@ -306,6 +306,91 @@ mm_modem_location_set_supl_server_sync (MMModemLocation *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_location_set_gps_refresh_rate_finish:
+ * @self: A #MMModemLocation.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_set_gps_refresh_rate().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_location_set_gps_refresh_rate().
+ *
+ * Returns: %TRUE if setting the GPS refresh rate was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_set_gps_refresh_rate_finish (MMModemLocation *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_set_gps_refresh_rate_finish (MM_GDBUS_MODEM_LOCATION (self), res, error);
+}
+
+/**
+ * mm_modem_location_set_gps_refresh_rate:
+ * @self: A #MMModemLocation.
+ * @rate: The GPS refresh rate, in seconds.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously configures the GPS refresh rate.
+
+ * If a 0 rate is used, the GPS location updates will be immediately propagated to the interface.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_location_set_gps_refresh_rate_finish() to get the result of the operation.
+ *
+ * See mm_modem_location_set_gps_refresh_rate_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_location_set_gps_refresh_rate (MMModemLocation *self,
+                                        guint rate,
+                                        GCancellable *cancellable,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_LOCATION (self));
+
+    mm_gdbus_modem_location_call_set_gps_refresh_rate (MM_GDBUS_MODEM_LOCATION (self),
+                                                       rate,
+                                                       cancellable,
+                                                       callback,
+                                                       user_data);
+}
+
+/**
+ * mm_modem_location_set_gps_refresh_rate_sync:
+ * @self: A #MMModemLocation.
+ * @rate: The GPS refresh rate, in seconds.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously configures the GPS refresh rate.
+ *
+ * If a 0 rate is used, the GPS location updates will be immediately propagated to the interface.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_location_set_gps_refresh_rate()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if setting the refresh rate was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_set_gps_refresh_rate_sync (MMModemLocation *self,
+                                             guint rate,
+                                             GCancellable *cancellable,
+                                             GError **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_set_gps_refresh_rate_sync (MM_GDBUS_MODEM_LOCATION (self),
+                                                                   rate,
+                                                                   cancellable,
+                                                                   error);
+}
+
+/*****************************************************************************/
+
 static gboolean
 build_locations (GVariant *dictionary,
                  MMLocation3gpp **location_3gpp,
@@ -787,6 +872,24 @@ mm_modem_location_dup_supl_server (MMModemLocation *self)
 
     RETURN_NON_EMPTY_STRING (
         mm_gdbus_modem_location_dup_supl_server (MM_GDBUS_MODEM_LOCATION (self)));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_location_get_gps_refresh_rate:
+ * @self: A #MMModemLocation.
+ *
+ * Gets the GPS refresh rate, in seconds.
+ *
+ * Returns: The GPS refresh rate, or 0 if no fixed rate is used.
+ */
+guint
+mm_modem_location_get_gps_refresh_rate (MMModemLocation *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), 0);
+
+    return mm_gdbus_modem_location_get_gps_refresh_rate (MM_GDBUS_MODEM_LOCATION (self));
 }
 
 /*****************************************************************************/
