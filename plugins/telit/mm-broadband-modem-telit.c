@@ -64,6 +64,29 @@ modem_power_down (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+modem_reset_finish (MMIfaceModem *self,
+                    GAsyncResult *res,
+                    GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_reset (MMIfaceModem *self,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "AT#REBOOT",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static gboolean
@@ -313,6 +336,8 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->reset = modem_reset;
+    iface->reset_finish = modem_reset_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->load_access_technologies = load_access_technologies;
