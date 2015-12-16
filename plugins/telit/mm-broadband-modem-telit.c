@@ -31,6 +31,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-telit.h"
+#include "mm-modem-helpers-telit.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -38,6 +39,186 @@ static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+
+/*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+#define CSIM_QUERY_PIN_RETRIES_STR  "+CSIM=10,0020000100"
+#define CSIM_QUERY_PUK_RETRIES_STR  "+CSIM=10,002C000100"
+#define CSIM_QUERY_PIN2_RETRIES_STR "+CSIM=10,0020008100"
+#define CSIM_QUERY_PUK2_RETRIES_STR "+CSIM=10,002C008100"
+#define CSIM_QUERY_TIMEOUT 3
+
+typedef enum {
+    LOAD_UNLOCK_RETRIES_STEP_FIRST,
+    LOAD_UNLOCK_RETRIES_STEP_PIN,
+    LOAD_UNLOCK_RETRIES_STEP_PUK,
+    LOAD_UNLOCK_RETRIES_STEP_PIN2,
+    LOAD_UNLOCK_RETRIES_STEP_PUK2,
+    LOAD_UNLOCK_RETRIES_STEP_LAST
+} LoadUnlockRetriesStep;
+
+typedef struct {
+    MMBroadbandModemTelit* self;
+    GSimpleAsyncResult* result;
+    MMUnlockRetries* retries;
+    LoadUnlockRetriesStep step;
+    guint succeded_requests;
+} LoadUnlockRetriesContext;
+
+static void load_unlock_retries_step (LoadUnlockRetriesContext* ctx);
+
+static void
+load_unlock_retries_context_complete_and_free (LoadUnlockRetriesContext* ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->retries);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadUnlockRetriesContext, ctx);
+}
+
+static MMUnlockRetries *
+modem_load_unlock_retries_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return (MMUnlockRetries*) g_object_ref (g_simple_async_result_get_op_res_gpointer (
+                                                G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+csim_query_ready (MMBaseModem *self,
+                  GAsyncResult* res,
+                  LoadUnlockRetriesContext* ctx)
+{
+    const gchar *response;
+    gint unlock_retries;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+
+    if (!response) {
+        mm_warn ("No respose for step %d: %s", ctx->step, error->message);
+        g_error_free (error);
+        goto next_step;
+    }
+
+    if ( (unlock_retries = parse_csim_response (ctx->step, response, &error)) < 0) {
+        mm_warn ("Parse error in step %d: %s.", ctx->step, error->message);
+        g_error_free (error);
+        goto next_step;
+    }
+
+    ctx->succeded_requests++;
+
+    switch (ctx->step) {
+        case LOAD_UNLOCK_RETRIES_STEP_PIN:
+            mm_dbg ("PIN unlock retries left: %d", unlock_retries);
+            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN, unlock_retries);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PUK:
+            mm_dbg ("PUK unlock retries left: %d", unlock_retries);
+            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK, unlock_retries);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PIN2:
+            mm_dbg ("PIN2 unlock retries left: %d", unlock_retries);
+            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN2, unlock_retries);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PUK2:
+            mm_dbg ("PUK2 unlock retries left: %d", unlock_retries);
+            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK2, unlock_retries);
+            break;
+        default:
+            break;
+    }
+
+next_step:
+    ctx->step++;
+    load_unlock_retries_step (ctx);
+}
+
+static void
+load_unlock_retries_step (LoadUnlockRetriesContext* ctx)
+{
+    switch (ctx->step) {
+        case LOAD_UNLOCK_RETRIES_STEP_FIRST:
+            /* Fall back on next step */
+            ctx->step++;
+        case LOAD_UNLOCK_RETRIES_STEP_PIN:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_QUERY_PIN_RETRIES_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_query_ready,
+                                      ctx);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PUK:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_QUERY_PUK_RETRIES_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_query_ready,
+                                      ctx);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PIN2:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_QUERY_PIN2_RETRIES_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_query_ready,
+                                      ctx);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_PUK2:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_QUERY_PUK2_RETRIES_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_query_ready,
+                                      ctx);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_LAST:
+            if (ctx->succeded_requests == 0) {
+                g_simple_async_result_set_error (ctx->result,
+                                                 MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_FAILED,
+                                                 "Could not get any of the SIM unlock retries values. Look above for warning messages");
+            } else {
+                g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                           g_object_ref (ctx->retries),
+                                                           (GDestroyNotify)g_object_unref);
+            }
+
+            load_unlock_retries_context_complete_and_free (ctx);
+            break;
+        default:
+            break;
+    }
+}
+
+static void
+modem_load_unlock_retries (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    LoadUnlockRetriesContext* ctx;
+
+    ctx = g_slice_new0 (LoadUnlockRetriesContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_unlock_retries);
+
+    ctx->retries = mm_unlock_retries_new ();
+    ctx->step = 0;
+    ctx->succeded_requests = 0;
+
+    load_unlock_retries_step (ctx);
+}
 
 /*****************************************************************************/
 /* Modem power down (Modem interface) */
@@ -336,6 +517,8 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
+    iface->load_unlock_retries = modem_load_unlock_retries;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
     iface->modem_power_down = modem_power_down;

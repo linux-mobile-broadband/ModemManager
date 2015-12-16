@@ -503,10 +503,26 @@ libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
 	telit/mm-plugin-telit.h \
 	telit/mm-broadband-modem-telit.c \
-	telit/mm-broadband-modem-telit.h
+	telit/mm-broadband-modem-telit.h \
+	telit/mm-modem-helpers-telit.c \
+	telit/mm-modem-helpers-telit.h
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += telit/77-mm-telit-port-types.rules
+
+noinst_PROGRAMS += test-modem-helpers-telit
+test_modem_helpers_telit_SOURCES = \
+	telit/mm-modem-helpers-telit.c \
+	telit/mm-modem-helpers-telit.h \
+	telit/tests/test-mm-modem-helpers-telit.c
+test_modem_helpers_telit_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_telit_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_telit_LDADD = $(top_builddir)/libmm-glib/libmm-glib.la
+test_modem_helpers_telit_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # MTK
 libmm_plugin_mtk_la_SOURCES = \
