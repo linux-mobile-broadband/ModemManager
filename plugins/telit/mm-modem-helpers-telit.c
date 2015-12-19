@@ -29,7 +29,7 @@
 /*****************************************************************************/
 /* +CSIM response parser */
 
-gint parse_csim_response (const guint step, const gchar* response, GError** error)
+gint parse_csim_response (const guint step, const gchar *response, GError **error)
 {
     GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
