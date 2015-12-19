@@ -72,7 +72,7 @@ test_parse_csim_response (void)
 
     /* Test valid responses */
     for (i = 0; valid_csim_response_test_list[i].response != NULL; i++) {
-        res = parse_csim_response (step, valid_csim_response_test_list[i].response, &error);
+        res = mm_telit_parse_csim_response (step, valid_csim_response_test_list[i].response, &error);
 
         g_assert_no_error (error);
         g_assert_cmpint (res, ==, valid_csim_response_test_list[i].result);
@@ -80,7 +80,7 @@ test_parse_csim_response (void)
 
     /* Test invalid responses */
     for (i = 0; invalid_csim_response_test_list[i].response != NULL; i++) {
-        res = parse_csim_response (step, invalid_csim_response_test_list[i].response, &error);
+        res = mm_telit_parse_csim_response (step, invalid_csim_response_test_list[i].response, &error);
 
         g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
         g_assert_cmpint (res, ==, invalid_csim_response_test_list[i].result);
