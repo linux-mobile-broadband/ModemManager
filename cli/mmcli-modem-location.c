@@ -301,10 +301,14 @@ print_location_status (void)
              mm_modem_location_signals_location (ctx->modem_location) ? "yes" : "no");
 
     /* If A-GPS supported, show SUPL server setup */
-    if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS)
+    if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS) {
+        const gchar *supl_server;
+
+        supl_server = mm_modem_location_get_supl_server (ctx->modem_location);
         g_print ("  ----------------------------\n"
                  "  A-GPS    |    SUPL server: '%s'\n",
-                 mm_modem_location_get_supl_server (ctx->modem_location));
+                 supl_server ? supl_server : "unset");
+    }
 
     /* If GPS supported, show GPS refresh rate */
     if (mm_modem_location_get_capabilities (ctx->modem_location) & (MM_MODEM_LOCATION_SOURCE_GPS_RAW |
