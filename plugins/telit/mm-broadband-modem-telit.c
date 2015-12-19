@@ -214,7 +214,7 @@ modem_load_unlock_retries (MMIfaceModem *self,
                                              modem_load_unlock_retries);
 
     ctx->retries = mm_unlock_retries_new ();
-    ctx->step = 0;
+    ctx->step = LOAD_UNLOCK_RETRIES_STEP_FIRST;
     ctx->succeded_requests = 0;
 
     load_unlock_retries_step (ctx);
