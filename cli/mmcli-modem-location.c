@@ -62,6 +62,8 @@ static gboolean disable_cdma_bs_flag;
 static gboolean get_cdma_bs_flag;
 static gboolean enable_gps_unmanaged_flag;
 static gboolean disable_gps_unmanaged_flag;
+static gboolean set_enable_signal_flag;
+static gboolean set_disable_signal_flag;
 static gboolean get_all_flag;
 static gchar *set_supl_server_str;
 static gchar *set_gps_refresh_rate_str;
@@ -147,6 +149,14 @@ static GOptionEntry entries[] = {
       "Set GPS refresh rate in seconds, or 0 disable the explicit rate.",
       "[RATE]"
     },
+    { "location-set-enable-signal", 0, 0, G_OPTION_ARG_NONE, &set_enable_signal_flag,
+      "Enable location update signaling in DBus property.",
+      NULL
+    },
+    { "location-set-disable-signal", 0, 0, G_OPTION_ARG_NONE, &set_disable_signal_flag,
+      "Disable location update signaling in DBus property.",
+      NULL
+    },
     { NULL }
 };
 
@@ -184,6 +194,11 @@ mmcli_modem_location_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
+    if (set_enable_signal_flag && set_disable_signal_flag) {
+        g_printerr ("error: cannot enable and disable location signaling\n");
+        exit (EXIT_FAILURE);
+    }
+
     if (get_all_flag) {
         get_3gpp_flag = TRUE;
         get_gps_nmea_flag = TRUE;
@@ -203,7 +218,9 @@ mmcli_modem_location_options_enabled (void)
                     enable_cdma_bs_flag +
                     disable_cdma_bs_flag +
                     enable_gps_unmanaged_flag +
-                    disable_gps_unmanaged_flag) +
+                    disable_gps_unmanaged_flag +
+                    set_enable_signal_flag +
+                    set_disable_signal_flag) +
                  !!(get_3gpp_flag +
                     get_gps_nmea_flag +
                     get_gps_raw_flag +
@@ -425,6 +442,16 @@ build_sources_from_flags (void)
     return sources;
 }
 
+static gboolean
+build_signals_location_from_flags (void)
+{
+    if (set_enable_signal_flag)
+        return TRUE;
+    if (set_disable_signal_flag)
+        return FALSE;
+    return mm_modem_location_signals_location (ctx->modem_location);
+}
+
 static void
 get_location_process_reply (MMLocation3gpp *location_3gpp,
                             MMLocationGpsNmea *location_gps_nmea,
@@ -597,11 +624,13 @@ get_modem_ready (GObject      *source,
         enable_cdma_bs_flag ||
         disable_cdma_bs_flag ||
         enable_gps_unmanaged_flag ||
-        disable_gps_unmanaged_flag) {
+        disable_gps_unmanaged_flag ||
+        set_enable_signal_flag ||
+        set_disable_signal_flag) {
         g_debug ("Asynchronously setting up location gathering...");
         mm_modem_location_setup (ctx->modem_location,
                                  build_sources_from_flags (),
-                                 mm_modem_location_signals_location (ctx->modem_location),
+                                 build_signals_location_from_flags (),
                                  ctx->cancellable,
                                  (GAsyncReadyCallback)setup_ready,
                                  NULL);
@@ -707,13 +736,15 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
         enable_cdma_bs_flag ||
         disable_cdma_bs_flag ||
         enable_gps_unmanaged_flag ||
-        disable_gps_unmanaged_flag) {
+        disable_gps_unmanaged_flag ||
+        set_enable_signal_flag ||
+        set_disable_signal_flag) {
         gboolean result;
 
         g_debug ("Synchronously setting up location gathering...");
         result = mm_modem_location_setup_sync (ctx->modem_location,
                                                build_sources_from_flags (),
-                                               mm_modem_location_signals_location (ctx->modem_location),
+                                               build_signals_location_from_flags (),
                                                NULL,
                                                &error);
         setup_process_reply (result, error);
