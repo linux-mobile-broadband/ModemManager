@@ -185,7 +185,7 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
                 g_simple_async_result_set_error (ctx->result,
                                                  MM_CORE_ERROR,
                                                  MM_CORE_ERROR_FAILED,
-                                                 "Could not get any of the SIM unlock retries values. Look above for warning messages");
+                                                 "Could not get any of the SIM unlock retries values");
             } else {
                 g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                            g_object_ref (ctx->retries),
