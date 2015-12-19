@@ -59,17 +59,17 @@ typedef enum {
 } LoadUnlockRetriesStep;
 
 typedef struct {
-    MMBroadbandModemTelit* self;
-    GSimpleAsyncResult* result;
-    MMUnlockRetries* retries;
+    MMBroadbandModemTelit *self;
+    GSimpleAsyncResult *result;
+    MMUnlockRetries *retries;
     LoadUnlockRetriesStep step;
     guint succeded_requests;
 } LoadUnlockRetriesContext;
 
-static void load_unlock_retries_step (LoadUnlockRetriesContext* ctx);
+static void load_unlock_retries_step (LoadUnlockRetriesContext *ctx);
 
 static void
-load_unlock_retries_context_complete_and_free (LoadUnlockRetriesContext* ctx)
+load_unlock_retries_context_complete_and_free (LoadUnlockRetriesContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->retries);
@@ -92,8 +92,8 @@ modem_load_unlock_retries_finish (MMIfaceModem *self,
 
 static void
 csim_query_ready (MMBaseModem *self,
-                  GAsyncResult* res,
-                  LoadUnlockRetriesContext* ctx)
+                  GAsyncResult *res,
+                  LoadUnlockRetriesContext *ctx)
 {
     const gchar *response;
     gint unlock_retries;
@@ -142,7 +142,7 @@ next_step:
 }
 
 static void
-load_unlock_retries_step (LoadUnlockRetriesContext* ctx)
+load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
 {
     switch (ctx->step) {
         case LOAD_UNLOCK_RETRIES_STEP_FIRST:
@@ -204,7 +204,7 @@ modem_load_unlock_retries (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    LoadUnlockRetriesContext* ctx;
+    LoadUnlockRetriesContext *ctx;
 
     ctx = g_slice_new0 (LoadUnlockRetriesContext);
     ctx->self = g_object_ref (self);

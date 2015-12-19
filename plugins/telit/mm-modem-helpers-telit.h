@@ -19,7 +19,6 @@
 #include <glib.h>
 
 /* +CSIM response parser */
-gint parse_csim_response (const guint step, const gchar* response, GError** error);
+gint parse_csim_response (const guint step, const gchar *response, GError **error);
 
 #endif  /* MM_MODEM_HELPERS_TELIT_H */
-
