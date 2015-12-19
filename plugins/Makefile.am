@@ -568,7 +568,6 @@ test_modem_helpers_telit_CPPFLAGS = \
 test_modem_helpers_telit_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
        $(top_builddir)/src/libmodem-helpers.la
-test_modem_helpers_telit_LDADD = $(top_builddir)/libmm-glib/libmm-glib.la
 test_modem_helpers_telit_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # MTK
