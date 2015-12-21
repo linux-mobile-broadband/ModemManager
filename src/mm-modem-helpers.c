@@ -68,6 +68,69 @@ mm_strip_tag (const gchar *str, const gchar *cmd)
 
 /*****************************************************************************/
 
+gchar **
+mm_split_string_groups (const gchar *str)
+{
+    GPtrArray *array;
+    const gchar *start;
+    const gchar *next;
+
+    array = g_ptr_array_new ();
+
+    /*
+     * Manually parse splitting groups. Groups may be single elements, or otherwise
+     * lists given between parenthesis, e.g.:
+     *
+     *    ("SM","ME"),("SM","ME"),("SM","ME")
+     *    "SM","SM","SM"
+     *    "SM",("SM","ME"),("SM","ME")
+     */
+
+    /* Iterate string splitting groups */
+    for (start = str; start; start = next) {
+        gchar *item;
+        gssize len = -1;
+
+        /* skip leading whitespaces */
+        while (*start == ' ')
+            start++;
+
+        if (*start == '(') {
+            start++;
+            next = strchr (start, ')');
+            if (next) {
+                len = next - start;
+                next = strchr (next, ',');
+                if (next)
+                    next++;
+            }
+        } else {
+            next = strchr (start, ',');
+            if (next) {
+                len = next - start;
+                next++;
+            }
+        }
+
+        if (len < 0)
+            item = g_strdup (start);
+        else
+            item = g_strndup (start, len);
+
+        g_ptr_array_add (array, item);
+    }
+
+    if (array->len > 0) {
+        g_ptr_array_add (array, NULL);
+        return (gchar **) g_ptr_array_free (array, FALSE);
+    }
+
+    g_ptr_array_unref (array);
+    return NULL;
+}
+
+/*****************************************************************************/
+
 guint
 mm_count_bits_set (gulong number)
 {
@@ -1290,67 +1353,6 @@ storage_from_str (const gchar *str)
     return MM_SMS_STORAGE_UNKNOWN;
 }
 
-static gchar **
-helper_split_groups (const gchar *str)
-{
-    GPtrArray *array;
-    const gchar *start;
-    const gchar *next;
-
-    array = g_ptr_array_new ();
-
-    /*
-     * Manually parse splitting groups. Groups may be single elements, or otherwise
-     * lists given between parenthesis, e.g.:
-     *
-     *    ("SM","ME"),("SM","ME"),("SM","ME")
-     *    "SM","SM","SM"
-     *    "SM",("SM","ME"),("SM","ME")
-     */
-
-    /* Iterate string splitting groups */
-    for (start = str; start; start = next) {
-        gchar *item;
-        gssize len = -1;
-
-        /* skip leading whitespaces */
-        while (*start == ' ')
-            start++;
-
-        if (*start == '(') {
-            start++;
-            next = strchr (start, ')');
-            if (next) {
-                len = next - start;
-                next = strchr (next, ',');
-                if (next)
-                    next++;
-            }
-        } else {
-            next = strchr (start, ',');
-            if (next) {
-                len = next - start;
-                next++;
-            }
-        }
-
-        if (len < 0)
-            item = g_strdup (start);
-        else
-            item = g_strndup (start, len);
-
-        g_ptr_array_add (array, item);
-    }
-
-    if (array->len > 0) {
-        g_ptr_array_add (array, NULL);
-        return (gchar **) g_ptr_array_free (array, FALSE);
-    }
-
-    g_ptr_array_unref (array);
-    return NULL;
-}
-
 gboolean
 mm_3gpp_parse_cpms_test_response (const gchar *reply,
                                   GArray **mem1,
@@ -1370,7 +1372,7 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
 
 #define N_EXPECTED_GROUPS 3
 
-    split = helper_split_groups (mm_strip_tag (reply, "+CPMS:"));
+    split = mm_split_string_groups (mm_strip_tag (reply, "+CPMS:"));
     if (!split)
         return FALSE;
 

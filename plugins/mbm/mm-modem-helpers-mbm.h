@@ -24,4 +24,18 @@ gboolean mm_mbm_parse_e2ipcfg_response (const gchar *response,
                                         MMBearerIpConfig **out_ip6_config,
                                         GError **error);
 
+typedef enum {
+    MBM_NETWORK_MODE_OFFLINE   = 0,
+    MBM_NETWORK_MODE_ANY       = 1,
+    MBM_NETWORK_MODE_LOW_POWER = 4,
+    MBM_NETWORK_MODE_2G        = 5,
+    MBM_NETWORK_MODE_3G        = 6,
+} MbmNetworkMode;
+
+/* AT+CFUN=? test parser
+ * Returns a bitmask, bit index set for the supported modes reported */
+gboolean mm_mbm_parse_cfun_test (const gchar *response,
+                                 guint32 *supported_mask,
+                                 GError **error);
+
 #endif  /* MM_MODEM_HELPERS_MBM_H */

@@ -51,6 +51,8 @@ gchar       *mm_strip_quotes (gchar *str);
 const gchar *mm_strip_tag    (const gchar *str,
                               const gchar *cmd);
 
+gchar **mm_split_string_groups (const gchar *str);
+
 guint mm_count_bits_set (gulong number);
 
 gchar *mm_create_device_identifier (guint vid,

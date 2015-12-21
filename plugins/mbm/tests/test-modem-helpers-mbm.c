@@ -28,6 +28,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-mbm.h"
 
+#define ENABLE_TEST_MESSAGE_TRACES
+
 /*****************************************************************************/
 /* Test *E2IPCFG responses */
 
@@ -47,7 +49,7 @@ typedef struct {
 } E2ipcfgTest;
 
 static const E2ipcfgTest tests[] = {
-    { "*E2IPCFG: (1,\"46.157.32.246\")(2,\"46.157.32.243\")(3,\"193.213.112.4\")(3,\"130.67.15.198\")\r\n", 
+    { "*E2IPCFG: (1,\"46.157.32.246\")(2,\"46.157.32.243\")(3,\"193.213.112.4\")(3,\"130.67.15.198\")\r\n",
         "46.157.32.246", "46.157.32.243", "193.213.112.4", "130.67.15.198",
         NULL, NULL },
 
@@ -130,6 +132,63 @@ test_e2ipcfg (void)
 }
 
 /*****************************************************************************/
+/* Test +CFUN test responses */
+
+#define MAX_MODES 32
+
+typedef struct {
+    const gchar *str;
+    guint32 expected_mask;
+} CfunTest;
+
+static const CfunTest cfun_tests[] = {
+    {
+        "+CFUN: (0,1,4-6),(1-0)\r\n",
+        ((1 << MBM_NETWORK_MODE_OFFLINE)   |
+         (1 << MBM_NETWORK_MODE_ANY)       |
+         (1 << MBM_NETWORK_MODE_LOW_POWER) |
+         (1 << MBM_NETWORK_MODE_2G)        |
+         (1 << MBM_NETWORK_MODE_3G))
+    },
+    {
+        "+CFUN: (0,1,4-6)\r\n",
+        ((1 << MBM_NETWORK_MODE_OFFLINE)   |
+         (1 << MBM_NETWORK_MODE_ANY)       |
+         (1 << MBM_NETWORK_MODE_LOW_POWER) |
+         (1 << MBM_NETWORK_MODE_2G)        |
+         (1 << MBM_NETWORK_MODE_3G))
+    },
+    {
+        "+CFUN: (0,1,4)\r\n",
+        ((1 << MBM_NETWORK_MODE_OFFLINE)   |
+         (1 << MBM_NETWORK_MODE_ANY)       |
+         (1 << MBM_NETWORK_MODE_LOW_POWER))
+    },
+    {
+        "+CFUN: (0,1)\r\n",
+        ((1 << MBM_NETWORK_MODE_OFFLINE)   |
+         (1 << MBM_NETWORK_MODE_ANY))
+    },
+};
+
+static void
+test_cfun (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_tests); i++) {
+        guint32 mask;
+        gboolean success;
+        GError *error = NULL;
+
+        success = mm_mbm_parse_cfun_test (cfun_tests[i].str, &mask, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (mask, ==, cfun_tests[i].expected_mask);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -159,6 +218,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/mbm/e2ipcfg", test_e2ipcfg);
+    g_test_add_func ("/MM/mbm/cfun", test_cfun);
 
     return g_test_run ();
 }

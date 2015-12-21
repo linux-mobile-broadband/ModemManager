@@ -35,6 +35,7 @@
 #include "mm-bearer-list.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
+#include "mm-modem-helpers-mbm.h"
 #include "mm-broadband-modem-mbm.h"
 #include "mm-broadband-bearer-mbm.h"
 #include "mm-sim-mbm.h"
@@ -58,12 +59,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbm, mm_broadband_modem_mbm, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
-
-#define MBM_NETWORK_MODE_OFFLINE   0
-#define MBM_NETWORK_MODE_ANY       1
-#define MBM_NETWORK_MODE_LOW_POWER 4
-#define MBM_NETWORK_MODE_2G        5
-#define MBM_NETWORK_MODE_3G        6
 
 #define MBM_E2NAP_DISCONNECTED 0
 #define MBM_E2NAP_CONNECTED    1
@@ -204,59 +199,55 @@ modem_after_sim_unlock (MMIfaceModem *self,
 /* Load supported modes (Modem interface) */
 
 static GArray *
-load_supported_modes_finish (MMIfaceModem *self,
+load_supported_modes_finish (MMIfaceModem *_self,
                              GAsyncResult *res,
                              GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-parent_load_supported_modes_ready (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-    GArray *all;
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
+    const gchar *response;
+    guint32 mask =  0;
     GArray *combinations;
-    GArray *filtered;
     MMModemModeCombination mode;
 
-    all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
-    if (!all) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    if (!mm_mbm_parse_cfun_test (response, &mask, error))
+        return FALSE;
 
     /* Build list of combinations */
     combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 3);
 
     /* 2G only */
-    mode.allowed = MM_MODEM_MODE_2G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+    if (mask & (1 << MBM_NETWORK_MODE_2G)) {
+        mode.allowed = MM_MODEM_MODE_2G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
     /* 3G only */
-    mode.allowed = MM_MODEM_MODE_3G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+    if (mask & (1 << MBM_NETWORK_MODE_3G)) {
+        mode.allowed = MM_MODEM_MODE_3G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
     /* 2G and 3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+    if (mask & (1 << MBM_NETWORK_MODE_ANY)) {
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
 
-    /* Filter out those unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations);
-    g_array_unref (all);
-    g_array_unref (combinations);
+    if (combinations->len == 0) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Couldn't load any supported mode");
+        g_array_unref (combinations);
+        return NULL;
+    }
 
-    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    return combinations;
 }
 
 static void
@@ -264,14 +255,12 @@ load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    /* Run parent's loading */
-    iface_modem_parent->load_supported_modes (
-        MM_IFACE_MODEM (self),
-        (GAsyncReadyCallback)parent_load_supported_modes_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_supported_modes));
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
