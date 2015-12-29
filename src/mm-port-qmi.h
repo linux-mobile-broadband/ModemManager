@@ -82,4 +82,6 @@ QmiClient *mm_port_qmi_get_client  (MMPortQmi *self,
                                     QmiService service,
                                     MMPortQmiFlag flag);
 
+gboolean mm_port_qmi_llp_is_raw_ip (MMPortQmi *self);
+
 #endif /* MM_PORT_QMI_H */

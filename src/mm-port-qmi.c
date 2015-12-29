@@ -36,6 +36,7 @@ struct _MMPortQmiPrivate {
     gboolean opening;
     QmiDevice *qmi_device;
     GList *services;
+    gboolean llp_is_raw_ip;
 };
 
 /*****************************************************************************/
@@ -159,6 +160,14 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
                                 cancellable,
                                 (GAsyncReadyCallback)allocate_client_ready,
                                 ctx);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_port_qmi_llp_is_raw_ip (MMPortQmi *self)
+{
+    return self->priv->llp_is_raw_ip;
 }
 
 /*****************************************************************************/
@@ -421,10 +430,18 @@ port_open_context_step (PortOpenContext *ctx)
         mm_dbg ("Checking data format: kernel %s, device %s",
                 qmi_device_expected_data_format_get_string (ctx->kernel_data_format),
                 qmi_wda_link_layer_protocol_get_string (ctx->llp));
-        if ((ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3 &&
-             ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) ||
-            (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP &&
-             ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP)) {
+
+        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3 &&
+            ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) {
+            ctx->self->priv->llp_is_raw_ip = FALSE;
+            ctx->step = PORT_OPEN_STEP_LAST;
+            port_open_context_step (ctx);
+            return;
+        }
+
+        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP &&
+            ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP) {
+            ctx->self->priv->llp_is_raw_ip = TRUE;
             ctx->step = PORT_OPEN_STEP_LAST;
             port_open_context_step (ctx);
             return;

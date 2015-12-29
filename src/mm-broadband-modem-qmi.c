@@ -311,6 +311,13 @@ modem_create_bearer (MMIfaceModem *self,
 {
     MMBaseBearer *bearer;
     GSimpleAsyncResult *result;
+    MMPortQmi *port;
+    gboolean force_dhcp = TRUE;
+
+    /* We use static IP setup when raw IP link layer protocol in use */
+    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    if (port && mm_port_qmi_llp_is_raw_ip (port))
+        force_dhcp = FALSE;
 
     /* Set a new ref to the bearer object as result */
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -320,7 +327,7 @@ modem_create_bearer (MMIfaceModem *self,
 
     /* We just create a MMBearerQmi */
     mm_dbg ("Creating QMI bearer in QMI modem");
-    bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties, TRUE);
+    bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties, force_dhcp);
     g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
