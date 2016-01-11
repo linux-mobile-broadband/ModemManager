@@ -46,23 +46,19 @@ struct _MMPluginManagerClass {
     GObjectClass parent;
 };
 
-GType mm_plugin_manager_get_type (void);
-
-MMPluginManager *mm_plugin_manager_new (const gchar *plugindir,
-                                        GError **error);
-
-/* Asynchronous operation to find the best plugin giving support to a
- * given device. */
-void     mm_plugin_manager_find_device_support        (MMPluginManager *self,
-                                                       MMDevice *device,
-                                                       GAsyncReadyCallback callback,
-                                                       gpointer user_data);
-gboolean mm_plugin_manager_find_device_support_finish (MMPluginManager *self,
-                                                       GAsyncResult *result,
-                                                       GError **error);
-
-/* Get plugin */
-MMPlugin *mm_plugin_manager_peek_plugin (MMPluginManager *self,
-                                         const gchar *plugin_name);
+GType            mm_plugin_manager_get_type (void);
+MMPluginManager *mm_plugin_manager_new                         (const gchar          *plugindir,
+                                                                GError              **error);
+void             mm_plugin_manager_device_support_check        (MMPluginManager      *self,
+                                                                MMDevice             *device,
+                                                                GAsyncReadyCallback   callback,
+                                                                gpointer              user_data);
+gboolean         mm_plugin_manager_device_support_check_cancel (MMPluginManager      *self,
+                                                                MMDevice             *device);
+MMPlugin *       mm_plugin_manager_device_support_check_finish (MMPluginManager      *self,
+                                                                GAsyncResult         *res,
+                                                                GError              **error);
+MMPlugin        *mm_plugin_manager_peek_plugin                 (MMPluginManager      *self,
+                                                                const gchar          *plugin_name);
 
 #endif /* MM_PLUGIN_MANAGER_H */

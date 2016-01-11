@@ -141,27 +141,38 @@ find_device_support_context_free (FindDeviceSupportContext *ctx)
 }
 
 static void
-find_device_support_ready (MMPluginManager *plugin_manager,
-                           GAsyncResult *result,
-                           FindDeviceSupportContext *ctx)
+device_support_check_ready (MMPluginManager          *plugin_manager,
+                            GAsyncResult             *res,
+                            FindDeviceSupportContext *ctx)
 {
-    GError *error = NULL;
+    GError   *error = NULL;
+    MMPlugin *plugin;
 
-    if (!mm_plugin_manager_find_device_support_finish (plugin_manager, result, &error)) {
-        mm_info ("Couldn't find support for device at '%s': %s",
-                 mm_device_get_path (ctx->device),
-                 error->message);
+    /* Receive plugin result from the plugin manager */
+    plugin = mm_plugin_manager_device_support_check_finish (plugin_manager, res, &error);
+    if (!plugin) {
+        mm_info ("Couldn't check support for device at '%s': %s",
+                 mm_device_get_path (ctx->device), error->message);
         g_error_free (error);
-    } else if (!mm_device_create_modem (ctx->device, ctx->self->priv->object_manager, &error)) {
-        mm_warn ("Couldn't create modem for device at '%s': %s",
-                 mm_device_get_path (ctx->device),
-                 error->message);
-        g_error_free (error);
-    } else {
-        mm_info ("Modem for device at '%s' successfully created",
-                 mm_device_get_path (ctx->device));
+        find_device_support_context_free (ctx);
+        return;
     }
 
+    /* Set the plugin as the one expected in the device */
+    mm_device_set_plugin (ctx->device, G_OBJECT (plugin));
+    g_object_unref (plugin);
+
+    if (!mm_device_create_modem (ctx->device, ctx->self->priv->object_manager, &error)) {
+        mm_warn ("Couldn't create modem for device at '%s': %s",
+                 mm_device_get_path (ctx->device), error->message);
+        g_error_free (error);
+        find_device_support_context_free (ctx);
+        return;
+    }
+
+    /* Modem now created */
+    mm_info ("Modem for device at '%s' successfully created",
+             mm_device_get_path (ctx->device));
     find_device_support_context_free (ctx);
 }
 
@@ -266,6 +277,8 @@ device_removed (MMBaseManager *self,
             /* If port probe list gets empty, remove the device object iself */
             if (!mm_device_peek_port_probe_list (device)) {
                 mm_dbg ("Removing empty device '%s'", mm_device_get_path (device));
+                if (mm_plugin_manager_device_support_check_cancel (self->priv->plugin_manager, device))
+                    mm_dbg ("Device support check has been cancelled");
                 mm_device_remove_modem (device);
                 g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
             }
@@ -397,10 +410,10 @@ device_added (MMBaseManager *manager,
         ctx = g_slice_new (FindDeviceSupportContext);
         ctx->self = g_object_ref (manager);
         ctx->device = g_object_ref (device);
-        mm_plugin_manager_find_device_support (
+        mm_plugin_manager_device_support_check (
             manager->priv->plugin_manager,
             device,
-            (GAsyncReadyCallback)find_device_support_ready,
+            (GAsyncReadyCallback) device_support_check_ready,
             ctx);
     }
 
