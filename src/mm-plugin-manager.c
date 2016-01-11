@@ -825,42 +825,42 @@ load_plugin (const gchar *path)
 
     module = g_module_open (path, G_MODULE_BIND_LAZY);
     if (!module) {
-        g_warning ("Could not load plugin '%s': %s", path_display, g_module_error ());
+        mm_warn ("[plugin manager] could not load plugin '%s': %s", path_display, g_module_error ());
         goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_major_version", (gpointer *) &major_plugin_version)) {
-        g_warning ("Could not load plugin '%s': Missing major version info", path_display);
+        mm_warn ("[plugin manager] could not load plugin '%s': Missing major version info", path_display);
         goto out;
     }
 
     if (*major_plugin_version != MM_PLUGIN_MAJOR_VERSION) {
-        g_warning ("Could not load plugin '%s': Plugin major version %d, %d is required",
-                   path_display, *major_plugin_version, MM_PLUGIN_MAJOR_VERSION);
+        mm_warn ("[plugin manager] could not load plugin '%s': Plugin major version %d, %d is required",
+                 path_display, *major_plugin_version, MM_PLUGIN_MAJOR_VERSION);
         goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_minor_version", (gpointer *) &minor_plugin_version)) {
-        g_warning ("Could not load plugin '%s': Missing minor version info", path_display);
+        mm_warn ("[plugin manager] could not load plugin '%s': Missing minor version info", path_display);
         goto out;
     }
 
     if (*minor_plugin_version != MM_PLUGIN_MINOR_VERSION) {
-        g_warning ("Could not load plugin '%s': Plugin minor version %d, %d is required",
+        mm_warn ("[plugin manager] could not load plugin '%s': Plugin minor version %d, %d is required",
                    path_display, *minor_plugin_version, MM_PLUGIN_MINOR_VERSION);
         goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_create", (gpointer *) &plugin_create_func)) {
-        g_warning ("Could not load plugin '%s': %s", path_display, g_module_error ());
+        mm_warn ("[plugin manager] could not load plugin '%s': %s", path_display, g_module_error ());
         goto out;
     }
 
     plugin = (*plugin_create_func) ();
-    if (plugin) {
+    if (plugin)
         g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
-    } else
-        mm_warn ("Could not load plugin '%s': initialization failed", path_display);
+    else
+        mm_warn ("[plugin manager] could not load plugin '%s': initialization failed", path_display);
 
 out:
     if (module && !plugin)
@@ -883,20 +883,20 @@ load_plugins (MMPluginManager *self,
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
-                     "GModules are not supported on your platform!");
+                     "modules are not supported on your platform!");
         goto out;
     }
 
     /* Get printable UTF-8 string of the path */
     plugindir_display = g_filename_display_name (self->priv->plugin_dir);
 
-    mm_dbg ("Looking for plugins in '%s'", plugindir_display);
+    mm_dbg ("[plugin manager] looking for plugins in '%s'", plugindir_display);
     dir = g_dir_open (self->priv->plugin_dir, 0, NULL);
     if (!dir) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_NO_PLUGINS,
-                     "Plugin directory '%s' not found",
+                     "plugin directory '%s' not found",
                      plugindir_display);
         goto out;
     }
@@ -915,7 +915,7 @@ load_plugins (MMPluginManager *self,
         if (!plugin)
             continue;
 
-        mm_dbg ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
+        mm_dbg ("[plugin manager] loaded plugin '%s'", mm_plugin_get_name (plugin));
 
         if (g_str_equal (mm_plugin_get_name (plugin), MM_PLUGIN_GENERIC_NAME))
             /* Generic plugin */
@@ -927,19 +927,19 @@ load_plugins (MMPluginManager *self,
 
     /* Check the generic plugin once all looped */
     if (!self->priv->generic)
-        mm_warn ("Generic plugin not loaded");
+        mm_warn ("[plugin manager] generic plugin not loaded");
 
     /* Treat as error if we don't find any plugin */
     if (!self->priv->plugins && !self->priv->generic) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_NO_PLUGINS,
-                     "No plugins found in plugin directory '%s'",
+                     "no plugins found in plugin directory '%s'",
                      plugindir_display);
         goto out;
     }
 
-    mm_dbg ("Successfully loaded %u plugins",
+    mm_dbg ("[plugin manager] successfully loaded %u plugins",
             g_list_length (self->priv->plugins) + !!self->priv->generic);
 
 out:
