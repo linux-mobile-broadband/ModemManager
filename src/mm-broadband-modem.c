@@ -6454,6 +6454,7 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             NULL);
     }
 
+    g_regex_unref (clip_regex);
     g_regex_unref (cring_regex);
     g_regex_unref (ring_regex);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
