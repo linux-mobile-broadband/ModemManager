@@ -35,15 +35,15 @@ typedef GTestFixtureFunc TCFunc;
 static TestData *
 test_data_new (const char *port)
 {
-	TestData *d;
+    TestData *d;
 
-	d = g_malloc0 (sizeof (TestData));
-	g_assert (d);
+    d = g_malloc0 (sizeof (TestData));
+    g_assert (d);
 
     if (port)
         d->com_data = test_com_setup (port);
 
-	return d;
+    return d;
 }
 
 static void
@@ -52,7 +52,7 @@ test_data_free (TestData *d)
     if (d->com_data)
         test_com_teardown (d->com_data);
 
-	g_free (d);
+    g_free (d);
 }
 
 int main (int argc, char **argv)
@@ -118,9 +118,9 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_com_gsm_subsys_state_info, data->com_data));
     }
 
-	result = g_test_run ();
+    result = g_test_run ();
 
-	test_data_free (data);
+    test_data_free (data);
 
-	return result;
+    return result;
 }
