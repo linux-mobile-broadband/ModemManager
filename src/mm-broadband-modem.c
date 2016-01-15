@@ -7874,8 +7874,10 @@ modem_time_load_network_time_finish (MMIfaceModemTime *self,
     gchar *result = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (response)
-        mm_parse_cclk_response (response, &result, NULL, error);
+    if (!response)
+        return NULL;
+    if (!mm_parse_cclk_response (response, &result, NULL, error))
+        return NULL;
     return result;
 }
 
@@ -7903,9 +7905,11 @@ modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
     const gchar *response;
     MMNetworkTimezone *tz = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
-    if (response)
-        mm_parse_cclk_response (response, NULL, &tz, error);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+    if (!mm_parse_cclk_response (response, NULL, &tz, error))
+        return NULL;
     return tz;
 }
 
