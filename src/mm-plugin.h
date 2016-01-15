@@ -64,7 +64,8 @@
 #define MM_PLUGIN_SEND_LF                   "send-lf"
 
 typedef enum {
-    MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
+    MM_PLUGIN_SUPPORTS_PORT_UNKNOWN = -1,
+    MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED,
     MM_PLUGIN_SUPPORTS_PORT_DEFER,
     MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED,
     MM_PLUGIN_SUPPORTS_PORT_SUPPORTED
@@ -119,14 +120,15 @@ MMPluginSupportsHint mm_plugin_discard_port_early (MMPlugin *plugin,
                                                    MMDevice *device,
                                                    GUdevDevice *port);
 
-void                   mm_plugin_supports_port        (MMPlugin *plugin,
-                                                       MMDevice *device,
-                                                       GUdevDevice *port,
-                                                       GAsyncReadyCallback callback,
-                                                       gpointer user_data);
-MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
-                                                       GAsyncResult *result,
-                                                       GError **error);
+void                   mm_plugin_supports_port        (MMPlugin             *plugin,
+                                                       MMDevice             *device,
+                                                       GUdevDevice          *port,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin             *plugin,
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
 
 MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
                                      MMDevice *device,

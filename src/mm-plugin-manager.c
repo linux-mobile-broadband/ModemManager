@@ -465,6 +465,7 @@ plugin_supports_port_ready (MMPlugin     *plugin,
     /* Get supports check results */
     support_result = mm_plugin_supports_port_finish (plugin, res, &error);
     if (error) {
+        g_assert_cmpuint (support_result, ==, MM_PLUGIN_SUPPORTS_PORT_UNKNOWN);
         mm_warn ("[plugin manager] task %s: error when checking support with plugin '%s': '%s'",
                  port_context->name, mm_plugin_get_name (plugin), error->message);
         g_error_free (error);
@@ -474,6 +475,7 @@ plugin_supports_port_ready (MMPlugin     *plugin,
     case MM_PLUGIN_SUPPORTS_PORT_SUPPORTED:
         port_context_supported (port_context, plugin);
         break;
+    case MM_PLUGIN_SUPPORTS_PORT_UNKNOWN:
     case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
         port_context_unsupported (port_context, plugin);
         break;
@@ -518,6 +520,7 @@ port_context_next (PortContext *port_context)
     mm_plugin_supports_port (plugin,
                              port_context->device,
                              port_context->port,
+                             port_context->cancellable,
                              (GAsyncReadyCallback) plugin_supports_port_ready,
                              port_context_ref (port_context));
 }
