@@ -757,12 +757,29 @@ device_context_ref (DeviceContext *device_context)
 }
 
 static PortContext *
-device_context_peek_port_context (DeviceContext *device_context,
-                                  GUdevDevice   *port)
+device_context_peek_running_port_context (DeviceContext *device_context,
+                                          GUdevDevice   *port)
 {
     GList *l;
 
     for (l = device_context->port_contexts; l; l = g_list_next (l)) {
+        PortContext *port_context;
+
+        port_context = (PortContext *)(l->data);
+        if ((port_context->port == port) ||
+            (!g_strcmp0 (g_udev_device_get_name (port_context->port), g_udev_device_get_name (port))))
+            return port_context;
+    }
+    return NULL;
+}
+
+static PortContext *
+device_context_peek_waiting_port_context (DeviceContext *device_context,
+                                          GUdevDevice   *port)
+{
+    GList *l;
+
+    for (l = device_context->wait_port_contexts; l; l = g_list_next (l)) {
         PortContext *port_context;
 
         port_context = (PortContext *)(l->data);
@@ -1113,15 +1130,27 @@ device_context_port_released (DeviceContext *device_context,
     mm_dbg ("[plugin manager] task %s: port released: %s",
             device_context->name, g_udev_device_get_name (port));
 
-    port_context = device_context_peek_port_context (device_context, port);
+    /* Check if there's a waiting port context */
+    port_context = device_context_peek_waiting_port_context (device_context, port);
+    if (port_context) {
+        /* We didn't run the port context yet, we can remove it right away */
+        device_context->wait_port_contexts = g_list_remove (device_context->wait_port_contexts, port_context);
+        port_context_unref (port_context);
+        return;
+    }
+
+    /* Now, check running port contexts, which will need cancellation if found */
+    port_context = device_context_peek_running_port_context (device_context, port);
+    if (port_context) {
+        /* Request cancellation of this single port, will be completed asynchronously */
+        port_context_cancel (port_context);
+        return;
+    }
 
     /* This is not something worth warning. If the probing task has already
      * been finished, it will already be removed from the list */
-    if (!port_context)
-        return;
-
-    /* Request cancellation of this single port, will be completed asynchronously */
-    port_context_cancel (port_context);
+    mm_dbg ("[plugin manager] task %s: port wasn't found: %s",
+            device_context->name, g_udev_device_get_name (port));
 }
 
 static void
@@ -1137,10 +1166,18 @@ device_context_port_grabbed (DeviceContext *device_context,
     mm_dbg ("[plugin manager] task %s: port grabbed: %s",
             device_context->name, g_udev_device_get_name (port));
 
-    /* Ignore if for any reason we still have it around */
-    port_context = device_context_peek_port_context (device_context, port);
+    /* Ignore if for any reason we still have it in the running list */
+    port_context = device_context_peek_running_port_context (device_context, port);
     if (port_context) {
-        mm_warn ("[plugin manager] task %s: port already being processed",
+        mm_warn ("[plugin manager] task %s: port context already being processed",
+                 device_context->name);
+        return;
+    }
+
+    /* Ignore if for any reason we still have it in the waiting list */
+    port_context = device_context_peek_waiting_port_context (device_context, port);
+    if (port_context) {
+        mm_warn ("[plugin manager] task %s: port context already scheduled",
                  device_context->name);
         return;
     }
