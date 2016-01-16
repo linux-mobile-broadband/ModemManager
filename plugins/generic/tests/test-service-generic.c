@@ -25,7 +25,7 @@
 /*****************************************************************************/
 
 static void
-test_something (TestFixture *fixture)
+test_enable_disable (TestFixture *fixture)
 {
     GError *error = NULL;
     MMObject *obj;
@@ -46,7 +46,7 @@ test_something (TestFixture *fixture)
 
     /* Set the test profile */
     test_fixture_set_profile (fixture,
-                              "test-something",
+                              "test-enable-disable",
                               "Generic",
                               (const gchar *const *)ports);
 
@@ -79,7 +79,7 @@ int main (int   argc,
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    TEST_ADD ("/MM/Service/Generic", test_something);
+    TEST_ADD ("/MM/Service/Generic/enable-disable", test_enable_disable);
 
     return g_test_run ();
 }
