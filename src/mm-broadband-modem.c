@@ -1061,6 +1061,7 @@ mdn_qcdm_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_nv_get_mdn_result ((const gchar *) response->data,
                                          response->len,
                                          &err);
+    g_byte_array_unref (response);
     if (!result) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
@@ -6690,6 +6691,7 @@ hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_hdr_subsys_state_info_result ((const gchar *) response->data,
                                                     response->len,
                                                     &err);
+    g_byte_array_unref (response);
     if (!result) {
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
