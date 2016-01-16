@@ -29,6 +29,7 @@ struct _TestPortContext {
     GMutex ready_mutex;
     GMainLoop *loop;
     GMainContext *context;
+    GSocket *socket;
     GSocketService *socket_service;
     GList *clients;
     GHashTable *commands;
@@ -280,6 +281,7 @@ create_socket_service (TestPortContext *self)
                    G_UNIX_SOCKET_ADDRESS_ABSTRACT));
     if (!g_socket_bind (socket, address, TRUE, &error))
         g_error ("Cannot bind socket: %s", error->message);
+    g_object_unref (address);
 
     /* Listen */
     if (!g_socket_listen (socket, &error))
@@ -297,19 +299,17 @@ create_socket_service (TestPortContext *self)
     /* Start it */
     g_socket_service_start (service);
 
-    /* And store it */
+    /* And store both the service and the socket.
+     * Since GLib 2.42 the socket may not be explicitly closed when the
+     * listener is diposed, so we'll do it ourselves. */
     self->socket_service = service;
+    self->socket = socket;
 
     /* Signal that the thread is ready */
     g_mutex_lock (&self->ready_mutex);
     self->ready = TRUE;
     g_cond_signal (&self->ready_cond);
     g_mutex_unlock (&self->ready_mutex);
-
-    if (socket)
-        g_object_unref (socket);
-    if (address)
-        g_object_unref (address);
 }
 
 /*****************************************************************************/
@@ -389,6 +389,15 @@ test_port_context_free (TestPortContext *self)
     if (self->commands)
         g_hash_table_unref (self->commands);
     g_list_free_full (self->clients, (GDestroyNotify)client_free);
+    if (self->socket) {
+        GError *error = NULL;
+
+        if (!g_socket_close (self->socket, &error)) {
+            g_debug ("Couldn't close socket: %s", error->message);
+            g_error_free (error);
+        }
+        g_object_unref (self->socket);
+    }
     if (self->socket_service) {
         if (g_socket_service_is_active (self->socket_service))
             g_socket_service_stop (self->socket_service);
