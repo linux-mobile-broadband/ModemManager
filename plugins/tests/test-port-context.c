@@ -28,6 +28,7 @@ struct _TestPortContext {
     GCond ready_cond;
     GMutex ready_mutex;
     GMainLoop *loop;
+    GMainContext *context;
     GSocketService *socket_service;
     GList *clients;
     GHashTable *commands;
@@ -235,7 +236,7 @@ client_new (TestPortContext *self,
                            (GSourceFunc)connection_readable_cb,
                            client,
                            NULL);
-    g_source_attach (client->connection_readable_source, NULL);
+    g_source_attach (client->connection_readable_source, self->context);
 
     return client;
 }
@@ -313,13 +314,23 @@ create_socket_service (TestPortContext *self)
 
 /*****************************************************************************/
 
+static gboolean
+cancel_loop_cb (TestPortContext *self)
+{
+    g_main_loop_quit (self->loop);
+    return FALSE;
+}
+
 void
 test_port_context_stop (TestPortContext *self)
 {
     g_assert (self->thread != NULL);
     g_assert (self->loop != NULL);
+    g_assert (self->context != NULL);
 
-    g_main_loop_quit (self->loop);
+    /* Cancel main loop of the port context thread, by scheduling an idle task
+     * in the thread-owned main context */
+    g_main_context_invoke (self->context, (GSourceFunc) cancel_loop_cb, self);
 
     g_thread_join (self->thread);
     self->thread = NULL;
@@ -328,13 +339,23 @@ test_port_context_stop (TestPortContext *self)
 static gpointer
 port_context_thread_func (TestPortContext *self)
 {
+    g_assert (self->loop == NULL);
+    g_assert (self->context == NULL);
+
+    /* Define main context and loop for the thread */
+    self->context = g_main_context_new ();
+    self->loop    = g_main_loop_new (self->context, FALSE);
+    g_main_context_push_thread_default (self->context);
+
+    /* Once the thread default context is setup, launch service */
     create_socket_service (self);
 
-    g_assert (self->loop == NULL);
-    self->loop = g_main_loop_new (g_main_context_get_thread_default (), FALSE);
     g_main_loop_run (self->loop);
+
     g_main_loop_unref (self->loop);
     self->loop = NULL;
+    g_main_context_unref (self->context);
+    self->context = NULL;
     return NULL;
 }
 
