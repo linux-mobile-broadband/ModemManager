@@ -716,14 +716,26 @@ port_serial_got_response (MMPortSerial *self,
 
     ctx = (CommandContext *) g_queue_pop_head (self->priv->queue);
     if (ctx) {
-        if (error)
+        if (error) {
+            /* If we're returning an error parsed in a generic way from the inputs,
+             * we fully avoid returning a response bytearray. This really applies
+             * only to AT, not to QCDM, so we shouldn't be worried of losing chunks
+             * of the next QCDM message. And given that the caller won't get the
+             * response array, we're the ones in charge of removing the processed
+             * data (otherwise ERROR replies may get fed to the next response
+             * parser).
+             */
             g_simple_async_result_set_from_error (ctx->result, error);
-        else {
-            if (ctx->allow_cached && !error)
+            g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
+        } else {
+            if (ctx->allow_cached)
                 port_serial_set_cached_reply (self, ctx->command, self->priv->response);
 
             /* Upon completion, it is a task of the caller to remove from the response
-             * buffer the processed data */
+             * buffer the processed data. This may seem unnecessary in the case of AT
+             * commands, as it'll remove the full received string, but the step is
+             * a key thing in the case of QCDM, where we want to read just until the
+             * next marker, not more. */
             g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                        g_byte_array_ref (self->priv->response),
                                                        (GDestroyNotify)g_byte_array_unref);
