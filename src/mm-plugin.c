@@ -811,6 +811,7 @@ mm_plugin_supports_port (MMPlugin            *self,
                        self->priv->send_lf,
                        self->priv->custom_at_probe,
                        self->priv->custom_init,
+                       cancellable,
                        (GAsyncReadyCallback) port_probe_run_ready,
                        task);
 }
