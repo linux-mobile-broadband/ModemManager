@@ -97,90 +97,67 @@ test_fixture_set_profile (TestFixture *fixture,
         g_error ("Error setting test profile: %s", error->message);
 }
 
-MMObject *
-test_fixture_get_modem (TestFixture *fixture)
+static MMObject *
+common_get_modem (TestFixture *fixture,
+                  gboolean     modem_expected)
 {
-    GError *error = NULL;
-    MMManager *manager;
     MMObject *found = NULL;
-    guint wait_time = 0;
-
-    /* Create manager */
-    g_assert (fixture->connection != NULL);
-    manager = mm_manager_new_sync (fixture->connection,
-                                   G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-                                   NULL, /* cancellable */
-                                   &error);
-    if (!manager)
-        g_error ("Couldn't create manager: %s", error->message);
+    guint     wait_time = 0;
 
     /* Find new modem object */
-    while (!found) {
-        GList *modems;
-        guint n_modems;
+    while (TRUE) {
+        GError    *error = NULL;
+        MMManager *manager;
+        GList     *modems;
+        guint      n_modems;
+        gboolean   ready = FALSE;
+
+        /* Create manager on each loop, so that we don't require on an external
+         * global main context processing to receive the DBus property updates.
+         */
+        g_assert (fixture->connection != NULL);
+        manager = mm_manager_new_sync (fixture->connection,
+                                       G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+                                       NULL, /* cancellable */
+                                       &error);
+        if (!manager)
+            g_error ("Couldn't create manager: %s", error->message);
 
         modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
         n_modems = g_list_length (modems);
         g_assert_cmpuint (n_modems, <=, 1);
 
-        if (n_modems == 0) {
-            /* Wait a bit before re-checking. We can do this kind of wait
-             * because properties in the manager are updated in another
-             * thread */
-            g_assert_cmpuint (wait_time, <=, 20);
-            wait_time++;
-            sleep (1);
-        } else
-            found = MM_OBJECT (g_object_ref (modems->data));
+        if (modem_expected == n_modems) {
+            if (modems) {
+                found = MM_OBJECT (g_object_ref (modems->data));
+                g_message ("Found modem at '%s'", mm_object_get_path (found));
+            }
+            ready = TRUE;
+        }
 
         g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+        g_object_unref (manager);
+
+        if (ready)
+            break;
+
+        /* Blocking wait */
+        g_assert_cmpuint (wait_time, <=, 20);
+        wait_time++;
+        sleep (1);
     }
 
-    g_message ("Found modem at '%s'", mm_object_get_path (found));
-
-    g_object_unref (manager);
-
     return found;
+}
+
+MMObject *
+test_fixture_get_modem (TestFixture *fixture)
+{
+    return common_get_modem (fixture, TRUE);
 }
 
 void
 test_fixture_no_modem (TestFixture *fixture)
 {
-    GError *error = NULL;
-    MMManager *manager;
-    guint wait_time = 0;
-    gboolean no_modems = FALSE;
-
-    /* Create manager */
-    g_assert (fixture->connection != NULL);
-    manager = mm_manager_new_sync (fixture->connection,
-                                   G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-                                   NULL, /* cancellable */
-                                   &error);
-    if (!manager)
-        g_error ("Couldn't create manager: %s", error->message);
-
-    /* Find new modem object */
-    while (!no_modems) {
-        GList *modems;
-        guint n_modems;
-
-        modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
-        n_modems = g_list_length (modems);
-        g_assert_cmpuint (n_modems, <=, 1);
-
-        if (n_modems == 1) {
-            /* Wait a bit before re-checking. We can do this kind of wait
-             * because properties in the manager are updated in another
-             * thread */
-            g_assert_cmpuint (wait_time, <=, 20);
-            wait_time++;
-            sleep (1);
-        } else
-            no_modems = TRUE;
-
-        g_list_free_full (modems, (GDestroyNotify) g_object_unref);
-    }
-
-    g_object_unref (manager);
+    common_get_modem (fixture, FALSE);
 }
