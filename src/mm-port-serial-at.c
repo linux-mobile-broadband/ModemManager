@@ -116,14 +116,16 @@ mm_port_serial_at_remove_echo (GByteArray *response)
     }
 }
 
-static gboolean
+static MMPortSerialResponseType
 parse_response (MMPortSerial *port,
                 GByteArray *response,
+                GByteArray **parsed_response,
                 GError **error)
 {
     MMPortSerialAt *self = MM_PORT_SERIAL_AT (port);
-    gboolean found;
     GString *string;
+    gsize parsed_len;
+    GError *inner_error = NULL;
 
     g_return_val_if_fail (self->priv->response_parser_fn != NULL, FALSE);
 
@@ -131,21 +133,38 @@ parse_response (MMPortSerial *port,
     if (self->priv->remove_echo)
         mm_port_serial_at_remove_echo (response);
 
+    /* If there's no response to receive, we're done; e.g. if we only got
+     * unsolicited messages */
+    if (!response->len)
+        return MM_PORT_SERIAL_RESPONSE_NONE;
+
     /* Construct the string that AT-parsing functions expect */
     string = g_string_sized_new (response->len + 1);
     g_string_append_len (string, (const char *) response->data, response->len);
 
-    /* Parse it */
-    found = self->priv->response_parser_fn (self->priv->response_parser_user_data, string, error);
+    /* Fully cleanup the response array, we'll consider the contents we got
+     * as the full reply that the command may expect. */
+    g_byte_array_remove_range (response, 0, response->len);
 
-    /* And copy it back into the response array after the parser has removed
-     * matches and cleaned it up.
-     */
-    if (response->len)
-        g_byte_array_remove_range (response, 0, response->len);
-    g_byte_array_append (response, (const guint8 *) string->str, string->len);
-    g_string_free (string, TRUE);
-    return found;
+    /* Parse it; returns FALSE if there is nothing we can do with this
+     * response yet. */
+    if (!self->priv->response_parser_fn (self->priv->response_parser_user_data, string, &inner_error)) {
+        /* Copy what we got back in the response buffer. */
+        g_byte_array_append (response, (const guint8 *) string->str, string->len);
+        g_string_free (string, TRUE);
+        return MM_PORT_SERIAL_RESPONSE_NONE;
+    }
+
+    /* If we got an error, propagate it without any further response string */
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_PORT_SERIAL_RESPONSE_ERROR;
+    }
+
+    /* Otherwise, build a new GByteArray considered as parsed response */
+    parsed_len = string->len;
+    *parsed_response = g_byte_array_new_take ((guint8 *) g_string_free (string, FALSE), parsed_len);
+    return MM_PORT_SERIAL_RESPONSE_BUFFER;
 }
 
 /*****************************************************************************/

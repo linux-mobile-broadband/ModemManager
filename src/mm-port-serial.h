@@ -40,6 +40,12 @@
 #define MM_PORT_SERIAL_SPEW_CONTROL "spew-control" /* Construct-only */
 #define MM_PORT_SERIAL_FLASH_OK     "flash-ok" /* Construct-only */
 
+typedef enum {
+    MM_PORT_SERIAL_RESPONSE_NONE,
+    MM_PORT_SERIAL_RESPONSE_BUFFER,
+    MM_PORT_SERIAL_RESPONSE_ERROR,
+} MMPortSerialResponseType;
+
 typedef struct _MMPortSerial MMPortSerial;
 typedef struct _MMPortSerialClass MMPortSerialClass;
 typedef struct _MMPortSerialPrivate MMPortSerialPrivate;
@@ -58,16 +64,26 @@ struct _MMPortSerialClass {
      */
     void     (*parse_unsolicited) (MMPortSerial *self, GByteArray *response);
 
-    /* Called to parse the device's response to a command or determine if the
-     * response was an error response.  If the response indicates an error, an
-     * appropriate error should be returned in the 'error' argument.  The
-     * function should return FALSE if there is not enough data yet to determine
-     * the device's reply (whether success *or* error), and should return TRUE
-     * when the device's response has been recognized and parsed.
+    /*
+     * Called to parse the device's response to a command or determine if the
+     * response was an error response.
+     *
+     * If the response indicates an error, @MM_PORT_SERIAL_RESPONSE_ERROR will
+     * be returned and an appropriate GError set in @error.
+     *
+     * If the response indicates a valid response, @MM_PORT_SERIAL_RESPONSE_BUFFER
+     * will be returned, and a newly allocated GByteArray set in @parsed_response.
+     *
+     * If there is no response, @MM_PORT_SERIAL_RESPONSE_NONE will be returned,
+     * and neither @error nor @parsed_response will be set.
+     *
+     * The implementation is allowed to cleanup the @response byte array, e.g. to
+     * just remove 1 single response if more than one found.
      */
-    gboolean (*parse_response)    (MMPortSerial *self,
-                                   GByteArray *response,
-                                   GError **error);
+    MMPortSerialResponseType (*parse_response) (MMPortSerial *self,
+                                                GByteArray *response,
+                                                GByteArray **parsed_response,
+                                                GError **error);
 
     /* Called to configure the serial port fd after it's opened.  On error, should
      * return FALSE and set 'error' as appropriate.

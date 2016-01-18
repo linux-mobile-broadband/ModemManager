@@ -68,9 +68,10 @@ remove_eval_cb (const GMatchInfo *match_info,
     return FALSE;
 }
 
-static gboolean
+static MMPortSerialResponseType
 parse_response (MMPortSerial *port,
                 GByteArray *response,
+                GByteArray **parsed_response,
                 GError **error)
 {
     MMPortSerialGps *self = MM_PORT_SERIAL_GPS (port);
@@ -112,7 +113,7 @@ parse_response (MMPortSerial *port,
     g_match_info_free (match_info);
 
     if (!matches)
-        return FALSE;
+        return MM_PORT_SERIAL_RESPONSE_NONE;
 
     /* Remove matches */
     result_len = response->len;
@@ -122,9 +123,11 @@ parse_response (MMPortSerial *port,
                                 0, 0,
                                 remove_eval_cb, &result_len, NULL);
 
+    /* Cleanup response buffer */
     g_byte_array_remove_range (response, 0, response->len);
-    g_byte_array_append (response, (const guint8 *) str, result_len);
-    g_free (str);
+
+    /* Build parsed response */
+    *parsed_response = g_byte_array_new_take ((guint8 *)str, result_len);
 
     return TRUE;
 }

@@ -696,9 +696,13 @@ port_serial_schedule_queue_process (MMPortSerial *self, guint timeout_ms)
 
 static void
 port_serial_got_response (MMPortSerial *self,
+                          GByteArray   *parsed_response,
                           const GError *error)
 {
     CommandContext *ctx;
+
+    /* Either one or the other, not both */
+    g_assert ((parsed_response && !error) || (!parsed_response && error));
 
     if (self->priv->timeout_id) {
         g_source_remove (self->priv->timeout_id);
@@ -716,29 +720,15 @@ port_serial_got_response (MMPortSerial *self,
 
     ctx = (CommandContext *) g_queue_pop_head (self->priv->queue);
     if (ctx) {
-        if (error) {
-            /* If we're returning an error parsed in a generic way from the inputs,
-             * we fully avoid returning a response bytearray. This really applies
-             * only to AT, not to QCDM, so we shouldn't be worried of losing chunks
-             * of the next QCDM message. And given that the caller won't get the
-             * response array, we're the ones in charge of removing the processed
-             * data (otherwise ERROR replies may get fed to the next response
-             * parser).
-             */
+        /* Complete the command context with the appropriate result */
+        if (error)
             g_simple_async_result_set_from_error (ctx->result, error);
-            g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
-        } else {
+        else {
             if (ctx->allow_cached)
-                port_serial_set_cached_reply (self, ctx->command, self->priv->response);
-
-            /* Upon completion, it is a task of the caller to remove from the response
-             * buffer the processed data. This may seem unnecessary in the case of AT
-             * commands, as it'll remove the full received string, but the step is
-             * a key thing in the case of QCDM, where we want to read just until the
-             * next marker, not more. */
+                port_serial_set_cached_reply (self, ctx->command, parsed_response);
             g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       g_byte_array_ref (self->priv->response),
-                                                       (GDestroyNotify)g_byte_array_unref);
+                                                       g_byte_array_ref (parsed_response),
+                                                       (GDestroyNotify) g_byte_array_unref);
         }
 
         /* Don't complete in idle. We need the caller remove the response range which
@@ -767,7 +757,7 @@ port_serial_timed_out (gpointer data)
     error = g_error_new_literal (MM_SERIAL_ERROR,
                                  MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
                                  "Serial command timed out");
-    port_serial_got_response (self, error);
+    port_serial_got_response (self, NULL, error);
     g_error_free (error);
 
     /* Emit a timed out signal, used by upper layers to identify a disconnected
@@ -792,7 +782,7 @@ port_serial_response_wait_cancelled (GCancellable *cancellable,
     error = g_error_new_literal (MM_CORE_ERROR,
                                  MM_CORE_ERROR_CANCELLED,
                                  "Waiting for the reply cancelled");
-    port_serial_got_response (self, error);
+    port_serial_got_response (self, NULL, error);
     g_error_free (error);
 }
 
@@ -814,18 +804,12 @@ port_serial_queue_process (gpointer data)
 
         cached = port_serial_get_cached_reply (self, ctx->command);
         if (cached) {
-            /* Ensure the response array is fully empty before setting the
-             * cached response.  */
-            if (self->priv->response->len > 0) {
-                mm_warn ("(%s) response array is not empty when using cached "
-                         "reply, cleaning up %u bytes",
-                         mm_port_get_device (MM_PORT (self)),
-                         self->priv->response->len);
-                g_byte_array_set_size (self->priv->response, 0);
-            }
+            GByteArray *parsed_response;
 
-            g_byte_array_append (self->priv->response, cached->data, cached->len);
-            port_serial_got_response (self, NULL);
+            parsed_response = g_byte_array_sized_new (cached->len);
+            g_byte_array_append (parsed_response, cached->data, cached->len);
+            port_serial_got_response (self, parsed_response, NULL);
+            g_byte_array_unref (parsed_response);
             return G_SOURCE_REMOVE;
         }
 
@@ -834,7 +818,7 @@ port_serial_queue_process (gpointer data)
 
     /* If error, report it */
     if (!port_serial_process_command (self, ctx, &error)) {
-        port_serial_got_response (self, error);
+        port_serial_got_response (self, NULL, error);
         g_error_free (error);
         return G_SOURCE_REMOVE;
     }
@@ -860,7 +844,7 @@ port_serial_queue_process (gpointer data)
             error = g_error_new (MM_CORE_ERROR,
                                  MM_CORE_ERROR_CANCELLED,
                                  "Won't wait for the reply");
-            port_serial_got_response (self, error);
+            port_serial_got_response (self, NULL, error);
             g_error_free (error);
             return G_SOURCE_REMOVE;
         }
@@ -873,16 +857,50 @@ port_serial_queue_process (gpointer data)
     return G_SOURCE_REMOVE;
 }
 
-static gboolean
-parse_response (MMPortSerial *self,
-                GByteArray *response,
-                GError **error)
+static void
+parse_response_buffer (MMPortSerial *self)
 {
-    if (MM_PORT_SERIAL_GET_CLASS (self)->parse_unsolicited)
-        MM_PORT_SERIAL_GET_CLASS (self)->parse_unsolicited (self, response);
+    GError *error = NULL;
+    GByteArray *parsed_response = NULL;
 
-    g_return_val_if_fail (MM_PORT_SERIAL_GET_CLASS (self)->parse_response, FALSE);
-    return MM_PORT_SERIAL_GET_CLASS (self)->parse_response (self, response, error);
+    /* Parse unsolicited messages in the subclass.
+     *
+     * If any message found, it's processed immediately and the message is
+     * removed from the response buffer.
+     */
+    if (MM_PORT_SERIAL_GET_CLASS (self)->parse_unsolicited)
+        MM_PORT_SERIAL_GET_CLASS (self)->parse_unsolicited (self,
+                                                            self->priv->response);
+
+    /* Parse response in the subclass.
+     *
+     * Returns TRUE either if an error is provided or if we really have the
+     * response to process. The parsed string is returned already out of the
+     * response buffer, and the response buffer is cleaned up accordingly.
+     */
+    g_assert (MM_PORT_SERIAL_GET_CLASS (self)->parse_response != NULL);
+    switch (MM_PORT_SERIAL_GET_CLASS (self)->parse_response (self,
+                                                             self->priv->response,
+                                                             &parsed_response,
+                                                             &error)) {
+    case MM_PORT_SERIAL_RESPONSE_BUFFER:
+        /* We have a valid response to process */
+        g_assert (parsed_response);
+        self->priv->n_consecutive_timeouts = 0;
+        port_serial_got_response (self, parsed_response, NULL);
+        g_byte_array_unref (parsed_response);
+        break;
+    case MM_PORT_SERIAL_RESPONSE_ERROR:
+        /* We have an error to process */
+        g_assert (error);
+        self->priv->n_consecutive_timeouts = 0;
+        port_serial_got_response (self, NULL, error);
+        g_error_free (error);
+        break;
+    case MM_PORT_SERIAL_RESPONSE_NONE:
+        /* Nothing to do this time */
+        break;
+    }
 }
 
 static gboolean
@@ -954,8 +972,6 @@ common_input_available (MMPortSerial *self,
                 status = G_IO_STATUS_NORMAL;
         }
 
-
-
         /* If no bytes read, just wait for more data */
         if (bytes_read == 0)
             break;
@@ -971,15 +987,9 @@ common_input_available (MMPortSerial *self,
             g_byte_array_remove_range (self->priv->response, 0, (SERIAL_BUF_SIZE / 2));
         }
 
-        /* Parse response. Returns TRUE either if an error is provided or if
-         * we really have the response to process. */
-        if (parse_response (self, self->priv->response, &error)) {
-            /* Reset number of consecutive timeouts only here */
-            self->priv->n_consecutive_timeouts = 0;
-            /* Process response retrieved */
-            port_serial_got_response (self, error);
-            g_clear_error (&error);
-        }
+        /* See if we can parse anything */
+        parse_response_buffer (self);
+
     } while (   (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN)
              && (self->priv->iochannel_id > 0 || self->priv->socket_source != NULL));
 
