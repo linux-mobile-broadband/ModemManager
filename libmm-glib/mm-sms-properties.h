@@ -71,7 +71,7 @@ void mm_sms_properties_set_smsc                    (MMSmsProperties *self,
 void mm_sms_properties_set_validity_relative       (MMSmsProperties *self,
                                                     guint validity);
 void mm_sms_properties_set_class                   (MMSmsProperties *self,
-                                                    gint class);
+                                                    gint message_class);
 void mm_sms_properties_set_delivery_report_request (MMSmsProperties *self,
                                                     gboolean request);
 void mm_sms_properties_set_teleservice_id          (MMSmsProperties *self,
