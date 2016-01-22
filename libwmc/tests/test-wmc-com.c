@@ -43,13 +43,13 @@ typedef struct {
 gpointer
 test_com_setup (const char *port, wmcbool uml290, wmcbool debug)
 {
-	TestComData *d;
-	int ret;
+    TestComData *d;
+    int ret;
 
-	d = g_malloc0 (sizeof (TestComData));
-	g_assert (d);
+    d = g_malloc0 (sizeof (TestComData));
+    g_assert (d);
     d->uml290 = uml290;
-	d->debug = debug;
+    d->debug = debug;
 
     if (getenv ("SERIAL_DEBUG"))
         d->debug = TRUE;
