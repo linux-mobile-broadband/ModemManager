@@ -94,8 +94,11 @@ dnl-----------------------------------------------------------------------------
 dnl Build dependencies
 dnl
 
+GLIB_MIN_VERSION=2.36.0
+GUDEV_MIN_VERSION=147
+
 PKG_CHECK_MODULES(MM,
-                  glib-2.0 >= 2.32
+                  glib-2.0 >= $GLIB_MIN_VERSION
                   gmodule-2.0
                   gobject-2.0
                   gio-2.0
@@ -104,7 +107,7 @@ AC_SUBST(MM_CFLAGS)
 AC_SUBST(MM_LIBS)
 
 PKG_CHECK_MODULES(LIBMM_GLIB,
-                  glib-2.0 >= 2.32
+                  glib-2.0 >= $GLIB_MIN_VERSION
                   gobject-2.0
                   gio-2.0
                   gio-unix-2.0)
@@ -112,13 +115,13 @@ AC_SUBST(LIBMM_GLIB_CFLAGS)
 AC_SUBST(LIBMM_GLIB_LIBS)
 
 PKG_CHECK_MODULES(MMCLI,
-                  glib-2.0 >= 2.32
+                  glib-2.0 >= $GLIB_MIN_VERSION
                   gobject-2.0
                   gio-2.0)
 AC_SUBST(MMCLI_CFLAGS)
 AC_SUBST(LIBMM_LIBS)
 
-PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= 147)
+PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= $GUDEV_MIN_VERSION)
 AC_SUBST(GUDEV_CFLAGS)
 AC_SUBST(GUDEV_LIBS)
 
@@ -132,10 +135,6 @@ AC_SUBST(GDBUS_CODEGEN)
 dnl-----------------------------------------------------------------------------
 dnl Testing support
 dnl
-
-dnl DBus testing support only with GIO 2.34
-PKG_CHECK_MODULES(DBUS_TEST_SUPPORT, [gio-2.0 >= 2.34], [have_dbus_test_support=yes], [have_dbus_test_support=no])
-AM_CONDITIONAL(BUILD_DBUS_TEST_SUPPORT, test "x$have_dbus_test_support" = "xyes")
 
 dnl Code coverage (disabled by default)
 AX_CODE_COVERAGE

@@ -50,8 +50,6 @@ noinst_LTLIBRARIES =
 
 # Common service test support
 
-if BUILD_DBUS_TEST_SUPPORT
-
 noinst_LTLIBRARIES += libmm-test-common.la
 
 libmm_test_common_la_SOURCES = \
@@ -88,8 +86,6 @@ TEST_COMMON_COMPILER_FLAGS = \
 TEST_COMMON_LIBADD_FLAGS = \
 	$(builddir)/libmm-test-common.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la
-
-endif
 
 ########################################
 
@@ -161,15 +157,11 @@ libmm_plugin_generic_la_SOURCES = \
 libmm_plugin_generic_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-if BUILD_DBUS_TEST_SUPPORT
-
 noinst_PROGRAMS += test-service-generic
 test_service_generic_SOURCES = generic/tests/test-service-generic.c
 test_service_generic_CPPFLAGS = $(TEST_COMMON_COMPILER_FLAGS)
 test_service_generic_LDADD = $(TEST_COMMON_LIBADD_FLAGS)
 test_service_generic_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-
-endif
 
 ## Motorola
 libmm_plugin_motorola_la_SOURCES = \
