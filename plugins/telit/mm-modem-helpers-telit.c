@@ -26,9 +26,6 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-telit.h"
 
-#define EMPTY_STRING ""
-
-
 /*****************************************************************************/
 /* +CSIM response parser */
 
@@ -168,7 +165,7 @@ mm_telit_parse_supported_bands_response (const gchar *response,
 
 end:
     if (!ret && bands != NULL)
-        g_array_free(bands, TRUE);
+        g_array_free (bands, TRUE);
 
     if(match_info)
         g_match_info_free (match_info);
@@ -198,14 +195,14 @@ mm_telit_get_2g_mm_bands (GMatchInfo *match_info,
 
     match_str = g_match_info_fetch_named (match_info, "Bands2G");
 
-    if (match_str == NULL || g_strcmp0(match_str, EMPTY_STRING) == 0) {
+    if (match_str == NULL || match_str[0] == '\0') {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not find 2G band flags from response");
         ret = FALSE;
         goto end;
     }
 
-    flags = g_array_new (FALSE, FALSE, sizeof(guint));
+    flags = g_array_new (FALSE, FALSE, sizeof (guint));
 
     if (!mm_telit_get_band_flags_from_string (match_str, &flags, error)) {
         ret = FALSE;
@@ -213,7 +210,9 @@ mm_telit_get_2g_mm_bands (GMatchInfo *match_info,
     }
 
     for (i = 0; i < flags->len; i++) {
-        guint flag = g_array_index (flags, guint, i);
+        guint flag;
+
+        flag = g_array_index (flags, guint, i);
         if (!mm_telit_update_band_array (flag, map, bands, error)) {
             ret = FALSE;
             goto end;
@@ -265,17 +264,16 @@ mm_telit_get_3g_mm_bands (GMatchInfo *match_info,
         { BND_FLAG_UNKNOWN, {}},
     };
 
-
     match_str = g_match_info_fetch_named (match_info, "Bands3G");
 
-    if (match_str == NULL || g_strcmp0(match_str, EMPTY_STRING) == 0) {
+    if (match_str == NULL || match_str[0] == '\0') {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not find 3G band flags from response");
         ret = FALSE;
         goto end;
     }
 
-    flags = g_array_new (FALSE, FALSE, sizeof(guint));
+    flags = g_array_new (FALSE, FALSE, sizeof (guint));
 
     if (!mm_telit_get_band_flags_from_string (match_str, &flags, error)) {
         ret = FALSE;
@@ -283,7 +281,9 @@ mm_telit_get_3g_mm_bands (GMatchInfo *match_info,
     }
 
     for (i = 0; i < flags->len; i++) {
-        guint flag = g_array_index (flags, guint, i);
+        guint flag;
+
+        flag = g_array_index (flags, guint, i);
         if (!mm_telit_update_band_array (flag, map, bands, error)) {
             ret = FALSE;
             goto end;
@@ -311,12 +311,11 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
     gchar *match_str = NULL;
     guint i;
     guint max_value;
-
     gchar **tokens;
 
     match_str = g_match_info_fetch_named (match_info, "Bands4G");
 
-    if (match_str == NULL || g_strcmp0(match_str, EMPTY_STRING) == 0) {
+    if (match_str == NULL || match_str[0] == '\0') {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not find 4G band flags from response");
         ret = FALSE;
@@ -332,12 +331,12 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
         goto end;
     }
 
-    sscanf(tokens[1], "%d", &max_value);
+    sscanf (tokens[1], "%d", &max_value);
 
-    for(i = 0; max_value > 0; i++) {
+    for (i = 0; max_value > 0; i++) {
         if (max_value % 2 != 0) {
             band = MM_MODEM_BAND_EUTRAN_I + i;
-            g_array_append_val(*bands, band);
+            g_array_append_val (*bands, band);
         }
         max_value = max_value >> 1;
     }
@@ -351,6 +350,7 @@ end:
 
     return ret;
 }
+
 gboolean
 mm_telit_bands_contains (GArray *mm_bands, const MMModemBand mm_band)
 {
@@ -403,7 +403,7 @@ mm_telit_get_band_flags_from_string (const gchar *flag_str,
     guint flag;
     guint i;
 
-    if (g_strcmp0(flag_str, "") == 0) {
+    if (flag_str == NULL || flag_str[0] == '\0') {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "String is empty, no band flags to parse");
         return FALSE;
@@ -443,6 +443,3 @@ mm_telit_get_band_flags_from_string (const gchar *flag_str,
 
     return TRUE;
 }
-
-
-
