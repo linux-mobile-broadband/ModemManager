@@ -104,7 +104,7 @@ modem_load_supported_bands (MMIfaceModem *self,
 {
     LoadSupportedBandsContext *ctx;
 
-    ctx = g_slice_new0(LoadSupportedBandsContext);
+    ctx = g_slice_new0 (LoadSupportedBandsContext);
 
     ctx->self = g_object_ref (self);
     ctx->mm_modem_is_2g = mm_iface_modem_is_2g (ctx->self);

@@ -26,7 +26,7 @@
 #include "mm-modem-helpers-telit.h"
 
 typedef struct {
-    gchar* response;
+    gchar *response;
     gint result;
 } CSIMResponseTest;
 
@@ -137,8 +137,11 @@ test_parse_band_flag_str (void) {
         g_assert_true (res);
 
         for (j = 0; j < band_flag_test[i].band_flags_len; j++) {
-            guint ref = band_flag_test[i].band_flags[j];
-            guint cur = g_array_index (band_flags, guint, j);
+            guint ref;
+            guint cur;
+
+            ref = band_flag_test[i].band_flags[j];
+            cur = g_array_index (band_flags, guint, j);
 
             g_assert_true (ref == cur);
         }
@@ -221,12 +224,15 @@ test_parse_supported_bands_response (void) {
 
 
         for (j = 0; j < supported_band_mapping_tests[i].mm_bands_len; j++) {
-            MMModemBand ref = supported_band_mapping_tests[i].mm_bands[j];
-            MMModemBand cur = g_array_index (bands, MMModemBand, j);
+            MMModemBand ref;
+            MMModemBand cur;
+
+            ref = supported_band_mapping_tests[i].mm_bands[j];
+            cur = g_array_index (bands, MMModemBand, j);
             g_assert_cmpint (cur, ==, ref);
         }
 
-        g_assert_cmpint(bands->len, ==, supported_band_mapping_tests[i].mm_bands_len);
+        g_assert_cmpint (bands->len, ==, supported_band_mapping_tests[i].mm_bands_len);
 
         g_array_free (bands, FALSE);
         bands = NULL;
