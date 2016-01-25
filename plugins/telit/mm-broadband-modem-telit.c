@@ -41,6 +41,90 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 /*****************************************************************************/
+/* Load supported bands (Modem interface) */
+typedef struct {
+    MMIfaceModem *self;
+    GSimpleAsyncResult *result;
+    gboolean mm_modem_is_2g;
+    gboolean mm_modem_is_3g;
+    gboolean mm_modem_is_4g;
+} LoadSupportedBandsContext;
+
+static void
+load_supported_bands_context_complete_and_free (LoadSupportedBandsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (LoadSupportedBandsContext, ctx);
+}
+
+static GArray *
+modem_load_supported_bands_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_supported_bands_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            LoadSupportedBandsContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GArray *bands = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+
+    if (!response)
+        g_simple_async_result_take_error (ctx->result, error);
+    else if (!mm_telit_parse_supported_bands_response (response,
+                                                       ctx->mm_modem_is_2g,
+                                                       ctx->mm_modem_is_3g,
+                                                       ctx->mm_modem_is_4g,
+                                                       &bands,
+                                                       &error))
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bands, (GDestroyNotify)g_array_unref);
+
+    load_supported_bands_context_complete_and_free(ctx);
+}
+
+static void
+modem_load_supported_bands (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    LoadSupportedBandsContext *ctx;
+
+    ctx = g_slice_new0(LoadSupportedBandsContext);
+
+    ctx->self = g_object_ref (self);
+    ctx->mm_modem_is_2g = mm_iface_modem_is_2g (ctx->self);
+    ctx->mm_modem_is_3g = mm_iface_modem_is_3g (ctx->self);
+    ctx->mm_modem_is_4g = mm_iface_modem_is_4g (ctx->self);
+
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_load_supported_bands);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "#BND=?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) load_supported_bands_ready,
+                              ctx);
+}
+
+/*****************************************************************************/
 /* Load unlock retries (Modem interface) */
 
 #define CSIM_QUERY_PIN_RETRIES_STR  "+CSIM=10,0020000100"
@@ -517,6 +601,8 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_supported_bands = modem_load_supported_bands;
+    iface->load_supported_bands_finish = modem_load_supported_bands_finish;
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->reset = modem_reset;
