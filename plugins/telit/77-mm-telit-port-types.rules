@@ -44,6 +44,9 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{ID_MM_TELIT_TAGGED}="1"
 # HE910, UE910, UL865 (dynamic port identification supported)
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0021", ENV{ID_MM_TELIT_TAGGED}="1", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
 
+# LE910 V2
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0036", ENV{ID_MM_TELIT_TAGGED}="1", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
+
 # NOTE: Qualcomm Gobi-based devices like the LE920 should not be handled
 # by this plugin, but by the Gobi plugin.
 
