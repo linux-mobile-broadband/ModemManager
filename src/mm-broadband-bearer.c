@@ -1511,10 +1511,18 @@ data_flash_3gpp_ready (MMPortSerial *data,
         return;
     }
 
-    /* Last resort, try to send CGACT in the data port itself */
-    mm_dbg ("Sending PDP context deactivation in data port...");
+    /* Send another CGACT on the primary port (also the data port when the modem
+     * only has one serial port) if the previous one failed.  Some modems, like
+     * the Huawei E173 (fw 11.126.15.00.445) stop responding on their primary
+     * port when the CGACT is sent on the separte data port.
+     */
+    if (MM_PORT_SERIAL (ctx->primary) == data)
+        mm_dbg ("Sending PDP context deactivation in primary/data port...");
+    else
+        mm_dbg ("Sending PDP context deactivation in primary port again...");
+
     mm_base_modem_at_command_full (ctx->modem,
-                                   MM_PORT_SERIAL_AT (data),
+                                   ctx->primary,
                                    ctx->cgact_command,
                                    10,
                                    FALSE,
