@@ -32,11 +32,10 @@ G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 /*****************************************************************************/
 
 static gboolean
-ensure_qmi_client (MMSimQmi *self,
-                   QmiService service,
-                   QmiClient **o_client,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+ensure_qmi_client (GTask       *task,
+                   MMSimQmi    *self,
+                   QmiService   service,
+                   QmiClient  **o_client)
 {
     MMBaseModem *modem = NULL;
     QmiClient *client;
@@ -51,12 +50,9 @@ ensure_qmi_client (MMSimQmi *self,
     g_object_unref (modem);
 
     if (!port) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek QMI port");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek QMI port");
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -64,13 +60,10 @@ ensure_qmi_client (MMSimQmi *self,
                                       service,
                                       MM_PORT_QMI_FLAG_DEFAULT);
     if (!client) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek client for service '%s'",
-                                             qmi_service_get_string (service));
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek client for service '%s'",
+                                 qmi_service_get_string (service));
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -82,24 +75,17 @@ ensure_qmi_client (MMSimQmi *self,
 /* Load SIM ID (ICCID) */
 
 static gchar *
-load_sim_identifier_finish (MMBaseSim *self,
-                            GAsyncResult *res,
-                            GError **error)
+load_sim_identifier_finish (MMBaseSim     *self,
+                            GAsyncResult  *res,
+                            GError       **error)
 {
-    gchar *sim_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    sim_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded SIM identifier: %s", sim_identifier);
-    return sim_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 dms_uim_get_iccid_ready (QmiClientDms *client,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask        *task)
 {
     QmiMessageDmsUimGetIccidOutput *output = NULL;
     GError *error = NULL;
@@ -107,43 +93,36 @@ dms_uim_get_iccid_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_get_iccid_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_get_iccid_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get UIM ICCID: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         const gchar *str = NULL;
 
         qmi_message_dms_uim_get_iccid_output_get_iccid (output, &str, NULL);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+        g_task_return_pointer (task, g_strdup (str), (GDestroyNotify) g_free);
     }
 
     if (output)
         qmi_message_dms_uim_get_iccid_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
-load_sim_identifier (MMBaseSim *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+load_sim_identifier (MMBaseSim           *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_sim_identifier);
 
     mm_dbg ("loading SIM identifier...");
     qmi_client_dms_uim_get_iccid (QMI_CLIENT_DMS (client),
@@ -151,31 +130,24 @@ load_sim_identifier (MMBaseSim *self,
                                   5,
                                   NULL,
                                   (GAsyncReadyCallback)dms_uim_get_iccid_ready,
-                                  result);
+                                  task);
 }
 
 /*****************************************************************************/
 /* Load IMSI */
 
 static gchar *
-load_imsi_finish (MMBaseSim *self,
-                  GAsyncResult *res,
-                  GError **error)
+load_imsi_finish (MMBaseSim     *self,
+                  GAsyncResult  *res,
+                  GError       **error)
 {
-    gchar *imsi;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    imsi = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded IMSI: %s", imsi);
-    return imsi;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 dms_uim_get_imsi_ready (QmiClientDms *client,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask        *task)
 {
     QmiMessageDmsUimGetImsiOutput *output = NULL;
     GError *error = NULL;
@@ -183,43 +155,36 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_get_imsi_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_get_imsi_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get UIM IMSI: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         const gchar *str = NULL;
 
         qmi_message_dms_uim_get_imsi_output_get_imsi (output, &str, NULL);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+        g_task_return_pointer (task, g_strdup (str), (GDestroyNotify) g_free);
     }
 
     if (output)
         qmi_message_dms_uim_get_imsi_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
-load_imsi (MMBaseSim *self,
+load_imsi (MMBaseSim           *self,
            GAsyncReadyCallback callback,
-           gpointer user_data)
+           gpointer            user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_imsi);
 
     mm_dbg ("loading IMSI...");
     qmi_client_dms_uim_get_imsi (QMI_CLIENT_DMS (client),
@@ -227,18 +192,18 @@ load_imsi (MMBaseSim *self,
                                  5,
                                  NULL,
                                  (GAsyncReadyCallback)dms_uim_get_imsi_ready,
-                                 result);
+                                 task);
 }
 
 /*****************************************************************************/
 /* Load operator identifier */
 
 static gboolean
-get_home_network (QmiClientNas *client,
-                  GAsyncResult *res,
-                  guint16      *out_mcc,
-                  guint16      *out_mnc,
-                  gboolean     *out_mnc_with_pcs,
+get_home_network (QmiClientNas  *client,
+                  GAsyncResult  *res,
+                  guint16       *out_mcc,
+                  guint16       *out_mnc,
+                  gboolean      *out_mnc_with_pcs,
                   gchar        **out_operator_name,
                   GError       **error)
 {
@@ -291,68 +256,54 @@ get_home_network (QmiClientNas *client,
 }
 
 static gchar *
-load_operator_identifier_finish (MMBaseSim *self,
-                                 GAsyncResult *res,
-                                 GError **error)
+load_operator_identifier_finish (MMBaseSim     *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
 {
-    gchar *operator_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    operator_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded operator identifier: %s", operator_identifier);
-    return operator_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_operator_identifier_ready (QmiClientNas *client,
                                 GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+                                GTask        *task)
 {
     guint16 mcc, mnc;
     gboolean mnc_with_pcs;
     GError *error = NULL;
+    GString *aux;
 
-    if (get_home_network (client, res, &mcc, &mnc, &mnc_with_pcs, NULL, &error)) {
-        GString *aux;
-
-        aux = g_string_new ("");
-        /* MCC always 3 digits */
-        g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mcc);
-        /* Guess about MNC, if < 100 assume it's 2 digits, no PCS info here */
-        if (mnc >= 100 || mnc_with_pcs)
-            g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
-        else
-            g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_string_free (aux, FALSE),
-                                                   (GDestroyNotify)g_free);
-    } else {
-        g_simple_async_result_take_error (simple, error);
+    if (!get_home_network (client, res, &mcc, &mnc, &mnc_with_pcs, NULL, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    aux = g_string_new ("");
+    /* MCC always 3 digits */
+    g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mcc);
+    /* Guess about MNC, if < 100 assume it's 2 digits, no PCS info here */
+    if (mnc >= 100 || mnc_with_pcs)
+        g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
+    else
+        g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
+    g_task_return_pointer (task, g_string_free (aux, FALSE), (GDestroyNotify) g_free);
+    g_object_unref (task);
 }
 
 static void
-load_operator_identifier (MMBaseSim *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+load_operator_identifier (MMBaseSim           *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_NAS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_operator_identifier);
 
     mm_dbg ("loading SIM operator identifier...");
     qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
@@ -360,64 +311,48 @@ load_operator_identifier (MMBaseSim *self,
                                      5,
                                      NULL,
                                      (GAsyncReadyCallback)load_operator_identifier_ready,
-                                     result);
+                                     task);
 }
 
 /*****************************************************************************/
 /* Load operator name */
 
 static gchar *
-load_operator_name_finish (MMBaseSim *self,
-                           GAsyncResult *res,
-                           GError **error)
+load_operator_name_finish (MMBaseSim     *self,
+                           GAsyncResult  *res,
+                           GError       **error)
 {
-    gchar *operator_name;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    operator_name = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded operator name: %s", operator_name);
-    return operator_name;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_operator_name_ready (QmiClientNas *client,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          GTask        *task)
 {
     gchar *operator_name = NULL;
     GError *error = NULL;
 
-    if (get_home_network (client, res, NULL, NULL, NULL, &operator_name, &error)) {
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   operator_name,
-                                                   (GDestroyNotify)g_free);
-    } else {
-        g_simple_async_result_take_error (simple, error);
-    }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    if (!get_home_network (client, res, NULL, NULL, NULL, &operator_name, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, operator_name, (GDestroyNotify) g_free);
+    g_object_unref (task);
 }
 
 static void
-load_operator_name (MMBaseSim *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+load_operator_name (MMBaseSim           *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_NAS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_operator_name);
 
     mm_dbg ("loading SIM operator name...");
     qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
@@ -425,7 +360,7 @@ load_operator_name (MMBaseSim *self,
                                      5,
                                      NULL,
                                      (GAsyncReadyCallback)load_operator_name_ready,
-                                     result);
+                                     task);
 }
 
 /*****************************************************************************/
@@ -459,17 +394,17 @@ pin_qmi_error_to_mobile_equipment_error (GError *qmi_error)
 }
 
 static gboolean
-send_pin_finish (MMBaseSim *self,
-                 GAsyncResult *res,
-                 GError **error)
+send_pin_finish (MMBaseSim     *self,
+                 GAsyncResult  *res,
+                 GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 dms_uim_verify_pin_ready (QmiClientDms *client,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          GTask        *task)
 {
     QmiMessageDmsUimVerifyPinOutput *output = NULL;
     GError *error = NULL;
@@ -477,20 +412,16 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_verify_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_verify_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't verify PIN: ");
-        g_simple_async_result_take_error (simple,
-                                          pin_qmi_error_to_mobile_equipment_error (error));
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
 
     if (output)
         qmi_message_dms_uim_verify_pin_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -499,19 +430,15 @@ send_pin (MMBaseSim *self,
           GAsyncReadyCallback callback,
           gpointer user_data)
 {
+    GTask *task;
     QmiMessageDmsUimVerifyPinInput *input;
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        send_pin);
 
     mm_dbg ("Sending PIN...");
     input = qmi_message_dms_uim_verify_pin_input_new ();
@@ -525,7 +452,7 @@ send_pin (MMBaseSim *self,
                                    5,
                                    NULL,
                                    (GAsyncReadyCallback)dms_uim_verify_pin_ready,
-                                   result);
+                                   task);
     qmi_message_dms_uim_verify_pin_input_unref (input);
 }
 
@@ -533,17 +460,17 @@ send_pin (MMBaseSim *self,
 /* Send PUK */
 
 static gboolean
-send_puk_finish (MMBaseSim *self,
-                 GAsyncResult *res,
-                 GError **error)
+send_puk_finish (MMBaseSim     *self,
+                 GAsyncResult  *res,
+                 GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 dms_uim_unblock_pin_ready (QmiClientDms *client,
                            GAsyncResult *res,
-                           GSimpleAsyncResult *simple)
+                           GTask        *task)
 {
     QmiMessageDmsUimUnblockPinOutput *output = NULL;
     GError *error = NULL;
@@ -551,45 +478,36 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_unblock_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_unblock_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't unblock PIN: ");
-        g_simple_async_result_take_error (simple,
-                                          pin_qmi_error_to_mobile_equipment_error (error));
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
 
     if (output)
         qmi_message_dms_uim_unblock_pin_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
-send_puk (MMBaseSim *self,
-          const gchar *puk,
-          const gchar *new_pin,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+send_puk (MMBaseSim           *self,
+          const gchar         *puk,
+          const gchar         *new_pin,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
 {
+    GTask *task;
     QmiMessageDmsUimUnblockPinInput *input;
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        send_puk);
-
     mm_dbg ("Sending PUK...");
-
     input = qmi_message_dms_uim_unblock_pin_input_new ();
     qmi_message_dms_uim_unblock_pin_input_set_info (
         input,
@@ -602,7 +520,7 @@ send_puk (MMBaseSim *self,
                                     5,
                                     NULL,
                                     (GAsyncReadyCallback)dms_uim_unblock_pin_ready,
-                                    result);
+                                    task);
     qmi_message_dms_uim_unblock_pin_input_unref (input);
 }
 
@@ -610,17 +528,17 @@ send_puk (MMBaseSim *self,
 /* Change PIN */
 
 static gboolean
-change_pin_finish (MMBaseSim *self,
-                   GAsyncResult *res,
-                   GError **error)
+change_pin_finish (MMBaseSim     *self,
+                   GAsyncResult  *res,
+                   GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 dms_uim_change_pin_ready (QmiClientDms *client,
-                           GAsyncResult *res,
-                           GSimpleAsyncResult *simple)
+                          GAsyncResult *res,
+                          GTask        *task)
 {
     QmiMessageDmsUimChangePinOutput *output = NULL;
     GError *error = NULL;
@@ -628,45 +546,36 @@ dms_uim_change_pin_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_change_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_change_pin_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't change PIN: ");
-        g_simple_async_result_take_error (simple,
-                                          pin_qmi_error_to_mobile_equipment_error (error));
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
 
     if (output)
         qmi_message_dms_uim_change_pin_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
-change_pin (MMBaseSim *self,
-            const gchar *old_pin,
-            const gchar *new_pin,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+change_pin (MMBaseSim           *self,
+            const gchar         *old_pin,
+            const gchar         *new_pin,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
 {
+    GTask *task;
     QmiMessageDmsUimChangePinInput *input;
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        change_pin);
-
     mm_dbg ("Changing PIN...");
-
     input = qmi_message_dms_uim_change_pin_input_new ();
     qmi_message_dms_uim_change_pin_input_set_info (
         input,
@@ -679,7 +588,7 @@ change_pin (MMBaseSim *self,
                                    5,
                                    NULL,
                                    (GAsyncReadyCallback)dms_uim_change_pin_ready,
-                                   result);
+                                   task);
     qmi_message_dms_uim_change_pin_input_unref (input);
 }
 
@@ -691,13 +600,13 @@ enable_pin_finish (MMBaseSim *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 dms_uim_set_pin_protection_ready (QmiClientDms *client,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask        *task)
 {
     QmiMessageDmsUimSetPinProtectionOutput *output = NULL;
     GError *error = NULL;
@@ -705,42 +614,34 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_set_pin_protection_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_set_pin_protection_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't enable PIN: ");
-        g_simple_async_result_take_error (simple,
-                                          pin_qmi_error_to_mobile_equipment_error (error));
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
 
     if (output)
         qmi_message_dms_uim_set_pin_protection_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
-enable_pin (MMBaseSim *self,
-            const gchar *pin,
-            gboolean enabled,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+enable_pin (MMBaseSim           *self,
+            const gchar         *pin,
+            gboolean             enabled,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
 {
+    GTask *task;
     QmiMessageDmsUimSetPinProtectionInput *input;
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        enable_pin);
 
     mm_dbg ("%s PIN...",
             enabled ? "Enabling" : "Disabling");
@@ -757,7 +658,7 @@ enable_pin (MMBaseSim *self,
                                            5,
                                            NULL,
                                            (GAsyncReadyCallback)dms_uim_set_pin_protection_ready,
-                                           result);
+                                           task);
     qmi_message_dms_uim_set_pin_protection_input_unref (input);
 }
 
