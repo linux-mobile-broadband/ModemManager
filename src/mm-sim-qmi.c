@@ -30,6 +30,14 @@
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 
+enum {
+    PROP_0,
+    PROP_DMS_UIM_DEPRECATED,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 struct _MMSimQmiPrivate {
     gboolean dms_uim_deprecated;
 };
@@ -481,17 +489,6 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_verify_pin_output_get_result (output, &error)) {
-        /* DMS UIM deprecated? */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            g_error_free (error);
-            qmi_message_dms_uim_verify_pin_output_unref (output);
-            /* Flag as deprecated and try with UIM */
-            self->priv->dms_uim_deprecated = TRUE;
-            uim_verify_pin (self, task);
-            return;
-        }
         g_prefix_error (&error, "Couldn't verify PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -654,17 +651,6 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_unblock_pin_output_get_result (output, &error)) {
-        /* DMS UIM deprecated? */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            g_error_free (error);
-            qmi_message_dms_uim_unblock_pin_output_unref (output);
-            /* Flag as deprecated and try with UIM */
-            self->priv->dms_uim_deprecated = TRUE;
-            uim_unblock_pin (self, task);
-            return;
-        }
         g_prefix_error (&error, "Couldn't unblock PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -835,17 +821,6 @@ dms_uim_change_pin_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_change_pin_output_get_result (output, &error)) {
-        /* DMS UIM deprecated? */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            g_error_free (error);
-            qmi_message_dms_uim_change_pin_output_unref (output);
-            /* Flag as deprecated and try with UIM */
-            self->priv->dms_uim_deprecated = TRUE;
-            uim_change_pin (self, task);
-            return;
-        }
         g_prefix_error (&error, "Couldn't change PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -1015,17 +990,6 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_set_pin_protection_output_get_result (output, &error)) {
-        /* DMS UIM deprecated? */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            g_error_free (error);
-            qmi_message_dms_uim_set_pin_protection_output_unref (output);
-            /* Flag as deprecated and try with UIM */
-            self->priv->dms_uim_deprecated = TRUE;
-            uim_enable_pin (self, task);
-            return;
-        }
         g_prefix_error (&error, "Couldn't enable PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -1120,10 +1084,11 @@ mm_sim_qmi_new_finish (GAsyncResult  *res,
 }
 
 void
-mm_sim_qmi_new (MMBaseModem *modem,
-                GCancellable *cancellable,
-                GAsyncReadyCallback callback,
-                gpointer user_data)
+mm_sim_qmi_new (MMBaseModem         *modem,
+                gboolean             dms_uim_deprecated,
+                GCancellable        *cancellable,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
 {
     g_async_initable_new_async (MM_TYPE_SIM_QMI,
                                 G_PRIORITY_DEFAULT,
@@ -1131,6 +1096,7 @@ mm_sim_qmi_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_SIM_QMI_DMS_UIM_DEPRECATED, dms_uim_deprecated,
                                 NULL);
 }
 
@@ -1144,12 +1110,51 @@ mm_sim_qmi_init (MMSimQmi *self)
 }
 
 static void
+set_property (GObject      *object,
+              guint         prop_id,
+              const GValue *value,
+              GParamSpec   *pspec)
+{
+    MMSimQmi *self = MM_SIM_QMI (object);
+
+    switch (prop_id) {
+    case PROP_DMS_UIM_DEPRECATED:
+        self->priv->dms_uim_deprecated = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject    *object,
+              guint       prop_id,
+              GValue     *value,
+              GParamSpec *pspec)
+{
+    MMSimQmi *self = MM_SIM_QMI (object);
+
+    switch (prop_id) {
+    case PROP_DMS_UIM_DEPRECATED:
+        g_value_set_boolean (value, self->priv->dms_uim_deprecated);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
 mm_sim_qmi_class_init (MMSimQmiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMSimQmiPrivate));
+
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
 
     base_sim_class->load_sim_identifier = load_sim_identifier;
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
@@ -1167,4 +1172,12 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     base_sim_class->change_pin_finish = change_pin_finish;
     base_sim_class->enable_pin = enable_pin;
     base_sim_class->enable_pin_finish = enable_pin_finish;
+
+    properties[PROP_DMS_UIM_DEPRECATED] =
+        g_param_spec_boolean (MM_SIM_QMI_DMS_UIM_DEPRECATED,
+                              "DMS UIM deprecated",
+                              "Whether DMS UIM commands should be skipped",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DMS_UIM_DEPRECATED, properties[PROP_DMS_UIM_DEPRECATED]);
 }

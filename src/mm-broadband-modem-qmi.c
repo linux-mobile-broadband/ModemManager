@@ -90,8 +90,8 @@ struct _MMBroadbandModemQmiPrivate {
     guint signal_info_indication_id;
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-    /* New devices may not support the legacy DMS UIM Get PIN status */
-    gboolean dms_uim_get_pin_status_supported;
+    /* New devices may not support the legacy DMS UIM commands */
+    gboolean dms_uim_deprecated;
 
     /* 3GPP/CDMA registration helpers */
     gchar *current_operator_id;
@@ -1753,7 +1753,7 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
             /* Flag that the command is unsupported, and try with the new way */
-            ctx->self->priv->dms_uim_get_pin_status_supported = FALSE;
+            ctx->self->priv->dms_uim_deprecated = TRUE;
             ctx->step++;
             load_unlock_required_context_step (ctx);
             return;
@@ -1833,7 +1833,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
         /* Go on to next step */
 
     case LOAD_UNLOCK_REQUIRED_STEP_DMS:
-        if (ctx->self->priv->dms_uim_get_pin_status_supported) {
+        if (!ctx->self->priv->dms_uim_deprecated) {
             /* Failure to get DMS client is hard really */
             client = peek_qmi_client (ctx->self, QMI_SERVICE_DMS, &error);
             if (!client) {
@@ -1998,7 +1998,7 @@ unlock_retries_dms_uim_get_pin_status_ready (QmiClientDms *client,
                              QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
             g_error_free (error);
             /* Flag that the command is unsupported, and try with the new way */
-            self->priv->dms_uim_get_pin_status_supported = FALSE;
+            self->priv->dms_uim_deprecated = TRUE;
             uim_load_unlock_retries (self, task);
             return;
         }
@@ -2070,7 +2070,7 @@ modem_load_unlock_retries (MMIfaceModem *_self,
     task = g_task_new (self, NULL, callback, user_data);
 
     mm_dbg ("loading unlock retries...");
-    if (self->priv->dms_uim_get_pin_status_supported)
+    if (!self->priv->dms_uim_deprecated)
         dms_uim_load_unlock_retries (MM_BROADBAND_MODEM_QMI (self), task);
     else
         uim_load_unlock_retries (MM_BROADBAND_MODEM_QMI (self), task);
@@ -3292,6 +3292,7 @@ create_sim (MMIfaceModem *self,
 {
     /* New QMI SIM */
     mm_sim_qmi_new (MM_BASE_MODEM (self),
+                    MM_BROADBAND_MODEM_QMI (self)->priv->dms_uim_deprecated,
                     NULL, /* cancellable */
                     callback,
                     user_data);
@@ -11322,9 +11323,6 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_QMI,
                                               MMBroadbandModemQmiPrivate);
-
-    /* Initially we always try to use the legacy command */
-    self->priv->dms_uim_get_pin_status_supported = TRUE;
 }
 
 static void

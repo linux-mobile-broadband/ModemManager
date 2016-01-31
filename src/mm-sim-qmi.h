@@ -32,6 +32,8 @@ typedef struct _MMSimQmi MMSimQmi;
 typedef struct _MMSimQmiClass MMSimQmiClass;
 typedef struct _MMSimQmiPrivate MMSimQmiPrivate;
 
+#define MM_SIM_QMI_DMS_UIM_DEPRECATED "dms-uim-deprecated"
+
 struct _MMSimQmi {
     MMBaseSim parent;
     MMSimQmiPrivate *priv;
@@ -43,11 +45,12 @@ struct _MMSimQmiClass {
 
 GType mm_sim_qmi_get_type (void);
 
-void       mm_sim_qmi_new        (MMBaseModem *modem,
-                                  GCancellable *cancellable,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-MMBaseSim *mm_sim_qmi_new_finish (GAsyncResult  *res,
-                                  GError       **error);
+void       mm_sim_qmi_new        (MMBaseModem          *modem,
+                                  gboolean              dms_uim_deprecated,
+                                  GCancellable         *cancellable,
+                                  GAsyncReadyCallback   callback,
+                                  gpointer              user_data);
+MMBaseSim *mm_sim_qmi_new_finish (GAsyncResult         *res,
+                                  GError              **error);
 
 #endif /* MM_SIM_QMI_H */
