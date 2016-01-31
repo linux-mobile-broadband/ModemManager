@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -28,6 +29,10 @@
 #include "mm-sim-qmi.h"
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
+
+struct _MMSimQmiPrivate {
+    gboolean dms_uim_deprecated;
+};
 
 /*****************************************************************************/
 
@@ -50,9 +55,11 @@ ensure_qmi_client (GTask       *task,
     g_object_unref (modem);
 
     if (!port) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't peek QMI port");
-        g_object_unref (task);
+        if (task) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't peek QMI port");
+            g_object_unref (task);
+        }
         return FALSE;
     }
 
@@ -60,10 +67,12 @@ ensure_qmi_client (GTask       *task,
                                       service,
                                       MM_PORT_QMI_FLAG_DEFAULT);
     if (!client) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't peek client for service '%s'",
-                                 qmi_service_get_string (service));
-        g_object_unref (task);
+        if (task) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't peek client for service '%s'",
+                                     qmi_service_get_string (service));
+            g_object_unref (task);
+        }
         return FALSE;
     }
 
@@ -402,18 +411,87 @@ send_pin_finish (MMBaseSim     *self,
 }
 
 static void
+uim_verify_pin_ready (QmiClientUim *client,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    QmiMessageUimVerifyPinOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_uim_verify_pin_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_uim_verify_pin_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't verify PIN: ");
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    if (output)
+        qmi_message_uim_verify_pin_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+uim_verify_pin (MMSimQmi *self,
+                GTask    *task)
+{
+    QmiMessageUimVerifyPinInput *input;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_UIM, &client))
+        return;
+
+    input = qmi_message_uim_verify_pin_input_new ();
+    qmi_message_uim_verify_pin_input_set_info (
+        input,
+        QMI_UIM_PIN_ID_PIN1,
+        g_task_get_task_data (task),
+        NULL);
+    qmi_message_uim_verify_pin_input_set_session_information (
+        input,
+        QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
+        "", /* ignored */
+        NULL);
+    qmi_client_uim_verify_pin (QMI_CLIENT_UIM (client),
+                               input,
+                               5,
+                               NULL,
+                               (GAsyncReadyCallback) uim_verify_pin_ready,
+                               task);
+    qmi_message_uim_verify_pin_input_unref (input);
+}
+
+static void
 dms_uim_verify_pin_ready (QmiClientDms *client,
                           GAsyncResult *res,
                           GTask        *task)
 {
     QmiMessageDmsUimVerifyPinOutput *output = NULL;
     GError *error = NULL;
+    MMSimQmi *self;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_verify_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_verify_pin_output_get_result (output, &error)) {
+        /* DMS UIM deprecated? */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            g_error_free (error);
+            qmi_message_dms_uim_verify_pin_output_unref (output);
+            /* Flag as deprecated and try with UIM */
+            self->priv->dms_uim_deprecated = TRUE;
+            uim_verify_pin (self, task);
+            return;
+        }
         g_prefix_error (&error, "Couldn't verify PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -425,39 +503,73 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
 }
 
 static void
-send_pin (MMBaseSim *self,
-          const gchar *pin,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+dms_uim_verify_pin (MMSimQmi *self,
+                    GTask    *task)
 {
-    GTask *task;
     QmiMessageDmsUimVerifyPinInput *input;
     QmiClient *client = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
+    if (!ensure_qmi_client (NULL,
                             MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client))
+                            QMI_SERVICE_DMS, &client)) {
+        /* Very unlikely that this will ever happen, but anyway, try with
+         * UIM service instead */
+        uim_verify_pin (self, task);
         return;
+    }
 
     mm_dbg ("Sending PIN...");
     input = qmi_message_dms_uim_verify_pin_input_new ();
     qmi_message_dms_uim_verify_pin_input_set_info (
         input,
         QMI_DMS_UIM_PIN_ID_PIN,
-        pin,
+        g_task_get_task_data (task),
         NULL);
     qmi_client_dms_uim_verify_pin (QMI_CLIENT_DMS (client),
                                    input,
                                    5,
                                    NULL,
-                                   (GAsyncReadyCallback)dms_uim_verify_pin_ready,
+                                   (GAsyncReadyCallback) dms_uim_verify_pin_ready,
                                    task);
     qmi_message_dms_uim_verify_pin_input_unref (input);
 }
 
+static void
+send_pin (MMBaseSim           *_self,
+          const gchar         *pin,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
+{
+    GTask *task;
+    MMSimQmi *self;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    g_task_set_task_data (task, g_strdup (pin), (GDestroyNotify) g_free);
+
+    mm_dbg ("Verifying PIN...");
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_verify_pin (self, task);
+    else
+        uim_verify_pin (self, task);
+}
+
 /*****************************************************************************/
 /* Send PUK */
+
+typedef struct {
+    gchar    *puk;
+    gchar    *new_pin;
+} UnblockPinContext;
+
+static void
+unblock_pin_context_free (UnblockPinContext *ctx)
+{
+    g_free (ctx->puk);
+    g_free (ctx->new_pin);
+    g_slice_free (UnblockPinContext, ctx);
+}
 
 static gboolean
 send_puk_finish (MMBaseSim     *self,
@@ -468,18 +580,91 @@ send_puk_finish (MMBaseSim     *self,
 }
 
 static void
+uim_unblock_pin_ready (QmiClientUim *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    QmiMessageUimUnblockPinOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_uim_unblock_pin_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_uim_unblock_pin_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't unblock PIN: ");
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    if (output)
+        qmi_message_uim_unblock_pin_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+uim_unblock_pin (MMSimQmi *self,
+                 GTask    *task)
+{
+    QmiMessageUimUnblockPinInput *input;
+    QmiClient *client = NULL;
+    UnblockPinContext *ctx;
+
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_UIM, &client))
+        return;
+
+    ctx = g_task_get_task_data (task);
+
+    input = qmi_message_uim_unblock_pin_input_new ();
+    qmi_message_uim_unblock_pin_input_set_info (
+        input,
+        QMI_UIM_PIN_ID_PIN1,
+        ctx->puk,
+        ctx->new_pin,
+        NULL);
+    qmi_message_uim_unblock_pin_input_set_session_information (
+        input,
+        QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
+        "", /* ignored */
+        NULL);
+    qmi_client_uim_unblock_pin (QMI_CLIENT_UIM (client),
+                                input,
+                                5,
+                                NULL,
+                                (GAsyncReadyCallback) uim_unblock_pin_ready,
+                                task);
+    qmi_message_uim_unblock_pin_input_unref (input);
+}
+
+static void
 dms_uim_unblock_pin_ready (QmiClientDms *client,
                            GAsyncResult *res,
                            GTask        *task)
 {
     QmiMessageDmsUimUnblockPinOutput *output = NULL;
     GError *error = NULL;
+    MMSimQmi *self;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_unblock_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_unblock_pin_output_get_result (output, &error)) {
+        /* DMS UIM deprecated? */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            g_error_free (error);
+            qmi_message_dms_uim_unblock_pin_output_unref (output);
+            /* Flag as deprecated and try with UIM */
+            self->priv->dms_uim_deprecated = TRUE;
+            uim_unblock_pin (self, task);
+            return;
+        }
         g_prefix_error (&error, "Couldn't unblock PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -491,29 +676,30 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
 }
 
 static void
-send_puk (MMBaseSim           *self,
-          const gchar         *puk,
-          const gchar         *new_pin,
-          GAsyncReadyCallback  callback,
-          gpointer             user_data)
+dms_uim_unblock_pin (MMSimQmi *self,
+                     GTask    *task)
 {
-    GTask *task;
     QmiMessageDmsUimUnblockPinInput *input;
     QmiClient *client = NULL;
+    UnblockPinContext *ctx;
 
-    task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
+    if (!ensure_qmi_client (NULL,
                             MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client))
+                            QMI_SERVICE_DMS, &client)) {
+        /* Very unlikely that this will ever happen, but anyway, try with
+         * UIM service instead */
+        uim_unblock_pin (self, task);
         return;
+    }
 
-    mm_dbg ("Sending PUK...");
+    ctx = g_task_get_task_data (task);
+
     input = qmi_message_dms_uim_unblock_pin_input_new ();
     qmi_message_dms_uim_unblock_pin_input_set_info (
         input,
         QMI_DMS_UIM_PIN_ID_PIN,
-        puk,
-        new_pin,
+        ctx->puk,
+        ctx->new_pin,
         NULL);
     qmi_client_dms_uim_unblock_pin (QMI_CLIENT_DMS (client),
                                     input,
@@ -524,8 +710,47 @@ send_puk (MMBaseSim           *self,
     qmi_message_dms_uim_unblock_pin_input_unref (input);
 }
 
+static void
+send_puk (MMBaseSim           *_self,
+          const gchar         *puk,
+          const gchar         *new_pin,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
+{
+    GTask *task;
+    UnblockPinContext *ctx;
+    MMSimQmi *self;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new (UnblockPinContext);
+    ctx->puk = g_strdup (puk);
+    ctx->new_pin = g_strdup (new_pin);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) unblock_pin_context_free);
+
+    mm_dbg ("Unblocking PIN...");
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_unblock_pin (self, task);
+    else
+        uim_unblock_pin (self, task);
+}
+
 /*****************************************************************************/
 /* Change PIN */
+
+typedef struct {
+    gchar    *old_pin;
+    gchar    *new_pin;
+} ChangePinContext;
+
+static void
+change_pin_context_free (ChangePinContext *ctx)
+{
+    g_free (ctx->old_pin);
+    g_free (ctx->new_pin);
+    g_slice_free (ChangePinContext, ctx);
+}
 
 static gboolean
 change_pin_finish (MMBaseSim     *self,
@@ -536,18 +761,91 @@ change_pin_finish (MMBaseSim     *self,
 }
 
 static void
+uim_change_pin_ready (QmiClientUim *client,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    QmiMessageUimChangePinOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_uim_change_pin_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_uim_change_pin_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't change PIN: ");
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    if (output)
+        qmi_message_uim_change_pin_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+uim_change_pin (MMSimQmi *self,
+                GTask    *task)
+{
+    QmiMessageUimChangePinInput *input;
+    QmiClient *client = NULL;
+    ChangePinContext *ctx;
+
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_UIM, &client))
+        return;
+
+    ctx = g_task_get_task_data (task);
+
+    input = qmi_message_uim_change_pin_input_new ();
+    qmi_message_uim_change_pin_input_set_info (
+        input,
+        QMI_UIM_PIN_ID_PIN1,
+        ctx->old_pin,
+        ctx->new_pin,
+        NULL);
+    qmi_message_uim_change_pin_input_set_session_information (
+        input,
+        QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
+        "", /* ignored */
+        NULL);
+    qmi_client_uim_change_pin (QMI_CLIENT_UIM (client),
+                               input,
+                               5,
+                               NULL,
+                               (GAsyncReadyCallback) uim_change_pin_ready,
+                               task);
+    qmi_message_uim_change_pin_input_unref (input);
+}
+
+static void
 dms_uim_change_pin_ready (QmiClientDms *client,
                           GAsyncResult *res,
                           GTask        *task)
 {
     QmiMessageDmsUimChangePinOutput *output = NULL;
     GError *error = NULL;
+    MMSimQmi *self;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_change_pin_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_change_pin_output_get_result (output, &error)) {
+        /* DMS UIM deprecated? */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            g_error_free (error);
+            qmi_message_dms_uim_change_pin_output_unref (output);
+            /* Flag as deprecated and try with UIM */
+            self->priv->dms_uim_deprecated = TRUE;
+            uim_change_pin (self, task);
+            return;
+        }
         g_prefix_error (&error, "Couldn't change PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -559,41 +857,80 @@ dms_uim_change_pin_ready (QmiClientDms *client,
 }
 
 static void
-change_pin (MMBaseSim           *self,
+dms_uim_change_pin (MMSimQmi *self,
+                    GTask    *task)
+{
+    QmiMessageDmsUimChangePinInput *input;
+    QmiClient *client = NULL;
+    ChangePinContext *ctx;
+
+    if (!ensure_qmi_client (NULL,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client)) {
+        /* Very unlikely that this will ever happen, but anyway, try with
+         * UIM service instead */
+        uim_change_pin (self, task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+
+    input = qmi_message_dms_uim_change_pin_input_new ();
+    qmi_message_dms_uim_change_pin_input_set_info (
+        input,
+        QMI_DMS_UIM_PIN_ID_PIN,
+        ctx->old_pin,
+        ctx->new_pin,
+        NULL);
+    qmi_client_dms_uim_change_pin (QMI_CLIENT_DMS (client),
+                                   input,
+                                   5,
+                                   NULL,
+                                   (GAsyncReadyCallback) dms_uim_change_pin_ready,
+                                   task);
+    qmi_message_dms_uim_change_pin_input_unref (input);
+}
+
+static void
+change_pin (MMBaseSim           *_self,
             const gchar         *old_pin,
             const gchar         *new_pin,
             GAsyncReadyCallback  callback,
             gpointer             user_data)
 {
     GTask *task;
-    QmiMessageDmsUimChangePinInput *input;
-    QmiClient *client = NULL;
+    ChangePinContext *ctx;
+    MMSimQmi *self;
 
+    self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client))
-        return;
+
+    ctx = g_slice_new (ChangePinContext);
+    ctx->old_pin = g_strdup (old_pin);
+    ctx->new_pin = g_strdup (new_pin);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) change_pin_context_free);
 
     mm_dbg ("Changing PIN...");
-    input = qmi_message_dms_uim_change_pin_input_new ();
-    qmi_message_dms_uim_change_pin_input_set_info (
-        input,
-        QMI_DMS_UIM_PIN_ID_PIN,
-        old_pin,
-        new_pin,
-        NULL);
-    qmi_client_dms_uim_change_pin (QMI_CLIENT_DMS (client),
-                                   input,
-                                   5,
-                                   NULL,
-                                   (GAsyncReadyCallback)dms_uim_change_pin_ready,
-                                   task);
-    qmi_message_dms_uim_change_pin_input_unref (input);
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_change_pin (self, task);
+    else
+        uim_change_pin (self, task);
 }
 
 /*****************************************************************************/
 /* Enable PIN */
+
+typedef struct {
+    gchar    *pin;
+    gboolean  enabled;
+} EnablePinContext;
+
+static void
+enable_pin_context_free (EnablePinContext *ctx)
+{
+    g_free (ctx->pin);
+    g_slice_free (EnablePinContext, ctx);
+}
 
 static gboolean
 enable_pin_finish (MMBaseSim *self,
@@ -604,18 +941,91 @@ enable_pin_finish (MMBaseSim *self,
 }
 
 static void
+uim_set_pin_protection_ready (QmiClientUim *client,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    QmiMessageUimSetPinProtectionOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_uim_set_pin_protection_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_uim_set_pin_protection_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't enable PIN: ");
+        g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    if (output)
+        qmi_message_uim_set_pin_protection_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+uim_enable_pin (MMSimQmi *self,
+                GTask    *task)
+{
+    QmiMessageUimSetPinProtectionInput *input;
+    QmiClient *client = NULL;
+    EnablePinContext *ctx;
+
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_UIM, &client))
+        return;
+
+    ctx = g_task_get_task_data (task);
+
+    input = qmi_message_uim_set_pin_protection_input_new ();
+    qmi_message_uim_set_pin_protection_input_set_info (
+        input,
+        QMI_UIM_PIN_ID_PIN1,
+        ctx->enabled,
+        ctx->pin,
+        NULL);
+    qmi_message_uim_set_pin_protection_input_set_session_information (
+        input,
+        QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
+        "", /* ignored */
+        NULL);
+    qmi_client_uim_set_pin_protection (QMI_CLIENT_UIM (client),
+                                       input,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)uim_set_pin_protection_ready,
+                                       task);
+    qmi_message_uim_set_pin_protection_input_unref (input);
+}
+
+static void
 dms_uim_set_pin_protection_ready (QmiClientDms *client,
                                   GAsyncResult *res,
                                   GTask        *task)
 {
     QmiMessageDmsUimSetPinProtectionOutput *output = NULL;
     GError *error = NULL;
+    MMSimQmi *self;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_set_pin_protection_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_dms_uim_set_pin_protection_output_get_result (output, &error)) {
+        /* DMS UIM deprecated? */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            g_error_free (error);
+            qmi_message_dms_uim_set_pin_protection_output_unref (output);
+            /* Flag as deprecated and try with UIM */
+            self->priv->dms_uim_deprecated = TRUE;
+            uim_enable_pin (self, task);
+            return;
+        }
         g_prefix_error (&error, "Couldn't enable PIN: ");
         g_task_return_error (task, pin_qmi_error_to_mobile_equipment_error (error));
     } else
@@ -627,31 +1037,30 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
 }
 
 static void
-enable_pin (MMBaseSim           *self,
-            const gchar         *pin,
-            gboolean             enabled,
-            GAsyncReadyCallback  callback,
-            gpointer             user_data)
+dms_uim_enable_pin (MMSimQmi *self,
+                    GTask    *task)
 {
-    GTask *task;
     QmiMessageDmsUimSetPinProtectionInput *input;
     QmiClient *client = NULL;
+    EnablePinContext *ctx;
 
-    task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
+    if (!ensure_qmi_client (NULL,
                             MM_SIM_QMI (self),
-                            QMI_SERVICE_DMS, &client))
+                            QMI_SERVICE_DMS, &client)) {
+        /* Very unlikely that this will ever happen, but anyway, try with
+         * UIM service instead */
+        uim_enable_pin (self, task);
         return;
+    }
 
-    mm_dbg ("%s PIN...",
-            enabled ? "Enabling" : "Disabling");
+    ctx = g_task_get_task_data (task);
 
     input = qmi_message_dms_uim_set_pin_protection_input_new ();
     qmi_message_dms_uim_set_pin_protection_input_set_info (
         input,
         QMI_DMS_UIM_PIN_ID_PIN,
-        enabled,
-        pin,
+        ctx->enabled,
+        ctx->pin,
         NULL);
     qmi_client_dms_uim_set_pin_protection (QMI_CLIENT_DMS (client),
                                            input,
@@ -660,6 +1069,32 @@ enable_pin (MMBaseSim           *self,
                                            (GAsyncReadyCallback)dms_uim_set_pin_protection_ready,
                                            task);
     qmi_message_dms_uim_set_pin_protection_input_unref (input);
+}
+
+static void
+enable_pin (MMBaseSim           *_self,
+            const gchar         *pin,
+            gboolean             enabled,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
+{
+    GTask *task;
+    EnablePinContext *ctx;
+    MMSimQmi *self;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new (EnablePinContext);
+    ctx->pin = g_strdup (pin);
+    ctx->enabled = enabled;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) enable_pin_context_free);
+
+    mm_dbg ("%s PIN...", enabled ? "Enabling" : "Disabling");
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_enable_pin (self, task);
+    else
+        uim_enable_pin (self, task);
 }
 
 /*****************************************************************************/
@@ -702,12 +1137,19 @@ mm_sim_qmi_new (MMBaseModem *modem,
 static void
 mm_sim_qmi_init (MMSimQmi *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_SIM_QMI,
+                                              MMSimQmiPrivate);
 }
 
 static void
 mm_sim_qmi_class_init (MMSimQmiClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMSimQmiPrivate));
 
     base_sim_class->load_sim_identifier = load_sim_identifier;
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
