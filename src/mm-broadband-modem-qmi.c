@@ -7580,6 +7580,7 @@ wms_list_messages_ready (QmiClientWms *client,
         g_error_free (error);
         ctx->step++;
         load_initial_sms_parts_step (ctx);
+        qmi_message_wms_list_messages_output_unref (output);
         return;
     }
 
