@@ -1622,8 +1622,13 @@ uim_get_card_status_ready (QmiClientUim *client,
     card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, card_i);
     app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, application_j);
 
-    /* If card not ready yet, return RETRY error */
-    if (app->state != QMI_UIM_CARD_APPLICATION_STATE_READY) {
+    /* If card not ready yet, return RETRY error.
+     * If the application state reports needing PIN/PUk, consider that ready as
+     * well, and let the logic fall down to check PIN1/PIN2. */
+    if (app->state != QMI_UIM_CARD_APPLICATION_STATE_READY &&
+        app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_OR_UPIN_PIN_REQUIRED &&
+        app->state != QMI_UIM_CARD_APPLICATION_STATE_PUK1_OR_UPIN_PUK_REQUIRED &&
+        app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_BLOCKED) {
         g_debug ("Neither SIM nor USIM are ready");
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
