@@ -1467,13 +1467,16 @@ modem_load_unlock_required_finish (MMIfaceModem *self,
 
 static void load_unlock_required_context_step (LoadUnlockRequiredContext *ctx);
 
-static void
-uim_get_card_status_ready (QmiClientUim *client,
-                           GAsyncResult *res,
-                           LoadUnlockRequiredContext *ctx)
+/* Used also when loading unlock retries left */
+static gboolean
+uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
+                                  MMModemLock                       *o_lock,
+                                  guint                             *o_pin1_retries,
+                                  guint                             *o_puk1_retries,
+                                  guint                             *o_pin2_retries,
+                                  guint                             *o_puk2_retries,
+                                  GError                           **error)
 {
-    QmiMessageUimGetCardStatusOutput *output;
-    GError *error = NULL;
     GArray *cards;
     QmiMessageUimGetCardStatusOutputCardStatusCardsElement *card;
     QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement *app;
@@ -1489,20 +1492,9 @@ uim_get_card_status_ready (QmiClientUim *client,
      * purposes, we're going to consider as the SIM to use the first card present
      * with a SIM/USIM application. */
 
-    output = qmi_client_uim_get_card_status_finish (client, res, &error);
-    if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
-    }
-
-    if (!qmi_message_uim_get_card_status_output_get_result (output, &error)) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+    if (!qmi_message_uim_get_card_status_output_get_result (output, error)) {
+        g_prefix_error (error, "QMI operation failed: ");
+        return FALSE;
     }
 
     qmi_message_uim_get_card_status_output_get_card_status (
@@ -1515,11 +1507,9 @@ uim_get_card_status_ready (QmiClientUim *client,
         NULL);
 
     if (cards->len == 0) {
-        g_simple_async_result_set_error (ctx->result, QMI_CORE_ERROR, QMI_CORE_ERROR_FAILED,
-                                         "No cards reported");
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+        g_set_error (error, QMI_CORE_ERROR, QMI_CORE_ERROR_FAILED,
+                     "No cards reported");
+        return FALSE;
     }
 
     if (cards->len > 1)
@@ -1598,24 +1588,22 @@ uim_get_card_status_ready (QmiClientUim *client,
     if (card_i < 0 || application_j < 0) {
         /* If not a single card found, report SIM not inserted */
         if (n_absent > 0 && !n_error && !n_invalid)
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
-                                             "No card found");
+            g_set_error (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
+                         "No card found");
         else if (n_error > 0)
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                                             "Card error");
+            g_set_error (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                         "Card error");
         else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
-                                             "Card failure: %u absent, %u errors, %u invalid",
-                                             n_absent, n_error, n_invalid);
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+            g_set_error (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
+                         "Card failure: %u absent, %u errors, %u invalid",
+                         n_absent, n_error, n_invalid);
+        return FALSE;
     }
 
     /* Get card/app to use */
@@ -1630,27 +1618,36 @@ uim_get_card_status_ready (QmiClientUim *client,
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PUK1_OR_UPIN_PUK_REQUIRED &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_BLOCKED) {
         g_debug ("Neither SIM nor USIM are ready");
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_RETRY,
-                                         "SIM not ready yet (retry)");
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
+                     "SIM not ready yet (retry)");
+        return FALSE;
     }
+
+    /* Report retries if requested to do so */
+    if (o_pin1_retries)
+        *o_pin1_retries = app->pin1_retries;
+    if (o_puk1_retries)
+        *o_puk1_retries = app->puk1_retries;
+    if (o_pin2_retries)
+        *o_pin2_retries = app->pin2_retries;
+    if (o_puk2_retries)
+        *o_puk2_retries = app->puk2_retries;
+
+    /* Early bail out if lock status isn't wanted at this point, so that we
+     * don't fail with an error the unlock retries check */
+    if (!o_lock)
+        return TRUE;
 
     /* Card is ready, what's the lock status? */
 
     /* PIN1 */
     switch (app->pin1_state) {
     case QMI_UIM_PIN_STATE_PERMANENTLY_BLOCKED:
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                                         "SIM PIN/PUK permanently blocked");
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                     "SIM PIN/PUK permanently blocked");
+        return FALSE;
 
     case QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED:
         lock = MM_MODEM_LOCK_SIM_PIN;
@@ -1666,13 +1663,11 @@ uim_get_card_status_ready (QmiClientUim *client,
         break;
 
     default:
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                                         "Unknown SIM PIN/PUK status");
-        qmi_message_uim_get_card_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
-        return;
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                     "Unknown SIM PIN/PUK status");
+        return FALSE;
     }
 
     /* PIN2 */
@@ -1698,7 +1693,36 @@ uim_get_card_status_ready (QmiClientUim *client,
         }
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
+    *o_lock = lock;
+    return TRUE;
+}
+
+static void
+unlock_required_uim_get_card_status_ready (QmiClientUim *client,
+                                           GAsyncResult *res,
+                                           LoadUnlockRequiredContext *ctx)
+{
+    QmiMessageUimGetCardStatusOutput *output;
+    GError *error = NULL;
+    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+
+    output = qmi_client_uim_get_card_status_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        load_unlock_required_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (!uim_get_card_status_output_parse (output,
+                                           &lock,
+                                           NULL, NULL, NULL, NULL,
+                                           &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else
+        g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
+
     qmi_message_uim_get_card_status_output_unref (output);
     load_unlock_required_context_complete_and_free (ctx);
 }
@@ -1844,7 +1868,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
                                         NULL,
                                         5,
                                         NULL,
-                                        (GAsyncReadyCallback) uim_get_card_status_ready,
+                                        (GAsyncReadyCallback) unlock_required_uim_get_card_status_ready,
                                         ctx);
         return;
     }
@@ -1872,93 +1896,184 @@ modem_load_unlock_required (MMIfaceModem *self,
 /* Check if unlock retries (Modem interface) */
 
 static MMUnlockRetries *
-modem_load_unlock_retries_finish (MMIfaceModem *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+modem_load_unlock_retries_finish (MMIfaceModem  *self,
+                                  GAsyncResult  *res,
+                                  GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_UNLOCK_RETRIES (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    return MM_UNLOCK_RETRIES (g_task_propagate_pointer (G_TASK (res), error));
 }
 
 static void
-retry_count_dms_uim_get_pin_status_ready (QmiClientDms *client,
+unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
                                           GAsyncResult *res,
-                                          GSimpleAsyncResult *simple)
+                                          GTask        *task)
+{
+    QmiMessageUimGetCardStatusOutput *output;
+    GError *error = NULL;
+    guint pin1_retries = 0;
+    guint puk1_retries = 0;
+    guint pin2_retries = 0;
+    guint puk2_retries = 0;
+    MMUnlockRetries *retries;
+
+    output = qmi_client_uim_get_card_status_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!uim_get_card_status_output_parse (output,
+                                           NULL,
+                                           &pin1_retries, &puk1_retries,
+                                           &pin2_retries, &puk2_retries,
+                                           &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    retries = mm_unlock_retries_new ();
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN,  pin1_retries);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK,  puk1_retries);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, pin2_retries);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2_retries);
+
+    qmi_message_uim_get_card_status_output_unref (output);
+
+    g_task_return_pointer (task, retries, g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+uim_load_unlock_retries (MMBroadbandModemQmi *self,
+                         GTask               *task)
+{
+    QmiClient *client;
+    GError *error = NULL;
+
+    client = peek_qmi_client (self, QMI_SERVICE_UIM, &error);
+    if (!client) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_client_uim_get_card_status (QMI_CLIENT_UIM (client),
+                                    NULL,
+                                    5,
+                                    NULL,
+                                    (GAsyncReadyCallback) unlock_retries_uim_get_card_status_ready,
+                                    task);
+}
+
+static void
+unlock_retries_dms_uim_get_pin_status_ready (QmiClientDms *client,
+                                             GAsyncResult *res,
+                                             GTask        *task)
 {
     QmiMessageDmsUimGetPinStatusOutput *output;
     GError *error = NULL;
+    MMBroadbandModemQmi *self;
+    MMUnlockRetries *retries;
+    guint8 verify_retries_left;
+    guint8 unblock_retries_left;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
-    } else if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't get unlock retries: ");
-        g_simple_async_result_take_error (simple, error);
-    } else {
-        MMUnlockRetries *retries;
-        guint8 verify_retries_left;
-        guint8 unblock_retries_left;
-
-        retries = mm_unlock_retries_new ();
-
-        if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
-                output,
-                NULL, /* current_status */
-                &verify_retries_left,
-                &unblock_retries_left,
-                NULL)) {
-            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, verify_retries_left);
-            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, unblock_retries_left);
-        }
-
-        if (qmi_message_dms_uim_get_pin_status_output_get_pin2_status (
-                output,
-                NULL, /* current_status */
-                &verify_retries_left,
-                &unblock_retries_left,
-                NULL)) {
-            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, verify_retries_left);
-            mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, unblock_retries_left);
-        }
-
-        g_simple_async_result_set_op_res_gpointer (simple, retries, g_object_unref);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
-    if (output)
+    if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
         qmi_message_dms_uim_get_pin_status_output_unref (output);
+        /* We get InvalidQmiCommand on newer devices which don't like the legacy way */
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            g_error_free (error);
+            /* Flag that the command is unsupported, and try with the new way */
+            self->priv->dms_uim_get_pin_status_supported = FALSE;
+            uim_load_unlock_retries (self, task);
+            return;
+        }
+        g_prefix_error (&error, "Couldn't get unlock retries: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    retries = mm_unlock_retries_new ();
+
+    if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
+            output,
+            NULL, /* current_status */
+            &verify_retries_left,
+            &unblock_retries_left,
+            NULL)) {
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN, verify_retries_left);
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, unblock_retries_left);
+    }
+
+    if (qmi_message_dms_uim_get_pin_status_output_get_pin2_status (
+            output,
+            NULL, /* current_status */
+            &verify_retries_left,
+            &unblock_retries_left,
+            NULL)) {
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, verify_retries_left);
+        mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, unblock_retries_left);
+    }
+
+    qmi_message_dms_uim_get_pin_status_output_unref (output);
+
+    g_task_return_pointer (task, retries, g_object_unref);
+    g_object_unref (task);
 }
 
 static void
-modem_load_unlock_retries (MMIfaceModem *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+dms_uim_load_unlock_retries (MMBroadbandModemQmi *self,
+                             GTask               *task)
 {
-    GSimpleAsyncResult *result;
-    QmiClient *client = NULL;
+    QmiClient *client;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
-                            QMI_SERVICE_DMS, &client,
-                            callback, user_data))
+    client = peek_qmi_client (self, QMI_SERVICE_DMS, NULL);
+    if (!client) {
+        /* Very unlikely that this will ever happen, but anyway, try with
+         * UIM service instead */
+        uim_load_unlock_retries (self, task);
         return;
+    }
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_unlock_retries);
-
-    mm_dbg ("loading unlock retries...");
     qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (client),
                                        NULL,
                                        5,
                                        NULL,
-                                       (GAsyncReadyCallback)retry_count_dms_uim_get_pin_status_ready,
-                                       result);
+                                       (GAsyncReadyCallback) unlock_retries_dms_uim_get_pin_status_ready,
+                                       task);
+}
+
+static void
+modem_load_unlock_retries (MMIfaceModem *_self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    MMBroadbandModemQmi *self;
+    GTask *task;
+
+    self = MM_BROADBAND_MODEM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_dbg ("loading unlock retries...");
+    if (self->priv->dms_uim_get_pin_status_supported)
+        dms_uim_load_unlock_retries (MM_BROADBAND_MODEM_QMI (self), task);
+    else
+        uim_load_unlock_retries (MM_BROADBAND_MODEM_QMI (self), task);
 }
 
 /*****************************************************************************/
