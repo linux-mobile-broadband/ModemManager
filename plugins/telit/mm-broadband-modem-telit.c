@@ -538,6 +538,86 @@ setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load current mode (Modem interface) */
+
+static gboolean
+load_current_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    const gchar *response;
+    const gchar *str;
+    gint a;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    str = mm_strip_tag (response, "+WS46: ");
+
+    if (!sscanf (str, "%d", &a)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +WS46 response: '%s'",
+                     response);
+        return FALSE;
+    }
+
+    *preferred = MM_MODEM_MODE_NONE;
+    switch (a) {
+    case 12:
+        *allowed = MM_MODEM_MODE_2G;
+        return TRUE;
+    case 22:
+        *allowed = MM_MODEM_MODE_3G;
+        return TRUE;
+    case 25:
+        if (mm_iface_modem_is_3gpp_lte (self))
+            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        else
+            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        return TRUE;
+    case 28:
+        *allowed = MM_MODEM_MODE_4G;
+        return TRUE;
+    case 29:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        return TRUE;
+    case 30:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+        return TRUE;
+    case 31:
+        *allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        return TRUE;
+    default:
+        break;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't parse unexpected +WS46 response: '%s'",
+                 response);
+    return FALSE;
+}
+
+static void
+load_current_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+WS46?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
 static GArray *
@@ -717,6 +797,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
 }
 
 static void
