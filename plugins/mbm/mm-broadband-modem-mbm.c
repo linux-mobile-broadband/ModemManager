@@ -1377,7 +1377,7 @@ gps_enabled_ready (MMBaseModem *self,
                                                  "Couldn't open raw GPS serial port");
         } else {
             GByteArray *buf;
-            const gchar *command = "AT*E2GPSNPD\r\n";
+            const gchar *command = "ATE0*E2GPSNPD\r\n";
 
             /* We need to send an AT command to the GPS data port to
              * toggle it into this data mode. This is a particularity of
