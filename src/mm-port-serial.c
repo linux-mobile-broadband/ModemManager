@@ -456,7 +456,6 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
     stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY );
     stbuf.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
     stbuf.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL);
-    stbuf.c_lflag &= ~(ECHO | ECHOE);
     stbuf.c_cc[VMIN] = 1;
     stbuf.c_cc[VTIME] = 0;
     stbuf.c_cc[VEOF] = 1;
