@@ -160,6 +160,7 @@ Makefile.in
 /plugins/test-modem-helpers-cinterion*
 /plugins/test-modem-helpers-icera*
 /plugins/test-modem-helpers-mbm*
+/plugins/test-modem-helpers-telit*
 /plugins/test-service-*
 
 /test/lsudev
