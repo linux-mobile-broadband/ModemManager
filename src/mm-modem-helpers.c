@@ -867,7 +867,7 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
         return NULL;
     }
 
-    r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-?(\\d+)?\\),\\(?\"(\\S+)\"",
+    r = g_regex_new ("\\+CGDCONT:\\s*\\(\\s*(\\d+)\\s*-?\\s*(\\d+)?\\s*\\)\\s*,\\s*\\(?\"(\\S+)\"",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, &inner_error);
     g_assert (r != NULL);
@@ -955,7 +955,7 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
         return NULL;
 
     list = NULL;
-    r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,([^,\\)]*),([^,\\)]*),([^,\\)]*)",
+    r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,([^, \\)]*)\\s*,([^, \\)]*)\\s*,([^, \\)]*)",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, &inner_error);
     if (r) {
