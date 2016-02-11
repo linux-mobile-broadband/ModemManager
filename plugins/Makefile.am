@@ -125,6 +125,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-nokia-icera.la \
 	libmm-plugin-cinterion.la \
 	libmm-plugin-iridium.la \
+	libmm-plugin-thuraya.la \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-novatel-lte.la \
@@ -460,6 +461,30 @@ libmm_plugin_iridium_la_SOURCES = \
 	iridium/mm-sim-iridium.h
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Thuraya XT
+libmm_plugin_thuraya_la_SOURCES = \
+	thuraya/mm-plugin-thuraya.c \
+	thuraya/mm-plugin-thuraya.h \
+	thuraya/mm-broadband-modem-thuraya.c \
+	thuraya/mm-broadband-modem-thuraya.h \
+	thuraya/mm-modem-helpers-thuraya.c \
+	thuraya/mm-modem-helpers-thuraya.h
+libmm_plugin_thuraya_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_thuraya_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+noinst_PROGRAMS += test-modem-helpers-thuraya
+test_modem_helpers_thuraya_SOURCES = \
+	thuraya/mm-modem-helpers-thuraya.c \
+	thuraya/mm-modem-helpers-thuraya.h \
+	thuraya/tests/test-mm-modem-helpers-thuraya.c
+test_modem_helpers_thuraya_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/thuraya \
+	$(PLUGIN_COMMON_COMPILER_FLAGS)
+test_modem_helpers_thuraya_LDADD = \
+       $(top_builddir)/libmm-glib/libmm-glib.la \
+       $(top_builddir)/src/libmodem-helpers.la
+test_modem_helpers_thuraya_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Common Novatel modem support library
 noinst_LTLIBRARIES += libmm-utils-novatel.la
