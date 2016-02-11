@@ -2215,7 +2215,7 @@ common_signal_info_get_quality (gint8 cdma1x_rssi,
                                 gint8 gsm_rssi,
                                 gint8 wcdma_rssi,
                                 gint8 lte_rssi,
-                                gint8 *out_quality,
+                                guint8 *out_quality,
                                 MMModemAccessTechnology *out_act)
 {
     gint8 rssi_max = -125;
@@ -2285,13 +2285,13 @@ common_signal_info_get_quality (gint8 cdma1x_rssi,
 static gboolean
 signal_info_get_quality (MMBroadbandModemQmi *self,
                          QmiMessageNasGetSignalInfoOutput *output,
-                         gint8 *out_quality,
+                         guint8 *out_quality,
                          MMModemAccessTechnology *out_act)
 {
     gint8 cdma1x_rssi = 0;
     gint8 evdo_rssi = 0;
     gint8 gsm_rssi = 0;
-    gint8 umts_rssi = 0;
+    gint8 wcdma_rssi = 0;
     gint8 lte_rssi = 0;
 
     qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
@@ -2310,7 +2310,8 @@ get_signal_info_ready (QmiClientNas *client,
 {
     QmiMessageNasGetSignalInfoOutput *output;
     GError *error = NULL;
-    guint quality = 0;
+    guint8 quality = 0;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     output = qmi_client_nas_get_signal_info_finish (client, res, &error);
     if (!output) {
@@ -2326,7 +2327,7 @@ get_signal_info_ready (QmiClientNas *client,
         return;
     }
 
-    if (!signal_info_get_quality (ctx->self, output, &quality)) {
+    if (!signal_info_get_quality (ctx->self, output, &quality, &act)) {
         qmi_message_nas_get_signal_info_output_unref (output);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
@@ -2335,6 +2336,13 @@ get_signal_info_ready (QmiClientNas *client,
         load_signal_quality_context_complete_and_free (ctx);
         return;
     }
+
+    /* We update the access technologies directly here when loading signal
+     * quality. It goes a bit out of context, but we can do it nicely */
+    mm_iface_modem_update_access_technologies (
+        MM_IFACE_MODEM (ctx->self),
+        act,
+        (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
@@ -4201,7 +4209,7 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* egprs_support */
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_dbg ("No GSM service reported");
@@ -4225,7 +4233,7 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                &egprs_support_valid,  &egprs_support,
+                NULL, NULL, /* egprs_support */
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_dbg ("No GSM service reported");
@@ -6083,7 +6091,7 @@ signal_info_indication_cb (QmiClientNas *client,
     gint8 cdma1x_rssi = 0;
     gint8 evdo_rssi = 0;
     gint8 gsm_rssi = 0;
-    gint8 umts_rssi = 0;
+    gint8 wcdma_rssi = 0;
     gint8 lte_rssi = 0;
     guint8 quality;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
@@ -6100,11 +6108,11 @@ signal_info_indication_cb (QmiClientNas *client,
                                         wcdma_rssi,
                                         lte_rssi,
                                         &quality,
-                                        &access_technology)) {
+                                        &act)) {
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
         mm_iface_modem_update_access_technologies (
             MM_IFACE_MODEM (self),
-            access_technology,
+            act,
             (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
     }
 }
