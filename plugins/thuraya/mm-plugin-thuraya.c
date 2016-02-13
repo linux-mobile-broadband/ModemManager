@@ -60,13 +60,13 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
-    static const gchar *vendor_strings[] = { "manufacturer apsi", NULL };
+    static const guint16 vendor_ids[] = { 0x1a26, 0 };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_THURAYA,
                       MM_PLUGIN_NAME,                    "Thuraya",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,      subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS,  vendor_strings,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,      vendor_ids,
                       MM_PLUGIN_ALLOWED_AT,              TRUE,
                       NULL));
 }
