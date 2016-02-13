@@ -434,6 +434,7 @@ mm_voice_clip_regex_get (void)
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
 #define CREG3 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG11 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*(\"[^\"\\s]*\")\\s*,\\s*(\"[^\"\\s]*\")"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
 #define CREG4 "\\+(CREG|CGREG|CEREG):\\s*([0-9]),\\s*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
@@ -462,7 +463,7 @@ mm_voice_clip_regex_get (void)
 GPtrArray *
 mm_3gpp_creg_regex_get (gboolean solicited)
 {
-    GPtrArray *array = g_ptr_array_sized_new (12);
+    GPtrArray *array = g_ptr_array_sized_new (13);
     GRegex *regex;
 
     /* #1 */
@@ -542,6 +543,14 @@ mm_3gpp_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CREG10 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CREG10 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #11 */
+    if (solicited)
+        regex = g_regex_new (CREG11 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG11 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
