@@ -1342,6 +1342,57 @@ done:
     return info;
 }
 
+/*****************************************************************************/
+
+/* AT+CRSM response parser */
+gboolean
+mm_3gpp_parse_crsm_response (const gchar *reply,
+                             guint *sw1,
+                             guint *sw2,
+                             gchar **hex,
+                             GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    g_assert (sw1 != NULL);
+    g_assert (sw2 != NULL);
+    g_assert (hex != NULL);
+
+    *sw1 = 0;
+    *sw2 = 0;
+    *hex = NULL;
+
+    if (!reply || !g_str_has_prefix (reply, "+CRSM:")) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing +CRSM prefix");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\+CRSM:\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*\"?([0-9a-fA-F]+)\"?",
+                     G_REGEX_RAW, 0, error);
+    if (!r)
+        return FALSE;
+
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL) &&
+        mm_get_uint_from_match_info (match_info, 1, sw1) &&
+        mm_get_uint_from_match_info (match_info, 2, sw2))
+        *hex = mm_get_string_unquoted_from_match_info (match_info, 3);
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (*hex == NULL) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse CRSM query result '%s'",
+                     reply);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 /*************************************************************************/
 
 static MMSmsStorage

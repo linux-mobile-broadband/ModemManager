@@ -2631,6 +2631,58 @@ test_cclk_response (void)
     }
 }
 
+
+/*****************************************************************************/
+/* Test +CRSM responses */
+
+typedef struct {
+    const gchar *str;
+    gboolean ret;
+    guint sw1;
+    guint sw2;
+    gchar *hex;
+} CrsmTest;
+
+static const CrsmTest crsm_tests[] = {
+    { "+CRSM: 144, 0, 0054485552415941FFFFFFFFFFFFFFFFFF", TRUE, 144, 0, "0054485552415941FFFFFFFFFFFFFFFFFF" },
+    { "+CRSM: 144, 0,0054485552415941FFFFFFFFFFFFFFFFFF", TRUE, 144, 0, "0054485552415941FFFFFFFFFFFFFFFFFF" },
+    { "+CRSM: 144, 0, \"0054485552415941FFFFFFFFFFFFFFFFFF\"", TRUE, 144, 0, "0054485552415941FFFFFFFFFFFFFFFFFF" },
+    { "+CRSM: 144, 0,\"0054485552415941FFFFFFFFFFFFFFFFFF\"", TRUE, 144, 0, "0054485552415941FFFFFFFFFFFFFFFFFF" },
+    { NULL, FALSE, 0, 0, NULL }
+};
+
+static void
+test_crsm_response (void)
+{
+    guint i;
+
+    for (i = 0; crsm_tests[i].str; i++) {
+        GError *error = NULL;
+        guint sw1 = 0;
+        guint sw2 = 0;
+        gchar *hex = 0;
+        gboolean ret;
+
+        ret = mm_3gpp_parse_crsm_response (crsm_tests[i].str,
+                                           &sw1,
+                                           &sw2,
+                                           &hex,
+                                           &error);
+
+        g_assert (ret == crsm_tests[i].ret);
+        g_assert (ret == (error ? FALSE : TRUE));
+
+        g_clear_error (&error);
+
+        g_assert (sw1 == crsm_tests[i].sw1);
+        g_assert (sw2 == crsm_tests[i].sw2);
+
+        g_assert_cmpstr (crsm_tests[i].hex, ==, hex);
+
+        g_free(hex);
+    }
+}
+
 /*****************************************************************************/
 
 void
@@ -2804,6 +2856,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_supported_capability_filter, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cclk_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_crsm_response, NULL));
 
     result = g_test_run ();
 

@@ -944,36 +944,27 @@ static gchar *
 parse_iccid (const gchar *response,
              GError **error)
 {
-    gchar buf[21];
-    const gchar *str;
-    gint sw1;
-    gint sw2;
-    gboolean success = FALSE;
+    guint sw1 = 0;
+    guint sw2 = 0;
+    gchar *hex = 0;
+    gchar *ret;
 
-    memset (buf, 0, sizeof (buf));
-    str = mm_strip_tag (response, "+CRSM:");
-    if (sscanf (str, "%d,%d,\"%20c\"", &sw1, &sw2, (char *) &buf) == 3)
-        success = TRUE;
-    else {
-        /* May not include quotes... */
-        if (sscanf (str, "%d,%d,%20c", &sw1, &sw2, (char *) &buf) == 3)
-            success = TRUE;
-    }
-
-    if (!success) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Could not parse the CRSM response");
+    if (!mm_3gpp_parse_crsm_response (response,
+                                      &sw1,
+                                      &sw2,
+                                      &hex,
+                                      error))
         return NULL;
-    }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        return mm_3gpp_parse_iccid (buf, error);
+        ret = mm_3gpp_parse_iccid (hex, error);
+        g_free (hex);
+        return ret;
     } else {
+        g_free (hex);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -1101,27 +1092,16 @@ static guint
 parse_mnc_length (const gchar *response,
                   GError **error)
 {
-    gint sw1;
-    gint sw2;
-    gboolean success = FALSE;
-    gchar hex[51];
+    guint sw1 = 0;
+    guint sw2 = 0;
+    gchar *hex = 0;
 
-    memset (hex, 0, sizeof (hex));
-    if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
-        success = TRUE;
-    else {
-        /* May not include quotes... */
-        if (sscanf (response, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
-            success = TRUE;
-    }
-
-    if (!success) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Could not parse the CRSM response");
+    if (!mm_3gpp_parse_crsm_response (response,
+                                      &sw1,
+                                      &sw2,
+                                      &hex,
+                                      error))
         return 0;
-    }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
         (sw1 == 0x91) ||
@@ -1130,15 +1110,6 @@ parse_mnc_length (const gchar *response,
         gsize buflen = 0;
         guint32 mnc_len;
         gchar *bin;
-
-        /* Make sure the buffer is only hex characters */
-        while (buflen < sizeof (hex) && hex[buflen]) {
-            if (!isxdigit (hex[buflen])) {
-                hex[buflen] = 0x0;
-                break;
-            }
-            buflen++;
-        }
 
         /* Convert hex string to binary */
         bin = mm_utils_hexstr2bin (hex, &buflen);
@@ -1149,8 +1120,11 @@ parse_mnc_length (const gchar *response,
                          "SIM returned malformed response '%s'",
                          hex);
             g_free (bin);
+            g_free (hex);
             return 0;
         }
+
+        g_free (hex);
 
         /* MNC length is byte 4 of this SIM file */
         mnc_len = bin[3] & 0xFF;
@@ -1168,6 +1142,7 @@ parse_mnc_length (const gchar *response,
         return 0;
     }
 
+    g_free (hex);
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_FAILED,
@@ -1238,27 +1213,16 @@ static gchar *
 parse_spn (const gchar *response,
            GError **error)
 {
-    gint sw1;
-    gint sw2;
-    gboolean success = FALSE;
-    gchar hex[51];
+    guint sw1 = 0;
+    guint sw2 = 0;
+    gchar *hex = 0;
 
-    memset (hex, 0, sizeof (hex));
-    if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
-        success = TRUE;
-    else {
-        /* May not include quotes... */
-        if (sscanf (response, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
-            success = TRUE;
-    }
-
-    if (!success) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Could not parse the CRSM response");
+    if (!mm_3gpp_parse_crsm_response (response,
+                                      &sw1,
+                                      &sw2,
+                                      &hex,
+                                      error))
         return NULL;
-    }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
         (sw1 == 0x91) ||
@@ -1268,15 +1232,6 @@ parse_spn (const gchar *response,
         gchar *bin;
         gchar *utf8;
 
-        /* Make sure the buffer is only hex characters */
-        while (buflen < sizeof (hex) && hex[buflen]) {
-            if (!isxdigit (hex[buflen])) {
-                hex[buflen] = 0x0;
-                break;
-            }
-            buflen++;
-        }
-
         /* Convert hex string to binary */
         bin = mm_utils_hexstr2bin (hex, &buflen);
         if (!bin) {
@@ -1285,8 +1240,11 @@ parse_spn (const gchar *response,
                          MM_CORE_ERROR_FAILED,
                          "SIM returned malformed response '%s'",
                          hex);
+            g_free (hex);
             return NULL;
         }
+
+        g_free (hex);
 
         /* Remove the FF filler at the end */
         while (buflen > 1 && bin[buflen - 1] == (char)0xff)
@@ -1298,6 +1256,7 @@ parse_spn (const gchar *response,
         return utf8;
     }
 
+    g_free (hex);
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_FAILED,

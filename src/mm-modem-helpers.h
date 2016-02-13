@@ -203,6 +203,14 @@ MM3gppPduInfo *mm_3gpp_parse_cmgr_read_response (const gchar *reply,
                                                  guint index,
                                                  GError **error);
 
+
+/* AT+CRSM response parser */
+gboolean mm_3gpp_parse_crsm_response (const gchar *reply,
+                                      guint *sw1,
+                                      guint *sw2,
+                                      gchar **hex,
+                                      GError **error);
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);
