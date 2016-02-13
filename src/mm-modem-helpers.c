@@ -1343,8 +1343,8 @@ done:
 }
 
 /*****************************************************************************/
-
 /* AT+CRSM response parser */
+
 gboolean
 mm_3gpp_parse_crsm_response (const gchar *reply,
                              guint *sw1,
@@ -1369,9 +1369,8 @@ mm_3gpp_parse_crsm_response (const gchar *reply,
     }
 
     r = g_regex_new ("\\+CRSM:\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*\"?([0-9a-fA-F]+)\"?",
-                     G_REGEX_RAW, 0, error);
-    if (!r)
-        return FALSE;
+                     G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
 
     if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL) &&
         mm_get_uint_from_match_info (match_info, 1, sw1) &&
