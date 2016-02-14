@@ -3204,19 +3204,19 @@ static const MMBaseModemAtCommand unsolicited_voice_disable_sequence[] = {
 };
 
 static void
-parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
-                                               GAsyncResult *res,
-                                               GSimpleAsyncResult *simple)
+modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
 {
-    GError *error = NULL;
+    GSimpleAsyncResult *simple;
 
-    if (!iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-    }
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_voice_disable_unsolicited_events);
 
-    /* Our own enable now */
+    /* No unsolicited events disabling in parent */
+
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
@@ -3226,25 +3226,6 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
         NULL, /* cancellable */
         (GAsyncReadyCallback)own_voice_disable_unsolicited_events_ready,
         simple);
-}
-
-static void
-modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_voice_disable_unsolicited_events);
-
-    /* Chain up parent's enable */
-    iface_modem_voice_parent->disable_unsolicited_events (
-        self,
-        (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
-        result);
 }
 
 /*****************************************************************************/
