@@ -77,12 +77,16 @@ mm_telit_parse_csim_response (const guint step,
     return retries;
 }
 
+#define SUPP_BAND_RESPONSE_REGEX          "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\)"
+#define SUPP_BAND_4G_MODEM_RESPONSE_REGEX "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\),\\s*\\((?P<Bands4G>\\d+-\\d+)\\)"
+#define CURR_BAND_RESPONSE_REGEX          "#BND:\\s*(?P<Bands2G>\\d+),\\s*(?P<Bands3G>\\d+)"
+#define CURR_BAND_4G_MODEM_RESPONSE_REGEX "#BND:\\s*(?P<Bands2G>\\d+),\\s*(?P<Bands3G>\\d+),\\s*(?P<Bands4G>\\d+)"
+
 /*****************************************************************************/
-/* #BND=? response parser
+/* #BND response parser
  *
- * Example:
- *  AT#BND=?
- *      #BND: <2G band flags>,<3G band flags>[, <4G band flags>]
+ * AT#BND=?
+ *      #BND: <2G band flags range>,<3G band flags range>[, <4G band flags range>]
  *
  *  where "band flags" is a list of numbers definining the supported bands.
  *  Note that the one Telit band flag may represent more than one MM band.
@@ -113,29 +117,55 @@ mm_telit_parse_csim_response (const guint step,
  *      (2-4106)
  *       2 = 2^1 --> lower supported band B2
  *       4106 = 2^1 + 2^3 + 2^12 --> the supported bands are B2, B4, B13
+ *
+ *
+ * AT#BND?
+ *      #BND: <2G band flags>,<3G band flags>[, <4G band flags>]
+ *
+ *  where "band flags" is a number definining the current bands.
+ *  Note that the one Telit band flag may represent more than one MM band.
+ *
+ *  e.g.
+ *
+ *  #BND: 0,4
+ *
+ *  0 = 2G band flag 0 is EGSM + DCS
+ *  4 = 3G band flag 4 is U1900 + U850
+ *
  */
-
-#define SUPP_BAND_RESPONSE_REGEX          "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\)"
-#define SUPP_BAND_4G_MODEM_RESPONSE_REGEX "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\),\\s*\\((?P<Bands4G>\\d+-\\d+)\\)"
-
 gboolean
-mm_telit_parse_supported_bands_response (const gchar *response,
-                                         const gboolean modem_is_2g,
-                                         const gboolean modem_is_3g,
-                                         const gboolean modem_is_4g,
-                                         GArray **supported_bands,
-                                         GError **error)
+mm_telit_parse_bnd_response (const gchar *response,
+                             gboolean modem_is_2g,
+                             gboolean modem_is_3g,
+                             gboolean modem_is_4g,
+                             MMTelitLoadBandsType band_type,
+                             GArray **supported_bands,
+                             GError **error)
 {
     GArray *bands = NULL;
     GMatchInfo *match_info = NULL;
     GRegex *r = NULL;
     gboolean ret = FALSE;
 
-    /* Parse #BND=? response */
-    if (modem_is_4g)
-        r = g_regex_new (SUPP_BAND_4G_MODEM_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
-    else
-        r = g_regex_new (SUPP_BAND_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
+    switch (band_type) {
+        case LOAD_SUPPORTED_BANDS:
+            /* Parse #BND=? response */
+            if (modem_is_4g)
+                r = g_regex_new (SUPP_BAND_4G_MODEM_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
+            else
+                r = g_regex_new (SUPP_BAND_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
+            break;
+        case LOAD_CURRENT_BANDS:
+            /* Parse #BND? response */
+            if (modem_is_4g)
+                r = g_regex_new (CURR_BAND_4G_MODEM_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
+            else
+                r = g_regex_new (CURR_BAND_RESPONSE_REGEX, G_REGEX_RAW, 0, NULL);
+            break;
+        default:
+            break;
+    }
+
 
     if (!g_regex_match (r, response, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -310,7 +340,7 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
     gboolean ret = TRUE;
     gchar *match_str = NULL;
     guint i;
-    guint max_value;
+    guint value;
     gchar **tokens;
 
     match_str = g_match_info_fetch_named (match_info, "Bands4G");
@@ -322,25 +352,28 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
         goto end;
     }
 
-    tokens = g_strsplit (match_str, "-", -1);
-    if (tokens == NULL) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not get 4G band ranges from string '%s'",
-                     match_str);
-        ret = FALSE;
-        goto end;
+    if (strstr(match_str, "-")) {
+        tokens = g_strsplit (match_str, "-", -1);
+        if (tokens == NULL) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Could not get 4G band ranges from string '%s'",
+                         match_str);
+            ret = FALSE;
+            goto end;
+        }
+        sscanf (tokens[1], "%d", &value);
+    } else {
+        sscanf (match_str, "%d", &value);
     }
 
-    sscanf (tokens[1], "%d", &max_value);
 
-    for (i = 0; max_value > 0; i++) {
-        if (max_value % 2 != 0) {
+    for (i = 0; value > 0; i++) {
+        if (value % 2 != 0) {
             band = MM_MODEM_BAND_EUTRAN_I + i;
             g_array_append_val (*bands, band);
         }
-        max_value = max_value >> 1;
+        value = value >> 1;
     }
-
 end:
     if (match_str != NULL)
         g_free (match_str);

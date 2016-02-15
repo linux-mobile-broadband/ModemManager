@@ -65,14 +65,21 @@ gint mm_telit_parse_csim_response (const guint step,
                                    const gchar *response,
                                    GError **error);
 
-/* #BND=? response parser */
+typedef enum {
+    LOAD_SUPPORTED_BANDS,
+    LOAD_CURRENT_BANDS
+} MMTelitLoadBandsType;
+
+/* #BND response parser */
 gboolean
-mm_telit_parse_supported_bands_response (const gchar *response,
-                                         const gboolean modem_is_2g,
-                                         const gboolean modem_is_3g,
-                                         const gboolean modem_is_4g,
-                                         GArray **supported_bands,
-                                         GError **error);
+mm_telit_parse_bnd_response (const gchar *response,
+                             gboolean modem_is_2g,
+                             gboolean modem_is_3g,
+                             gboolean modem_is_4g,
+                             MMTelitLoadBandsType band_type,
+                             GArray **supported_bands,
+                             GError **error);
+
 
 gboolean mm_telit_bands_contains (GArray *mm_bands, const MMModemBand mm_band);
 
