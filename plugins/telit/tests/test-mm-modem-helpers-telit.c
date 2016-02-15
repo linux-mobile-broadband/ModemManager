@@ -213,12 +213,13 @@ test_parse_supported_bands_response (void) {
     GArray* bands = NULL;
 
     for (i = 0; supported_band_mapping_tests[i].response != NULL; i++) {
-        res = mm_telit_parse_supported_bands_response (supported_band_mapping_tests[i].response,
-                                                       supported_band_mapping_tests[i].modem_is_2g,
-                                                       supported_band_mapping_tests[i].modem_is_3g,
-                                                       supported_band_mapping_tests[i].modem_is_4g,
-                                                       &bands,
-                                                       &error);
+        res = mm_telit_parse_bnd_response (supported_band_mapping_tests[i].response,
+                                           supported_band_mapping_tests[i].modem_is_2g,
+                                           supported_band_mapping_tests[i].modem_is_3g,
+                                           supported_band_mapping_tests[i].modem_is_4g,
+                                           LOAD_SUPPORTED_BANDS,
+                                           &bands,
+                                           &error);
         g_assert_no_error (error);
         g_assert_true (res);
 
@@ -239,6 +240,81 @@ test_parse_supported_bands_response (void) {
     }
 }
 
+
+static BNDResponseTest current_band_mapping_tests [] = {
+    { "#BND: 0,5", TRUE, TRUE, FALSE, 3, { MM_MODEM_BAND_EGSM,
+                                           MM_MODEM_BAND_DCS,
+                                           MM_MODEM_BAND_U900
+                                         }
+    },
+    { "#BND: 1,3", TRUE, TRUE, FALSE, 5, { MM_MODEM_BAND_EGSM,
+                                           MM_MODEM_BAND_PCS,
+                                           MM_MODEM_BAND_U2100,
+                                           MM_MODEM_BAND_U1900,
+                                           MM_MODEM_BAND_U850,
+                                         }
+    },
+    { "#BND: 2,7", TRUE, TRUE, FALSE, 3, { MM_MODEM_BAND_DCS,
+                                           MM_MODEM_BAND_G850,
+                                           MM_MODEM_BAND_U17IV
+                                         },
+    },
+    { "#BND: 3,0,1", TRUE, TRUE, TRUE, 4, { MM_MODEM_BAND_PCS,
+                                            MM_MODEM_BAND_G850,
+                                            MM_MODEM_BAND_U2100,
+                                            MM_MODEM_BAND_EUTRAN_I
+                                          }
+    },
+    { "#BND: 0,0,3", TRUE, FALSE, TRUE, 4, { MM_MODEM_BAND_EGSM,
+                                            MM_MODEM_BAND_DCS,
+                                            MM_MODEM_BAND_EUTRAN_I,
+                                            MM_MODEM_BAND_EUTRAN_II
+                                          }
+    },
+    { "#BND: 0,0,3", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_I,
+                                              MM_MODEM_BAND_EUTRAN_II
+                                            }
+    },
+    { NULL, FALSE, FALSE, FALSE, 0, {}},
+};
+
+static void
+test_parse_current_bands_response (void) {
+    GError* error = NULL;
+    gboolean res = FALSE;
+    guint i, j;
+    GArray* bands = NULL;
+
+    for (i = 0; current_band_mapping_tests[i].response != NULL; i++) {
+        res = mm_telit_parse_bnd_response (current_band_mapping_tests[i].response,
+                                           current_band_mapping_tests[i].modem_is_2g,
+                                           current_band_mapping_tests[i].modem_is_3g,
+                                           current_band_mapping_tests[i].modem_is_4g,
+                                           LOAD_CURRENT_BANDS,
+                                           &bands,
+                                           &error);
+        g_assert_no_error (error);
+        g_assert_true (res);
+
+
+        for (j = 0; j < current_band_mapping_tests[i].mm_bands_len; j++) {
+            MMModemBand ref;
+            MMModemBand cur;
+
+            ref = current_band_mapping_tests[i].mm_bands[j];
+            cur = g_array_index (bands, MMModemBand, j);
+            g_assert_cmpint (cur, ==, ref);
+        }
+
+        g_assert_cmpint (bands->len, ==, current_band_mapping_tests[i].mm_bands_len);
+
+        g_array_free (bands, FALSE);
+        bands = NULL;
+    }
+}
+
+
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -250,5 +326,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/supported/bands_contains", test_mm_bands_contains);
     g_test_add_func ("/MM/telit/bands/supported/parse_band_flag", test_parse_band_flag_str);
     g_test_add_func ("/MM/telit/bands/supported/parse_bands_response", test_parse_supported_bands_response);
+    g_test_add_func ("/MM/telit/bands/current/parse_bands_response", test_parse_current_bands_response);
     return g_test_run ();
 }
