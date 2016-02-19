@@ -726,7 +726,8 @@ port_serial_got_response (MMPortSerial *self,
              * parser).
              */
             g_simple_async_result_set_from_error (ctx->result, error);
-            g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
+            if (self->priv->response->len)
+                g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
         } else {
             if (ctx->allow_cached)
                 port_serial_set_cached_reply (self, ctx->command, self->priv->response);
