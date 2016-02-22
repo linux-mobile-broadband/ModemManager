@@ -654,6 +654,102 @@ load_current_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Set current modes (Modem interface) */
+
+static gboolean
+set_current_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+ws46_set_ready (MMIfaceModem *self,
+                GAsyncResult *res,
+                GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_current_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *command;
+    gint ws46_mode = -1;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_current_modes);
+
+    if (allowed == MM_MODEM_MODE_2G)
+        ws46_mode = 12;
+    else if (allowed == MM_MODEM_MODE_3G)
+        ws46_mode = 22;
+    else if (allowed == MM_MODEM_MODE_4G)
+        ws46_mode = 28;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        if (mm_iface_modem_is_3gpp_lte (self))
+            ws46_mode = 29;
+        else
+            ws46_mode = 25;
+    } else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G))
+        ws46_mode = 30;
+    else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
+        ws46_mode = 31;
+    else if (allowed == (MM_MODEM_MODE_2G  | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G) ||
+             allowed == MM_MODEM_MODE_ANY)
+        ws46_mode = 25;
+
+    /* Telit modems do not support preferred mode selection */
+    if ((ws46_mode < 0) || (preferred != MM_MODEM_MODE_NONE)) {
+        gchar *allowed_str;
+        gchar *preferred_str;
+
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Requested mode (allowed: '%s', preferred: '%s') not "
+                                         "supported by the modem.",
+                                         allowed_str,
+                                         preferred_str);
+        g_free (allowed_str);
+        g_free (preferred_str);
+
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    command = g_strdup_printf ("AT+WS46=%d", ws46_mode);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        10,
+        FALSE,
+        (GAsyncReadyCallback)ws46_set_ready,
+        result);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
 static GArray *
@@ -837,6 +933,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_current_modes = load_current_modes;
     iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
 }
 
 static void
