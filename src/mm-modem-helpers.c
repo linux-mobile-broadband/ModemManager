@@ -191,7 +191,7 @@ mm_create_device_identifier (guint vid,
         g_checksum_update (sum, (const guchar *) &str_vid[0], strlen (str_vid));
         g_string_append_printf (msg, "%08x", vid);
     }
-    if (vid) {
+    if (pid) {
         snprintf (str_pid, sizeof (str_pid) - 1, "%08x", pid);
         g_checksum_update (sum, (const guchar *) &str_pid[0], strlen (str_pid));
         g_string_append_printf (msg, "%08x", pid);
