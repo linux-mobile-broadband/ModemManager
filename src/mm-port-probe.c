@@ -323,9 +323,6 @@ typedef struct {
     /* ---- MBIM probing specific context ---- */
     MMPortMbim *mbim_port;
 #endif
-
-    /* Error reporting during idle completion */
-    GError *possible_error;
 } PortProbeRunContext;
 
 static gboolean serial_probe_at       (MMPortProbe *self);
@@ -333,11 +330,8 @@ static gboolean serial_probe_qcdm     (MMPortProbe *self);
 static void     serial_probe_schedule (MMPortProbe *self);
 
 static void
-port_probe_run_context_cleanup (PortProbeRunContext *ctx)
+port_probe_run_context_free (PortProbeRunContext *ctx)
 {
-    /* We cleanup signal connections here, to be executed before a task is
-     * completed (and when it's freed) */
-
     if (ctx->cancellable && ctx->at_probing_cancellable_linked) {
         g_cancellable_disconnect (ctx->cancellable, ctx->at_probing_cancellable_linked);
         ctx->at_probing_cancellable_linked = 0;
@@ -352,13 +346,6 @@ port_probe_run_context_cleanup (PortProbeRunContext *ctx)
         g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
         ctx->buffer_full_id = 0;
     }
-}
-
-static void
-port_probe_run_context_free (PortProbeRunContext *ctx)
-{
-    /* Cleanup signals */
-    port_probe_run_context_cleanup (ctx);
 
     if (ctx->serial) {
         if (mm_port_serial_is_open (ctx->serial))
@@ -387,83 +374,7 @@ port_probe_run_context_free (PortProbeRunContext *ctx)
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
 
-    /* We may have an error here if the task was completed
-     * with error and was cancelled at the same time */
-    if (ctx->possible_error)
-        g_error_free (ctx->possible_error);
-
     g_slice_free (PortProbeRunContext, ctx);
-}
-
-static gboolean
-task_return_in_idle_cb (GTask *task)
-{
-    PortProbeRunContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-
-    if (g_task_return_error_if_cancelled (task))
-        goto out;
-
-    if (ctx->possible_error) {
-        g_task_return_error (task, ctx->possible_error);
-        ctx->possible_error = NULL;
-        goto out;
-    }
-
-    g_task_return_boolean (task, TRUE);
-
-out:
-    g_object_unref (task);
-    return G_SOURCE_REMOVE;
-}
-
-static void
-task_return_in_idle (MMPortProbe *self,
-                     GError      *error)
-{
-    PortProbeRunContext *ctx;
-    GTask               *task;
-
-    /* Steal task from private info */
-    g_assert (self->priv->task);
-    task = self->priv->task;
-    self->priv->task = NULL;
-
-    /* Early cleanup of signals */
-    ctx = g_task_get_task_data (task);
-    port_probe_run_context_cleanup (ctx);
-
-    /* We will propatate an error if we have one */
-    ctx->possible_error = error;
-
-    /* Schedule idle to complete.
-     *
-     * NOTE!!!!!!!
-     *
-     * Completing not-on-idle is very problematic due to how we process
-     * responses in the serial port: the response returned by the finish()
-     * call is constant, so that completion is always not-on-idle. And if we
-     * mix both tasks completed not-on-idle, we may end up reaching a point
-     * where the serial port is being closed while the serial port response
-     * is still being processed.
-     *
-     * By always completing this task on-idle, we make sure that the serial
-     * port gets closed always once the response processor has been finished.
-     */
-    g_idle_add ((GSourceFunc) task_return_in_idle_cb, task);
-}
-
-static gboolean
-task_return_error_in_idle_if_cancelled (MMPortProbe *self)
-{
-    if (!g_cancellable_is_cancelled (g_task_get_cancellable (self->priv->task)))
-        return FALSE;
-
-    /* We complete without error because the error is set afterwards by
-     * the GTask in g_task_return_error_if_cancelled() */
-    task_return_in_idle (self, NULL);
-    return TRUE;
 }
 
 /***************************************************************/
@@ -616,8 +527,10 @@ wdm_probe (MMPortProbe *self)
     ctx->source_id = 0;
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
+    }
 
     /* QMI probing needed? */
     if ((ctx->flags & MM_PORT_PROBE_QMI) &&
@@ -634,7 +547,8 @@ wdm_probe (MMPortProbe *self)
     }
 
     /* All done now */
-    task_return_in_idle (self, NULL);
+    g_task_return_boolean (self->priv->task, TRUE);
+    g_clear_object (&self->priv->task);
     return G_SOURCE_REMOVE;
 }
 
@@ -657,8 +571,10 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
     ctx = g_task_get_task_data (self->priv->task);
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return;
+    }
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (!error) {
@@ -726,8 +642,10 @@ serial_probe_qcdm (MMPortProbe *self)
     ctx->source_id = 0;
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
+    }
 
     mm_dbg ("(%s/%s) probing QCDM...",
             g_udev_device_get_subsystem (self->priv->port),
@@ -747,25 +665,27 @@ serial_probe_qcdm (MMPortProbe *self)
     /* Open the QCDM port */
     ctx->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (g_udev_device_get_name (self->priv->port)));
     if (!ctx->serial) {
-        task_return_in_idle (self,
-                             g_error_new (MM_CORE_ERROR,
-                                          MM_CORE_ERROR_FAILED,
-                                          "(%s/%s) Couldn't create QCDM port",
-                                          g_udev_device_get_subsystem (self->priv->port),
-                                          g_udev_device_get_name (self->priv->port)));
+        g_task_return_new_error (self->priv->task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "(%s/%s) Couldn't create QCDM port",
+                                 g_udev_device_get_subsystem (self->priv->port),
+                                 g_udev_device_get_name (self->priv->port));
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
     }
 
     /* Try to open the port */
     if (!mm_port_serial_open (ctx->serial, &error)) {
-        task_return_in_idle (self,
-                             g_error_new (MM_SERIAL_ERROR,
-                                          MM_SERIAL_ERROR_OPEN_FAILED,
-                                          "(%s/%s) Failed to open QCDM port: %s",
-                                          g_udev_device_get_subsystem (self->priv->port),
-                                          g_udev_device_get_name (self->priv->port),
-                                          (error ? error->message : "unknown error")));
+        g_task_return_new_error (self->priv->task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_OPEN_FAILED,
+                                 "(%s/%s) Failed to open QCDM port: %s",
+                                 g_udev_device_get_subsystem (self->priv->port),
+                                 g_udev_device_get_name (self->priv->port),
+                                 (error ? error->message : "unknown error"));
         g_clear_error (&error);
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
     }
 
@@ -779,12 +699,13 @@ serial_probe_qcdm (MMPortProbe *self)
     len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
     if (len <= 0) {
         g_byte_array_unref (verinfo);
-        task_return_in_idle (self,
-                             g_error_new (MM_SERIAL_ERROR,
-                                          MM_SERIAL_ERROR_OPEN_FAILED,
-                                          "(%s/%s) Failed to create QCDM versin info command",
-                                          g_udev_device_get_subsystem (self->priv->port),
-                                          g_udev_device_get_name (self->priv->port)));
+        g_task_return_new_error (self->priv->task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_OPEN_FAILED,
+                                 "(%s/%s) Failed to create QCDM versin info command",
+                                 g_udev_device_get_subsystem (self->priv->port),
+                                 g_udev_device_get_name (self->priv->port));
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
     }
     verinfo->len = len + 1;
@@ -936,8 +857,10 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
     ctx = g_task_get_task_data (self->priv->task);
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return;
+    }
 
     /* If AT probing cancelled, end this partial probing */
     if (g_cancellable_is_cancelled (ctx->at_probing_cancellable)) {
@@ -959,13 +882,14 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
                                                &result_error)) {
         /* Were we told to abort the whole probing? */
         if (result_error) {
-            task_return_in_idle (self,
-                                 g_error_new (MM_CORE_ERROR,
-                                              MM_CORE_ERROR_UNSUPPORTED,
-                                              "(%s/%s) error while probing AT features: %s",
-                                              g_udev_device_get_subsystem (self->priv->port),
-                                              g_udev_device_get_name (self->priv->port),
-                                              result_error->message));
+            g_task_return_new_error (self->priv->task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "(%s/%s) error while probing AT features: %s",
+                                     g_udev_device_get_subsystem (self->priv->port),
+                                     g_udev_device_get_name (self->priv->port),
+                                     result_error->message);
+            g_clear_object (&self->priv->task);
             goto out;
         }
 
@@ -1016,7 +940,7 @@ serial_probe_at (MMPortProbe *self)
     ctx->source_id = 0;
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self)) {
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
         g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
     }
@@ -1083,7 +1007,8 @@ at_custom_init_ready (MMPortProbe *self,
 
     if (!ctx->at_custom_init_finish (self, res, &error)) {
         /* All errors propagated up end up forcing an UNSUPPORTED result */
-        task_return_in_idle (self, error);
+        g_task_return_error (self->priv->task, error);
+        g_clear_object (&self->priv->task);
         return;
     }
 
@@ -1103,8 +1028,10 @@ serial_probe_schedule (MMPortProbe *self)
     ctx = g_task_get_task_data (self->priv->task);
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return;
+    }
 
     /* If we got some custom initialization setup requested, go on with it
      * first. */
@@ -1172,8 +1099,9 @@ serial_probe_schedule (MMPortProbe *self)
         return;
     }
 
-    /* All done! Finish asynchronously */
-    task_return_in_idle (self, NULL);
+    /* All done! */
+    g_task_return_boolean (self->priv->task, TRUE);
+    g_clear_object (&self->priv->task);
 }
 
 static void
@@ -1237,8 +1165,10 @@ serial_open_at (MMPortProbe *self)
     ctx->source_id = 0;
 
     /* If already cancelled, do nothing else */
-    if (task_return_error_in_idle_if_cancelled (self))
+    if (g_task_return_error_if_cancelled (self->priv->task)) {
+        g_clear_object (&self->priv->task);
         return G_SOURCE_REMOVE;
+    }
 
     /* Create AT serial port if not done before */
     if (!ctx->serial) {
@@ -1250,12 +1180,13 @@ serial_open_at (MMPortProbe *self)
 
         ctx->serial = MM_PORT_SERIAL (mm_port_serial_at_new (g_udev_device_get_name (self->priv->port), subsys));
         if (!ctx->serial) {
-            task_return_in_idle (self,
-                                 g_error_new (MM_CORE_ERROR,
-                                              MM_CORE_ERROR_FAILED,
-                                              "(%s/%s) couldn't create AT port",
-                                              g_udev_device_get_subsystem (self->priv->port),
-                                              g_udev_device_get_name (self->priv->port)));
+            g_task_return_new_error (self->priv->task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "(%s/%s) couldn't create AT port",
+                                     g_udev_device_get_subsystem (self->priv->port),
+                                     g_udev_device_get_name (self->priv->port));
+            g_clear_object (&self->priv->task);
             return G_SOURCE_REMOVE;
         }
 
@@ -1281,12 +1212,13 @@ serial_open_at (MMPortProbe *self)
         /* Abort if maximum number of open tries reached */
         if (++ctx->at_open_tries > 4) {
             /* took too long to open the port; give up */
-            task_return_in_idle (self,
-                                 g_error_new (MM_CORE_ERROR,
-                                              MM_CORE_ERROR_FAILED,
-                                              "(%s/%s) failed to open port after 4 tries",
-                                              g_udev_device_get_subsystem (self->priv->port),
-                                              g_udev_device_get_name (self->priv->port)));
+            g_task_return_new_error (self->priv->task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "(%s/%s) failed to open port after 4 tries",
+                                     g_udev_device_get_subsystem (self->priv->port),
+                                     g_udev_device_get_name (self->priv->port));
+            g_clear_object (&self->priv->task);
             g_clear_error (&error);
             return G_SOURCE_REMOVE;
         }
@@ -1298,14 +1230,14 @@ serial_open_at (MMPortProbe *self)
             return G_SOURCE_REMOVE;
         }
 
-        port_probe_run_context_cleanup (ctx);
-        task_return_in_idle (self,
-                             g_error_new (MM_SERIAL_ERROR,
-                                          MM_SERIAL_ERROR_OPEN_FAILED,
-                                          "(%s/%s) failed to open port: %s",
-                                          g_udev_device_get_subsystem (self->priv->port),
-                                          g_udev_device_get_name (self->priv->port),
-                                          (error ? error->message : "unknown error")));
+        g_task_return_new_error (self->priv->task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_OPEN_FAILED,
+                                 "(%s/%s) failed to open port: %s",
+                                 g_udev_device_get_subsystem (self->priv->port),
+                                 g_udev_device_get_name (self->priv->port),
+                                 (error ? error->message : "unknown error"));
+        g_clear_object (&self->priv->task);
         g_clear_error (&error);
         return G_SOURCE_REMOVE;
     }
@@ -1411,8 +1343,8 @@ mm_port_probe_run (MMPortProbe                *self,
         mm_dbg ("(%s/%s) port probing finished: no more probings needed",
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
-        port_probe_run_context_cleanup (ctx);
-        task_return_in_idle (self, NULL);
+        g_task_return_boolean (self->priv->task, TRUE);
+        g_clear_object (&self->priv->task);
         return;
     }
 
