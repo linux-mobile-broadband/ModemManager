@@ -698,8 +698,6 @@ port_serial_got_response (MMPortSerial *self,
                           GByteArray   *parsed_response,
                           const GError *error)
 {
-    CommandContext *ctx;
-
     /* Either one or the other, not both */
     g_assert ((parsed_response && !error) || (!parsed_response && error));
 
@@ -717,26 +715,36 @@ port_serial_got_response (MMPortSerial *self,
 
     g_clear_object (&self->priv->cancellable);
 
-    ctx = (CommandContext *) g_queue_pop_head (self->priv->queue);
-    if (ctx) {
-        /* Complete the command context with the appropriate result */
-        if (error)
-            g_simple_async_result_set_from_error (ctx->result, error);
-        else {
-            if (ctx->allow_cached)
-                port_serial_set_cached_reply (self, ctx->command, parsed_response);
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       g_byte_array_ref (parsed_response),
-                                                       (GDestroyNotify) g_byte_array_unref);
+    /* The completion of the command context may end up fully disposing the
+     * serial port object. In order to cope with that, we make sure we have
+     * our own reference to the object while the completion and follow up
+     * setup runs. */
+    g_object_ref (self);
+    {
+        CommandContext *ctx;
+
+        ctx = (CommandContext *) g_queue_pop_head (self->priv->queue);
+        if (ctx) {
+            /* Complete the command context with the appropriate result */
+            if (error)
+                g_simple_async_result_set_from_error (ctx->result, error);
+            else {
+                if (ctx->allow_cached)
+                    port_serial_set_cached_reply (self, ctx->command, parsed_response);
+                g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                           g_byte_array_ref (parsed_response),
+                                                           (GDestroyNotify) g_byte_array_unref);
+            }
+
+            /* Don't complete in idle. We need the caller remove the response range which
+             * was processed, and that must be done before processing any new queued command */
+            command_context_complete_and_free (ctx, FALSE);
         }
 
-        /* Don't complete in idle. We need the caller remove the response range which
-         * was processed, and that must be done before processing any new queued command */
-        command_context_complete_and_free (ctx, FALSE);
+        if (!g_queue_is_empty (self->priv->queue))
+            port_serial_schedule_queue_process (self, 0);
     }
-
-    if (!g_queue_is_empty (self->priv->queue))
-        port_serial_schedule_queue_process (self, 0);
+    g_object_unref (self);
 }
 
 static gboolean
@@ -756,12 +764,19 @@ port_serial_timed_out (gpointer data)
     error = g_error_new_literal (MM_SERIAL_ERROR,
                                  MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
                                  "Serial command timed out");
-    port_serial_got_response (self, NULL, error);
-    g_error_free (error);
 
-    /* Emit a timed out signal, used by upper layers to identify a disconnected
-     * serial port */
-    g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+    /* Make sure we have a valid reference when emitting the signal */
+    g_object_ref (self);
+    {
+        port_serial_got_response (self, NULL, error);
+
+        /* Emit a timed out signal, used by upper layers to identify a disconnected
+         * serial port */
+        g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+    }
+    g_object_unref (self);
+
+    g_error_free (error);
 
     return G_SOURCE_REMOVE;
 }
@@ -781,6 +796,7 @@ port_serial_response_wait_cancelled (GCancellable *cancellable,
     error = g_error_new_literal (MM_CORE_ERROR,
                                  MM_CORE_ERROR_CANCELLED,
                                  "Waiting for the reply cancelled");
+    /* Note: may complete last operation and unref the MMPortSerial */
     port_serial_got_response (self, NULL, error);
     g_error_free (error);
 }
@@ -807,6 +823,7 @@ port_serial_queue_process (gpointer data)
 
             parsed_response = g_byte_array_sized_new (cached->len);
             g_byte_array_append (parsed_response, cached->data, cached->len);
+            /* Note: may complete last operation and unref the MMPortSerial */
             port_serial_got_response (self, parsed_response, NULL);
             g_byte_array_unref (parsed_response);
             return G_SOURCE_REMOVE;
@@ -817,6 +834,7 @@ port_serial_queue_process (gpointer data)
 
     /* If error, report it */
     if (!port_serial_process_command (self, ctx, &error)) {
+        /* Note: may complete last operation and unref the MMPortSerial */
         port_serial_got_response (self, NULL, error);
         g_error_free (error);
         return G_SOURCE_REMOVE;
@@ -843,6 +861,7 @@ port_serial_queue_process (gpointer data)
             error = g_error_new (MM_CORE_ERROR,
                                  MM_CORE_ERROR_CANCELLED,
                                  "Won't wait for the reply");
+            /* Note: may complete last operation and unref the MMPortSerial */
             port_serial_got_response (self, NULL, error);
             g_error_free (error);
             return G_SOURCE_REMOVE;
@@ -886,6 +905,7 @@ parse_response_buffer (MMPortSerial *self)
         /* We have a valid response to process */
         g_assert (parsed_response);
         self->priv->n_consecutive_timeouts = 0;
+        /* Note: may complete last operation and unref the MMPortSerial */
         port_serial_got_response (self, parsed_response, NULL);
         g_byte_array_unref (parsed_response);
         break;
@@ -893,6 +913,7 @@ parse_response_buffer (MMPortSerial *self)
         /* We have an error to process */
         g_assert (error);
         self->priv->n_consecutive_timeouts = 0;
+        /* Note: may complete last operation and unref the MMPortSerial */
         port_serial_got_response (self, NULL, error);
         g_error_free (error);
         break;
@@ -912,6 +933,8 @@ common_input_available (MMPortSerial *self,
     CommandContext *ctx;
     const char *device;
     GError *error = NULL;
+    gboolean iterate = TRUE;
+    gboolean keep_source = G_SOURCE_CONTINUE;
 
     if (condition & G_IO_HUP) {
         device = mm_port_get_device (MM_PORT (self));
@@ -920,21 +943,21 @@ common_input_available (MMPortSerial *self,
         if (self->priv->response->len)
             g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
         port_serial_close_force (self);
-        return FALSE;
+        return G_SOURCE_REMOVE;
     }
 
     if (condition & G_IO_ERR) {
         if (self->priv->response->len)
             g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
-        return TRUE;
+        return G_SOURCE_CONTINUE;
     }
 
     /* Don't read any input if the current command isn't done being sent yet */
     ctx = g_queue_peek_nth (self->priv->queue, 0);
     if (ctx && (ctx->started == TRUE) && (ctx->done == FALSE))
-        return TRUE;
+        return G_SOURCE_CONTINUE;
 
-    do {
+    while (iterate) {
         bytes_read = 0;
 
         if (self->priv->iochannel) {
@@ -986,13 +1009,30 @@ common_input_available (MMPortSerial *self,
             g_byte_array_remove_range (self->priv->response, 0, (SERIAL_BUF_SIZE / 2));
         }
 
-        /* See if we can parse anything */
-        parse_response_buffer (self);
+        /* See if we can parse anything. The response parsing may actually
+         * schedule the completion of a serial command, and that in turn may end
+         * up fully disposing this serial port object. In order to cope with
+         * that we make sure we have our own reference to the object while the
+         * response buffer operation is run, and then we check ourselves whether
+         * we should be keeping this socket/iochannel source or not. */
+        g_object_ref (self);
+        {
+            parse_response_buffer (self);
 
-    } while (   (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN)
-             && (self->priv->iochannel_id > 0 || self->priv->socket_source != NULL));
+            /* If we didn't end up closing the iochannel/socket in the previous
+             * operation, we keep this source. */
+            keep_source = ((self->priv->iochannel_id > 0 || self->priv->socket_source != NULL) ?
+                           G_SOURCE_CONTINUE : G_SOURCE_REMOVE);
 
-    return TRUE;
+            /* If we're keeping the source and we still may have bytes to read,
+             * iterate. */
+            iterate = ((keep_source == G_SOURCE_CONTINUE) &&
+                       (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN));
+        }
+        g_object_unref (self);
+    }
+
+    return keep_source;
 }
 
 static gboolean
@@ -1017,7 +1057,6 @@ data_watch_enable (MMPortSerial *self, gboolean enable)
     if (self->priv->iochannel_id) {
         if (enable)
             g_warn_if_fail (self->priv->iochannel_id == 0);
-
         g_source_remove (self->priv->iochannel_id);
         self->priv->iochannel_id = 0;
     }
@@ -1977,25 +2016,24 @@ get_property (GObject *object,
 }
 
 static void
-dispose (GObject *object)
-{
-    MMPortSerial *self = MM_PORT_SERIAL (object);
-
-    if (self->priv->timeout_id) {
-        g_source_remove (self->priv->timeout_id);
-        self->priv->timeout_id = 0;
-    }
-
-    port_serial_close_force (MM_PORT_SERIAL (object));
-    mm_port_serial_flash_cancel (MM_PORT_SERIAL (object));
-
-    G_OBJECT_CLASS (mm_port_serial_parent_class)->dispose (object);
-}
-
-static void
 finalize (GObject *object)
 {
     MMPortSerial *self = MM_PORT_SERIAL (object);
+
+    port_serial_close_force     (MM_PORT_SERIAL (object));
+    mm_port_serial_flash_cancel (MM_PORT_SERIAL (object));
+
+    /* These are disposed during port closing */
+    g_assert (self->priv->iochannel     == NULL);
+    g_assert (self->priv->iochannel_id  == 0);
+    g_assert (self->priv->socket        == NULL);
+    g_assert (self->priv->socket_source == NULL);
+
+    if (self->priv->timeout_id)
+        g_source_remove (self->priv->timeout_id);
+
+    if (self->priv->queue_id)
+        g_source_remove (self->priv->queue_id);
 
     g_hash_table_destroy (self->priv->reply_cache);
     g_byte_array_unref (self->priv->response);
@@ -2014,8 +2052,7 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
     /* Virtual methods */
     object_class->set_property = set_property;
     object_class->get_property = get_property;
-    object_class->dispose = dispose;
-    object_class->finalize = finalize;
+    object_class->finalize     = finalize;
 
     klass->config_fd = real_config_fd;
 
