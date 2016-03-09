@@ -1057,6 +1057,7 @@ typedef enum {
     INITIALIZATION_STEP_CHECK_SUPPORT,
     INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
     INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES,
+    INITIALIZATION_STEP_INIT_CURRENT_STORAGES,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1213,6 +1214,30 @@ check_support_ready (MMIfaceModemMessaging *self,
 }
 
 static void
+init_current_storages_ready (MMIfaceModemMessaging *self,
+                             GAsyncResult *res,
+                             InitializationContext *ctx)
+{
+    StorageContext *storage_ctx;
+    GError *error = NULL;
+
+    storage_ctx = get_storage_context (self);
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages_finish (
+            self,
+            res,
+            &error)) {
+        mm_dbg ("Couldn't initialize current storages: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        mm_dbg ("Current storages initialized");
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitializationContext *ctx)
 {
     /* Don't run new steps if we're cancelled */
@@ -1278,6 +1303,18 @@ interface_initialization_step (InitializationContext *ctx)
             MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_supported_storages (
                 ctx->self,
                 (GAsyncReadyCallback)load_supported_storages_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_INIT_CURRENT_STORAGES:
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->init_current_storages &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->init_current_storages_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->init_current_storages (
+                ctx->self,
+                (GAsyncReadyCallback)init_current_storages_ready,
                 ctx);
             return;
         }

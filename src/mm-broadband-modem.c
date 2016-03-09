@@ -5242,6 +5242,77 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Init current SMS storages (Messaging interface) */
+
+static gboolean
+modem_messaging_init_current_storages_finish (MMIfaceModemMessaging *_self,
+                                              GAsyncResult *res,
+                                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cpms_query_ready (MMBroadbandModem *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    MMSmsStorage mem1;
+    MMSmsStorage mem2;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Parse reply */
+    if (!mm_3gpp_parse_cpms_query_response (response,
+                                            &mem1,
+                                            &mem2,
+                                            &error)) {
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        self->priv->current_sms_mem1_storage = mem1;
+        self->priv->current_sms_mem2_storage = mem2;
+
+        mm_dbg ("Current storages initialized:");
+        mm_dbg ("  mem1 (list/read/delete) storages: '%s'",
+                mm_common_build_sms_storages_string (&mem1, 1));
+        mm_dbg ("  mem2 (write/send) storages:       '%s'",
+                mm_common_build_sms_storages_string (&mem2, 1));
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_messaging_init_current_storages (MMIfaceModemMessaging *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_init_current_storages);
+
+    /* Check support storages */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CPMS?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)cpms_query_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Lock/unlock SMS storage (Messaging interface implementation helper)
  *
  * The basic commands to work with SMS storages play with AT+CPMS and three
@@ -5382,6 +5453,15 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
         self->priv->mem2_storage_locked = TRUE;
         self->priv->current_sms_mem2_storage = mem2;
         mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
+
+        if (mem1 == MM_SMS_STORAGE_UNKNOWN) {
+            /* Some modems may not support empty string parameters. Then if mem1 is
+             * UNKNOWN, we send again the already locked mem1 value in place of an
+             * empty string. This way we also avoid to confuse the environment of
+             * other async operation that have potentially locked mem1 previoulsy.
+             * */
+            mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+        }
     }
 
     /* We don't touch 'mem3' here */
@@ -5446,6 +5526,7 @@ modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     gchar *cmd;
     GSimpleAsyncResult *result;
+    gchar *mem1_str;
     gchar *mem_str;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -5456,14 +5537,21 @@ modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
     /* Set defaults as current */
     self->priv->current_sms_mem2_storage = storage;
 
+    /* We provide the current sms storage for mem1 if not UNKNOWN */
+    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+
     mem_str = g_ascii_strup (mm_sms_storage_get_string (storage), -1);
-    cmd = g_strdup_printf ("+CPMS=\"\",\"%s\",\"%s\"", mem_str, mem_str);
+    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"",
+                           mem1_str ? mem1_str : "",
+                           mem_str,
+                           mem_str);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cpms_set_ready,
                               result);
+    g_free (mem1_str);
     g_free (mem_str);
     g_free (cmd);
 }
@@ -10390,6 +10478,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
     iface->create_sms = modem_messaging_create_sms;
+    iface->init_current_storages = modem_messaging_init_current_storages;
+    iface->init_current_storages_finish = modem_messaging_init_current_storages_finish;
 }
 
 static void

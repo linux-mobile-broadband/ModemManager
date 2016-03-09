@@ -62,6 +62,13 @@ struct _MMIfaceModemMessaging {
                                                 GArray **mem2,
                                                 GArray **mem3,
                                                 GError **error);
+    /* Initializes the state of the storages */
+    void (* init_current_storages) (MMIfaceModemMessaging *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gboolean (*init_current_storages_finish) (MMIfaceModemMessaging *self,
+                                              GAsyncResult *res,
+                                              GError **error);
 
     /* Set default storage (async) */
     void (* set_default_storage) (MMIfaceModemMessaging *self,

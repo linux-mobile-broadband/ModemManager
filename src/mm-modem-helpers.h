@@ -158,6 +158,16 @@ gboolean mm_3gpp_parse_cpms_test_response (const gchar *reply,
                                            GArray **mem2,
                                            GArray **mem3);
 
+/* AT+CPMS? (Current SMS storage) response parser */
+gboolean mm_3gpp_parse_cpms_query_response (const gchar *reply,
+                                            MMSmsStorage *mem1,
+                                            MMSmsStorage *mem2,
+                                            GError** error);
+gboolean mm_3gpp_get_cpms_storage_match (GMatchInfo *match_info,
+                                         const gchar *match_name,
+                                         MMSmsStorage *storage,
+                                         GError **error);
+
 /* AT+CSCS=? (Supported charsets) response parser */
 gboolean mm_3gpp_parse_cscs_test_response (const gchar *reply,
                                            MMModemCharset *out_charsets);

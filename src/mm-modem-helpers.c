@@ -1507,6 +1507,82 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
     return FALSE;
 }
 
+/**********************************************************************
+ * AT+CPMS?
+ * +CPMS: <memr>,<usedr>,<totalr>,<memw>,<usedw>,<totalw>, <mems>,<useds>,<totals>
+ */
+
+#define CPMS_QUERY_REGEX "\\+CPMS:\\s*\"(?P<memr>.*)\",[0-9]+,[0-9]+,\"(?P<memw>.*)\",[0-9]+,[0-9]+,\"(?P<mems>.*)\",[0-9]+,[0-9]"
+
+gboolean
+mm_3gpp_parse_cpms_query_response (const gchar *reply,
+                                   MMSmsStorage *memr,
+                                   MMSmsStorage *memw,
+                                   GError **error)
+{
+    GRegex *r = NULL;
+    gboolean ret = FALSE;
+    GMatchInfo *match_info = NULL;
+
+    r = g_regex_new (CPMS_QUERY_REGEX, G_REGEX_RAW, 0, NULL);
+
+    g_assert(r);
+
+    if (!g_regex_match (r, reply, 0, &match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not parse CPMS query reponse '%s'", reply);
+        goto end;
+    }
+
+    if (!g_match_info_matches(match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not find matches in CPMS query reply '%s'", reply);
+        goto end;
+    }
+
+    if (!mm_3gpp_get_cpms_storage_match (match_info, "memr", memr, error)) {
+        goto end;
+    }
+
+    if (!mm_3gpp_get_cpms_storage_match (match_info, "memw", memw, error)) {
+        goto end;
+    }
+
+    ret = TRUE;
+
+end:
+    if (r != NULL)
+        g_regex_unref (r);
+
+    if (match_info != NULL)
+        g_match_info_free (match_info);
+
+    return ret;
+}
+
+gboolean
+mm_3gpp_get_cpms_storage_match (GMatchInfo *match_info,
+                                const gchar *match_name,
+                                MMSmsStorage *storage,
+                                GError **error)
+{
+    gboolean ret = TRUE;
+    gchar *str = NULL;
+
+    str = g_match_info_fetch_named(match_info, match_name);
+    if (str == NULL || str[0] == '\0') {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not find '%s' from CPMS reply", match_name);
+        ret = FALSE;
+    } else {
+        *storage = storage_from_str (str);
+    }
+
+    g_free (str);
+
+    return ret;
+}
+
 /*************************************************************************/
 
 gboolean
