@@ -97,4 +97,6 @@ gboolean mm_telit_update_2g_bands(gchar *band_list, GMatchInfo **match_info, GAr
 gboolean mm_telit_update_3g_bands(gchar *band_list, GMatchInfo **match_info, GArray **bands, GError **error);
 gboolean mm_telit_update_4g_bands(GArray** bands, GMatchInfo *match_info, GError **error);
 
+void mm_telit_get_band_flag (GArray *bands_array, gint *flag_2g, gint *flag_3g, gint *flag_4g);
+
 #endif  /* MM_MODEM_HELPERS_TELIT_H */

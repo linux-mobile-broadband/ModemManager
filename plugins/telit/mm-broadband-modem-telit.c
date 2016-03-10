@@ -43,6 +43,121 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 /*****************************************************************************/
+/* Set current bands (Modem interface) */
+
+static gboolean
+modem_set_current_bands_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_set_current_bands_ready (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_set_current_bands (MMIfaceModem *self,
+                         GArray *bands_array,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    gchar *cmd;
+    gint flag2g;
+    gint flag3g;
+    gint flag4g;
+    gboolean is_2g;
+    gboolean is_3g;
+    gboolean is_4g;
+    GSimpleAsyncResult *res;
+
+    mm_telit_get_band_flag (bands_array, &flag2g, &flag3g, &flag4g);
+
+    is_2g = mm_iface_modem_is_2g (self);
+    is_3g = mm_iface_modem_is_3g (self);
+    is_4g = mm_iface_modem_is_4g (self);
+
+    if (is_2g && flag2g == -1) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "None or invalid 2G bands combination in the provided list");
+        return;
+    }
+
+    if (is_3g && flag3g == -1) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "None or invalid 3G bands combination in the provided list");
+        return;
+    }
+
+    if (is_4g && flag4g == -1) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "None or invalid 4G bands combination in the provided list");
+        return;
+    }
+
+    cmd = NULL;
+    if (is_2g && !is_3g && !is_4g)
+        cmd = g_strdup_printf ("AT#BND=%d", flag2g);
+    else if (is_2g && is_3g && !is_4g)
+        cmd = g_strdup_printf ("AT#BND=%d,%d", flag2g, flag3g);
+    else if (is_2g && is_3g && is_4g)
+        cmd = g_strdup_printf ("AT#BND=%d,%d,%d", flag2g, flag3g, flag4g);
+    else if (!is_2g && !is_3g && is_4g)
+        cmd = g_strdup_printf ("AT#BND=0,0,%d", flag4g);
+    else if (!is_2g && is_3g && is_4g)
+        cmd = g_strdup_printf ("AT#BND=0,%d,%d", flag3g, flag4g);
+    else if (is_2g && !is_3g && is_4g)
+        cmd = g_strdup_printf ("AT#BND=%d,0,%d", flag2g, flag4g);
+    else {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unexpectd error: could not compose AT#BND command");
+        return;
+    }
+    res = g_simple_async_result_new (G_OBJECT (self),
+                                     callback,
+                                     user_data,
+                                     modem_set_current_bands);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)modem_set_current_bands_ready,
+                              res);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Load current bands (Modem interface) */
 
 typedef struct {
@@ -915,6 +1030,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->set_current_bands = modem_set_current_bands;
+    iface->set_current_bands_finish = modem_set_current_bands_finish;
     iface->load_current_bands = modem_load_current_bands;
     iface->load_current_bands_finish = modem_load_bands_finish;
     iface->load_supported_bands = modem_load_supported_bands;
