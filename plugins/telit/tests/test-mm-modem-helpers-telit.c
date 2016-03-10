@@ -313,7 +313,195 @@ test_parse_current_bands_response (void) {
     }
 }
 
+static void
+test_telit_get_2g_bnd_flag (void)
+{
+    GArray *bands_array;
+    gint flag2g;
+    MMModemBand egsm = MM_MODEM_BAND_EGSM;
+    MMModemBand dcs = MM_MODEM_BAND_DCS;
+    MMModemBand pcs = MM_MODEM_BAND_PCS;
+    MMModemBand g850 = MM_MODEM_BAND_G850;
 
+    /* Test Flag 0 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, egsm);
+    g_array_append_val (bands_array, dcs);
+
+    mm_telit_get_band_flag (bands_array, &flag2g, NULL, NULL);
+    g_assert_cmpuint (flag2g, ==, 0);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 1 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, egsm);
+    g_array_append_val (bands_array, pcs);
+
+    mm_telit_get_band_flag (bands_array, &flag2g, NULL, NULL);
+    g_assert_cmpuint (flag2g, ==, 1);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 2 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, g850);
+    g_array_append_val (bands_array, dcs);
+
+    mm_telit_get_band_flag (bands_array, &flag2g, NULL, NULL);
+    g_assert_cmpuint (flag2g, ==, 2);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 3 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, g850);
+    g_array_append_val (bands_array, pcs);
+
+    mm_telit_get_band_flag (bands_array, &flag2g, NULL, NULL);
+    g_assert_cmpuint (flag2g, ==, 3);
+    g_array_free (bands_array, TRUE);
+
+    /* Test invalid band array */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, g850);
+    g_array_append_val (bands_array, egsm);
+
+    mm_telit_get_band_flag (bands_array, &flag2g, NULL, NULL);
+    g_assert_cmpuint (flag2g, ==, -1);
+    g_array_free (bands_array, TRUE);
+}
+
+
+static void
+test_telit_get_3g_bnd_flag (void)
+{
+    GArray *bands_array;
+    MMModemBand u2100 = MM_MODEM_BAND_U2100;
+    MMModemBand u1900 = MM_MODEM_BAND_U1900;
+    MMModemBand u850 = MM_MODEM_BAND_U850;
+    MMModemBand u900 = MM_MODEM_BAND_U900;
+    MMModemBand u17iv = MM_MODEM_BAND_U17IV;
+    MMModemBand u17ix = MM_MODEM_BAND_U17IX;
+    gint flag;
+
+    /* Test flag 0 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u2100);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 0);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 1 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u1900);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 1);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 2 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u850);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 2);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 3 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 3);
+    g_array_append_val (bands_array, u2100);
+    g_array_append_val (bands_array, u1900);
+    g_array_append_val (bands_array, u850);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 3);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 4 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, u1900);
+    g_array_append_val (bands_array, u850);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 4);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 5 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u900);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 5);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 6 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, u2100);
+    g_array_append_val (bands_array, u900);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 6);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 7 */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u17iv);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, 7);
+    g_array_free (bands_array, TRUE);
+
+    /* Test invalid band array */
+    flag = -1;
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, u17ix);
+
+    mm_telit_get_band_flag (bands_array, NULL, &flag, NULL);
+    g_assert_cmpint (flag, ==, -1);
+    g_array_free (bands_array, TRUE);
+}
+
+static void
+test_telit_get_4g_bnd_flag (void)
+{
+    GArray *bands_array;
+    MMModemBand eutran_i = MM_MODEM_BAND_EUTRAN_I;
+    MMModemBand eutran_ii = MM_MODEM_BAND_EUTRAN_II;
+    MMModemBand egsm = MM_MODEM_BAND_EGSM;
+    gint flag = -1;
+
+    /* Test flag 1 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, eutran_i);
+
+    mm_telit_get_band_flag (bands_array, NULL, NULL, &flag);
+    g_assert_cmpint (flag, ==, 1);
+    g_array_free (bands_array, TRUE);
+
+    /* Test flag 3 */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 2);
+    g_array_append_val (bands_array, eutran_i);
+    g_array_append_val (bands_array, eutran_ii);
+
+    mm_telit_get_band_flag (bands_array, NULL, NULL, &flag);
+    g_assert_cmpint (flag, ==, 3);
+    g_array_free (bands_array, TRUE);
+
+    /* Test invalid bands array */
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    g_array_append_val (bands_array, egsm);
+
+    mm_telit_get_band_flag (bands_array, NULL, NULL, &flag);
+    g_assert_cmpint (flag, ==, -1);
+    g_array_free (bands_array, TRUE);
+}
 
 int main (int argc, char **argv)
 {
@@ -327,5 +515,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/supported/parse_band_flag", test_parse_band_flag_str);
     g_test_add_func ("/MM/telit/bands/supported/parse_bands_response", test_parse_supported_bands_response);
     g_test_add_func ("/MM/telit/bands/current/parse_bands_response", test_parse_current_bands_response);
+    g_test_add_func ("/MM/telit/bands/current/set_bands/2g", test_telit_get_2g_bnd_flag);
+    g_test_add_func ("/MM/telit/bands/current/set_bands/3g", test_telit_get_3g_bnd_flag);
+    g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
     return g_test_run ();
 }

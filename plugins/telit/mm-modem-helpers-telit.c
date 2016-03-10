@@ -26,6 +26,91 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-telit.h"
 
+
+/*****************************************************************************/
+/* Set current bands helpers */
+
+void
+mm_telit_get_band_flag (GArray *bands_array,
+                        gint *flag2g,
+                        gint *flag3g,
+                        gint *flag4g)
+{
+    guint mask2g = 0;
+    guint mask3g = 0;
+    guint mask4g = 0;
+    guint found4g = FALSE;
+    guint i;
+
+    for (i = 0; i < bands_array->len; i++) {
+        MMModemBand band = g_array_index(bands_array, MMModemBand, i);
+
+        if (flag2g != NULL &&
+            band > MM_MODEM_BAND_UNKNOWN && band <= MM_MODEM_BAND_G850) {
+            mask2g += 1 << band;
+        }
+
+        if (flag3g != NULL &&
+            band >= MM_MODEM_BAND_U2100 && band <= MM_MODEM_BAND_U2600) {
+            mask3g += 1 << band;
+        }
+
+         if (flag4g != NULL &&
+             band >= MM_MODEM_BAND_EUTRAN_I && band <= MM_MODEM_BAND_EUTRAN_XLIV) {
+             mask4g += 1 << (band - MM_MODEM_BAND_EUTRAN_I);
+             found4g = TRUE;
+        }
+    }
+
+    /* Get 2G flag */
+    if (flag2g != NULL) {
+        if (mask2g == ((1 << MM_MODEM_BAND_EGSM) + (1 << MM_MODEM_BAND_DCS)))
+            *flag2g = 0;
+        else if (mask2g == ((1 << MM_MODEM_BAND_EGSM) + (1 << MM_MODEM_BAND_PCS)))
+            *flag2g = 1;
+        else if (mask2g == ((1 << MM_MODEM_BAND_G850) + (1 << MM_MODEM_BAND_DCS)))
+            *flag2g = 2;
+        else if (mask2g == ((1 << MM_MODEM_BAND_G850) + (1 << MM_MODEM_BAND_PCS)))
+            *flag2g = 3;
+        else
+            *flag2g = -1;
+    }
+
+    /* Get 3G flag */
+    if (flag3g != NULL) {
+        if (mask3g == (1 << MM_MODEM_BAND_U2100))
+            *flag3g = 0;
+        else if (mask3g == (1 << MM_MODEM_BAND_U1900))
+            *flag3g = 1;
+        else if (mask3g == (1 << MM_MODEM_BAND_U850))
+            *flag3g = 2;
+        else if (mask3g == ((1 << MM_MODEM_BAND_U2100) +
+                            (1 << MM_MODEM_BAND_U1900) +
+                            (1 << MM_MODEM_BAND_U850)))
+            *flag3g = 3;
+        else if (mask3g == ((1 << MM_MODEM_BAND_U1900) +
+                            (1 << MM_MODEM_BAND_U850)))
+            *flag3g = 4;
+        else if (mask3g == (1 << MM_MODEM_BAND_U900))
+            *flag3g = 5;
+        else if (mask3g == ((1 << MM_MODEM_BAND_U2100) +
+                            (1 << MM_MODEM_BAND_U900)))
+            *flag3g = 6;
+        else if (mask3g == (1 << MM_MODEM_BAND_U17IV))
+            *flag3g = 7;
+        else
+            *flag3g = -1;
+    }
+
+    /* 4G flag correspond to the mask */
+    if (flag4g != NULL) {
+        if (found4g)
+            *flag4g = mask4g;
+        else
+            *flag4g = -1;
+    }
+}
+
 /*****************************************************************************/
 /* +CSIM response parser */
 
