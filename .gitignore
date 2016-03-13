@@ -151,6 +151,9 @@ Makefile.in
 /m4/wchar_t.m4
 /m4/wint_t.m4
 /m4/xsize.m4
+/m4/extern-inline.m4
+/m4/fcntl-o.m4
+/m4/threadlib.m4
 
 /uml290/uml290mode
 
