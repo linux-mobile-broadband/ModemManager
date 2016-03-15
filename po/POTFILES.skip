@@ -1,2 +1,4 @@
 data/org.freedesktop.ModemManager1.policy.in
 data/tests/org.freedesktop.ModemManager1.service.in
+# https://bugs.launchpad.net/intltool/+bug/1117944
+sub/data/org.freedesktop.ModemManager1.policy.in
