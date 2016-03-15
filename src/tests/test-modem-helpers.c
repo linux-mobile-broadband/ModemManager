@@ -1831,6 +1831,21 @@ test_cgdcont_test_response_thuraya (void *f, gpointer d)
     test_cgdcont_test_results ("Thuraya", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+
+static void
+test_cgdcont_test_response_cinterion_phs8 (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CGDCONT: (1-17,101-116),\"IP\",,,(0),(0-4)\r\n";
+    static MM3gppPdpContextFormat expected[] = {
+        { 1, 17, MM_BEARER_IP_FAMILY_IPV4 }
+    };
+
+    test_cgdcont_test_results ("Cinterion PHS8-USA REVISION 03.001", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+
+
 /*****************************************************************************/
 /* Test CGDCONT read responses */
 
@@ -2775,6 +2790,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple_and_ignore, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_single_context, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_thuraya, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_cinterion_phs8, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));

@@ -773,7 +773,7 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
         return NULL;
     }
 
-    r = g_regex_new ("\\+CGDCONT:\\s*\\(\\s*(\\d+)\\s*-?\\s*(\\d+)?\\s*\\)\\s*,\\s*\\(?\"(\\S+)\"",
+    r = g_regex_new ("\\+CGDCONT:\\s*\\(\\s*(\\d+)\\s*-?\\s*(\\d+)?[^\\)]*\\)\\s*,\\s*\\(?\"(\\S+)\"",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, &inner_error);
     g_assert (r != NULL);
