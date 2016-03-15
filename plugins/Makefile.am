@@ -114,7 +114,7 @@ test_modem_helpers_icera_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_icera_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_icera_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ########################################
@@ -202,7 +202,7 @@ test_modem_helpers_huawei_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_huawei_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_huawei_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Common Mbm modem support library
@@ -242,7 +242,7 @@ test_modem_helpers_mbm_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_mbm_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_mbm_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Option
@@ -446,7 +446,7 @@ test_modem_helpers_cinterion_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_cinterion_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_cinterion_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Iridium modem
@@ -483,7 +483,7 @@ test_modem_helpers_thuraya_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_thuraya_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_thuraya_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Common Novatel modem support library
@@ -584,7 +584,7 @@ test_modem_helpers_telit_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS)
 test_modem_helpers_telit_LDADD = \
        $(top_builddir)/libmm-glib/libmm-glib.la \
-       $(top_builddir)/src/libmodem-helpers.la
+       $(top_builddir)/src/libhelpers.la
 test_modem_helpers_telit_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # MTK
