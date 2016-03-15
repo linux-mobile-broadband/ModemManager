@@ -247,6 +247,6 @@ libmm_generated_la_CPPFLAGS = \
 libmm_generated_la_LIBADD = $(LIBMM_GLIB_LIBS)
 
 includedir = @includedir@/libmm-glib
-include_HEADERS = $(GENERATED_H)
+nodist_include_HEADERS = $(GENERATED_H)
 
 CLEANFILES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)
