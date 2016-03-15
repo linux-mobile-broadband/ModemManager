@@ -1,7 +1,7 @@
 
 SUBDIRS = . tests
 
-AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_CFLAGS  = $(CODE_COVERAGE_CFLAGS)
 AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
 
 noinst_LTLIBRARIES = libmm-generated.la
@@ -14,7 +14,8 @@ GENERATED_H = \
 	mm-gdbus-sms.h \
 	mm-gdbus-call.h \
 	mm-gdbus-bearer.h \
-	mm-gdbus-modem.h
+	mm-gdbus-modem.h \
+	$(NULL)
 
 GENERATED_C = \
 	mm-enums-types.c \
@@ -25,7 +26,8 @@ GENERATED_C = \
 	mm-gdbus-sms.c \
 	mm-gdbus-call.c \
 	mm-gdbus-bearer.c \
-	mm-gdbus-modem.c
+	mm-gdbus-modem.c   \
+	$(NULL)
 
 GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
@@ -44,7 +46,8 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml \
+	$(NULL)
 
 BUILT_SOURCES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)
 
@@ -117,7 +120,8 @@ mm_gdbus_modem_generated = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml \
+	$(NULL)
 mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
@@ -228,9 +232,7 @@ mm-gdbus-call.c: $(mm_gdbus_call_deps)
 $(filter-out mm-gdbus-call.c, $(mm_gdbus_call_generated)): $(mm_gdbus_call_deps) mm-gdbus-call.c
 	@: # nothing to do, generated as a side-effect of the .c
 
-nodist_libmm_generated_la_SOURCES = \
-	$(GENERATED_H) \
-	$(GENERATED_C)
+nodist_libmm_generated_la_SOURCES = $(GENERATED_H) $(GENERATED_C)
 
 libmm_generated_la_CPPFLAGS = \
 	$(LIBMM_GLIB_CFLAGS) \
@@ -239,10 +241,10 @@ libmm_generated_la_CPPFLAGS = \
 	-I$(top_builddir)/include \
 	-Wno-unused-function \
 	-Wno-float-equal \
-	-Wno-shadow
+	-Wno-shadow \
+	$(NULL)
 
-libmm_generated_la_LIBADD = \
-	$(LIBMM_GLIB_LIBS)
+libmm_generated_la_LIBADD = $(LIBMM_GLIB_LIBS)
 
 includedir = @includedir@/libmm-glib
 include_HEADERS = $(GENERATED_H)

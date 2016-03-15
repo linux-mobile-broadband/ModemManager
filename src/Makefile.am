@@ -78,18 +78,21 @@ libhelpers_la_SOURCES = \
 	mm-sms-part-3gpp.h \
 	mm-sms-part-3gpp.c \
 	mm-sms-part-cdma.h \
-	mm-sms-part-cdma.c
+	mm-sms-part-cdma.c \
+	$(NULL)
 
 if WITH_QMI
 libhelpers_la_SOURCES += \
 	mm-modem-helpers-qmi.c \
-	mm-modem-helpers-qmi.h
+	mm-modem-helpers-qmi.h \
+	$(NULL)
 endif
 
 if WITH_MBIM
 libhelpers_la_SOURCES += \
 	mm-modem-helpers-mbim.c \
-	mm-modem-helpers-mbim.h
+	mm-modem-helpers-mbim.h \
+	$(NULL)
 endif
 
 ################################################################################
@@ -133,20 +136,23 @@ libport_la_SOURCES = \
 	mm-port-serial-gps.c \
 	mm-port-serial-gps.h \
 	mm-serial-parsers.c \
-	mm-serial-parsers.h
+	mm-serial-parsers.h \
+	$(NULL)
 
 nodist_libport_la_SOURCES = $(PORT_ENUMS_GENERATED)
 
 if WITH_QMI
 libport_la_SOURCES += \
 	mm-port-qmi.c \
-	mm-port-qmi.h
+	mm-port-qmi.h \
+	$(NULL)
 endif
 
 if WITH_MBIM
 libport_la_SOURCES += \
 	mm-port-mbim.c \
-	mm-port-mbim.h
+	mm-port-mbim.h \
+	$(NULL)
 endif
 
 libport_la_LIBADD = \
@@ -193,7 +199,8 @@ BUILT_SOURCES += $(DAEMON_ENUMS_GENERATED)
 CLEANFILES    += $(DAEMON_ENUMS_GENERATED)
 
 ModemManager_CPPFLAGS = \
-	-DPLUGINDIR=\"$(pkglibdir)\"
+	-DPLUGINDIR=\"$(pkglibdir)\" \
+	$(NULL)
 
 ModemManager_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la \
@@ -273,7 +280,8 @@ ModemManager_SOURCES = \
 	mm-port-probe-at.h \
 	mm-port-probe-at.c \
 	mm-plugin.c \
-	mm-plugin.h
+	mm-plugin.h \
+	$(NULL)
 
 nodist_ModemManager_SOURCES = $(DAEMON_ENUMS_GENERATED)
 
@@ -302,7 +310,8 @@ ModemManager_SOURCES += \
 	mm-bearer-qmi.h \
 	mm-bearer-qmi.c \
 	mm-broadband-modem-qmi.h \
-	mm-broadband-modem-qmi.c
+	mm-broadband-modem-qmi.c \
+	$(NULL)
 endif
 
 # Additional MBIM support in ModemManager
@@ -315,5 +324,6 @@ ModemManager_SOURCES += \
 	mm-bearer-mbim.h \
 	mm-bearer-mbim.c \
 	mm-broadband-modem-mbim.h \
-	mm-broadband-modem-mbim.c
+	mm-broadband-modem-mbim.c \
+	$(NULL)
 endif

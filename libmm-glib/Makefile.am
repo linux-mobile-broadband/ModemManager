@@ -1,6 +1,6 @@
 SUBDIRS = generated . tests
 
-AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
+AM_CFLAGS  = $(CODE_COVERAGE_CFLAGS)
 AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
 
 lib_LTLIBRARIES = libmm-glib.la
@@ -80,7 +80,8 @@ libmm_glib_la_SOURCES = \
 	mm-cdma-manual-activation-properties.h \
 	mm-cdma-manual-activation-properties.c \
 	mm-signal.h \
-	mm-signal.c
+	mm-signal.c \
+	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
 	-I$(srcdir) \
@@ -91,19 +92,23 @@ libmm_glib_la_CPPFLAGS = \
 	-I${top_srcdir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated \
 	-DLIBMM_GLIB_COMPILATION \
-	$(AM_CPPFLAGS)
+	$(AM_CPPFLAGS) \
+	$(NULL)
 
 libmm_glib_la_CFLAGS = \
 	$(LIBMM_GLIB_CFLAGS) \
-	$(AM_CFLAGS)
+	$(AM_CFLAGS) \
+	$(NULL)
 
 libmm_glib_la_LIBADD = \
 	${top_builddir}/libmm-glib/generated/libmm-generated.la \
-	$(LIBMM_GLIB_LIBS)
+	$(LIBMM_GLIB_LIBS) \
+	$(NULL)
 
 libmm_glib_la_LDFLAGS = \
 	-version-info $(MM_GLIB_LT_CURRENT):$(MM_GLIB_LT_REVISION):$(MM_GLIB_LT_AGE) \
-	$(AM_LDFLAGS)
+	$(AM_LDFLAGS) \
+	$(NULL)
 
 includedir = @includedir@/libmm-glib
 include_HEADERS = \
@@ -143,7 +148,8 @@ include_HEADERS = \
 	mm-network-timezone.h \
 	mm-firmware-properties.h \
 	mm-cdma-manual-activation-properties.h \
-	mm-signal.h
+	mm-signal.h \
+	$(NULL)
 
 CLEANFILES =
 
@@ -158,7 +164,8 @@ GENERATED_H = \
 	mm-gdbus-sim.h \
 	mm-gdbus-sms.h \
 	mm-gdbus-bearer.h \
-	mm-gdbus-modem.h
+	mm-gdbus-modem.h \
+	$(NULL)
 
 GENERATED_C = \
 	mm-enums-types.c \
@@ -168,14 +175,16 @@ GENERATED_C = \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
 	mm-gdbus-bearer.c \
-	mm-gdbus-modem.c
+	mm-gdbus-modem.c \
+	$(NULL)
 
 PUBLIC_H = \
 	ModemManager-names.h \
 	ModemManager-version.h
 	ModemManager-enums.h \
 	ModemManager-errors.h \
-	ModemManager.h
+	ModemManager.h \
+	$(NULL)
 
 INTROSPECTION_GIRS = ModemManager-1.0.gir
 INTROSPECTION_SCANNER_ARGS = --warn-all
@@ -190,7 +199,8 @@ ModemManager_1_0_gir_SCANNERFLAGS = \
 	--c-include "libmm-glib.h" \
 	--identifier-prefix=MM \
 	--identifier-prefix=Mm \
-	--symbol-prefix=mm
+	--symbol-prefix=mm \
+	$(NULL)
 ModemManager_1_0_gir_FILES = \
 	$(include_HEADERS) \
 	$(filter-out %.h,$(libmm_glib_la_SOURCES)) \

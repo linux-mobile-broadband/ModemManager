@@ -7,7 +7,8 @@ mmcli_CPPFLAGS = \
 	-I$(top_builddir)/include \
 	-I$(top_srcdir)/libmm-glib \
 	-I${top_srcdir}/libmm-glib/generated \
-	-I${top_builddir}/libmm-glib/generated
+	-I${top_builddir}/libmm-glib/generated \
+	$(NULL)
 
 mmcli_SOURCES = \
 	mmcli.h \
@@ -29,12 +30,13 @@ mmcli_SOURCES = \
 	mmcli-bearer.c \
 	mmcli-sim.c \
 	mmcli-sms.c \
-	mmcli-call.c
+	mmcli-call.c \
+	$(NULL)
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
-	$(top_builddir)/libmm-glib/libmm-glib.la
-
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
 
 completiondir = $(datadir)/bash-completion/completions
 
