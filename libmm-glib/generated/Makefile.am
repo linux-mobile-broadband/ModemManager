@@ -86,8 +86,12 @@ mm-errors-quarks.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(to
 mm_gdbus_manager_generated = \
 	mm-gdbus-manager.h \
 	mm-gdbus-manager.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.xml
-$(mm_gdbus_manager_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
+	$(NULL)
+mm_gdbus_manager_deps = \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.xml \
+	$(NULL)
+mm-gdbus-manager.c: $(mm_gdbus_manager_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -95,6 +99,8 @@ $(mm_gdbus_manager_generated): $(top_srcdir)/introspection/org.freedesktop.Modem
 		--generate-c-code mm-gdbus-manager \
 		$< \
 		$(NULL)
+$(filter-out mm-gdbus-manager.c, $(mm_gdbus_manager_generated)): $(mm_gdbus_manager_deps) mm-gdbus-manager.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 # Modem interfaces
 mm_gdbus_modem_generated = \
@@ -124,8 +130,9 @@ mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Simple.xml \
-	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Signal.xml
-$(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Signal.xml \
+	$(NULL)
+mm-gdbus-modem.c: $(mm_gdbus_modem_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -137,13 +144,19 @@ $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd" org.gtk.GDBus.C.Name Modem3gppUssd \
 		$^ \
 		$(NULL)
+$(filter-out mm-gdbus-modem.c, $(mm_gdbus_modem_generated)): $(mm_gdbus_modem_deps) mm-gdbus-modem.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 # SIM interface
 mm_gdbus_sim_generated = \
 	mm-gdbus-sim.h \
 	mm-gdbus-sim.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml
-$(mm_gdbus_sim_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sim.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
+	$(NULL)
+mm_gdbus_sim_deps = \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sim.xml \
+	$(NULL)
+mm-gdbus-sim.c: $(mm_gdbus_sim_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -151,13 +164,19 @@ $(mm_gdbus_sim_generated): $(top_srcdir)/introspection/org.freedesktop.ModemMana
 		--generate-c-code mm-gdbus-sim \
 		$< \
 		$(NULL)
+$(filter-out mm-gdbus-sim.c, $(mm_gdbus_sim_generated)): $(mm_gdbus_sim_deps) mm-gdbus-sim.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 # Bearer interface
 mm_gdbus_bearer_generated = \
 	mm-gdbus-bearer.h \
 	mm-gdbus-bearer.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml
-$(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Bearer.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml \
+	$(NULL)
+mm_gdbus_bearer_deps = \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Bearer.xml \
+	$(NULL)
+mm-gdbus-bearer.c: $(mm_gdbus_bearer_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -165,13 +184,19 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemM
 		--generate-c-code mm-gdbus-bearer \
 		$< \
 		$(NULL)
+$(filter-out mm-gdbus-bearer.c, $(mm_gdbus_bearer_generated)): $(mm_gdbus_bearer_deps) mm-gdbus-bearer.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 # SMS interface
 mm_gdbus_sms_generated = \
 	mm-gdbus-sms.h \
 	mm-gdbus-sms.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml
-$(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sms.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
+	$(NULL)
+mm_gdbus_sms_deps = \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sms.xml \
+	$(NULL)
+mm-gdbus-sms.c: $(mm_gdbus_sms_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -180,13 +205,19 @@ $(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemMana
 		--annotate "org.freedesktop.ModemManager1.Sms:Data" org.gtk.GDBus.C.ForceGVariant True \
 		$< \
 		$(NULL)
+$(filter-out mm-gdbus-sms.c, $(mm_gdbus_sms_generated)): $(mm_gdbus_sms_deps) mm-gdbus-sms.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 # Call interface
 mm_gdbus_call_generated = \
 	mm-gdbus-call.h \
 	mm-gdbus-call.c \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml
-$(mm_gdbus_call_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Call.xml
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml \
+	$(NULL)
+mm_gdbus_call_deps = \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Call.xml \
+	$(NULL)
+mm-gdbus-call.c: $(mm_gdbus_call_deps)
 	$(AM_V_GEN) $(GDBUS_CODEGEN) \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -194,6 +225,8 @@ $(mm_gdbus_call_generated): $(top_srcdir)/introspection/org.freedesktop.ModemMan
 		--generate-c-code mm-gdbus-call \
 		$< \
 		$(NULL)
+$(filter-out mm-gdbus-call.c, $(mm_gdbus_call_generated)): $(mm_gdbus_call_deps) mm-gdbus-call.c
+	@: # nothing to do, generated as a side-effect of the .c
 
 nodist_libmm_generated_la_SOURCES = \
 	$(GENERATED_H) \
