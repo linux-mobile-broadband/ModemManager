@@ -523,9 +523,9 @@ mm_modem_voice_delete_call_finish (MMModemVoice *self,
  * Asynchronously deletes a given #MMCall from the modem.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_voice_delete_finish() to get the result of the operation.
+ * You can then call mm_modem_voice_delete_call_finish() to get the result of the operation.
  *
- * See mm_modem_voice_delete_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_voice_delete_call_sync() for the synchronous, blocking version of this method.
  */
 void
 mm_modem_voice_delete_call (MMModemVoice *self,

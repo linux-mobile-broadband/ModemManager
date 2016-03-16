@@ -31,7 +31,7 @@
  * in newly created CALL objects.
  *
  * This object is created by the user and passed to ModemManager with either
- * mm_modem_voice_create() or mm_modem_voice_create_sync().
+ * mm_modem_voice_create_call() or mm_modem_voice_create_call_sync().
  */
 
 G_DEFINE_TYPE (MMCallProperties, mm_call_properties, G_TYPE_OBJECT)
