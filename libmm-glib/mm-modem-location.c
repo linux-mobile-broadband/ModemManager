@@ -843,7 +843,7 @@ mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_supl_server() if on another
+ * @self was constructed. Use mm_modem_location_dup_supl_server() if on another
  * thread.</warning>
  *
  * Returns: (transfer none): The SUPL server address, or %NULL if none available. Do not free the returned value, it belongs to @self.
