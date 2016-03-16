@@ -1,4 +1,26 @@
 
+ModemManager 1.4.14
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Core: improved several AT response parsers (+CREG, +CGDCONT, +CPMS...).
+ * Core: explicitly disconnect bearer before removing it.
+ * 3GPP: allow LAC/CID updates while registering.
+ * QMI: don't assume LAC/CID updates are always given in system indications.
+ * QMI: don't add APN auth settings if user/pass not given.
+ * QMI: load SIM operator id and name with "NAS home network"
+ * QMI: power-cycle reset functionality implemented.
+ * Telit: added udev rules for Telite LE910 V2.
+ * Telit: implemented modem reset & power down.
+ * Telit: implemented unlock retries loading.
+ * Telit: implemented supported/current bands loading/setting.
+ * Telit: implemented supported/current modes loading/setting.
+ * Blacklist: ignored proxmark3.
+ * and some other minor fixes...
+
+
 ModemManager 1.4.12
 -------------------------------------------
 This is a new bugfix release of ModemManager.
