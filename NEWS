@@ -1,4 +1,105 @@
 
+ModemManager 1.6.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+ * This version requires:
+   ** GLib 2.36.0
+   ** gettext 0.19.3
+   ** libmbim >= 1.12.0 (for the optional MBIM support)
+   ** libqmi >= 1.14.0 (for the optional QMI support)
+   ** libsystemd >= 209 or libsystemd-login >= 183 (for the optional suspend
+      and resume support)
+
+ * For distributions using systemd, it is suggested that the new optional
+   suspend/resume is explicitly requested during configure with the new
+   '--with-suspend-resume=systemd' argument.
+
+This version comes with the following new features:
+
+ * Core:
+   ** Implemented support for suspend/resume detection, currently working
+      when systemd is in use. Whenever the system is suspended, we'll flag the
+      modems as invalid so that they are re-probed from scratch when the system
+      is resumed.
+   ** Added cancellation support for the probing operations.
+   ** Reworked and simplified the serial port response processing.
+
+ * Location interface:
+   ** Added A-GPS support, currently available only for QMI based modems with
+      PDS service.
+   ** Added support for updating the default GPS refresh time.
+
+ * Time interface:
+   ** New default implementation for all AT-based modems.
+
+ * Voice interface:
+   ** New DBus interface to allow the management of voice calls, which currently
+      assumes that the audio channel is setup out of ModemManager.
+
+ * Bearer:
+   ** New support for reporting statistics of the ongoing connection with a new
+      'Stats' property, currently available for QMI and MBIM based modems.
+
+ * QMI:
+   ** Implemented support for devices which only work in "raw IP" mode, like
+      the Sierra MC7455.
+   ** Implemented support for SIM related operations using the UIM service, as
+      newer modems with multi-SIM capabilities don't suppor the legacy DMS UIM
+      operations.
+
+ * udev:
+   ** Added new supported 'ID_MM_PORT_IGNORE' tag to allow fully ignoring ports
+      specified by the user.
+
+ * mmcli:
+   ** Added command completion.
+   ** Added new operations to use the Voice interface.
+   ** Added new operations to manage the A-GPS settings.
+
+ * Build:
+   ** Added code coverage support.
+
+ * Plugins:
+   ** haier: new plugin to support the Haier CE81B.
+   ** thuraya: new plugin for Thuraya satellite modems.
+   ** sierra-legacy,sierra: the implementation for Sierra modems is now split
+      into two different plugins: a 'legacy' one for the old PPP and DirectIP
+      based modems and the standard one for the newer QMI and MBIM based ones.
+   ** dell: new plugin for Dell rebranded devices from Novatel, Sierra or
+      Ericsson.
+   ** gobi: removed the plugin. All non-vendor specific QMI devices should now
+      be managed by the generic plugin.
+   ** mbm: dynamically load the list of supported modes.
+   ** huawei: implemented Voice call management support.
+   ** huawei: use static IP addressing in NDISDUP capable devices if the AT^DHCP
+      response provides the IP details.
+
+The following features which were backported to 1.4.x releases are also present
+in ModemManager 1.6.0:
+
+ * MBIM:
+   ** The mbim-proxy is used by default.
+   ** Implemented support for disconnection status notification while connected.
+   ** Disabled CDMA capabilities, until properly supported.
+
+ * QMI:
+   ** The qmi-proxy is used by default.
+   ** If online mode fails, use 'DMS Set FCC Authentication', required by some
+      rebranded Sierra modems (e.g. Dell branded ones).
+   ** Implemented support for loading SIM operator id and name.
+   ** Implemented power-cycle reset functionality.
+
+ * Plugins:
+   ** telit: added support for new devices, like HE910, UE910 and UL865.
+   ** telit: implemented dynamic port identification.
+   ** telit: implemented unlock retries loading.
+   ** telit: implemented supported/current bands management.
+   ** telit: implemented supported/current modes management.
+   ** telit: implemented modem reset and power down.
+   ** mbm: implemented GPS support for Ericsson HS2350 and H5321gw modems.
+
+
 ModemManager 1.4.0
 -------------------------------------------
 This is a new stable release of ModemManager.
