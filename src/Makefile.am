@@ -295,11 +295,6 @@ if SUSPEND_RESUME_SYSTEMD
 ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor-systemd.c
 endif
 
-# Additional suspend/resume support via upower
-if SUSPEND_RESUME_UPOWER
-ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor-upower.c
-endif
-
 # Additional QMI support in ModemManager
 if WITH_QMI
 ModemManager_SOURCES += \

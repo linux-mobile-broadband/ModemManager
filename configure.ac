@@ -186,7 +186,7 @@ dnl-----------------------------------------------------------------------------
 dnl Suspend/resume support
 dnl
 
-AC_ARG_WITH(suspend-resume, AS_HELP_STRING([--with-suspend-resume=no|upower|systemd], [Build ModemManager with specific suspend/resume support]))
+AC_ARG_WITH(suspend-resume, AS_HELP_STRING([--with-suspend-resume=no|systemd], [Build ModemManager with specific suspend/resume support]))
 
 if test "x$with_suspend_resume" = "x"; then
    with_suspend_resume="none"
@@ -196,20 +196,16 @@ case $with_suspend_resume in
     none)
         AC_DEFINE(WITH_SUSPEND_RESUME, 0, [Define if you have suspend-resume support])
         ;;
-    upower)
-        AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have suspend-resume support])
-        ;;
     systemd)
         PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd >= 209],,
                           [PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd-login >= 183])])
         AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have suspend-resume support])
         ;;
     *)
-        AC_MSG_ERROR(--with-suspend-resume must be one of [none, upower, systemd])
+        AC_MSG_ERROR(--with-suspend-resume must be one of [none, systemd])
         ;;
 esac
 
-AM_CONDITIONAL(SUSPEND_RESUME_UPOWER,  test "x$with_suspend_resume" = "xupower")
 AM_CONDITIONAL(SUSPEND_RESUME_SYSTEMD, test "x$with_suspend_resume" = "xsystemd")
 
 dnl-----------------------------------------------------------------------------
