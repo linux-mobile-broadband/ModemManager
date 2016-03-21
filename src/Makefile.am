@@ -292,7 +292,7 @@ endif
 
 # Additional suspend/resume support via systemd
 if SUSPEND_RESUME_SYSTEMD
-ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor-systemd.c
+ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor.c
 endif
 
 # Additional QMI support in ModemManager
