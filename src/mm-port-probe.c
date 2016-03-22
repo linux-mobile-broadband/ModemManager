@@ -1023,6 +1023,7 @@ static void
 serial_probe_schedule (MMPortProbe *self)
 {
     PortProbeRunContext *ctx;
+    GTask *task;
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -1100,8 +1101,10 @@ serial_probe_schedule (MMPortProbe *self)
     }
 
     /* All done! */
-    g_task_return_boolean (self->priv->task, TRUE);
-    g_clear_object (&self->priv->task);
+    task = self->priv->task;
+    self->priv->task = NULL;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
