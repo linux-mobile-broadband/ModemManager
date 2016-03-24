@@ -397,7 +397,7 @@ mm_modem_oma_cancel_session_sync (MMModemOma *self,
 MMOmaFeature
 mm_modem_oma_get_features  (MMModemOma *self)
 {
-    g_return_val_if_fail (MM_IS_MODEM_OMA (self), MM_OMA_SESSION_TYPE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_MODEM_OMA (self), MM_OMA_FEATURE_NONE);
 
     return (MMOmaFeature) mm_gdbus_modem_oma_get_features (MM_GDBUS_MODEM_OMA (self));
 }
