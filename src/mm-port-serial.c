@@ -90,7 +90,6 @@ struct _MMPortSerialPrivate {
     GSocket *socket;
     GSource *socket_source;
 
-    struct termios old_t;
 
     guint baud;
     guint bits;
@@ -1199,14 +1198,6 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         /* Flush any waiting IO */
         tcflush (self->priv->fd, TCIOFLUSH);
 
-        if (tcgetattr (self->priv->fd, &self->priv->old_t) < 0) {
-            errno_save = errno;
-            g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
-                         "Could not set attributes on serial device %s: %s", device, strerror (errno_save));
-            mm_warn ("(%s) could not set attributes on serial device (%d)", device, errno_save);
-            goto error;
-        }
-
         /* Don't wait for pending data when closing the port; this can cause some
          * stupid devices that don't respond to URBs on a particular port to hang
          * for 30 seconds when probing fails.  See GNOME bug #630670.
@@ -1388,7 +1379,6 @@ _close_internal (MMPortSerial *self, gboolean force)
                 }
             }
 
-            tcsetattr (self->priv->fd, TCSANOW, &self->priv->old_t);
             tcflush (self->priv->fd, TCIOFLUSH);
         }
 
