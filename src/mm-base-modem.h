@@ -113,9 +113,6 @@ gboolean  mm_base_modem_grab_port    (MMBaseModem *self,
 MMPort   *mm_base_modem_get_port     (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name);
-gboolean  mm_base_modem_owns_port    (MMBaseModem *self,
-                                      const gchar *subsys,
-                                      const gchar *name);
 
 gboolean  mm_base_modem_has_at_port  (MMBaseModem *self);
 

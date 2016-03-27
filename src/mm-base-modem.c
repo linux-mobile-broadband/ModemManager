@@ -130,14 +130,6 @@ mm_base_modem_get_port (MMBaseModem *self,
     return port;
 }
 
-gboolean
-mm_base_modem_owns_port (MMBaseModem *self,
-                         const gchar *subsys,
-                         const gchar *name)
-{
-    return !!mm_base_modem_get_port (self, subsys, name);
-}
-
 static void
 serial_port_timed_out_cb (MMPortSerial *port,
                           guint n_consecutive_timeouts,
