@@ -106,30 +106,6 @@ get_hash_key (const gchar *subsys,
     return g_strdup_printf ("%s%s", subsys, name);
 }
 
-MMPort *
-mm_base_modem_get_port (MMBaseModem *self,
-                        const gchar *subsys,
-                        const gchar *name)
-{
-    MMPort *port;
-    gchar *key;
-
-    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
-    g_return_val_if_fail (name != NULL, NULL);
-    g_return_val_if_fail (subsys != NULL, NULL);
-
-    /* Only 'net' or 'tty' should be given */
-    g_return_val_if_fail (g_str_equal (subsys, "net") ||
-                          g_str_equal (subsys, "tty"),
-                          NULL);
-
-    key = get_hash_key (subsys, name);
-    port = g_hash_table_lookup (self->priv->ports, key);
-    g_free (key);
-
-    return port;
-}
-
 static void
 serial_port_timed_out_cb (MMPortSerial *port,
                           guint n_consecutive_timeouts,
