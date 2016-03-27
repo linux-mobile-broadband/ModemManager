@@ -64,7 +64,7 @@ static GOptionEntry entries[] = {
       "Create a new SMS in a given modem",
       "[\"key=value,...\"]"
     },
-    { "messaging-create-sms-with-data", 0, 0, G_OPTION_ARG_STRING, &create_with_data_str,
+    { "messaging-create-sms-with-data", 0, 0, G_OPTION_ARG_FILENAME, &create_with_data_str,
       "Pass the given file as data contents when creating a new SMS",
       "[File path]"
     },
