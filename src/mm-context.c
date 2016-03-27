@@ -30,8 +30,8 @@ static gboolean rel_ts;
 static const GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag, "Print version", NULL },
     { "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Run with extended debugging capabilities", NULL },
-    { "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of [ERR, WARN, INFO, DEBUG]", "INFO" },
-    { "log-file", 0, 0, G_OPTION_ARG_STRING, &log_file, "Path to log file", NULL },
+    { "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of ERR, WARN, INFO, DEBUG", "[LEVEL]" },
+    { "log-file", 0, 0, G_OPTION_ARG_STRING, &log_file, "Path to log file", "[PATH]" },
     { "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
     { "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
     { NULL }
