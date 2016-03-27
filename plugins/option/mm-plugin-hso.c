@@ -56,13 +56,13 @@ hso_custom_init (MMPortProbe *probe,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    GUdevDevice *udev_port;
+    MMKernelDevice *kernel_port;
     GSimpleAsyncResult *result;
     const gchar *subsys, *sysfs_path;
 
     subsys = mm_port_probe_get_port_subsys (probe);
-    udev_port = mm_port_probe_peek_port (probe);
-    sysfs_path = g_udev_device_get_sysfs_path (udev_port);
+    kernel_port = mm_port_probe_peek_port (probe);
+    sysfs_path = mm_kernel_device_get_sysfs_path (kernel_port);
 
     if (g_str_equal (subsys, "tty")) {
         gchar *hsotype_path;

@@ -324,9 +324,9 @@ dell_custom_init (MMPortProbe *probe,
                   gpointer user_data)
 {
     CustomInitContext *ctx;
-    GUdevDevice *udevDevice;
+    MMKernelDevice *port_device;
 
-    udevDevice = mm_port_probe_peek_port (probe);
+    port_device = mm_port_probe_peek_port (probe);
 
     ctx = g_slice_new0 (CustomInitContext);
     ctx->result = g_simple_async_result_new (G_OBJECT (probe),
@@ -342,7 +342,7 @@ dell_custom_init (MMPortProbe *probe,
 
     /* Dell-branded Telit modems always answer to +GMI
      * Avoid +CGMI and ATI sending for minimizing port probing time */
-    if (g_udev_device_get_property_as_boolean (udevDevice, "ID_MM_TELIT_PORTS_TAGGED")) {
+    if (mm_kernel_device_get_property_as_boolean (port_device, "ID_MM_TELIT_PORTS_TAGGED")) {
         ctx->cgmi_retries = 0;
         ctx->ati_retries = 0;
     }

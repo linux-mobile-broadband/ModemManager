@@ -55,7 +55,7 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
-    GUdevDevice *port;
+    MMKernelDevice *port;
     gint usbif;
 
     /* The Option plugin cannot do anything with non-AT ports */
@@ -73,7 +73,7 @@ grab_port (MMPlugin *self,
      * the modem/data port, per mail with Option engineers.  Only this port
      * will emit responses to dialing commands.
      */
-    usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
+    usbif = mm_kernel_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
     if (usbif == 0)
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY | MM_PORT_SERIAL_AT_FLAG_PPP;
 

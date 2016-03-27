@@ -12,15 +12,16 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
- * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
- * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc
+ * Copyright (C) 2016 Velocloud, Inc.
+ * Copyright (C) 2011 - 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <string.h>
 #include <ctype.h>
 
 #include <gmodule.h>
-#include <gudev/gudev.h>
+#include "mm-kernel-device-udev.h"
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
@@ -94,8 +95,8 @@ find_device_by_modem (MMBaseManager *manager,
 }
 
 static MMDevice *
-find_device_by_port (MMBaseManager *manager,
-                     GUdevDevice *port)
+find_device_by_port (MMBaseManager  *manager,
+                     MMKernelDevice *port)
 {
     GHashTableIter iter;
     gpointer key, value;
@@ -118,10 +119,10 @@ find_device_by_physdev_uid (MMBaseManager *self,
 }
 
 static MMDevice *
-find_device_by_udev_device (MMBaseManager *manager,
-                            GUdevDevice *udev_device)
+find_device_by_kernel_device (MMBaseManager  *manager,
+                              MMKernelDevice *kernel_device)
 {
-    return find_device_by_physdev_uid (manager, g_udev_device_get_sysfs_path (udev_device));
+    return find_device_by_physdev_uid (manager, mm_kernel_device_get_physdev_uid (kernel_device));
 }
 
 /*****************************************************************************/
@@ -175,100 +176,26 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     find_device_support_context_free (ctx);
 }
 
-static GUdevDevice *
-find_physical_device (GUdevDevice *child)
-{
-    GUdevDevice *iter, *old = NULL;
-    GUdevDevice *physdev = NULL;
-    const char *subsys, *type, *name;
-    guint32 i = 0;
-    gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE, is_platform = FALSE;
-    gboolean is_pnp = FALSE;
-
-    g_return_val_if_fail (child != NULL, NULL);
-
-    /* Bluetooth rfcomm devices are "virtual" and don't necessarily have
-     * parents at all.
-     */
-    name = g_udev_device_get_name (child);
-    if (name && strncmp (name, "rfcomm", 6) == 0)
-        return g_object_ref (child);
-
-    iter = g_object_ref (child);
-    while (iter && i++ < 8) {
-        subsys = g_udev_device_get_subsystem (iter);
-        if (subsys) {
-            if (is_usb || g_str_has_prefix (subsys, "usb")) {
-                is_usb = TRUE;
-                type = g_udev_device_get_devtype (iter);
-                if (type && !strcmp (type, "usb_device")) {
-                    physdev = iter;
-                    break;
-                }
-            } else if (is_pcmcia || !strcmp (subsys, "pcmcia")) {
-                GUdevDevice *pcmcia_parent;
-                const char *tmp_subsys;
-
-                is_pcmcia = TRUE;
-
-                /* If the parent of this PCMCIA device is no longer part of
-                 * the PCMCIA subsystem, we want to stop since we're looking
-                 * for the base PCMCIA device, not the PCMCIA controller which
-                 * is usually PCI or some other bus type.
-                 */
-                pcmcia_parent = g_udev_device_get_parent (iter);
-                if (pcmcia_parent) {
-                    tmp_subsys = g_udev_device_get_subsystem (pcmcia_parent);
-                    if (tmp_subsys && strcmp (tmp_subsys, "pcmcia"))
-                        physdev = iter;
-                    g_object_unref (pcmcia_parent);
-                    if (physdev)
-                        break;
-                }
-            } else if (is_platform || !strcmp (subsys, "platform")) {
-                /* Take the first platform parent as the physical device */
-                is_platform = TRUE;
-                physdev = iter;
-                break;
-            } else if (is_pci || !strcmp (subsys, "pci")) {
-                is_pci = TRUE;
-                physdev = iter;
-                break;
-            } else if (is_pnp || !strcmp (subsys, "pnp")) {
-                is_pnp = TRUE;
-                physdev = iter;
-                break;
-            }
-        }
-
-        old = iter;
-        iter = g_udev_device_get_parent (old);
-        g_object_unref (old);
-    }
-
-    return physdev;
-}
-
 static void
-device_removed (MMBaseManager *self,
-                GUdevDevice *udev_device)
+device_removed (MMBaseManager  *self,
+                MMKernelDevice *kernel_device)
 {
     MMDevice *device;
     const gchar *subsys;
     const gchar *name;
 
-    g_return_if_fail (udev_device != NULL);
+    g_return_if_fail (kernel_device != NULL);
 
-    subsys = g_udev_device_get_subsystem (udev_device);
-    name = g_udev_device_get_name (udev_device);
+    subsys = mm_kernel_device_get_subsystem (kernel_device);
+    name = mm_kernel_device_get_name (kernel_device);
 
     if (!g_str_has_prefix (subsys, "usb") ||
         (name && g_str_has_prefix (name, "cdc-wdm"))) {
         /* Handle tty/net/wdm port removal */
-        device = find_device_by_port (self, udev_device);
+        device = find_device_by_port (self, kernel_device);
         if (device) {
             mm_info ("(%s/%s): released by device '%s'", subsys, name, mm_device_get_uid (device));
-            mm_device_release_port (device, udev_device);
+            mm_device_release_port (device, kernel_device);
 
             /* If port probe list gets empty, remove the device object iself */
             if (!mm_device_peek_port_probe_list (device)) {
@@ -291,105 +218,49 @@ device_removed (MMBaseManager *self,
      * device has been removed.  That way, if the device is reinserted later, we'll go through
      * the process of exporting it.
      */
-    device = find_device_by_udev_device (self, udev_device);
+    device = find_device_by_kernel_device (self, kernel_device);
     if (device) {
         mm_dbg ("Removing device '%s'", mm_device_get_uid (device));
         mm_device_remove_modem (device);
         g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
         return;
     }
-
-    /* Maybe a plugin is checking whether or not the port is supported.
-     * TODO: Cancel every possible supports check in this port. */
 }
 
 static void
-device_added (MMBaseManager *manager,
-              GUdevDevice *port,
-              gboolean hotplugged,
-              gboolean manual_scan)
+device_added (MMBaseManager  *manager,
+              MMKernelDevice *port,
+              gboolean        hotplugged,
+              gboolean        manual_scan)
 {
-    MMDevice *device;
-    const char *subsys, *name, *physdev_uid, *physdev_subsys;
-    gboolean is_candidate;
-    GUdevDevice *physdev = NULL;
+    MMDevice    *device;
+    const gchar *physdev_uid;
 
     g_return_if_fail (port != NULL);
 
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-
-    /* ignore VTs */
-    if (strncmp (name, "tty", 3) == 0 && isdigit (name[3]))
-        return;
-
-    /* Ignore devices that aren't completely configured by udev yet.  If
-     * ModemManager is started in parallel with udev, explicitly requesting
-     * devices may return devices for which not all udev rules have yet been
-     * applied (a bug in udev/gudev).  Since we often need those rules to match
-     * the device to a specific ModemManager driver, we need to ensure that all
-     * rules have been processed before handling a device.
-     */
-    is_candidate = g_udev_device_get_property_as_boolean (port, "ID_MM_CANDIDATE");
-    if (!is_candidate) {
-        /* This could mean that device changed, loosing its ID_MM_CANDIDATE
+    if (!mm_kernel_device_is_candidate (port, manual_scan)) {
+        /* This could mean that device changed, losing its ID_MM_CANDIDATE
          * flags (such as Bluetooth RFCOMM devices upon disconnect.
          * Try to forget it. */
-        if (hotplugged && !manual_scan)
-            device_removed (manager, port);
+        device_removed (manager, port);
+        mm_dbg ("(%s/%s): port not candidate",
+                mm_kernel_device_get_subsystem (port),
+                mm_kernel_device_get_name (port));
         return;
     }
 
-    if (find_device_by_port (manager, port))
+    /* If already added, ignore new event */
+    if (find_device_by_port (manager, port)) {
+        mm_dbg ("(%s/%s): port already added",
+                mm_kernel_device_get_subsystem (port),
+                mm_kernel_device_get_name (port));
         return;
-
-    /* Find the port's physical device's sysfs path.  This is the kernel device
-     * that "owns" all the ports of the device, like the USB device or the PCI
-     * device the provides each tty or network port.
-     */
-    physdev = find_physical_device (port);
-    if (!physdev) {
-        /* Warn about it, but filter out some common ports that we know don't have
-         * anything to do with mobile broadband.
-         */
-        if (   strcmp (name, "console")
-            && strcmp (name, "ptmx")
-            && strcmp (name, "lo")
-            && strcmp (name, "tty")
-            && !strstr (name, "virbr"))
-            mm_dbg ("(%s/%s): could not get port's parent device", subsys, name);
-
-        goto out;
     }
 
-    /* Is the device blacklisted? */
-    if (g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_IGNORE")) {
-        mm_dbg ("(%s/%s): port's parent device is blacklisted", subsys, name);
-        goto out;
-    }
-
-    /* Is the device in the manual-only greylist? If so, return if this is an
-     * automatic scan. */
-    if (!manual_scan && g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_MANUAL_SCAN_ONLY")) {
-        mm_dbg ("(%s/%s): port probed only in manual scan", subsys, name);
-        goto out;
-    }
-
-    /* If the physdev is a 'platform' or 'pnp' device that's not whitelisted, ignore it */
-    physdev_subsys = g_udev_device_get_subsystem (physdev);
-    if (   physdev_subsys
-        && (   g_str_equal (physdev_subsys, "platform")
-            || g_str_equal (physdev_subsys, "pnp"))
-        && !g_udev_device_get_property_as_boolean (physdev, "ID_MM_PLATFORM_DRIVER_PROBE")) {
-        mm_dbg ("(%s/%s): port's parent platform driver is not whitelisted", subsys, name);
-        goto out;
-    }
-
-    physdev_uid = g_udev_device_get_sysfs_path (physdev);
-    if (!physdev_uid) {
-        mm_dbg ("(%s/%s): could not get port's parent device sysfs path", subsys, name);
-        goto out;
-    }
+    /* Get the port's physical device's uid. All ports of the same physical
+     * device will share the same uid. */
+    physdev_uid = mm_kernel_device_get_physdev_uid (port);
+    g_assert (physdev_uid);
 
     /* See if we already created an object to handle ports in this device */
     device = find_device_by_physdev_uid (manager, physdev_uid);
@@ -397,7 +268,7 @@ device_added (MMBaseManager *manager,
         FindDeviceSupportContext *ctx;
 
         /* Keep the device listed in the Manager */
-        device = mm_device_new (physdev, hotplugged);
+        device = mm_device_new (physdev_uid, hotplugged, FALSE);
         g_hash_table_insert (manager->priv->devices,
                              g_strdup (physdev_uid),
                              device);
@@ -415,10 +286,6 @@ device_added (MMBaseManager *manager,
 
     /* Grab the port in the existing device. */
     mm_device_grab_port (device, port);
-
-out:
-    if (physdev)
-        g_object_unref (physdev);
 }
 
 static void
@@ -430,6 +297,7 @@ handle_uevent (GUdevClient *client,
     MMBaseManager *self = MM_BASE_MANAGER (user_data);
     const gchar *subsys;
     const gchar *name;
+    MMKernelDevice *kernel_device;
 
     g_return_if_fail (action != NULL);
 
@@ -438,15 +306,19 @@ handle_uevent (GUdevClient *client,
     g_return_if_fail (subsys != NULL);
     g_return_if_fail (g_str_equal (subsys, "tty") || g_str_equal (subsys, "net") || g_str_has_prefix (subsys, "usb"));
 
+    kernel_device = mm_kernel_device_udev_new (device);
+
     /* We only care about tty/net and usb/cdc-wdm devices when adding modem ports,
      * but for remove, also handle usb parent device remove events
      */
-    name = g_udev_device_get_name (device);
+    name = mm_kernel_device_get_name (kernel_device);
     if (   (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change"))
         && (!g_str_has_prefix (subsys, "usb") || (name && g_str_has_prefix (name, "cdc-wdm"))))
-        device_added (self, device, TRUE, FALSE);
+        device_added (self, kernel_device, TRUE, FALSE);
     else if (g_str_equal (action, "remove"))
-        device_removed (self, device);
+        device_removed (self, kernel_device);
+
+    g_object_unref (kernel_device);
 }
 
 typedef struct {
@@ -458,7 +330,12 @@ typedef struct {
 static gboolean
 start_device_added_idle (StartDeviceAdded *ctx)
 {
-    device_added (ctx->self, ctx->device, FALSE, ctx->manual_scan);
+    MMKernelDevice *kernel_device;
+
+    kernel_device = mm_kernel_device_udev_new (ctx->device);
+    device_added (ctx->self, kernel_device, FALSE, ctx->manual_scan);
+    g_object_unref (kernel_device);
+
     g_object_unref (ctx->self);
     g_object_unref (ctx->device);
     g_slice_free (StartDeviceAdded, ctx);
@@ -757,7 +634,7 @@ handle_set_profile (MmGdbusTest *skeleton,
 
     /* Create device and keep it listed in the Manager */
     physdev_uid = g_strdup_printf ("/virtual/%s", id);
-    device = mm_device_virtual_new (physdev_uid, TRUE);
+    device = mm_device_new (physdev_uid, TRUE, TRUE);
     g_hash_table_insert (self->priv->devices, physdev_uid, device);
 
     /* Grab virtual ports */

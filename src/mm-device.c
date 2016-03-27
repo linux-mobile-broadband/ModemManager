@@ -32,7 +32,6 @@ G_DEFINE_TYPE (MMDevice, mm_device, G_TYPE_OBJECT);
 enum {
     PROP_0,
     PROP_UID,
-    PROP_UDEV_DEVICE,
     PROP_PLUGIN,
     PROP_MODEM,
     PROP_HOTPLUGGED,
@@ -56,8 +55,7 @@ struct _MMDevicePrivate {
     /* Unique id */
     gchar *uid;
 
-    /* Parent UDev device */
-    GUdevDevice *udev_device;
+    /* If USB, device vid/pid */
     guint16 vendor;
     guint16 product;
 
@@ -87,22 +85,16 @@ struct _MMDevicePrivate {
 /*****************************************************************************/
 
 static MMPortProbe *
-device_find_probe_with_device (MMDevice    *self,
-                               GUdevDevice *udev_port,
-                               gboolean lookup_ignored)
+device_find_probe_with_device (MMDevice       *self,
+                               MMKernelDevice *kernel_port,
+                               gboolean        lookup_ignored)
 {
     GList *l;
 
     for (l = self->priv->port_probes; l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
-        if (   g_udev_device_has_property (udev_port, "DEVPATH_OLD")
-            && g_str_has_suffix (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
-                                 g_udev_device_get_property (udev_port, "DEVPATH_OLD")))
-            return probe;
-
-        if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
-                         g_udev_device_get_sysfs_path (udev_port)))
+        if (mm_kernel_device_cmp (mm_port_probe_peek_port (probe), kernel_port))
             return probe;
     }
 
@@ -112,13 +104,7 @@ device_find_probe_with_device (MMDevice    *self,
     for (l = self->priv->ignored_port_probes; l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
-        if (   g_udev_device_has_property (udev_port, "DEVPATH_OLD")
-            && g_str_has_suffix (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
-                                 g_udev_device_get_property (udev_port, "DEVPATH_OLD")))
-            return probe;
-
-        if (g_str_equal (g_udev_device_get_sysfs_path (mm_port_probe_peek_port (probe)),
-                         g_udev_device_get_sysfs_path (udev_port)))
+        if (mm_kernel_device_cmp (mm_port_probe_peek_port (probe), kernel_port))
             return probe;
     }
 
@@ -126,164 +112,21 @@ device_find_probe_with_device (MMDevice    *self,
 }
 
 gboolean
-mm_device_owns_port (MMDevice    *self,
-                     GUdevDevice *udev_port)
+mm_device_owns_port (MMDevice       *self,
+                     MMKernelDevice *kernel_port)
 {
-    return !!device_find_probe_with_device (self, udev_port, TRUE);
-}
-
-static gboolean
-get_device_ids (GUdevDevice *device,
-                guint16     *vendor,
-                guint16     *product)
-{
-    GUdevDevice *parent = NULL;
-    const gchar *vid = NULL, *pid = NULL, *parent_subsys;
-    gboolean success = FALSE;
-    char *pci_vid = NULL, *pci_pid = NULL;
-
-    parent = g_udev_device_get_parent (device);
-    if (parent) {
-        parent_subsys = g_udev_device_get_subsystem (parent);
-        if (parent_subsys) {
-            if (g_str_equal (parent_subsys, "bluetooth")) {
-                /* Bluetooth devices report the VID/PID of the BT adapter here,
-                 * which isn't really what we want.  Just return null IDs instead.
-                 */
-                success = TRUE;
-                goto out;
-            } else if (g_str_equal (parent_subsys, "pcmcia")) {
-                /* For PCMCIA devices we need to grab the PCMCIA subsystem's
-                 * manfid and cardid, since any IDs on the tty device itself
-                 * may be from PCMCIA controller or something else.
-                 */
-                vid = g_udev_device_get_sysfs_attr (parent, "manf_id");
-                pid = g_udev_device_get_sysfs_attr (parent, "card_id");
-                if (!vid || !pid)
-                    goto out;
-            } else if (g_str_equal (parent_subsys, "platform")) {
-                /* Platform devices don't usually have a VID/PID */
-                success = TRUE;
-                goto out;
-            } else if (g_str_has_prefix (parent_subsys, "usb") &&
-                       (!g_strcmp0 (g_udev_device_get_driver (parent), "qmi_wwan") ||
-                        !g_strcmp0 (g_udev_device_get_driver (parent), "cdc_mbim"))) {
-                /* Need to look for vendor/product in the parent of the QMI/MBIM device */
-                GUdevDevice *qmi_parent;
-
-                qmi_parent = g_udev_device_get_parent (parent);
-                if (qmi_parent) {
-                    vid = g_udev_device_get_property (qmi_parent, "ID_VENDOR_ID");
-                    pid = g_udev_device_get_property (qmi_parent, "ID_MODEL_ID");
-                    g_object_unref (qmi_parent);
-                }
-            } else if (g_str_equal (parent_subsys, "pci")) {
-                const char *pci_id;
-
-                /* We can't always rely on the model + vendor showing up on
-                 * the PCI device's child, so look at the PCI parent.  PCI_ID
-                 * has the format "1931:000C".
-                 */
-                pci_id = g_udev_device_get_property (parent, "PCI_ID");
-                if (pci_id && strlen (pci_id) == 9 && pci_id[4] == ':') {
-                    vid = pci_vid = g_strdup (pci_id);
-                    pci_vid[4] = '\0';
-                    pid = pci_pid = g_strdup (pci_id + 5);
-                }
-            }
-        }
-    }
-
-    if (!vid)
-        vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
-    if (!vid)
-        goto out;
-
-    if (strncmp (vid, "0x", 2) == 0)
-        vid += 2;
-    if (strlen (vid) != 4)
-        goto out;
-
-    if (vendor) {
-        *vendor = (guint16) (mm_utils_hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint16) ((mm_utils_hex2byte (vid) & 0xFF) << 8);
-    }
-
-    if (!pid)
-        pid = g_udev_device_get_property (device, "ID_MODEL_ID");
-    if (!pid) {
-        *vendor = 0;
-        goto out;
-    }
-
-    if (strncmp (pid, "0x", 2) == 0)
-        pid += 2;
-    if (strlen (pid) != 4) {
-        *vendor = 0;
-        goto out;
-    }
-
-    if (product) {
-        *product = (guint16) (mm_utils_hex2byte (pid + 2) & 0xFF);
-        *product |= (guint16) ((mm_utils_hex2byte (pid) & 0xFF) << 8);
-    }
-
-    success = TRUE;
-
-out:
-    if (parent)
-        g_object_unref (parent);
-    g_free (pci_vid);
-    g_free (pci_pid);
-    return success;
-}
-
-const gchar *
-mm_device_utils_get_port_driver (GUdevDevice *udev_port)
-{
-    const gchar *driver, *subsys;
-    const char *name = g_udev_device_get_name (udev_port);
-
-    driver = g_udev_device_get_driver (udev_port);
-    if (!driver) {
-        GUdevDevice *parent;
-
-        parent = g_udev_device_get_parent (udev_port);
-        if (parent)
-            driver = g_udev_device_get_driver (parent);
-
-        /* Check for bluetooth; it's driver is a bunch of levels up so we
-         * just check for the subsystem of the parent being bluetooth.
-         */
-        if (!driver && parent) {
-            subsys = g_udev_device_get_subsystem (parent);
-            if (subsys && !strcmp (subsys, "bluetooth"))
-                driver = "bluetooth";
-        }
-
-        if (parent)
-            g_object_unref (parent);
-    }
-
-    /* Newer kernels don't set up the rfcomm port parent in sysfs,
-     * so we must infer it from the device name.
-     */
-    if (!driver && strncmp (name, "rfcomm", 6) == 0)
-        driver = "bluetooth";
-
-    /* Note: may return NULL! */
-    return driver;
+    return !!device_find_probe_with_device (self, kernel_port, TRUE);
 }
 
 static void
-add_port_driver (MMDevice *self,
-                 GUdevDevice *udev_port)
+add_port_driver (MMDevice       *self,
+                 MMKernelDevice *kernel_port)
 {
     const gchar *driver;
     guint n_items;
     guint i;
 
-    driver = mm_device_utils_get_port_driver (udev_port);
+    driver = mm_kernel_device_get_driver (kernel_port);
     if (!driver)
         return;
 
@@ -301,51 +144,46 @@ add_port_driver (MMDevice *self,
     if (!driver)
         return;
 
-    self->priv->drivers = g_realloc (self->priv->drivers,
-                                     (n_items + 2) * sizeof (gchar *));
+    self->priv->drivers = g_realloc (self->priv->drivers, (n_items + 2) * sizeof (gchar *));
     self->priv->drivers[n_items] = g_strdup (driver);
     self->priv->drivers[n_items + 1] = NULL;
 }
 
 void
-mm_device_grab_port (MMDevice    *self,
-                     GUdevDevice *udev_port)
+mm_device_grab_port (MMDevice       *self,
+                     MMKernelDevice *kernel_port)
 {
     MMPortProbe *probe;
 
-    if (mm_device_owns_port (self, udev_port))
+    if (mm_device_owns_port (self, kernel_port))
         return;
 
     /* Get the vendor/product IDs out of the first one that gives us
      * some valid value (it seems we may get NULL reported for VID in QMI
      * ports, e.g. Huawei E367) */
     if (!self->priv->vendor && !self->priv->product) {
-        if (!get_device_ids (udev_port,
-                             &self->priv->vendor,
-                             &self->priv->product)) {
-            mm_dbg ("(%s) could not get vendor/product ID",
-                    self->priv->uid);
-        }
+        self->priv->vendor  = mm_kernel_device_get_physdev_vid (kernel_port);
+        self->priv->product = mm_kernel_device_get_physdev_pid (kernel_port);
     }
 
     /* Add new port driver */
-    add_port_driver (self, udev_port);
+    add_port_driver (self, kernel_port);
 
     /* Create and store new port probe */
-    probe = mm_port_probe_new (self, udev_port);
+    probe = mm_port_probe_new (self, kernel_port);
     self->priv->port_probes = g_list_prepend (self->priv->port_probes, probe);
 
     /* Notify about the grabbed port */
-    g_signal_emit (self, signals[SIGNAL_PORT_GRABBED], 0, udev_port);
+    g_signal_emit (self, signals[SIGNAL_PORT_GRABBED], 0, kernel_port);
 }
 
 void
-mm_device_release_port (MMDevice    *self,
-                        GUdevDevice *udev_port)
+mm_device_release_port (MMDevice       *self,
+                        MMKernelDevice *kernel_port)
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port, TRUE);
+    probe = device_find_probe_with_device (self, kernel_port, TRUE);
     if (probe) {
         /* Found, remove from lists and destroy probe */
         if (g_list_find (self->priv->port_probes, probe))
@@ -360,17 +198,18 @@ mm_device_release_port (MMDevice    *self,
 }
 
 void
-mm_device_ignore_port  (MMDevice *self,
-                        GUdevDevice *udev_port)
+mm_device_ignore_port  (MMDevice       *self,
+                        MMKernelDevice *kernel_port)
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port, FALSE);
+    probe = device_find_probe_with_device (self, kernel_port, FALSE);
     if (probe) {
         /* Found, remove from list and add to the ignored list */
-        mm_dbg ("Fully ignoring port '%s/%s' from now on",
-                g_udev_device_get_subsystem (udev_port),
-                g_udev_device_get_name (udev_port));
+        mm_dbg ("[device %s] fully ignoring port '%s/%s' from now on",
+                self->priv->uid,
+                mm_kernel_device_get_subsystem (kernel_port),
+                mm_kernel_device_get_name (kernel_port));
         self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
         self->priv->ignored_port_probes = g_list_prepend (self->priv->ignored_port_probes, probe);
     }
@@ -392,10 +231,7 @@ unexport_modem (MMDevice *self)
         g_object_set (self->priv->modem,
                       MM_BASE_MODEM_CONNECTION, NULL,
                       NULL);
-
-        mm_dbg ("Unexported modem '%s' from path '%s'",
-                g_udev_device_get_sysfs_path (self->priv->udev_device),
-                path);
+        mm_dbg ("[device %s] unexported modem from path '%s'", self->priv->uid, path);
         g_free (path);
     }
 }
@@ -414,8 +250,7 @@ export_modem (MMDevice *self)
 
     /* If modem not yet valid (not fully initialized), don't export it */
     if (!mm_base_modem_get_valid (self->priv->modem)) {
-        mm_dbg ("Modem '%s' not yet fully initialized",
-                g_udev_device_get_sysfs_path (self->priv->udev_device));
+        mm_dbg ("[device %s] modem not yet fully initialized", self->priv->uid);
         return;
     }
 
@@ -425,8 +260,7 @@ export_modem (MMDevice *self)
                   NULL);
     if (path) {
         g_free (path);
-        mm_dbg ("Modem '%s' already exported",
-                g_udev_device_get_sysfs_path (self->priv->udev_device));
+        mm_dbg ("[device %s] modem already exported", self->priv->uid);
         return;
     }
 
@@ -445,21 +279,14 @@ export_modem (MMDevice *self)
     g_dbus_object_manager_server_export (self->priv->object_manager,
                                          G_DBUS_OBJECT_SKELETON (self->priv->modem));
 
-    mm_dbg ("Exported modem '%s' at path '%s'",
-            (self->priv->virtual ?
-             self->priv->uid :
-             g_udev_device_get_sysfs_path (self->priv->udev_device)),
-            path);
-
-    /* Once connected, dump additional debug info about the modem */
-    mm_dbg ("(%s): '%s' modem, VID 0x%04X PID 0x%04X (%s)",
-            path,
-            mm_base_modem_get_plugin (self->priv->modem),
+    mm_dbg ("[device %s] exported modem at path '%s'", self->priv->uid, path);
+    mm_dbg ("[device %s]    plugin:  %s", self->priv->uid, mm_base_modem_get_plugin (self->priv->modem));
+    mm_dbg ("[device %s]    vid:pid: 0x%04X:0x%04X",
+            self->priv->uid,
             (mm_base_modem_get_vendor_id (self->priv->modem) & 0xFFFF),
-            (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF),
-            (self->priv->virtual ?
-             "virtual" :
-             g_udev_device_get_subsystem (self->priv->udev_device)));
+            (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF));
+    if (self->priv->virtual)
+        mm_dbg ("[device %s]    virtual", self->priv->uid);
 
     g_free (path);
 }
@@ -512,7 +339,7 @@ modem_valid (MMBaseModem *modem,
         if (self->priv->modem)
             export_modem (self);
         else
-            mm_dbg ("Not exporting modem; no longer available");
+            mm_dbg ("[device %s] not exporting modem; no longer available", self->priv->uid);
     }
 }
 
@@ -533,7 +360,8 @@ mm_device_create_modem (MMDevice                  *self,
             return FALSE;
         }
 
-        mm_info ("Creating modem with plugin '%s' and '%u' ports",
+        mm_info ("[device %s] creating modem with plugin '%s' and '%u' ports",
+                 self->priv->uid,
                  mm_plugin_get_name (self->priv->plugin),
                  g_list_length (self->priv->port_probes));
     } else {
@@ -545,7 +373,8 @@ mm_device_create_modem (MMDevice                  *self,
             return FALSE;
         }
 
-        mm_info ("Creating virtual modem with plugin '%s' and '%u' ports",
+        mm_info ("[device %s] creating virtual modem with plugin '%s' and '%u' ports",
+                 self->priv->uid,
                  mm_plugin_get_name (self->priv->plugin),
                  g_strv_length (self->priv->virtual_ports));
     }
@@ -591,20 +420,6 @@ mm_device_get_product (MMDevice *self)
     return self->priv->product;
 }
 
-GUdevDevice *
-mm_device_peek_udev_device (MMDevice *self)
-{
-    g_return_val_if_fail (self->priv->udev_device != NULL, NULL);
-    return self->priv->udev_device;
-}
-
-GUdevDevice *
-mm_device_get_udev_device (MMDevice *self)
-{
-    g_return_val_if_fail (self->priv->udev_device != NULL, NULL);
-    return G_UDEV_DEVICE (g_object_ref (self->priv->udev_device));
-}
-
 void
 mm_device_set_plugin (MMDevice *self,
                       GObject  *plugin)
@@ -647,22 +462,22 @@ mm_device_get_modem (MMDevice *self)
 }
 
 GObject *
-mm_device_peek_port_probe (MMDevice *self,
-                           GUdevDevice *udev_port)
+mm_device_peek_port_probe (MMDevice       *self,
+                           MMKernelDevice *kernel_port)
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port, FALSE);
+    probe = device_find_probe_with_device (self, kernel_port, FALSE);
     return (probe ? G_OBJECT (probe) : NULL);
 }
 
 GObject *
-mm_device_get_port_probe (MMDevice *self,
-                          GUdevDevice *udev_port)
+mm_device_get_port_probe (MMDevice       *self,
+                          MMKernelDevice *kernel_port)
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, udev_port, FALSE);
+    probe = device_find_probe_with_device (self, kernel_port, FALSE);
     return (probe ? g_object_ref (probe) : NULL);
 }
 
@@ -723,34 +538,16 @@ mm_device_is_virtual (MMDevice *self)
 /*****************************************************************************/
 
 MMDevice *
-mm_device_new (GUdevDevice *udev_device,
-               gboolean hotplugged)
-{
-    const gchar *uid;
-
-    g_return_val_if_fail (udev_device != NULL, NULL);
-
-    uid = g_udev_device_get_property (udev_device, "ID_MM_PHYSDEV_UID");
-    if (uid)
-        mm_dbg ("device with an explicit physdev UID: %s", uid);
-
-    return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
-                                    MM_DEVICE_UDEV_DEVICE, udev_device,
-                                    MM_DEVICE_UID, uid ? uid : g_udev_device_get_sysfs_path (udev_device),
-                                    MM_DEVICE_HOTPLUGGED, hotplugged,
-                                    NULL));
-}
-
-MMDevice *
-mm_device_virtual_new (const gchar *uid,
-                       gboolean hotplugged)
+mm_device_new (const gchar *uid,
+               gboolean     hotplugged,
+               gboolean     virtual)
 {
     g_return_val_if_fail (uid != NULL, NULL);
 
     return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
-                                    MM_DEVICE_UID, uid,
+                                    MM_DEVICE_UID,        uid,
                                     MM_DEVICE_HOTPLUGGED, hotplugged,
-                                    MM_DEVICE_VIRTUAL, TRUE,
+                                    MM_DEVICE_VIRTUAL,    virtual,
                                     NULL));
 }
 
@@ -758,9 +555,7 @@ static void
 mm_device_init (MMDevice *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_DEVICE,
-                                              MMDevicePrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_DEVICE, MMDevicePrivate);
 }
 
 static void
@@ -775,10 +570,6 @@ set_property (GObject *object,
     case PROP_UID:
         /* construct only */
         self->priv->uid = g_value_dup_string (value);
-        break;
-    case PROP_UDEV_DEVICE:
-        /* construct only */
-        self->priv->udev_device = g_value_dup_object (value);
         break;
     case PROP_PLUGIN:
         g_clear_object (&(self->priv->plugin));
@@ -812,9 +603,6 @@ get_property (GObject *object,
     case PROP_UID:
         g_value_set_string (value, self->priv->uid);
         break;
-    case PROP_UDEV_DEVICE:
-        g_value_set_object (value, self->priv->udev_device);
-        break;
     case PROP_PLUGIN:
         g_value_set_object (value, self->priv->plugin);
         break;
@@ -838,7 +626,6 @@ dispose (GObject *object)
 {
     MMDevice *self = MM_DEVICE (object);
 
-    g_clear_object (&(self->priv->udev_device));
     g_clear_object (&(self->priv->plugin));
     g_list_free_full (self->priv->port_probes, (GDestroyNotify)g_object_unref);
     g_list_free_full (self->priv->ignored_port_probes, (GDestroyNotify)g_object_unref);
@@ -869,8 +656,8 @@ mm_device_class_init (MMDeviceClass *klass)
     /* Virtual methods */
     object_class->get_property = get_property;
     object_class->set_property = set_property;
-    object_class->finalize = finalize;
-    object_class->dispose = dispose;
+    object_class->finalize     = finalize;
+    object_class->dispose      = dispose;
 
     properties[PROP_UID] =
         g_param_spec_string (MM_DEVICE_UID,
@@ -879,14 +666,6 @@ mm_device_class_init (MMDeviceClass *klass)
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_UID, properties[PROP_UID]);
-
-    properties[PROP_UDEV_DEVICE] =
-        g_param_spec_object (MM_DEVICE_UDEV_DEVICE,
-                             "UDev Device",
-                             "UDev device object",
-                             G_UDEV_TYPE_DEVICE,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_UDEV_DEVICE, properties[PROP_UDEV_DEVICE]);
 
     properties[PROP_PLUGIN] =
         g_param_spec_object (MM_DEVICE_PLUGIN,
@@ -927,7 +706,7 @@ mm_device_class_init (MMDeviceClass *klass)
                       G_STRUCT_OFFSET (MMDeviceClass, port_grabbed),
                       NULL, NULL,
                       g_cclosure_marshal_generic,
-                      G_TYPE_NONE, 1, G_UDEV_TYPE_DEVICE);
+                      G_TYPE_NONE, 1, MM_TYPE_KERNEL_DEVICE);
 
     signals[SIGNAL_PORT_RELEASED] =
         g_signal_new (MM_DEVICE_PORT_RELEASED,
@@ -936,5 +715,5 @@ mm_device_class_init (MMDeviceClass *klass)
                       G_STRUCT_OFFSET (MMDeviceClass, port_released),
                       NULL, NULL,
                       g_cclosure_marshal_generic,
-                      G_TYPE_NONE, 1, G_UDEV_TYPE_DEVICE);
+                      G_TYPE_NONE, 1, MM_TYPE_KERNEL_DEVICE);
 }

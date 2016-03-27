@@ -72,13 +72,13 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
-    GUdevDevice *port;
+    MMKernelDevice *port;
     MMPortType port_type;
 
     port_type = mm_port_probe_get_port_type (probe);
     port = mm_port_probe_peek_port (probe);
 
-    if (g_udev_device_get_property_as_boolean (port, "ID_MM_ERICSSON_MBM_GPS_PORT")) {
+    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_ERICSSON_MBM_GPS_PORT")) {
         mm_dbg ("(%s/%s) Port flagged as GPS",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));

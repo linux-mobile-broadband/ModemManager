@@ -12,6 +12,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/src \
 	-I$(top_builddir)/src \
+	-I$(top_srcdir)/src/kerneldevice \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
 	-I$(top_srcdir)/libmm-glib \

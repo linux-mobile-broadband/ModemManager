@@ -19,8 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include <gudev/gudev.h>
-
+#include "mm-kernel-device.h"
 #include "mm-base-modem.h"
 
 #define MM_TYPE_DEVICE            (mm_device_get_type ())
@@ -34,12 +33,11 @@ typedef struct _MMDevice MMDevice;
 typedef struct _MMDeviceClass MMDeviceClass;
 typedef struct _MMDevicePrivate MMDevicePrivate;
 
-#define MM_DEVICE_UID         "uid"
-#define MM_DEVICE_UDEV_DEVICE "udev-device"
-#define MM_DEVICE_PLUGIN      "plugin"
-#define MM_DEVICE_MODEM       "modem"
-#define MM_DEVICE_HOTPLUGGED  "hotplugged"
-#define MM_DEVICE_VIRTUAL     "virtual"
+#define MM_DEVICE_UID        "uid"
+#define MM_DEVICE_PLUGIN     "plugin"
+#define MM_DEVICE_MODEM      "modem"
+#define MM_DEVICE_HOTPLUGGED "hotplugged"
+#define MM_DEVICE_VIRTUAL    "virtual"
 
 #define MM_DEVICE_PORT_GRABBED  "port-grabbed"
 #define MM_DEVICE_PORT_RELEASED "port-released"
@@ -53,62 +51,54 @@ struct _MMDeviceClass {
     GObjectClass parent;
 
     /* signals */
-    void (* port_grabbed)  (MMDevice *self,
-                            GUdevDevice *port);
-    void (* port_released) (MMDevice *self,
-                            GUdevDevice *port);
+    void (* port_grabbed)  (MMDevice       *self,
+                            MMKernelDevice *port);
+    void (* port_released) (MMDevice       *self,
+                            MMKernelDevice *port);
 };
 
 GType mm_device_get_type (void);
 
-MMDevice *mm_device_new (GUdevDevice *udev_device,
-                         gboolean hotplugged);
+MMDevice *mm_device_new (const gchar *uid,
+                         gboolean     hotplugged,
+                         gboolean     virtual);
 
-void     mm_device_grab_port    (MMDevice    *self,
-                                 GUdevDevice *udev_port);
-void     mm_device_release_port (MMDevice    *self,
-                                 GUdevDevice *udev_port);
-gboolean mm_device_owns_port    (MMDevice    *self,
-                                 GUdevDevice *udev_port);
-void     mm_device_ignore_port  (MMDevice *self,
-                                 GUdevDevice *udev_port);
+void     mm_device_grab_port    (MMDevice       *self,
+                                 MMKernelDevice *kernel_port);
+void     mm_device_release_port (MMDevice       *self,
+                                 MMKernelDevice *kernel_port);
+gboolean mm_device_owns_port    (MMDevice       *self,
+                                 MMKernelDevice *kernel_port);
+void     mm_device_ignore_port  (MMDevice       *self,
+                                 MMKernelDevice *kernel_port);
 
 gboolean mm_device_create_modem (MMDevice                  *self,
                                  GDBusObjectManagerServer  *object_manager,
                                  GError                   **error);
-void     mm_device_remove_modem (MMDevice  *self);
+void     mm_device_remove_modem (MMDevice *self);
 
-const gchar  *mm_device_get_uid          (MMDevice *self);
-const gchar **mm_device_get_drivers      (MMDevice *self);
-guint16       mm_device_get_vendor       (MMDevice *self);
-guint16       mm_device_get_product      (MMDevice *self);
-GUdevDevice  *mm_device_peek_udev_device (MMDevice *self);
-GUdevDevice  *mm_device_get_udev_device  (MMDevice *self);
-void          mm_device_set_plugin       (MMDevice *self,
-                                          GObject  *plugin);
-GObject      *mm_device_peek_plugin      (MMDevice *self);
-GObject      *mm_device_get_plugin       (MMDevice *self);
-MMBaseModem  *mm_device_peek_modem       (MMDevice *self);
-MMBaseModem  *mm_device_get_modem        (MMDevice *self);
-
-GObject     *mm_device_peek_port_probe      (MMDevice *self,
-                                             GUdevDevice *udev_port);
-GObject     *mm_device_get_port_probe       (MMDevice *self,
-                                             GUdevDevice *udev_port);
-GList       *mm_device_peek_port_probe_list (MMDevice *self);
-GList       *mm_device_get_port_probe_list  (MMDevice *self);
-
-const gchar *mm_device_utils_get_port_driver (GUdevDevice *udev_port);
-
-gboolean    mm_device_get_hotplugged     (MMDevice *self);
-
+const gchar     *mm_device_get_uid              (MMDevice       *self);
+const gchar    **mm_device_get_drivers          (MMDevice       *self);
+guint16          mm_device_get_vendor           (MMDevice       *self);
+guint16          mm_device_get_product          (MMDevice       *self);
+void             mm_device_set_plugin           (MMDevice       *self,
+                                                 GObject        *plugin);
+GObject         *mm_device_peek_plugin          (MMDevice       *self);
+GObject         *mm_device_get_plugin           (MMDevice       *self);
+MMBaseModem     *mm_device_peek_modem           (MMDevice       *self);
+MMBaseModem     *mm_device_get_modem            (MMDevice       *self);
+GObject         *mm_device_peek_port_probe      (MMDevice       *self,
+                                                 MMKernelDevice *kernel_port);
+GObject         *mm_device_get_port_probe       (MMDevice       *self,
+                                                 MMKernelDevice *kernel_port);
+GList           *mm_device_peek_port_probe_list (MMDevice       *self);
+GList           *mm_device_get_port_probe_list  (MMDevice       *self);
+gboolean         mm_device_get_hotplugged       (MMDevice       *self);
 
 /* For testing purposes */
-MMDevice     *mm_device_virtual_new        (const gchar *uid,
-                                            gboolean hotplugged);
-void          mm_device_virtual_grab_ports (MMDevice *self,
+void          mm_device_virtual_grab_ports (MMDevice     *self,
                                             const gchar **ports);
-const gchar **mm_device_virtual_peek_ports (MMDevice *self);
-gboolean      mm_device_is_virtual         (MMDevice *self);
+const gchar **mm_device_virtual_peek_ports (MMDevice     *self);
+gboolean      mm_device_is_virtual         (MMDevice     *self);
 
 #endif /* MM_DEVICE_H */

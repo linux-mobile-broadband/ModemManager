@@ -23,13 +23,12 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <gudev/gudev.h>
-
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
 #include "mm-plugin.h"
 #include "mm-device.h"
+#include "mm-kernel-device.h"
 #include "mm-port-serial-at.h"
 #include "mm-port-serial-qcdm.h"
 #include "mm-serial-parsers.h"
@@ -162,14 +161,14 @@ is_virtual_port (const gchar *device_name)
 
 /* Returns TRUE if the support check request was filtered out */
 static gboolean
-apply_subsystem_filter (MMPlugin *self,
-                        GUdevDevice *port)
+apply_subsystem_filter (MMPlugin       *self,
+                        MMKernelDevice *port)
 {
     if (self->priv->subsystems) {
         const gchar *subsys;
         guint i;
 
-        subsys = g_udev_device_get_subsystem (port);
+        subsys = mm_kernel_device_get_subsystem (port);
         for (i = 0; self->priv->subsystems[i]; i++) {
             if (g_str_equal (subsys, self->priv->subsystems[i]))
                 break;
@@ -189,11 +188,11 @@ apply_subsystem_filter (MMPlugin *self,
 
 /* Returns TRUE if the support check request was filtered out */
 static gboolean
-apply_pre_probing_filters (MMPlugin *self,
-                           MMDevice *device,
-                           GUdevDevice *port,
-                           gboolean *need_vendor_probing,
-                           gboolean *need_product_probing)
+apply_pre_probing_filters (MMPlugin       *self,
+                           MMDevice       *device,
+                           MMKernelDevice *port,
+                           gboolean       *need_vendor_probing,
+                           gboolean       *need_product_probing)
 {
     guint16 vendor;
     guint16 product;
@@ -209,7 +208,7 @@ apply_pre_probing_filters (MMPlugin *self,
     if (apply_subsystem_filter (self, port)) {
         mm_dbg ("(%s) [%s] filtered by subsystem",
                 self->priv->name,
-                g_udev_device_get_name (port));
+                mm_kernel_device_get_name (port));
         return TRUE;
     }
 
@@ -232,7 +231,7 @@ apply_pre_probing_filters (MMPlugin *self,
         const gchar **drivers;
 
         /* Detect any modems accessible through the list of virtual ports */
-        drivers = (is_virtual_port (g_udev_device_get_name (port)) ?
+        drivers = (is_virtual_port (mm_kernel_device_get_name (port)) ?
                    virtual_drivers :
                    mm_device_get_drivers (device));
 
@@ -240,7 +239,7 @@ apply_pre_probing_filters (MMPlugin *self,
         if (!drivers) {
             mm_dbg ("(%s) [%s] filtered as couldn't retrieve drivers",
                     self->priv->name,
-                    g_udev_device_get_name (port));
+                    mm_kernel_device_get_name (port));
             return TRUE;
         }
 
@@ -261,7 +260,7 @@ apply_pre_probing_filters (MMPlugin *self,
             if (!found) {
                 mm_dbg ("(%s) [%s] filtered by drivers",
                         self->priv->name,
-                        g_udev_device_get_name (port));
+                        mm_kernel_device_get_name (port));
                 return TRUE;
             }
         }
@@ -276,7 +275,7 @@ apply_pre_probing_filters (MMPlugin *self,
                     if (g_str_equal (drivers[j], self->priv->forbidden_drivers[i])) {
                         mm_dbg ("(%s) [%s] filtered by forbidden drivers",
                                 self->priv->name,
-                                g_udev_device_get_name (port));
+                                mm_kernel_device_get_name (port));
                         return TRUE;
                     }
                 }
@@ -292,7 +291,7 @@ apply_pre_probing_filters (MMPlugin *self,
                 if (g_str_equal (drivers[j], "qmi_wwan")) {
                     mm_dbg ("(%s) [%s] filtered by implicit QMI driver",
                             self->priv->name,
-                            g_udev_device_get_name (port));
+                            mm_kernel_device_get_name (port));
                     return TRUE;
                 }
             }
@@ -307,7 +306,7 @@ apply_pre_probing_filters (MMPlugin *self,
                 if (g_str_equal (drivers[j], "cdc_mbim")) {
                     mm_dbg ("(%s) [%s] filtered by implicit MBIM driver",
                             self->priv->name,
-                            g_udev_device_get_name (port));
+                            mm_kernel_device_get_name (port));
                     return TRUE;
                 }
             }
@@ -369,11 +368,11 @@ apply_pre_probing_filters (MMPlugin *self,
         ((!self->priv->vendor_strings &&
           !self->priv->product_strings &&
           !self->priv->forbidden_product_strings) ||
-         g_str_equal (g_udev_device_get_subsystem (port), "net") ||
-         g_str_has_prefix (g_udev_device_get_name (port), "cdc-wdm"))) {
+         g_str_equal (mm_kernel_device_get_subsystem (port), "net") ||
+         g_str_has_prefix (mm_kernel_device_get_name (port), "cdc-wdm"))) {
         mm_dbg ("(%s) [%s] filtered by vendor/product IDs",
                 self->priv->name,
-                g_udev_device_get_name (port));
+                mm_kernel_device_get_name (port));
         return TRUE;
     }
 
@@ -385,7 +384,7 @@ apply_pre_probing_filters (MMPlugin *self,
                 product == self->priv->forbidden_product_ids[i].r) {
                 mm_dbg ("(%s) [%s] filtered by forbidden vendor/product IDs",
                         self->priv->name,
-                        g_udev_device_get_name (port));
+                        mm_kernel_device_get_name (port));
                 return TRUE;
             }
         }
@@ -418,8 +417,7 @@ apply_pre_probing_filters (MMPlugin *self,
     if (self->priv->udev_tags) {
         for (i = 0; self->priv->udev_tags[i]; i++) {
             /* Check if the port was tagged */
-            if (g_udev_device_get_property_as_boolean (port,
-                                                       self->priv->udev_tags[i]))
+            if (mm_kernel_device_get_property_as_boolean (port, self->priv->udev_tags[i]))
                 break;
         }
 
@@ -427,7 +425,7 @@ apply_pre_probing_filters (MMPlugin *self,
         if (!self->priv->udev_tags[i]) {
             mm_dbg ("(%s) [%s] filtered by udev tags",
                     self->priv->name,
-                    g_udev_device_get_name (port));
+                    mm_kernel_device_get_name (port));
             return TRUE;
         }
     }
@@ -676,7 +674,7 @@ mm_plugin_supports_port_finish (MMPlugin      *self,
 void
 mm_plugin_supports_port (MMPlugin            *self,
                          MMDevice            *device,
-                         GUdevDevice         *port,
+                         MMKernelDevice      *port,
                          GCancellable        *cancellable,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
@@ -691,7 +689,7 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     g_return_if_fail (MM_IS_PLUGIN (self));
     g_return_if_fail (MM_IS_DEVICE (device));
-    g_return_if_fail (G_UDEV_IS_DEVICE (port));
+    g_return_if_fail (MM_IS_KERNEL_DEVICE (port));
 
     /* Create new cancellable task */
     task = g_task_new (self, cancellable, callback, user_data);
@@ -718,16 +716,16 @@ mm_plugin_supports_port (MMPlugin            *self,
                                  MM_CORE_ERROR_FAILED,
                                  "(%s) Missing port probe for port (%s/%s)",
                                  self->priv->name,
-                                 g_udev_device_get_subsystem (port),
-                                 g_udev_device_get_name (port));
+                                 mm_kernel_device_get_subsystem (port),
+                                 mm_kernel_device_get_name (port));
         g_object_unref (task);
         return;
     }
 
     /* Before launching any probing, check if the port is a net device. */
-    if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
+    if (g_str_equal (mm_kernel_device_get_subsystem (port), "net")) {
         mm_dbg ("(%s) [%s] probing deferred until result suggested",
-                self->priv->name, g_udev_device_get_name (port));
+                self->priv->name, mm_kernel_device_get_name (port));
         g_task_return_int (task, MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED);
         g_object_unref (task);
         return;
@@ -735,7 +733,7 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     /* Build flags depending on what probing needed */
     probe_run_flags = MM_PORT_PROBE_NONE;
-    if (!g_str_has_prefix (g_udev_device_get_name (port), "cdc-wdm")) {
+    if (!g_str_has_prefix (mm_kernel_device_get_name (port), "cdc-wdm")) {
         /* Serial ports... */
         if (self->priv->at)
             probe_run_flags |= MM_PORT_PROBE_AT;
@@ -745,9 +743,9 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_QCDM;
     } else {
         /* cdc-wdm ports... */
-        if (self->priv->qmi && !g_strcmp0 (mm_device_utils_get_port_driver (port), "qmi_wwan"))
+        if (self->priv->qmi && !g_strcmp0 (mm_kernel_device_get_driver (port), "qmi_wwan"))
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        else if (self->priv->mbim && !g_strcmp0 (mm_device_utils_get_port_driver (port), "cdc_mbim"))
+        else if (self->priv->mbim && !g_strcmp0 (mm_kernel_device_get_driver (port), "cdc_mbim"))
             probe_run_flags |= MM_PORT_PROBE_MBIM;
         else
             probe_run_flags |= MM_PORT_PROBE_AT;
@@ -780,7 +778,7 @@ mm_plugin_supports_port (MMPlugin            *self,
         mm_dbg ("(%s) [%s] not setting up AT probing tasks: "
                 "modem already has the expected single AT port",
                 self->priv->name,
-                g_udev_device_get_name (port));
+                mm_kernel_device_get_name (port));
 
         /* Assuming it won't be an AT port. We still run the probe anyway, in
          * case we need to check for other port types (e.g. QCDM) */
@@ -800,7 +798,7 @@ mm_plugin_supports_port (MMPlugin            *self,
     probe_list_str = mm_port_probe_flag_build_string_from_mask (ctx->flags);
     mm_dbg ("(%s) [%s] probe required: '%s'",
             self->priv->name,
-            g_udev_device_get_name (port),
+            mm_kernel_device_get_name (port),
             probe_list_str);
     g_free (probe_list_str);
 
@@ -819,9 +817,9 @@ mm_plugin_supports_port (MMPlugin            *self,
 /*****************************************************************************/
 
 MMPluginSupportsHint
-mm_plugin_discard_port_early (MMPlugin *self,
-                              MMDevice *device,
-                              GUdevDevice *port)
+mm_plugin_discard_port_early (MMPlugin       *self,
+                              MMDevice       *device,
+                              MMKernelDevice *port)
 {
     gboolean need_vendor_probing = FALSE;
     gboolean need_product_probing = FALSE;
@@ -913,7 +911,7 @@ mm_plugin_create_modem (MMPlugin  *self,
             }
 #if !defined WITH_QMI
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     !g_strcmp0 (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)), "qmi_wwan")) {
+                     !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "qmi_wwan")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_get_port_subsys (probe),
@@ -926,7 +924,7 @@ mm_plugin_create_modem (MMPlugin  *self,
 #endif
 #if !defined WITH_MBIM
             else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     !g_strcmp0 (mm_device_utils_get_port_driver (mm_port_probe_peek_port (probe)), "cdc_mbim")) {
+                     !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "cdc_mbim")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_get_port_subsys (probe),

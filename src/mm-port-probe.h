@@ -21,11 +21,11 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <gio/gio.h>
-#include <gudev/gudev.h>
 
 #include "mm-private-boxed-types.h"
 #include "mm-port-probe-at.h"
 #include "mm-port-serial-at.h"
+#include "mm-kernel-device.h"
 #include "mm-device.h"
 
 #define MM_TYPE_PORT_PROBE            (mm_port_probe_get_type ())
@@ -78,16 +78,16 @@ typedef gboolean (* MMPortProbeAtCustomInitFinish) (MMPortProbe *probe,
 
 GType mm_port_probe_get_type (void);
 
-MMPortProbe *mm_port_probe_new (MMDevice *device,
-                                GUdevDevice *port);
+MMPortProbe *mm_port_probe_new (MMDevice       *device,
+                                MMKernelDevice *port);
 
-MMDevice    *mm_port_probe_peek_device      (MMPortProbe *self);
-MMDevice    *mm_port_probe_get_device       (MMPortProbe *self);
-GUdevDevice *mm_port_probe_peek_port        (MMPortProbe *self);
-GUdevDevice *mm_port_probe_get_port         (MMPortProbe *self);
-const gchar *mm_port_probe_get_port_name    (MMPortProbe *self);
-const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
-const gchar *mm_port_probe_get_parent_path  (MMPortProbe *self);
+MMDevice       *mm_port_probe_peek_device     (MMPortProbe *self);
+MMDevice       *mm_port_probe_get_device      (MMPortProbe *self);
+MMKernelDevice *mm_port_probe_peek_port       (MMPortProbe *self);
+MMKernelDevice *mm_port_probe_get_port        (MMPortProbe *self);
+const gchar    *mm_port_probe_get_port_name   (MMPortProbe *self);
+const gchar    *mm_port_probe_get_port_subsys (MMPortProbe *self);
+const gchar    *mm_port_probe_get_parent_path (MMPortProbe *self);
 
 /* Probing result setters */
 void mm_port_probe_set_result_at         (MMPortProbe *self,

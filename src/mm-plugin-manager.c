@@ -62,7 +62,7 @@ struct _MMPluginManagerPrivate {
 static GList *
 plugin_manager_build_plugins_list (MMPluginManager *self,
                                    MMDevice        *device,
-                                   GUdevDevice     *port)
+                                   MMKernelDevice  *port)
 {
     GList *list = NULL;
     GList *l;
@@ -179,8 +179,8 @@ struct _PortContext {
     gchar *name;
     /* The device where the port is*/
     MMDevice *device;
-    /* The GUDev reported port object */
-    GUdevDevice *port;
+    /* The reported kernel port object */
+    MMKernelDevice *port;
 
     /* The operation task */
     GTask *task;
@@ -642,7 +642,7 @@ static PortContext *
 port_context_new (MMPluginManager *self,
                   const gchar     *parent_name,
                   MMDevice        *device,
-                  GUdevDevice     *port)
+                  MMKernelDevice  *port)
 {
     PortContext *port_context;
 
@@ -653,7 +653,7 @@ port_context_new (MMPluginManager *self,
     port_context->timer     = g_timer_new ();
 
     /* Set context name */
-    port_context->name = g_strdup_printf ("%s,%s", parent_name, g_udev_device_get_name (port));
+    port_context->name = g_strdup_printf ("%s,%s", parent_name, mm_kernel_device_get_name (port));
 
     return port_context;
 }
@@ -757,8 +757,8 @@ device_context_ref (DeviceContext *device_context)
 }
 
 static PortContext *
-device_context_peek_running_port_context (DeviceContext *device_context,
-                                          GUdevDevice   *port)
+device_context_peek_running_port_context (DeviceContext  *device_context,
+                                          MMKernelDevice *port)
 {
     GList *l;
 
@@ -767,15 +767,15 @@ device_context_peek_running_port_context (DeviceContext *device_context,
 
         port_context = (PortContext *)(l->data);
         if ((port_context->port == port) ||
-            (!g_strcmp0 (g_udev_device_get_name (port_context->port), g_udev_device_get_name (port))))
+            (!g_strcmp0 (mm_kernel_device_get_name (port_context->port), mm_kernel_device_get_name (port))))
             return port_context;
     }
     return NULL;
 }
 
 static PortContext *
-device_context_peek_waiting_port_context (DeviceContext *device_context,
-                                          GUdevDevice   *port)
+device_context_peek_waiting_port_context (DeviceContext  *device_context,
+                                          MMKernelDevice *port)
 {
     GList *l;
 
@@ -784,7 +784,7 @@ device_context_peek_waiting_port_context (DeviceContext *device_context,
 
         port_context = (PortContext *)(l->data);
         if ((port_context->port == port) ||
-            (!g_strcmp0 (g_udev_device_get_name (port_context->port), g_udev_device_get_name (port))))
+            (!g_strcmp0 (mm_kernel_device_get_name (port_context->port), mm_kernel_device_get_name (port))))
             return port_context;
     }
     return NULL;
@@ -988,7 +988,7 @@ device_context_continue (DeviceContext *device_context)
         PortContext *port_context = (PortContext *) (l->data);
         const gchar *portname;
 
-        portname = g_udev_device_get_name (port_context->port);
+        portname = mm_kernel_device_get_name (port_context->port);
         if (!s)
             s = g_string_new (portname);
         else
@@ -1122,13 +1122,13 @@ device_context_min_wait_time_elapsed (DeviceContext *device_context)
 }
 
 static void
-device_context_port_released (DeviceContext *device_context,
-                              GUdevDevice   *port)
+device_context_port_released (DeviceContext  *device_context,
+                              MMKernelDevice *port)
 {
     PortContext *port_context;
 
     mm_dbg ("[plugin manager] task %s: port released: %s",
-            device_context->name, g_udev_device_get_name (port));
+            device_context->name, mm_kernel_device_get_name (port));
 
     /* Check if there's a waiting port context */
     port_context = device_context_peek_waiting_port_context (device_context, port);
@@ -1150,12 +1150,12 @@ device_context_port_released (DeviceContext *device_context,
     /* This is not something worth warning. If the probing task has already
      * been finished, it will already be removed from the list */
     mm_dbg ("[plugin manager] task %s: port wasn't found: %s",
-            device_context->name, g_udev_device_get_name (port));
+            device_context->name, mm_kernel_device_get_name (port));
 }
 
 static void
-device_context_port_grabbed (DeviceContext *device_context,
-                             GUdevDevice   *port)
+device_context_port_grabbed (DeviceContext  *device_context,
+                             MMKernelDevice *port)
 {
     MMPluginManager *self;
     PortContext     *port_context;
@@ -1164,7 +1164,7 @@ device_context_port_grabbed (DeviceContext *device_context,
     self = MM_PLUGIN_MANAGER (device_context->self);
 
     mm_dbg ("[plugin manager] task %s: port grabbed: %s",
-            device_context->name, g_udev_device_get_name (port));
+            device_context->name, mm_kernel_device_get_name (port));
 
     /* Ignore if for any reason we still have it in the running list */
     port_context = device_context_peek_running_port_context (device_context, port);

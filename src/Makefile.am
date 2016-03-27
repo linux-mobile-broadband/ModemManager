@@ -22,6 +22,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/libmm-glib \
 	-I${top_builddir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated/tests \
+	-I$(srcdir)/kerneldevice \
 	$(NULL)
 
 AM_LDFLAGS = \
@@ -94,6 +95,19 @@ libhelpers_la_SOURCES += \
 	mm-modem-helpers-mbim.h \
 	$(NULL)
 endif
+
+################################################################################
+# kerneldevice library
+################################################################################
+
+noinst_LTLIBRARIES += libkerneldevice.la
+
+libkerneldevice_la_SOURCES = \
+	kerneldevice/mm-kernel-device.h \
+	kerneldevice/mm-kernel-device.c \
+	kerneldevice/mm-kernel-device-udev.h \
+	kerneldevice/mm-kernel-device-udev.c \
+	$(NULL)
 
 ################################################################################
 # ports library
@@ -208,6 +222,7 @@ ModemManager_LDADD = \
 	$(top_builddir)/libmm-glib/generated/tests/libmm-test-generated.la \
 	$(builddir)/libhelpers.la \
 	$(builddir)/libport.la \
+	$(builddir)/libkerneldevice.la \
 	$(NULL)
 
 ModemManager_SOURCES = \
