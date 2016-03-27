@@ -35,14 +35,14 @@ MMManager *mmcli_get_manager_sync   (GDBusConnection *connection);
 
 
 void     mmcli_get_modem         (GDBusConnection *connection,
-                                  const gchar *path_or_index,
+                                  const gchar *modem_str,
                                   GCancellable *cancellable,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
 MMObject *mmcli_get_modem_finish (GAsyncResult *res,
                                   MMManager **o_manager);
 MMObject *mmcli_get_modem_sync   (GDBusConnection *connection,
-                                  const gchar *path_or_index,
+                                  const gchar *modem_str,
                                   MMManager **o_manager);
 
 void      mmcli_get_bearer        (GDBusConnection *connection,

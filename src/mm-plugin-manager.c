@@ -1355,7 +1355,7 @@ plugin_manager_peek_device_context (MMPluginManager *self,
 
         device_context = (DeviceContext *)(l->data);
         if ((device == device_context->device) ||
-            (! g_strcmp0 (mm_device_get_path (device_context->device), mm_device_get_path (device))))
+            (!g_strcmp0 (mm_device_get_uid (device_context->device), mm_device_get_uid (device))))
             return device_context;
     }
     return NULL;
@@ -1427,7 +1427,7 @@ mm_plugin_manager_device_support_check (MMPluginManager     *self,
     if (device_context) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
                                  "Device support check task already available for device '%s'",
-                                 mm_device_get_path (device));
+                                 mm_device_get_uid (device));
         g_object_unref (task);
         return;
     }
@@ -1439,7 +1439,7 @@ mm_plugin_manager_device_support_check (MMPluginManager     *self,
     self->priv->device_contexts = g_list_prepend (self->priv->device_contexts, device_context);
 
     mm_dbg ("[plugin manager] task %s: new support task for device: %s",
-            device_context->name, mm_device_get_path (device_context->device));
+            device_context->name, mm_device_get_uid (device_context->device));
 
     /* Run device context */
     device_context_run (self,

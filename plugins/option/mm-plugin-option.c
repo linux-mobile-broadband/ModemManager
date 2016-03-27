@@ -34,14 +34,14 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
-              const gchar *sysfs_path,
+              const gchar *uid,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_option_new (sysfs_path,
+    return MM_BASE_MODEM (mm_broadband_modem_option_new (uid,
                                                          drivers,
                                                          mm_plugin_get_name (self),
                                                          vendor,

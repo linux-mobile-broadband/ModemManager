@@ -865,7 +865,7 @@ mm_plugin_create_modem (MMPlugin  *self,
 
     /* Let the plugin create the modem from the port probe results */
     modem = MM_PLUGIN_GET_CLASS (self)->create_modem (MM_PLUGIN (self),
-                                                      mm_device_get_path (device),
+                                                      mm_device_get_uid (device),
                                                       mm_device_get_drivers (device),
                                                       mm_device_get_vendor (device),
                                                       mm_device_get_product (device),

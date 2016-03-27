@@ -61,7 +61,7 @@ static const MMPortProbeAtCommand custom_at_probe[] = {
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
-              const gchar *sysfs_path,
+              const gchar *uid,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -71,7 +71,7 @@ create_modem (MMPlugin *self,
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered ZTE modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -82,7 +82,7 @@ create_modem (MMPlugin *self,
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
         mm_dbg ("MBIM-powered ZTE modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (sysfs_path,
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
                                                            vendor,
@@ -91,13 +91,13 @@ create_modem (MMPlugin *self,
 #endif
 
     if (mm_port_probe_list_is_icera (probes))
-        return MM_BASE_MODEM (mm_broadband_modem_zte_icera_new (sysfs_path,
+        return MM_BASE_MODEM (mm_broadband_modem_zte_icera_new (uid,
                                                                 drivers,
                                                                 mm_plugin_get_name (self),
                                                                 vendor,
                                                                 product));
 
-    return MM_BASE_MODEM (mm_broadband_modem_zte_new (sysfs_path,
+    return MM_BASE_MODEM (mm_broadband_modem_zte_new (uid,
                                                       drivers,
                                                       mm_plugin_get_name (self),
                                                       vendor,

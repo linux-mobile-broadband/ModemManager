@@ -31,7 +31,7 @@ G_DEFINE_TYPE (MMDevice, mm_device, G_TYPE_OBJECT);
 
 enum {
     PROP_0,
-    PROP_PATH,
+    PROP_UID,
     PROP_UDEV_DEVICE,
     PROP_PLUGIN,
     PROP_MODEM,
@@ -53,8 +53,8 @@ struct _MMDevicePrivate {
     /* Whether the device is real or virtual */
     gboolean virtual;
 
-    /* Device path */
-    gchar *path;
+    /* Unique id */
+    gchar *uid;
 
     /* Parent UDev device */
     GUdevDevice *udev_device;
@@ -324,7 +324,7 @@ mm_device_grab_port (MMDevice    *self,
                              &self->priv->vendor,
                              &self->priv->product)) {
             mm_dbg ("(%s) could not get vendor/product ID",
-                    self->priv->path);
+                    self->priv->uid);
         }
     }
 
@@ -447,7 +447,7 @@ export_modem (MMDevice *self)
 
     mm_dbg ("Exported modem '%s' at path '%s'",
             (self->priv->virtual ?
-             self->priv->path :
+             self->priv->uid :
              g_udev_device_get_sysfs_path (self->priv->udev_device)),
             path);
 
@@ -496,12 +496,12 @@ modem_valid (MMBaseModem *modem,
             GError *error = NULL;
 
             if (!mm_device_create_modem (self, self->priv->object_manager, &error)) {
-                 mm_warn ("Could not recreate modem for device at '%s': %s",
-                         mm_device_get_path (self),
-                         error ? error->message : "unknown");
+                 mm_warn ("Could not recreate modem for device '%s': %s",
+                          self->priv->uid,
+                          error ? error->message : "unknown");
                 g_error_free (error);
             } else {
-                mm_dbg ("Modem recreated for device '%s'", mm_device_get_path (self));
+                mm_dbg ("Modem recreated for device '%s'", self->priv->uid);
             }
         }
     } else {
@@ -568,9 +568,9 @@ mm_device_create_modem (MMDevice                  *self,
 /*****************************************************************************/
 
 const gchar *
-mm_device_get_path (MMDevice *self)
+mm_device_get_uid (MMDevice *self)
 {
-    return self->priv->path;
+    return self->priv->uid;
 }
 
 const gchar **
@@ -726,23 +726,29 @@ MMDevice *
 mm_device_new (GUdevDevice *udev_device,
                gboolean hotplugged)
 {
+    const gchar *uid;
+
     g_return_val_if_fail (udev_device != NULL, NULL);
+
+    uid = g_udev_device_get_property (udev_device, "ID_MM_PHYSDEV_UID");
+    if (uid)
+        mm_dbg ("device with an explicit physdev UID: %s", uid);
 
     return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
                                     MM_DEVICE_UDEV_DEVICE, udev_device,
-                                    MM_DEVICE_PATH, g_udev_device_get_sysfs_path (udev_device),
+                                    MM_DEVICE_UID, uid ? uid : g_udev_device_get_sysfs_path (udev_device),
                                     MM_DEVICE_HOTPLUGGED, hotplugged,
                                     NULL));
 }
 
 MMDevice *
-mm_device_virtual_new (const gchar *path,
+mm_device_virtual_new (const gchar *uid,
                        gboolean hotplugged)
 {
-    g_return_val_if_fail (path != NULL, NULL);
+    g_return_val_if_fail (uid != NULL, NULL);
 
     return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
-                                    MM_DEVICE_PATH, path,
+                                    MM_DEVICE_UID, uid,
                                     MM_DEVICE_HOTPLUGGED, hotplugged,
                                     MM_DEVICE_VIRTUAL, TRUE,
                                     NULL));
@@ -766,9 +772,9 @@ set_property (GObject *object,
     MMDevice *self = MM_DEVICE (object);
 
     switch (prop_id) {
-    case PROP_PATH:
+    case PROP_UID:
         /* construct only */
-        self->priv->path = g_value_dup_string (value);
+        self->priv->uid = g_value_dup_string (value);
         break;
     case PROP_UDEV_DEVICE:
         /* construct only */
@@ -803,6 +809,9 @@ get_property (GObject *object,
     MMDevice *self = MM_DEVICE (object);
 
     switch (prop_id) {
+    case PROP_UID:
+        g_value_set_string (value, self->priv->uid);
+        break;
     case PROP_UDEV_DEVICE:
         g_value_set_object (value, self->priv->udev_device);
         break;
@@ -843,7 +852,7 @@ finalize (GObject *object)
 {
     MMDevice *self = MM_DEVICE (object);
 
-    g_free (self->priv->path);
+    g_free (self->priv->uid);
     g_strfreev (self->priv->drivers);
     g_strfreev (self->priv->virtual_ports);
 
@@ -863,13 +872,13 @@ mm_device_class_init (MMDeviceClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
-    properties[PROP_PATH] =
-        g_param_spec_string (MM_DEVICE_PATH,
-                             "Path",
-                             "Device path",
+    properties[PROP_UID] =
+        g_param_spec_string (MM_DEVICE_UID,
+                             "Unique ID",
+                             "Unique device id, e.g. the physical device sysfs path",
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
+    g_object_class_install_property (object_class, PROP_UID, properties[PROP_UID]);
 
     properties[PROP_UDEV_DEVICE] =
         g_param_spec_object (MM_DEVICE_UDEV_DEVICE,

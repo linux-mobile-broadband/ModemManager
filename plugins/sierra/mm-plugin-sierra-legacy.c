@@ -37,7 +37,7 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
-              const gchar *sysfs_path,
+              const gchar *uid,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -45,13 +45,13 @@ create_modem (MMPlugin *self,
               GError **error)
 {
     if (mm_common_sierra_port_probe_list_is_icera (probes))
-        return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (sysfs_path,
+        return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (uid,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
                                                                    product));
 
-    return MM_BASE_MODEM (mm_broadband_modem_sierra_new (sysfs_path,
+    return MM_BASE_MODEM (mm_broadband_modem_sierra_new (uid,
                                                          drivers,
                                                          mm_plugin_get_name (self),
                                                          vendor,

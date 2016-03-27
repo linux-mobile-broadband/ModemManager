@@ -104,7 +104,7 @@ struct _MMPluginClass {
     /* Plugins need to provide a method to create a modem object given
      * a list of port probes (Mandatory) */
     MMBaseModem *(*create_modem) (MMPlugin *plugin,
-                                  const gchar *sysfs_path,
+                                  const gchar *uid,
                                   const gchar **drivers,
                                   guint16 vendor,
                                   guint16 product,

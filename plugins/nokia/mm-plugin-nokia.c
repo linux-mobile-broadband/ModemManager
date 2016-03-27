@@ -44,14 +44,14 @@ static const MMPortProbeAtCommand custom_at_probe[] = {
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
-              const gchar *sysfs_path,
+              const gchar *uid,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_nokia_new (sysfs_path,
+    return MM_BASE_MODEM (mm_broadband_modem_nokia_new (uid,
                                                         drivers,
                                                         mm_plugin_get_name (self),
                                                         vendor,

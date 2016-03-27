@@ -111,18 +111,17 @@ find_device_by_port (MMBaseManager *manager,
 }
 
 static MMDevice *
-find_device_by_sysfs_path (MMBaseManager *self,
-                           const gchar *sysfs_path)
+find_device_by_physdev_uid (MMBaseManager *self,
+                            const gchar   *physdev_uid)
 {
-    return g_hash_table_lookup (self->priv->devices,
-                                sysfs_path);
+    return g_hash_table_lookup (self->priv->devices, physdev_uid);
 }
 
 static MMDevice *
 find_device_by_udev_device (MMBaseManager *manager,
                             GUdevDevice *udev_device)
 {
-    return find_device_by_sysfs_path (manager, g_udev_device_get_sysfs_path (udev_device));
+    return find_device_by_physdev_uid (manager, g_udev_device_get_sysfs_path (udev_device));
 }
 
 /*****************************************************************************/
@@ -151,8 +150,8 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     /* Receive plugin result from the plugin manager */
     plugin = mm_plugin_manager_device_support_check_finish (plugin_manager, res, &error);
     if (!plugin) {
-        mm_info ("Couldn't check support for device at '%s': %s",
-                 mm_device_get_path (ctx->device), error->message);
+        mm_info ("Couldn't check support for device '%s': %s",
+                 mm_device_get_uid (ctx->device), error->message);
         g_error_free (error);
         find_device_support_context_free (ctx);
         return;
@@ -163,16 +162,16 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     g_object_unref (plugin);
 
     if (!mm_device_create_modem (ctx->device, ctx->self->priv->object_manager, &error)) {
-        mm_warn ("Couldn't create modem for device at '%s': %s",
-                 mm_device_get_path (ctx->device), error->message);
+        mm_warn ("Couldn't create modem for device '%s': %s",
+                 mm_device_get_uid (ctx->device), error->message);
         g_error_free (error);
         find_device_support_context_free (ctx);
         return;
     }
 
     /* Modem now created */
-    mm_info ("Modem for device at '%s' successfully created",
-             mm_device_get_path (ctx->device));
+    mm_info ("Modem for device '%s' successfully created",
+             mm_device_get_uid (ctx->device));
     find_device_support_context_free (ctx);
 }
 
@@ -268,19 +267,16 @@ device_removed (MMBaseManager *self,
         /* Handle tty/net/wdm port removal */
         device = find_device_by_port (self, udev_device);
         if (device) {
-            mm_info ("(%s/%s): released by modem %s",
-                     subsys,
-                     name,
-                     g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
+            mm_info ("(%s/%s): released by device '%s'", subsys, name, mm_device_get_uid (device));
             mm_device_release_port (device, udev_device);
 
             /* If port probe list gets empty, remove the device object iself */
             if (!mm_device_peek_port_probe_list (device)) {
-                mm_dbg ("Removing empty device '%s'", mm_device_get_path (device));
+                mm_dbg ("Removing empty device '%s'", mm_device_get_uid (device));
                 if (mm_plugin_manager_device_support_check_cancel (self->priv->plugin_manager, device))
                     mm_dbg ("Device support check has been cancelled");
                 mm_device_remove_modem (device);
-                g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+                g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
             }
         }
 
@@ -297,9 +293,9 @@ device_removed (MMBaseManager *self,
      */
     device = find_device_by_udev_device (self, udev_device);
     if (device) {
-        mm_dbg ("Removing device '%s'", mm_device_get_path (device));
+        mm_dbg ("Removing device '%s'", mm_device_get_uid (device));
         mm_device_remove_modem (device);
-        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+        g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
         return;
     }
 
@@ -314,7 +310,7 @@ device_added (MMBaseManager *manager,
               gboolean manual_scan)
 {
     MMDevice *device;
-    const char *subsys, *name, *physdev_path, *physdev_subsys;
+    const char *subsys, *name, *physdev_uid, *physdev_subsys;
     gboolean is_candidate;
     GUdevDevice *physdev = NULL;
 
@@ -389,21 +385,21 @@ device_added (MMBaseManager *manager,
         goto out;
     }
 
-    physdev_path = g_udev_device_get_sysfs_path (physdev);
-    if (!physdev_path) {
+    physdev_uid = g_udev_device_get_sysfs_path (physdev);
+    if (!physdev_uid) {
         mm_dbg ("(%s/%s): could not get port's parent device sysfs path", subsys, name);
         goto out;
     }
 
     /* See if we already created an object to handle ports in this device */
-    device = find_device_by_sysfs_path (manager, physdev_path);
+    device = find_device_by_physdev_uid (manager, physdev_uid);
     if (!device) {
         FindDeviceSupportContext *ctx;
 
         /* Keep the device listed in the Manager */
         device = mm_device_new (physdev, hotplugged);
         g_hash_table_insert (manager->priv->devices,
-                             g_strdup (physdev_path),
+                             g_strdup (physdev_uid),
                              device);
 
         /* Launch device support check */
@@ -754,15 +750,15 @@ handle_set_profile (MmGdbusTest *skeleton,
 {
     MMPlugin *plugin;
     MMDevice *device;
-    gchar *physdev;
+    gchar *physdev_uid;
     GError *error = NULL;
 
     mm_info ("Test profile set to: '%s'", id);
 
     /* Create device and keep it listed in the Manager */
-    physdev = g_strdup_printf ("/virtual/%s", id);
-    device = mm_device_virtual_new (physdev, TRUE);
-    g_hash_table_insert (self->priv->devices, physdev, device);
+    physdev_uid = g_strdup_printf ("/virtual/%s", id);
+    device = mm_device_virtual_new (physdev_uid, TRUE);
+    g_hash_table_insert (self->priv->devices, physdev_uid, device);
 
     /* Grab virtual ports */
     mm_device_virtual_grab_ports (device, (const gchar **)ports);
@@ -774,8 +770,8 @@ handle_set_profile (MmGdbusTest *skeleton,
                              MM_CORE_ERROR_NOT_FOUND,
                              "Requested plugin '%s' not found",
                              plugin_name);
-        mm_warn ("Couldn't set plugin for virtual device at '%s': %s",
-                 mm_device_get_path (device),
+        mm_warn ("Couldn't set plugin for virtual device '%s': %s",
+                 mm_device_get_uid (device),
                  error->message);
         goto out;
     }
@@ -783,20 +779,20 @@ handle_set_profile (MmGdbusTest *skeleton,
 
     /* Create modem */
     if (!mm_device_create_modem (device, self->priv->object_manager, &error)) {
-        mm_warn ("Couldn't create modem for virtual device at '%s': %s",
-                 mm_device_get_path (device),
+        mm_warn ("Couldn't create modem for virtual device '%s': %s",
+                 mm_device_get_uid (device),
                  error->message);
         goto out;
     }
 
-    mm_info ("Modem for virtual device at '%s' successfully created",
-             mm_device_get_path (device));
+    mm_info ("Modem for virtual device '%s' successfully created",
+             mm_device_get_uid (device));
 
 out:
 
     if (error) {
         mm_device_remove_modem (device);
-        g_hash_table_remove (self->priv->devices, mm_device_get_path (device));
+        g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
         g_dbus_method_invocation_return_gerror (invocation, error);
         g_error_free (error);
     } else

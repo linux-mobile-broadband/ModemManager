@@ -114,25 +114,41 @@ mmcli_get_manager_sync (GDBusConnection *connection)
 
 static MMObject *
 find_modem (MMManager *manager,
-            const gchar *modem_path)
+            const gchar *modem_path,
+            const gchar *modem_uid)
 {
     GList *modems;
     GList *l;
     MMObject *found = NULL;
 
+    g_assert (modem_path || modem_uid);
+    g_assert (!(modem_path && modem_uid));
+
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
     for (l = modems; l; l = g_list_next (l)) {
-        MMObject *modem = MM_OBJECT (l->data);
+        MMObject *obj;
+        MMModem  *modem;
 
-        if (g_str_equal (mm_object_get_path (modem), modem_path)) {
-            found = g_object_ref (modem);
+        obj   = MM_OBJECT (l->data);
+        modem = MM_MODEM (mm_object_get_modem (obj));
+
+        if (modem_path && g_str_equal (mm_object_get_path (obj), modem_path)) {
+            found = g_object_ref (obj);
+            break;
+        }
+
+        if (modem_uid && g_str_equal (mm_modem_get_device (modem), modem_uid)) {
+            found = g_object_ref (obj);
             break;
         }
     }
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 
     if (!found) {
-        g_printerr ("error: couldn't find modem at '%s'\n", modem_path);
+        if (modem_path)
+            g_printerr ("error: couldn't find modem at '%s'\n", modem_path);
+        else if (modem_uid)
+            g_printerr ("error: couldn't find modem identified by uid '%s'\n", modem_uid);
         exit (EXIT_FAILURE);
     }
 
@@ -145,6 +161,7 @@ typedef struct {
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     gchar *modem_path;
+    gchar *modem_uid;
 } GetModemContext;
 
 typedef struct {
@@ -168,6 +185,7 @@ get_modem_context_complete_and_free (GetModemContext *ctx)
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
     g_free (ctx->modem_path);
+    g_free (ctx->modem_uid);
     g_free (ctx);
 }
 
@@ -193,7 +211,7 @@ get_manager_ready (GDBusConnection *connection,
 
     results = g_new (GetModemResults, 1);
     results->manager = mmcli_get_manager_finish (res);
-    results->object = find_modem (results->manager, ctx->modem_path);
+    results->object = find_modem (results->manager, ctx->modem_path, ctx->modem_uid);
 
     /* Set operation results */
     g_simple_async_result_set_op_res_gpointer (
@@ -204,37 +222,57 @@ get_manager_ready (GDBusConnection *connection,
     get_modem_context_complete_and_free (ctx);
 }
 
-static gchar *
-get_modem_path (const gchar *path_or_index)
+static void
+get_modem_path_or_uid (const gchar  *str,
+                       gchar       **modem_path,
+                       gchar       **modem_uid)
 {
-    gchar *modem_path;
+    gboolean  all_numeric;
+    guint     i;
 
     /* We must have a given modem specified */
-    if (!path_or_index) {
+    if (!str || !str[0]) {
         g_printerr ("error: no modem was specified\n");
         exit (EXIT_FAILURE);
     }
 
-    /* Modem path may come in two ways: full DBus path or just modem index.
-     * If it is a modem index, we'll need to generate the DBus path ourselves */
-    if (g_str_has_prefix (path_or_index, MM_DBUS_MODEM_PREFIX)) {
-        g_debug ("Assuming '%s' is the full modem path", path_or_index);
-        modem_path = g_strdup (path_or_index);
-    } else if (g_ascii_isdigit (path_or_index[0])) {
-        g_debug ("Assuming '%s' is the modem index", path_or_index);
-        modem_path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%s", path_or_index);
-    } else {
-        g_printerr ("error: invalid path or index string specified: '%s'\n",
-                    path_or_index);
-        exit (EXIT_FAILURE);
+    /* Modem path may come in three ways:
+     *   a) full DBus path
+     *   b) modem index
+     *   c) uid
+     */
+
+    *modem_path = NULL;
+    *modem_uid  = NULL;
+
+    /* If we have DBus prefix, we have the modem DBus path */
+    if (g_str_has_prefix (str, MM_DBUS_MODEM_PREFIX)) {
+        g_debug ("Assuming '%s' is the full modem path", str);
+        *modem_path = g_strdup (str);
+        return;
     }
 
-    return modem_path;
+    /* If all numeric, we have the modem index */
+    all_numeric = TRUE;
+    for (i = 0; str[i]; i++) {
+        if (!g_ascii_isdigit (str[i])) {
+            all_numeric = FALSE;
+            break;
+        }
+    }
+    if (all_numeric) {
+        g_debug ("Assuming '%s' is the modem index", str);
+        *modem_path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%s", str);
+        return;
+    }
+
+    /* Otherwise we have the UID */
+    *modem_uid = g_strdup (str);
 }
 
 void
 mmcli_get_modem (GDBusConnection *connection,
-                 const gchar *path_or_index,
+                 const gchar *modem_str,
                  GCancellable *cancellable,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
@@ -242,7 +280,8 @@ mmcli_get_modem (GDBusConnection *connection,
     GetModemContext *ctx;
 
     ctx = g_new0 (GetModemContext, 1);
-    ctx->modem_path = get_modem_path (path_or_index);
+    get_modem_path_or_uid (modem_str, &ctx->modem_path, &ctx->modem_uid);
+    g_assert (ctx->modem_path || ctx->modem_uid);
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
                                              callback,
                                              user_data,
@@ -261,17 +300,20 @@ mmcli_get_modem_sync (GDBusConnection *connection,
 {
     MMManager *manager;
     MMObject *found;
-    gchar *modem_path;
+    gchar *modem_path = NULL;
+    gchar *modem_uid = NULL;
 
     manager = mmcli_get_manager_sync (connection);
-    modem_path = get_modem_path (modem_str);
-    found = find_modem (manager, modem_path);
+    get_modem_path_or_uid (modem_str, &modem_path, &modem_uid);
+    g_assert (modem_path || modem_uid);
+    found = find_modem (manager, modem_path, modem_uid);
 
     if (o_manager)
         *o_manager = manager;
     else
         g_object_unref (manager);
     g_free (modem_path);
+    g_free (modem_uid);
 
     return found;
 }
