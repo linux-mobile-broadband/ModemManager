@@ -347,8 +347,13 @@ mm_device_release_port (MMDevice    *self,
 
     probe = device_find_probe_with_device (self, udev_port, TRUE);
     if (probe) {
-        /* Found, remove from list and destroy probe */
-        self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
+        /* Found, remove from lists and destroy probe */
+        if (g_list_find (self->priv->port_probes, probe))
+            self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
+        else if (g_list_find (self->priv->ignored_port_probes, probe))
+            self->priv->ignored_port_probes = g_list_remove (self->priv->ignored_port_probes, probe);
+        else
+            g_assert_not_reached ();
         g_signal_emit (self, signals[SIGNAL_PORT_RELEASED], 0, mm_port_probe_peek_port (probe));
         g_object_unref (probe);
     }
