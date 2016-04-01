@@ -186,10 +186,19 @@ dnl-----------------------------------------------------------------------------
 dnl Suspend/resume support
 dnl
 
-AC_ARG_WITH(suspend-resume, AS_HELP_STRING([--with-suspend-resume=no|systemd], [Build ModemManager with specific suspend/resume support]))
+PKG_CHECK_MODULES(LIBSYSTEMD, [libsystemd >= 209],[have_libsystemd=yes],[have_libsystemd=no])
+PKG_CHECK_MODULES(LIBSYSTEMD_LOGIN, [libsystemd-login >= 183],[have_libsystemd_login=yes],[have_libsystemd_login=no])
+AC_ARG_WITH(suspend-resume,
+            AS_HELP_STRING([--with-suspend-resume=no|systemd],
+                           [Enable suspend/resume support [[default=auto]]]),,
+            [with_suspend_resume=auto])
 
-if test "x$with_suspend_resume" = "x"; then
-   with_suspend_resume="no"
+if test "x$with_suspend_resume" = "xauto"; then
+    if test "x$have_libsystemd" = "xyes" || test "x$have_libsystemd_login" = "xyes"; then
+        with_suspend_resume=systemd
+    else
+        with_suspend_resume=no
+    fi
 fi
 
 case $with_suspend_resume in
@@ -197,12 +206,13 @@ case $with_suspend_resume in
         AC_DEFINE(WITH_SUSPEND_RESUME, 0, [Define if you have suspend-resume support])
         ;;
     systemd)
-        PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd >= 209],,
-                          [PKG_CHECK_MODULES(SYSTEMD_INHIBIT, [libsystemd-login >= 183])])
+        if test "x$have_libsystemd" = "xno" && test "x$have_libsystemd_login" = "xno"; then
+		    AC_MSG_ERROR(libsystemd or libsystemd-login development headers are required)
+	    fi
         AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have suspend-resume support])
         ;;
     *)
-        AC_MSG_ERROR(--with-suspend-resume must be one of [no, systemd])
+        AC_MSG_ERROR([Wrong value for --with-suspend-resume: $with_suspend_resume])
         ;;
 esac
 
