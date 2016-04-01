@@ -214,23 +214,21 @@ dnl
 
 PKG_CHECK_MODULES(POLKIT, [polkit-gobject-1 >= 0.97], [have_polkit=yes],[have_polkit=no])
 AC_ARG_WITH(polkit,
-            AS_HELP_STRING([--with-polkit=(strict|permissive|none)],
+            AS_HELP_STRING([--with-polkit=(strict|permissive|no)],
                            [Enable PolicyKit support [[default=auto]]]),,
             [with_polkit=auto])
 
 if test "x$with_polkit" = "xauto"; then
 	if test "x$have_polkit" = "xno"; then
-        with_polkit="none"
+        with_polkit="no"
     else
         with_polkit="strict"
     fi
-elif test "x$with_polkit" = "xno"; then
-    with_polkit=none
 elif test "x$with_polkit" = "xyes"; then
     with_polkit=strict
 fi
 
-if test "x$with_polkit" = "xnone"; then
+if test "x$with_polkit" = "xno"; then
     AC_DEFINE(WITH_POLKIT, 0, [Define if you have PolicyKit support])
 else
 	if test "x$have_polkit" = "xno"; then
@@ -255,7 +253,7 @@ else
     AC_SUBST(MM_DEFAULT_USER_POLICY)
 fi
 
-AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xnone" ])
+AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xno"])
 
 dnl-----------------------------------------------------------------------------
 dnl MBIM support (enabled by default)
