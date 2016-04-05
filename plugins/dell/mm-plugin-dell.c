@@ -297,7 +297,7 @@ dell_custom_init (MMPortProbe *probe,
 {
     CustomInitContext *ctx;
 
-    ctx = g_slice_new (CustomInitContext);
+    ctx = g_slice_new0 (CustomInitContext);
     ctx->result = g_simple_async_result_new (G_OBJECT (probe),
                                              callback,
                                              user_data,
@@ -306,6 +306,7 @@ dell_custom_init (MMPortProbe *probe,
     ctx->port = g_object_ref (port);
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
     ctx->gmi_retries = 3;
+    ctx->cgmi_retries = 3;
     ctx->ati_retries = 3;
 
     custom_init_step (ctx);
