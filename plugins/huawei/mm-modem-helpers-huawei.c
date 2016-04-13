@@ -190,7 +190,7 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
     if (!bin || bin_len != 4)
         goto done;
 
-    *out_addr = GUINT32_TO_BE (*((guint32 *) bin));
+    *out_addr = GUINT32_SWAP_LE_BE (*((guint32 *) bin));
     success = TRUE;
 
 done:
