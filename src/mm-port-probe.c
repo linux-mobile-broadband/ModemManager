@@ -125,6 +125,7 @@ port_probe_task_return_error (MMPortProbe *self,
     task = self->priv->task;
     self->priv->task = NULL;
     g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 static void
@@ -136,6 +137,7 @@ port_probe_task_return_boolean (MMPortProbe *self,
     task = self->priv->task;
     self->priv->task = NULL;
     g_task_return_boolean (task, result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
