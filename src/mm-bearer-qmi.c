@@ -49,7 +49,11 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
     QmiClientWds *client_ipv4;
+    guint packet_service_status_ipv4_indication_id;
+
     QmiClientWds *client_ipv6;
+    guint packet_service_status_ipv6_indication_id;
+
     MMPort *data;
     guint32 packet_data_handle_ipv4;
     guint32 packet_data_handle_ipv6;
@@ -214,17 +218,24 @@ reload_stats (MMBaseBearer *self,
 /*****************************************************************************/
 /* Connect */
 
+static void common_setup_cleanup_unsolicited_events (MMBearerQmi *self,
+                                                     QmiClientWds *client,
+                                                     gboolean enable,
+                                                     guint *indication_id);
+
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
     CONNECT_STEP_IP_FAMILY_IPV4,
+    CONNECT_STEP_ENABLE_INDICATIONS_IPV4,
     CONNECT_STEP_START_NETWORK_IPV4,
     CONNECT_STEP_GET_CURRENT_SETTINGS_IPV4,
     CONNECT_STEP_IPV6,
     CONNECT_STEP_WDS_CLIENT_IPV6,
     CONNECT_STEP_IP_FAMILY_IPV6,
+    CONNECT_STEP_ENABLE_INDICATIONS_IPV6,
     CONNECT_STEP_START_NETWORK_IPV6,
     CONNECT_STEP_GET_CURRENT_SETTINGS_IPV6,
     CONNECT_STEP_LAST
@@ -247,6 +258,7 @@ typedef struct {
     gboolean ipv4;
     gboolean running_ipv4;
     QmiClientWds *client_ipv4;
+    guint packet_service_status_ipv4_indication_id;
     guint32 packet_data_handle_ipv4;
     MMBearerIpConfig *ipv4_config;
     GError *error_ipv4;
@@ -254,6 +266,7 @@ typedef struct {
     gboolean ipv6;
     gboolean running_ipv6;
     QmiClientWds *client_ipv6;
+    guint packet_service_status_ipv6_indication_id;
     guint32 packet_data_handle_ipv6;
     MMBearerIpConfig *ipv6_config;
     GError *error_ipv6;
@@ -267,6 +280,20 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_free (ctx->apn);
     g_free (ctx->user);
     g_free (ctx->password);
+
+    if (ctx->packet_service_status_ipv4_indication_id) {
+        common_setup_cleanup_unsolicited_events (ctx->self,
+                                                 ctx->client_ipv4,
+                                                 FALSE,
+                                                 &ctx->packet_service_status_ipv4_indication_id);
+    }
+    if (ctx->packet_service_status_ipv6_indication_id) {
+        common_setup_cleanup_unsolicited_events (ctx->self,
+                                                 ctx->client_ipv6,
+                                                 FALSE,
+                                                 &ctx->packet_service_status_ipv6_indication_id);
+    }
+
     g_clear_error (&ctx->error_ipv4);
     g_clear_error (&ctx->error_ipv6);
     g_clear_object (&ctx->client_ipv4);
@@ -745,6 +772,75 @@ set_ip_family_ready (QmiClientWds *client,
 }
 
 static void
+packet_service_status_indication_cb (QmiClientWds *client,
+                                     QmiIndicationWdsPacketServiceStatusOutput *output,
+                                     MMBearerQmi *self)
+{
+    QmiWdsConnectionStatus connection_status;
+
+    if (qmi_indication_wds_packet_service_status_output_get_connection_status (
+            output,
+            &connection_status,
+            NULL,
+            NULL)) {
+        MMBearerConnectionStatus bearer_status = mm_base_bearer_get_status (MM_BASE_BEARER (self));
+
+        if (connection_status == QMI_WDS_CONNECTION_STATUS_DISCONNECTED &&
+            bearer_status != MM_BEARER_CONNECTION_STATUS_DISCONNECTED &&
+            bearer_status != MM_BEARER_CONNECTION_STATUS_DISCONNECTING) {
+            QmiWdsCallEndReason cer;
+            QmiWdsVerboseCallEndReasonType verbose_cer_type;
+            gint16 verbose_cer_reason;
+
+            if (qmi_indication_wds_packet_service_status_output_get_call_end_reason (
+                    output,
+                    &cer,
+                    NULL))
+                mm_info ("bearer call end reason (%u): '%s'",
+                         cer,
+                         qmi_wds_call_end_reason_get_string (cer));
+
+            if (qmi_indication_wds_packet_service_status_output_get_verbose_call_end_reason (
+                    output,
+                    &verbose_cer_type,
+                    &verbose_cer_reason,
+                    NULL))
+                mm_info ("bearer verbose call end reason (%u,%d): [%s] %s",
+                         verbose_cer_type,
+                         verbose_cer_reason,
+                         qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type),
+                         qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason));
+
+            mm_base_bearer_report_connection_status (MM_BASE_BEARER (self), MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        }
+    }
+}
+
+static void
+common_setup_cleanup_unsolicited_events (MMBearerQmi *self,
+                                         QmiClientWds *client,
+                                         gboolean enable,
+                                         guint *indication_id)
+{
+    if (!client)
+        return;
+
+    /* Connect/Disconnect "Packet Service Status" indications */
+    if (enable) {
+        g_assert (*indication_id == 0);
+        *indication_id =
+            g_signal_connect (client,
+                              "packet-service-status",
+                              G_CALLBACK (packet_service_status_indication_cb),
+                              self);
+    } else {
+        g_assert (*indication_id != 0);
+        g_signal_handler_disconnect (client, *indication_id);
+        *indication_id = 0;
+    }
+}
+
+static void
 qmi_port_allocate_client_ready (MMPortQmi *qmi,
                                 GAsyncResult *res,
                                 ConnectContext *ctx)
@@ -887,6 +983,14 @@ connect_context_step (ConnectContext *ctx)
         /* Just fall down */
         ctx->step++;
 
+    case CONNECT_STEP_ENABLE_INDICATIONS_IPV4:
+        common_setup_cleanup_unsolicited_events (ctx->self,
+                                                 ctx->client_ipv4,
+                                                 TRUE,
+                                                 &ctx->packet_service_status_ipv4_indication_id);
+        /* Just fall down */
+        ctx->step++;
+
     case CONNECT_STEP_START_NETWORK_IPV4: {
         QmiMessageWdsStartNetworkInput *input;
 
@@ -976,6 +1080,14 @@ connect_context_step (ConnectContext *ctx)
         /* Just fall down */
         ctx->step++;
 
+    case CONNECT_STEP_ENABLE_INDICATIONS_IPV6:
+        common_setup_cleanup_unsolicited_events (ctx->self,
+                                                 ctx->client_ipv6,
+                                                 TRUE,
+                                                 &ctx->packet_service_status_ipv6_indication_id);
+        /* Just fall down */
+        ctx->step++;
+
     case CONNECT_STEP_START_NETWORK_IPV6: {
         QmiMessageWdsStartNetworkInput *input;
 
@@ -1016,6 +1128,8 @@ connect_context_step (ConnectContext *ctx)
             g_assert (ctx->self->priv->client_ipv4 == NULL);
             if (ctx->packet_data_handle_ipv4) {
                 ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+                ctx->self->priv->packet_service_status_ipv4_indication_id = ctx->packet_service_status_ipv4_indication_id;
+                ctx->packet_service_status_ipv4_indication_id = 0;
                 ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
             }
 
@@ -1023,6 +1137,8 @@ connect_context_step (ConnectContext *ctx)
             g_assert (ctx->self->priv->client_ipv6 == NULL);
             if (ctx->packet_data_handle_ipv6) {
                 ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+                ctx->self->priv->packet_service_status_ipv6_indication_id = ctx->packet_service_status_ipv6_indication_id;
+                ctx->packet_service_status_ipv6_indication_id = 0;
                 ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
             }
 
@@ -1357,6 +1473,11 @@ disconnect_context_step (DisconnectContext *ctx)
         if (ctx->packet_data_handle_ipv4) {
             QmiMessageWdsStopNetworkInput *input;
 
+            common_setup_cleanup_unsolicited_events (ctx->self,
+                                                     ctx->client_ipv4,
+                                                     FALSE,
+                                                     &ctx->self->priv->packet_service_status_ipv4_indication_id);
+
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
 
@@ -1377,6 +1498,11 @@ disconnect_context_step (DisconnectContext *ctx)
     case DISCONNECT_STEP_STOP_NETWORK_IPV6:
         if (ctx->packet_data_handle_ipv6) {
             QmiMessageWdsStopNetworkInput *input;
+
+            common_setup_cleanup_unsolicited_events (ctx->self,
+                                                     ctx->client_ipv6,
+                                                     FALSE,
+                                                     &ctx->self->priv->packet_service_status_ipv6_indication_id);
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
@@ -1543,6 +1669,19 @@ static void
 dispose (GObject *object)
 {
     MMBearerQmi *self = MM_BEARER_QMI (object);
+
+    if (self->priv->packet_service_status_ipv4_indication_id) {
+        common_setup_cleanup_unsolicited_events (self,
+                                                 self->priv->client_ipv4,
+                                                 FALSE,
+                                                 &self->priv->packet_service_status_ipv4_indication_id);
+    }
+    if (self->priv->packet_service_status_ipv6_indication_id) {
+        common_setup_cleanup_unsolicited_events (self,
+                                                 self->priv->client_ipv6,
+                                                 FALSE,
+                                                 &self->priv->packet_service_status_ipv6_indication_id);
+    }
 
     g_clear_object (&self->priv->data);
     g_clear_object (&self->priv->client_ipv4);
