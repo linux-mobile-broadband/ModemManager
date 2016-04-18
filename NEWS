@@ -47,6 +47,7 @@ This version comes with the following new features:
    ** Implemented support for SIM related operations using the UIM service, as
       newer modems with multi-SIM capabilities don't suppor the legacy DMS UIM
       operations.
+   ** Implemented support for detecting network-initiated disconnections.
 
  * udev:
    ** Added new supported 'ID_MM_PORT_IGNORE' tag to allow fully ignoring ports
