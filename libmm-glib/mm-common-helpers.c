@@ -832,12 +832,13 @@ mm_common_get_boolean_from_string (const gchar *value,
     if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1"))
         return TRUE;
 
-    if (g_ascii_strcasecmp (value, "false") && g_str_equal (value, "0"))
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Cannot get boolean from string '%s'", value);
+    if (!g_ascii_strcasecmp (value, "false") || g_str_equal (value, "0"))
+        return FALSE;
 
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Cannot get boolean from string '%s'", value);
     return FALSE;
 }
 
