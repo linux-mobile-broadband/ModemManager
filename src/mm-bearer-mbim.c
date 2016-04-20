@@ -413,14 +413,13 @@ ip_configuration_query_ready (MbimDevice *device,
             ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
             ipv4_config = mm_bearer_ip_config_new ();
 
-            /* We assume that if we have IP and DNS, we can setup static */
+            /* We assume that if we have an IP we can use static configuration.
+             * Not all modems or providers will return DNS servers or even a
+             * gateway, and not all modems support DHCP either. The IP management
+             * daemon/script just has to deal with this...
+             */
             if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
-                ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
-                ipv4addresscount > 0 &&
-                ipv4dnsservercount > 0) {
-                gchar **strarr;
-                guint i, n;
-
+                ipv4addresscount > 0) {
                 mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
 
                 /* IP address, pick the first one */
@@ -441,8 +440,15 @@ ip_configuration_query_ready (MbimDevice *device,
                     g_free (str);
                     g_object_unref (addr);
                 }
+            } else
+                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
 
-                /* DNS */
+            /* DNS */
+            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
+                ipv4dnsservercount > 0) {
+                gchar **strarr;
+                guint i, n;
+
                 strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
                 for (i = 0, n = 0; i < ipv4dnsservercount; i++) {
                     addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
@@ -452,8 +458,7 @@ ip_configuration_query_ready (MbimDevice *device,
                 }
                 mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
                 g_strfreev (strarr);
-            } else
-                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+            }
 
             /* MTU */
             if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
@@ -465,30 +470,28 @@ ip_configuration_query_ready (MbimDevice *device,
         if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
             ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
             ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            gboolean address_set = FALSE;
+            gboolean gateway_set = FALSE;
+            gboolean dns_set = FALSE;
+
             ipv6_config = mm_bearer_ip_config_new ();
 
-            /* We assume that if we have IP and DNS, we can setup static */
             if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
-                ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
-                ipv6addresscount > 0 &&
-                ipv6dnsservercount > 0) {
-                gchar **strarr;
-                guint i, n;
-
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
+                ipv6addresscount > 0) {
 
                 /* IP address, pick the first one */
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[0]->ipv6_address, G_SOCKET_FAMILY_IPV6);
                 str = g_inet_address_to_string (addr);
                 mm_bearer_ip_config_set_address (ipv6_config, str);
                 g_free (str);
+                address_set = TRUE;
 
                 /* If the address is a link-local one, then SLAAC or DHCP must be used
-                 * to get the real prefix and address.  Change the method to DHCP to
-                 * indicate this to clients.
+                 * to get the real prefix and address.
+                 * FIXME: maybe the modem reported non-LL address in ipv6address[1] ?
                  */
                 if (g_inet_address_get_is_link_local (addr))
-                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+                    address_set = FALSE;
 
                 g_object_unref (addr);
 
@@ -502,7 +505,14 @@ ip_configuration_query_ready (MbimDevice *device,
                     mm_bearer_ip_config_set_gateway (ipv6_config, str);
                     g_free (str);
                     g_object_unref (addr);
+                    gateway_set = TRUE;
                 }
+            }
+
+            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
+                ipv6dnsservercount > 0) {
+                gchar **strarr;
+                guint i, n;
 
                 /* DNS */
                 strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
@@ -514,12 +524,22 @@ ip_configuration_query_ready (MbimDevice *device,
                 }
                 mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
                 g_strfreev (strarr);
-            } else
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+
+                dns_set = TRUE;
+            }
 
             /* MTU */
             if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
                 mm_bearer_ip_config_set_mtu (ipv6_config, ipv6mtu);
+
+            /* Only use the static method if all basic properties are available,
+             * otherwise use DHCP to indicate the missing ones should be
+             * retrieved from SLAAC or DHCPv6.
+             */
+            if (address_set && gateway_set && dns_set)
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
+            else
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
         } else
             ipv6_config = NULL;
 

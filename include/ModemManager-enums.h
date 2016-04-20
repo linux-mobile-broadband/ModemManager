@@ -852,13 +852,19 @@ typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
 /**
  * MMBearerIpMethod:
  * @MM_BEARER_IP_METHOD_UNKNOWN: Unknown method.
- * @MM_BEARER_IP_METHOD_PPP: Use PPP to get the address.
+ * @MM_BEARER_IP_METHOD_PPP: Use PPP to get IP addresses and DNS information.
+ * For IPv6, use PPP to retrieve the 64-bit Interface Identifier, use the IID to
+ * construct an IPv6 link-local address by following RFC 5072, and then run
+ * DHCP over the PPP link to retrieve DNS settings.
  * @MM_BEARER_IP_METHOD_STATIC: Use the provided static IP configuration given
- * by the modem to configure the IP data interface.
+ * by the modem to configure the IP data interface.  Note that DNS servers may
+ * not be provided by the network or modem firmware.
  * @MM_BEARER_IP_METHOD_DHCP: Begin DHCP or IPv6 SLAAC on the data interface to
- * obtain necessary IP configuration details.  For IPv4 bearers DHCP should
- * be used.  For IPv6 bearers SLAAC should be used to determine the prefix and
- * any additional details.
+ * obtain any necessary IP configuration details that are not already provided
+ * by the IP configuration.  For IPv4 bearers DHCP should be used.  For IPv6
+ * bearers SLAAC should be used, and the IP configuration may already contain
+ * a link-local address that should be assigned to the interface before SLAAC
+ * is started to obtain the rest of the configuration.
  *
  * Type of IP method configuration to be used in a given Bearer.
  */
