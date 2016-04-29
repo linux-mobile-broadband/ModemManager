@@ -217,6 +217,22 @@ NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
 NOVATEL_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-novatel.la
 
 ################################################################################
+# common telit support
+################################################################################
+
+# Common telit modem support library
+noinst_LTLIBRARIES += libmm-utils-telit.la
+libmm_utils_telit_la_SOURCES = \
+	telit/mm-common-telit.c \
+	telit/mm-common-telit.h \
+	telit/mm-broadband-modem-telit.c \
+	telit/mm-broadband-modem-telit.h \
+	$(NULL)
+
+TELIT_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/telit
+TELIT_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-telit.la
+
+################################################################################
 # plugin: generic
 ################################################################################
 
@@ -663,7 +679,7 @@ libmm_plugin_novatel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_novatel_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS)
 
 ################################################################################
-# plugin: dell (novatel or sierra)
+# plugin: dell (novatel, sierra or telit)
 ################################################################################
 
 pkglib_LTLIBRARIES += libmm-plugin-dell.la
@@ -671,9 +687,11 @@ libmm_plugin_dell_la_SOURCES = \
 	dell/mm-plugin-dell.c \
 	dell/mm-plugin-dell.h \
 	$(NULL)
-libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
+libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
 libmm_plugin_dell_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)
+libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(TELIT_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)
+
+dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
 ################################################################################
 # plugin: altair lte
@@ -752,12 +770,10 @@ pkglib_LTLIBRARIES += libmm-plugin-telit.la
 libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
 	telit/mm-plugin-telit.h \
-	telit/mm-broadband-modem-telit.c \
-	telit/mm-broadband-modem-telit.h \
 	$(NULL)
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_telit_la_LIBADD   = $(builddir)/libhelpers-telit.la
+libmm_plugin_telit_la_LIBADD   = $(builddir)/libhelpers-telit.la $(TELIT_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
