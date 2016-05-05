@@ -317,6 +317,7 @@ activate_ready (MMBaseModem *modem,
      * reset ourselves just in case */
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
+        self->priv->connect_pending = NULL;
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
