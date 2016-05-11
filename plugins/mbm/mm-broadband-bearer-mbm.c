@@ -139,6 +139,36 @@ dial_3gpp_report_connection_status (gpointer data,
     ctx->e2nap_status = status;
 }
 
+static void
+connect_error_disconnect_ready (MMBroadbandBearer *self,
+                                GAsyncResult *res,
+                                Dial3gppContext *ctx)
+{
+    MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp_finish (
+        self,
+        res,
+        NULL);
+    dial_3gpp_context_complete_and_free (ctx);
+}
+
+static void
+connect_error_disconnect_start (Dial3gppContext *ctx)
+{
+    /* We don't care about connect status anymore */
+    if (ctx->self->priv->connect_pending == ctx)
+        ctx->self->priv->connect_pending = NULL;
+
+    MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->disconnect_3gpp (
+        MM_BROADBAND_BEARER (ctx->self),
+        MM_BROADBAND_MODEM (ctx->modem),
+        ctx->primary,
+        NULL,
+        ctx->data,
+        ctx->cid,
+        (GAsyncReadyCallback) connect_error_disconnect_ready,
+        ctx);
+}
+
 static gboolean
 handle_e2nap_connect_status (Dial3gppContext *ctx)
 {
@@ -181,7 +211,7 @@ connect_poll_ready (MMBaseModem *modem,
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!response) {
         g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        connect_error_disconnect_start (ctx);
         return;
     }
 
@@ -217,7 +247,7 @@ connect_poll_cb (Dial3gppContext *ctx)
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_CANCELLED,
                                          "Dial operation has been cancelled");
-        dial_3gpp_context_complete_and_free (ctx);
+        connect_error_disconnect_start (ctx);
         return G_SOURCE_REMOVE;
     }
 
@@ -231,7 +261,7 @@ connect_poll_cb (Dial3gppContext *ctx)
                                          MM_MOBILE_EQUIPMENT_ERROR,
                                          MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
                                          "Connection attempt timed out");
-        dial_3gpp_context_complete_and_free (ctx);
+        connect_error_disconnect_start (ctx);
         return G_SOURCE_REMOVE;
     }
 
@@ -260,7 +290,7 @@ activate_ready (MMBaseModem *modem,
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        connect_error_disconnect_start (ctx);
         return;
     }
 
