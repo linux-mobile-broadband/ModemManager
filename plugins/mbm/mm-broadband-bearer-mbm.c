@@ -46,12 +46,15 @@ G_DEFINE_TYPE (MMBroadbandBearerMbm, mm_broadband_bearer_mbm, MM_TYPE_BROADBAND_
 
 struct _MMBroadbandBearerMbmPrivate {
     gpointer connect_pending;
+    gpointer disconnect_pending;
 };
 
 /*****************************************************************************/
 
-static void dial_3gpp_report_connection_status (gpointer data,
-                                                MMBearerConnectionStatus status);
+static void dial_3gpp_report_connection_status  (gpointer data,
+                                                 MMBearerConnectionStatus status);
+static void disconnect_report_connection_status (gpointer data,
+                                                 MMBearerConnectionStatus status);
 
 static void
 report_connection_status (MMBaseBearer *bearer,
@@ -68,6 +71,9 @@ report_connection_status (MMBaseBearer *bearer,
     if (self->priv->connect_pending) {
         /* Save unsolicited status for the pending connection attempt */
         dial_3gpp_report_connection_status (self->priv->connect_pending, status);
+    } else if (self->priv->disconnect_pending) {
+        /* Save unsolicited status for the pending disconnection attempt */
+        disconnect_report_connection_status (self->priv->disconnect_pending, status);
     } else {
         if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
             MM_BASE_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
@@ -134,7 +140,7 @@ dial_3gpp_report_connection_status (gpointer data,
 }
 
 static gboolean
-handle_e2nap_status (Dial3gppContext *ctx)
+handle_e2nap_connect_status (Dial3gppContext *ctx)
 {
     switch (ctx->e2nap_status) {
     case MM_BEARER_CONNECTION_STATUS_CONNECTED:
@@ -164,9 +170,9 @@ handle_e2nap_status (Dial3gppContext *ctx)
 static gboolean connect_poll_cb (Dial3gppContext *ctx);
 
 static void
-poll_ready (MMBaseModem *modem,
-            GAsyncResult *res,
-            Dial3gppContext *ctx)
+connect_poll_ready (MMBaseModem *modem,
+                    GAsyncResult *res,
+                    Dial3gppContext *ctx)
 {
     GError *error = NULL;
     const gchar *response;
@@ -190,7 +196,7 @@ poll_ready (MMBaseModem *modem,
     }
 
     /* Process any unsolicited E2NAP disconnect notification */
-    if (handle_e2nap_status (ctx))
+    if (handle_e2nap_connect_status (ctx))
         return;
 
     /* Check again in one second */
@@ -216,7 +222,7 @@ connect_poll_cb (Dial3gppContext *ctx)
     }
 
     /* Process any unsolicited E2NAP status */
-    if (handle_e2nap_status (ctx))
+    if (handle_e2nap_connect_status (ctx))
         return G_SOURCE_REMOVE;
 
     /* Too many retries... */
@@ -237,7 +243,7 @@ connect_poll_cb (Dial3gppContext *ctx)
                                    FALSE,
                                    FALSE, /* raw */
                                    ctx->cancellable,
-                                   (GAsyncReadyCallback)poll_ready,
+                                   (GAsyncReadyCallback)connect_poll_ready,
                                    ctx);
     return G_SOURCE_REMOVE;
 }
@@ -259,7 +265,7 @@ activate_ready (MMBaseModem *modem,
     }
 
     /* Process any unsolicited E2NAP status received before the ENAP OK */
-    if (handle_e2nap_status (ctx))
+    if (handle_e2nap_connect_status (ctx))
         return;
 
     /* No unsolicited E2NAP status yet; wait for it and periodically poll
@@ -560,12 +566,21 @@ typedef struct {
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     GSimpleAsyncResult *result;
+    guint poll_count;
+    guint poll_id;
+    MMBearerConnectionStatus e2nap_status;
 } DisconnectContext;
 
 static void
 disconnect_context_complete_and_free (DisconnectContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    /* Clear bearer object pointer to this disconnect context */
+    if (ctx->self->priv->disconnect_pending == ctx)
+        ctx->self->priv->disconnect_pending = NULL;
+
+    g_simple_async_result_complete_in_idle (ctx->result);
+    if (ctx->poll_id)
+        g_source_remove (ctx->poll_id);
     g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->self);
@@ -582,6 +597,95 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void
+disconnect_report_connection_status (gpointer data,
+                                     MMBearerConnectionStatus status)
+{
+    DisconnectContext *ctx = data;
+
+    g_assert (ctx);
+    ctx->e2nap_status = status;
+}
+
+static gboolean
+handle_e2nap_disconnect_status (DisconnectContext *ctx)
+{
+    if (ctx->e2nap_status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
+        /* Reporting disconnected */
+        mm_dbg ("Connection disconnect indicated already by an unsolicited message");
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_context_complete_and_free (ctx);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static gboolean disconnect_poll_cb (DisconnectContext *ctx);
+
+static void
+disconnect_poll_ready (MMBaseModem *modem,
+                       GAsyncResult *res,
+                       DisconnectContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *response;
+    guint state;
+
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (sscanf (response, "*ENAP: %d", &state) == 1
+        && state == 0) {
+        /* Disconnected */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Check again in one second */
+    g_assert (ctx->poll_id == 0);
+    ctx->poll_id = g_timeout_add_seconds (1,
+                                          (GSourceFunc)disconnect_poll_cb,
+                                          ctx);
+}
+
+static gboolean
+disconnect_poll_cb (DisconnectContext *ctx)
+{
+    ctx->poll_id = 0;
+
+    /* Process any unsolicited E2NAP status */
+    if (handle_e2nap_disconnect_status (ctx))
+        return G_SOURCE_REMOVE;
+
+    /* Too many retries... */
+    if (ctx->poll_count > 20) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_MOBILE_EQUIPMENT_ERROR,
+                                         MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
+                                         "Disconnection attempt timed out");
+        disconnect_context_complete_and_free (ctx);
+        return G_SOURCE_REMOVE;
+    }
+
+    ctx->poll_count++;
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   "AT*ENAP?",
+                                   3,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)disconnect_poll_ready,
+                                   ctx);
+    return G_SOURCE_REMOVE;
+}
+
+static void
 disconnect_enap_ready (MMBaseModem *modem,
                        GAsyncResult *res,
                        DisconnectContext *ctx)
@@ -595,8 +699,15 @@ disconnect_enap_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disconnect_context_complete_and_free (ctx);
+    /* Process any unsolicited E2NAP status received before the ENAP OK */
+    if (handle_e2nap_disconnect_status (ctx))
+        return;
+
+    /* No unsolicited E2NAP status yet; wait for it and periodically poll
+     * to handle very old F3507g/MD300 firmware that may not send E2NAP. */
+    ctx->poll_id = g_timeout_add_seconds (1,
+                                          (GSourceFunc)disconnect_poll_cb,
+                                          ctx);
 }
 
 static void
@@ -621,6 +732,12 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              disconnect_3gpp);
+
+    /* The unsolicited response to ENAP may come before the OK does.
+     * We will keep the disconnection context in the bearer private data so
+     * that it is accessible from the unsolicited message handler. */
+    g_assert (ctx->self->priv->disconnect_pending == NULL);
+    ctx->self->priv->disconnect_pending = ctx;
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
                                    primary,
