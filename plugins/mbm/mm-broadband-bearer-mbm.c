@@ -46,9 +46,36 @@ G_DEFINE_TYPE (MMBroadbandBearerMbm, mm_broadband_bearer_mbm, MM_TYPE_BROADBAND_
 
 struct _MMBroadbandBearerMbmPrivate {
     gpointer connect_pending;
-    guint connect_pending_id;
-    gulong connect_cancellable_id;
 };
+
+/*****************************************************************************/
+
+static void dial_3gpp_report_connection_status (gpointer data,
+                                                MMBearerConnectionStatus status);
+
+static void
+report_connection_status (MMBaseBearer *bearer,
+                          MMBearerConnectionStatus status)
+{
+    MMBroadbandBearerMbm *self = MM_BROADBAND_BEARER_MBM (bearer);
+
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED ||
+              status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+
+    mm_dbg ("Received unsolicited *E2NAP (%s)",
+            mm_bearer_connection_status_get_string (status));
+
+    if (self->priv->connect_pending) {
+        /* Save unsolicited status for the pending connection attempt */
+        dial_3gpp_report_connection_status (self->priv->connect_pending, status);
+    } else {
+        if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
+            MM_BASE_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
+                bearer,
+                status);
+        }
+    }
+}
 
 /*****************************************************************************/
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
@@ -62,47 +89,27 @@ typedef struct {
     MMPort *data;
     GSimpleAsyncResult *result;
     guint poll_count;
+    guint poll_id;
+    MMBearerConnectionStatus e2nap_status;
 } Dial3gppContext;
 
 static void
 dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
 {
+    /* Clear bearer object pointer to this connect context */
+    if (ctx->self->priv->connect_pending == ctx)
+        ctx->self->priv->connect_pending = NULL;
+
     g_simple_async_result_complete_in_idle (ctx->result);
-    if (ctx->data)
-        g_object_unref (ctx->data);
+    g_clear_object (&ctx->data);
+    if (ctx->poll_id)
+        g_source_remove (ctx->poll_id);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_slice_free (Dial3gppContext, ctx);
-}
-
-static gboolean
-dial_3gpp_context_set_error_if_cancelled (Dial3gppContext *ctx,
-                                          GError **error)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_CANCELLED,
-                 "Dial operation has been cancelled");
-    return TRUE;
-}
-
-static gboolean
-dial_3gpp_context_complete_and_free_if_cancelled (Dial3gppContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!dial_3gpp_context_set_error_if_cancelled (ctx, &error))
-        return FALSE;
-
-    g_simple_async_result_take_error (ctx->result, error);
-    dial_3gpp_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static MMPort *
@@ -117,127 +124,64 @@ dial_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void
-report_connection_status (MMBaseBearer *bearer,
-                          MMBearerConnectionStatus status)
+dial_3gpp_report_connection_status (gpointer data,
+                                    MMBearerConnectionStatus status)
 {
-    MMBroadbandBearerMbm *self = MM_BROADBAND_BEARER_MBM (bearer);
-    Dial3gppContext *ctx;
+    Dial3gppContext *ctx = data;
 
-    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED ||
-              status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    g_assert (ctx);
+    ctx->e2nap_status = status;
+}
 
-    /* Recover context (if any) and remove both cancellation and timeout (if any)*/
-    ctx = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
-
-    /* Connection status reported but no connection attempt? */
-    if (!ctx) {
-        g_assert (self->priv->connect_pending_id == 0);
-
-        mm_dbg ("Received spontaneous *E2NAP (%s)",
-                mm_bearer_connection_status_get_string (status));
-
-        if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
-            /* If no connection attempt on-going, make sure we mark ourselves as
-             * disconnected */
-            MM_BASE_BEARER_CLASS (mm_broadband_bearer_mbm_parent_class)->report_connection_status (
-                bearer,
-                status);
-        }
-        return;
-    }
-
-    if (self->priv->connect_pending_id) {
-        g_source_remove (self->priv->connect_pending_id);
-        self->priv->connect_pending_id = 0;
-    }
-
-    if (self->priv->connect_cancellable_id) {
-        g_cancellable_disconnect (ctx->cancellable,
-                                  self->priv->connect_cancellable_id);
-        self->priv->connect_cancellable_id = 0;
-    }
-
-    /* Reporting connected */
-    if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED) {
+static gboolean
+handle_e2nap_status (Dial3gppContext *ctx)
+{
+    switch (ctx->e2nap_status) {
+    case MM_BEARER_CONNECTION_STATUS_CONNECTED:
+        /* Reporting connected */
+        mm_dbg ("Connected status indicated already by an unsolicited message");
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
                                                    (GDestroyNotify)g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
-        return;
+        return TRUE;
+    case MM_BEARER_CONNECTION_STATUS_DISCONNECTED:
+        /* Reporting disconnected */
+        mm_dbg ("Connection failure status indicated already by an unsolicited message");
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Call setup failed");
+        dial_3gpp_context_complete_and_free (ctx);
+        return TRUE;
+    default:
+        break;
     }
 
-    /* Reporting disconnected */
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Call setup failed");
-    dial_3gpp_context_complete_and_free (ctx);
+    return FALSE;
 }
 
-static void
-connect_cancelled_cb (GCancellable *cancellable,
-                      MMBroadbandBearerMbm *self)
-{
-    GError *error = NULL;
-    Dial3gppContext *ctx;
-
-    /* Recover context and remove timeout */
-    ctx = self->priv->connect_pending;
-
-    g_source_remove (self->priv->connect_pending_id);
-
-    self->priv->connect_pending = NULL;
-    self->priv->connect_pending_id = 0;
-    self->priv->connect_cancellable_id = 0;
-
-    g_assert (dial_3gpp_context_set_error_if_cancelled (ctx, &error));
-
-    g_simple_async_result_take_error (ctx->result, error);
-    dial_3gpp_context_complete_and_free (ctx);
-}
-
-static gboolean poll_timeout_cb (MMBroadbandBearerMbm *self);
+static gboolean connect_poll_cb (Dial3gppContext *ctx);
 
 static void
 poll_ready (MMBaseModem *modem,
             GAsyncResult *res,
-            MMBroadbandBearerMbm *self)
+            Dial3gppContext *ctx)
 {
-    Dial3gppContext *ctx;
     GError *error = NULL;
     const gchar *response;
     guint state;
 
-    /* Try to recover the connection context. If none found, it means the
-     * context was already completed and we have nothing else to do. */
-    ctx = self->priv->connect_pending;
-
-    /* Balance refcount with the extra ref we passed to command_full() */
-    g_object_unref (self);
-
-    if (!ctx) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
-
-        /* Run _finish() to finalize the async call, even if we don't care
-         * the result */
-        mm_base_modem_at_command_full_finish (modem, res, NULL);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (ctx->result, error);
+        dial_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    response = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (response
-        && sscanf (response, "*ENAP: %d", &state) == 1
+    if (sscanf (response, "*ENAP: %d", &state) == 1
         && state == 1) {
         /* Success!  Connected... */
-        self->priv->connect_pending = NULL;
-
-        if (ctx && self->priv->connect_cancellable_id) {
-            g_cancellable_disconnect (ctx->cancellable,
-                                      self->priv->connect_cancellable_id);
-            self->priv->connect_cancellable_id = 0;
-        }
-
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
                                                    (GDestroyNotify)g_object_unref);
@@ -245,28 +189,38 @@ poll_ready (MMBaseModem *modem,
         return;
     }
 
-    self->priv->connect_pending_id = g_timeout_add_seconds (1,
-                                                            (GSourceFunc)poll_timeout_cb,
-                                                            self);
+    /* Process any unsolicited E2NAP disconnect notification */
+    if (handle_e2nap_status (ctx))
+        return;
+
+    /* Check again in one second */
+    g_assert (ctx->poll_id == 0);
+    ctx->poll_id = g_timeout_add_seconds (1,
+                                          (GSourceFunc)connect_poll_cb,
+                                          ctx);
 }
 
 static gboolean
-poll_timeout_cb (MMBroadbandBearerMbm *self)
+connect_poll_cb (Dial3gppContext *ctx)
 {
-    Dial3gppContext *ctx;
+    ctx->poll_id = 0;
 
-    /* Recover context */
-    ctx = self->priv->connect_pending;
+    /* Complete if we were cancelled */
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Dial operation has been cancelled");
+        dial_3gpp_context_complete_and_free (ctx);
+        return G_SOURCE_REMOVE;
+    }
+
+    /* Process any unsolicited E2NAP status */
+    if (handle_e2nap_status (ctx))
+        return G_SOURCE_REMOVE;
 
     /* Too many retries... */
     if (ctx->poll_count > 50) {
-        g_cancellable_disconnect (ctx->cancellable,
-                                  self->priv->connect_cancellable_id);
-
-        self->priv->connect_pending = NULL;
-        self->priv->connect_pending_id = 0;
-        self->priv->connect_cancellable_id = 0;
-
         g_simple_async_result_set_error (ctx->result,
                                          MM_MOBILE_EQUIPMENT_ERROR,
                                          MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
@@ -282,56 +236,37 @@ poll_timeout_cb (MMBroadbandBearerMbm *self)
                                    3,
                                    FALSE,
                                    FALSE, /* raw */
-                                   NULL, /* cancellable */
+                                   ctx->cancellable,
                                    (GAsyncReadyCallback)poll_ready,
-                                   g_object_ref (ctx->self)); /* we pass the bearer object! */
-    self->priv->connect_pending_id = 0;
+                                   ctx);
     return G_SOURCE_REMOVE;
 }
 
 static void
 activate_ready (MMBaseModem *modem,
                 GAsyncResult *res,
-                MMBroadbandBearerMbm *self)
+                Dial3gppContext *ctx)
 {
-    Dial3gppContext *ctx;
     GError *error = NULL;
-
-    /* Try to recover the connection context. If none found, it means the
-     * context was already completed and we have nothing else to do. */
-    ctx = self->priv->connect_pending;
-
-    /* Balance refcount with the extra ref we passed to command_full() */
-    g_object_unref (self);
-
-    if (!ctx) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
-
-        /* Run _finish() to finalize the async call, even if we don't care
-         * the result */
-        mm_base_modem_at_command_full_finish (modem, res, NULL);
-        return;
-    }
 
     /* From now on, if we get cancelled, we'll need to run the connection
      * reset ourselves just in case */
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        self->priv->connect_pending = NULL;
         g_simple_async_result_take_error (ctx->result, error);
         dial_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    /* We will now setup a timeout to poll for the status */
-    self->priv->connect_pending_id = g_timeout_add_seconds (1,
-                                                            (GSourceFunc)poll_timeout_cb,
-                                                            self);
+    /* Process any unsolicited E2NAP status received before the ENAP OK */
+    if (handle_e2nap_status (ctx))
+        return;
 
-    self->priv->connect_cancellable_id = g_cancellable_connect (ctx->cancellable,
-                                                                G_CALLBACK (connect_cancelled_cb),
-                                                                self,
-                                                                NULL);
+    /* No unsolicited E2NAP status yet; wait for it and periodically poll
+     * to handle very old F3507g/MD300 firmware that may not send E2NAP. */
+    ctx->poll_id = g_timeout_add_seconds (1,
+                                          (GSourceFunc)connect_poll_cb,
+                                          ctx);
 }
 
 static void
@@ -341,25 +276,21 @@ activate (Dial3gppContext *ctx)
 
     /* The unsolicited response to ENAP may come before the OK does.
      * We will keep the connection context in the bearer private data so
-     * that it is accessible from the unsolicited message handler. Note
-     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
-     * may not be valid any more when the callback is called (it may be
-     * already completed in the unsolicited handling) */
+     * that it is accessible from the unsolicited message handler. */
     g_assert (ctx->self->priv->connect_pending == NULL);
     ctx->self->priv->connect_pending = ctx;
 
-    /* Success, activate the PDP context and start the data session */
-    command = g_strdup_printf ("AT*ENAP=1,%d",
-                               ctx->cid);
+    /* Activate the PDP context and start the data session */
+    command = g_strdup_printf ("AT*ENAP=1,%d", ctx->cid);
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    command,
                                    3,
                                    FALSE,
                                    FALSE, /* raw */
-                                   NULL, /* cancellable */
+                                   ctx->cancellable,
                                    (GAsyncReadyCallback)activate_ready,
-                                   g_object_ref (ctx->self)); /* we pass the bearer object! */
+                                   ctx);
     g_free (command);
 }
 
@@ -369,10 +300,6 @@ authenticate_ready (MMBaseModem *modem,
                     Dial3gppContext *ctx)
 {
     GError *error = NULL;
-
-    /* If cancelled, complete */
-    if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
-        return;
 
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
@@ -416,7 +343,7 @@ authenticate (Dial3gppContext *ctx)
                                        3,
                                        FALSE,
                                        FALSE, /* raw */
-                                       NULL, /* cancellable */
+                                       ctx->cancellable,
                                        (GAsyncReadyCallback)authenticate_ready,
                                        ctx);
         g_free (command);
