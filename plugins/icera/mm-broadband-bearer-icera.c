@@ -752,43 +752,6 @@ activate_ready (MMBaseModem *modem,
                                                            self);
 }
 
-static void
-deactivate_ready (MMBaseModem *modem,
-                  GAsyncResult *res,
-                  Dial3gppContext *ctx)
-{
-    gchar *command;
-
-    /*
-     * Ignore any error here; %IPDPACT=ctx,0 will produce an error 767
-     * if the context is not, in fact, connected. This is annoying but
-     * harmless.
-     */
-    mm_base_modem_at_command_full_finish (modem, res, NULL);
-
-    /* The unsolicited response to %IPDPACT may come before the OK does.
-     * We will keep the connection context in the bearer private data so
-     * that it is accessible from the unsolicited message handler. Note
-     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
-     * may not be valid any more when the callback is called (it may be
-     * already completed in the unsolicited handling) */
-    g_assert (ctx->self->priv->connect_pending == NULL);
-    ctx->self->priv->connect_pending = ctx;
-
-    command = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
-    mm_base_modem_at_command_full (
-        ctx->modem,
-        ctx->primary,
-        command,
-        60,
-        FALSE,
-        FALSE, /* raw */
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)activate_ready,
-        g_object_ref (ctx->self)); /* we pass the bearer object! */
-    g_free (command);
-}
-
 static void authenticate (Dial3gppContext *ctx);
 
 static gboolean
@@ -827,13 +790,16 @@ authenticate_ready (MMBaseModem *modem,
         return;
     }
 
-    /*
-     * Deactivate the context we want to use before we try to activate
-     * it. This handles the case where ModemManager crashed while
-     * connected and is now trying to reconnect. (Should some part of
-     * the core or modem driver have made sure of this already?)
-     */
-    command = g_strdup_printf ("%%IPDPACT=%d,0", ctx->cid);
+    /* The unsolicited response to %IPDPACT may come before the OK does.
+     * We will keep the connection context in the bearer private data so
+     * that it is accessible from the unsolicited message handler. Note
+     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
+     * may not be valid any more when the callback is called (it may be
+     * already completed in the unsolicited handling) */
+    g_assert (ctx->self->priv->connect_pending == NULL);
+    ctx->self->priv->connect_pending = ctx;
+
+    command = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
     mm_base_modem_at_command_full (
         ctx->modem,
         ctx->primary,
@@ -842,8 +808,8 @@ authenticate_ready (MMBaseModem *modem,
         FALSE,
         FALSE, /* raw */
         NULL, /* cancellable */
-        (GAsyncReadyCallback)deactivate_ready,
-        ctx);
+        (GAsyncReadyCallback)activate_ready,
+        g_object_ref (ctx->self)); /* we pass the bearer object! */
     g_free (command);
 }
 
@@ -913,6 +879,45 @@ authenticate (Dial3gppContext *ctx)
 }
 
 static void
+deactivate_ready (MMBaseModem *modem,
+                  GAsyncResult *res,
+                  Dial3gppContext *ctx)
+{
+    /*
+     * Ignore any error here; %IPDPACT=ctx,0 will produce an error 767
+     * if the context is not, in fact, connected. This is annoying but
+     * harmless.
+     */
+    mm_base_modem_at_command_full_finish (modem, res, NULL);
+
+    authenticate (ctx);
+}
+
+static void
+connect_deactivate (Dial3gppContext *ctx)
+{
+    gchar *command;
+
+    /* Deactivate the context we want to use before we try to activate
+     * it. This handles the case where ModemManager crashed while
+     * connected and is now trying to reconnect. (Should some part of
+     * the core or modem driver have made sure of this already?)
+     */
+    command = g_strdup_printf ("%%IPDPACT=%d,0", ctx->cid);
+    mm_base_modem_at_command_full (
+        ctx->modem,
+        ctx->primary,
+        command,
+        60,
+        FALSE,
+        FALSE, /* raw */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)deactivate_ready,
+        ctx);
+    g_free (command);
+}
+
+static void
 dial_3gpp (MMBroadbandBearer *self,
            MMBaseModem *modem,
            MMPortSerialAt *primary,
@@ -948,7 +953,7 @@ dial_3gpp (MMBroadbandBearer *self,
         return;
     }
 
-    authenticate (ctx);
+    connect_deactivate (ctx);
 }
 
 /*****************************************************************************/
