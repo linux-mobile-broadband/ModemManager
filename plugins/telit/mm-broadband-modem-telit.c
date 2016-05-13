@@ -42,6 +42,42 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
+
+/*****************************************************************************/
+/* After Sim Unlock (Modem interface) */
+static gboolean
+modem_after_sim_unlock_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return TRUE;
+}
+
+static gboolean
+after_sim_unlock_ready (GSimpleAsyncResult *result)
+{
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+modem_after_sim_unlock (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_sim_unlock);
+
+    /* A short delay is necessary with some SIMs when
+    they have just been unlocked. Using 1 second as secure margin. */
+    g_timeout_add_seconds (1, (GSourceFunc) after_sim_unlock_ready, result);
+}
+
 /*****************************************************************************/
 /* Set current bands (Modem interface) */
 
@@ -1052,6 +1088,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes = set_current_modes;
     iface->set_current_modes_finish = set_current_modes_finish;
+    iface->modem_after_sim_unlock = modem_after_sim_unlock;
+    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
 }
 
 static void
