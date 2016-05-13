@@ -2907,8 +2907,8 @@ update_unlock_retries (MMIfaceModem *self,
 typedef enum {
     UPDATE_LOCK_INFO_CONTEXT_STEP_FIRST = 0,
     UPDATE_LOCK_INFO_CONTEXT_STEP_LOCK,
-    UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES,
     UPDATE_LOCK_INFO_CONTEXT_STEP_AFTER_UNLOCK,
+    UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES,
     UPDATE_LOCK_INFO_CONTEXT_STEP_LAST
 } UpdateLockInfoContextStep;
 
@@ -3074,20 +3074,6 @@ update_lock_info_context_step (UpdateLockInfoContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES:
-        /* Load unlock retries if possible */
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries (
-                ctx->self,
-                (GAsyncReadyCallback)load_unlock_retries_ready,
-                ctx);
-            return;
-        }
-
-        /* Fall down to next step */
-        ctx->step++;
-
     case UPDATE_LOCK_INFO_CONTEXT_STEP_AFTER_UNLOCK:
         /* If we get that no lock is required, run the after SIM unlock step
          * in order to wait for the SIM to get ready.  Skip waiting on
@@ -3108,6 +3094,20 @@ update_lock_info_context_step (UpdateLockInfoContext *ctx)
 
             /* If no way to run after SIM unlock step, we're done */
             mm_dbg ("SIM is ready, and no need for the after SIM unlock step...");
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case UPDATE_LOCK_INFO_CONTEXT_STEP_RETRIES:
+        /* Load unlock retries if possible */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries (
+                ctx->self,
+                (GAsyncReadyCallback)load_unlock_retries_ready,
+                ctx);
+            return;
         }
 
         /* Fall down to next step */
