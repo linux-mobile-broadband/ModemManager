@@ -32,8 +32,8 @@
 
 G_DEFINE_TYPE (MMPluginX22x, mm_plugin_x22x, MM_TYPE_PLUGIN)
 
-int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
-int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
+MM_PLUGIN_DEFINE_MAJOR_VERSION
+MM_PLUGIN_DEFINE_MINOR_VERSION
 
 /*****************************************************************************/
 /* Custom init */

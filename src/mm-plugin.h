@@ -31,6 +31,15 @@
 #define MM_PLUGIN_MAJOR_VERSION 4
 #define MM_PLUGIN_MINOR_VERSION 0
 
+#if defined (G_HAVE_GNUC_VISIBILITY)
+#define VISIBILITY __attribute__((visibility("protected")))
+#else
+#define VISIBILITY
+#endif
+
+#define MM_PLUGIN_DEFINE_MAJOR_VERSION VISIBILITY int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
+#define MM_PLUGIN_DEFINE_MINOR_VERSION VISIBILITY int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
+
 #define MM_TYPE_PLUGIN            (mm_plugin_get_type ())
 #define MM_PLUGIN(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN, MMPlugin))
 #define MM_PLUGIN_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PLUGIN, MMPluginClass))
