@@ -9795,13 +9795,16 @@ initialize_step (InitializeContext *ctx)
                                                  "Modem is unusable, "
                                                  "cannot fully initialize");
             } else {
-                /* Fatal SIM failure :-( */
+                /* Fatal SIM, firmware, or modem failure :-( */
                 g_simple_async_result_set_error (ctx->result,
                                                  MM_CORE_ERROR,
                                                  MM_CORE_ERROR_WRONG_STATE,
                                                  "Modem is unusable, "
                                                  "cannot fully initialize");
-                /* Ensure we only leave the Modem interface around */
+                /* Ensure we only leave the Modem, OMA, and Firmware interfaces
+                 * around.  A failure could be caused by firmware issues, which
+                 * a firmware update, switch, or provisioning could fix.
+                 */
                 mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
                 mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
                 mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
