@@ -358,7 +358,7 @@ interface_initialization_step (InitializationContext *ctx)
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_UNSUPPORTED,
-                                             "Firmware not supported");
+                                             "Firmware interface not available");
             initialization_context_complete_and_free (ctx);
             return;
         }
