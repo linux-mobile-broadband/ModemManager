@@ -38,6 +38,10 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-part-3gpp.h"
 
+#if defined WITH_QMI
+# include <libqmi-glib.h>
+#endif
+
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
@@ -939,43 +943,246 @@ modem_load_power_state (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Power up/down (Modem interface) */
+/* Power up (Modem interface) */
+
+typedef enum {
+    POWER_UP_CONTEXT_STEP_FIRST,
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    POWER_UP_CONTEXT_STEP_QMI_DEVICE_NEW,
+    POWER_UP_CONTEXT_STEP_QMI_DEVICE_OPEN,
+    POWER_UP_CONTEXT_STEP_ALLOCATE_QMI_CLIENT_DMS,
+    POWER_UP_CONTEXT_STEP_FCC_AUTH,
+    POWER_UP_CONTEXT_STEP_RELEASE_QMI_CLIENT_DMS,
+    POWER_UP_CONTEXT_STEP_RETRY,
+#endif
+    POWER_UP_CONTEXT_STEP_LAST,
+} PowerUpContextStep;
+
+typedef struct {
+    MMBroadbandModemMbim *self;
+    MbimDevice *device;
+    GSimpleAsyncResult *result;
+    PowerUpContextStep step;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    QmiDevice *qmi_device;
+    QmiClient *qmi_client;
+    GError *saved_error;
+#endif
+} PowerUpContext;
+
+static void
+power_up_context_complete_and_free (PowerUpContext *ctx)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (ctx->qmi_device) {
+        if (ctx->qmi_client) {
+            qmi_device_release_client (ctx->qmi_device,
+                                       ctx->qmi_client,
+                                       QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                                       3, NULL, NULL, NULL);
+            g_object_unref (ctx->qmi_client);
+        }
+        g_object_unref (ctx->qmi_device);
+    }
+    if (ctx->saved_error)
+        g_error_free (ctx->saved_error);
+#endif
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->device);
+    g_object_unref (ctx->self);
+    g_slice_free (PowerUpContext, ctx);
+}
 
 static gboolean
-common_power_up_down_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+power_up_finish (MMIfaceModem *self,
+                 GAsyncResult *res,
+                 GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static void power_up_context_step (PowerUpContext *ctx);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
 static void
-radio_state_set_down_ready (MbimDevice *device,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+release_qmi_client_dms_ready (QmiDevice      *dev,
+                              GAsyncResult   *res,
+                              PowerUpContext *ctx)
 {
-    MbimMessage *response;
     GError *error = NULL;
 
-    response = mbim_device_command_finish (device, res, &error);
-    if (response)
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+    /* Non-fatal error */
+    if (!qmi_device_release_client_finish (dev, res, &error)) {
+        g_debug ("error: couldn't release client: %s", error->message);
+        g_error_free (error);
+    }
 
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    if (response)
-        mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    ctx->step++;
+    power_up_context_step (ctx);
 }
 
 static void
-radio_state_set_up_ready (MbimDevice *device,
-                          GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+set_radio_state_release_qmi_client_dms (PowerUpContext *ctx)
+{
+    qmi_device_release_client (ctx->qmi_device,
+                               ctx->qmi_client,
+                               QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                               10,
+                               NULL,
+                               (GAsyncReadyCallback)release_qmi_client_dms_ready,
+                               ctx);
+}
+
+static void
+set_fcc_authentication_ready (QmiClientDms   *client,
+                              GAsyncResult   *res,
+                              PowerUpContext *ctx)
+{
+    QmiMessageDmsSetFccAuthenticationOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
+    if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
+        g_debug ("error: couldn't set FCC auth: %s", error->message);
+        g_error_free (error);
+        g_assert (ctx->saved_error);
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+        power_up_context_complete_and_free (ctx);
+        goto out;
+    }
+
+    ctx->step++;
+    power_up_context_step (ctx);
+
+out:
+    if (output)
+        qmi_message_dms_set_fcc_authentication_output_unref (output);
+}
+
+static void
+set_radio_state_fcc_auth (PowerUpContext *ctx)
+{
+    qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->qmi_client),
+                                           NULL,
+                                           10,
+                                           NULL, /* cancellable */
+                                           (GAsyncReadyCallback)set_fcc_authentication_ready,
+                                           ctx);
+}
+
+static void
+qmi_client_dms_ready (QmiDevice      *dev,
+                      GAsyncResult   *res,
+                      PowerUpContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->qmi_client = qmi_device_allocate_client_finish (dev, res, &error);
+    if (!ctx->qmi_client) {
+        g_debug ("error: couldn't create DMS client: %s", error->message);
+        g_error_free (error);
+        g_assert (ctx->saved_error);
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+        power_up_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->step++;
+    power_up_context_step (ctx);
+}
+
+static void
+set_radio_state_allocate_qmi_client_dms (PowerUpContext *ctx)
+{
+    g_assert (ctx->qmi_device);
+    qmi_device_allocate_client (ctx->qmi_device,
+                                QMI_SERVICE_DMS,
+                                QMI_CID_NONE,
+                                10,
+                                NULL, /* cancellable */
+                                (GAsyncReadyCallback) qmi_client_dms_ready,
+                                ctx);
+}
+
+static void
+device_open_ready (QmiDevice      *dev,
+                   GAsyncResult   *res,
+                   PowerUpContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!qmi_device_open_finish (dev, res, &error)) {
+        g_debug ("error: couldn't open QmiDevice: %s", error->message);
+        g_error_free (error);
+        g_assert (ctx->saved_error);
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+        power_up_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->step++;
+    power_up_context_step (ctx);
+}
+
+static void
+set_radio_state_qmi_device_open (PowerUpContext *ctx)
+{
+    /* Open the device */
+    g_assert (ctx->qmi_device);
+    qmi_device_open (ctx->qmi_device,
+                     (QMI_DEVICE_OPEN_FLAGS_PROXY | QMI_DEVICE_OPEN_FLAGS_MBIM),
+                     15,
+                     NULL, /* cancellable */
+                     (GAsyncReadyCallback)device_open_ready,
+                     ctx);
+}
+
+static void
+qmi_device_new_ready (GObject        *unused,
+                      GAsyncResult   *res,
+                      PowerUpContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->qmi_device = qmi_device_new_finish (res, &error);
+    if (!ctx->qmi_device) {
+        g_debug ("error: couldn't create QmiDevice: %s", error->message);
+        g_error_free (error);
+        g_assert (ctx->saved_error);
+        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        ctx->saved_error = NULL;
+        power_up_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->step++;
+    power_up_context_step (ctx);
+}
+
+static void
+set_radio_state_qmi_device_new (PowerUpContext *ctx)
+{
+    GFile *file;
+
+    file = mbim_device_get_file (ctx->device);
+    qmi_device_new (file,
+                    NULL, /* cancellable */
+                    (GAsyncReadyCallback) qmi_device_new_ready,
+                    ctx);
+    g_object_unref (file);
+}
+
+#endif
+
+static void
+radio_state_set_up_ready (MbimDevice     *device,
+                          GAsyncResult   *res,
+                          PowerUpContext *ctx)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -995,64 +1202,99 @@ radio_state_set_up_ready (MbimDevice *device,
                                  MM_CORE_ERROR_FAILED,
                                  "Cannot power-up: hardware radio switch is OFF");
         else if (software_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
-            g_warn_if_reached ();
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot power-up: sotware radio switch is OFF");
     }
-
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+
+    /* Nice! we're done, quick exit */
+    if (!error) {
+        ctx->step = POWER_UP_CONTEXT_STEP_LAST;
+        power_up_context_step (ctx);
+        return;
+    }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* Only the first attempt isn't fatal */
+    if (ctx->step == POWER_UP_CONTEXT_STEP_FIRST) {
+        /* Warn and keep, will retry */
+        g_warning ("%s", error->message);
+        g_assert (!ctx->saved_error);
+        ctx->saved_error = error;
+        ctx->step++;
+        power_up_context_step (ctx);
+        return;
+    }
+#endif
+
+    /* Fatal */
+    g_simple_async_result_take_error (ctx->result, error);
+    power_up_context_complete_and_free (ctx);
 }
 
 static void
-common_power_up_down (MMIfaceModem *self,
-                      gboolean up,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+set_radio_state_up (PowerUpContext *ctx)
 {
-    GSimpleAsyncResult *result;
-    MbimDevice *device;
     MbimMessage *message;
-    MbimRadioSwitchState state;
-    GAsyncReadyCallback ready_cb;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_power_up_down);
-
-    if (up) {
-        ready_cb = (GAsyncReadyCallback)radio_state_set_up_ready;
-        state = MBIM_RADIO_SWITCH_STATE_ON;
-    } else {
-        ready_cb = (GAsyncReadyCallback)radio_state_set_down_ready;
-        state = MBIM_RADIO_SWITCH_STATE_OFF;
-    }
-
-    message = mbim_message_radio_state_set_new (state, NULL);
-    mbim_device_command (device,
+    message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_ON, NULL);
+    mbim_device_command (ctx->device,
                          message,
                          20,
                          NULL,
-                         ready_cb,
-                         result);
+                         (GAsyncReadyCallback)radio_state_set_up_ready,
+                         ctx);
     mbim_message_unref (message);
 }
 
 static void
-modem_power_down (MMIfaceModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+power_up_context_step (PowerUpContext *ctx)
 {
-    common_power_up_down (self, FALSE, callback, user_data);
+    switch (ctx->step) {
+    case POWER_UP_CONTEXT_STEP_FIRST:
+        set_radio_state_up (ctx);
+        return;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+    case POWER_UP_CONTEXT_STEP_QMI_DEVICE_NEW:
+        set_radio_state_qmi_device_new (ctx);
+        return;
+
+    case POWER_UP_CONTEXT_STEP_QMI_DEVICE_OPEN:
+        set_radio_state_qmi_device_open (ctx);
+        return;
+
+    case POWER_UP_CONTEXT_STEP_ALLOCATE_QMI_CLIENT_DMS:
+        set_radio_state_allocate_qmi_client_dms (ctx);
+        return;
+
+    case POWER_UP_CONTEXT_STEP_FCC_AUTH:
+        set_radio_state_fcc_auth (ctx);
+        return;
+
+    case POWER_UP_CONTEXT_STEP_RELEASE_QMI_CLIENT_DMS:
+        set_radio_state_release_qmi_client_dms (ctx);
+        return;
+
+    case POWER_UP_CONTEXT_STEP_RETRY:
+        set_radio_state_up (ctx);
+        return;
+
+#endif
+
+    case POWER_UP_CONTEXT_STEP_LAST:
+        /* Good! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        power_up_context_complete_and_free (ctx);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
 }
 
 static void
@@ -1060,7 +1302,80 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    common_power_up_down (self, TRUE, callback, user_data);
+    PowerUpContext *ctx;
+    MbimDevice *device;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (PowerUpContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    ctx->step = POWER_UP_CONTEXT_STEP_FIRST;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_power_up);
+    power_up_context_step (ctx);
+}
+
+/*****************************************************************************/
+/* Power down (Modem interface) */
+
+static gboolean
+power_down_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+radio_state_set_down_ready (MbimDevice         *device,
+                            GAsyncResult       *res,
+                            GSimpleAsyncResult *simple)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response) {
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+        mbim_message_unref (response);
+    }
+
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *simple;
+    MbimDevice *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_power_down);
+    message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_OFF, NULL);
+    mbim_device_command (device,
+                         message,
+                         20,
+                         NULL,
+                         (GAsyncReadyCallback)radio_state_set_down_ready,
+                         simple);
+    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -2903,9 +3218,9 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state = modem_load_power_state;
     iface->load_power_state_finish = modem_load_power_state_finish;
     iface->modem_power_up = modem_power_up;
-    iface->modem_power_up_finish = common_power_up_down_finish;
+    iface->modem_power_up_finish = power_up_finish;
     iface->modem_power_down = modem_power_down;
-    iface->modem_power_down_finish = common_power_up_down_finish;
+    iface->modem_power_down_finish = power_down_finish;
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
