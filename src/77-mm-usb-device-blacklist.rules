@@ -166,4 +166,9 @@ ATTRS{idVendor}=="1424", ENV{ID_MM_DEVICE_IGNORE}="1"
 # proxmark3
 ATTRS{manufacturer}=="proxmark.org", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Sigma Sport Docking Station TOPLINE 2009
+ATTRS{idVendor}=="1d9d", ATTRS{idProduct}=="1010", ENV{ID_MM_DEVICE_IGNORE}="1"
+# Sigma Sport Docking Station TOPLINE 2012
+ATTRS{idVendor}=="1d9d", ATTRS{idProduct}=="1011", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
