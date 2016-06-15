@@ -896,7 +896,7 @@ connect_context_step (ConnectContext *ctx)
             return;
         }
 
-        mm_dbg ("Launching connection with APN '%s'...", apn);
+        mm_dbg ("Launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ip_type), apn);
         message = (mbim_message_connect_set_new (
                        ctx->self->priv->session_id,
                        MBIM_ACTIVATION_COMMAND_ACTIVATE,
