@@ -581,7 +581,6 @@ connect_set_ready (MbimDevice *device,
     MbimMessage *response;
     guint32 session_id;
     MbimActivationState activation_state;
-    MbimContextIpType ip_type;
     guint32 nw_error;
 
     response = mbim_device_command_finish (device, res, &error);
@@ -595,7 +594,7 @@ connect_set_ready (MbimDevice *device,
                 &session_id,
                 &activation_state,
                 NULL, /* voice_call_state */
-                &ip_type,
+                NULL, /* ip_type */
                 NULL, /* context_type */
                 &nw_error,
                 &inner_error)) {
@@ -604,11 +603,15 @@ connect_set_ready (MbimDevice *device,
                     g_error_free (error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
             } else {
-                ctx->ip_type = ip_type;
+                /* Report the ip_type we originally requested, since the ip_type
+                 * from the response is only relevant if the requested used
+                 * MBIM_CONTEXT_IP_TYPE_DEFAULT, which MM never does.  Some
+                 * devices (K5160) report the wrong type in the response.
+                 */
                 mm_dbg ("Session ID '%u': %s (IP type: %s)",
                         session_id,
                         mbim_activation_state_get_string (activation_state),
-                        mbim_context_ip_type_get_string (ip_type));
+                        mbim_context_ip_type_get_string (ctx->ip_type));
             }
         } else {
             /* Prefer the error from the result to the parsing error */
@@ -816,7 +819,6 @@ connect_context_step (ConnectContext *ctx)
         const gchar *user;
         const gchar *password;
         MbimAuthProtocol auth;
-        MbimContextIpType ip_type;
         MMBearerIpFamily ip_family;
         GError *error = NULL;
 
@@ -870,13 +872,13 @@ connect_context_step (ConnectContext *ctx)
         }
 
         if (ip_family == MM_BEARER_IP_FAMILY_IPV4)
-            ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
+            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
         else if (ip_family == MM_BEARER_IP_FAMILY_IPV6)
-            ip_type = MBIM_CONTEXT_IP_TYPE_IPV6;
+            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV6;
         else if (ip_family == MM_BEARER_IP_FAMILY_IPV4V6)
-            ip_type = MBIM_CONTEXT_IP_TYPE_IPV4V6;
+            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4V6;
         else if (ip_family == (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6))
-            ip_type = MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6;
+            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6;
         else if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
                  ip_family == MM_BEARER_IP_FAMILY_ANY)
             /* A valid default IP family should have been specified */
@@ -896,7 +898,7 @@ connect_context_step (ConnectContext *ctx)
             return;
         }
 
-        mm_dbg ("Launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ip_type), apn);
+        mm_dbg ("Launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ctx->ip_type), apn);
         message = (mbim_message_connect_set_new (
                        ctx->self->priv->session_id,
                        MBIM_ACTIVATION_COMMAND_ACTIVATE,
@@ -905,7 +907,7 @@ connect_context_step (ConnectContext *ctx)
                        password ? password : "",
                        MBIM_COMPRESSION_NONE,
                        auth,
-                       ip_type,
+                       ctx->ip_type,
                        mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
                        &error));
         if (!message) {
