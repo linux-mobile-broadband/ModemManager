@@ -6,8 +6,8 @@ This is a new stable release of ModemManager.
  * This version requires:
    ** GLib 2.36.0
    ** gettext 0.19.3
-   ** libmbim >= 1.12.0 (for the optional MBIM support)
-   ** libqmi >= 1.14.0 (for the optional QMI support)
+   ** libmbim >= 1.14.0 (for the optional MBIM support)
+   ** libqmi >= 1.16.0 (for the optional QMI support)
    ** libsystemd >= 209 or libsystemd-login >= 183 (for the optional suspend
       and resume support)
 
@@ -49,6 +49,10 @@ This version comes with the following new features:
       operations.
    ** Implemented support for detecting network-initiated disconnections.
 
+ * MBIM:
+   ** If online mode fails, try to use the 'DMS Set FCC Authentication' QMI
+      message via the QMI-over-MBIM support, if supported by the device.
+
  * udev:
    ** Added new supported 'ID_MM_PORT_IGNORE' tag to allow fully ignoring ports
       specified by the user.
@@ -72,6 +76,8 @@ This version comes with the following new features:
    ** gobi: removed the plugin. All non-vendor specific QMI devices should now
       be managed by the generic plugin.
    ** mbm: dynamically load the list of supported modes.
+   ** mbm: fixed several connection/disconnection issues.
+   ** simtech: support QMI devices.
    ** huawei: implemented Voice call management support.
    ** huawei: use static IP addressing in NDISDUP capable devices if the AT^DHCP
       response provides the IP details.
