@@ -329,7 +329,7 @@ modem_create_bearer (MMIfaceModem *self,
                                         modem_create_bearer);
 
     /* We just create a MMBearerQmi */
-    mm_dbg ("Creating QMI bearer in QMI modem");
+    mm_dbg ("Creating QMI bearer (%s) in QMI modem", force_dhcp ? "DHCP" : "Static IP");
     bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties, force_dhcp);
     g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
     g_simple_async_result_complete_in_idle (result);

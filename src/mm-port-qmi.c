@@ -453,11 +453,13 @@ port_open_context_step (PortOpenContext *ctx)
     case PORT_OPEN_STEP_SET_KERNEL_DATA_FORMAT:
         /* Update the data format to be expected by the kernel */
         mm_dbg ("Updating kernel data format: %s", qmi_wda_link_layer_protocol_get_string (ctx->llp));
-        if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3)
+        if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) {
             ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
-        else if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP)
+            ctx->self->priv->llp_is_raw_ip = FALSE;
+        } else if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP) {
             ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
-        else
+            ctx->self->priv->llp_is_raw_ip = TRUE;
+        } else
             g_assert_not_reached ();
 
         /* Regardless of the output, we're done after this action */
