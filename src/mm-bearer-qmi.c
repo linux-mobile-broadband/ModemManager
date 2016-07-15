@@ -38,14 +38,6 @@ G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 
 #define GLOBAL_PACKET_DATA_HANDLE 0xFFFFFFFF
 
-enum {
-    PROP_0,
-    PROP_FORCE_DHCP,
-    PROP_LAST
-};
-
-static GParamSpec *properties[PROP_LAST];
-
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
     QmiClientWds *client_ipv4;
@@ -57,7 +49,6 @@ struct _MMBearerQmiPrivate {
     MMPort *data;
     guint32 packet_data_handle_ipv4;
     guint32 packet_data_handle_ipv6;
-    gboolean force_dhcp;
 };
 
 /*****************************************************************************/
@@ -226,6 +217,7 @@ static void common_setup_cleanup_unsolicited_events (MMBearerQmi *self,
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
+    CONNECT_STEP_IP_METHOD,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
     CONNECT_STEP_IP_FAMILY_IPV4,
@@ -254,6 +246,8 @@ typedef struct {
     QmiWdsAuthentication auth;
     gboolean no_ip_family_preference;
     gboolean default_ip_family_set;
+
+    MMBearerIpMethod ip_method;
 
     gboolean ipv4;
     gboolean running_ipv4;
@@ -464,6 +458,7 @@ qmi_inet4_ntop (guint32 address, char *buf, const gsize buflen)
 
 static MMBearerIpConfig *
 get_ipv4_config (MMBearerQmi *self,
+                 MMBearerIpMethod ip_method,
                  QmiMessageWdsGetCurrentSettingsOutput *output,
                  guint32 mtu)
 {
@@ -495,11 +490,7 @@ get_ipv4_config (MMBearerQmi *self,
     mm_info ("QMI IPv4 Settings:");
 
     config = mm_bearer_ip_config_new ();
-    if (self->priv->force_dhcp)
-        /* Force DHCP, but still set the static IPv4 config details if we get them */
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-    else
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+    mm_bearer_ip_config_set_method (config, ip_method);
 
     /* IPv4 address */
     qmi_inet4_ntop (addr, buf, sizeof (buf));
@@ -569,6 +560,7 @@ qmi_inet6_ntop (GArray *array, char *buf, const gsize buflen)
 
 static MMBearerIpConfig *
 get_ipv6_config (MMBearerQmi *self,
+                 MMBearerIpMethod ip_method,
                  QmiMessageWdsGetCurrentSettingsOutput *output,
                  guint32 mtu)
 {
@@ -591,11 +583,7 @@ get_ipv6_config (MMBearerQmi *self,
     mm_info ("QMI IPv6 Settings:");
 
     config = mm_bearer_ip_config_new ();
-    if (self->priv->force_dhcp)
-        /* Force DHCP, but still set the static IPv6 config details if we get them */
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-    else
-        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_STATIC);
+    mm_bearer_ip_config_set_method (config, ip_method);
 
     /* IPv6 address */
     qmi_inet6_ntop (array, buf, sizeof (buf));
@@ -682,9 +670,9 @@ get_current_settings_ready (QmiClientWds *client,
         }
 
         if (ip_family == QMI_WDS_IP_FAMILY_IPV4)
-            ctx->ipv4_config = get_ipv4_config (ctx->self, output, mtu);
+            ctx->ipv4_config = get_ipv4_config (ctx->self, ctx->ip_method, output, mtu);
         else if (ip_family == QMI_WDS_IP_FAMILY_IPV6)
-            ctx->ipv6_config = get_ipv6_config (ctx->self, output, mtu);
+            ctx->ipv6_config = get_ipv6_config (ctx->self, ctx->ip_method, output, mtu);
 
         /* Domain names */
         if (qmi_message_wds_get_current_settings_output_get_domain_name_list (output, &array, &error)) {
@@ -920,6 +908,21 @@ connect_context_step (ConnectContext *ctx)
         }
 
         /* If already open, just fall down */
+        ctx->step++;
+
+    case CONNECT_STEP_IP_METHOD:
+        /* Once the QMI port is open, we decide the IP method we're going
+         * to request. If the LLP is raw-ip, we force Static IP, because not
+         * all DHCP clients support the raw-ip interfaces; otherwise default
+         * to DHCP as always. */
+        if (mm_port_qmi_llp_is_raw_ip (ctx->qmi))
+            ctx->ip_method = MM_BEARER_IP_METHOD_STATIC;
+        else
+            ctx->ip_method = MM_BEARER_IP_METHOD_DHCP;
+
+        mm_dbg ("Defaulting to use %s IP method", mm_bearer_ip_method_get_string (ctx->ip_method));
+
+        /* Just fall down */
         ctx->step++;
 
     case CONNECT_STEP_IPV4:
@@ -1256,6 +1259,7 @@ _connect (MMBaseBearer *self,
     ctx->data = data;
     ctx->cancellable = g_object_ref (cancellable);
     ctx->step = CONNECT_STEP_FIRST;
+    ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1600,8 +1604,7 @@ report_connection_status (MMBaseBearer *self,
 
 MMBaseBearer *
 mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
-                   MMBearerProperties *config,
-                   gboolean force_dhcp)
+                   MMBearerProperties  *config)
 {
     MMBaseBearer *bearer;
 
@@ -1611,7 +1614,6 @@ mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
     bearer = g_object_new (MM_TYPE_BEARER_QMI,
                            MM_BASE_BEARER_MODEM, modem,
                            MM_BASE_BEARER_CONFIG, config,
-                           MM_BEARER_QMI_FORCE_DHCP, force_dhcp,
                            NULL);
 
     /* Only export valid bearers */
@@ -1627,42 +1629,6 @@ mm_bearer_qmi_init (MMBearerQmi *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BEARER_QMI,
                                               MMBearerQmiPrivate);
-}
-
-static void
-set_property (GObject *object,
-              guint prop_id,
-              const GValue *value,
-              GParamSpec *pspec)
-{
-    MMBearerQmi *self = MM_BEARER_QMI (object);
-
-    switch (prop_id) {
-    case PROP_FORCE_DHCP:
-        self->priv->force_dhcp = g_value_get_boolean (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
-              GParamSpec *pspec)
-{
-    MMBearerQmi *self = MM_BEARER_QMI (object);
-
-    switch (prop_id) {
-    case PROP_FORCE_DHCP:
-        g_value_set_boolean (value, self->priv->force_dhcp);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
 }
 
 static void
@@ -1700,8 +1666,6 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
 
     /* Virtual methods */
     object_class->dispose = dispose;
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
 
     base_bearer_class->connect = _connect;
     base_bearer_class->connect_finish = connect_finish;
@@ -1710,13 +1674,4 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->reload_stats = reload_stats;
     base_bearer_class->reload_stats_finish = reload_stats_finish;
-
-    /* Properties */
-    properties[PROP_FORCE_DHCP] =
-        g_param_spec_boolean (MM_BEARER_QMI_FORCE_DHCP,
-                              "Force DHCP",
-                              "Never setup static IP config, always DHCP.",
-                              FALSE,
-                              G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_FORCE_DHCP, properties[PROP_FORCE_DHCP]);
 }

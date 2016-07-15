@@ -38,8 +38,6 @@ typedef struct _MMBearerQmi MMBearerQmi;
 typedef struct _MMBearerQmiClass MMBearerQmiClass;
 typedef struct _MMBearerQmiPrivate MMBearerQmiPrivate;
 
-#define MM_BEARER_QMI_FORCE_DHCP "bearer-qmi-force-dhcp"
-
 struct _MMBearerQmi {
     MMBaseBearer parent;
     MMBearerQmiPrivate *priv;
@@ -54,7 +52,6 @@ GType mm_bearer_qmi_get_type (void);
 /* QMI bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */
 MMBaseBearer *mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
-                                 MMBearerProperties *config,
-                                 gboolean force_dhcp);
+                                 MMBearerProperties *config);
 
 #endif /* MM_BEARER_QMI_H */
