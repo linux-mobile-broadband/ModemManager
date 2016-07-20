@@ -2081,7 +2081,7 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
         qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC, mnc);
 
         qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC,
-                             le16toh (*(u_int16_t *)(&rsp->lai[3])));
+                             rsp->lai[4] << 8 | rsp->lai[3]);
 
         qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID, le16toh (rsp->cellid));
     }
