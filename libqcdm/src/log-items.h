@@ -90,6 +90,56 @@ struct DMLogItemCdmaReversePowerControl {
 } __attribute__ ((packed));
 typedef struct DMLogItemCdmaReversePowerControl DMLogItemCdmaReversePowerControl;
 
+/* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
+struct EvdoPilotSetsV2PilotRecord {
+    u_int16_t pilot_pn;
+    /* HDR pilot energy doesn't appear to be in the same units as 1x pilot
+     * energy (eg, -0.5 dBm increments).  Instead, you can approximate EC/IO
+     * by using this formula empirically derived from simultaneous AT!ECIO
+     * and HDR Pilot Sets V2 results from a Sierra modem:
+     *
+     * EC/IO = (pilot_energy / -50) + 1
+     */
+    u_int16_t pilot_energy;
+    union {
+        struct {
+            u_int16_t mac_index;
+            u_int8_t unknown1;
+            u_int8_t unknown2;
+            u_int16_t window_center;
+        } Active;
+        struct {
+            u_int16_t channel_number;
+            u_int8_t unknown1;
+            u_int8_t unknown2;
+            u_int16_t window_center;
+        } Candidate;
+        struct {
+            u_int16_t channel_number;
+            u_int16_t window_center;
+            u_int8_t unknown1; // Offset?
+            u_int8_t unknown2; // Age?
+        } Remaining;
+    };
+} __attribute__ ((packed));
+typedef struct EvdoPilotSetsV2PilotRecord EvdoPilotSetsV2PilotRecord;
+
+/* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
+struct DMLogItemEvdoPilotSetsV2 {
+    u_int8_t pn_offset;
+    u_int8_t active_set_count;
+    u_int8_t active_set_window;
+    u_int16_t active_set_channel;
+    u_int8_t unknown1;
+    u_int8_t candidate_set_count;
+    u_int8_t candidate_set_window;
+    u_int8_t remaining_set_count;
+    u_int8_t remaining_set_window;
+    u_int8_t unknown2;
+
+    EvdoPilotSetsV2PilotRecord records[];
+} __attribute__ ((packed));
+typedef struct DMLogItemEvdoPilotSetsV2 DMLogItemEvdoPilotSetsV2;
 
 /* DM_LOG_ITEM_WCDMA_TA_FINGER_INFO */
 struct DMLogItemWcdmaTaFingerInfo {
