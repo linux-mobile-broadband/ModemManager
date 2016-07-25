@@ -375,6 +375,7 @@ cli/Makefile
 examples/Makefile
 examples/modem-watcher-python/Makefile
 examples/modem-watcher-javascript/Makefile
+examples/sms-python/Makefile
 ])
 AC_OUTPUT
 

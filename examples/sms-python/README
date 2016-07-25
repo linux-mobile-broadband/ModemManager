@@ -1,0 +1,20 @@
+
+The sms-python program makes use of the 'libmm-glib' library through
+GObject Introspection to talk to ModemManager.
+
+The program will:
+ * Detect whether ModemManager is found in the bus
+ * Prepare SMS properties object with the provided Number and Text.
+ * Loop through each modem found in the system, and for each:
+   ** Create a SMS
+   ** Send the SMS
+
+The output will look like this:
+
+$ ./sms-python "+1234567890" "hello there, how are you?"
+/org/freedesktop/ModemManager1/Modem/0: sms sent
+
+Note that the program requires ModemManager and libmm-glib to be installed in
+the system and the introspection typelibs available in the standard paths.
+
+Have fun!
