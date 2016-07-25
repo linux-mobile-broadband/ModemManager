@@ -18,9 +18,9 @@
 # Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
 #
 
-import os
-import sys
+import os, sys, gi
 
+gi.require_version('ModemManager', '1.0')
 from gi.repository import GLib, GObject, Gio, ModemManager
 
 """
