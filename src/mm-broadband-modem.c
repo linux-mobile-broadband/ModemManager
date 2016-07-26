@@ -53,6 +53,8 @@
 #include "mm-port-serial-qcdm.h"
 #include "libqcdm/src/errors.h"
 #include "libqcdm/src/commands.h"
+#include "libqcdm/src/logs.h"
+#include "libqcdm/src/log-items.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -172,6 +174,7 @@ struct _MMBroadbandModemPrivate {
     gboolean checked_sprint_support;
     gboolean has_spservice;
     gboolean has_speri;
+    gint evdo_pilot_rssi;
 
     /*<--- Modem Simple interface --->*/
     /* Properties */
@@ -1713,6 +1716,45 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 /*****************************************************************************/
 /* Signal quality loading (Modem interface) */
 
+static void
+qcdm_evdo_pilot_sets_log_handle (MMPortSerialQcdm *port,
+                                 GByteArray *log_buffer,
+                                 gpointer user_data)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (user_data);
+    QcdmResult *result;
+    u_int32_t num_active = 0;
+    u_int32_t pilot_pn = 0;
+    u_int32_t pilot_energy = 0;
+    int32_t rssi_dbm = 0;
+
+    result = qcdm_log_item_evdo_pilot_sets_v2_new ((const char *) log_buffer->data,
+                                                   log_buffer->len,
+                                                   NULL);
+    if (!result)
+        return;
+
+    if (!qcdm_log_item_evdo_pilot_sets_v2_get_num (result,
+                                                   QCDM_LOG_ITEM_EVDO_PILOT_SETS_V2_TYPE_ACTIVE,
+                                                   &num_active)) {
+        qcdm_result_unref (result);
+        return;
+    }
+
+    if (num_active > 0 &&
+        qcdm_log_item_evdo_pilot_sets_v2_get_pilot (result,
+                                                    QCDM_LOG_ITEM_EVDO_PILOT_SETS_V2_TYPE_ACTIVE,
+                                                    0,
+                                                    &pilot_pn,
+                                                    &pilot_energy,
+                                                    &rssi_dbm)) {
+        mm_dbg ("EVDO active pilot RSSI: %ddBm", rssi_dbm);
+        self->priv->evdo_pilot_rssi = rssi_dbm;
+    }
+
+    qcdm_result_unref (result);
+}
+
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
@@ -1742,6 +1784,21 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
                                  G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+static guint
+signal_quality_evdo_pilot_sets (MMBroadbandModem *self)
+{
+    gint dbm;
+
+    if (self->priv->modem_cdma_evdo_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        return 0;
+
+    if (self->priv->evdo_pilot_rssi >= 0)
+        return 0;
+
+    dbm = CLAMP (self->priv->evdo_pilot_rssi, -113, -51);
+    return 100 - ((dbm + 51) * 100 / (-113 + 51));
+}
+
 static void
 signal_quality_csq_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
@@ -1767,8 +1824,11 @@ signal_quality_csq_ready (MMBroadbandModem *self,
         result_str = mm_strip_tag (result_str, "+CSQ:");
         if (sscanf (result_str, "%d, %d", &quality, &ber)) {
             if (quality == 99) {
-                /* 99 means unknown, no service, etc */
-                quality = 0;
+                /* 99 can mean unknown, no service, etc.  But the modem may
+                 * also only report CDMA 1x quality in CSQ, so try EVDO via
+                 * QCDM log messages too.
+                 */
+                quality = signal_quality_evdo_pilot_sets (self);
             } else {
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
@@ -1977,6 +2037,17 @@ static void
 signal_quality_qcdm (SignalQualityContext *ctx)
 {
     GByteArray *pilot_sets;
+    guint quality;
+
+    /* If EVDO is active try that signal strength first */
+    quality = signal_quality_evdo_pilot_sets (ctx->self);
+    if (quality > 0) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (quality),
+                                                   NULL);
+        signal_quality_context_complete_and_free (ctx);
+        return;
+    }
 
     /* Use CDMA1x pilot EC/IO if we can */
     pilot_sets = g_byte_array_sized_new (25);
@@ -6713,6 +6784,167 @@ modem_cdma_load_meid (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited events (CDMA interface) */
+
+typedef struct {
+    MMBroadbandModem *self;
+    gboolean setup;
+    GSimpleAsyncResult *result;
+    MMPortSerialQcdm *qcdm;
+} CdmaUnsolicitedEventsContext;
+
+static void
+cdma_unsolicited_events_context_complete_and_free (CdmaUnsolicitedEventsContext *ctx,
+                                                   gboolean close_port,
+                                                   GError *error)
+{
+    if (error)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    g_clear_object (&ctx->result);
+    g_clear_object (&ctx->self);
+
+    if (ctx->qcdm && close_port)
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
+    g_clear_object (&ctx->qcdm);
+
+    g_free (ctx);
+}
+
+static void
+logcmd_qcdm_ready (MMPortSerialQcdm *port,
+                   GAsyncResult *res,
+                   CdmaUnsolicitedEventsContext *ctx)
+{
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+    GByteArray *response;
+    GError *error = NULL;
+
+    response = mm_port_serial_qcdm_command_finish (port, res, &error);
+    if (error) {
+        cdma_unsolicited_events_context_complete_and_free (ctx, TRUE, error);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_log_config_set_mask_result ((const gchar *) response->data,
+                                                  response->len,
+                                                  &err);
+    g_byte_array_unref (response);
+    if (!result) {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to parse Log Config Set Mask command result: %d",
+                             err);
+        cdma_unsolicited_events_context_complete_and_free (ctx, TRUE, error);
+        return;
+    }
+
+    mm_port_serial_qcdm_add_unsolicited_msg_handler (port,
+                                                     DM_LOG_ITEM_EVDO_PILOT_SETS_V2,
+                                                     ctx->setup ? qcdm_evdo_pilot_sets_log_handle : NULL,
+                                                     ctx->self,
+                                                     NULL);
+
+    qcdm_result_unref (result);
+
+    /* Balance the mm_port_seral_open() from modem_cdma_setup_cleanup_unsolicited_events().
+     * We want to close it in either case:
+     *  (a) we're cleaning up and setup opened the port
+     *  (b) if it was unexpectedly closed before cleanup and thus cleanup opened it
+     *
+     * Setup should leave the port open to allow log messages to be received
+     * and sent to handlers.
+     */
+    cdma_unsolicited_events_context_complete_and_free (ctx, ctx->setup ? FALSE : TRUE, NULL);
+}
+
+static void
+modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
+                                             gboolean setup,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
+{                                       
+    CdmaUnsolicitedEventsContext *ctx;
+    GByteArray *logcmd;
+    u_int16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
+    GError *error = NULL;
+
+    ctx = g_new0 (CdmaUnsolicitedEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->setup = TRUE;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_cdma_setup_cleanup_unsolicited_events);
+    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (!ctx->qcdm) {
+        cdma_unsolicited_events_context_complete_and_free (ctx, FALSE, NULL);
+        return;
+    }
+
+    /* Setup must open the QCDM port and keep it open to receive unsolicited
+     * events.  Cleanup expects the port to already be opened from setup, but
+     * if not we still want to open it and try to disable log messages.
+     */
+    if (setup || !mm_port_serial_is_open (MM_PORT_SERIAL (ctx->qcdm))) {
+        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), &error)) {
+            cdma_unsolicited_events_context_complete_and_free (ctx, FALSE, error);
+            return;
+        }
+    }
+
+    logcmd = g_byte_array_sized_new (512);
+    logcmd->len = qcdm_cmd_log_config_set_mask_new ((char *) logcmd->data,
+                                                    512,
+                                                    0x01,  /* Equipment ID */
+                                                    setup ? log_items : NULL);
+    assert (logcmd->len);
+
+    mm_port_serial_qcdm_command (ctx->qcdm,
+                                 logcmd,
+                                 5,
+                                 NULL,
+                                 (GAsyncReadyCallback)logcmd_qcdm_ready,
+                                 ctx);
+    g_byte_array_unref (logcmd);
+}
+
+static gboolean
+modem_cdma_setup_cleanup_unsolicited_events_finish (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    modem_cdma_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM (self),
+                                                 TRUE,
+                                                 callback,
+                                                 user_data);
+}
+
+static void
+modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    modem_cdma_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM (self),
+                                                 FALSE,
+                                                 callback,
+                                                 user_data);
+}
+
+/*****************************************************************************/
 /* HDR state check (CDMA interface) */
 
 typedef struct {
@@ -10429,6 +10661,10 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->load_meid_finish = modem_cdma_load_meid_finish;
 
     /* Registration check steps */
+    iface->setup_unsolicited_events = modem_cdma_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_cdma_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_cdma_setup_cleanup_unsolicited_events_finish;
     iface->setup_registration_checks = modem_cdma_setup_registration_checks;
     iface->setup_registration_checks_finish = modem_cdma_setup_registration_checks_finish;
     iface->get_call_manager_state = modem_cdma_get_call_manager_state;

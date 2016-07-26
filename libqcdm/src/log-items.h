@@ -37,7 +37,7 @@ enum {
     DM_LOG_ITEM_EVDO_REV_POWER_CONTROL          = 0x1063,
     DM_LOG_ITEM_EVDO_ARQ_EFFECTIVE_RECEIVE_RATE = 0x1066,
     DM_LOG_ITEM_EVDO_AIR_LINK_SUMMARY           = 0x1068,
-    DM_LOG_ITEM_EVDO_POWER                      = 0x1069
+    DM_LOG_ITEM_EVDO_POWER                      = 0x1069,
     DM_LOG_ITEM_EVDO_FWD_LINK_PACKET_SNAPSHOT   = 0x106A,
     DM_LOG_ITEM_EVDO_ACCESS_ATTEMPT             = 0x106C,
     DM_LOG_ITEM_EVDO_REV_ACTIVITY_BITS_BUFFER   = 0x106D,
@@ -91,14 +91,14 @@ struct DMLogItemCdmaReversePowerControl {
 typedef struct DMLogItemCdmaReversePowerControl DMLogItemCdmaReversePowerControl;
 
 /* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
-struct EvdoPilotSetsV2PilotRecord {
+struct DMLogItemEvdoPilotSetsV2Pilot {
     u_int16_t pilot_pn;
     /* HDR pilot energy doesn't appear to be in the same units as 1x pilot
-     * energy (eg, -0.5 dBm increments).  Instead, you can approximate EC/IO
-     * by using this formula empirically derived from simultaneous AT!ECIO
-     * and HDR Pilot Sets V2 results from a Sierra modem:
+     * energy (eg, -0.5 dBm increments).  Instead it appears roughly correlated
+     * to RSSI dBm by using this formula empirically derived from simultaneous
+     * AT!RSSI and HDR Pilot Sets V2 results from a Sierra modem:
      *
-     * EC/IO = (pilot_energy / -50) + 1
+     * RSSI dBm = -110 + (MAX(pilot_energy - 50, 0) / 14)
      */
     u_int16_t pilot_energy;
     union {
@@ -122,22 +122,22 @@ struct EvdoPilotSetsV2PilotRecord {
         } Remaining;
     };
 } __attribute__ ((packed));
-typedef struct EvdoPilotSetsV2PilotRecord EvdoPilotSetsV2PilotRecord;
+typedef struct DMLogItemEvdoPilotSetsV2Pilot DMLogItemEvdoPilotSetsV2Pilot;
 
 /* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
 struct DMLogItemEvdoPilotSetsV2 {
     u_int8_t pn_offset;
-    u_int8_t active_set_count;
-    u_int8_t active_set_window;
-    u_int16_t active_set_channel;
+    u_int8_t active_count;
+    u_int8_t active_window;
+    u_int16_t active_channel;
     u_int8_t unknown1;
-    u_int8_t candidate_set_count;
-    u_int8_t candidate_set_window;
-    u_int8_t remaining_set_count;
-    u_int8_t remaining_set_window;
+    u_int8_t candidate_count;
+    u_int8_t candidate_window;
+    u_int8_t remaining_count;
+    u_int8_t remaining_window;
     u_int8_t unknown2;
 
-    EvdoPilotSetsV2PilotRecord records[];
+    DMLogItemEvdoPilotSetsV2Pilot sets[];
 } __attribute__ ((packed));
 typedef struct DMLogItemEvdoPilotSetsV2 DMLogItemEvdoPilotSetsV2;
 
@@ -148,7 +148,7 @@ struct DMLogItemWcdmaTaFingerInfo {
     u_int8_t non_coherent_interval_len;
     u_int8_t num_paths;
     u_int32_t path_enr;
-    int32_t pn_pos_path
+    int32_t pn_pos_path;
     int16_t pri_cpich_psc;
     u_int8_t unknown1;
     u_int8_t sec_cpich_ssc;
@@ -214,7 +214,7 @@ typedef struct DMLogItemGsmBurstMetric DMLogItemGsmBurstMetric;
 
 struct DMLogItemGsmBurstMetrics {
     u_int8_t channel;
-    DMLogItemBurstMetric metrics[4];
+    DMLogItemGsmBurstMetric metrics[4];
 } __attribute__ ((packed));
 typedef struct DMLogItemGsmBurstMetrics DMLogItemGsmBurstMetrics;
 

@@ -31,9 +31,11 @@
 
 typedef struct _MMPortSerialQcdm MMPortSerialQcdm;
 typedef struct _MMPortSerialQcdmClass MMPortSerialQcdmClass;
+typedef struct _MMPortSerialQcdmPrivate MMPortSerialQcdmPrivate;
 
 struct _MMPortSerialQcdm {
     MMPortSerial parent;
+    MMPortSerialQcdmPrivate *priv;
 };
 
 struct _MMPortSerialQcdmClass {
@@ -54,5 +56,19 @@ void        mm_port_serial_qcdm_command        (MMPortSerialQcdm *self,
 GByteArray *mm_port_serial_qcdm_command_finish (MMPortSerialQcdm *self,
                                                 GAsyncResult *res,
                                                 GError **error);
+
+typedef void (*MMPortSerialQcdmUnsolicitedMsgFn) (MMPortSerialQcdm *port,
+                                                  GByteArray *log_buffer,
+                                                  gpointer user_data);
+
+void     mm_port_serial_qcdm_add_unsolicited_msg_handler (MMPortSerialQcdm *self,
+                                                          guint log_code,
+                                                          MMPortSerialQcdmUnsolicitedMsgFn callback,
+                                                          gpointer user_data,
+                                                          GDestroyNotify notify);
+
+void     mm_port_serial_qcdm_enable_unsolicited_msg_handler (MMPortSerialQcdm *self,
+                                                             guint log_code,
+                                                             gboolean enable);
 
 #endif /* MM_PORT_SERIAL_QCDM_H */
