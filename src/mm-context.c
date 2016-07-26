@@ -128,7 +128,7 @@ print_version (void)
 {
     g_print ("\n"
              "ModemManager " MM_DIST_VERSION "\n"
-             "Copyright (2008 - 2014) The ModemManager authors\n"
+             "Copyright (2008 - 2016) The ModemManager authors\n"
              "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl-2.0.html>\n"
              "This is free software: you are free to change and redistribute it.\n"
              "There is NO WARRANTY, to the extent permitted by law.\n"
