@@ -7,38 +7,37 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="1bc7", GOTO="mm_telit_vendorcheck"
 GOTO="mm_telit_port_types_end"
 
 LABEL="mm_telit_vendorcheck"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
 # UC864-E, UC864-E-AUTO, UC864-K, UC864-WD, UC864-WDU
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1003", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1003", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1003", ATTRS{bInterfaceNumber}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1003", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1003", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # UC864-G
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ATTRS{bInterfaceNumber}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ATTRS{bInterfaceNumber}=="03", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1004", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # CC864-DUAL
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ATTRS{bInterfaceNumber}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ATTRS{bInterfaceNumber}=="03", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1005", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # CC864-SINGLE, CC864-KPS
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1006", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1006", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1006", ATTRS{bInterfaceNumber}=="00", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1006", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1006", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # DE910-DUAL
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ATTRS{bInterfaceNumber}=="01", ENV{ID_MM_TELIT_PORT_TYPE_NMEA}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_TELIT_PORT_TYPE_AUX}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ATTRS{bInterfaceNumber}=="03", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # CE910-DUAL
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ATTRS{bInterfaceNumber}=="01", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{ID_MM_TELIT_TAGGED}="1"
 
 # HE910, UE910, UL865 (dynamic port identification supported)
