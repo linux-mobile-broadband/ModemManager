@@ -14,10 +14,11 @@
 
 
 ACTION!="add|change|move", GOTO="mm_longcheer_port_types_end"
+SUBSYSTEMS!="usb", GOTO="mm_longcheer_port_types_end"
 SUBSYSTEM!="tty", GOTO="mm_longcheer_port_types_end"
 
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="1c9e", GOTO="mm_longcheer_vendorcheck"
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="1bbb", GOTO="mm_tamobile_vendorcheck"
+ATTRS{idVendor}=="1c9e", GOTO="mm_longcheer_vendorcheck"
+ATTRS{idVendor}=="1bbb", GOTO="mm_tamobile_vendorcheck"
 GOTO="mm_longcheer_port_types_end"
 
 LABEL="mm_longcheer_vendorcheck"
