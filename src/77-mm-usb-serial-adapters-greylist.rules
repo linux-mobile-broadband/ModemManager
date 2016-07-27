@@ -2,7 +2,6 @@
 
 ACTION!="add|change|move", GOTO="mm_usb_serial_adapters_greylist_end"
 SUBSYSTEM!="usb", GOTO="mm_usb_serial_adapters_greylist_end"
-ENV{DEVTYPE}!="usb_device",  GOTO="mm_usb_serial_adapters_greylist_end"
 
 # Belkin F5U183 Serial Adapter
 ATTRS{idVendor}=="050d", ATTRS{idProduct}=="0103", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"

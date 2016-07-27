@@ -2,7 +2,6 @@
 
 ACTION!="add|change|move", GOTO="mm_usb_device_blacklist_end"
 SUBSYSTEM!="usb", GOTO="mm_usb_device_blacklist_end"
-ENV{DEVTYPE}!="usb_device",  GOTO="mm_usb_device_blacklist_end"
 
 # APC UPS devices
 ATTRS{idVendor}=="051d", ENV{ID_MM_DEVICE_IGNORE}="1"
