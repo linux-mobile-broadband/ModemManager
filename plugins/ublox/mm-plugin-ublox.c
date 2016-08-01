@@ -20,7 +20,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-ublox.h"
 #include "mm-plugin-ublox.h"
 
 G_DEFINE_TYPE (MMPluginUblox, mm_plugin_ublox, MM_TYPE_PLUGIN)
@@ -31,19 +31,19 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 /*****************************************************************************/
 
 static MMBaseModem *
-create_modem (MMPlugin *self,
-              const gchar *sysfs_path,
+create_modem (MMPlugin     *self,
+              const gchar  *sysfs_path,
               const gchar **drivers,
-              guint16 vendor,
-              guint16 product,
-              GList *probes,
-              GError **error)
+              guint16       vendor,
+              guint16       product,
+              GList        *probes,
+              GError      **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  drivers,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_ublox_new (sysfs_path,
+                                                        drivers,
+                                                        mm_plugin_get_name (self),
+                                                        vendor,
+                                                        product));
 }
 
 /*****************************************************************************/

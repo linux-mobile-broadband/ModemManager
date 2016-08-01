@@ -859,6 +859,8 @@ pkglib_LTLIBRARIES += libmm-plugin-ublox.la
 libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-plugin-ublox.c \
 	ublox/mm-plugin-ublox.h \
+	ublox/mm-broadband-modem-ublox.h \
+	ublox/mm-broadband-modem-ublox.c \
 	$(NULL)
 libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
