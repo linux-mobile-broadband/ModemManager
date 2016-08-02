@@ -58,6 +58,12 @@ noinst_LTLIBRARIES =
 # Plugins
 pkglib_LTLIBRARIES =
 
+# Built sources
+BUILT_SOURCES =
+
+# Clean files
+CLEANFILES =
+
 ################################################################################
 # common service test support
 ################################################################################
@@ -856,10 +862,38 @@ test_udev_rules_LDADD = \
 ################################################################################
 
 noinst_LTLIBRARIES += libhelpers-ublox.la
+
+UBLOX_ENUMS_INPUTS = \
+	ublox/mm-modem-helpers-ublox.h \
+	$(NULL)
+
+UBLOX_ENUMS_GENERATED = \
+	ublox/mm-ublox-enums-types.h \
+	ublox/mm-ublox-enums-types.c \
+	$(NULL)
+
+ublox/mm-ublox-enums-types.h: Makefile.am $(UBLOX_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
+		--fhead "#include \"mm-modem-helpers-ublox.h\"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--ftail "#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n" \
+		$(UBLOX_ENUMS_INPUTS) > $@
+
+ublox/mm-ublox-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c ublox/mm-ublox-enums-types.h
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
+		--fhead "#include \"mm-ublox-enums-types.h\"" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		$(UBLOX_ENUMS_INPUTS) > $@
+
 libhelpers_ublox_la_SOURCES = \
 	ublox/mm-modem-helpers-ublox.c \
 	ublox/mm-modem-helpers-ublox.h \
 	$(NULL)
+
+nodist_libhelpers_ublox_la_SOURCES = $(UBLOX_ENUMS_GENERATED)
+
+BUILT_SOURCES += $(UBLOX_ENUMS_GENERATED)
+CLEANFILES    += $(UBLOX_ENUMS_GENERATED)
 
 noinst_PROGRAMS += test-modem-helpers-ublox
 test_modem_helpers_ublox_SOURCES = \

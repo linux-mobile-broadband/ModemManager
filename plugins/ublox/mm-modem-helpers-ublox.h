@@ -21,7 +21,7 @@
 /*****************************************************************************/
 /* UUSBCONF? response parser */
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_ublox_usb_profile >*/
     MM_UBLOX_USB_PROFILE_UNKNOWN,
     MM_UBLOX_USB_PROFILE_RNDIS,
     MM_UBLOX_USB_PROFILE_ECM,
@@ -35,7 +35,7 @@ gboolean mm_ublox_parse_uusbconf_response (const gchar        *response,
 /*****************************************************************************/
 /* UBMCONF? response parser */
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_ublox_networking_mode >*/
     MM_UBLOX_NETWORKING_MODE_UNKNOWN,
     MM_UBLOX_NETWORKING_MODE_ROUTER,
     MM_UBLOX_NETWORKING_MODE_BRIDGE,

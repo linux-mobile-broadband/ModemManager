@@ -170,6 +170,8 @@ Makefile.in
 /plugins/test-modem-helpers-ublox*
 /plugins/test-service-*
 
+/plugins/ublox/mm-ublox-enums-types.[ch]
+
 /test/lsudev
 /test/mmtty
 /test/mmrules

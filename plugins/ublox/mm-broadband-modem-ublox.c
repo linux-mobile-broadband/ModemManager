@@ -28,6 +28,7 @@
 #include "mm-broadband-bearer.h"
 #include "mm-broadband-modem-ublox.h"
 #include "mm-modem-helpers-ublox.h"
+#include "mm-ublox-enums-types.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -123,16 +124,8 @@ mode_check_ready (MMBaseModem  *self,
         mm_dbg ("u-blox: couldn't parse current networking mode response '%s': %s", response, error->message);
         g_error_free (error);
     } else {
-        switch (ctx->self->priv->mode) {
-        case MM_UBLOX_NETWORKING_MODE_ROUTER:
-            mm_dbg ("u-blox: networking mode loaded: router");
-            break;
-        case MM_UBLOX_NETWORKING_MODE_BRIDGE:
-            mm_dbg ("u-blox: networking mode loaded: bridge");
-            break;
-        default:
-            g_assert_not_reached ();
-        }
+        g_assert (ctx->self->priv->mode != MM_UBLOX_NETWORKING_MODE_UNKNOWN);
+        mm_dbg ("u-blox: networking mode loaded: %s", mm_ublox_networking_mode_get_string (ctx->self->priv->mode));
     }
 
     /* Assume the operation has been performed, even if it may have failed */
@@ -161,19 +154,8 @@ profile_check_ready (MMBaseModem  *self,
         mm_dbg ("u-blox: couldn't parse current usb profile response '%s': %s", response, error->message);
         g_error_free (error);
     } else {
-        switch (ctx->self->priv->profile) {
-        case MM_UBLOX_USB_PROFILE_RNDIS:
-            mm_dbg ("u-blox: usb profile loaded: high throughput");
-            break;
-        case MM_UBLOX_USB_PROFILE_ECM:
-            mm_dbg ("u-blox: usb profile loaded: medium/low throughput");
-            break;
-        case MM_UBLOX_USB_PROFILE_BACK_COMPATIBLE:
-            mm_dbg ("u-blox: usb profile loaded: back-compatible");
-            break;
-        default:
-            g_assert_not_reached ();
-        }
+        g_assert (ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_UNKNOWN);
+        mm_dbg ("u-blox: usb profile loaded: %s", mm_ublox_usb_profile_get_string (ctx->self->priv->profile));
     }
 
     /* Assume the operation has been performed, even if it may have failed */
