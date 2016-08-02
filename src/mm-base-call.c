@@ -610,10 +610,9 @@ call_start_ready (MMBaseModem *modem,
             mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         }
 
-        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)          ||
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER)     ||
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)    )
-        {
+        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)      ||
+            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER) ||
+            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)) {
             /* Update state */
             mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
         }
@@ -626,14 +625,14 @@ call_start_ready (MMBaseModem *modem,
 
     /* check response for error */
     if (response && strlen (response) > 0 ) {
-        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Couldn't start the call: "
                              "Modem response '%s'", response);
         /* Update state */
-        mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
     } else {
         /* Update state */
-        mm_base_call_change_state(ctx->self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
     }
 
     if (error) {
@@ -648,8 +647,8 @@ call_start_ready (MMBaseModem *modem,
 
 static void
 call_start (MMBaseCall *self,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+            GAsyncReadyCallback callback,
+            gpointer user_data)
 {
     CallStartContext *ctx;
     gchar *cmd;
@@ -663,7 +662,7 @@ call_start (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)) );
+    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
     mm_base_modem_at_command (ctx->modem,
                               cmd,
                               90,
