@@ -27,6 +27,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer.h"
 #include "mm-broadband-modem-ublox.h"
+#include "mm-broadband-bearer-ublox.h"
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
 
@@ -101,6 +102,29 @@ broadband_bearer_new_ready (GObject      *source,
     }
 
     mm_dbg ("u-blox: new generic broadband bearer created at DBus path '%s'", mm_base_bearer_get_path (ctx->bearer));
+    ctx->step++;
+    create_bearer_step (task);
+}
+
+static void
+broadband_bearer_ublox_new_ready (GObject      *source,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    CreateBearerContext *ctx;
+    GError *error = NULL;
+
+    ctx = (CreateBearerContext *) g_task_get_task_data (task);
+
+    g_assert (!ctx->bearer);
+    ctx->bearer = mm_broadband_bearer_ublox_new_finish (res, &error);
+    if (!ctx->bearer) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_dbg ("u-blox: new u-blox broadband bearer created at DBus path '%s'", mm_base_bearer_get_path (ctx->bearer));
     ctx->step++;
     create_bearer_step (task);
 }
@@ -207,8 +231,29 @@ create_bearer_step (GTask *task)
         /* fall down */
 
     case CREATE_BEARER_STEP_CREATE_BEARER:
-        /* For now, we just create a MMBroadbandBearer */
-        mm_dbg ("u-blox: creating generic broadband bearer in u-blox modem...");
+        /* If we have a net interface, we'll create a u-blox bearer, unless for
+         * any reason we have the back-compatible profile selected, or if we don't
+         * know the mode to use. */
+        if ((ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_ECM || ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_RNDIS) &&
+            (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_BRIDGE || ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_ROUTER) &&
+            mm_base_modem_peek_best_data_port (MM_BASE_MODEM (ctx->self), MM_PORT_TYPE_NET)) {
+            mm_dbg ("u-blox: creating u-blox broadband bearer (%s profile, %s mode)...",
+                    mm_ublox_usb_profile_get_string (ctx->self->priv->profile),
+                    mm_ublox_networking_mode_get_string (ctx->self->priv->mode));
+            mm_broadband_bearer_ublox_new (
+                MM_BROADBAND_MODEM (ctx->self),
+                ctx->self->priv->profile,
+                ctx->self->priv->mode,
+                ctx->properties,
+                NULL, /* cancellable */
+                (GAsyncReadyCallback) broadband_bearer_ublox_new_ready,
+                task);
+            return;
+        }
+
+        /* If usb profile is back-compatible already, or if there is no NET port
+         * available, create default generic bearer */
+        mm_dbg ("u-blox: creating generic broadband bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
                                  ctx->properties,
                                  NULL, /* cancellable */
