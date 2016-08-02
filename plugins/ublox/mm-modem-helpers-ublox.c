@@ -81,3 +81,64 @@ mm_ublox_parse_uusbconf_response (const gchar        *response,
     *out_profile = profile;
     return TRUE;
 }
+
+/*****************************************************************************/
+/* UBMCONF? response parser */
+
+gboolean
+mm_ublox_parse_ubmconf_response (const gchar            *response,
+                                 MMUbloxNetworkingMode  *out_mode,
+                                 GError                **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    GError *inner_error = NULL;
+    MMUbloxNetworkingMode mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+
+    g_assert (out_mode != NULL);
+
+    /* Response may be e.g.:
+     * +UBMCONF: 1
+     * +UBMCONF: 2
+     */
+    r = g_regex_new ("\\+UBMCONF: (\\d+)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        guint mode_id = 0;
+
+        if (mm_get_uint_from_match_info (match_info, 1, &mode_id)) {
+            switch (mode_id) {
+            case 1:
+                mode = MM_UBLOX_NETWORKING_MODE_ROUTER;
+                break;
+            case 2:
+                mode = MM_UBLOX_NETWORKING_MODE_BRIDGE;
+                break;
+            default:
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                           "Unknown mode id: '%u'", mode_id);
+                break;
+            }
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (mode == MM_UBLOX_NETWORKING_MODE_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse networking mode response");
+        return FALSE;
+    }
+
+    *out_mode = mode;
+    return TRUE;
+}

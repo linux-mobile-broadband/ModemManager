@@ -67,6 +67,42 @@ test_uusbconf_response (void)
 }
 
 /*****************************************************************************/
+/* Test UBMCONF? responses */
+
+typedef struct {
+    const gchar           *str;
+    MMUbloxNetworkingMode  mode;
+} UbmconfResponseTest;
+
+static const UbmconfResponseTest ubmconf_response_tests[] = {
+    {
+        .str  = "+UBMCONF: 1\r\n",
+        .mode = MM_UBLOX_NETWORKING_MODE_ROUTER
+    },
+    {
+        .str  = "+UBMCONF: 2\r\n",
+        .mode = MM_UBLOX_NETWORKING_MODE_BRIDGE
+    },
+};
+
+static void
+test_ubmconf_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (ubmconf_response_tests); i++) {
+        MMUbloxNetworkingMode mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+        GError *error = NULL;
+        gboolean success;
+
+        success = mm_ublox_parse_ubmconf_response (ubmconf_response_tests[i].str, &mode, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (ubmconf_response_tests[i].mode, ==, mode);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -96,6 +132,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
+    g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
 
     return g_test_run ();
 }

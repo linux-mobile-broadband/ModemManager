@@ -32,4 +32,17 @@ gboolean mm_ublox_parse_uusbconf_response (const gchar        *response,
                                            MMUbloxUsbProfile  *out_profile,
                                            GError            **error);
 
+/*****************************************************************************/
+/* UBMCONF? response parser */
+
+typedef enum {
+    MM_UBLOX_NETWORKING_MODE_UNKNOWN,
+    MM_UBLOX_NETWORKING_MODE_ROUTER,
+    MM_UBLOX_NETWORKING_MODE_BRIDGE,
+} MMUbloxNetworkingMode;
+
+gboolean mm_ublox_parse_ubmconf_response (const gchar            *response,
+                                          MMUbloxNetworkingMode  *out_mode,
+                                          GError                **error);
+
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */
