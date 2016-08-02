@@ -167,6 +167,7 @@ Makefile.in
 /plugins/test-modem-helpers-mbm*
 /plugins/test-modem-helpers-telit*
 /plugins/test-modem-helpers-thuraya*
+/plugins/test-modem-helpers-ublox*
 /plugins/test-service-*
 
 /test/lsudev

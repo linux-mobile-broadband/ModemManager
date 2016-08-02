@@ -855,6 +855,25 @@ test_udev_rules_LDADD = \
 # plugin: u-blox
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-ublox.la
+libhelpers_ublox_la_SOURCES = \
+	ublox/mm-modem-helpers-ublox.c \
+	ublox/mm-modem-helpers-ublox.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-ublox
+test_modem_helpers_ublox_SOURCES = \
+	ublox/tests/test-modem-helpers-ublox.c \
+	$(NULL)
+test_modem_helpers_ublox_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/ublox \
+	$(NULL)
+test_modem_helpers_ublox_LDADD = \
+	$(builddir)/libhelpers-ublox.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 pkglib_LTLIBRARIES += libmm-plugin-ublox.la
 libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-plugin-ublox.c \
@@ -864,6 +883,7 @@ libmm_plugin_ublox_la_SOURCES = \
 	$(NULL)
 libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_ublox_la_LIBADD   = $(builddir)/libhelpers-ublox.la
 
 ################################################################################
 
