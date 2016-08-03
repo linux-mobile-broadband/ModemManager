@@ -3495,16 +3495,21 @@ modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                       GError **error)
 {
     const gchar *result;
-    gchar *operator_code;
+    gchar *operator_code = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
         return NULL;
 
-    operator_code = mm_3gpp_parse_operator (result, MM_MODEM_CHARSET_UNKNOWN);
-    if (operator_code)
-        mm_dbg ("loaded Operator Code: %s", operator_code);
+    if (!mm_3gpp_parse_cops_read_response (result,
+                                           NULL, /* mode */
+                                           NULL, /* format */
+                                           &operator_code,
+                                           NULL, /* act */
+                                           error))
+        return NULL;
 
+    mm_dbg ("loaded Operator Code: %s", operator_code);
     return operator_code;
 }
 
@@ -3531,16 +3536,23 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                       GError **error)
 {
     const gchar *result;
-    gchar *operator_name;
+    gchar *operator_name = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
         return NULL;
 
-    operator_name = mm_3gpp_parse_operator (result, MM_BROADBAND_MODEM (self)->priv->modem_current_charset);
+    if (!mm_3gpp_parse_cops_read_response (result,
+                                           NULL, /* mode */
+                                           NULL, /* format */
+                                           &operator_name,
+                                           NULL, /* act */
+                                           error))
+        return NULL;
+
+    mm_3gpp_normalize_operator_name (&operator_name, MM_BROADBAND_MODEM (self)->priv->modem_current_charset);
     if (operator_name)
         mm_dbg ("loaded Operator Name: %s", operator_name);
-
     return operator_name;
 }
 

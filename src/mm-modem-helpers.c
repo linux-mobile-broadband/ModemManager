@@ -849,6 +849,89 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
 
 /*************************************************************************/
 
+gboolean
+mm_3gpp_parse_cops_read_response (const gchar              *response,
+                                  guint                    *out_mode,
+                                  guint                    *out_format,
+                                  gchar                   **out_operator,
+                                  MMModemAccessTechnology  *out_act,
+                                  GError                  **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    GError *inner_error = NULL;
+    guint mode = 0;
+    guint format = 0;
+    gchar *operator = NULL;
+    guint actval = 0;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    g_assert (out_mode || out_format || out_operator || out_act);
+
+    /* We assume the response to be either:
+     *   +COPS: <mode>,<format>,<oper>
+     * or:
+     *   +COPS: <mode>,<format>,<oper>,<AcT>
+     */
+    r = g_regex_new ("\\+COPS:\\s*(\\d+),(\\d+),([^,]*)(?:,(\\d+))?(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    if (out_mode && !mm_get_uint_from_match_info (match_info, 1, &mode)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing mode");
+        goto out;
+    }
+
+    if (out_format && !mm_get_uint_from_match_info (match_info, 2, &format)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing format");
+        goto out;
+    }
+
+    if (out_operator && !(operator = mm_get_string_unquoted_from_match_info (match_info, 3))) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing operator");
+        goto out;
+    }
+
+    /* AcT is optional */
+    if (out_act && g_match_info_get_match_count (match_info) >= 5) {
+        if (!mm_get_uint_from_match_info (match_info, 4, &actval)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing AcT");
+            goto out;
+        }
+        act = get_mm_access_tech_from_etsi_access_tech (actval);
+    }
+
+out:
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_free (operator);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_mode)
+        *out_mode = mode;
+    if (out_format)
+        *out_format = format;
+    if (out_operator)
+        *out_operator = operator;
+    if (out_act)
+        *out_act = act;
+    return TRUE;
+}
+
+/*************************************************************************/
 
 static void
 mm_3gpp_pdp_context_format_free (MM3gppPdpContextFormat *format)
@@ -2349,57 +2432,34 @@ mm_string_to_access_tech (const gchar *string)
 
 /*************************************************************************/
 
-gchar *
-mm_3gpp_parse_operator (const gchar *reply,
-                        MMModemCharset cur_charset)
+void
+mm_3gpp_normalize_operator_name (gchar          **operator,
+                                 MMModemCharset   cur_charset)
 {
-    gchar *operator = NULL;
+    g_assert (operator);
 
-    if (reply && !strncmp (reply, "+COPS: ", 7)) {
-        /* Got valid reply */
-        GRegex *r;
-        GMatchInfo *match_info;
+    if (*operator == NULL)
+        return;
 
-        reply += 7;
-        r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
-        if (!r)
-            return NULL;
-
-        g_regex_match (r, reply, 0, &match_info);
-        if (g_match_info_matches (match_info))
-            operator = g_match_info_fetch (match_info, 3);
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
+    /* Some modems (Option & HSO) return the operator name as a hexadecimal
+     * string of the bytes of the operator name as encoded by the current
+     * character set.
+     */
+    if (cur_charset == MM_MODEM_CHARSET_UCS2) {
+        /* In this case we're already checking UTF-8 validity */
+        *operator = mm_charset_take_and_convert_to_utf8 (*operator, MM_MODEM_CHARSET_UCS2);
     }
+    /* Ensure the operator name is valid UTF-8 so that we can send it
+     * through D-Bus and such.
+     */
+    else if (!g_utf8_validate (*operator, -1, NULL))
+        g_clear_pointer (operator, g_free);
 
-    if (operator) {
-        /* Some modems (Option & HSO) return the operator name as a hexadecimal
-         * string of the bytes of the operator name as encoded by the current
-         * character set.
-         */
-        if (cur_charset == MM_MODEM_CHARSET_UCS2) {
-            /* In this case we're already checking UTF-8 validity */
-            operator = mm_charset_take_and_convert_to_utf8 (operator, MM_MODEM_CHARSET_UCS2);
-        }
-        /* Ensure the operator name is valid UTF-8 so that we can send it
-         * through D-Bus and such.
-         */
-        else if (!g_utf8_validate (operator, -1, NULL)) {
-            g_free (operator);
-            return NULL;
-        }
-
-        /* Some modems (Novatel LTE) return the operator name as "Unknown" when
-         * it fails to obtain the operator name. Return NULL in such case.
-         */
-        if (operator && g_ascii_strcasecmp (operator, "unknown") == 0) {
-            g_free (operator);
-            return NULL;
-        }
-    }
-
-    return operator;
+    /* Some modems (Novatel LTE) return the operator name as "Unknown" when
+     * it fails to obtain the operator name. Return NULL in such case.
+     */
+    if (*operator && g_ascii_strcasecmp (*operator, "unknown") == 0)
+        g_clear_pointer (operator, g_free);
 }
 
 /*************************************************************************/

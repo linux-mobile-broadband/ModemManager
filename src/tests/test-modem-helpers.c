@@ -689,6 +689,83 @@ test_cops_response_umts_invalid (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test COPS? responses */
+
+typedef struct {
+    const gchar             *str;
+    guint                    mode;
+    guint                    format;
+    const gchar             *operator;
+    MMModemAccessTechnology  act;
+} CopsQueryData;
+
+static void
+test_cops_query_data (const CopsQueryData *item)
+{
+    gboolean                 result;
+    GError                  *error = NULL;
+    guint                    mode = G_MAXUINT;
+    guint                    format = G_MAXUINT;
+    gchar                   *operator = NULL;
+    MMModemAccessTechnology  act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    result = mm_3gpp_parse_cops_read_response (item->str,
+                                               &mode,
+                                               &format,
+                                               &operator,
+                                               &act,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (result);
+    g_assert_cmpuint (mode,     ==, item->mode);
+    g_assert_cmpuint (format,   ==, item->format);
+    g_assert_cmpstr  (operator, ==, item->operator);
+    g_assert_cmpuint (act,      ==, item->act);
+
+    g_free (operator);
+}
+
+static const CopsQueryData cops_query_data[] = {
+    {
+        .str = "+COPS: 1,0,\"CHINA MOBILE\"",
+        .mode = 1,
+        .format = 0,
+        .operator = "CHINA MOBILE",
+        .act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN
+    },
+    {
+        .str = "+COPS: 1,0,\"CHINA MOBILE\",7",
+        .mode = 1,
+        .format = 0,
+        .operator = "CHINA MOBILE",
+        .act = MM_MODEM_ACCESS_TECHNOLOGY_LTE
+    },
+    {
+        .str = "+COPS: 1,2,\"46000\"",
+        .mode = 1,
+        .format = 2,
+        .operator = "46000",
+        .act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN
+    },
+    {
+        .str = "+COPS: 1,2,\"46000\",7",
+        .mode = 1,
+        .format = 2,
+        .operator = "46000",
+        .act = MM_MODEM_ACCESS_TECHNOLOGY_LTE
+    },
+};
+
+static void
+test_cops_query (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cops_query_data); i++)
+        test_cops_query_data (&cops_query_data[i]);
+}
+
+/*****************************************************************************/
 /* Test CREG/CGREG responses and unsolicited messages */
 
 typedef struct {
@@ -2961,6 +3038,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cops_query, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_creg1_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, reg_data));

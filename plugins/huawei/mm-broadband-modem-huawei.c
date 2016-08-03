@@ -2179,10 +2179,18 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                       GError **error)
 {
     const gchar *result;
-    gchar *operator_name;
+    gchar *operator_name = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
+        return NULL;
+
+    if (!mm_3gpp_parse_cops_read_response (result,
+                                           NULL, /* mode */
+                                           NULL, /* format */
+                                           &operator_name,
+                                           NULL, /* act */
+                                           error))
         return NULL;
 
     /* Despite +CSCS? may claim supporting UCS2, Huawei modems always report the
@@ -2190,7 +2198,7 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
      * charset claimed by the modem and assume the charset is IRA when parsing
      * the operator name.
      */
-    operator_name = mm_3gpp_parse_operator (result, MM_MODEM_CHARSET_IRA);
+    mm_3gpp_normalize_operator_name (&operator_name, MM_MODEM_CHARSET_IRA);
     if (operator_name)
         mm_dbg ("loaded Operator Name: %s", operator_name);
 

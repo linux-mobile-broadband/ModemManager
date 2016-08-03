@@ -116,6 +116,14 @@ void mm_3gpp_network_info_list_free (GList *info_list);
 GList *mm_3gpp_parse_cops_test_response (const gchar *reply,
                                          GError **error);
 
+/* AT+COPS? (current operator) response parser */
+gboolean mm_3gpp_parse_cops_read_response (const gchar              *response,
+                                           guint                    *out_mode,
+                                           guint                    *out_format,
+                                           gchar                   **out_operator,
+                                           MMModemAccessTechnology  *out_act,
+                                           GError                  **error);
+
 /* AT+CGDCONT=? (PDP context format) test parser */
 typedef struct {
     guint min_cid;
@@ -240,8 +248,8 @@ gchar *mm_3gpp_facility_to_acronym (MMModem3gppFacility facility);
 
 MMModemAccessTechnology mm_string_to_access_tech (const gchar *string);
 
-gchar *mm_3gpp_parse_operator (const gchar *reply,
-                               MMModemCharset cur_charset);
+void mm_3gpp_normalize_operator_name (gchar          **operator,
+                                      MMModemCharset   cur_charset);
 
 gboolean mm_3gpp_parse_operator_id (const gchar *operator_id,
                                     guint16 *mcc,
