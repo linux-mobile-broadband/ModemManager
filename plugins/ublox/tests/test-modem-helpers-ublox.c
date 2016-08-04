@@ -103,6 +103,85 @@ test_ubmconf_response (void)
 }
 
 /*****************************************************************************/
+/* Test UIPADDR=N responses */
+
+typedef struct {
+    const gchar *str;
+    guint        cid;
+    const gchar *if_name;
+    const gchar *ipv4_address;
+    const gchar *ipv4_subnet;
+    const gchar *ipv6_global_address;
+    const gchar *ipv6_link_local_address;
+} UipaddrResponseTest;
+
+static const UipaddrResponseTest uipaddr_response_tests[] = {
+    {
+        .str = "+UIPADDR: 1,\"ccinet0\",\"5.168.120.13\",\"255.255.255.0\",\"\",\"\"",
+        .cid = 1,
+        .if_name = "ccinet0",
+        .ipv4_address = "5.168.120.13",
+        .ipv4_subnet = "255.255.255.0",
+    },
+    {
+        .str = "+UIPADDR: 2,\"ccinet1\",\"\",\"\",\"2001::1:200:FF:FE00:0/64\",\"FE80::200:FF:FE00:0/64\"",
+        .cid = 2,
+        .if_name = "ccinet1",
+        .ipv6_global_address = "2001::1:200:FF:FE00:0/64",
+        .ipv6_link_local_address = "FE80::200:FF:FE00:0/64",
+    },
+    {
+        .str = "+UIPADDR: 3,\"ccinet2\",\"5.10.100.2\",\"255.255.255.0\",\"2001::1:200:FF:FE00:0/64\",\"FE80::200:FF:FE00:0/64\"",
+        .cid = 3,
+        .if_name = "ccinet2",
+        .ipv4_address = "5.10.100.2",
+        .ipv4_subnet = "255.255.255.0",
+        .ipv6_global_address = "2001::1:200:FF:FE00:0/64",
+        .ipv6_link_local_address = "FE80::200:FF:FE00:0/64",
+    },
+};
+
+static void
+test_uipaddr_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (uipaddr_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint     cid = G_MAXUINT;
+        gchar    *if_name = NULL;
+        gchar    *ipv4_address = NULL;
+        gchar    *ipv4_subnet = NULL;
+        gchar    *ipv6_global_address = NULL;
+        gchar    *ipv6_link_local_address = NULL;
+
+        success = mm_ublox_parse_uipaddr_response (uipaddr_response_tests[i].str,
+                                                   &cid,
+                                                   &if_name,
+                                                   &ipv4_address,
+                                                   &ipv4_subnet,
+                                                   &ipv6_global_address,
+                                                   &ipv6_link_local_address,
+                                                   &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (uipaddr_response_tests[i].cid,                     ==, cid);
+        g_assert_cmpstr  (uipaddr_response_tests[i].if_name,                 ==, if_name);
+        g_assert_cmpstr  (uipaddr_response_tests[i].ipv4_address,            ==, ipv4_address);
+        g_assert_cmpstr  (uipaddr_response_tests[i].ipv4_subnet,             ==, ipv4_subnet);
+        g_assert_cmpstr  (uipaddr_response_tests[i].ipv6_global_address,     ==, ipv6_global_address);
+        g_assert_cmpstr  (uipaddr_response_tests[i].ipv6_link_local_address, ==, ipv6_link_local_address);
+
+        g_free (if_name);
+        g_free (ipv4_address);
+        g_free (ipv4_subnet);
+        g_free (ipv6_global_address);
+        g_free (ipv6_link_local_address);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -133,6 +212,7 @@ int main (int argc, char **argv)
 
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
     g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
+    g_test_add_func ("/MM/ublox/uipaddr/response",  test_uipaddr_response);
 
     return g_test_run ();
 }

@@ -45,4 +45,16 @@ gboolean mm_ublox_parse_ubmconf_response (const gchar            *response,
                                           MMUbloxNetworkingMode  *out_mode,
                                           GError                **error);
 
+/*****************************************************************************/
+/* UIPADDR=N response parser */
+
+gboolean mm_ublox_parse_uipaddr_response (const gchar  *response,
+                                          guint        *out_cid,
+                                          gchar       **out_if_name,
+                                          gchar       **out_ipv4_address,
+                                          gchar       **out_ipv4_subnet,
+                                          gchar       **out_ipv6_global_address,
+                                          gchar       **out_ipv6_link_local_address,
+                                          GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */
