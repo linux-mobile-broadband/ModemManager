@@ -2733,6 +2733,168 @@ test_crsm_response (void)
 }
 
 /*****************************************************************************/
+/* Test CGCONTRDP=N responses */
+
+typedef struct {
+    const gchar *str;
+    guint        cid;
+    guint        bearer_id;
+    const gchar *apn;
+    const gchar *local_address;
+    const gchar *subnet;
+    const gchar *gateway_address;
+    const gchar *dns_primary_address;
+    const gchar *dns_secondary_address;
+} CgcontrdpResponseTest;
+
+static const CgcontrdpResponseTest cgcontrdp_response_tests[] = {
+    /* Post TS 27.007 v9.4.0 format */
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49.255.255.255.255\",\"2.197.17.49\",\"10.207.43.46\",\"10.206.56.132\",\"0.0.0.0\",\"0.0.0.0\",0",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+        .dns_primary_address = "10.207.43.46",
+        .dns_secondary_address = "10.206.56.132",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49.255.255.255.255\",\"2.197.17.49\",\"10.207.43.46\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+        .dns_primary_address = "10.207.43.46",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49.255.255.255.255\",\"2.197.17.49\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49.255.255.255.255\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+    },
+    /* Pre TS 27.007 v9.4.0 format */
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49\",\"255.255.255.255\",\"2.197.17.49\",\"10.207.43.46\",\"10.206.56.132\",\"0.0.0.0\",\"0.0.0.0\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+        .dns_primary_address = "10.207.43.46",
+        .dns_secondary_address = "10.206.56.132",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49\",\"255.255.255.255\",\"2.197.17.49\",\"10.207.43.46\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+        .dns_primary_address = "10.207.43.46",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49\",\"255.255.255.255\",\"2.197.17.49\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+        .gateway_address = "2.197.17.49",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49\",\"255.255.255.255\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+        .subnet = "255.255.255.255",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\",\"2.197.17.49\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+        .local_address = "2.197.17.49",
+    },
+    /* Common */
+    {
+        .str = "+CGCONTRDP: 4,5,\"ibox.tim.it.mnc001.mcc222.gprs\"",
+        .cid = 4,
+        .bearer_id = 5,
+        .apn = "ibox.tim.it.mnc001.mcc222.gprs",
+    },
+    {
+        .str = "+CGCONTRDP: 4,5,\"\"",
+        .cid = 4,
+        .bearer_id = 5,
+    },
+};
+
+static void
+test_cgcontrdp_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cgcontrdp_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint     cid = G_MAXUINT;
+        guint     bearer_id = G_MAXUINT;
+        gchar    *apn = NULL;
+        gchar    *local_address = NULL;
+        gchar    *subnet = NULL;
+        gchar    *gateway_address = NULL;
+        gchar    *dns_primary_address = NULL;
+        gchar    *dns_secondary_address = NULL;
+
+        success = mm_3gpp_parse_cgcontrdp_response (cgcontrdp_response_tests[i].str,
+                                                    &cid,
+                                                    &bearer_id,
+                                                    &apn,
+                                                    &local_address,
+                                                    &subnet,
+                                                    &gateway_address,
+                                                    &dns_primary_address,
+                                                    &dns_secondary_address,
+                                                    &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cgcontrdp_response_tests[i].cid,                   ==, cid);
+        g_assert_cmpuint (cgcontrdp_response_tests[i].bearer_id,             ==, bearer_id);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].apn,                   ==, apn);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].local_address,         ==, local_address);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].subnet,                ==, subnet);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].gateway_address,       ==, gateway_address);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].dns_primary_address,   ==, dns_primary_address);
+        g_assert_cmpstr  (cgcontrdp_response_tests[i].dns_secondary_address, ==, dns_secondary_address);
+
+        g_free (apn);
+        g_free (local_address);
+        g_free (subnet);
+        g_free (gateway_address);
+        g_free (dns_primary_address);
+        g_free (dns_secondary_address);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -2909,6 +3071,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cclk_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_crsm_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cgcontrdp_response, NULL));
 
     result = g_test_run ();
 

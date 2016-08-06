@@ -221,6 +221,18 @@ gboolean mm_3gpp_parse_crsm_response (const gchar *reply,
                                       gchar **hex,
                                       GError **error);
 
+/* AT+CGCONTRDP=N response parser */
+gboolean mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
+                                           guint        *out_cid,
+                                           guint        *out_bearer_id,
+                                           gchar       **out_apn,
+                                           gchar       **out_local_address,
+                                           gchar       **out_subnet,
+                                           gchar       **out_gateway_address,
+                                           gchar       **out_dns_primary_address,
+                                           gchar       **out_dns_secondary_address,
+                                           GError      **error);
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);

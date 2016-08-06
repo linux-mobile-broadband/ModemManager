@@ -1393,6 +1393,204 @@ mm_3gpp_parse_crsm_response (const gchar *reply,
 }
 
 /*************************************************************************/
+/* CGCONTRDP=N response parser */
+
+static gboolean
+split_local_address_and_subnet (const gchar  *str,
+                                gchar       **local_address,
+                                gchar       **subnet)
+{
+    const gchar *separator;
+    guint count = 0;
+
+    /* E.g. split: "2.43.2.44.255.255.255.255"
+     * into:
+     *    local address: "2.43.2.44",
+     *    subnet: "255.255.255.255"
+     */
+    g_assert (str);
+    g_assert (local_address);
+    g_assert (subnet);
+
+    separator = str;
+    while (1) {
+        separator = strchr (separator, '.');
+        if (separator) {
+            count++;
+            if (count == 4) {
+                if (local_address)
+                    *local_address = g_strndup (str, (separator - str));
+                if (subnet)
+                    *subnet = g_strdup (++separator);
+                return TRUE;
+            }
+            separator++;
+            continue;
+        }
+
+        /* Not even the full IP? report error parsing */
+        if (count < 3)
+            return FALSE;
+
+        if (count == 3) {
+            if (local_address)
+                *local_address = g_strdup (str);
+            if (subnet)
+                *subnet = NULL;
+            return TRUE;
+        }
+    }
+}
+
+gboolean
+mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
+                                  guint        *out_cid,
+                                  guint        *out_bearer_id,
+                                  gchar       **out_apn,
+                                  gchar       **out_local_address,
+                                  gchar       **out_subnet,
+                                  gchar       **out_gateway_address,
+                                  gchar       **out_dns_primary_address,
+                                  gchar       **out_dns_secondary_address,
+                                  GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    guint       cid = 0;
+    guint       bearer_id = 0;
+    gchar      *apn = NULL;
+    gchar      *local_address_and_subnet = NULL;
+    gchar      *local_address = NULL;
+    gchar      *subnet = NULL;
+    gchar      *gateway_address = NULL;
+    gchar      *dns_primary_address = NULL;
+    gchar      *dns_secondary_address = NULL;
+    guint       field_format_extra_index = 0;
+
+    /* Response may be e.g.:
+     * +CGCONTRDP: 4,5,"ibox.tim.it.mnc001.mcc222.gprs","2.197.17.49.255.255.255.255","2.197.17.49","10.207.43.46","10.206.56.132","0.0.0.0","0.0.0.0",0
+     *
+     * We assume only ONE line is returned; because we request +CGCONTRDP with
+     * a specific N CID. Also, we don't parse all fields, we stop after
+     * secondary DNS.
+     *
+     * Only the 3 first parameters (cid, bearer id, apn) are mandatory in the
+     * response, all the others are optional, but, we'll anyway assume that APN
+     * may be empty.
+     *
+     * The format of the response changed in TS 27.007 v9.4.0, we try to detect
+     * both formats ('a' if >= v9.4.0, 'b' if < v9.4.0) with a single regex here.
+     */
+    r = g_regex_new ("\\+CGCONTRDP: "
+                     "(\\d+),(\\d+),([^,]*)" /* cid, bearer id, apn */
+                     "(?:,([^,]*))?" /* (a)ip+mask        or (b)ip */
+                     "(?:,([^,]*))?" /* (a)gateway        or (b)mask */
+                     "(?:,([^,]*))?" /* (a)dns1           or (b)gateway */
+                     "(?:,([^,]*))?" /* (a)dns2           or (b)dns1 */
+                     "(?:,([^,]*))?" /* (a)p-cscf primary or (b)dns2 */
+                     "(?:,(.*))?"    /* others, ignored */
+                     "(?:\\r\\n)?",
+                     0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Couldn't match +CGCONTRDP response");
+        goto out;
+    }
+
+    if (out_cid && !mm_get_uint_from_match_info (match_info, 1, &cid)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing cid");
+        goto out;
+    }
+
+    if (out_bearer_id && !mm_get_uint_from_match_info (match_info, 2, &bearer_id)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing bearer id");
+        goto out;
+    }
+
+    /* Remaining strings are optional or empty allowed */
+
+    if (out_apn)
+        apn = mm_get_string_unquoted_from_match_info (match_info, 3);
+
+    /*
+     * The +CGCONTRDP=[cid] response format before version TS 27.007 v9.4.0 had
+     * the subnet in its own comma-separated field. Try to detect that.
+     */
+    local_address_and_subnet = mm_get_string_unquoted_from_match_info (match_info, 4);
+    if (local_address_and_subnet && !split_local_address_and_subnet (local_address_and_subnet, &local_address, &subnet)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing local address and subnet");
+        goto out;
+    }
+    /* If we don't have a subnet in field 4, we're using the old format with subnet in an extra field */
+    if (!subnet) {
+        if (out_subnet)
+            subnet = mm_get_string_unquoted_from_match_info (match_info, 5);
+        field_format_extra_index = 1;
+    }
+
+    if (out_gateway_address)
+        gateway_address = mm_get_string_unquoted_from_match_info (match_info, 5 + field_format_extra_index);
+
+    if (out_dns_primary_address)
+        dns_primary_address = mm_get_string_unquoted_from_match_info (match_info, 6 + field_format_extra_index);
+
+    if (out_dns_secondary_address)
+        dns_secondary_address = mm_get_string_unquoted_from_match_info (match_info, 7 + field_format_extra_index);
+
+out:
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    g_free (local_address_and_subnet);
+
+    if (inner_error) {
+        g_free (apn);
+        g_free (local_address);
+        g_free (subnet);
+        g_free (gateway_address);
+        g_free (dns_primary_address);
+        g_free (dns_secondary_address);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_cid)
+        *out_cid = cid;
+    if (out_bearer_id)
+        *out_bearer_id = bearer_id;
+    if (out_apn)
+        *out_apn = apn;
+
+    /* Local address and subnet may always be retrieved, even if not requested
+     * by the caller, as we need them to know which +CGCONTRDP=[cid] response is
+     * being parsed. So make sure we free them if not needed. */
+    if (out_local_address)
+        *out_local_address = local_address;
+    else
+        g_free (local_address);
+    if (out_subnet)
+        *out_subnet = subnet;
+    else
+        g_free (subnet);
+
+    if (out_gateway_address)
+        *out_gateway_address = gateway_address;
+    if (out_dns_primary_address)
+        *out_dns_primary_address = dns_primary_address;
+    if (out_dns_secondary_address)
+        *out_dns_secondary_address = dns_secondary_address;
+    return TRUE;
+}
+
+/*************************************************************************/
 
 static MMSmsStorage
 storage_from_str (const gchar *str)
