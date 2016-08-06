@@ -129,7 +129,7 @@ gboolean
 mm_device_owns_port (MMDevice    *self,
                      GUdevDevice *udev_port)
 {
-    return !!device_find_probe_with_device (self, udev_port, FALSE);
+    return !!device_find_probe_with_device (self, udev_port, TRUE);
 }
 
 static gboolean
