@@ -144,6 +144,15 @@ void mm_3gpp_pdp_context_list_free (GList *pdp_list);
 GList *mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
                                             GError **error);
 
+/* AT+CGACT? (active PDP context query) response parser */
+typedef struct {
+    guint cid;
+    gboolean active;
+} MM3gppPdpContextActive;
+void mm_3gpp_pdp_context_active_list_free (GList *pdp_active_list);
+GList *mm_3gpp_parse_cgact_read_response (const gchar *reply,
+                                          GError **error);
+
 /* CREG/CGREG response/unsolicited message parser */
 gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       MMModem3gppRegistrationState *out_reg_state,

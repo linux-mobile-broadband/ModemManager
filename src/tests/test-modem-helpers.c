@@ -1994,6 +1994,93 @@ test_cgdcont_read_response_samsung (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CGDCONT read responses */
+
+static void
+test_cgact_read_results (const gchar *desc,
+                         const gchar *reply,
+                         MM3gppPdpContextActive *expected_results,
+                         guint32 expected_results_len)
+{
+    GList *l;
+    GError *error = NULL;
+    GList *results;
+
+    trace ("\nTesting %s +CGACT response...\n", desc);
+
+    results = mm_3gpp_parse_cgact_read_response (reply, &error);
+    g_assert_no_error (error);
+    if (expected_results_len) {
+        g_assert (results);
+        g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
+    }
+
+    for (l = results; l; l = g_list_next (l)) {
+        MM3gppPdpContextActive *pdp = l->data;
+        gboolean found = FALSE;
+        guint i;
+
+        for (i = 0; !found && i < expected_results_len; i++) {
+            MM3gppPdpContextActive *expected;
+
+            expected = &expected_results[i];
+            if (pdp->cid == expected->cid) {
+                found = TRUE;
+                g_assert_cmpuint (pdp->active, ==, expected->active);
+            }
+        }
+
+        g_assert (found == TRUE);
+    }
+
+    mm_3gpp_pdp_context_active_list_free (results);
+}
+
+static void
+test_cgact_read_response_none (void)
+{
+    test_cgact_read_results ("none", "", NULL, 0);
+}
+
+static void
+test_cgact_read_response_single_inactive (void)
+{
+    const gchar *reply = "+CGACT: 1,0\r\n";
+    static MM3gppPdpContextActive expected[] = {
+        { 1, FALSE },
+    };
+
+    test_cgact_read_results ("single inactive", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
+test_cgact_read_response_single_active (void)
+{
+    const gchar *reply = "+CGACT: 1,1\r\n";
+    static MM3gppPdpContextActive expected[] = {
+        { 1, TRUE },
+    };
+
+    test_cgact_read_results ("single active", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
+test_cgact_read_response_multiple (void)
+{
+    const gchar *reply =
+        "+CGACT: 1,0\r\n"
+        "+CGACT: 4,1\r\n"
+        "+CGACT: 5,0\r\n";
+    static MM3gppPdpContextActive expected[] = {
+        { 1, FALSE },
+        { 4, TRUE },
+        { 5, FALSE },
+    };
+
+    test_cgact_read_results ("multiple", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
+/*****************************************************************************/
 /* Test CPMS responses */
 
 static gboolean
@@ -3122,6 +3209,11 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cgact_read_response_none, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgact_read_response_single_inactive, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgact_read_response_single_active, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgact_read_response_multiple, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic, NULL));
     g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_without_detail, NULL));
