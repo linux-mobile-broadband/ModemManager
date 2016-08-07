@@ -47,7 +47,7 @@ struct _MMBroadbandBearer {
 struct _MMBroadbandBearerClass {
     MMBaseBearerClass parent;
 
-    /* Full 3GPP connection sequence */
+    /* Full 3GPP connection sequence (cid selection, dial, get ip config) */
     void     (* connect_3gpp)        (MMBroadbandBearer *self,
                                       MMBroadbandModem *modem,
                                       MMPortSerialAt *primary,
@@ -58,6 +58,17 @@ struct _MMBroadbandBearerClass {
     MMBearerConnectResult * (* connect_3gpp_finish) (MMBroadbandBearer *self,
                                                      GAsyncResult *res,
                                                      GError **error);
+
+    /* CID selection sub-part of 3GPP connection */
+    void  (* cid_selection_3gpp)        (MMBroadbandBearer *self,
+                                         MMBaseModem *modem,
+                                         MMPortSerialAt *primary,
+                                         GCancellable *cancellable,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    guint (* cid_selection_3gpp_finish) (MMBroadbandBearer *self,
+                                         GAsyncResult *res,
+                                         GError **error);
 
     /* Dialing sub-part of 3GPP connection */
     void     (* dial_3gpp)        (MMBroadbandBearer *self,

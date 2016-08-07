@@ -69,6 +69,26 @@ mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
 }
 
 /*****************************************************************************/
+
+static MMBearerIpFamily
+select_bearer_ip_family (MMBroadbandBearer *self)
+{
+    MMBearerIpFamily ip_family;
+
+    ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY) {
+        gchar *default_family;
+
+        ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
+        default_family = mm_bearer_ip_family_build_string_from_mask (ip_family);
+        mm_dbg ("No specific IP family requested, defaulting to %s", default_family);
+        g_free (default_family);
+    }
+
+    return ip_family;
+}
+
+/*****************************************************************************/
 /* Detailed connect context, used in both CDMA and 3GPP sequences */
 
 typedef struct {
@@ -83,9 +103,6 @@ typedef struct {
     gboolean close_data_on_exit;
 
     /* 3GPP-specific */
-    guint cid;
-    guint max_cid;
-    gboolean use_existing_cid;
     MMBearerIpFamily ip_family;
 } DetailedConnectContext;
 
@@ -167,16 +184,7 @@ detailed_connect_context_new (MMBroadbandBearer *self,
                                              user_data,
                                              detailed_connect_context_new);
 
-    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    if (ctx->ip_family == MM_BEARER_IP_FAMILY_NONE ||
-        ctx->ip_family == MM_BEARER_IP_FAMILY_ANY) {
-        gchar *default_family;
-
-        ctx->ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
-        default_family = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
-        mm_dbg ("No specific IP family requested, defaulting to %s", default_family);
-        g_free (default_family);
-    }
+    ctx->ip_family = select_bearer_ip_family (self);
 
     /* NOTE:
      * We don't currently support cancelling AT commands, so we'll just check
@@ -620,6 +628,331 @@ dial_3gpp (MMBroadbandBearer *self,
 }
 
 /*****************************************************************************/
+/* 3GPP cid selection (sub-step of the 3GPP Connection sequence) */
+
+typedef struct {
+    MMBroadbandBearer *self;
+    MMBaseModem       *modem;
+    MMPortSerialAt    *primary;
+    GCancellable      *cancellable;
+    guint              cid;
+    guint              max_cid;
+    gboolean           use_existing_cid;
+    MMBearerIpFamily   ip_family;
+} CidSelection3gppContext;
+
+static void
+cid_selection_3gpp_context_free (CidSelection3gppContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->cancellable);
+    g_slice_free (CidSelection3gppContext, ctx);
+}
+
+static guint
+cid_selection_3gpp_finish (MMBroadbandBearer  *self,
+                           GAsyncResult       *res,
+                           GError            **error)
+{
+    gssize cid;
+
+    /* We return 0 as an invalid CID, not -1 */
+    cid = g_task_propagate_int (G_TASK (res), error);
+    return (guint) (cid < 0 ? 0 : cid);
+}
+
+static void
+initialize_pdp_context_ready (MMBaseModem  *modem,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    CidSelection3gppContext *ctx;
+    GError                  *error = NULL;
+
+    ctx = (CidSelection3gppContext *) g_task_get_task_data (task);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (error) {
+        mm_warn ("Couldn't initialize PDP context with our APN: '%s'", error->message);
+        g_task_return_error (task, error);
+    } else
+        g_task_return_int (task, (gssize) ctx->cid);
+    g_object_unref (task);
+}
+
+static void
+find_cid_ready (MMBaseModem  *modem,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    gchar                   *apn;
+    gchar                   *command;
+    GError                  *error = NULL;
+    const gchar             *pdp_type;
+    CidSelection3gppContext *ctx;
+
+    ctx = (CidSelection3gppContext *) g_task_get_task_data (task);
+
+    mm_base_modem_at_sequence_full_finish (modem, res, NULL, &error);
+    if (error) {
+        mm_warn ("Couldn't find best CID to use: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Validate requested PDP type */
+    pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
+    if (!pdp_type) {
+        gchar * str;
+
+        str = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "Unsupported IP type requested: '%s'", str);
+        g_object_unref (task);
+        g_free (str);
+        return;
+    }
+
+    /* If no error reported, we must have a valid CID to be used */
+    g_assert (ctx->cid != 0);
+
+    /* If there's already a PDP context defined, just use it */
+    if (ctx->use_existing_cid) {
+        g_task_return_int (task, (gssize) ctx->cid);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Otherwise, initialize a new PDP context with our APN */
+    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self))));
+    command = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s", ctx->cid, pdp_type, apn);
+    g_free (apn);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   command,
+                                   3,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback) initialize_pdp_context_ready,
+                                   task);
+    g_free (command);
+}
+
+static gboolean
+parse_cid_range (MMBaseModem              *modem,
+                 CidSelection3gppContext  *ctx,
+                 const gchar              *command,
+                 const gchar              *response,
+                 gboolean                  last_command,
+                 const GError             *error,
+                 GVariant                **result,
+                 GError                  **result_error)
+{
+    GError *inner_error = NULL;
+    GList  *formats, *l;
+    guint   cid;
+
+    /* If cancelled, set result error */
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_set_error (result_error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+                     "Connection setup operation has been cancelled");
+        return FALSE;
+    }
+
+    if (error) {
+        mm_dbg ("Unexpected +CGDCONT error: '%s'", error->message);
+        mm_dbg ("Defaulting to CID=1");
+        ctx->cid = 1;
+        return TRUE;
+    }
+
+    formats = mm_3gpp_parse_cgdcont_test_response (response, &inner_error);
+    if (inner_error) {
+        mm_dbg ("Error parsing +CGDCONT test response: '%s'", inner_error->message);
+        mm_dbg ("Defaulting to CID=1");
+        g_error_free (inner_error);
+        ctx->cid = 1;
+        return TRUE;
+    }
+
+    cid = 0;
+    for (l = formats; l; l = g_list_next (l)) {
+        MM3gppPdpContextFormat *format = l->data;
+
+        /* Found exact PDP type? */
+        if (format->pdp_type == ctx->ip_family) {
+            if (ctx->max_cid < format->max_cid)
+                cid = ctx->max_cid + 1;
+            else
+                cid = ctx->max_cid;
+            break;
+        }
+    }
+
+    mm_3gpp_pdp_context_format_list_free (formats);
+
+    if (cid == 0) {
+        mm_dbg ("Defaulting to CID=1");
+        cid = 1;
+    } else
+        mm_dbg ("Using CID %u", cid);
+
+    ctx->cid = cid;
+    return TRUE;
+}
+
+static gboolean
+parse_pdp_list (MMBaseModem             *modem,
+                CidSelection3gppContext *ctx,
+                const gchar             *command,
+                const gchar             *response,
+                gboolean                 last_command,
+                const GError            *error,
+                GVariant               **result,
+                GError                 **result_error)
+{
+    GError *inner_error = NULL;
+    GList *pdp_list;
+    GList *l;
+    guint cid;
+
+    /* If cancelled, set result error */
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_set_error (result_error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+                     "Connection setup operation has been cancelled");
+        return FALSE;
+    }
+
+    /* Some Android phones don't support querying existing PDP contexts,
+     * but will accept setting the APN.  So if CGDCONT? isn't supported,
+     * just ignore that error and hope for the best. (bgo #637327)
+     */
+    if (g_error_matches (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
+        mm_dbg ("Querying PDP context list is unsupported");
+        return FALSE;
+    }
+
+    if (error) {
+        mm_dbg ("Unexpected +CGDCONT? error: '%s'", error->message);
+        return FALSE;
+    }
+
+    pdp_list = mm_3gpp_parse_cgdcont_read_response (response, &inner_error);
+    if (!pdp_list) {
+        if (inner_error) {
+            mm_dbg ("%s", inner_error->message);
+            g_error_free (inner_error);
+        } else {
+            /* No predefined PDP contexts found */
+            mm_dbg ("No PDP contexts found");
+        }
+        return FALSE;
+    }
+
+    cid = 0;
+
+    /* Show all found PDP contexts in debug log */
+    mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
+    for (l = pdp_list; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp = l->data;
+        gchar *ip_family_str;
+
+        ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
+        mm_dbg ("  PDP context [cid=%u] [type='%s'] [apn='%s']",
+                pdp->cid,
+                ip_family_str,
+                pdp->apn ? pdp->apn : "");
+        g_free (ip_family_str);
+    }
+
+    /* Look for the exact PDP context we want */
+    for (l = pdp_list; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp = l->data;
+
+        if (pdp->pdp_type == ctx->ip_family) {
+            /* PDP with no APN set? we may use that one if not exact match found */
+            if (!pdp->apn || !pdp->apn[0]) {
+                mm_dbg ("Found PDP context with CID %u and no APN",
+                        pdp->cid);
+                cid = pdp->cid;
+            } else {
+                const gchar *apn;
+
+                apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+                if (apn && !g_ascii_strcasecmp (pdp->apn, apn)) {
+                    gchar *ip_family_str;
+
+                    /* Found a PDP context with the same CID and PDP type, we'll use it. */
+                    ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
+                    mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
+                            pdp->cid, ip_family_str, pdp->apn);
+                    cid = pdp->cid;
+                    ctx->use_existing_cid = TRUE;
+                    g_free (ip_family_str);
+                    /* In this case, stop searching */
+                    break;
+                }
+            }
+        }
+
+        if (ctx->max_cid < pdp->cid)
+            ctx->max_cid = pdp->cid;
+    }
+    mm_3gpp_pdp_context_list_free (pdp_list);
+
+    if (cid > 0) {
+        ctx->cid = cid;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static const MMBaseModemAtCommand find_cid_sequence[] = {
+    { "+CGDCONT?",  3, FALSE, (MMBaseModemAtResponseProcessor) parse_pdp_list  },
+    { "+CGDCONT=?", 3, TRUE,  (MMBaseModemAtResponseProcessor) parse_cid_range },
+    { NULL }
+};
+
+static void
+cid_selection_3gpp (MMBroadbandBearer   *self,
+                    MMBaseModem         *modem,
+                    MMPortSerialAt      *primary,
+                    GCancellable        *cancellable,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    GTask                   *task;
+    CidSelection3gppContext *ctx;
+
+    ctx = g_slice_new0 (CidSelection3gppContext);
+    ctx->self        = g_object_ref (self);
+    ctx->modem       = g_object_ref (modem);
+    ctx->primary     = g_object_ref (primary);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->ip_family   = select_bearer_ip_family (self);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) cid_selection_3gpp_context_free);
+
+    mm_dbg ("Looking for best CID...");
+    mm_base_modem_at_sequence_full (ctx->modem,
+                                    ctx->primary,
+                                    find_cid_sequence,
+                                    ctx, /* also passed as response processor context */
+                                    NULL, /* response_processor_context_free */
+                                    NULL, /* cancellable */
+                                    (GAsyncReadyCallback) find_cid_ready,
+                                    task);
+}
+
+/*****************************************************************************/
 /* 3GPP CONNECT
  *
  * 3GPP connection procedure of a bearer involves several steps:
@@ -702,7 +1035,7 @@ dial_3gpp_ready (MMBroadbandModem *modem,
             ctx->primary,
             ctx->secondary,
             ctx->data,
-            ctx->cid,
+            ctx->self->priv->cid,
             ctx->ip_family,
             (GAsyncReadyCallback)get_ip_config_3gpp_ready,
             ctx);
@@ -744,294 +1077,45 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
-start_3gpp_dial (DetailedConnectContext *ctx)
+cid_selection_3gpp_ready (MMBroadbandModem       *modem,
+                          GAsyncResult           *res,
+                          DetailedConnectContext *ctx)
 {
+    GError *error = NULL;
+
     /* Keep CID around after initializing the PDP context in order to
      * handle corresponding unsolicited PDP activation responses. */
-    ctx->self->priv->cid = ctx->cid;
+    ctx->self->priv->cid = MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->cid_selection_3gpp_finish (ctx->self, res, &error);
+    if (!ctx->self->priv->cid) {
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+
     MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
                                                           ctx->modem,
                                                           ctx->primary,
-                                                          ctx->cid,
+                                                          ctx->self->priv->cid,
                                                           ctx->cancellable,
-                                                          (GAsyncReadyCallback)dial_3gpp_ready,
+                                                          (GAsyncReadyCallback) dial_3gpp_ready,
                                                           ctx);
 }
 
 static void
-initialize_pdp_context_ready (MMBaseModem *modem,
-                              GAsyncResult *res,
-                              DetailedConnectContext *ctx)
-{
-    GError *error = NULL;
-
-    /* If cancelled, complete */
-    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
-        return;
-
-    mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (error) {
-        mm_warn ("Couldn't initialize PDP context with our APN: '%s'",
-                 error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
-        return;
-    }
-
-    start_3gpp_dial (ctx);
-}
-
-static void
-find_cid_ready (MMBaseModem *modem,
-                GAsyncResult *res,
-                DetailedConnectContext *ctx)
-{
-    GVariant *result;
-    gchar *apn, *command;
-    GError *error = NULL;
-    const gchar *pdp_type;
-
-    result = mm_base_modem_at_sequence_full_finish (modem, res, NULL, &error);
-    if (!result) {
-        mm_warn ("Couldn't find best CID to use: '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* If cancelled, complete. Normally, we would get the cancellation error
-     * already when finishing the sequence, but we may still get cancelled
-     * between last command result parsing in the sequence and the ready(). */
-    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
-        return;
-
-    pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
-    if (!pdp_type) {
-        gchar * str;
-
-        str = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_INVALID_ARGS,
-                                         "Unsupported IP type requested: '%s'",
-                                         str);
-        g_free (str);
-        detailed_connect_context_complete_and_free (ctx);
-        return;
-    }
-    ctx->cid = g_variant_get_uint32 (result);
-
-    /* If there's already a PDP context defined, just use it */
-    if (ctx->use_existing_cid) {
-        start_3gpp_dial (ctx);
-        return;
-    }
-
-    /* Otherwise, initialize a new PDP context with our APN */
-    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self))));
-    command = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
-                               ctx->cid,
-                               pdp_type,
-                               apn);
-    g_free (apn);
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   command,
-                                   3,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback)initialize_pdp_context_ready,
-                                   ctx);
-    g_free (command);
-}
-
-static gboolean
-parse_cid_range (MMBaseModem *modem,
-                 DetailedConnectContext *ctx,
-                 const gchar *command,
-                 const gchar *response,
-                 gboolean last_command,
-                 const GError *error,
-                 GVariant **result,
-                 GError **result_error)
-{
-    GError *inner_error = NULL;
-    GList *formats, *l;
-    guint cid;
-
-    /* If cancelled, set result error */
-    if (detailed_connect_context_set_error_if_cancelled (ctx, result_error))
-        return FALSE;
-
-    if (error) {
-        mm_dbg ("Unexpected +CGDCONT error: '%s'", error->message);
-        mm_dbg ("Defaulting to CID=1");
-        *result = g_variant_new_uint32 (1);
-        return TRUE;
-    }
-
-    formats = mm_3gpp_parse_cgdcont_test_response (response, &inner_error);
-    if (inner_error) {
-        mm_dbg ("Error parsing +CGDCONT test response: '%s'", inner_error->message);
-        mm_dbg ("Defaulting to CID=1");
-        g_error_free (inner_error);
-        *result = g_variant_new_uint32 (1);
-        return TRUE;
-    }
-
-    cid = 0;
-    for (l = formats; l; l = g_list_next (l)) {
-        MM3gppPdpContextFormat *format = l->data;
-
-        /* Found exact PDP type? */
-        if (format->pdp_type == ctx->ip_family) {
-            if (ctx->max_cid < format->max_cid)
-                cid = ctx->max_cid + 1;
-            else
-                cid = ctx->max_cid;
-            break;
-        }
-    }
-
-    mm_3gpp_pdp_context_format_list_free (formats);
-
-    if (cid == 0) {
-        mm_dbg ("Defaulting to CID=1");
-        cid = 1;
-    } else
-        mm_dbg ("Using CID %u", cid);
-
-    *result = g_variant_new_uint32 (cid);
-    return TRUE;
-}
-
-static gboolean
-parse_pdp_list (MMBaseModem *modem,
-                DetailedConnectContext *ctx,
-                const gchar *command,
-                const gchar *response,
-                gboolean last_command,
-                const GError *error,
-                GVariant **result,
-                GError **result_error)
-{
-    GError *inner_error = NULL;
-    GList *pdp_list;
-    GList *l;
-    guint cid;
-
-    /* If cancelled, set result error */
-    if (detailed_connect_context_set_error_if_cancelled (ctx, result_error))
-        return FALSE;
-
-    ctx->max_cid = 0;
-
-    /* Some Android phones don't support querying existing PDP contexts,
-     * but will accept setting the APN.  So if CGDCONT? isn't supported,
-     * just ignore that error and hope for the best. (bgo #637327)
-     */
-    if (g_error_matches (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
-        mm_dbg ("Querying PDP context list is unsupported");
-        return FALSE;
-    }
-
-    if (error) {
-        mm_dbg ("Unexpected +CGDCONT? error: '%s'", error->message);
-        return FALSE;
-    }
-
-    pdp_list = mm_3gpp_parse_cgdcont_read_response (response, &inner_error);
-    if (!pdp_list) {
-        if (inner_error) {
-            mm_dbg ("%s", inner_error->message);
-            g_error_free (inner_error);
-        } else {
-            /* No predefined PDP contexts found */
-            mm_dbg ("No PDP contexts found");
-        }
-        return FALSE;
-    }
-
-    cid = 0;
-
-    /* Show all found PDP contexts in debug log */
-    mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
-    for (l = pdp_list; l; l = g_list_next (l)) {
-        MM3gppPdpContext *pdp = l->data;
-        gchar *ip_family_str;
-
-        ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
-        mm_dbg ("  PDP context [cid=%u] [type='%s'] [apn='%s']",
-                pdp->cid,
-                ip_family_str,
-                pdp->apn ? pdp->apn : "");
-        g_free (ip_family_str);
-    }
-
-    /* Look for the exact PDP context we want */
-    for (l = pdp_list; l; l = g_list_next (l)) {
-        MM3gppPdpContext *pdp = l->data;
-
-        if (pdp->pdp_type == ctx->ip_family) {
-            /* PDP with no APN set? we may use that one if not exact match found */
-            if (!pdp->apn || !pdp->apn[0]) {
-                mm_dbg ("Found PDP context with CID %u and no APN",
-                        pdp->cid);
-                cid = pdp->cid;
-            } else {
-                const gchar *apn;
-
-                apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-                if (apn && !g_ascii_strcasecmp (pdp->apn, apn)) {
-                    gchar *ip_family_str;
-
-                    /* Found a PDP context with the same CID and PDP type, we'll use it. */
-                    ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
-                    mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
-                            pdp->cid, ip_family_str, pdp->apn);
-                    cid = pdp->cid;
-                    ctx->use_existing_cid = TRUE;
-                    g_free (ip_family_str);
-                    /* In this case, stop searching */
-                    break;
-                }
-            }
-        }
-
-        if (ctx->max_cid < pdp->cid)
-            ctx->max_cid = pdp->cid;
-    }
-    mm_3gpp_pdp_context_list_free (pdp_list);
-
-    if (cid > 0) {
-        *result = g_variant_new_uint32 (cid);
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-static const MMBaseModemAtCommand find_cid_sequence[] = {
-    { "+CGDCONT?",  3, FALSE, (MMBaseModemAtResponseProcessor)parse_pdp_list  },
-    { "+CGDCONT=?", 3, TRUE,  (MMBaseModemAtResponseProcessor)parse_cid_range },
-    { NULL }
-};
-
-static void
-connect_3gpp (MMBroadbandBearer *self,
-              MMBroadbandModem *modem,
-              MMPortSerialAt *primary,
-              MMPortSerialAt *secondary,
-              GCancellable *cancellable,
-              GAsyncReadyCallback callback,
-              gpointer user_data)
+connect_3gpp (MMBroadbandBearer   *self,
+              MMBroadbandModem    *modem,
+              MMPortSerialAt      *primary,
+              MMPortSerialAt      *secondary,
+              GCancellable        *cancellable,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
 {
     DetailedConnectContext *ctx;
 
     g_assert (primary != NULL);
+
+    /* Clear CID on every connection attempt */
+    self->priv->cid = 0;
 
     ctx = detailed_connect_context_new (self,
                                         modem,
@@ -1041,15 +1125,12 @@ connect_3gpp (MMBroadbandBearer *self,
                                         callback,
                                         user_data);
 
-    mm_dbg ("Looking for best CID...");
-    mm_base_modem_at_sequence_full (ctx->modem,
-                                    ctx->primary,
-                                    find_cid_sequence,
-                                    ctx, /* also passed as response processor context */
-                                    NULL, /* response_processor_context_free */
-                                    NULL, /* cancellable */
-                                    (GAsyncReadyCallback)find_cid_ready,
-                                    ctx);
+    MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->cid_selection_3gpp (ctx->self,
+                                                                   ctx->modem,
+                                                                   ctx->primary,
+                                                                   ctx->cancellable,
+                                                                   (GAsyncReadyCallback)cid_selection_3gpp_ready,
+                                                                   ctx);
 }
 
 /*****************************************************************************/
@@ -2108,6 +2189,8 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     klass->connect_3gpp_finish = detailed_connect_finish;
     klass->dial_3gpp = dial_3gpp;
     klass->dial_3gpp_finish = dial_3gpp_finish;
+    klass->cid_selection_3gpp = cid_selection_3gpp;
+    klass->cid_selection_3gpp_finish = cid_selection_3gpp_finish;
 
     klass->connect_cdma = connect_cdma;
     klass->connect_cdma_finish = detailed_connect_finish;
