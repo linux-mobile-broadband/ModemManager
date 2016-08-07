@@ -13,6 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -32,15 +33,11 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-#define CONNECTION_CHECK_TIMEOUT_SEC 5
 #define QMISTATUS_TAG "$NWQMISTATUS:"
 
-G_DEFINE_TYPE (MMBroadbandBearerNovatelLte, mm_broadband_bearer_novatel_lte, MM_TYPE_BROADBAND_BEARER);
+G_DEFINE_TYPE (MMBroadbandBearerNovatelLte, mm_broadband_bearer_novatel_lte, MM_TYPE_BROADBAND_BEARER)
 
-struct _MMBroadbandBearerNovatelLtePrivate {
-    /* timeout id for checking whether we're still connected */
-    guint connection_poller;
-};
+/*****************************************************************************/
 
 static gchar *
 normalize_qmistatus (const gchar *status)
@@ -56,6 +53,87 @@ normalize_qmistatus (const gchar *status)
             *iter = ' ';
 
     return normalized_status;
+}
+
+static gboolean
+is_qmistatus_connected (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return g_strrstr (str, "QMI State: CONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_CONNECTED");
+}
+
+static gboolean
+is_qmistatus_disconnected (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return g_strrstr (str, "QMI State: DISCONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_DISCONNECTED");
+}
+
+static gboolean
+is_qmistatus_call_failed (const gchar *str)
+{
+    str = mm_strip_tag (str, QMISTATUS_TAG);
+
+    return (g_strrstr (str, "QMI_RESULT_FAILURE:QMI_ERR_CALL_FAILED") != NULL);
+}
+
+/*****************************************************************************/
+/* Connection status monitoring */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *bearer,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), error);
+    return (value < 0 ? MM_BEARER_CONNECTION_STATUS_UNKNOWN : (MMBearerConnectionStatus) value);
+}
+
+static void
+poll_connection_ready (MMBaseModem  *modem,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    const gchar *result;
+    GError *error = NULL;
+
+    result = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!result)
+        g_task_return_error (task, error);
+    else if (is_qmistatus_disconnected (result))
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    else
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_CONNECTED);
+    g_object_unref (task);
+}
+
+static void
+load_connection_status (MMBaseBearer        *bearer,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask       *task;
+    MMBaseModem *modem = NULL;
+
+    task = g_task_new (bearer, NULL, callback, user_data);
+
+    g_object_get (MM_BASE_BEARER (bearer),
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+
+    mm_base_modem_at_command (
+        modem,
+        "$NWQMISTATUS",
+        3,
+        FALSE,
+        (GAsyncReadyCallback) poll_connection_ready,
+        task);
+
+    g_object_unref (modem);
 }
 
 /*****************************************************************************/
@@ -98,72 +176,6 @@ connect_3gpp_finish (MMBroadbandBearer *self,
 
 static gboolean connect_3gpp_qmistatus (DetailedConnectContext *ctx);
 
-static gboolean
-is_qmistatus_connected (const gchar *str)
-{
-    str = mm_strip_tag (str, QMISTATUS_TAG);
-
-    return g_strrstr (str, "QMI State: CONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_CONNECTED");
-}
-
-static gboolean
-is_qmistatus_disconnected (const gchar *str)
-{
-    str = mm_strip_tag (str, QMISTATUS_TAG);
-
-    return g_strrstr (str, "QMI State: DISCONNECTED") || g_strrstr (str, "QMI State: QMI_WDS_PKT_DATA_DISCONNECTED");
-}
-
-static gboolean
-is_qmistatus_call_failed (const gchar *str)
-{
-    str = mm_strip_tag (str, QMISTATUS_TAG);
-
-    return (g_strrstr (str, "QMI_RESULT_FAILURE:QMI_ERR_CALL_FAILED") != NULL);
-}
-
-static void
-poll_connection_ready (MMBaseModem *modem,
-                       GAsyncResult *res,
-                       MMBroadbandBearerNovatelLte *bearer)
-{
-    const gchar *result;
-    GError *error = NULL;
-
-    result = mm_base_modem_at_command_finish (modem, res, &error);
-    if (!result) {
-        mm_warn ("QMI connection status failed: %s", error->message);
-        g_error_free (error);
-        return;
-    }
-
-    if (is_qmistatus_disconnected (result)) {
-        mm_base_bearer_report_connection_status (MM_BASE_BEARER (bearer), MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
-        g_source_remove (bearer->priv->connection_poller);
-        bearer->priv->connection_poller = 0;
-    }
-}
-
-static gboolean
-poll_connection (MMBroadbandBearerNovatelLte *bearer)
-{
-    MMBaseModem *modem = NULL;
-
-    g_object_get (MM_BASE_BEARER (bearer),
-                  MM_BASE_BEARER_MODEM, &modem,
-                  NULL);
-    mm_base_modem_at_command (
-        modem,
-        "$NWQMISTATUS",
-        3,
-        FALSE,
-        (GAsyncReadyCallback)poll_connection_ready,
-        bearer);
-    g_object_unref (modem);
-
-    return G_SOURCE_CONTINUE;
-}
-
 static void
 connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                               GAsyncResult *res,
@@ -187,9 +199,6 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         MMBearerIpConfig *config;
 
         mm_dbg("Connected");
-        ctx->self->priv->connection_poller = g_timeout_add_seconds (CONNECTION_CHECK_TIMEOUT_SEC,
-                                                                    (GSourceFunc)poll_connection,
-                                                                    ctx->self);
         config = mm_bearer_ip_config_new ();
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
         g_simple_async_result_set_op_res_gpointer (
@@ -494,12 +503,6 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
-    MMBroadbandBearerNovatelLte *bearer = MM_BROADBAND_BEARER_NOVATEL_LTE (self);
-
-    if (bearer->priv->connection_poller) {
-        g_source_remove (bearer->priv->connection_poller);
-        bearer->priv->connection_poller = 0;
-    }
 
     ctx = detailed_disconnect_context_new (self, modem, primary, data, callback, user_data);
 
@@ -558,33 +561,16 @@ mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
 static void
 mm_broadband_bearer_novatel_lte_init (MMBroadbandBearerNovatelLte *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BROADBAND_BEARER_NOVATEL_LTE,
-                                              MMBroadbandBearerNovatelLtePrivate);
-
-    self->priv->connection_poller = 0;
-}
-
-static void
-finalize (GObject *object)
-{
-    MMBroadbandBearerNovatelLte *self = MM_BROADBAND_BEARER_NOVATEL_LTE (object);
-
-    if (self->priv->connection_poller)
-        g_source_remove (self->priv->connection_poller);
-
-    G_OBJECT_CLASS (mm_broadband_bearer_novatel_lte_parent_class)->finalize (object);
 }
 
 static void
 mm_broadband_bearer_novatel_lte_class_init (MMBroadbandBearerNovatelLteClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelLtePrivate));
-
-    object_class->finalize = finalize;
+    base_bearer_class->load_connection_status = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;

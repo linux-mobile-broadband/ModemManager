@@ -36,11 +36,9 @@
 
 typedef struct _MMBroadbandBearerNovatelLte MMBroadbandBearerNovatelLte;
 typedef struct _MMBroadbandBearerNovatelLteClass MMBroadbandBearerNovatelLteClass;
-typedef struct _MMBroadbandBearerNovatelLtePrivate MMBroadbandBearerNovatelLtePrivate;
 
 struct _MMBroadbandBearerNovatelLte {
     MMBroadbandBearer parent;
-    MMBroadbandBearerNovatelLtePrivate *priv;
 };
 
 struct _MMBroadbandBearerNovatelLteClass {
