@@ -101,6 +101,17 @@ struct _MMBaseBearerClass {
                                     GAsyncResult *res,
                                     GError **error);
 
+    /* Monitor connection status:
+     * NOTE: only CONNECTED or DISCONNECTED should be reported here; this method
+     * is used to poll for connection status once the connection has been
+     * established */
+    void (* load_connection_status) (MMBaseBearer *bearer,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    MMBearerConnectionStatus (* load_connection_status_finish) (MMBaseBearer *bearer,
+                                                                GAsyncResult *res,
+                                                                GError **error);
+
     /* Reload statistics */
     void (* reload_stats) (MMBaseBearer *bearer,
                            GAsyncReadyCallback callback,

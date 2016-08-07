@@ -14,7 +14,7 @@
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
  * Copyright (C) 2015 Azimut Electronics
- * Copyright (C) 2011 - 2015 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2011 - 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -45,6 +45,8 @@
 #define BEARER_DEFERRED_UNREGISTRATION_TIMEOUT 15
 
 #define BEARER_STATS_UPDATE_TIMEOUT 30
+
+#define BEARER_CONNECTION_MONITOR_TIMEOUT 5
 
 G_DEFINE_TYPE (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON)
 
@@ -86,6 +88,9 @@ struct _MMBaseBearerPrivate {
     GCancellable *connect_cancellable;
     /* handler id for the disconnect + cancel connect request */
     gulong disconnect_signal_handler;
+
+    /* Connection status monitoring */
+    guint connection_monitor_id;
 
     /*-- 3GPP specific --*/
     guint deferred_3gpp_unregistration_id;
@@ -131,6 +136,63 @@ mm_base_bearer_export (MMBaseBearer *self)
                   MM_BASE_BEARER_PATH, path,
                   NULL);
     g_free (path);
+}
+
+/*****************************************************************************/
+
+static void
+connection_monitor_stop (MMBaseBearer *self)
+{
+    if (self->priv->connection_monitor_id) {
+        g_source_remove (self->priv->connection_monitor_id);
+        self->priv->connection_monitor_id = 0;
+    }
+}
+
+static void
+load_connection_status_ready (MMBaseBearer *self,
+                              GAsyncResult *res)
+{
+    GError                   *error = NULL;
+    MMBearerConnectionStatus  status;
+
+    status = MM_BASE_BEARER_GET_CLASS (self)->load_connection_status_finish (self, res, &error);
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
+        mm_warn ("checking if connected failed: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    /* Report connection or disconnection */
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED || status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    mm_dbg ("connection status loaded: %s", mm_bearer_connection_status_get_string (status));
+    mm_base_bearer_report_connection_status (self, status);
+}
+
+static gboolean
+connection_monitor_cb (MMBaseBearer *self)
+{
+    /* If the implementation knows how to update stat values, run it */
+    MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
+            self,
+            (GAsyncReadyCallback)load_connection_status_ready,
+            NULL);
+    return G_SOURCE_CONTINUE;
+}
+
+static void
+connection_monitor_start (MMBaseBearer *self)
+{
+    /* If not implemented, don't schedule anything */
+    if (!MM_BASE_BEARER_GET_CLASS (self)->load_connection_status ||
+        !MM_BASE_BEARER_GET_CLASS (self)->load_connection_status_finish)
+        return;
+
+    /* Schedule */
+    g_assert (!self->priv->connection_monitor_id);
+    self->priv->connection_monitor_id = g_timeout_add_seconds (BEARER_CONNECTION_MONITOR_TIMEOUT,
+                                                               (GSourceFunc) connection_monitor_cb,
+                                                               self);
 }
 
 /*****************************************************************************/
@@ -262,6 +324,8 @@ bearer_update_status (MMBaseBearer *self,
         bearer_reset_interface_status (self);
         /* Stop statistics */
         bearer_stats_stop (self);
+        /* Stop connection monitoring */
+        connection_monitor_stop (self);
     }
 }
 
@@ -283,6 +347,9 @@ bearer_update_status_connected (MMBaseBearer *self,
 
     /* Start statistics */
     bearer_stats_start (self);
+
+    /* Start connection monitor, if supported */
+    connection_monitor_start (self);
 
     /* Update the property value */
     self->priv->status = MM_BEARER_STATUS_CONNECTED;
@@ -1100,15 +1167,15 @@ static void
 report_connection_status (MMBaseBearer *self,
                           MMBearerConnectionStatus status)
 {
-    /* The only status expected at this point is DISCONNECTED.
-     * No other status should have been given to the generic implementation
-     * of report_connection_status (it would be an error).
+    /* The only status expected at this point is DISCONNECTED or CONNECTED,
+     * although here we just process the DISCONNECTED one.
      */
-    g_assert (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED || status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 
     /* In the generic bearer implementation we just need to reset the
      * interface status */
-    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+        bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
 }
 
 void
@@ -1264,6 +1331,7 @@ dispose (GObject *object)
 {
     MMBaseBearer *self = MM_BASE_BEARER (object);
 
+    connection_monitor_stop (self);
     bearer_stats_stop (self);
     g_clear_object (&self->priv->stats);
 
