@@ -131,6 +131,105 @@ mm_split_string_groups (const gchar *str)
 
 /*****************************************************************************/
 
+static int uint_compare_func (gconstpointer a, gconstpointer b)
+{
+   return (*(guint *)a - *(guint *)b);
+}
+
+GArray *
+mm_parse_uint_list (const gchar  *str,
+                    GError      **error)
+{
+    GArray *array;
+    gchar  *dupstr;
+    gchar  *aux;
+    GError *inner_error = NULL;
+
+    if (!str || !str[0])
+        return NULL;
+
+    /* Parses into a GArray of guints, the list of numbers given in the string,
+     * also supporting number intervals.
+     * E.g.:
+     *   1-6      --> 1,2,3,4,5,6
+     *   1,2,4-6  --> 1,2,4,5,6
+     */
+    array = g_array_new (FALSE, FALSE, sizeof (guint));
+    aux = dupstr = g_strdup (str);
+
+    while (aux) {
+        gchar *next;
+        gchar *interval;
+
+        next = strchr (aux, ',');
+        if (next) {
+            *next = '\0';
+            next++;
+        }
+
+        interval = strchr (aux, '-');
+        if (interval) {
+            guint start = 0;
+            guint stop = 0;
+
+            *interval = '\0';
+            interval++;
+
+            if (!mm_get_uint_from_str (aux, &start)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "couldn't parse interval start integer: '%s'", aux);
+                goto out;
+            }
+            if (!mm_get_uint_from_str (interval, &stop)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "couldn't parse interval stop integer: '%s'", interval);
+                goto out;
+            }
+
+            if (start > stop) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "interval start (%u) cannot be bigger than interval stop (%u)", start, stop);
+                goto out;
+            }
+
+            for (; start <= stop; start++)
+                g_array_append_val (array, start);
+        } else {
+            guint num;
+
+            if (!mm_get_uint_from_str (aux, &num)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "couldn't parse integer: '%s'", aux);
+                goto out;
+            }
+
+            g_array_append_val (array, num);
+        }
+
+        aux = next;
+    }
+
+    if (!array->len)
+        inner_error = g_error_new (MM_CORE_ERROR,
+                                   MM_CORE_ERROR_FAILED,
+                                   "couldn't parse list of integers: '%s'", str);
+    else
+        g_array_sort (array, uint_compare_func);
+
+out:
+    g_free (dupstr);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_array_unref (array);
+        return NULL;
+    }
+
+    return array;
+}
+
+/*****************************************************************************/
+
 guint
 mm_count_bits_set (gulong number)
 {
