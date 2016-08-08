@@ -53,6 +53,9 @@ const gchar *mm_strip_tag    (const gchar *str,
 
 gchar **mm_split_string_groups (const gchar *str);
 
+GArray *mm_parse_uint_list (const gchar  *str,
+                            GError      **error);
+
 guint mm_count_bits_set (gulong number);
 
 gchar *mm_create_device_identifier (guint vid,
