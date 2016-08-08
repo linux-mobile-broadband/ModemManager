@@ -182,6 +182,97 @@ test_uipaddr_response (void)
 }
 
 /*****************************************************************************/
+/* Test URAT=? responses */
+
+static void
+compare_combinations (const gchar                  *response,
+                      const MMModemModeCombination *expected_combinations,
+                      guint                         n_expected_combinations)
+{
+    GArray *combinations;
+    GError *error = NULL;
+    guint i;
+
+    combinations = mm_ublox_parse_urat_test_response (response, &error);
+    g_assert_no_error (error);
+    g_assert (combinations);
+
+    g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
+
+    for (i = 0; i < combinations->len; i++) {
+        MMModemModeCombination combination;
+        guint                  j;
+        gboolean               found = FALSE;
+
+        combination = g_array_index (combinations, MMModemModeCombination, i);
+        for (j = 0; !found && j < n_expected_combinations; j++)
+            found = (combination.allowed == expected_combinations[j].allowed &&
+                     combination.preferred == expected_combinations[j].preferred);
+        g_assert (found);
+    }
+
+    g_array_unref (combinations);
+}
+
+static void
+test_urat_test_response_2g (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE }
+    };
+
+    compare_combinations ("+URAT: 0",       expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: 0,0",     expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0)",     expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0),(0)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+static void
+test_urat_test_response_2g3g (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_2G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_3G },
+    };
+
+    compare_combinations ("+URAT: (0,1,2),(0,2)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0-2),(0,2)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+static void
+test_urat_test_response_2g3g4g (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_2G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_3G },
+
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_4G, MM_MODEM_MODE_2G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_4G, MM_MODEM_MODE_4G },
+
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_3G },
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_4G },
+
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_2G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_3G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_4G },
+    };
+
+    compare_combinations ("+URAT: (0,1,2,3,4,5,6),(0,2,3)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0-6),(0,2,3)",           expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -210,9 +301,19 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
+<<<<<<< HEAD
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
     g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
     g_test_add_func ("/MM/ublox/uipaddr/response",  test_uipaddr_response);
+=======
+    g_test_add_func ("/MM/ublox/uusbconf/response",  test_uusbconf_response);
+    g_test_add_func ("/MM/ublox/ubmconf/response",   test_ubmconf_response);
+    g_test_add_func ("/MM/ublox/uipaddr/response",   test_uipaddr_response);
+    g_test_add_func ("/MM/ublox/cgcontrdp/response", test_cgcontrdp_response);
+    g_test_add_func ("/MM/ublox/urat/test/response/2g",     test_urat_test_response_2g);
+    g_test_add_func ("/MM/ublox/urat/test/response/2g3g",   test_urat_test_response_2g3g);
+    g_test_add_func ("/MM/ublox/urat/test/response/2g3g4g", test_urat_test_response_2g3g4g);
+>>>>>>> 759a486... ublox: new +URAT=? response parser
 
     return g_test_run ();
 }

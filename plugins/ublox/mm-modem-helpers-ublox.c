@@ -16,6 +16,7 @@
 #include <glib.h>
 #include <string.h>
 
+#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-ublox.h"
 
@@ -238,4 +239,127 @@ out:
     if (out_ipv6_link_local_address)
         *out_ipv6_link_local_address = ipv6_link_local_address;
     return TRUE;
+}
+
+/*****************************************************************************/
+/* URAT=? response parser */
+
+/* Index of the array is the ublox-specific value */
+static const MMModemMode ublox_combinations[] = {
+    ( MM_MODEM_MODE_2G ),
+    ( MM_MODEM_MODE_2G | MM_MODEM_MODE_3G ),
+    (                    MM_MODEM_MODE_3G ),
+    (                                       MM_MODEM_MODE_4G ),
+    ( MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
+    ( MM_MODEM_MODE_2G |                    MM_MODEM_MODE_4G ),
+    (                    MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
+};
+
+GArray *
+mm_ublox_parse_urat_test_response (const gchar  *response,
+                                   GError      **error)
+{
+    GArray *combinations = NULL;
+    GArray *selected = NULL;
+    GArray *preferred = NULL;
+    gchar **split;
+    guint   split_len;
+    GError *inner_error = NULL;
+    guint   i;
+
+    /*
+     * E.g.:
+     *  AT+URAT=?
+     *  +URAT: (0-6),(0,2,3)
+     */
+    response = mm_strip_tag (response, "+URAT:");
+    split = mm_split_string_groups (response);
+    split_len = g_strv_length (split);
+    if (split_len > 2 || split_len < 1) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Unexpected number of groups in +URAT=? response: %u", g_strv_length (split));
+        goto out;
+    }
+
+    /* The selected list must have values */
+    selected = mm_parse_uint_list (split[0], &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!selected) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "No selected RAT values given in +URAT=? response");
+        goto out;
+    }
+
+    /* For our purposes, the preferred list may be empty */
+    preferred = mm_parse_uint_list (split[1], &inner_error);
+    if (inner_error)
+        goto out;
+
+    /* Build array of combinations */
+    combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
+
+    for (i = 0; i < selected->len; i++) {
+        guint                  selected_value;
+        MMModemModeCombination combination;
+        guint                  j;
+
+        selected_value = g_array_index (selected, guint, i);
+        if (selected_value >= G_N_ELEMENTS (ublox_combinations)) {
+            mm_warn ("Unexpected AcT value: %u", selected_value);
+            continue;
+        }
+
+        /* Combination without any preferred */
+        combination.allowed = ublox_combinations[selected_value];
+        combination.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, combination);
+
+        if (mm_count_bits_set (combination.allowed) == 1)
+            continue;
+
+        if (!preferred)
+            continue;
+
+        for (j = 0; j < preferred->len; j++) {
+            guint preferred_value;
+
+            preferred_value = g_array_index (preferred, guint, j);
+            if (preferred_value >= G_N_ELEMENTS (ublox_combinations)) {
+                mm_warn ("Unexpected AcT preferred value: %u", preferred_value);
+                continue;
+            }
+            combination.preferred = ublox_combinations[preferred_value];
+            if (mm_count_bits_set (combination.preferred) != 1) {
+                mm_warn ("AcT preferred value should be a single AcT: %u", preferred_value);
+                continue;
+            }
+            if (!(combination.allowed & combination.preferred))
+                continue;
+            g_array_append_val (combinations, combination);
+        }
+    }
+
+    if (combinations->len == 0) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "No combinations built from +URAT=? response");
+        goto out;
+    }
+
+out:
+    g_strfreev (split);
+    if (selected)
+        g_array_unref (selected);
+    if (preferred)
+        g_array_unref (preferred);
+
+    if (inner_error) {
+        if (combinations)
+            g_array_unref (combinations);
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
+    return combinations;
 }

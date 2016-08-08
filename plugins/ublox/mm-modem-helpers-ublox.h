@@ -57,4 +57,10 @@ gboolean mm_ublox_parse_uipaddr_response (const gchar  *response,
                                           gchar       **out_ipv6_link_local_address,
                                           GError      **error);
 
+/*****************************************************************************/
+/* URAT=? response parser */
+
+GArray *mm_ublox_parse_urat_test_response (const gchar  *response,
+                                           GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */
