@@ -46,6 +46,44 @@ struct _MMBroadbandModemUbloxPrivate {
 };
 
 /*****************************************************************************/
+/* Load supported modes (Modem interface) */
+
+static GArray *
+load_supported_modes_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
+{
+    const gchar *response;
+    GArray      *combinations;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    if (!(combinations = mm_ublox_parse_urat_test_response (response, error)))
+        return FALSE;
+
+    if (!(combinations = mm_ublox_filter_supported_modes (mm_iface_modem_get_model (self), combinations, error)))
+        return FALSE;
+
+    return combinations;
+}
+
+static void
+load_supported_modes (MMIfaceModem        *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+URAT=?",
+        3,
+        TRUE,
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 typedef enum {
@@ -324,6 +362,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer        = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->load_supported_modes        = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
 }
 
 static void

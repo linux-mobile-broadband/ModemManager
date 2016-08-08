@@ -363,3 +363,66 @@ out:
 
     return combinations;
 }
+
+/*****************************************************************************/
+
+static MMModemMode
+supported_modes_per_model (const gchar *model)
+{
+    MMModemMode all = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+
+    if (model) {
+        /* Some TOBY-L2/MPCI-L2 devices don't support 2G */
+        if (g_str_equal (model, "TOBY-L201") || g_str_equal (model, "TOBY-L220") || g_str_equal (model, "MPCI-L201"))
+            all &= ~MM_MODEM_MODE_2G;
+        /* None of the LISA-U or SARA-U devices support 4G */
+        else if (g_str_has_prefix (model, "LISA-U") || g_str_has_prefix (model, "SARA-U")) {
+            all &= ~MM_MODEM_MODE_4G;
+            /* Some SARA devices don't support 2G */
+            if (g_str_equal (model, "SARA-U270-53S") || g_str_equal (model, "SARA-U280"))
+                all &= ~MM_MODEM_MODE_2G;
+        }
+    }
+
+    return all;
+}
+
+GArray *
+mm_ublox_filter_supported_modes (const gchar  *model,
+                                 GArray       *combinations,
+                                 GError      **error)
+{
+    MMModemModeCombination mode;
+    GArray *all;
+    GArray *filtered;
+
+    /* Model not specified? */
+    if (!model)
+        return combinations;
+
+    /* AT+URAT=? lies; we need an extra per-device filtering, thanks u-blox.
+     * Don't know all PIDs for all devices, so model string based filtering... */
+
+    mode.allowed   = supported_modes_per_model (model);
+    mode.preferred = MM_MODEM_MODE_NONE;
+
+    /* Nothing filtered? */
+    if (mode.allowed == supported_modes_per_model (NULL))
+        return combinations;
+
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    g_array_append_val (all, mode);
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    /* Error if nothing left */
+    if (filtered->len == 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No valid mode combinations built after filtering (model %s)", model);
+        g_array_unref (filtered);
+        return NULL;
+    }
+
+    return filtered;
+}

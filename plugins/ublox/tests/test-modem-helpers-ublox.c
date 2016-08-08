@@ -182,10 +182,11 @@ test_uipaddr_response (void)
 }
 
 /*****************************************************************************/
-/* Test URAT=? responses */
+/* Test URAT=? responses and model based filtering */
 
 static void
 compare_combinations (const gchar                  *response,
+                      const gchar                  *model,
                       const MMModemModeCombination *expected_combinations,
                       guint                         n_expected_combinations)
 {
@@ -194,6 +195,10 @@ compare_combinations (const gchar                  *response,
     guint i;
 
     combinations = mm_ublox_parse_urat_test_response (response, &error);
+    g_assert_no_error (error);
+    g_assert (combinations);
+
+    combinations = mm_ublox_filter_supported_modes (model, combinations, &error);
     g_assert_no_error (error);
     g_assert (combinations);
 
@@ -221,10 +226,10 @@ test_urat_test_response_2g (void)
         { MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE }
     };
 
-    compare_combinations ("+URAT: 0",       expected_combinations, G_N_ELEMENTS (expected_combinations));
-    compare_combinations ("+URAT: 0,0",     expected_combinations, G_N_ELEMENTS (expected_combinations));
-    compare_combinations ("+URAT: (0)",     expected_combinations, G_N_ELEMENTS (expected_combinations));
-    compare_combinations ("+URAT: (0),(0)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: 0",       NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: 0,0",     NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0)",     NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0),(0)", NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
 }
 
 static void
@@ -238,8 +243,8 @@ test_urat_test_response_2g3g (void)
         { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_3G },
     };
 
-    compare_combinations ("+URAT: (0,1,2),(0,2)", expected_combinations, G_N_ELEMENTS (expected_combinations));
-    compare_combinations ("+URAT: (0-2),(0,2)", expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0,1,2),(0,2)", NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0-2),(0,2)",   NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
 }
 
 static void
@@ -268,8 +273,48 @@ test_urat_test_response_2g3g4g (void)
         { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_4G },
     };
 
-    compare_combinations ("+URAT: (0,1,2,3,4,5,6),(0,2,3)", expected_combinations, G_N_ELEMENTS (expected_combinations));
-    compare_combinations ("+URAT: (0-6),(0,2,3)",           expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0,1,2,3,4,5,6),(0,2,3)", NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+    compare_combinations ("+URAT: (0-6),(0,2,3)",           NULL, expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+static void
+test_mode_filtering_toby_l201 (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_3G },
+        { MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, MM_MODEM_MODE_4G },
+    };
+
+    compare_combinations ("+URAT: (0-6),(0,2,3)", "TOBY-L201", expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+static void
+test_mode_filtering_lisa_u200 (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_2G },
+        { MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, MM_MODEM_MODE_3G },
+    };
+
+    compare_combinations ("+URAT: (0-6),(0,2,3)", "LISA-U200", expected_combinations, G_N_ELEMENTS (expected_combinations));
+}
+
+static void
+test_mode_filtering_sara_u280 (void)
+{
+    static const MMModemModeCombination expected_combinations[] = {
+        { MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE },
+    };
+
+    compare_combinations ("+URAT: (0-6),(0,2,3)", "SARA-U280", expected_combinations, G_N_ELEMENTS (expected_combinations));
 }
 
 /*****************************************************************************/
@@ -301,19 +346,15 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-<<<<<<< HEAD
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
     g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
     g_test_add_func ("/MM/ublox/uipaddr/response",  test_uipaddr_response);
-=======
-    g_test_add_func ("/MM/ublox/uusbconf/response",  test_uusbconf_response);
-    g_test_add_func ("/MM/ublox/ubmconf/response",   test_ubmconf_response);
-    g_test_add_func ("/MM/ublox/uipaddr/response",   test_uipaddr_response);
-    g_test_add_func ("/MM/ublox/cgcontrdp/response", test_cgcontrdp_response);
-    g_test_add_func ("/MM/ublox/urat/test/response/2g",     test_urat_test_response_2g);
-    g_test_add_func ("/MM/ublox/urat/test/response/2g3g",   test_urat_test_response_2g3g);
-    g_test_add_func ("/MM/ublox/urat/test/response/2g3g4g", test_urat_test_response_2g3g4g);
->>>>>>> 759a486... ublox: new +URAT=? response parser
+    g_test_add_func ("/MM/ublox/urat/test/response/2g",        test_urat_test_response_2g);
+    g_test_add_func ("/MM/ublox/urat/test/response/2g3g",      test_urat_test_response_2g3g);
+    g_test_add_func ("/MM/ublox/urat/test/response/2g3g4g",    test_urat_test_response_2g3g4g);
+    g_test_add_func ("/MM/ublox/urat/test/response/toby-l201", test_mode_filtering_toby_l201);
+    g_test_add_func ("/MM/ublox/urat/test/response/lisa-u200", test_mode_filtering_lisa_u200);
+    g_test_add_func ("/MM/ublox/urat/test/response/sara-u280", test_mode_filtering_sara_u280);
 
     return g_test_run ();
 }

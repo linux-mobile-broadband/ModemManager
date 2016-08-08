@@ -63,4 +63,12 @@ gboolean mm_ublox_parse_uipaddr_response (const gchar  *response,
 GArray *mm_ublox_parse_urat_test_response (const gchar  *response,
                                            GError      **error);
 
+/*****************************************************************************/
+/* Model-based supported modes filtering */
+
+GArray *mm_ublox_filter_supported_modes (const gchar  *model,
+                                         GArray       *combinations,
+                                         GError      **error);
+
+
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */
