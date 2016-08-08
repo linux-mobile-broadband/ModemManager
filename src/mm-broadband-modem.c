@@ -114,6 +114,7 @@ enum {
     PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
     PROP_MODEM_VOICE_CALL_LIST,
     PROP_MODEM_SIMPLE_STATUS,
+    PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
     PROP_LAST
 };
 
@@ -126,7 +127,9 @@ typedef struct _PortsContext PortsContext;
 struct _MMBroadbandModemPrivate {
     /* Broadband modem specific implementation */
     PortsContext *enabled_ports_ctx;
+    PortsContext *sim_hot_swap_ports_ctx;
     gboolean modem_init_run;
+    gboolean sim_hot_swap_supported;
 
     /*<--- Modem interface --->*/
     /* Properties */
@@ -8549,6 +8552,11 @@ disabling_stopped (MMBroadbandModem *self,
         ports_context_unref (self->priv->enabled_ports_ctx);
         self->priv->enabled_ports_ctx = NULL;
     }
+
+    if (self->priv->sim_hot_swap_ports_ctx) {
+        ports_context_unref (self->priv->sim_hot_swap_ports_ctx);
+        self->priv->sim_hot_swap_ports_ctx = NULL;
+    }
     return TRUE;
 }
 
@@ -9667,6 +9675,7 @@ typedef enum {
     INITIALIZE_STEP_IFACE_SIGNAL,
     INITIALIZE_STEP_IFACE_OMA,
     INITIALIZE_STEP_IFACE_FIRMWARE,
+    INITIALIZE_STEP_SIM_HOT_SWAP,
     INITIALIZE_STEP_IFACE_SIMPLE,
     INITIALIZE_STEP_LAST,
 } InitializeStep;
@@ -10008,6 +10017,38 @@ initialize_step (InitializeContext *ctx)
                                             ctx);
         return;
 
+    case INITIALIZE_STEP_SIM_HOT_SWAP:
+        {
+            gboolean is_sim_hot_swap_supported = FALSE;
+
+            g_object_get (ctx->self,
+                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
+                          &is_sim_hot_swap_supported,
+                          NULL);
+
+            if (!is_sim_hot_swap_supported) {
+                ctx->self->priv->sim_hot_swap_ports_ctx = NULL;
+            } else {
+                PortsContext *ports;
+                GError *error = NULL;
+
+                mm_dbg ("Creating PortsContext for SIM hot swap.");
+
+                ports = g_new0 (PortsContext, 1);
+                ports->ref_count = 1;
+
+                if (!open_ports_enabling (ctx->self, ports, FALSE, &error)) {
+                    mm_warn ("Couldn't open ports during Modem SIM hot swap enabling: %s", error? error->message : "unknown reason");
+                    g_error_free (error);
+                } else
+                    ctx->self->priv->sim_hot_swap_ports_ctx = ports_context_ref (ports);
+
+                ports_context_unref (ports);
+            }
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZE_STEP_IFACE_SIMPLE:
         if (ctx->self->priv->modem_state != MM_MODEM_STATE_FAILED)
             mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
@@ -10028,11 +10069,35 @@ initialize_step (InitializeContext *ctx)
                                                  "cannot fully initialize");
             } else {
                 /* Fatal SIM, firmware, or modem failure :-( */
-                g_simple_async_result_set_error (ctx->result,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_WRONG_STATE,
-                                                 "Modem is unusable, "
-                                                 "cannot fully initialize");
+                gboolean is_sim_hot_swap_supported = FALSE;
+                MMModemStateFailedReason reason =
+                    mm_gdbus_modem_get_state_failed_reason (
+                        (MmGdbusModem*)ctx->self->priv->modem_dbus_skeleton);
+
+                g_object_get (ctx->self,
+                             MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
+                             &is_sim_hot_swap_supported,
+                             NULL);
+
+                if (reason == MM_MODEM_STATE_FAILED_REASON_SIM_MISSING &&
+                    is_sim_hot_swap_supported &&
+                    ctx->self->priv->sim_hot_swap_ports_ctx) {
+                        mm_info ("SIM is missing, but the modem supports SIM hot swap. Waiting for SIM...");
+                        g_simple_async_result_set_error (ctx->result,
+                                                         MM_CORE_ERROR,
+                                                         MM_CORE_ERROR_WRONG_STATE,
+                                                         "Modem is unusable due to SIM missing, "
+                                                         "cannot fully initialize, "
+                                                         "waiting for SIM insertion.");
+                } else {
+                    mm_dbg ("SIM is missing and Modem does not support SIM Hot Swap");
+                    g_simple_async_result_set_error (ctx->result,
+                                                     MM_CORE_ERROR,
+                                                     MM_CORE_ERROR_WRONG_STATE,
+                                                     "Modem is unusable, "
+                                                     "cannot fully initialize");
+                }
+
                 /* Ensure we only leave the Modem, OMA, and Firmware interfaces
                  * around.  A failure could be caused by firmware issues, which
                  * a firmware update, switch, or provisioning could fix.
@@ -10045,6 +10110,7 @@ initialize_step (InitializeContext *ctx)
                 mm_iface_modem_voice_shutdown (MM_IFACE_MODEM_VOICE (ctx->self));
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
                 mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
+
             }
             initialize_context_complete_and_free (ctx);
             return;
@@ -10192,6 +10258,39 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                     MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton))));
 }
 
+
+/*****************************************************************************/
+static void
+after_hotswap_event_disable_ready (MMBaseModem *self,
+                                   GAsyncResult *res,
+                                   gpointer user_data)
+{
+    GError *error = NULL;
+    mm_base_modem_disable_finish (self, res, &error);
+    if (error) {
+        mm_err ("Disable modem error: %s", error->message);
+        g_error_free (error);
+    } else {
+        mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+    }
+}
+
+
+void
+mm_broadband_modem_update_sim_hot_swap_detected (MMBroadbandModem *self)
+{
+    if (self->priv->sim_hot_swap_ports_ctx) {
+        mm_dbg ("Releasing SIM hot swap ports context");
+        ports_context_unref (self->priv->sim_hot_swap_ports_ctx);
+        self->priv->sim_hot_swap_ports_ctx = NULL;
+    }
+
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_disable (MM_BASE_MODEM (self),
+                           (GAsyncReadyCallback) after_hotswap_event_disable_ready,
+                           NULL);
+}
+
 /*****************************************************************************/
 
 MMBroadbandModem *
@@ -10323,6 +10422,9 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
         break;
+    case PROP_MODEM_SIM_HOT_SWAP_SUPPORTED:
+        self->priv->sim_hot_swap_supported = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -10425,6 +10527,9 @@ get_property (GObject *object,
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
         break;
+    case PROP_MODEM_SIM_HOT_SWAP_SUPPORTED:
+        g_value_set_boolean (value, self->priv->sim_hot_swap_supported);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -10453,6 +10558,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_messaging_sms_default_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
+    self->priv->sim_hot_swap_supported = FALSE;
 }
 
 static void
@@ -10907,4 +11013,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
                                       MM_IFACE_MODEM_SIMPLE_STATUS);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
+                                      MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED);
 }

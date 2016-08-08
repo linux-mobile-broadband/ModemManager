@@ -166,6 +166,10 @@ void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
 gboolean mm_base_modem_get_valid    (MMBaseModem *self);
 
+void     mm_base_modem_set_reprobe (MMBaseModem *self,
+                                    gboolean reprobe);
+gboolean mm_base_modem_get_reprobe (MMBaseModem *self);
+
 const gchar  *mm_base_modem_get_device  (MMBaseModem *self);
 const gchar **mm_base_modem_get_drivers (MMBaseModem *self);
 const gchar  *mm_base_modem_get_plugin  (MMBaseModem *self);

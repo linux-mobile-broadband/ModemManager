@@ -3747,6 +3747,7 @@ typedef enum {
     INITIALIZATION_STEP_SUPPORTED_BANDS,
     INITIALIZATION_STEP_SUPPORTED_IP_FAMILIES,
     INITIALIZATION_STEP_POWER_STATE,
+    INITIALIZATION_STEP_SIM_HOT_SWAP,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_SIM,
     INITIALIZATION_STEP_OWN_NUMBERS,
@@ -4203,6 +4204,27 @@ load_current_bands_ready (MMIfaceModem *self,
     interface_initialization_step (ctx);
 }
 
+/*****************************************************************************/
+/* Setup SIM hot swap (Modem interface) */
+static void
+setup_sim_hot_swap_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          InitializationContext *ctx) {
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Iface modem: SIM hot swap setup failed: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        mm_dbg ("Iface modem: SIM hot swap setup succeded");
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
 static void
 interface_initialization_step (InitializationContext *ctx)
 {
@@ -4544,6 +4566,18 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case INITIALIZATION_STEP_SIM_HOT_SWAP:
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap (
+                MM_IFACE_MODEM (ctx->self),
+                (GAsyncReadyCallback) setup_sim_hot_swap_ready,
+                ctx);
+                return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
@@ -4707,6 +4741,21 @@ interface_initialization_step (InitializationContext *ctx)
                           ctx->self);
 
         if (ctx->fatal_error) {
+            if (g_error_matches (ctx->fatal_error,
+                                 MM_MOBILE_EQUIPMENT_ERROR,
+                                 MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED)) {
+                gboolean is_sim_hot_swap_supported = FALSE;
+
+                g_object_get (ctx->self,
+                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
+                              &is_sim_hot_swap_supported,
+                              NULL);
+
+                if (is_sim_hot_swap_supported) {
+                    mm_iface_modem_update_failed_state (ctx->self,
+                                                        MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
+                }
+            }
             g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
             ctx->fatal_error = NULL;
         } else {
@@ -5119,6 +5168,13 @@ iface_modem_init (gpointer g_iface)
                               "List of bearers handled by the modem",
                               MM_TYPE_BEARER_LIST,
                               G_PARAM_READWRITE));
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
+                               "Sim Hot Swap Supported",
+                               "Whether the modem supports sim hot swap or not.",
+                               FALSE,
+                               G_PARAM_READWRITE));
 
     initialized = TRUE;
 }

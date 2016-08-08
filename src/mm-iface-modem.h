@@ -32,10 +32,11 @@
 #define MM_IS_IFACE_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM))
 #define MM_IFACE_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
 
-#define MM_IFACE_MODEM_DBUS_SKELETON "iface-modem-dbus-skeleton"
-#define MM_IFACE_MODEM_STATE         "iface-modem-state"
-#define MM_IFACE_MODEM_SIM           "iface-modem-sim"
-#define MM_IFACE_MODEM_BEARER_LIST   "iface-modem-bearer-list"
+#define MM_IFACE_MODEM_DBUS_SKELETON           "iface-modem-dbus-skeleton"
+#define MM_IFACE_MODEM_STATE                   "iface-modem-state"
+#define MM_IFACE_MODEM_SIM                     "iface-modem-sim"
+#define MM_IFACE_MODEM_BEARER_LIST             "iface-modem-bearer-list"
+#define MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED  "iface-modem-sim-hot-swap-supported"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
@@ -325,6 +326,14 @@ struct _MMIfaceModem {
                            GAsyncReadyCallback callback,
                            gpointer user_data);
     MMBaseBearer * (*create_bearer_finish) (MMIfaceModem *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+    /* Setup SIM hot swap */
+    void (*setup_sim_hot_swap) (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+
+    gboolean (*setup_sim_hot_swap_finish) (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error);
 };

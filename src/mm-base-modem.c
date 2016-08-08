@@ -47,6 +47,7 @@ enum {
     PROP_VENDOR_ID,
     PROP_PRODUCT_ID,
     PROP_CONNECTION,
+    PROP_REPROBE,
     PROP_LAST
 };
 
@@ -70,6 +71,7 @@ struct _MMBaseModemPrivate {
 
     gboolean hotplugged;
     gboolean valid;
+    gboolean reprobe;
 
     guint max_timeouts;
 
@@ -391,6 +393,24 @@ mm_base_modem_set_valid (MMBaseModem *self,
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_VALID]);
     }
 }
+
+void
+mm_base_modem_set_reprobe (MMBaseModem *self,
+                           gboolean reprobe)
+{
+    g_return_if_fail (MM_IS_BASE_MODEM (self));
+
+    self->priv->reprobe = reprobe;
+}
+
+gboolean
+mm_base_modem_get_reprobe (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
+
+    return self->priv->reprobe;
+}
+
 
 gboolean
 mm_base_modem_get_valid (MMBaseModem *self)
@@ -1295,6 +1315,9 @@ set_property (GObject *object,
     case PROP_VALID:
         mm_base_modem_set_valid (self, g_value_get_boolean (value));
         break;
+    case PROP_REPROBE:
+        mm_base_modem_set_reprobe (self, g_value_get_boolean (value));
+        break;
     case PROP_MAX_TIMEOUTS:
         self->priv->max_timeouts = g_value_get_uint (value);
         break;
@@ -1337,6 +1360,9 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_VALID:
         g_value_set_boolean (value, self->priv->valid);
+        break;
+    case PROP_REPROBE:
+        g_value_set_boolean (value, self->priv->reprobe);
         break;
     case PROP_MAX_TIMEOUTS:
         g_value_set_uint (value, self->priv->max_timeouts);
