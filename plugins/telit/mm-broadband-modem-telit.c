@@ -79,6 +79,142 @@ modem_after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup SIM hot swap (Modem interface) */
+
+static void
+telit_qss_unsolicited_handler (MMPortSerialAt *port,
+                               GMatchInfo *match_info,
+                               MMBroadbandModemTelit *self)
+{
+    guint qss;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &qss))
+        return;
+
+    switch (qss) {
+        case 0:
+            mm_info ("QSS: SIM removed");
+            break;
+        case 1:
+            mm_info ("QSS: SIM inserted");
+            break;
+        case 2:
+            mm_info ("QSS: SIM inserted and PIN unlocked");
+            break;
+        case 3:
+            mm_info ("QSS: SIM inserted and PIN locked");
+            break;
+        default:
+            mm_warn ("QSS: unknown QSS value %d", qss);
+            break;
+    }
+
+    mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+}
+
+typedef struct {
+    MMBroadbandModemTelit *self;
+    GSimpleAsyncResult *result;
+} ToggleQssUnsolicitedContext;
+
+static void
+toggle_qss_unsolicited_context_complete_and_free (ToggleQssUnsolicitedContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (ToggleQssUnsolicitedContext, ctx);
+}
+
+static gboolean
+modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+telit_qss_toggle_ready (MMBaseModem *self,
+                        GAsyncResult *res,
+                        ToggleQssUnsolicitedContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Enable QSS failed: %s", error->message);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Could not enable QSS");
+    } else {
+        MMPortSerialAt *primary;
+        MMPortSerialAt *secondary;
+        GRegex *pattern;
+
+        pattern = g_regex_new ("#QSS:\\s*([0-3])\\r\\n", G_REGEX_RAW, 0, NULL);
+        g_assert (pattern);
+
+        primary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            primary,
+            pattern,
+            (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
+            ctx->self,
+            NULL);
+
+        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
+        if (secondary)
+            mm_port_serial_at_add_unsolicited_msg_handler (
+                secondary,
+                pattern,
+                (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
+                ctx->self,
+                NULL);
+
+        g_regex_unref (pattern);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+
+    }
+
+    toggle_qss_unsolicited_context_complete_and_free (ctx);
+}
+
+
+static void
+modem_setup_sim_hot_swap (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    ToggleQssUnsolicitedContext *ctx;
+    MMPortSerialAt *port;
+
+    mm_dbg ("Telit SIM hot swap: Enable QSS");
+
+    ctx = g_slice_new0 (ToggleQssUnsolicitedContext);
+    ctx->self = g_object_ref (MM_BROADBAND_MODEM_TELIT (self));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_setup_sim_hot_swap);
+
+    port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    if (!port)
+        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   port,
+                                   "#QSS=1",
+                                   3,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback) telit_qss_toggle_ready,
+                                   ctx);
+}
+
+/*****************************************************************************/
 /* Set current bands (Modem interface) */
 
 static gboolean
@@ -250,7 +386,7 @@ load_bands_ready (MMBaseModem *self,
     else
         g_simple_async_result_set_op_res_gpointer (ctx->result, bands, (GDestroyNotify)g_array_unref);
 
-    load_bands_context_complete_and_free(ctx);
+    load_bands_context_complete_and_free (ctx);
 }
 
 static void
@@ -1053,6 +1189,7 @@ mm_broadband_modem_telit_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          NULL);
 }
 
@@ -1090,6 +1227,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_modes_finish = set_current_modes_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
+    iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
 }
 
 static void
