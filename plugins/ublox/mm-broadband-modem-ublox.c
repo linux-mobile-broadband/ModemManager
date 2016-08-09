@@ -116,6 +116,36 @@ load_supported_modes (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+static MMModemPowerState
+load_power_state_finish (MMIfaceModem  *self,
+                         GAsyncResult  *res,
+                         GError       **error)
+{
+    MMModemPowerState  state = MM_MODEM_POWER_STATE_UNKNOWN;
+    const gchar       *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (response)
+        mm_ublox_parse_cfun_response (response, &state, error);
+    return state;
+}
+
+static void
+load_power_state (MMIfaceModem        *self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 typedef enum {
@@ -394,6 +424,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer        = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->load_power_state        = load_power_state;
+    iface->load_power_state_finish = load_power_state_finish;
     iface->load_supported_modes        = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_current_modes        = load_current_modes;
