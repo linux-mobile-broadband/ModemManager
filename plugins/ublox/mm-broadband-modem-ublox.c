@@ -43,7 +43,276 @@ struct _MMBroadbandModemUbloxPrivate {
     /* Networking mode in use */
     MMUbloxNetworkingMode mode;
     gboolean              mode_checked;
+
+    /* Flag to specify whether a power operation is ongoing */
+    gboolean power_operation_ongoing;
+
+    /* Mode combination to apply if "any" requested */
+    MMModemMode any_allowed;
 };
+
+/*****************************************************************************/
+
+static gboolean
+acquire_power_operation (MMBroadbandModemUblox  *self,
+                         GError                **error)
+{
+    if (self->priv->power_operation_ongoing) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
+                     "An operation which requires power updates is currently in progress");
+        return FALSE;
+    }
+    self->priv->power_operation_ongoing = TRUE;
+    return TRUE;
+}
+
+static void
+release_power_operation (MMBroadbandModemUblox *self)
+{
+    g_assert (self->priv->power_operation_ongoing);
+    self->priv->power_operation_ongoing = FALSE;
+}
+
+/*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+typedef enum {
+    SET_CURRENT_MODES_STEP_FIRST,
+    SET_CURRENT_MODES_STEP_ACQUIRE,
+    SET_CURRENT_MODES_STEP_CURRENT_POWER,
+    SET_CURRENT_MODES_STEP_POWER_DOWN,
+    SET_CURRENT_MODES_STEP_URAT,
+    SET_CURRENT_MODES_STEP_RECOVER_CURRENT_POWER,
+    SET_CURRENT_MODES_STEP_RELEASE,
+    SET_CURRENT_MODES_STEP_LAST,
+} SetCurrentModesStep;
+
+typedef struct {
+    MMBroadbandModemUblox *self;
+    SetCurrentModesStep    step;
+    gchar                 *command;
+    MMModemPowerState      initial_state;
+    GError                *saved_error;
+} SetCurrentModesContext;
+
+static void
+set_current_modes_context_free (SetCurrentModesContext *ctx)
+{
+    g_assert (!ctx->saved_error);
+    g_free (ctx->command);
+    g_object_unref (ctx->self);
+    g_slice_free (SetCurrentModesContext, ctx);
+}
+
+static gboolean
+set_current_modes_finish (MMIfaceModem  *self,
+                          GAsyncResult  *res,
+                          GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void set_current_modes_step (GTask *task);
+
+static void
+set_current_modes_recover_power_ready (MMBaseModem  *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
+{
+    SetCurrentModesContext *ctx;
+
+    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    /* propagate the error if none already set */
+    mm_base_modem_at_command_finish (self, res, ctx->saved_error ? NULL : &ctx->saved_error);
+
+    /* Go to next step (release power operation) regardless of the result */
+    ctx->step++;
+    set_current_modes_step (task);
+}
+
+static void
+set_current_modes_urat_ready (MMBaseModem  *self,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    SetCurrentModesContext *ctx;
+
+    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    mm_base_modem_at_command_finish (self, res, &ctx->saved_error);
+
+    /* Go to next step (recover current power) regardless of the result */
+    ctx->step++;
+    set_current_modes_step (task);
+}
+
+static void
+set_current_modes_low_power_ready (MMBaseModem  *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    SetCurrentModesContext *ctx;
+
+    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error))
+        ctx->step = SET_CURRENT_MODES_STEP_RELEASE;
+    else
+        ctx->step++;
+
+    set_current_modes_step (task);
+}
+
+static void
+set_current_modes_current_power_ready (MMBaseModem  *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
+{
+    SetCurrentModesContext *ctx;
+    const gchar            *response;
+
+    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    response = mm_base_modem_at_command_finish (self, res, &ctx->saved_error);
+    if (!response || !mm_ublox_parse_cfun_response (response, &ctx->initial_state, &ctx->saved_error))
+        ctx->step = SET_CURRENT_MODES_STEP_RELEASE;
+    else
+        ctx->step++;
+
+    set_current_modes_step (task);
+}
+
+static void
+set_current_modes_step (GTask *task)
+{
+    SetCurrentModesContext *ctx;
+
+    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    switch (ctx->step) {
+    case SET_CURRENT_MODES_STEP_FIRST:
+        ctx->step++;
+        /* fall down */
+
+    case SET_CURRENT_MODES_STEP_ACQUIRE:
+        mm_dbg ("acquiring power operation...");
+        if (!acquire_power_operation (ctx->self, &ctx->saved_error)) {
+            ctx->step = SET_CURRENT_MODES_STEP_LAST;
+            set_current_modes_step (task);
+            return;
+        }
+        ctx->step++;
+        /* fall down */
+
+    case SET_CURRENT_MODES_STEP_CURRENT_POWER:
+        mm_dbg ("checking current power operation...");
+        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                  "+CFUN?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback) set_current_modes_current_power_ready,
+                                  task);
+        return;
+
+    case SET_CURRENT_MODES_STEP_POWER_DOWN:
+        if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
+            mm_dbg ("powering down before AcT change...");
+            mm_base_modem_at_command (
+                MM_BASE_MODEM (ctx->self),
+                "+CFUN=4",
+                3,
+                FALSE,
+                (GAsyncReadyCallback) set_current_modes_low_power_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall down */
+
+    case SET_CURRENT_MODES_STEP_URAT:
+        mm_dbg ("updating AcT...");
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (ctx->self),
+            ctx->command,
+            3,
+            FALSE,
+            (GAsyncReadyCallback) set_current_modes_urat_ready,
+            task);
+        return;
+
+    case SET_CURRENT_MODES_STEP_RECOVER_CURRENT_POWER:
+        if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
+            mm_dbg ("recovering power state after AcT change...");
+            mm_base_modem_at_command (
+                MM_BASE_MODEM (ctx->self),
+                "+CFUN=1",
+                3,
+                FALSE,
+                (GAsyncReadyCallback) set_current_modes_recover_power_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall down */
+
+    case SET_CURRENT_MODES_STEP_RELEASE:
+        mm_dbg ("releasing power operation...");
+        release_power_operation (ctx->self);
+        ctx->step++;
+        /* fall down */
+
+    case SET_CURRENT_MODES_STEP_LAST:
+        if (ctx->saved_error) {
+            g_task_return_error (task, ctx->saved_error);
+            ctx->saved_error = NULL;
+        } else
+            g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+}
+
+static void
+set_current_modes (MMIfaceModem        *self,
+                   MMModemMode          allowed,
+                   MMModemMode          preferred,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    GTask                  *task;
+    SetCurrentModesContext *ctx;
+    gchar                  *command;
+    GError                 *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Handle ANY */
+    if (allowed == MM_MODEM_MODE_ANY)
+        allowed = MM_BROADBAND_MODEM_UBLOX (self)->priv->any_allowed;
+
+    /* Build command */
+    command = mm_ublox_build_urat_set_command (allowed, preferred, &error);
+    if (!command) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (SetCurrentModesContext);
+    ctx->self = MM_BROADBAND_MODEM_UBLOX (g_object_ref (self));
+    ctx->command = command;
+    ctx->initial_state = MM_MODEM_POWER_STATE_UNKNOWN;
+    ctx->step = SET_CURRENT_MODES_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) set_current_modes_context_free);
+
+    set_current_modes_step (task);
+}
 
 /*****************************************************************************/
 /* Load current modes (Modem interface) */
@@ -98,6 +367,9 @@ load_supported_modes_finish (MMIfaceModem  *self,
     if (!(combinations = mm_ublox_filter_supported_modes (mm_iface_modem_get_model (self), combinations, error)))
         return FALSE;
 
+    /* Decide and store which combination to apply when ANY requested */
+    MM_BROADBAND_MODEM_UBLOX (self)->priv->any_allowed = mm_ublox_get_modem_mode_any (combinations);
+
     return combinations;
 }
 
@@ -143,6 +415,92 @@ load_power_state (MMIfaceModem        *self,
                               FALSE,
                               callback,
                               user_data);
+}
+
+/*****************************************************************************/
+/* Modem power up/down/off (Modem interface) */
+
+static gboolean
+common_modem_power_operation_finish (MMIfaceModem  *self,
+                                     GAsyncResult  *res,
+                                     GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+power_operation_ready (MMBaseModem  *self,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    GError *error = NULL;
+
+    release_power_operation (MM_BROADBAND_MODEM_UBLOX (self));
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_modem_power_operation (MMBroadbandModemUblox  *self,
+                              const gchar            *command,
+                              GAsyncReadyCallback     callback,
+                              gpointer                user_data)
+{
+    GTask  *task;
+    GError *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Fail if there is already an ongoing power management operation */
+    if (!acquire_power_operation (self, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Use AT+CFUN=4 for power down, puts device in airplane mode */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              30,
+                              FALSE,
+                              (GAsyncReadyCallback) power_operation_ready,
+                              task);
+}
+
+static void
+modem_reset (MMIfaceModem        *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
+{
+    common_modem_power_operation (MM_BROADBAND_MODEM_UBLOX (self), "+CFUN=16", callback, user_data);
+}
+
+static void
+modem_power_off (MMIfaceModem        *self,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data)
+{
+    common_modem_power_operation (MM_BROADBAND_MODEM_UBLOX (self), "+CPWROFF", callback, user_data);
+}
+
+static void
+modem_power_down (MMIfaceModem        *self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
+{
+    common_modem_power_operation (MM_BROADBAND_MODEM_UBLOX (self), "+CFUN=4", callback, user_data);
+}
+
+static void
+modem_power_up (MMIfaceModem        *self,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
+{
+    common_modem_power_operation (MM_BROADBAND_MODEM_UBLOX (self), "+CFUN=1", callback, user_data);
 }
 
 /*****************************************************************************/
@@ -417,6 +775,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
                                               MMBroadbandModemUbloxPrivate);
     self->priv->profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
     self->priv->mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+    self->priv->any_allowed = MM_MODEM_MODE_NONE;
 }
 
 static void
@@ -426,10 +785,20 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_bearer_finish = modem_create_bearer_finish;
     iface->load_power_state        = load_power_state;
     iface->load_power_state_finish = load_power_state_finish;
+    iface->modem_power_up        = modem_power_up;
+    iface->modem_power_up_finish = common_modem_power_operation_finish;
+    iface->modem_power_down        = modem_power_down;
+    iface->modem_power_down_finish = common_modem_power_operation_finish;
+    iface->modem_power_off        = modem_power_off;
+    iface->modem_power_off_finish = common_modem_power_operation_finish;
+    iface->reset        = modem_reset;
+    iface->reset_finish = common_modem_power_operation_finish;
     iface->load_supported_modes        = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_current_modes        = load_current_modes;
     iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes        = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
 }
 
 static void

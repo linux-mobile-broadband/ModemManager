@@ -79,6 +79,11 @@ GArray *mm_ublox_filter_supported_modes (const gchar  *model,
                                          GError      **error);
 
 /*****************************************************************************/
+/* Get mode to apply when ANY */
+
+MMModemMode mm_ublox_get_modem_mode_any (const GArray *combinations);
+
+/*****************************************************************************/
 /* URAT? response parser */
 
 gboolean mm_ublox_parse_urat_read_response (const gchar  *response,

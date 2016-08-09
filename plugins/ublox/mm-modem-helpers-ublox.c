@@ -460,6 +460,37 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 }
 
 /*****************************************************************************/
+/* Get mode to apply when ANY */
+
+MMModemMode
+mm_ublox_get_modem_mode_any (const GArray *combinations)
+{
+    guint       i;
+    MMModemMode any = MM_MODEM_MODE_NONE;
+    guint       any_bits_set = 0;
+
+    for (i = 0; i < combinations->len; i++) {
+        MMModemModeCombination *combination;
+        guint bits_set;
+
+        combination = &g_array_index (combinations, MMModemModeCombination, i);
+        if (combination->preferred == MM_MODEM_MODE_NONE)
+            continue;
+        bits_set = mm_count_bits_set (combination->allowed);
+        if (bits_set > any_bits_set) {
+            any_bits_set = bits_set;
+            any = combination->allowed;
+        }
+    }
+
+    /* If combinations were processed via mm_ublox_parse_urat_test_response(),
+     * we're sure that there will be at least one combination with preferred
+     * 'none', so there must be some valid combination as result */
+    g_assert (any != MM_MODEM_MODE_NONE);
+    return any;
+}
+
+/*****************************************************************************/
 /* URAT? response parser */
 
 gboolean
