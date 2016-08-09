@@ -17,6 +17,7 @@
 #define MM_MODEM_HELPERS_UBLOX_H
 
 #include <glib.h>
+#include <ModemManager.h>
 
 /*****************************************************************************/
 /* UUSBCONF? response parser */
@@ -69,6 +70,14 @@ GArray *mm_ublox_parse_urat_test_response (const gchar  *response,
 GArray *mm_ublox_filter_supported_modes (const gchar  *model,
                                          GArray       *combinations,
                                          GError      **error);
+
+/*****************************************************************************/
+/* URAT? response parser */
+
+gboolean mm_ublox_parse_urat_read_response (const gchar  *response,
+                                            MMModemMode  *out_allowed,
+                                            MMModemMode  *out_preferred,
+                                            GError      **error);
 
 
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */

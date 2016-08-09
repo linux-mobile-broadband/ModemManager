@@ -426,3 +426,97 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 
     return filtered;
 }
+
+/*****************************************************************************/
+/* URAT? response parser */
+
+gboolean
+mm_ublox_parse_urat_read_response (const gchar  *response,
+                                   MMModemMode  *out_allowed,
+                                   MMModemMode  *out_preferred,
+                                   GError      **error)
+{
+    GRegex      *r;
+    GMatchInfo  *match_info;
+    GError      *inner_error = NULL;
+    MMModemMode  allowed = MM_MODEM_MODE_NONE;
+    MMModemMode  preferred = MM_MODEM_MODE_NONE;
+    gchar       *allowed_str = NULL;
+    gchar       *preferred_str = NULL;
+
+    g_assert (out_allowed != NULL && out_preferred != NULL);
+
+    /* Response may be e.g.:
+     * +URAT: 1,2
+     * +URAT: 1
+     */
+    r = g_regex_new ("\\+URAT: (\\d+)(?:,(\\d+))?(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        guint  value = 0;
+
+        /* Selected item is mandatory */
+        if (!mm_get_uint_from_match_info (match_info, 1, &value)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "Couldn't read AcT selected value");
+            goto out;
+        }
+        if (value >= G_N_ELEMENTS (ublox_combinations)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "Unexpected AcT selected value: %u", value);
+            goto out;
+        }
+        allowed = ublox_combinations[value];
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        mm_dbg ("current allowed modes retrieved: %s", allowed_str);
+
+        /* Preferred item is optional */
+        if (mm_get_uint_from_match_info (match_info, 2, &value)) {
+            if (value >= G_N_ELEMENTS (ublox_combinations)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "Unexpected AcT preferred value: %u", value);
+                goto out;
+            }
+            preferred = ublox_combinations[value];
+            preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+            mm_dbg ("current preferred modes retrieved: %s", preferred_str);
+            if (mm_count_bits_set (preferred) != 1) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "AcT preferred value should be a single AcT: %s", preferred_str);
+                goto out;
+            }
+            if (!(allowed & preferred)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "AcT preferred value (%s) not a subset of the allowed value (%s)",
+                                           preferred_str, allowed_str);
+                goto out;
+            }
+        }
+    }
+
+out:
+
+    g_free (allowed_str);
+    g_free (preferred_str);
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (allowed == MM_MODEM_MODE_NONE) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Couldn't parse +URAT response: %s", response);
+        return FALSE;
+    }
+
+    *out_allowed = allowed;
+    *out_preferred = preferred;
+    return TRUE;
+}
