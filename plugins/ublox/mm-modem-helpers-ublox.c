@@ -552,3 +552,49 @@ out:
     *out_preferred = preferred;
     return TRUE;
 }
+
+/*****************************************************************************/
+/* URAT=X command builder */
+
+static gboolean
+append_rat_value (GString      *str,
+                  MMModemMode   mode,
+                  GError      **error)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (ublox_combinations); i++) {
+        if (ublox_combinations[i] == mode) {
+            g_string_append_printf (str, "%u", i);
+            return TRUE;
+        }
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No AcT value matches requested mode");
+    return FALSE;
+}
+
+gchar *
+mm_ublox_build_urat_set_command (MMModemMode   allowed,
+                                 MMModemMode   preferred,
+                                 GError      **error)
+{
+    GString *command;
+
+    command = g_string_new ("+URAT=");
+    if (!append_rat_value (command, allowed, error)) {
+        g_string_free (command, TRUE);
+        return NULL;
+    }
+
+    if (preferred != MM_MODEM_MODE_NONE) {
+        g_string_append (command, ",");
+        if (!append_rat_value (command, preferred, error)) {
+            g_string_free (command, TRUE);
+            return NULL;
+        }
+    }
+
+    return g_string_free (command, FALSE);
+}

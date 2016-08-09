@@ -86,5 +86,11 @@ gboolean mm_ublox_parse_urat_read_response (const gchar  *response,
                                             MMModemMode  *out_preferred,
                                             GError      **error);
 
+/*****************************************************************************/
+/* URAT=X command builder */
+
+gchar *mm_ublox_build_urat_set_command (MMModemMode   allowed,
+                                        MMModemMode   preferred,
+                                        GError      **error);
 
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */

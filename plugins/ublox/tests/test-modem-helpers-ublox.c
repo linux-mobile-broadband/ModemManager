@@ -354,32 +354,37 @@ test_mode_filtering_sara_u280 (void)
 }
 
 /*****************************************************************************/
-/* URAT? response parser */
+/* URAT? response parser and URAT=X command builder */
 
 typedef struct {
-    const gchar *str;
+    const gchar *command;
+    const gchar *response;
     MMModemMode  allowed;
     MMModemMode  preferred;
-} UratReadResponseTest;
+} UratTest;
 
-static const UratReadResponseTest urat_read_response_tests[] = {
+static const UratTest urat_tests[] = {
     {
-        .str       = "+URAT: 1,2\r\n",
+        .command   = "+URAT=1,2",
+        .response  = "+URAT: 1,2\r\n",
         .allowed   = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
         .preferred = MM_MODEM_MODE_3G,
     },
     {
-        .str       = "+URAT: 4,0\r\n",
+        .command   = "+URAT=4,0",
+        .response  = "+URAT: 4,0\r\n",
         .allowed   = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G),
         .preferred = MM_MODEM_MODE_2G,
     },
     {
-        .str       = "+URAT: 0\r\n",
+        .command   = "+URAT=0",
+        .response  = "+URAT: 0\r\n",
         .allowed   = MM_MODEM_MODE_2G,
         .preferred = MM_MODEM_MODE_NONE,
     },
     {
-        .str       = "+URAT: 6\r\n",
+        .command   = "+URAT=6",
+        .response  = "+URAT: 6\r\n",
         .allowed   = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G),
         .preferred = MM_MODEM_MODE_NONE,
     },
@@ -390,18 +395,33 @@ test_urat_read_response (void)
 {
     guint i;
 
-    for (i = 0; i < G_N_ELEMENTS (urat_read_response_tests); i++) {
+    for (i = 0; i < G_N_ELEMENTS (urat_tests); i++) {
         MMModemMode  allowed   = MM_MODEM_MODE_NONE;
         MMModemMode  preferred = MM_MODEM_MODE_NONE;
         GError      *error = NULL;
         gboolean     success;
 
-        success = mm_ublox_parse_urat_read_response (urat_read_response_tests[i].str,
+        success = mm_ublox_parse_urat_read_response (urat_tests[i].response,
                                                      &allowed, &preferred, &error);
         g_assert_no_error (error);
         g_assert (success);
-        g_assert_cmpuint (urat_read_response_tests[i].allowed,   ==, allowed);
-        g_assert_cmpuint (urat_read_response_tests[i].preferred, ==, preferred);
+        g_assert_cmpuint (urat_tests[i].allowed,   ==, allowed);
+        g_assert_cmpuint (urat_tests[i].preferred, ==, preferred);
+    }
+}
+
+static void
+test_urat_write_command (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (urat_tests); i++) {
+        gchar  *command;
+        GError *error = NULL;
+
+        command = mm_ublox_build_urat_set_command (urat_tests[i].allowed, urat_tests[i].preferred, &error);
+        g_assert_no_error (error);
+        g_assert_cmpstr (command, ==, urat_tests[i].command);
     }
 }
 
@@ -446,6 +466,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/urat/test/response/lisa-u200", test_mode_filtering_lisa_u200);
     g_test_add_func ("/MM/ublox/urat/test/response/sara-u280", test_mode_filtering_sara_u280);
     g_test_add_func ("/MM/ublox/urat/read/response", test_urat_read_response);
+    g_test_add_func ("/MM/ublox/urat/write/command", test_urat_write_command);
 
     return g_test_run ();
 }
