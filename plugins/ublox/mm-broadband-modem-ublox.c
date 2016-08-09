@@ -24,6 +24,7 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer.h"
 #include "mm-broadband-modem-ublox.h"
@@ -369,6 +370,10 @@ load_supported_modes_finish (MMIfaceModem  *self,
 
     /* Decide and store which combination to apply when ANY requested */
     MM_BROADBAND_MODEM_UBLOX (self)->priv->any_allowed = mm_ublox_get_modem_mode_any (combinations);
+
+    /* If 4G supported, explicitly use +CEREG */
+    if (MM_BROADBAND_MODEM_UBLOX (self)->priv->any_allowed & MM_MODEM_MODE_4G)
+        g_object_set (self, MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, TRUE, NULL);
 
     return combinations;
 }
