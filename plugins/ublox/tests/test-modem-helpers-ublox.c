@@ -27,6 +27,64 @@
 #include "mm-modem-helpers-ublox.h"
 
 /*****************************************************************************/
+/* Test +UPINCNT responses */
+
+typedef struct {
+    const gchar *str;
+    guint        pin_attempts;
+    guint        pin2_attempts;
+    guint        puk_attempts;
+    guint        puk2_attempts;
+} UpinCntResponseTest;
+
+static const UpinCntResponseTest upincnt_response_tests[] = {
+    { .str = "+UPINCNT: 3,3,10,10\r\n",
+      .pin_attempts  = 3,
+      .pin2_attempts = 3,
+      .puk_attempts  = 10,
+      .puk2_attempts = 10
+    },
+    { .str = "+UPINCNT: 0,3,5,5\r\n",
+      .pin_attempts  = 0,
+      .pin2_attempts = 3,
+      .puk_attempts  = 5,
+      .puk2_attempts = 5
+    },
+    { .str = "+UPINCNT: 0,0,0,0\r\n",
+      .pin_attempts  = 0,
+      .pin2_attempts = 0,
+      .puk_attempts  = 0,
+      .puk2_attempts = 0
+    },
+};
+
+static void
+test_upincnt_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (upincnt_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint     pin_attempts  = G_MAXUINT;
+        guint     pin2_attempts = G_MAXUINT;
+        guint     puk_attempts  = G_MAXUINT;
+        guint     puk2_attempts = G_MAXUINT;
+
+        success = mm_ublox_parse_upincnt_response (upincnt_response_tests[i].str,
+                                                   &pin_attempts, &pin2_attempts,
+                                                   &puk_attempts, &puk2_attempts,
+                                                   &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (upincnt_response_tests[i].pin_attempts,  ==, pin_attempts);
+        g_assert_cmpuint (upincnt_response_tests[i].pin2_attempts, ==, pin2_attempts);
+        g_assert_cmpuint (upincnt_response_tests[i].puk_attempts,  ==, puk_attempts);
+        g_assert_cmpuint (upincnt_response_tests[i].puk2_attempts, ==, puk2_attempts);
+    }
+}
+
+/*****************************************************************************/
 /* Test UUSBCONF? responses */
 
 typedef struct {
@@ -454,7 +512,7 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-
+    g_test_add_func ("/MM/ublox/upincnt/response",  test_upincnt_response);
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
     g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
     g_test_add_func ("/MM/ublox/uipaddr/response",  test_uipaddr_response);

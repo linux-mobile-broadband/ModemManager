@@ -21,6 +21,86 @@
 #include "mm-modem-helpers-ublox.h"
 
 /*****************************************************************************/
+/* +UPINCNT response parser */
+
+gboolean
+mm_ublox_parse_upincnt_response (const gchar  *response,
+                                 guint        *out_pin_attempts,
+                                 guint        *out_pin2_attempts,
+                                 guint        *out_puk_attempts,
+                                 guint        *out_puk2_attempts,
+                                 GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    guint       pin_attempts = 0;
+    guint       pin2_attempts = 0;
+    guint       puk_attempts = 0;
+    guint       puk2_attempts = 0;
+    gboolean    success = TRUE;
+
+    g_assert (out_pin_attempts);
+    g_assert (out_pin2_attempts);
+    g_assert (out_puk_attempts);
+    g_assert (out_puk2_attempts);
+
+    /* Response may be e.g.:
+     * +UPINCNT: 3,3,10,10
+     */
+    r = g_regex_new ("\\+UPINCNT: (\\d+),(\\d+),(\\d+),(\\d+)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        if (!mm_get_uint_from_match_info (match_info, 1, &pin_attempts)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Couldn't parse PIN attempts");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 2, &pin2_attempts)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Couldn't parse PIN2 attempts");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 3, &puk_attempts)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Couldn't parse PUK attempts");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 4, &puk2_attempts)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Couldn't parse PUK2 attempts");
+            goto out;
+        }
+        success = TRUE;
+    }
+
+out:
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (!success) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +UPINCNT response: '%s'", response);
+        return FALSE;
+    }
+
+    *out_pin_attempts  = pin_attempts;
+    *out_pin2_attempts = pin2_attempts;
+    *out_puk_attempts  = puk_attempts;
+    *out_puk2_attempts = puk2_attempts;
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* UUSBCONF? response parser */
 
 gboolean

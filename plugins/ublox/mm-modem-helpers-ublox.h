@@ -20,6 +20,16 @@
 #include <ModemManager.h>
 
 /*****************************************************************************/
+/* +UPINCNT response parser */
+
+gboolean mm_ublox_parse_upincnt_response (const gchar  *response,
+                                          guint        *out_pin_attempts,
+                                          guint        *out_pin2_attempts,
+                                          guint        *out_puk_attempts,
+                                          guint        *out_puk2_attempts,
+                                          GError      **error);
+
+/*****************************************************************************/
 /* UUSBCONF? response parser */
 
 typedef enum { /*< underscore_name=mm_ublox_usb_profile >*/
