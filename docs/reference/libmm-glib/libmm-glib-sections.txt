@@ -894,6 +894,7 @@ MMSignal
 MM_SIGNAL_UNKNOWN
 <SUBSECTION Getters>
 mm_signal_get_rssi
+mm_signal_get_rscp
 mm_signal_get_ecio
 mm_signal_get_sinr
 mm_signal_get_io
@@ -905,6 +906,7 @@ mm_signal_new
 mm_signal_new_from_dictionary
 mm_signal_get_dictionary
 mm_signal_set_rssi
+mm_signal_set_rscp
 mm_signal_set_ecio
 mm_signal_set_sinr
 mm_signal_set_io

@@ -178,8 +178,10 @@ print_signal_info (void)
     if (signal)
         g_print ("  -------------------------\n"
                  "  UMTS   | RSSI: '%.2lf' dBm\n"
-                 "         | EcIo: '%.2lf' dBm\n",
+                 "         | RSCP: '%.2lf' dBm\n"
+                 "         | EcIo: '%.2lf' dB\n",
                  mm_signal_get_rssi (signal),
+                 mm_signal_get_rscp (signal),
                  mm_signal_get_ecio (signal));
 
     /* LTE */
