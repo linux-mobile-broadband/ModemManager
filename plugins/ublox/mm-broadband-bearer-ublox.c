@@ -338,6 +338,110 @@ cgact_activate_ready (MMBaseModem  *modem,
 }
 
 static void
+activate_3gpp (GTask *task)
+{
+    CommonConnectContext *ctx;
+    gchar                *cmd;
+
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    cmd = g_strdup_printf ("+CGACT=1,%u", ctx->cid);
+    mm_dbg ("activating PDP context #%u...", ctx->cid);
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                              cmd,
+                              120,
+                              FALSE,
+                              (GAsyncReadyCallback) cgact_activate_ready,
+                              task);
+    g_free (cmd);
+}
+
+static void
+uauthreq_ready (MMBaseModem  *modem,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    const gchar          *response;
+    GError               *error = NULL;
+    CommonConnectContext *ctx;
+
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    activate_3gpp (task);
+}
+
+static void
+authenticate_3gpp (GTask *task)
+{
+    const gchar          *user;
+    const gchar          *password;
+    MMBearerAllowedAuth   allowed_auth;
+    CommonConnectContext *ctx;
+    gchar                *cmd;
+
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+
+    if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
+        mm_dbg ("Not using authentication");
+        cmd = g_strdup_printf ("+UAUTHREQ=%u,0", ctx->cid);
+    } else {
+        gchar *quoted_user;
+        gchar *quoted_password;
+        guint  ublox_auth;
+
+        if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN || allowed_auth == (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
+            mm_dbg ("Using automatic authentication method");
+            ublox_auth = 3;
+        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
+            mm_dbg ("Using PAP authentication method");
+            ublox_auth = 1;
+        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
+            mm_dbg ("Using CHAP authentication method");
+            ublox_auth = 2;
+        } else {
+            gchar *str;
+
+            str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "Cannot use any of the specified authentication methods (%s)", str);
+            g_object_unref (task);
+            g_free (str);
+            return;
+        }
+
+        quoted_user = mm_port_serial_at_quote_string (user);
+        quoted_password = mm_port_serial_at_quote_string (password);
+        cmd = g_strdup_printf ("+UAUTHREQ=%u,%u,%s,%s",
+                               ctx->cid,
+                               ublox_auth,
+                               quoted_password,
+                               quoted_user);
+        g_free (quoted_user);
+        g_free (quoted_password);
+    }
+
+    mm_dbg ("setting up authentication preferences in PDP context #%u...", ctx->cid);
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                              cmd,
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback) uauthreq_ready,
+                              task);
+    g_free (cmd);
+}
+
+static void
 dial_3gpp (MMBroadbandBearer   *self,
            MMBaseModem         *modem,
            MMPortSerialAt      *primary,
@@ -347,7 +451,6 @@ dial_3gpp (MMBroadbandBearer   *self,
            gpointer             user_data)
 {
     GTask *task;
-    gchar *cmd;
 
     if (!(task = common_connect_task_new (MM_BROADBAND_BEARER_UBLOX (self),
                                           MM_BROADBAND_MODEM (modem),
@@ -359,15 +462,7 @@ dial_3gpp (MMBroadbandBearer   *self,
                                           user_data)))
         return;
 
-    cmd = g_strdup_printf ("+CGACT=1,%u", cid);
-    mm_dbg ("activating PDP context #%u...", cid);
-    mm_base_modem_at_command (MM_BASE_MODEM (modem),
-                              cmd,
-                              120,
-                              FALSE,
-                              (GAsyncReadyCallback) cgact_activate_ready,
-                              task);
-    g_free (cmd);
+    authenticate_3gpp (task);
 }
 
 /*****************************************************************************/
