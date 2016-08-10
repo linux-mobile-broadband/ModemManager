@@ -82,7 +82,7 @@ mm_signal_set_rssi (MMSignal *self,
  * mm_signal_get_ecio:
  * @self: a #MMSignal.
  *
- * Gets the Ec/Io, in dBm.
+ * Gets the Ec/Io, in dB.
  *
  * Only applicable to CDMA1x, CDMA EV-DO and UMTS (WCDMA).
  *

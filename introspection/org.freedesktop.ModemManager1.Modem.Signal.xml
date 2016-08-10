@@ -153,7 +153,7 @@
         <varlistentry><term><literal>"ecio"</literal></term>
           <listitem>
             <para>
-              The UMTS Ec/Io, in dBm, given as a floating point value
+              The UMTS Ec/Io, in dB, given as a floating point value
               (signature <literal>"d"</literal>).
             </para>
           </listitem>
