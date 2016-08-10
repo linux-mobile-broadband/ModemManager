@@ -149,6 +149,14 @@
               given as a floating point value (signature <literal>"d"</literal>).
             </para>
           </listitem>
+          </varlistentry>
+        <varlistentry><term><literal>"rscp"</literal></term>
+          <listitem>
+            <para>
+              The UMTS RSCP (Received Signal Code Power), in dBm, given as a
+              floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
         </varlistentry>
         <varlistentry><term><literal>"ecio"</literal></term>
           <listitem>

@@ -32,6 +32,7 @@
 G_DEFINE_TYPE (MMSignal, mm_signal, G_TYPE_OBJECT)
 
 #define PROPERTY_RSSI "rssi"
+#define PROPERTY_RSCP "rscp"
 #define PROPERTY_ECIO "ecio"
 #define PROPERTY_SINR "sinr"
 #define PROPERTY_IO   "io"
@@ -41,6 +42,7 @@ G_DEFINE_TYPE (MMSignal, mm_signal, G_TYPE_OBJECT)
 
 struct _MMSignalPrivate {
     gdouble rssi;
+    gdouble rscp;
     gdouble ecio;
     gdouble sinr;
     gdouble io;
@@ -74,6 +76,33 @@ mm_signal_set_rssi (MMSignal *self,
     g_return_if_fail (MM_IS_SIGNAL (self));
 
     self->priv->rssi = value;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_signal_get_rscp:
+ * @self: a #MMSignal.
+ *
+ * Gets the RSCP (Received Signal Code Power), in dBm.
+ *
+ * Returns: the RSCP, or %MM_SIGNAL_UNKNOWN if unknown.
+ */
+gdouble
+mm_signal_get_rscp (MMSignal *self)
+{
+    g_return_val_if_fail (MM_IS_SIGNAL (self), MM_SIGNAL_UNKNOWN);
+
+    return self->priv->rscp;
+}
+
+void
+mm_signal_set_rscp (MMSignal *self,
+                    gdouble value)
+{
+    g_return_if_fail (MM_IS_SIGNAL (self));
+
+    self->priv->rscp = value;
 }
 
 /*****************************************************************************/
@@ -279,6 +308,12 @@ mm_signal_get_dictionary (MMSignal *self)
                                PROPERTY_RSSI,
                                g_variant_new_double (self->priv->rssi));
 
+    if (self->priv->rscp != MM_SIGNAL_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_RSCP,
+                               g_variant_new_double (self->priv->rscp));
+
     if (self->priv->ecio != MM_SIGNAL_UNKNOWN)
         g_variant_builder_add (&builder,
                                "{sv}",
@@ -328,6 +363,8 @@ consume_variant (MMSignal *self,
 {
     if (g_str_equal (key, PROPERTY_RSSI))
         self->priv->rssi = g_variant_get_double (value);
+    else if (g_str_equal (key, PROPERTY_RSCP))
+        self->priv->rscp = g_variant_get_double (value);
     else if (g_str_equal (key, PROPERTY_ECIO))
         self->priv->ecio = g_variant_get_double (value);
     else if (g_str_equal (key, PROPERTY_SINR))
@@ -424,6 +461,7 @@ mm_signal_init (MMSignal *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_SIGNAL, MMSignalPrivate);
     self->priv->rssi = MM_SIGNAL_UNKNOWN;
+    self->priv->rscp = MM_SIGNAL_UNKNOWN;
     self->priv->ecio = MM_SIGNAL_UNKNOWN;
     self->priv->sinr = MM_SIGNAL_UNKNOWN;
     self->priv->io   = MM_SIGNAL_UNKNOWN;
