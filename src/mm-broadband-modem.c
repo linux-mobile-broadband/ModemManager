@@ -6871,7 +6871,7 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
                                              gboolean setup,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data)
-{                                       
+{
     CdmaUnsolicitedEventsContext *ctx;
     GByteArray *logcmd;
     u_int16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
@@ -10022,13 +10022,10 @@ initialize_step (InitializeContext *ctx)
             gboolean is_sim_hot_swap_supported = FALSE;
 
             g_object_get (ctx->self,
-                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
-                          &is_sim_hot_swap_supported,
+                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
                           NULL);
 
-            if (!is_sim_hot_swap_supported) {
-                ctx->self->priv->sim_hot_swap_ports_ctx = NULL;
-            } else {
+            if (is_sim_hot_swap_supported) {
                 PortsContext *ports;
                 GError *error = NULL;
 
@@ -10110,7 +10107,6 @@ initialize_step (InitializeContext *ctx)
                 mm_iface_modem_voice_shutdown (MM_IFACE_MODEM_VOICE (ctx->self));
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
                 mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
-
             }
             initialize_context_complete_and_free (ctx);
             return;
@@ -10274,7 +10270,6 @@ after_hotswap_event_disable_ready (MMBaseModem *self,
         mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
     }
 }
-
 
 void
 mm_broadband_modem_update_sim_hot_swap_detected (MMBroadbandModem *self)

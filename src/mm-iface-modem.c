@@ -4747,14 +4747,11 @@ interface_initialization_step (InitializationContext *ctx)
                 gboolean is_sim_hot_swap_supported = FALSE;
 
                 g_object_get (ctx->self,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
-                              &is_sim_hot_swap_supported,
+                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
                               NULL);
 
-                if (is_sim_hot_swap_supported) {
-                    mm_iface_modem_update_failed_state (ctx->self,
-                                                        MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
-                }
+                if (is_sim_hot_swap_supported)
+                    mm_iface_modem_update_failed_state (ctx->self, MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
             }
             g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
             ctx->fatal_error = NULL;

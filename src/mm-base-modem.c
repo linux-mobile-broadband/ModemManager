@@ -411,7 +411,6 @@ mm_base_modem_get_reprobe (MMBaseModem *self)
     return self->priv->reprobe;
 }
 
-
 gboolean
 mm_base_modem_get_valid (MMBaseModem *self)
 {

@@ -489,15 +489,13 @@ modem_valid (MMBaseModem *modem,
              MMDevice    *self)
 {
     if (!mm_base_modem_get_valid (modem)) {
-        GDBusObjectManagerServer *object_manager = self->priv->object_manager;
-
         /* Modem no longer valid */
         mm_device_remove_modem (self);
 
         if (mm_base_modem_get_reprobe (modem)) {
             GError *error = NULL;
 
-            if (!mm_device_create_modem (self, object_manager, &error)) {
+            if (!mm_device_create_modem (self, self->priv->object_manager, &error)) {
                  mm_warn ("Could not recreate modem for device at '%s': %s",
                          mm_device_get_path (self),
                          error ? error->message : "unknown");
