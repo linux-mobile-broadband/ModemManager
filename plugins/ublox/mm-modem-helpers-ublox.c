@@ -540,6 +540,111 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 }
 
 /*****************************************************************************/
+/* Supported bands loading */
+
+typedef struct {
+    guint       ubandsel_value;
+    MMModemBand bands_2g[2];
+    MMModemBand bands_3g[2];
+    MMModemBand bands_4g[2];
+} BandConfiguration;
+
+static const BandConfiguration band_configuration[] = {
+    {
+        .ubandsel_value = 700,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII }
+    },
+    {
+        .ubandsel_value = 800,
+        .bands_3g = { MM_MODEM_BAND_U800 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_XX }
+    },
+    {
+        .ubandsel_value = 850,
+        .bands_2g = { MM_MODEM_BAND_G850 },
+        .bands_3g = { MM_MODEM_BAND_U850 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_V }
+    },
+    {
+        .ubandsel_value = 900,
+        .bands_2g = { MM_MODEM_BAND_EGSM },
+        .bands_3g = { MM_MODEM_BAND_U900 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_VIII }
+    },
+    {
+        .ubandsel_value = 1500,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_XI }
+    },
+    {
+        .ubandsel_value = 1700,
+        .bands_3g = { MM_MODEM_BAND_U17IV },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_IV }
+    },
+    {
+        .ubandsel_value = 1800,
+        .bands_2g = { MM_MODEM_BAND_DCS },
+        .bands_3g = { MM_MODEM_BAND_U1800 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_III }
+    },
+    {
+        .ubandsel_value = 1900,
+        .bands_2g = { MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_U1900 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_II }
+    },
+    {
+        .ubandsel_value = 2100,
+        .bands_3g = { MM_MODEM_BAND_U2100 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_I }
+    },
+    {
+        .ubandsel_value = 2600,
+        .bands_3g = { MM_MODEM_BAND_U2600 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_VII }
+    },
+};
+
+GArray *
+mm_ublox_get_supported_bands (const gchar  *model,
+                              GError      **error)
+{
+    MMModemMode  mode;
+    GArray      *bands;
+    guint        i;
+
+    mode = supported_modes_per_model (model);
+
+    bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
+        if ((mode & MM_MODEM_MODE_2G) && band_configuration[i].bands_2g[0]) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_2g[0]);
+            if (band_configuration[i].bands_2g[1])
+                bands = g_array_append_val (bands, band_configuration[i].bands_2g[1]);
+        }
+        if ((mode & MM_MODEM_MODE_3G) && band_configuration[i].bands_3g[0]) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_3g[0]);
+            if (band_configuration[i].bands_3g[1])
+                bands = g_array_append_val (bands, band_configuration[i].bands_3g[1]);
+        }
+        if ((mode & MM_MODEM_MODE_4G) && band_configuration[i].bands_4g[0]) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_4g[0]);
+            if (band_configuration[i].bands_4g[1])
+                bands = g_array_append_val (bands, band_configuration[i].bands_4g[1]);
+        }
+    }
+
+    if (bands->len == 0) {
+        g_array_unref (bands);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No valid supported bands loaded");
+        return NULL;
+    }
+
+    return bands;
+}
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode

@@ -484,6 +484,114 @@ test_urat_write_command (void)
 }
 
 /*****************************************************************************/
+/* Supported bands */
+
+static void
+common_validate_supported_bands (const gchar       *model,
+                                 const MMModemBand *expected_bands,
+                                 guint              n_expected_bands)
+{
+    GError *error = NULL;
+    GArray *bands;
+    gchar  *bands_str;
+    GArray *expected_bands_array;
+    gchar  *expected_bands_str;
+
+    bands = mm_ublox_get_supported_bands (model, &error);
+    g_assert_no_error (error);
+    g_assert (bands);
+    mm_common_bands_garray_sort (bands);
+    bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
+    g_array_unref (bands);
+
+    expected_bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_expected_bands);
+    g_array_append_vals (expected_bands_array, expected_bands, n_expected_bands);
+    mm_common_bands_garray_sort (expected_bands_array);
+    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(expected_bands_array->data), expected_bands_array->len);
+    g_array_unref (expected_bands_array);
+
+    g_assert_cmpstr (bands_str, ==, expected_bands_str);
+    g_free (bands_str);
+    g_free (expected_bands_str);
+}
+
+static void
+test_supported_bands_all (void)
+{
+    /* All 2G, 3G and 4G bands */
+    const MMModemBand expected_bands[] = {
+        /*  700 */ MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII,
+        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_XX,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+        /* 1500 */ MM_MODEM_BAND_EUTRAN_XI,
+        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_IV,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
+        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_I,
+        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_VII,
+    };
+
+    common_validate_supported_bands (NULL, expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_supported_bands_toby_l201 (void)
+{
+    /* Only 3G and 4G bands */
+    const MMModemBand expected_bands[] = {
+        /*  700 */ MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII,
+        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_XX,
+        /*  850 */ MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  900 */ MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+        /* 1500 */ MM_MODEM_BAND_EUTRAN_XI,
+        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_IV,
+        /* 1800 */ MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
+        /* 1900 */ MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
+        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_I,
+        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_VII,
+    };
+
+    common_validate_supported_bands ("TOBY-L201", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_supported_bands_lisa_u200 (void)
+{
+    /* Only 2G and 3G bands */
+    const MMModemBand expected_bands[] = {
+        /*  800 */ MM_MODEM_BAND_U800,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900,
+        /* 1700 */ MM_MODEM_BAND_U17IV,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800,
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900,
+        /* 2100 */ MM_MODEM_BAND_U2100,
+        /* 2600 */ MM_MODEM_BAND_U2600,
+    };
+
+    common_validate_supported_bands ("LISA-U200", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_supported_bands_sara_u280 (void)
+{
+    /* Only 3G bands */
+    const MMModemBand expected_bands[] = {
+        /*  800 */ MM_MODEM_BAND_U800,
+        /*  850 */ MM_MODEM_BAND_U850,
+        /*  900 */ MM_MODEM_BAND_U900,
+        /* 1700 */ MM_MODEM_BAND_U17IV,
+        /* 1800 */ MM_MODEM_BAND_U1800,
+        /* 1900 */ MM_MODEM_BAND_U1900,
+        /* 2100 */ MM_MODEM_BAND_U2100,
+        /* 2600 */ MM_MODEM_BAND_U2600,
+    };
+
+    common_validate_supported_bands ("SARA-U280", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -525,6 +633,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/urat/test/response/sara-u280", test_mode_filtering_sara_u280);
     g_test_add_func ("/MM/ublox/urat/read/response", test_urat_read_response);
     g_test_add_func ("/MM/ublox/urat/write/command", test_urat_write_command);
+    g_test_add_func ("/MM/ublox/supported-bands/all",       test_supported_bands_all);
+    g_test_add_func ("/MM/ublox/supported-bands/toby-l201", test_supported_bands_toby_l201);
+    g_test_add_func ("/MM/ublox/supported-bands/lisa-u200", test_supported_bands_lisa_u200);
+    g_test_add_func ("/MM/ublox/supported-bands/sara-u280", test_supported_bands_sara_u280);
 
     return g_test_run ();
 }

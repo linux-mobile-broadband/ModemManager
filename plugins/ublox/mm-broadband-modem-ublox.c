@@ -75,6 +75,44 @@ release_power_operation (MMBroadbandModemUblox *self)
 }
 
 /*****************************************************************************/
+/* Load supported bands (Modem interface) */
+
+static GArray *
+load_supported_bands_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
+{
+    return (GArray *) g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_supported_bands (MMIfaceModem        *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    GTask  *task;
+    GError *error = NULL;
+    GArray *bands;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* The list of supported tasks we give here must include not only the bands
+     * allowed in the current AcT, but the whole list of bands allowed in all
+     * AcTs. This is because the list of supported bands is loaded only once
+     * during modem initialization. Not ideal, but the current API is like that.
+     *
+     * So, we give a predefined list of supported bands and we filter them in the
+     * same way we filter the allowed AcTs.
+     */
+    bands = mm_ublox_get_supported_bands (mm_iface_modem_get_model (self), &error);
+    if (!bands)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
 /* Set allowed modes (Modem interface) */
 
 typedef enum {
@@ -850,6 +888,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes        = set_current_modes;
     iface->set_current_modes_finish = set_current_modes_finish;
+    iface->load_supported_bands        = load_supported_bands;
+    iface->load_supported_bands_finish = load_supported_bands_finish;
 }
 
 static void
