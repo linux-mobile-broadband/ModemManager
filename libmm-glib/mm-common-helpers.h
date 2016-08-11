@@ -100,7 +100,8 @@ GVariant    *mm_common_bands_garray_to_variant (GArray *array);
 GVariant    *mm_common_build_bands_any     (void);
 GVariant    *mm_common_build_bands_unknown (void);
 
-gboolean     mm_common_bands_garray_cmp (GArray *a, GArray *b);
+gboolean     mm_common_bands_garray_cmp  (GArray *a, GArray *b);
+void         mm_common_bands_garray_sort (GArray *array);
 
 GArray                 *mm_common_mode_combinations_variant_to_garray (GVariant *variant);
 MMModemModeCombination *mm_common_mode_combinations_variant_to_array  (GVariant *variant,

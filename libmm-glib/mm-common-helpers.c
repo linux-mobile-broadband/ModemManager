@@ -655,6 +655,12 @@ mm_common_bands_garray_cmp (GArray *a, GArray *b)
     return !different;
 }
 
+void
+mm_common_bands_garray_sort (GArray *array)
+{
+    g_array_sort (array, (GCompareFunc) cmp_band);
+}
+
 GArray *
 mm_common_mode_combinations_variant_to_garray (GVariant *variant)
 {
