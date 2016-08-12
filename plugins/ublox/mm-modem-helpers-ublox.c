@@ -732,6 +732,61 @@ out:
 }
 
 /*****************************************************************************/
+/* UBANDSEL=X command builder */
+
+static gint
+ubandsel_num_cmp (const guint *a, const guint *b)
+{
+    return (*a - *b);
+}
+
+gchar *
+mm_ublox_build_ubandsel_set_command (GArray  *bands,
+                                     GError **error)
+{
+    GString *command = NULL;
+    GArray  *ubandsel_nums;
+    guint    i;
+
+    if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
+        return g_strdup ("+UBANDSEL=0");
+
+    ubandsel_nums = g_array_sized_new (FALSE, FALSE, sizeof (guint), G_N_ELEMENTS (band_configuration));
+    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
+        guint j;
+
+        for (j = 0; j < bands->len; j++) {
+            MMModemBand band;
+
+            band = g_array_index (bands, MMModemBand, j);
+
+            if (band == band_configuration[i].bands_2g[0] || band == band_configuration[i].bands_2g[1] ||
+                band == band_configuration[i].bands_3g[0] || band == band_configuration[i].bands_3g[1] ||
+                band == band_configuration[i].bands_4g[0] || band == band_configuration[i].bands_4g[1]) {
+                g_array_append_val (ubandsel_nums, band_configuration[i].ubandsel_value);
+                break;
+            }
+        }
+    }
+
+    if (ubandsel_nums->len == 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Given band combination is unsupported");
+        g_array_unref (ubandsel_nums);
+        return NULL;
+    }
+
+    if (ubandsel_nums->len > 1)
+        g_array_sort (ubandsel_nums, (GCompareFunc) ubandsel_num_cmp);
+
+    /* Build command */
+    command = g_string_new ("+UBANDSEL=");
+    for (i = 0; i < ubandsel_nums->len; i++)
+        g_string_append_printf (command, "%s%u", i == 0 ? "" : ",", g_array_index (ubandsel_nums, guint, i));
+    return g_string_free (command, FALSE);
+}
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode

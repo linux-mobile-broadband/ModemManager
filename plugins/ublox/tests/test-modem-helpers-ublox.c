@@ -670,6 +670,61 @@ test_ubandsel_response_one (void)
 }
 
 /*****************************************************************************/
+/* +UBANDSEL=x command builder */
+
+static void
+common_validate_ubandsel_request (const MMModemBand *bands,
+                                  guint              n_bands,
+                                  const gchar       *expected_request)
+{
+    GError *error = NULL;
+    GArray *bands_array;
+    gchar  *request;
+
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
+    g_array_append_vals (bands_array, bands, n_bands);
+
+    request = mm_ublox_build_ubandsel_set_command (bands_array, &error);
+    g_assert_no_error (error);
+    g_assert (request);
+
+    g_assert_cmpstr (request, ==, expected_request);
+
+    g_array_unref (bands_array);
+    g_free (request);
+}
+
+static void
+test_ubandsel_request_any (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_ANY
+    };
+
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=0");
+}
+
+static void
+test_ubandsel_request_2g (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS
+    };
+
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=850,900,1800,1900");
+}
+
+static void
+test_ubandsel_request_1800 (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III
+    };
+
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=1800");
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -720,6 +775,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/ubandsel/response/two",   test_ubandsel_response_two);
     g_test_add_func ("/MM/ublox/ubandsel/response/three", test_ubandsel_response_three);
     g_test_add_func ("/MM/ublox/ubandsel/response/four",  test_ubandsel_response_four);
+
+    g_test_add_func ("/MM/ublox/ubandsel/request/any",  test_ubandsel_request_any);
+    g_test_add_func ("/MM/ublox/ubandsel/request/2g",   test_ubandsel_request_2g);
+    g_test_add_func ("/MM/ublox/ubandsel/request/1800", test_ubandsel_request_1800);
 
     return g_test_run ();
 }
