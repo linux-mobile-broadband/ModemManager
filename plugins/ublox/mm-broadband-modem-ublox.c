@@ -113,6 +113,37 @@ load_supported_bands (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Load current bands (Modem interface) */
+
+static GArray *
+load_current_bands_finish (MMIfaceModem  *self,
+                           GAsyncResult  *res,
+                           GError       **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return NULL;
+
+    return mm_ublox_parse_ubandsel_response (response, error);
+}
+
+static void
+load_current_bands (MMIfaceModem        *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+UBANDSEL?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)callback,
+        user_data);
+}
+
+/*****************************************************************************/
 /* Set allowed modes (Modem interface) */
 
 typedef enum {
@@ -890,6 +921,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_supported_bands        = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
+    iface->load_current_bands        = load_current_bands;
+    iface->load_current_bands_finish = load_current_bands_finish;
 }
 
 static void
