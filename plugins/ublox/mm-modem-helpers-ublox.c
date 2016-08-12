@@ -645,6 +645,93 @@ mm_ublox_get_supported_bands (const gchar  *model,
 }
 
 /*****************************************************************************/
+/* +UBANDSEL? response parser */
+
+static void
+append_bands (GArray *bands,
+              guint   ubandsel_value)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++)
+        if (ubandsel_value == band_configuration[i].ubandsel_value)
+            break;
+
+    if (i == G_N_ELEMENTS (band_configuration)) {
+        mm_warn ("Unknown band configuration value given: %u", ubandsel_value);
+        return;
+    }
+
+    /* Note: we don't care if the device doesn't support one of these modes;
+     * the generic logic will filter out all bands not supported before
+     * exposing them in the DBus property */
+
+    if (band_configuration[i].bands_2g[0]) {
+        g_array_append_val (bands, band_configuration[i].bands_2g[0]);
+        if (band_configuration[i].bands_2g[1])
+            g_array_append_val (bands, band_configuration[i].bands_2g[1]);
+    }
+
+    if (band_configuration[i].bands_3g[0]) {
+        g_array_append_val (bands, band_configuration[i].bands_3g[0]);
+        if (band_configuration[i].bands_3g[1])
+            g_array_append_val (bands, band_configuration[i].bands_3g[1]);
+    }
+
+    if (band_configuration[i].bands_4g[0]) {
+        g_array_append_val (bands, band_configuration[i].bands_4g[0]);
+        if (band_configuration[i].bands_4g[1])
+            g_array_append_val (bands, band_configuration[i].bands_4g[1]);
+    }
+}
+
+GArray *
+mm_ublox_parse_ubandsel_response (const gchar  *response,
+                                  GError      **error)
+{
+    GArray  *array_values = NULL;
+    GArray  *array = NULL;
+    gchar   *dupstr = NULL;
+    GError  *inner_error = NULL;
+    guint    i;
+
+    if (!g_str_has_prefix (response, "+UBANDSEL")) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Couldn't parse +UBANDSEL response: '%s'", response);
+        goto out;
+    }
+
+    /* Response may be e.g.:
+     *  +UBANDSEL: 850,900,1800,1900
+     */
+    dupstr = g_strchomp (g_strdup (mm_strip_tag (response, "+UBANDSEL:")));
+
+    array_values = mm_parse_uint_list (dupstr, &inner_error);
+    if (!array_values)
+        goto out;
+
+    /* Convert list of ubandsel numbers to MMModemBand values */
+    array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+    for (i = 0; i < array_values->len; i++)
+        append_bands (array, g_array_index (array_values, guint, i));
+
+    if (!array->len) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "No known band selection values matched in +UBANDSEL response: '%s'", response);
+        goto out;
+    }
+
+out:
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_clear_pointer (&array, g_array_unref);
+    }
+    g_clear_pointer (&array_values, g_array_unref);
+    g_free (dupstr);
+    return array;
+}
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode

@@ -592,6 +592,84 @@ test_supported_bands_sara_u280 (void)
 }
 
 /*****************************************************************************/
+/* Test +UBANDSEL? response parser */
+
+static void
+common_validate_ubandsel_response (const gchar       *str,
+                                   const MMModemBand *expected_bands,
+                                   guint              n_expected_bands)
+{
+    GError *error = NULL;
+    GArray *bands;
+    gchar  *bands_str;
+    GArray *expected_bands_array;
+    gchar  *expected_bands_str;
+
+    bands = mm_ublox_parse_ubandsel_response (str, &error);
+    g_assert_no_error (error);
+    g_assert (bands);
+    mm_common_bands_garray_sort (bands);
+    bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
+    g_array_unref (bands);
+
+    expected_bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_expected_bands);
+    g_array_append_vals (expected_bands_array, expected_bands, n_expected_bands);
+    mm_common_bands_garray_sort (expected_bands_array);
+    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(expected_bands_array->data), expected_bands_array->len);
+    g_array_unref (expected_bands_array);
+
+    g_assert_cmpstr (bands_str, ==, expected_bands_str);
+    g_free (bands_str);
+    g_free (expected_bands_str);
+}
+
+static void
+test_ubandsel_response_four (void)
+{
+    const MMModemBand expected_bands[] = {
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
+    };
+
+    common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800,1900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_ubandsel_response_three (void)
+{
+    const MMModemBand expected_bands[] = {
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
+    };
+
+    common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_ubandsel_response_two (void)
+{
+    const MMModemBand expected_bands[] = {
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+    };
+
+    common_validate_ubandsel_response ("+UBANDSEL: 850,900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_ubandsel_response_one (void)
+{
+    const MMModemBand expected_bands[] = {
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+    };
+
+    common_validate_ubandsel_response ("+UBANDSEL: 850\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -637,6 +715,11 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/supported-bands/toby-l201", test_supported_bands_toby_l201);
     g_test_add_func ("/MM/ublox/supported-bands/lisa-u200", test_supported_bands_lisa_u200);
     g_test_add_func ("/MM/ublox/supported-bands/sara-u280", test_supported_bands_sara_u280);
+
+    g_test_add_func ("/MM/ublox/ubandsel/response/one",   test_ubandsel_response_one);
+    g_test_add_func ("/MM/ublox/ubandsel/response/two",   test_ubandsel_response_two);
+    g_test_add_func ("/MM/ublox/ubandsel/response/three", test_ubandsel_response_three);
+    g_test_add_func ("/MM/ublox/ubandsel/response/four",  test_ubandsel_response_four);
 
     return g_test_run ();
 }

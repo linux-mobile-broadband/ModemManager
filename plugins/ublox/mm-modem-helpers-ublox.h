@@ -95,6 +95,12 @@ GArray *mm_ublox_get_supported_bands (const gchar  *model,
                                       GError      **error);
 
 /*****************************************************************************/
+/* UBANDSEL? response parser */
+
+GArray *mm_ublox_parse_ubandsel_response (const gchar  *response,
+                                          GError      **error);
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode mm_ublox_get_modem_mode_any (const GArray *combinations);
