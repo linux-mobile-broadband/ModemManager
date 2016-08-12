@@ -165,7 +165,7 @@
     <!--
         Lte:
 
-        Dictionary of available signal information for the UMTS (WCDMA) access
+        Dictionary of available signal information for the LTE access
         technology.
 
         This dictionary is composed of a string key, with an associated data
