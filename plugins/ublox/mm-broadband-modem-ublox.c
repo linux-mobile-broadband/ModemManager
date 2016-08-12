@@ -144,54 +144,69 @@ load_current_bands (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
-/* Set allowed modes (Modem interface) */
+/* Set allowed modes/bands (Modem interface) */
 
 typedef enum {
-    SET_CURRENT_MODES_STEP_FIRST,
-    SET_CURRENT_MODES_STEP_ACQUIRE,
-    SET_CURRENT_MODES_STEP_CURRENT_POWER,
-    SET_CURRENT_MODES_STEP_POWER_DOWN,
-    SET_CURRENT_MODES_STEP_URAT,
-    SET_CURRENT_MODES_STEP_RECOVER_CURRENT_POWER,
-    SET_CURRENT_MODES_STEP_RELEASE,
-    SET_CURRENT_MODES_STEP_LAST,
-} SetCurrentModesStep;
+    SET_CURRENT_MODES_BANDS_STEP_FIRST,
+    SET_CURRENT_MODES_BANDS_STEP_ACQUIRE,
+    SET_CURRENT_MODES_BANDS_STEP_CURRENT_POWER,
+    SET_CURRENT_MODES_BANDS_STEP_POWER_DOWN,
+    SET_CURRENT_MODES_BANDS_STEP_COMMAND,
+    SET_CURRENT_MODES_BANDS_STEP_RECOVER_CURRENT_POWER,
+    SET_CURRENT_MODES_BANDS_STEP_RELEASE,
+    SET_CURRENT_MODES_BANDS_STEP_LAST,
+} SetCurrentModesBandsStep;
 
 typedef struct {
-    MMBroadbandModemUblox *self;
-    SetCurrentModesStep    step;
-    gchar                 *command;
-    MMModemPowerState      initial_state;
-    GError                *saved_error;
-} SetCurrentModesContext;
+    MMBroadbandModemUblox    *self;
+    SetCurrentModesBandsStep  step;
+    gchar                    *command;
+    MMModemPowerState         initial_state;
+    GError                   *saved_error;
+} SetCurrentModesBandsContext;
 
 static void
-set_current_modes_context_free (SetCurrentModesContext *ctx)
+set_current_modes_bands_context_free (SetCurrentModesBandsContext *ctx)
 {
     g_assert (!ctx->saved_error);
     g_free (ctx->command);
     g_object_unref (ctx->self);
-    g_slice_free (SetCurrentModesContext, ctx);
+    g_slice_free (SetCurrentModesBandsContext, ctx);
+}
+
+static void
+set_current_modes_bands_context_new (GTask        *task,
+                                     MMIfaceModem *self,
+                                     gchar        *command)
+{
+    SetCurrentModesBandsContext *ctx;
+
+    ctx = g_slice_new0 (SetCurrentModesBandsContext);
+    ctx->self = MM_BROADBAND_MODEM_UBLOX (g_object_ref (self));
+    ctx->command = command;
+    ctx->initial_state = MM_MODEM_POWER_STATE_UNKNOWN;
+    ctx->step = SET_CURRENT_MODES_BANDS_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) set_current_modes_bands_context_free);
 }
 
 static gboolean
-set_current_modes_finish (MMIfaceModem  *self,
-                          GAsyncResult  *res,
-                          GError       **error)
+common_set_current_modes_bands_finish (MMIfaceModem  *self,
+                                       GAsyncResult  *res,
+                                       GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void set_current_modes_step (GTask *task);
+static void set_current_modes_bands_step (GTask *task);
 
 static void
-set_current_modes_recover_power_ready (MMBaseModem  *self,
-                                       GAsyncResult *res,
-                                       GTask        *task)
+set_current_modes_bands_recover_power_ready (MMBaseModem  *self,
+                                             GAsyncResult *res,
+                                             GTask        *task)
 {
-    SetCurrentModesContext *ctx;
+    SetCurrentModesBandsContext *ctx;
 
-    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
 
     /* propagate the error if none already set */
@@ -199,145 +214,145 @@ set_current_modes_recover_power_ready (MMBaseModem  *self,
 
     /* Go to next step (release power operation) regardless of the result */
     ctx->step++;
-    set_current_modes_step (task);
+    set_current_modes_bands_step (task);
 }
 
 static void
-set_current_modes_urat_ready (MMBaseModem  *self,
-                              GAsyncResult *res,
-                              GTask        *task)
+set_current_modes_bands_command_ready (MMBaseModem  *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
 {
-    SetCurrentModesContext *ctx;
+    SetCurrentModesBandsContext *ctx;
 
-    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
 
     mm_base_modem_at_command_finish (self, res, &ctx->saved_error);
 
     /* Go to next step (recover current power) regardless of the result */
     ctx->step++;
-    set_current_modes_step (task);
+    set_current_modes_bands_step (task);
 }
 
 static void
-set_current_modes_low_power_ready (MMBaseModem  *self,
-                                   GAsyncResult *res,
-                                   GTask        *task)
+set_current_modes_bands_low_power_ready (MMBaseModem  *self,
+                                         GAsyncResult *res,
+                                         GTask        *task)
 {
-    SetCurrentModesContext *ctx;
+    SetCurrentModesBandsContext *ctx;
 
-    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
 
     if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error))
-        ctx->step = SET_CURRENT_MODES_STEP_RELEASE;
+        ctx->step = SET_CURRENT_MODES_BANDS_STEP_RELEASE;
     else
         ctx->step++;
 
-    set_current_modes_step (task);
+    set_current_modes_bands_step (task);
 }
 
 static void
-set_current_modes_current_power_ready (MMBaseModem  *self,
-                                       GAsyncResult *res,
-                                       GTask        *task)
+set_current_modes_bands_current_power_ready (MMBaseModem  *self,
+                                             GAsyncResult *res,
+                                             GTask        *task)
 {
-    SetCurrentModesContext *ctx;
-    const gchar            *response;
+    SetCurrentModesBandsContext *ctx;
+    const gchar                 *response;
 
-    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
 
     response = mm_base_modem_at_command_finish (self, res, &ctx->saved_error);
     if (!response || !mm_ublox_parse_cfun_response (response, &ctx->initial_state, &ctx->saved_error))
-        ctx->step = SET_CURRENT_MODES_STEP_RELEASE;
+        ctx->step = SET_CURRENT_MODES_BANDS_STEP_RELEASE;
     else
         ctx->step++;
 
-    set_current_modes_step (task);
+    set_current_modes_bands_step (task);
 }
 
 static void
-set_current_modes_step (GTask *task)
+set_current_modes_bands_step (GTask *task)
 {
-    SetCurrentModesContext *ctx;
+    SetCurrentModesBandsContext *ctx;
 
-    ctx = (SetCurrentModesContext *) g_task_get_task_data (task);
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
 
     switch (ctx->step) {
-    case SET_CURRENT_MODES_STEP_FIRST:
+    case SET_CURRENT_MODES_BANDS_STEP_FIRST:
         ctx->step++;
         /* fall down */
 
-    case SET_CURRENT_MODES_STEP_ACQUIRE:
+    case SET_CURRENT_MODES_BANDS_STEP_ACQUIRE:
         mm_dbg ("acquiring power operation...");
         if (!acquire_power_operation (ctx->self, &ctx->saved_error)) {
-            ctx->step = SET_CURRENT_MODES_STEP_LAST;
-            set_current_modes_step (task);
+            ctx->step = SET_CURRENT_MODES_BANDS_STEP_LAST;
+            set_current_modes_bands_step (task);
             return;
         }
         ctx->step++;
         /* fall down */
 
-    case SET_CURRENT_MODES_STEP_CURRENT_POWER:
+    case SET_CURRENT_MODES_BANDS_STEP_CURRENT_POWER:
         mm_dbg ("checking current power operation...");
         mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                                   "+CFUN?",
                                   3,
                                   FALSE,
-                                  (GAsyncReadyCallback) set_current_modes_current_power_ready,
+                                  (GAsyncReadyCallback) set_current_modes_bands_current_power_ready,
                                   task);
         return;
 
-    case SET_CURRENT_MODES_STEP_POWER_DOWN:
+    case SET_CURRENT_MODES_BANDS_STEP_POWER_DOWN:
         if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
-            mm_dbg ("powering down before AcT change...");
+            mm_dbg ("powering down before configuration change...");
             mm_base_modem_at_command (
                 MM_BASE_MODEM (ctx->self),
                 "+CFUN=4",
                 3,
                 FALSE,
-                (GAsyncReadyCallback) set_current_modes_low_power_ready,
+                (GAsyncReadyCallback) set_current_modes_bands_low_power_ready,
                 task);
             return;
         }
         ctx->step++;
         /* fall down */
 
-    case SET_CURRENT_MODES_STEP_URAT:
-        mm_dbg ("updating AcT...");
+    case SET_CURRENT_MODES_BANDS_STEP_COMMAND:
+        mm_dbg ("updating configuration...");
         mm_base_modem_at_command (
             MM_BASE_MODEM (ctx->self),
             ctx->command,
             3,
             FALSE,
-            (GAsyncReadyCallback) set_current_modes_urat_ready,
+            (GAsyncReadyCallback) set_current_modes_bands_command_ready,
             task);
         return;
 
-    case SET_CURRENT_MODES_STEP_RECOVER_CURRENT_POWER:
+    case SET_CURRENT_MODES_BANDS_STEP_RECOVER_CURRENT_POWER:
         if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
-            mm_dbg ("recovering power state after AcT change...");
+            mm_dbg ("recovering power state after configuration change...");
             mm_base_modem_at_command (
                 MM_BASE_MODEM (ctx->self),
                 "+CFUN=1",
                 3,
                 FALSE,
-                (GAsyncReadyCallback) set_current_modes_recover_power_ready,
+                (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
                 task);
             return;
         }
         ctx->step++;
         /* fall down */
 
-    case SET_CURRENT_MODES_STEP_RELEASE:
+    case SET_CURRENT_MODES_BANDS_STEP_RELEASE:
         mm_dbg ("releasing power operation...");
         release_power_operation (ctx->self);
         ctx->step++;
         /* fall down */
 
-    case SET_CURRENT_MODES_STEP_LAST:
+    case SET_CURRENT_MODES_BANDS_STEP_LAST:
         if (ctx->saved_error) {
             g_task_return_error (task, ctx->saved_error);
             ctx->saved_error = NULL;
@@ -355,10 +370,9 @@ set_current_modes (MMIfaceModem        *self,
                    GAsyncReadyCallback  callback,
                    gpointer             user_data)
 {
-    GTask                  *task;
-    SetCurrentModesContext *ctx;
-    gchar                  *command;
-    GError                 *error = NULL;
+    GTask  *task;
+    gchar  *command;
+    GError *error = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -374,14 +388,32 @@ set_current_modes (MMIfaceModem        *self,
         return;
     }
 
-    ctx = g_slice_new0 (SetCurrentModesContext);
-    ctx->self = MM_BROADBAND_MODEM_UBLOX (g_object_ref (self));
-    ctx->command = command;
-    ctx->initial_state = MM_MODEM_POWER_STATE_UNKNOWN;
-    ctx->step = SET_CURRENT_MODES_STEP_FIRST;
-    g_task_set_task_data (task, ctx, (GDestroyNotify) set_current_modes_context_free);
+    set_current_modes_bands_context_new (task, self, command);
+    set_current_modes_bands_step (task);
+}
 
-    set_current_modes_step (task);
+static void
+set_current_bands (MMIfaceModem         *self,
+                   GArray              *bands_array,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    GTask  *task;
+    gchar  *command;
+    GError *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Build command */
+    command = mm_ublox_build_ubandsel_set_command (bands_array, &error);
+    if (!command) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    set_current_modes_bands_context_new (task, self, command);
+    set_current_modes_bands_step (task);
 }
 
 /*****************************************************************************/
@@ -918,11 +950,13 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes        = load_current_modes;
     iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes        = set_current_modes;
-    iface->set_current_modes_finish = set_current_modes_finish;
+    iface->set_current_modes_finish = common_set_current_modes_bands_finish;
     iface->load_supported_bands        = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands        = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
+    iface->set_current_bands        = set_current_bands;
+    iface->set_current_bands_finish = common_set_current_modes_bands_finish;
 }
 
 static void
