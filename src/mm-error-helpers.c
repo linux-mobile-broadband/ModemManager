@@ -16,6 +16,7 @@
  */
 
 #include "mm-error-helpers.h"
+#include "mm-log.h"
 
 #include <ctype.h>
 
@@ -50,7 +51,7 @@ mm_connection_error_for_code (MMConnectionError code)
         break;
 
     default:
-        g_debug ("Invalid connection error code: %u", code);
+        mm_dbg ("Invalid connection error code: %u", code);
         /* uhm... make something up (yes, ok, lie!). */
         code = MM_CONNECTION_ERROR_NO_CARRIER;
         msg = "No carrier";
@@ -127,7 +128,7 @@ mm_mobile_equipment_error_for_code (MMMobileEquipmentError code)
     }
 
     /* Not found? Then, default */
-    g_debug ("Invalid mobile equipment error code: %u", (guint)code);
+    mm_dbg ("Invalid mobile equipment error code: %u", (guint)code);
     return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                         MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                         "Unknown error");
@@ -163,8 +164,7 @@ mm_mobile_equipment_error_for_string (const gchar *str)
 
     /* Not found? Then, default */
     if (!msg) {
-        g_debug ("Invalid mobile equipment error string: '%s' (%s)",
-                 str, buf);
+        mm_dbg ("Invalid mobile equipment error string: '%s' (%s)", str, buf);
         code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
         msg = "Unknown error";
     }
@@ -215,7 +215,7 @@ mm_message_error_for_code (MMMessageError code)
     }
 
     /* Not found? Then, default */
-    g_debug ("Invalid message error code: %u", (guint)code);
+    mm_dbg ("Invalid message error code: %u", (guint)code);
     return g_error_new (MM_MESSAGE_ERROR,
                         MM_MESSAGE_ERROR_UNKNOWN,
                         "Unknown error");
@@ -251,8 +251,7 @@ mm_message_error_for_string (const gchar *str)
 
     /* Not found? Then, default */
     if (!msg) {
-        g_debug ("Invalid message error string: '%s' (%s)",
-                 str, buf);
+        mm_dbg ("Invalid message error string: '%s' (%s)", str, buf);
         code = MM_MESSAGE_ERROR_UNKNOWN;
         msg = "Unknown error";
     }

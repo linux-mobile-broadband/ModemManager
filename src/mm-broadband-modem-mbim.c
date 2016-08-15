@@ -1015,7 +1015,7 @@ release_qmi_client_dms_ready (QmiDevice      *dev,
 
     /* Non-fatal error */
     if (!qmi_device_release_client_finish (dev, res, &error)) {
-        g_debug ("error: couldn't release client: %s", error->message);
+        mm_dbg ("error: couldn't release client: %s", error->message);
         g_error_free (error);
     }
 
@@ -1045,7 +1045,7 @@ set_fcc_authentication_ready (QmiClientDms   *client,
 
     output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
-        g_debug ("error: couldn't set FCC auth: %s", error->message);
+        mm_dbg ("error: couldn't set FCC auth: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
         g_simple_async_result_take_error (ctx->result, ctx->saved_error);
@@ -1082,7 +1082,7 @@ qmi_client_dms_ready (QmiDevice      *dev,
 
     ctx->qmi_client = qmi_device_allocate_client_finish (dev, res, &error);
     if (!ctx->qmi_client) {
-        g_debug ("error: couldn't create DMS client: %s", error->message);
+        mm_dbg ("error: couldn't create DMS client: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
         g_simple_async_result_take_error (ctx->result, ctx->saved_error);
@@ -1116,7 +1116,7 @@ device_open_ready (QmiDevice      *dev,
     GError *error = NULL;
 
     if (!qmi_device_open_finish (dev, res, &error)) {
-        g_debug ("error: couldn't open QmiDevice: %s", error->message);
+        mm_dbg ("error: couldn't open QmiDevice: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
         g_simple_async_result_take_error (ctx->result, ctx->saved_error);
@@ -1151,7 +1151,7 @@ qmi_device_new_ready (GObject        *unused,
 
     ctx->qmi_device = qmi_device_new_finish (res, &error);
     if (!ctx->qmi_device) {
-        g_debug ("error: couldn't create QmiDevice: %s", error->message);
+        mm_dbg ("error: couldn't create QmiDevice: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
         g_simple_async_result_take_error (ctx->result, ctx->saved_error);
@@ -1221,7 +1221,7 @@ radio_state_set_up_ready (MbimDevice     *device,
     /* Only the first attempt isn't fatal */
     if (ctx->step == POWER_UP_CONTEXT_STEP_FIRST) {
         /* Warn and keep, will retry */
-        g_warning ("%s", error->message);
+        mm_warn ("%s", error->message);
         g_assert (!ctx->saved_error);
         ctx->saved_error = error;
         ctx->step++;

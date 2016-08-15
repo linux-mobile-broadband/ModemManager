@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "mm-modem-helpers.h"
+#include "mm-log.h"
 
 static void
 test_def_chars (void *f, gpointer d)
@@ -361,6 +362,25 @@ test_take_convert_ucs2_bad_ascii2 (void *f, gpointer d)
     g_assert (converted == NULL);
 }
 
+void
+_mm_log (const char *loc,
+         const char *func,
+         guint32 level,
+         const char *fmt,
+         ...)
+{
+#if defined ENABLE_TEST_MESSAGE_TRACES
+    /* Dummy log function */
+    va_list args;
+    gchar *msg;
+
+    va_start (args, fmt);
+    msg = g_strdup_vprintf (fmt, args);
+    va_end (args);
+    g_print ("%s\n", msg);
+    g_free (msg);
+#endif
+}
 
 typedef GTestFixtureFunc TCFunc;
 

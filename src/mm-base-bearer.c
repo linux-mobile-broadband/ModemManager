@@ -175,7 +175,7 @@ reload_stats_ready (MMBaseBearer *self,
     guint64 tx_bytes = 0;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error)) {
-        g_warning ("Reloading stats failed: %s", error->message);
+        mm_warn ("Reloading stats failed: %s", error->message);
         g_error_free (error);
         return;
     }

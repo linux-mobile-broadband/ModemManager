@@ -3371,7 +3371,7 @@ set_power_state_load_ready (MMIfaceModem *self,
 
     ctx->previous_real_power_state = MM_IFACE_MODEM_GET_INTERFACE (self)->load_power_state_finish (self, res, &error);
     if (error) {
-        g_debug ("Couldn't reload current power state: %s", error->message);
+        mm_dbg ("Couldn't reload current power state: %s", error->message);
         g_error_free (error);
         /* Default to the cached one */
         ctx->previous_real_power_state = ctx->previous_cached_power_state;
