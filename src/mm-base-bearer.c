@@ -114,6 +114,8 @@ struct _MMBaseBearerPrivate {
     guint stats_update_id;
     /* Timer to measure the duration of the connection */
     GTimer *duration_timer;
+    /* Flag to specify whether reloading stats is supported or not */
+    gboolean reload_stats_unsupported;
 };
 
 /*****************************************************************************/
@@ -234,14 +236,25 @@ static void
 reload_stats_ready (MMBaseBearer *self,
                     GAsyncResult *res)
 {
-    GError *error = NULL;
-    guint64 rx_bytes = 0;
-    guint64 tx_bytes = 0;
+    GError  *error = NULL;
+    guint64  rx_bytes = 0;
+    guint64  tx_bytes = 0;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error)) {
-        mm_warn ("Reloading stats failed: %s", error->message);
+        /* If reloading stats fails, warn about it and don't update anything */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            mm_warn ("Reloading stats failed: %s", error->message);
+            g_error_free (error);
+            return;
+        }
+
+        /* If we're being told that reloading stats is unsupported, just ignore
+         * the error and update oly the duration timer. */
+        mm_dbg ("Reloading stats is unsupported by the device");
+        self->priv->reload_stats_unsupported = TRUE;
+        rx_bytes = 0;
+        tx_bytes = 0;
         g_error_free (error);
-        return;
     }
 
     /* We only update stats if they were retrieved properly */
@@ -255,7 +268,8 @@ static gboolean
 stats_update_cb (MMBaseBearer *self)
 {
     /* If the implementation knows how to update stat values, run it */
-    if (MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
+    if (!self->priv->reload_stats_unsupported &&
+        MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
         MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish) {
         MM_BASE_BEARER_GET_CLASS (self)->reload_stats (
             self,
