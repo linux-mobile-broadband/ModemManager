@@ -126,4 +126,15 @@ gchar *mm_ublox_build_urat_set_command (MMModemMode   allowed,
                                         MMModemMode   preferred,
                                         GError      **error);
 
+/*****************************************************************************/
+/* +UGCNTRD response parser */
+
+gboolean mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
+                                                  guint         in_cid,
+                                                  guint        *session_tx_bytes,
+                                                  guint        *session_rx_bytes,
+                                                  guint        *total_tx_bytes,
+                                                  guint        *total_rx_bytes,
+                                                  GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */

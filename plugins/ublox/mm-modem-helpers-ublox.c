@@ -956,3 +956,93 @@ mm_ublox_build_urat_set_command (MMModemMode   allowed,
 
     return g_string_free (command, FALSE);
 }
+
+/*****************************************************************************/
+/* +UGCNTRD response parser */
+
+gboolean
+mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
+                                         guint         in_cid,
+                                         guint        *out_session_tx_bytes,
+                                         guint        *out_session_rx_bytes,
+                                         guint        *out_total_tx_bytes,
+                                         guint        *out_total_rx_bytes,
+                                         GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    guint       session_tx_bytes = 0;
+    guint       session_rx_bytes = 0;
+    guint       total_tx_bytes   = 0;
+    guint       total_rx_bytes   = 0;
+    gboolean    matched = FALSE;
+
+    /* Response may be e.g.:
+     *  +UGCNTRD: 31,2704,1819,2724,1839
+     * We assume only ONE line is returned.
+     */
+    r = g_regex_new ("\\+UGCNTRD:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    while (!inner_error && g_match_info_matches (match_info)) {
+        guint cid = 0;
+
+        /* Matched CID? */
+        if (!mm_get_uint_from_match_info (match_info, 1, &cid) || cid != in_cid) {
+            g_match_info_next (match_info, &inner_error);
+            continue;
+        }
+
+        if (out_session_tx_bytes && !mm_get_uint_from_match_info (match_info, 2, &session_tx_bytes)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing session TX bytes");
+            goto out;
+        }
+
+        if (out_session_rx_bytes && !mm_get_uint_from_match_info (match_info, 3, &session_rx_bytes)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing session RX bytes");
+            goto out;
+        }
+
+        if (out_total_tx_bytes && !mm_get_uint_from_match_info (match_info, 4, &total_tx_bytes)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing total TX bytes");
+            goto out;
+        }
+
+        if (out_total_rx_bytes && !mm_get_uint_from_match_info (match_info, 5, &total_rx_bytes)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing total RX bytes");
+            goto out;
+        }
+
+        matched = TRUE;
+        break;
+    }
+
+    if (!matched) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No statistics found for CID %u", in_cid);
+        goto out;
+    }
+
+out:
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_session_tx_bytes)
+        *out_session_tx_bytes = session_tx_bytes;
+    if (out_session_rx_bytes)
+        *out_session_rx_bytes = session_rx_bytes;
+    if (out_total_tx_bytes)
+        *out_total_tx_bytes = total_tx_bytes;
+    if (out_total_rx_bytes)
+        *out_total_rx_bytes = total_rx_bytes;
+    return TRUE;
+}

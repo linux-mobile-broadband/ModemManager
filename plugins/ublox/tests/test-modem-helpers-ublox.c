@@ -725,6 +725,84 @@ test_ubandsel_request_1800 (void)
 }
 
 /*****************************************************************************/
+/* Test +UGCNTRD responses */
+
+typedef struct {
+    const gchar *str;
+    guint        cid;
+    guint        session_tx_bytes;
+    guint        session_rx_bytes;
+    guint        total_tx_bytes;
+    guint        total_rx_bytes;
+} UgcntrdResponseTest;
+
+static const UgcntrdResponseTest ugcntrd_response_tests[] = {
+    {
+        .str = "+UGCNTRD: 1, 100, 0, 100, 0",
+        .cid              = 1,
+        .session_tx_bytes = 100,
+        .session_rx_bytes = 0,
+        .total_tx_bytes   = 100,
+        .total_rx_bytes   = 0
+    },
+    {
+        .str = "+UGCNTRD: 31,2704,1819,2724,1839",
+        .cid              = 31,
+        .session_tx_bytes = 2704,
+        .session_rx_bytes = 1819,
+        .total_tx_bytes   = 2724,
+        .total_rx_bytes   = 1839
+    },
+    {
+        .str = "+UGCNTRD: 1, 100, 0, 100, 0\r\n"
+               "+UGCNTRD: 31,2704,1819,2724,1839\r\n",
+        .cid              = 1,
+        .session_tx_bytes = 100,
+        .session_rx_bytes = 0,
+        .total_tx_bytes   = 100,
+        .total_rx_bytes   = 0
+    },
+    {
+        .str = "+UGCNTRD: 1, 100, 0, 100, 0\r\n"
+               "+UGCNTRD: 31,2704,1819,2724,1839\r\n",
+        .cid              = 31,
+        .session_tx_bytes = 2704,
+        .session_rx_bytes = 1819,
+        .total_tx_bytes   = 2724,
+        .total_rx_bytes   = 1839
+    }
+};
+
+static void
+test_ugcntrd_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (ugcntrd_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint     session_tx_bytes = G_MAXUINT;
+        guint     session_rx_bytes = G_MAXUINT;
+        guint     total_tx_bytes   = G_MAXUINT;
+        guint     total_rx_bytes   = G_MAXUINT;
+
+        success = mm_ublox_parse_ugcntrd_response_for_cid (ugcntrd_response_tests[i].str,
+                                                           ugcntrd_response_tests[i].cid,
+                                                           &session_tx_bytes,
+                                                           &session_rx_bytes,
+                                                           &total_tx_bytes,
+                                                           &total_rx_bytes,
+                                                           &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (ugcntrd_response_tests[i].session_tx_bytes, ==, session_tx_bytes);
+        g_assert_cmpuint (ugcntrd_response_tests[i].session_rx_bytes, ==, session_rx_bytes);
+        g_assert_cmpuint (ugcntrd_response_tests[i].total_tx_bytes,   ==, total_tx_bytes);
+        g_assert_cmpuint (ugcntrd_response_tests[i].total_rx_bytes,   ==, total_rx_bytes);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -779,6 +857,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/ubandsel/request/any",  test_ubandsel_request_any);
     g_test_add_func ("/MM/ublox/ubandsel/request/2g",   test_ubandsel_request_2g);
     g_test_add_func ("/MM/ublox/ubandsel/request/1800", test_ubandsel_request_1800);
+
+    g_test_add_func ("/MM/ublox/ugcntrd/response", test_ugcntrd_response);
 
     return g_test_run ();
 }
