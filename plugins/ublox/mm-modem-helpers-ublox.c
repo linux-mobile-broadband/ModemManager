@@ -986,6 +986,12 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
     g_assert (r != NULL);
 
+    /* Report invalid CID given */
+    if (!in_cid) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid CID given");
+        goto out;
+    }
+
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     while (!inner_error && g_match_info_matches (match_info)) {
         guint cid = 0;

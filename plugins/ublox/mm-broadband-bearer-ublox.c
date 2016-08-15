@@ -44,9 +44,16 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_SUPPORTED,
+    FEATURE_UNSUPPORTED,
+} FeatureSupport;
+
 struct _MMBroadbandBearerUbloxPrivate {
     MMUbloxUsbProfile     profile;
     MMUbloxNetworkingMode mode;
+    FeatureSupport        statistics;
 };
 
 /*****************************************************************************/
@@ -527,6 +534,152 @@ disconnect_3gpp  (MMBroadbandBearer   *self,
 }
 
 /*****************************************************************************/
+/* Reload statistics */
+
+typedef struct {
+    guint64 bytes_rx;
+    guint64 bytes_tx;
+} StatsResult;
+
+static gboolean
+reload_stats_finish (MMBaseBearer  *self,
+                     guint64       *bytes_rx,
+                     guint64       *bytes_tx,
+                     GAsyncResult  *res,
+                     GError       **error)
+{
+    StatsResult *result;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return FALSE;
+
+    if (bytes_rx)
+        *bytes_rx = result->bytes_rx;
+    if (bytes_tx)
+        *bytes_tx = result->bytes_tx;
+    g_free (result);
+    return TRUE;
+}
+
+static void
+ugcntrd_ready (MMBaseModem  *modem,
+               GAsyncResult *res,
+               GTask        *task)
+{
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
+    GError                 *error = NULL;
+    guint                   tx_bytes = 0;
+    guint                   rx_bytes = 0;
+    guint                   cid;
+
+    self = MM_BROADBAND_BEARER_UBLOX (g_task_get_source_object (task));
+
+    cid = mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (self));
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (response)
+        mm_ublox_parse_ugcntrd_response_for_cid (response,
+                                                 cid,
+                                                 &tx_bytes, &rx_bytes,
+                                                 NULL, NULL,
+                                                 &error);
+
+    if (error) {
+        g_prefix_error (&error, "Couldn't load PDP context %u statistics: ", cid);
+        g_task_return_error (task, error);
+    } else {
+        StatsResult *result;
+
+        result = g_new (StatsResult, 1);
+        result->bytes_rx = rx_bytes;
+        result->bytes_tx = tx_bytes;
+        g_task_return_pointer (task, result, (GDestroyNotify) g_free);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+run_reload_stats (MMBroadbandBearerUblox *self,
+                  GTask                  *task)
+{
+    /* Unsupported? */
+    if (self->priv->statistics == FEATURE_UNSUPPORTED) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Loading statistics isn't supported by this device");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Supported */
+    if (self->priv->statistics == FEATURE_SUPPORTED) {
+        MMBaseModem *modem = NULL;
+
+        g_object_get (MM_BASE_BEARER (self),
+                      MM_BASE_BEARER_MODEM, &modem,
+                      NULL);
+        mm_base_modem_at_command (MM_BASE_MODEM (modem),
+                                  "+UGCNTRD",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback) ugcntrd_ready,
+                                  task);
+        g_object_unref (modem);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static void
+ugcntrd_test_ready (MMBaseModem  *modem,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    MMBroadbandBearerUblox *self;
+
+    self = MM_BROADBAND_BEARER_UBLOX (g_task_get_source_object (task));
+
+    if (!mm_base_modem_at_command_finish (modem, res, NULL))
+        self->priv->statistics = FEATURE_UNSUPPORTED;
+    else
+        self->priv->statistics = FEATURE_SUPPORTED;
+
+    run_reload_stats (self, task);
+}
+
+static void
+reload_stats (MMBaseBearer        *self,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (MM_BROADBAND_BEARER_UBLOX (self)->priv->statistics == FEATURE_SUPPORT_UNKNOWN) {
+        MMBaseModem *modem = NULL;
+
+        g_object_get (MM_BASE_BEARER (self),
+                      MM_BASE_BEARER_MODEM, &modem,
+                      NULL);
+
+        mm_base_modem_at_command (MM_BASE_MODEM (modem),
+                                  "+UGCNTRD=?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback) ugcntrd_test_ready,
+                                  task);
+        g_object_unref (modem);
+        return;
+    }
+
+    run_reload_stats (MM_BROADBAND_BEARER_UBLOX (self), task);
+}
+
+/*****************************************************************************/
 
 MMBaseBearer *
 mm_broadband_bearer_ublox_new_finish (GAsyncResult  *res,
@@ -624,14 +777,16 @@ mm_broadband_bearer_ublox_init (MMBroadbandBearerUblox *self)
                                               MMBroadbandBearerUbloxPrivate);
 
     /* Defaults */
-    self->priv->profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
-    self->priv->mode    = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+    self->priv->profile    = MM_UBLOX_USB_PROFILE_UNKNOWN;
+    self->priv->mode       = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+    self->priv->statistics = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
 mm_broadband_bearer_ublox_class_init (MMBroadbandBearerUbloxClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GObjectClass           *object_class           = G_OBJECT_CLASS (klass);
+    MMBaseBearerClass      *base_bearer_class      = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerUbloxPrivate));
@@ -641,6 +796,8 @@ mm_broadband_bearer_ublox_class_init (MMBroadbandBearerUbloxClass *klass)
 
     /* Note: the ublox plugin uses the generic AT+CGACT? based check to monitor
      * the connection status (i.e. default load_connection_status()) */
+    base_bearer_class->reload_stats = reload_stats;
+    base_bearer_class->reload_stats_finish = reload_stats_finish;
 
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
