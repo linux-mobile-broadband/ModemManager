@@ -24,6 +24,7 @@
 #include <libmm-glib.h>
 
 #include "mm-charsets.h"
+#include "mm-log.h"
 
 typedef struct {
     const char *gsm_name;
@@ -130,9 +131,8 @@ mm_modem_charset_byte_array_append (GByteArray *array,
     converted = g_convert (utf8, -1, iconv_to, "UTF-8", NULL, &written, &error);
     if (!converted) {
         if (error) {
-            g_warning ("%s: failed to convert '%s' to %s character set: (%d) %s",
-                       __func__, utf8, iconv_to,
-                       error->code, error->message);
+            mm_warn ("failed to convert '%s' to %s character set: (%d) %s",
+                     utf8, iconv_to, error->code, error->message);
             g_error_free (error);
         }
         return FALSE;

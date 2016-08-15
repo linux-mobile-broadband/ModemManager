@@ -25,6 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-mbm.h"
 
@@ -175,7 +176,7 @@ add_supported_mode (guint32 *mask,
     g_assert (mask);
 
     if (mode >= 32)
-        g_warning ("Ignored unexpected mode in +CFUN match: %d", mode);
+        mm_warn ("Ignored unexpected mode in +CFUN match: %d", mode);
     else
         *mask |= (1 << mode);
 }
@@ -236,18 +237,18 @@ mm_mbm_parse_cfun_test (const gchar *response,
                     last_str = separator + 1;
 
                     if (!mm_get_uint_from_str (first_str, &first))
-                        g_warning ("Couldn't match range start: '%s'", first_str);
+                        mm_warn ("Couldn't match range start: '%s'", first_str);
                     else if (!mm_get_uint_from_str (last_str, &last))
-                        g_warning ("Couldn't match range stop: '%s'", last_str);
+                        mm_warn ("Couldn't match range stop: '%s'", last_str);
                     else if (first >= last)
-                        g_warning ("Couldn't match range: wrong first '%s' and last '%s' items", first_str, last_str);
+                        mm_warn ("Couldn't match range: wrong first '%s' and last '%s' items", first_str, last_str);
                     else {
                         for (mode = first; mode <= last; mode++)
                             add_supported_mode (&mask, mode);
                     }
                 } else {
                     if (!mm_get_uint_from_str (supported_modes[i], &mode))
-                        g_warning ("Couldn't match mode: '%s'", supported_modes[i]);
+                        mm_warn ("Couldn't match mode: '%s'", supported_modes[i]);
                     else
                         add_supported_mode (&mask, mode);
                 }

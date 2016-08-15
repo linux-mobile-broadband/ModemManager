@@ -1008,7 +1008,7 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
                                                    combinations,
                                                    (GDestroyNotify)g_array_unref);
     } else {
-        g_debug ("Error while checking ^SYSCFG format: %s", error->message);
+        mm_dbg ("Error while checking ^SYSCFG format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
@@ -1066,7 +1066,7 @@ syscfgex_test_ready (MMBroadbandModemHuawei *self,
 
     /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
     if (error) {
-        g_debug ("Error while checking ^SYSCFGEX format: %s", error->message);
+        mm_dbg ("Error while checking ^SYSCFGEX format: %s", error->message);
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN)) {
@@ -1127,7 +1127,7 @@ prefmode_test_ready (MMBroadbandModemHuawei *self,
                                                    combinations,
                                                    (GDestroyNotify)g_array_unref);
     } else {
-        g_debug ("Error while checking ^PREFMODE format: %s", error->message);
+        mm_dbg ("Error while checking ^PREFMODE format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
@@ -2163,7 +2163,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
     g_warn_if_fail (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_port_get_parent_path (port);
     if (!net_port_parent_path) {
-        g_warning ("(%s) no parent path for net port", mm_port_get_device (port));
+        mm_warn ("(%s) no parent path for net port", mm_port_get_device (port));
         return NULL;
     }
 

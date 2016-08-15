@@ -1238,7 +1238,7 @@ dms_get_ids_ready (QmiClientDms *client,
         else if (len == 8)
             ctx->self->priv->esn = g_strdup (str);
         else
-            g_debug ("Invalid ESN reported: '%s' (unexpected length)", str);
+            mm_dbg ("Invalid ESN reported: '%s' (unexpected length)", str);
     }
 
     if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
@@ -1248,7 +1248,7 @@ dms_get_ids_ready (QmiClientDms *client,
         if (len == 14)
             ctx->self->priv->meid = g_strdup (str);
         else
-            g_debug ("Invalid MEID reported: '%s' (unexpected length)", str);
+            mm_dbg ("Invalid MEID reported: '%s' (unexpected length)", str);
     }
 
     if (ctx->self->priv->imei)
@@ -1504,7 +1504,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
     }
 
     if (cards->len > 1)
-        g_debug ("Multiple cards reported: %u", cards->len);
+        mm_dbg ("Multiple cards reported: %u", cards->len);
 
     /* All KNOWN applications in all cards will need to be in READY state for us
      * to consider UNLOCKED */
@@ -1517,25 +1517,25 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
             gboolean sim_usim_found = FALSE;
 
             if (card->applications->len == 0) {
-                g_debug ("No applications reported in card [%u]", i);
+                mm_dbg ("No applications reported in card [%u]", i);
                 n_invalid++;
                 break;
             }
 
             if (card->applications->len > 1)
-                g_debug ("Multiple applications reported in card [%u]: %u", i, card->applications->len);
+                mm_dbg ("Multiple applications reported in card [%u]: %u", i, card->applications->len);
 
             for (j = 0; j < card->applications->len; j++) {
                 app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, j);
 
                 if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_UNKNOWN) {
-                    g_debug ("Unknown application [%u] found in card [%u]: %s. Ignored.",
-                             j, i, qmi_uim_card_application_state_get_string (app->state));
+                    mm_dbg ("Unknown application [%u] found in card [%u]: %s. Ignored.",
+                            j, i, qmi_uim_card_application_state_get_string (app->state));
                     continue;
                 }
 
-                g_debug ("Application '%s' [%u] in card [%u]: %s",
-                         qmi_uim_card_application_type_get_string (app->type), j, i, qmi_uim_card_application_state_get_string (app->state));
+                mm_dbg ("Application '%s' [%u] in card [%u]: %s",
+                        qmi_uim_card_application_type_get_string (app->type), j, i, qmi_uim_card_application_state_get_string (app->state));
 
                 if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_SIM || app->type == QMI_UIM_CARD_APPLICATION_TYPE_USIM) {
                     /* We found the card/app pair to use! Only keep the first found,
@@ -1550,7 +1550,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
             }
 
             if (!sim_usim_found) {
-                g_debug ("No SIM/USIM application found in card [%u]", i);
+                mm_dbg ("No SIM/USIM application found in card [%u]", i);
                 n_invalid++;
             }
 
@@ -1558,7 +1558,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
         }
 
         case QMI_UIM_CARD_STATE_ABSENT:
-            g_debug ("Card '%u' is absent", i);
+            mm_dbg ("Card '%u' is absent", i);
             n_absent++;
             break;
 
@@ -1566,9 +1566,9 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
         default:
             n_error++;
             if (qmi_uim_card_error_get_string (card->error_code) != NULL)
-                g_warning ("Card '%u' is unusable: %s", i, qmi_uim_card_error_get_string (card->error_code));
+                mm_warn ("Card '%u' is unusable: %s", i, qmi_uim_card_error_get_string (card->error_code));
             else
-                g_warning ("Card '%u' is unusable: unknown error", i);
+                mm_warn ("Card '%u' is unusable: unknown error", i);
             break;
         }
 
@@ -1608,7 +1608,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_OR_UPIN_PIN_REQUIRED &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PUK1_OR_UPIN_PUK_REQUIRED &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_BLOCKED) {
-        g_debug ("Neither SIM nor USIM are ready");
+        mm_dbg ("Neither SIM nor USIM are ready");
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
                      "SIM not ready yet (retry)");
         return FALSE;
@@ -1669,7 +1669,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
             break;
 
         case QMI_UIM_PIN_STATE_PERMANENTLY_BLOCKED:
-            g_warning ("PUK2 permanently blocked");
+            mm_warn ("PUK2 permanently blocked");
         case QMI_UIM_PIN_STATE_BLOCKED:
             lock = MM_MODEM_LOCK_SIM_PUK2;
             break;
@@ -1679,7 +1679,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
             break;
 
         default:
-            g_warning ("Unknown SIM PIN2/PUK2 status");
+            mm_warn ("Unknown SIM PIN2/PUK2 status");
             break;
         }
     }
@@ -7691,7 +7691,7 @@ wms_list_messages_ready (QmiClientWms *client,
 
     if (!qmi_message_wms_list_messages_output_get_result (output, &error)) {
         /* Ignore error, keep on */
-        g_debug ("Couldn't read SMS messages: %s", error->message);
+        mm_dbg ("Couldn't read SMS messages: %s", error->message);
         g_error_free (error);
         ctx->step++;
         load_initial_sms_parts_step (ctx);
@@ -9730,7 +9730,7 @@ oma_event_report_indication_cb (QmiClientNas *client,
 
         session_type = mm_oma_session_type_from_qmi_oma_session_type (network_initiated_alert_session_type);
         if (session_type == MM_OMA_SESSION_TYPE_UNKNOWN)
-            g_warning ("Unknown QMI OMA session type '%u'", network_initiated_alert_session_type);
+            mm_warn ("Unknown QMI OMA session type '%u'", network_initiated_alert_session_type);
         else
             mm_iface_modem_oma_add_pending_network_initiated_session (
                 MM_IFACE_MODEM_OMA (self),
