@@ -2089,6 +2089,7 @@ MMModemAccessTechnology
 mm_string_to_access_tech (const gchar *string)
 {
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gsize len;
 
     g_return_val_if_fail (string != NULL, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
 
@@ -2102,14 +2103,15 @@ mm_string_to_access_tech (const gchar *string)
     else if (strcasestr (string, "HSPA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
 
-
     if (strcasestr (string, "HSUPA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
 
     if (strcasestr (string, "HSDPA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
 
-    if (strcasestr (string, "UMTS") || strcasestr (string, "3G"))
+    if (strcasestr (string, "UMTS") ||
+        strcasestr (string, "3G") ||
+        strcasestr (string, "WCDMA"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
 
     if (strcasestr (string, "EDGE"))
@@ -2132,6 +2134,17 @@ mm_string_to_access_tech (const gchar *string)
 
     if (strcasestr (string, "1xRTT") || strcasestr (string, "CDMA2000 1X"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+
+    /* Check "EVDO" and "CDMA" as standalone strings since their characters
+     * are included in other strings too.
+     */
+    len = strlen (string);
+    if (strncmp (string, "EVDO", 4) && (len >= 4 && !isalnum (string[4])))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    if (strncmp (string, "CDMA", 4) && (len >= 4 && !isalnum (string[4])))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    if (strncmp (string, "CDMA-EVDO", 9) && (len >= 9 && !isalnum (string[9])))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT | MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
 
     return act;
 }
