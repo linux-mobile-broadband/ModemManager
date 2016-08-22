@@ -785,10 +785,17 @@ parse_cid_range (MMBaseModem              *modem,
 
         /* Found exact PDP type? */
         if (format->pdp_type == ctx->ip_family) {
-            if (ctx->max_cid < format->max_cid)
+            gchar *ip_family_str;
+
+            ip_family_str = mm_bearer_ip_family_build_string_from_mask (format->pdp_type);
+            if (ctx->max_cid < format->max_cid) {
                 cid = ctx->max_cid + 1;
-            else
+                mm_dbg ("Using empty CID %u with PDP type '%s'", cid, ip_family_str);
+            } else {
                 cid = ctx->max_cid;
+                mm_dbg ("Re-using CID %u (max) with PDP type '%s'", cid, ip_family_str);
+            }
+            g_free (ip_family_str);
             break;
         }
     }
@@ -798,8 +805,7 @@ parse_cid_range (MMBaseModem              *modem,
     if (cid == 0) {
         mm_dbg ("Defaulting to CID=1");
         cid = 1;
-    } else
-        mm_dbg ("Using CID %u", cid);
+    }
 
     ctx->cid = cid;
     return TRUE;
