@@ -127,6 +127,10 @@ gboolean mm_3gpp_parse_cops_read_response (const gchar              *response,
                                            MMModemAccessTechnology  *out_act,
                                            GError                  **error);
 
+/* Logic to compare two APN names */
+gboolean mm_3gpp_cmp_apn_name (const gchar *requested,
+                               const gchar *existing);
+
 /* AT+CGDCONT=? (PDP context format) test parser */
 typedef struct {
     guint min_cid;

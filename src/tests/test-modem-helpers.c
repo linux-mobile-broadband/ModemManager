@@ -1822,6 +1822,43 @@ test_iccid_parse_unquoted_invalid_mii (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test APN cmp */
+
+typedef struct {
+    const gchar *existing;
+    const gchar *requested;
+    gboolean     match_expected;
+} TestApnCmp;
+
+static const TestApnCmp test_apn_cmp[] = {
+    { "m2m.com.attz",                      "m2m.com.attz",                      TRUE  },
+    { "m2m.com.attz",                      "M2M.COM.ATTZ",                      TRUE  },
+    { "M2M.COM.ATTZ",                      "m2m.com.attz",                      TRUE  },
+    { "m2m.com.attz.mnc170.mcc310.gprs",   "m2m.com.attz",                      TRUE  },
+    { "ac.vodafone.es.MNC001.MCC214.GPRS", "ac.vodafone.es",                    TRUE  },
+    { "m2m.com.attz",                      "m2m.com.attz.mnc170.mcc310.gprs",   FALSE },
+    { "ac.vodafone.es",                    "ac.vodafone.es.MNC001.MCC214.GPRS", FALSE },
+    { "internet.test",                     "internet",                          FALSE },
+    { "internet.test",                     "INTERNET",                          FALSE },
+    { "internet.test",                     "internet.tes",                      FALSE },
+    { "",                                  "",                                  FALSE },
+};
+
+static void
+test_cmp_apn_name (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_apn_cmp); i++) {
+        g_debug ("Comparing requested '%s' vs existing '%s': %s match",
+                 test_apn_cmp[i].requested,
+                 test_apn_cmp[i].existing,
+                 test_apn_cmp[i].match_expected ? "should" : "shouldn't");
+        g_assert (mm_3gpp_cmp_apn_name (test_apn_cmp[i].requested, test_apn_cmp[i].existing) == test_apn_cmp[i].match_expected);
+    }
+}
+
+/*****************************************************************************/
 /* Test CGDCONT test responses */
 
 static void
@@ -3455,6 +3492,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cpms_response_mixed_spaces, NULL));
     g_test_suite_add (suite, TESTCASE (test_cpms_response_empty_fields, NULL));
     g_test_suite_add (suite, TESTCASE (test_cpms_query_response,        NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cmp_apn_name, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_single, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_test_response_multiple, NULL));

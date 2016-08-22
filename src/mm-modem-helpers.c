@@ -1031,6 +1031,50 @@ out:
 }
 
 /*************************************************************************/
+/* Logic to compare two APN names */
+
+gboolean
+mm_3gpp_cmp_apn_name (const gchar *requested,
+                      const gchar *existing)
+{
+    size_t requested_len;
+    size_t existing_len;
+
+    /* Both must be given to compare properly */
+    if (!existing || !existing[0] || !requested || !requested[0])
+        return FALSE;
+
+    requested_len = strlen (requested);
+
+    /*
+     * 1) The requested APN should be at least the prefix of the existing one.
+     */
+    if (g_ascii_strncasecmp (existing, requested, requested_len) != 0)
+        return FALSE;
+
+    /*
+     * 2) If the existing one is actually the same as the requested one (i.e.
+     *    there are no more different chars in the existing one), we're done.
+     */
+    if (existing[requested_len] == '\0')
+        return TRUE;
+
+    existing_len = strlen (existing);
+
+    /* 3) Special handling for PDP contexts reported by u-blox modems once the
+     *    contexts have been activated at least once:
+     *      "ac.vodafone.es.MNC001.MCC214.GPRS" should match "ac.vodafone.es"
+     */
+    if ((existing_len > (requested_len + 14)) &&
+        g_ascii_strncasecmp (&existing[requested_len], ".mnc", 4) == 0 &&
+        g_ascii_strncasecmp (&existing[requested_len + 7], ".mcc", 4) == 0)
+        return TRUE;
+
+    /* No match */
+    return FALSE;
+}
+
+/*************************************************************************/
 
 static void
 mm_3gpp_pdp_context_format_free (MM3gppPdpContextFormat *format)
