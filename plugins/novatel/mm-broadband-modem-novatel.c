@@ -780,7 +780,7 @@ get_one_quality (const gchar *reply,
             /* Some cards appear to use RX0/RX1 and output RSSI in negative dBm */
             if (dbm < 0)
                 success = TRUE;
-        } else if (isdigit (*temp) && (dbm > 0) && (dbm < 115)) {
+        } else if (isdigit (*temp) && (dbm > 0) && (dbm <= 125)) {
             /* S720 appears to use "1x RSSI" and print RSSI in dBm without '-' */
             dbm *= -1;
             success = TRUE;
