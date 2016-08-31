@@ -29,6 +29,19 @@ MM_PLUGIN_DEFINE_MAJOR_VERSION
 MM_PLUGIN_DEFINE_MINOR_VERSION
 
 /*****************************************************************************/
+/* Custom commands for AT probing */
+
+/* Increase the response timeout for probe commands since the TOBY-L2 modem
+ * takes longer to respond after a reset.
+ */
+static const MMPortProbeAtCommand custom_at_probe[] = {
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { NULL }
+};
+
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin     *self,
@@ -59,6 +72,7 @@ mm_plugin_create (void)
                                     MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                                     MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                                     MM_PLUGIN_ALLOWED_AT,         TRUE,
+                                    MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                                     NULL));
 }
 
