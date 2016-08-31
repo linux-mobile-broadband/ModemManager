@@ -1,0 +1,162 @@
+
+The 'ublox' plugin is originally targeted for the u-blox TOBY-L2 series,
+although it may be used with other kind of devices likely without many issues.
+
+=====================================
+  USB profiles and networking modes
+=====================================
+
+The TOBY-L2 devices may work in multiple different USB profiles:
+
+ * AT+UUSBCONF=0: fairly back-compatible profile, where only cdc-acm TTYs are
+   exposed. ModemManager will default to PPP for the connection setup when in
+   this profile.
+
+ * AT+UUSBCONF=2: ECM profile, where multiple cdc-acm TTYs are exposed along
+   with a ECM network interface.
+
+ * AT+UUSBCONF=3: RNDIS profile, where one cdc-acm TTY and a RNDIS network
+   interface are exposed. This is the default factory-programmed value.
+
+When a profile with a network interface (ECM or RNDIS) is in use, the device may
+work in multiple networking modes:
+
+ * AT+UBMCONF=1: Router mode, with a built-in DHCP server running behind the
+   network interface. The network interface will be assigned an IP address from
+   a subnet managed by the device itself. This is the default factory-programmed
+   value. E.g.:
+
+        $ ip addr
+        9: usb0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 1000
+            link/ether 02:07:01:15:00:0b brd ff:ff:ff:ff:ff:ff
+            inet 192.168.1.100/24 brd 192.168.1.255 scope global dynamic usb0
+               valid_lft 43009sec preferred_lft 43009sec
+
+        $ ip route
+        default via 192.168.1.1 dev usb0  proto static  metric 700
+        192.168.1.0/24 dev usb0  proto kernel  scope link  src 192.168.1.100  metric 700
+
+ * AT+UBMCONF=2: Bridge mode, where static IP addressing and routing must be
+   performed once connected. The network interface will be assigned the same IP
+   address provided by the network operator. The plugin uses 'AT+UIPADDR=N' the
+   default gateway IP settings and 'AT++CGCONTRDP=N' to retrieve the interface
+   IP settings and DNS setup.
+
+        $ ip addr
+        11: usb0: <BROADCAST,MULTICAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 1000
+            link/ether 02:07:01:15:00:0b brd ff:ff:ff:ff:ff:ff
+            inet 47.59.109.26/32 brd 47.59.109.26 scope global usb0
+               valid_lft forever preferred_lft forever
+
+        $ ip route
+        default via 47.59.109.229 dev usb0  proto static  metric 700
+        47.59.109.26 dev usb0  proto kernel  scope link  src 47.59.109.26  metric 700
+        47.59.109.229 dev usb0  proto static  scope link  metric 700
+
+The 'ublox' plugin in ModemManager works with any of the previous combinations
+seamlessly. It is assumed that the device doesn't change either USB profile or
+networking mode once it has been detected and processed by ModemManager.
+
+NOTE: If manually selecting different USB profiles or networking modes, remember
+to reset the module before assuming the new settings have been applied. E.g.,
+using plain mmcli commands:
+  $ sudo mmcli -m 0 --command="AT+UUSBCONF=3"
+  $ sudo mmcli -m 0 --reset
+
+=================================
+  Connection setup
+=================================
+
+The plugin allows to connect to specific APNs in the usual way (i.e. by creating
+a PDP context for the specific APN), and then activating the PDP context with
+'AT+CGACT=[CID]'.
+
+Authentication settings of the APN (user, password, authentication type) are
+also supported via the 'AT+UAUTHREQ' command.
+
+The plugin doesn't currently support reporting as auto-connected the default LTE
+bearer.
+
+========================================
+  Connection monitoring and statistics
+========================================
+
+The status of the connection of the specific PDP context is monitored
+periodically using 'AT+CGACT?', in order to detect network-originated
+disconnections. This implementation is given in the Generic broadband bearer
+implementation, and is not ublox-specific.
+
+If the device supports it, connection TX/RX statistics will also be periodically
+loaded using the AT+UGCNTRD command. Note, though, that the TOBY-L2 doesn't seem
+to support this information via control commands.
+
+===========================================
+  Supported and current mode combinations
+===========================================
+
+The full list of supported mode combinations is loaded using 'AT+URAT=?', and
+then filtered by device product name to remove technologies not supported in
+several devices. E.g. the standard TOBY-L2 list of supported mode combinations
+will include all 2G, 3G and 4G, but if the device is a L201, 2G support will be
+removed from the list.
+
+The current mode combination in use is loaded using 'AT+URAT?', and the setting
+may be changed using the 'AT+URAT=X' request.
+
+In order to be able to update this setting, the device will be put in low-power
+mode ('AT+CFUN=4'), then the setting update will be run, and finally the device
+will recover the previous functionality mode it was in (e.g. 'AT+CFUN=1' if it
+was in full functionality mode).
+
+===============================
+  Supported and current bands
+===============================
+
+The full list of supported bands is hardcoded based on the supported modes of the
+device. There is no runtime loading of which are the supported bands because the
+'AT+UBANDSEL=?' command gives different results depending on the current access
+technology (i.e. there is no single full list of supported bands reported).
+
+The current list of bands is loaded via the 'AT+UBANDSEL?' command, and the
+setting may be changed using the 'AT+UBANDSEL=X' request.
+
+In order to be able to update this setting, the device will be put in low-power
+mode ('AT+CFUN=4'), then the setting update will be run, and finally the device
+will recover the previous functionality mode it was in (e.g. 'AT+CFUN=1' if it
+was in full functionality mode).
+
+======================
+  Functionality mode
+======================
+
+The plugin implements a custom 'AT+CFUN?' response parser because it provides
+multiple modes that may be treated as 'low-power' by ModemManager (e.g. mode
+'0' is minimum functionality, mode '4' is airplane mode and mode '19' is
+minimum functionality with SIM deactivated).
+
+The plugin implements power-on ('AT+CFUN=1'), power-down ('AT+CFUN=4'), reset
+('AT+CFUN=16') and power-off ('AT+CPWROFF'). As usual, a reset will trigger a
+power cycle of the device, and the power-off will render the modem unusable
+until it's power cycled externally.
+
+====================================
+  Network registration and quality
+====================================
+
+The LTE specific 'AT+CEREG' registration checks will be enabled by default if
+the module supports LTE. Additionally, a custom 'CREG/CGREG/CEREG' state number
+parser is provided to support u-blox specific reported states (e.g. state '6'
+to indicate 'sms only registration' on the '+CREG' indications for the CS
+network when on LTE).
+
+The plugin implements the extended Signal interface, providing RSSI, RSCP, Ec/Io
+and RSRQ measurements obtained with the 'AT+CESQ' command.
+
+==================
+  PIN management
+==================
+
+A custom method to load the PIN/PUK remaining attempts is implemented based on
+the 'AT+UPINCNT' command.
+
+Have fun!
