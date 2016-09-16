@@ -1,4 +1,15 @@
 
+ModemManager 1.6.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+ * Huawei: fix setting up unsolicited voice messages
+ * Blacklist: ignored u-blox GPS/GLOSNASS USB dongle and some new Arduinos.
+ * ZTE: avoid making udev rules tty-only.
+ * and some other minor fixes...
+
+
 ModemManager 1.6.0
 -------------------------------------------
 This is a new stable release of ModemManager.
