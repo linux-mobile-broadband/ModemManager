@@ -1,4 +1,17 @@
 
+ModemManager 1.4.16
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+ * Build fixes for GCC 6.
+ * MTK: add support for the D-Link DWM-156 A3.
+ * Icera: deactivate context before authentication.
+ * ZTE: avoid making udev rules tty-only.
+ * Blacklist: ignored u-blox GPS/GLOSNASS USB dongle and some new Arduinos.
+ * and some other minor fixes...
+
+
 ModemManager 1.4.14
 -------------------------------------------
 This is a new bugfix release of ModemManager.
