@@ -11,9 +11,10 @@
 
 
 ACTION!="add|change|move", GOTO="mm_simtech_port_types_end"
-SUBSYSTEMS!="usb", GOTO="mm_simtech_port_types_end"
-SUBSYSTEM!="tty", GOTO="mm_simtech_port_types_end"
-ATTRS{idVendor}!="1e0e", GOTO="mm_simtech_port_types_end"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="1e0e", GOTO="mm_simtech_port_types"
+GOTO="mm_simtech_port_types_end"
+
+LABEL="mm_simtech_port_types"
 
 # A-LINK 3GU
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="cefe", ATTRS{bInterfaceNumber}=="02", ENV{ID_MM_SIMTECH_PORT_TYPE_MODEM}="1"
