@@ -1538,4 +1538,12 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                              G_TYPE_DBUS_CONNECTION,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
+
+    properties[PROP_REPROBE] =
+        g_param_spec_boolean (MM_BASE_MODEM_REPROBE,
+                              "Reprobe",
+                              "Whether the modem needs to be reprobed or not.",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_REPROBE, properties[PROP_REPROBE]);
 }

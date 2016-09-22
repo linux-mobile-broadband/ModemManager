@@ -61,6 +61,7 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 #define MM_BASE_MODEM_PLUGIN         "base-modem-plugin"
 #define MM_BASE_MODEM_VENDOR_ID      "base-modem-vendor-id"
 #define MM_BASE_MODEM_PRODUCT_ID     "base-modem-product-id"
+#define MM_BASE_MODEM_REPROBE        "base-modem-reprobe"
 
 struct _MMBaseModem {
     MmGdbusObjectSkeleton parent;
