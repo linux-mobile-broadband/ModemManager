@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011-2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "config.h"
@@ -29,6 +29,8 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+#include <gudev/gudev.h>
+
 #define _LIBMM_INSIDE_MMCLI
 #include "libmm-glib.h"
 
@@ -39,6 +41,7 @@
 typedef struct {
     MMManager *manager;
     GCancellable *cancellable;
+    GUdevClient *udev;
 } Context;
 static Context *ctx;
 
@@ -47,6 +50,8 @@ static gboolean list_modems_flag;
 static gboolean monitor_modems_flag;
 static gboolean scan_modems_flag;
 static gchar *set_logging_str;
+static gchar *report_kernel_event_str;
+static gboolean report_kernel_event_auto_scan;
 
 static GOptionEntry entries[] = {
     { "set-logging", 'G', 0, G_OPTION_ARG_STRING, &set_logging_str,
@@ -63,6 +68,14 @@ static GOptionEntry entries[] = {
     },
     { "scan-modems", 'S', 0, G_OPTION_ARG_NONE, &scan_modems_flag,
       "Request to re-scan looking for modems",
+      NULL
+    },
+    { "report-kernel-event", 'K', 0, G_OPTION_ARG_STRING, &report_kernel_event_str,
+      "Report kernel event",
+      "[\"key=value,...\"]"
+    },
+    { "report-kernel-event-auto-scan", 0, 0, G_OPTION_ARG_NONE, &report_kernel_event_auto_scan,
+      "Automatically report kernel events based on udev notifications",
       NULL
     },
     { NULL }
@@ -96,7 +109,9 @@ mmcli_manager_options_enabled (void)
     n_actions = (list_modems_flag +
                  monitor_modems_flag +
                  scan_modems_flag +
-                 !!set_logging_str);
+                 !!set_logging_str +
+                 !!report_kernel_event_str +
+                 report_kernel_event_auto_scan);
 
     if (n_actions > 1) {
         g_printerr ("error: too many manager actions requested\n");
@@ -104,6 +119,9 @@ mmcli_manager_options_enabled (void)
     }
 
     if (monitor_modems_flag)
+        mmcli_force_async_operation ();
+
+    if (report_kernel_event_auto_scan)
         mmcli_force_async_operation ();
 
     checked = TRUE;
@@ -116,6 +134,8 @@ context_free (Context *ctx)
     if (!ctx)
         return;
 
+    if (ctx->udev)
+        g_object_unref (ctx->udev);
     if (ctx->manager)
         g_object_unref (ctx->manager);
     if (ctx->cancellable)
@@ -127,6 +147,47 @@ void
 mmcli_manager_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+report_kernel_event_process_reply (gboolean      result,
+                                   const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't report kernel event: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully reported kernel event\n");
+}
+
+static void
+report_kernel_event_ready (MMManager    *manager,
+                           GAsyncResult *result)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_manager_report_kernel_event_finish (manager, result, &error);
+    report_kernel_event_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static MMKernelEventProperties *
+build_kernel_event_properties_from_input (const gchar *properties_string)
+{
+    GError *error = NULL;
+    MMKernelEventProperties *properties;
+
+    properties = mm_kernel_event_properties_new_from_string (properties_string, &error);
+    if (!properties) {
+        g_printerr ("error: cannot parse properties string: '%s'\n", error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    return properties;
 }
 
 static void
@@ -248,6 +309,22 @@ cancelled (GCancellable *cancellable)
 }
 
 static void
+handle_uevent (GUdevClient *client,
+               const char  *action,
+               GUdevDevice *device,
+               gpointer     none)
+{
+    MMKernelEventProperties *properties;
+
+    properties = mm_kernel_event_properties_new ();
+    mm_kernel_event_properties_set_action (properties, action);
+    mm_kernel_event_properties_set_subsystem (properties, g_udev_device_get_subsystem (device));
+    mm_kernel_event_properties_set_name (properties, g_udev_device_get_name (device));
+    mm_manager_report_kernel_event (ctx->manager, properties, NULL, NULL, NULL);
+    g_object_unref (properties);
+}
+
+static void
 get_manager_ready (GObject      *source,
                    GAsyncResult *result,
                    gpointer      none)
@@ -273,6 +350,54 @@ get_manager_ready (GObject      *source,
                                  ctx->cancellable,
                                  (GAsyncReadyCallback)scan_devices_ready,
                                  NULL);
+        return;
+    }
+
+    /* Request to report kernel event? */
+    if (report_kernel_event_str) {
+        MMKernelEventProperties *properties;
+
+        properties = build_kernel_event_properties_from_input (report_kernel_event_str);
+        mm_manager_report_kernel_event (ctx->manager,
+                                        properties,
+                                        ctx->cancellable,
+                                        (GAsyncReadyCallback)report_kernel_event_ready,
+                                        NULL);
+        g_object_unref (properties);
+        return;
+    }
+
+    if (report_kernel_event_auto_scan) {
+        const gchar *subsys[] = { "tty", "usbmisc", "net", NULL };
+        guint i;
+
+        ctx->udev = g_udev_client_new (subsys);
+        g_signal_connect (ctx->udev, "uevent", G_CALLBACK (handle_uevent), NULL);
+
+        for (i = 0; subsys[i]; i++) {
+            GList *list, *iter;
+
+            list = g_udev_client_query_by_subsystem (ctx->udev, subsys[i]);
+            for (iter = list; iter; iter = g_list_next (iter)) {
+                MMKernelEventProperties *properties;
+                GUdevDevice *device;
+
+                device = G_UDEV_DEVICE (iter->data);
+                properties = mm_kernel_event_properties_new ();
+                mm_kernel_event_properties_set_action (properties, "add");
+                mm_kernel_event_properties_set_subsystem (properties, subsys[i]);
+                mm_kernel_event_properties_set_name (properties, g_udev_device_get_name (device));
+                mm_manager_report_kernel_event (ctx->manager, properties, NULL, NULL, NULL);
+                g_object_unref (properties);
+            }
+            g_list_free_full (list, (GDestroyNotify) g_object_unref);
+        }
+
+        /* If we get cancelled, operation done */
+        g_cancellable_connect (ctx->cancellable,
+                               G_CALLBACK (cancelled),
+                               NULL,
+                               NULL);
         return;
     }
 
@@ -332,6 +457,11 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
         exit (EXIT_FAILURE);
     }
 
+    if (report_kernel_event_auto_scan) {
+        g_printerr ("error: monitoring udev events cannot be done synchronously\n");
+        exit (EXIT_FAILURE);
+    }
+
     /* Initialize context */
     ctx = g_new0 (Context, 1);
     ctx->manager = mmcli_get_manager_sync (connection);
@@ -359,6 +489,20 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
                                                NULL,
                                                &error);
         scan_devices_process_reply (result, error);
+        return;
+    }
+
+    /* Request to report kernel event? */
+    if (report_kernel_event_str) {
+        MMKernelEventProperties *properties;
+        gboolean result;
+
+        properties = build_kernel_event_properties_from_input (report_kernel_event_str);
+        result = mm_manager_report_kernel_event_sync (ctx->manager,
+                                                      properties,
+                                                      NULL,
+                                                      &error);
+        report_kernel_event_process_reply (result, error);
         return;
     }
 

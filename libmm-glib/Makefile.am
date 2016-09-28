@@ -81,6 +81,8 @@ libmm_glib_la_SOURCES = \
 	mm-cdma-manual-activation-properties.c \
 	mm-signal.h \
 	mm-signal.c \
+	mm-kernel-event-properties.h \
+	mm-kernel-event-properties.c \
 	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
@@ -149,6 +151,7 @@ include_HEADERS = \
 	mm-firmware-properties.h \
 	mm-cdma-manual-activation-properties.h \
 	mm-signal.h \
+	mm-kernel-event-properties.h \
 	$(NULL)
 
 CLEANFILES =

@@ -21,11 +21,15 @@
 #include "mm-kernel-device-udev.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMKernelDeviceUdev, mm_kernel_device_udev,  MM_TYPE_KERNEL_DEVICE)
+static void initable_iface_init (GInitableIface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMKernelDeviceUdev, mm_kernel_device_udev,  MM_TYPE_KERNEL_DEVICE, 0,
+                        G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init))
 
 enum {
     PROP_0,
     PROP_UDEV_DEVICE,
+    PROP_PROPERTIES,
     PROP_LAST
 };
 
@@ -37,6 +41,8 @@ struct _MMKernelDeviceUdevPrivate {
     GUdevDevice *physdev;
     guint16      vendor;
     guint16      product;
+
+    MMKernelEventProperties *properties;
 };
 
 /*****************************************************************************/
@@ -153,8 +159,11 @@ ensure_device_ids (MMKernelDeviceUdev *self)
     if (self->priv->vendor || self->priv->product)
         return;
 
+    if (!self->priv->device)
+        return;
+
     if (!get_device_ids (self->priv->device, &self->priv->vendor, &self->priv->product))
-        mm_dbg ("(%s/%s) could not get vendor/product ID",
+        mm_dbg ("(%s/%s) could not get vendor/product id",
                 g_udev_device_get_subsystem (self->priv->device),
                 g_udev_device_get_name      (self->priv->device));
 }
@@ -240,25 +249,42 @@ ensure_physdev (MMKernelDeviceUdev *self)
 {
     if (self->priv->physdev)
         return;
-    self->priv->physdev = find_physical_gudevdevice (self->priv->device);
+    if (self->priv->device)
+        self->priv->physdev = find_physical_gudevdevice (self->priv->device);
 }
 
 /*****************************************************************************/
 
 static const gchar *
-kernel_device_get_subsystem (MMKernelDevice *self)
+kernel_device_get_subsystem (MMKernelDevice *_self)
 {
-    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (self), NULL);
+    MMKernelDeviceUdev *self;
 
-    return g_udev_device_get_subsystem (MM_KERNEL_DEVICE_UDEV (self)->priv->device);
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (self->priv->device)
+        return g_udev_device_get_subsystem (self->priv->device);
+
+    g_assert (self->priv->properties);
+    return mm_kernel_event_properties_get_subsystem (self->priv->properties);
 }
 
 static const gchar *
-kernel_device_get_name (MMKernelDevice *self)
+kernel_device_get_name (MMKernelDevice *_self)
 {
-    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (self), NULL);
+    MMKernelDeviceUdev *self;
 
-    return g_udev_device_get_name (MM_KERNEL_DEVICE_UDEV (self)->priv->device);
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (self->priv->device)
+        return g_udev_device_get_name (self->priv->device);
+
+    g_assert (self->priv->properties);
+    return mm_kernel_event_properties_get_name (self->priv->properties);
 }
 
 static const gchar *
@@ -270,6 +296,9 @@ kernel_device_get_driver (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return NULL;
 
     driver = g_udev_device_get_driver (self->priv->device);
     if (!driver) {
@@ -308,6 +337,9 @@ kernel_device_get_sysfs_path (MMKernelDevice *self)
 {
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
 
+    if (!MM_KERNEL_DEVICE_UDEV (self)->priv->device)
+        return NULL;
+
     return g_udev_device_get_sysfs_path (MM_KERNEL_DEVICE_UDEV (self)->priv->device);
 }
 
@@ -320,14 +352,20 @@ kernel_device_get_physdev_uid (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_physdev (self);
 
-    if (!self->priv->physdev)
-        return NULL;
+    /* Prefer the one coming in the properties, if any */
+    if (self->priv->properties)
+        uid = mm_kernel_event_properties_get_uid (MM_KERNEL_DEVICE_UDEV (self)->priv->properties);
 
-    uid = g_udev_device_get_property (self->priv->physdev, "ID_MM_PHYSDEV_UID");
-    if (!uid)
-        uid = g_udev_device_get_sysfs_path (self->priv->physdev);
+    if (!uid) {
+        ensure_physdev (self);
+        if (!self->priv->physdev)
+            return NULL;
+
+        uid = g_udev_device_get_property (self->priv->physdev, "ID_MM_PHYSDEV_UID");
+        if (!uid)
+            uid = g_udev_device_get_sysfs_path (self->priv->physdev);
+    }
 
     return uid;
 }
@@ -364,7 +402,8 @@ kernel_device_get_parent_sysfs_path (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), 0);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    if (!self->priv->parent)
+
+    if (!self->priv->parent && self->priv->device)
         self->priv->parent = g_udev_device_get_parent (self->priv->device);
     return (self->priv->parent ? g_udev_device_get_sysfs_path (self->priv->parent) : NULL);
 }
@@ -381,6 +420,9 @@ kernel_device_is_candidate (MMKernelDevice *_self,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), FALSE);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return FALSE;
 
     name   = g_udev_device_get_name      (self->priv->device);
     subsys = g_udev_device_get_subsystem (self->priv->device);
@@ -455,17 +497,22 @@ kernel_device_cmp (MMKernelDevice *_a,
     a = MM_KERNEL_DEVICE_UDEV (_a);
     b = MM_KERNEL_DEVICE_UDEV (_b);
 
-    if (g_udev_device_has_property (a->priv->device, "DEVPATH_OLD") &&
-        g_str_has_suffix (g_udev_device_get_sysfs_path (b->priv->device),
-                          g_udev_device_get_property   (a->priv->device, "DEVPATH_OLD")))
-        return TRUE;
+    if (a->priv->device && b->priv->device) {
+        if (g_udev_device_has_property (a->priv->device, "DEVPATH_OLD") &&
+            g_str_has_suffix (g_udev_device_get_sysfs_path (b->priv->device),
+                              g_udev_device_get_property   (a->priv->device, "DEVPATH_OLD")))
+            return TRUE;
 
-    if (g_udev_device_has_property (b->priv->device, "DEVPATH_OLD") &&
-        g_str_has_suffix (g_udev_device_get_sysfs_path (a->priv->device),
-                          g_udev_device_get_property   (b->priv->device, "DEVPATH_OLD")))
-        return TRUE;
+        if (g_udev_device_has_property (b->priv->device, "DEVPATH_OLD") &&
+            g_str_has_suffix (g_udev_device_get_sysfs_path (a->priv->device),
+                              g_udev_device_get_property   (b->priv->device, "DEVPATH_OLD")))
+            return TRUE;
 
-    return !g_strcmp0 (g_udev_device_get_sysfs_path (a->priv->device), g_udev_device_get_sysfs_path (b->priv->device));
+        return !g_strcmp0 (g_udev_device_get_sysfs_path (a->priv->device), g_udev_device_get_sysfs_path (b->priv->device));
+    }
+
+    return (!g_strcmp0 (mm_kernel_device_get_subsystem (_a), mm_kernel_device_get_subsystem (_b)) &&
+            !g_strcmp0 (mm_kernel_device_get_name      (_a), mm_kernel_device_get_name      (_b)));
 }
 
 static gboolean
@@ -477,6 +524,10 @@ kernel_device_has_property (MMKernelDevice *_self,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), FALSE);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return FALSE;
+
     return g_udev_device_has_property (self->priv->device, property);
 }
 
@@ -489,6 +540,10 @@ kernel_device_get_property (MMKernelDevice *_self,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return NULL;
+
     return g_udev_device_get_property (self->priv->device, property);
 }
 
@@ -501,6 +556,10 @@ kernel_device_get_property_as_boolean (MMKernelDevice *_self,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), FALSE);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return FALSE;
+
     return g_udev_device_get_property_as_boolean (self->priv->device, property);
 }
 
@@ -513,6 +572,10 @@ kernel_device_get_property_as_int (MMKernelDevice *_self,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return -1;
+
     return g_udev_device_get_property_as_int (self->priv->device, property);
 }
 
@@ -521,11 +584,31 @@ kernel_device_get_property_as_int (MMKernelDevice *_self,
 MMKernelDevice *
 mm_kernel_device_udev_new (GUdevDevice *udev_device)
 {
+    GError *error = NULL;
+    MMKernelDevice *self;
+
     g_return_val_if_fail (G_UDEV_IS_DEVICE (udev_device), NULL);
 
-    return MM_KERNEL_DEVICE (g_object_new (MM_TYPE_KERNEL_DEVICE_UDEV,
-                                           "udev-device", udev_device,
-                                           NULL));
+    self = MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_UDEV,
+                                             NULL,
+                                             &error,
+                                             "udev-device", udev_device,
+                                             NULL));
+    g_assert_no_error (error);
+    return self;
+}
+
+/*****************************************************************************/
+
+MMKernelDevice *
+mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *properties,
+                                           GError                  **error)
+{
+    return MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_UDEV,
+                                             NULL,
+                                             error,
+                                             "properties", properties,
+                                             NULL));
 }
 
 /*****************************************************************************/
@@ -550,6 +633,10 @@ set_property (GObject      *object,
         g_assert (!self->priv->device);
         self->priv->device = g_value_dup_object (value);
         break;
+    case PROP_PROPERTIES:
+        g_assert (!self->priv->properties);
+        self->priv->properties = g_value_dup_object (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -568,10 +655,71 @@ get_property (GObject    *object,
     case PROP_UDEV_DEVICE:
         g_value_set_object (value, self->priv->device);
         break;
+    case PROP_PROPERTIES:
+        g_value_set_object (value, self->priv->properties);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
     }
+}
+
+static gboolean
+initable_init (GInitable     *initable,
+               GCancellable  *cancellable,
+               GError       **error)
+{
+    MMKernelDeviceUdev *self = MM_KERNEL_DEVICE_UDEV (initable);
+    const gchar *subsystem;
+    const gchar *name;
+
+    /* When created from a GUdevDevice, we're done */
+    if (self->priv->device)
+        return TRUE;
+
+    /* Otherwise, we do need properties with subsystem and name */
+    if (!self->priv->properties) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "missing properties in kernel device");
+        return FALSE;
+    }
+
+    subsystem = mm_kernel_event_properties_get_subsystem (self->priv->properties);
+    if (!subsystem) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "subsystem is mandatory in kernel device");
+        return FALSE;
+    }
+
+    name = mm_kernel_event_properties_get_name (self->priv->properties);
+    if (!mm_kernel_device_get_name (MM_KERNEL_DEVICE (self))) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "name is mandatory in kernel device");
+        return FALSE;
+    }
+
+    /* On remove events, we don't look for the GUdevDevice */
+    if (g_strcmp0 (mm_kernel_event_properties_get_action (self->priv->properties), "remove")) {
+        GUdevClient *client;
+        GUdevDevice *device;
+
+        client = g_udev_client_new (NULL);
+        device = g_udev_client_query_by_subsystem_and_name (client, subsystem, name);
+        if (!device) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "device %s/%s not found",
+                         subsystem,
+                         name);
+            g_object_unref (client);
+            return FALSE;
+        }
+
+        /* Store device */
+        self->priv->device = device;
+        g_object_unref (client);
+    }
+
+    return TRUE;
 }
 
 static void
@@ -582,8 +730,15 @@ dispose (GObject *object)
     g_clear_object (&self->priv->physdev);
     g_clear_object (&self->priv->parent);
     g_clear_object (&self->priv->device);
+    g_clear_object (&self->priv->properties);
 
     G_OBJECT_CLASS (mm_kernel_device_udev_parent_class)->dispose (object);
+}
+
+static void
+initable_iface_init (GInitableIface *iface)
+{
+    iface->init = initable_init;
 }
 
 static void
@@ -618,6 +773,14 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
                              "udev device",
                              "Device object as reported by GUdev",
                              G_UDEV_TYPE_DEVICE,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                             G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_UDEV_DEVICE, properties[PROP_UDEV_DEVICE]);
+
+    properties[PROP_PROPERTIES] =
+        g_param_spec_object ("properties",
+                             "Properties",
+                             "Generic kernel event properties",
+                             MM_TYPE_KERNEL_EVENT_PROPERTIES,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PROPERTIES, properties[PROP_PROPERTIES]);
 }

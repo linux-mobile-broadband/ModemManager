@@ -26,6 +26,8 @@ static const gchar *log_level;
 static const gchar *log_file;
 static gboolean show_ts;
 static gboolean rel_ts;
+static const gchar *initial_kernel_events;
+static gboolean no_auto_scan;
 
 static const GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag, "Print version", NULL },
@@ -34,6 +36,8 @@ static const GOptionEntry entries[] = {
     { "log-file", 0, 0, G_OPTION_ARG_FILENAME, &log_file, "Path to log file", "[PATH]" },
     { "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
     { "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
+    { "no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &no_auto_scan, "Don't auto-scan looking for devices", NULL },
+    { "initial-kernel-events", 0, 0, G_OPTION_ARG_FILENAME, &initial_kernel_events, "Path to initial kernel events file (requires --no-auto-scan)", "[PATH]" },
     { NULL }
 };
 
@@ -67,17 +71,27 @@ mm_context_get_relative_timestamps (void)
     return rel_ts;
 }
 
+const gchar *
+mm_context_get_initial_kernel_events (void)
+{
+    return initial_kernel_events;
+}
+
+gboolean
+mm_context_get_no_auto_scan (void)
+{
+    return no_auto_scan;
+}
+
 /*****************************************************************************/
 /* Test context */
 
 static gboolean test_session;
-static gboolean test_no_auto_scan;
 static gboolean test_enable;
 static gchar *test_plugin_dir;
 
 static const GOptionEntry test_entries[] = {
     { "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session, "Run in session DBus", NULL },
-    { "test-no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &test_no_auto_scan, "Don't auto-scan looking for devices", NULL },
     { "test-enable", 0, 0, G_OPTION_ARG_NONE, &test_enable, "Enable the Test interface in the daemon", NULL },
     { "test-plugin-dir", 0, 0, G_OPTION_ARG_FILENAME, &test_plugin_dir, "Path to look for plugins", "[PATH]" },
     { NULL }
@@ -101,12 +115,6 @@ gboolean
 mm_context_get_test_session (void)
 {
     return test_session;
-}
-
-gboolean
-mm_context_get_test_no_auto_scan (void)
-{
-    return test_no_auto_scan;
 }
 
 gboolean
@@ -149,7 +157,7 @@ mm_context_init (gint argc,
     g_option_context_add_group (ctx, test_get_option_group ());
 
     if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
-        g_warning ("%s\n", error->message);
+        g_warning ("error: %s", error->message);
         g_error_free (error);
         exit (1);
     }
@@ -166,4 +174,10 @@ mm_context_init (gint argc,
     /* If just version requested, print and exit */
     if (version_flag)
         print_version ();
+
+    /* Initial kernel events processing may only be used if autoscan is disabled */
+    if (!no_auto_scan && initial_kernel_events) {
+        g_warning ("error: --initial-kernel-events must be used only if --no-auto-scan is also used");
+        exit (1);
+    }
 }

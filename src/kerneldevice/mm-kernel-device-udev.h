@@ -20,6 +20,9 @@
 #include <glib-object.h>
 #include <gudev/gudev.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-kernel-device.h"
 
 #define MM_TYPE_KERNEL_DEVICE_UDEV            (mm_kernel_device_udev_get_type ())
@@ -42,7 +45,9 @@ struct _MMKernelDeviceUdevClass {
     MMKernelDeviceClass parent;
 };
 
-GType           mm_kernel_device_udev_get_type (void);
-MMKernelDevice *mm_kernel_device_udev_new      (GUdevDevice *udev_device);
+GType           mm_kernel_device_udev_get_type            (void);
+MMKernelDevice *mm_kernel_device_udev_new                 (GUdevDevice              *udev_device);
+MMKernelDevice *mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *properties,
+                                                           GError                  **error);
 
 #endif /* MM_KERNEL_DEVICE_UDEV_H */

@@ -34,6 +34,7 @@
 #define MM_BASE_MANAGER_AUTO_SCAN   "auto-scan"   /* Construct-only */
 #define MM_BASE_MANAGER_ENABLE_TEST "enable-test" /* Construct-only */
 #define MM_BASE_MANAGER_PLUGIN_DIR  "plugin-dir"  /* Construct-only */
+#define MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS "initial-kernel-events" /* Construct-only */
 
 typedef struct _MMBaseManagerPrivate MMBaseManagerPrivate;
 
@@ -51,6 +52,7 @@ GType mm_base_manager_get_type (void);
 MMBaseManager   *mm_base_manager_new         (GDBusConnection *bus,
                                               const gchar *plugin_dir,
                                               gboolean auto_scan,
+                                              const gchar *initial_kernel_events,
                                               gboolean enable_test,
                                               GError **error);
 

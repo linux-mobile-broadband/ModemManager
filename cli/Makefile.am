@@ -2,6 +2,7 @@ bin_PROGRAMS = mmcli
 
 mmcli_CPPFLAGS = \
 	$(MMCLI_CFLAGS) \
+        $(GUDEV_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
@@ -34,6 +35,7 @@ mmcli_SOURCES = \
 	$(NULL)
 
 mmcli_LDADD = \
+        $(GUDEV_LIBS) \
 	$(MMCLI_LIBS) \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)

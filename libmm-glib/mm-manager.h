@@ -33,6 +33,7 @@
 #include <ModemManager.h>
 
 #include "mm-gdbus-modem.h"
+#include "mm-kernel-event-properties.h"
 
 G_BEGIN_DECLS
 
@@ -107,6 +108,19 @@ gboolean mm_manager_scan_devices_finish (MMManager     *manager,
 gboolean mm_manager_scan_devices_sync (MMManager     *manager,
                                        GCancellable  *cancellable,
                                        GError       **error);
+
+void     mm_manager_report_kernel_event        (MMManager                *manager,
+                                                MMKernelEventProperties  *properties,
+                                                GCancellable             *cancellable,
+                                                GAsyncReadyCallback       callback,
+                                                gpointer                  user_data);
+gboolean mm_manager_report_kernel_event_finish (MMManager                *manager,
+                                                GAsyncResult             *res,
+                                                GError                  **error);
+gboolean mm_manager_report_kernel_event_sync   (MMManager                *manager,
+                                                MMKernelEventProperties  *properties,
+                                                GCancellable             *cancellable,
+                                                GError                  **error);
 
 G_END_DECLS
 

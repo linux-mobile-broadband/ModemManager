@@ -497,6 +497,130 @@ mm_manager_scan_devices_sync (MMManager     *manager,
 
 /*****************************************************************************/
 
+/**
+ * mm_manager_report_kernel_event_finish:
+ * @manager: A #MMManager.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_report_kernel_event().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_manager_report_kernel_event().
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_report_kernel_event_finish (MMManager     *manager,
+                                       GAsyncResult  *res,
+                                       GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+report_kernel_event_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
+                           GAsyncResult                       *res,
+                           GTask                              *task)
+{
+    GError *error = NULL;
+
+    if (!mm_gdbus_org_freedesktop_modem_manager1_call_report_kernel_event_finish (
+            manager_iface_proxy,
+            res,
+            &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+/**
+ * mm_manager_report_kernel_event:
+ * @manager: A #MMManager.
+ * @properties: the properties of the kernel event.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously report kernel event.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_manager_report_kernel_event_finish() to get the result of the operation.
+ *
+ * See mm_manager_report_kernel_event_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_manager_report_kernel_event (MMManager                *manager,
+                                MMKernelEventProperties  *properties,
+                                GCancellable             *cancellable,
+                                GAsyncReadyCallback       callback,
+                                gpointer                  user_data)
+{
+    GTask    *task;
+    GError   *inner_error = NULL;
+    GVariant *dictionary;
+
+    g_return_if_fail (MM_IS_MANAGER (manager));
+
+    task = g_task_new (manager, cancellable, callback, user_data);
+
+    if (!ensure_modem_manager1_proxy (manager, &inner_error)) {
+        g_task_return_error (task, inner_error);
+        g_object_unref (task);
+        return;
+    }
+
+    dictionary = mm_kernel_event_properties_get_dictionary (properties);
+    mm_gdbus_org_freedesktop_modem_manager1_call_report_kernel_event (
+        manager->priv->manager_iface_proxy,
+        dictionary,
+        cancellable,
+        (GAsyncReadyCallback)report_kernel_event_ready,
+        task);
+    g_variant_unref (dictionary);
+}
+
+/**
+ * mm_manager_report_kernel_event_sync:
+ * @manager: A #MMManager.
+ * @properties: the properties of the kernel event.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously report kernel event.
+ *
+ * The calling thread is blocked until a reply is received.
+ *
+ * See mm_manager_report_kernel_event() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_report_kernel_event_sync (MMManager                *manager,
+                                     MMKernelEventProperties  *properties,
+                                     GCancellable             *cancellable,
+                                     GError                  **error)
+{
+    GVariant *dictionary;
+    gboolean  result;
+
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+
+    if (!ensure_modem_manager1_proxy (manager, error))
+        return FALSE;
+
+    dictionary = mm_kernel_event_properties_get_dictionary (properties);
+    result = (mm_gdbus_org_freedesktop_modem_manager1_call_report_kernel_event_sync (
+                  manager->priv->manager_iface_proxy,
+                  dictionary,
+                  cancellable,
+                  error));
+    g_variant_unref (dictionary);
+    return result;
+}
+
+/*****************************************************************************/
+
 static void
 register_dbus_errors (void)
 {

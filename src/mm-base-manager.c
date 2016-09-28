@@ -47,6 +47,7 @@ enum {
     PROP_AUTO_SCAN,
     PROP_ENABLE_TEST,
     PROP_PLUGIN_DIR,
+    PROP_INITIAL_KERNEL_EVENTS,
     LAST_PROP
 };
 
@@ -59,6 +60,8 @@ struct _MMBaseManagerPrivate {
     gboolean enable_test;
     /* Path to look for plugins */
     gchar *plugin_dir;
+    /* Path to the list of initial kernel events */
+    gchar *initial_kernel_events;
     /* The UDev client */
     GUdevClient *udev;
     /* The authorization provider */
@@ -238,6 +241,11 @@ device_added (MMBaseManager  *manager,
 
     g_return_if_fail (port != NULL);
 
+    mm_dbg ("(%s/%s): adding device at sysfs path: %s",
+            mm_kernel_device_get_subsystem (port),
+            mm_kernel_device_get_name (port),
+            mm_kernel_device_get_sysfs_path (port));
+
     if (!mm_kernel_device_is_candidate (port, manual_scan)) {
         /* This could mean that device changed, losing its ID_MM_CANDIDATE
          * flags (such as Bluetooth RFCOMM devices upon disconnect.
@@ -267,6 +275,11 @@ device_added (MMBaseManager  *manager,
     if (!device) {
         FindDeviceSupportContext *ctx;
 
+        mm_dbg ("(%s/%s): first port in device %s",
+                mm_kernel_device_get_subsystem (port),
+                mm_kernel_device_get_name (port),
+                physdev_uid);
+
         /* Keep the device listed in the Manager */
         device = mm_device_new (physdev_uid, hotplugged, FALSE);
         g_hash_table_insert (manager->priv->devices,
@@ -282,10 +295,71 @@ device_added (MMBaseManager  *manager,
             device,
             (GAsyncReadyCallback) device_support_check_ready,
             ctx);
-    }
+    } else
+        mm_dbg ("(%s/%s): additional port in device %s",
+                mm_kernel_device_get_subsystem (port),
+                mm_kernel_device_get_name (port),
+                physdev_uid);
 
     /* Grab the port in the existing device. */
     mm_device_grab_port (device, port);
+}
+
+static gboolean
+handle_kernel_event (MMBaseManager            *self,
+                     MMKernelEventProperties  *properties,
+                     GError                  **error)
+{
+    MMKernelDevice *kernel_device;
+    const gchar    *action;
+    const gchar    *subsystem;
+    const gchar    *name;
+    const gchar    *uid;
+
+    action = mm_kernel_event_properties_get_action (properties);
+    if (!action) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Missing mandatory parameter 'action'");
+        return FALSE;
+    }
+    if (g_strcmp0 (action, "add") != 0 && g_strcmp0 (action, "remove") != 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid 'action' parameter given: '%s' (expected 'add' or 'remove')", action);
+        return FALSE;
+    }
+
+    subsystem = mm_kernel_event_properties_get_subsystem (properties);
+    if (!subsystem) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Missing mandatory parameter 'subsystem'");
+        return FALSE;
+    }
+
+    name = mm_kernel_event_properties_get_name (properties);
+    if (!name) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Missing mandatory parameter 'name'");
+        return FALSE;
+    }
+
+    uid = mm_kernel_event_properties_get_uid (properties);
+
+    mm_dbg ("Kernel event reported:");
+    mm_dbg ("  action:    %s", action);
+    mm_dbg ("  subsystem: %s", subsystem);
+    mm_dbg ("  name:      %s", name);
+    mm_dbg ("  uid:       %s", uid ? uid : "n/a");
+
+    kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
+
+    if (!kernel_device)
+        return FALSE;
+
+    if (g_strcmp0 (action, "add") == 0)
+        device_added (self, kernel_device, TRUE, TRUE);
+    else if (g_strcmp0 (action, "remove") == 0)
+        device_removed (self, kernel_device);
+    else
+        g_assert_not_reached ();
+    g_object_unref (kernel_device);
+
+    return TRUE;
 }
 
 static void
@@ -356,57 +430,112 @@ start_device_added (MMBaseManager *self,
     g_idle_add ((GSourceFunc)start_device_added_idle, ctx);
 }
 
-void
-mm_base_manager_start (MMBaseManager *manager,
-                       gboolean manual_scan)
+static void
+process_scan (MMBaseManager *self,
+              gboolean       manual_scan)
 {
     GList *devices, *iter;
 
-    g_return_if_fail (manager != NULL);
-    g_return_if_fail (MM_IS_BASE_MANAGER (manager));
-
-    if (!manager->priv->auto_scan && !manual_scan)
-        return;
-
-    mm_dbg ("Starting %s device scan...", manual_scan ? "manual" : "automatic");
-
-    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
+    devices = g_udev_client_query_by_subsystem (self->priv->udev, "tty");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
+        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
-    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "net");
+    devices = g_udev_client_query_by_subsystem (self->priv->udev, "net");
     for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
+        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
-    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "usb");
+    devices = g_udev_client_query_by_subsystem (self->priv->udev, "usb");
     for (iter = devices; iter; iter = g_list_next (iter)) {
         const gchar *name;
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
+            start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
     /* Newer kernels report 'usbmisc' subsystem */
-    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "usbmisc");
+    devices = g_udev_client_query_by_subsystem (self->priv->udev, "usbmisc");
     for (iter = devices; iter; iter = g_list_next (iter)) {
         const gchar *name;
 
         name = g_udev_device_get_name (G_UDEV_DEVICE (iter->data));
         if (name && g_str_has_prefix (name, "cdc-wdm"))
-            start_device_added (manager, G_UDEV_DEVICE (iter->data), manual_scan);
+            start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
+}
 
+static void
+process_initial_kernel_events (MMBaseManager *self)
+{
+    gchar *contents = NULL;
+    gchar *line;
+    GError *error = NULL;
+
+    if (!self->priv->initial_kernel_events)
+        return;
+
+    if (!g_file_get_contents (self->priv->initial_kernel_events, &contents, NULL, &error)) {
+        g_warning ("Couldn't load initial kernel events: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    line = contents;
+    while (line) {
+        gchar *next;
+
+        next = strchr (line, '\n');
+        if (next) {
+            *next = '\0';
+            next++;
+        }
+
+        /* ignore empty lines */
+        if (line[0] != '\0') {
+            MMKernelEventProperties *properties;
+
+            properties = mm_kernel_event_properties_new_from_string (line, &error);
+            if (!properties) {
+                g_warning ("Couldn't parse line '%s' as initial kernel event %s", line, error->message);
+                g_clear_error (&error);
+            } else if (!handle_kernel_event (self, properties, &error)) {
+                g_warning ("Couldn't process line '%s' as initial kernel event %s", line, error->message);
+                g_clear_error (&error);
+            } else
+                g_debug ("Processed initial kernel event:' %s'", line);
+        }
+
+        line = next;
+    }
+
+    g_free (contents);
+}
+
+void
+mm_base_manager_start (MMBaseManager *self,
+                       gboolean       manual_scan)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_BASE_MANAGER (self));
+
+    if (!self->priv->auto_scan && !manual_scan) {
+        /* If we have a list of initial kernel events, process it now */
+        process_initial_kernel_events (self);
+        return;
+    }
+
+    mm_dbg ("Starting %s device scan...", manual_scan ? "manual" : "automatic");
+    process_scan (self, manual_scan);
     mm_dbg ("Finished device scan...");
 }
 
@@ -615,6 +744,81 @@ handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MMBaseManager *self;
+    GDBusMethodInvocation *invocation;
+    GVariant *dictionary;
+} ReportKernelEventContext;
+
+static void
+report_kernel_event_context_free (ReportKernelEventContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_variant_unref (ctx->dictionary);
+    g_slice_free (ReportKernelEventContext, ctx);
+}
+
+static void
+report_kernel_event_auth_ready (MMAuthProvider           *authp,
+                                GAsyncResult             *res,
+                                ReportKernelEventContext *ctx)
+{
+    GError                  *error = NULL;
+    MMKernelEventProperties *properties = NULL;
+
+    if (!mm_auth_provider_authorize_finish (authp, res, &error))
+        goto out;
+
+    if (ctx->self->priv->auto_scan) {
+        error = g_error_new_literal (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "Cannot report kernel event: "
+                                     "udev monitoring already in place");
+        goto out;
+    }
+
+    properties = mm_kernel_event_properties_new_from_dictionary (ctx->dictionary, &error);
+    if (!properties)
+        goto out;
+
+    handle_kernel_event (ctx->self, properties, &error);
+
+out:
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_org_freedesktop_modem_manager1_complete_report_kernel_event (
+            MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+            ctx->invocation);
+
+    if (properties)
+        g_object_unref (properties);
+    report_kernel_event_context_free (ctx);
+}
+
+static gboolean
+handle_report_kernel_event (MmGdbusOrgFreedesktopModemManager1 *manager,
+                            GDBusMethodInvocation *invocation,
+                            GVariant *dictionary)
+{
+    ReportKernelEventContext *ctx;
+
+    ctx = g_slice_new0 (ReportKernelEventContext);
+    ctx->self = g_object_ref (manager);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->dictionary = g_variant_ref (dictionary);
+
+    mm_auth_provider_authorize (ctx->self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MANAGER_CONTROL,
+                                ctx->self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)report_kernel_event_auth_ready,
+                                ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Test profile setup */
 
 static gboolean
@@ -684,6 +888,7 @@ MMBaseManager *
 mm_base_manager_new (GDBusConnection *connection,
                      const gchar *plugin_dir,
                      gboolean auto_scan,
+                     const gchar *initial_kernel_events,
                      gboolean enable_test,
                      GError **error)
 {
@@ -695,6 +900,7 @@ mm_base_manager_new (GDBusConnection *connection,
                            MM_BASE_MANAGER_CONNECTION, connection,
                            MM_BASE_MANAGER_PLUGIN_DIR, plugin_dir,
                            MM_BASE_MANAGER_AUTO_SCAN, auto_scan,
+                           MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS, initial_kernel_events,
                            MM_BASE_MANAGER_ENABLE_TEST, enable_test,
                            NULL);
 }
@@ -740,6 +946,10 @@ set_property (GObject *object,
         g_free (priv->plugin_dir);
         priv->plugin_dir = g_value_dup_string (value);
         break;
+    case PROP_INITIAL_KERNEL_EVENTS:
+        g_free (priv->initial_kernel_events);
+        priv->initial_kernel_events = g_value_dup_string (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -766,6 +976,9 @@ get_property (GObject *object,
         break;
     case PROP_PLUGIN_DIR:
         g_value_set_string (value, priv->plugin_dir);
+        break;
+    case PROP_INITIAL_KERNEL_EVENTS:
+        g_value_set_string (value, priv->initial_kernel_events);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -811,6 +1024,10 @@ mm_base_manager_init (MMBaseManager *manager)
     g_signal_connect (manager,
                       "handle-scan-devices",
                       G_CALLBACK (handle_scan_devices),
+                      NULL);
+    g_signal_connect (manager,
+                      "handle-report-kernel-event",
+                      G_CALLBACK (handle_report_kernel_event),
                       NULL);
 }
 
@@ -864,6 +1081,7 @@ finalize (GObject *object)
 {
     MMBaseManagerPrivate *priv = MM_BASE_MANAGER (object)->priv;
 
+    g_free (priv->initial_kernel_events);
     g_free (priv->plugin_dir);
 
     g_hash_table_destroy (priv->devices);
@@ -941,6 +1159,14 @@ mm_base_manager_class_init (MMBaseManagerClass *manager_class)
          g_param_spec_string (MM_BASE_MANAGER_PLUGIN_DIR,
                               "Plugin directory",
                               "Where to look for plugins",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_INITIAL_KERNEL_EVENTS,
+         g_param_spec_string (MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS,
+                              "Initial kernel events",
+                              "Path to a file with the list of initial kernel events",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

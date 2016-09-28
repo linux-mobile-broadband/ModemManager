@@ -37,5 +37,79 @@
       <arg name="level" type="s" direction="in" />
     </method>
 
+    <!--
+        ReportKernelEvent:
+        @properties: event properties.
+
+        Reports a kernel event to ModemManager.
+
+        This method is only available if udev is not being used to report kernel
+        events.
+
+        The @properties dictionary is composed of key/value string pairs. The
+        possible keys are:
+
+        <variablelist>
+
+          <varlistentry><term><literal>action</literal></term>
+            <listitem>
+              <para>
+                The type of action, given as a string value (signature
+                <literal>"s"</literal>).
+                This parameter is MANDATORY.
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>add</literal></term>
+                  <listitem>
+                    A new kernel device has been added.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>remove</literal></term>
+                  <listitem>
+                    An existing kernel device has been removed.
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry><term><literal>name</literal></term>
+            <listitem>
+              <para>
+                The device name, given as a string value (signature
+                <literal>"s"</literal>).
+                This parameter is MANDATORY.
+              </para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry><term><literal>subsystem</literal></term>
+            <listitem>
+              <para>
+                The device subsystem, given as a string value (signature
+                <literal>"s"</literal>).
+                This parameter is MANDATORY.
+              </para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry><term><literal>uid</literal></term>
+            <listitem>
+              <para>
+                The unique ID of the physical device, given as a string value
+                (signature <literal>"s"</literal>).
+                This parameter is OPTIONAL, if not given the sysfs path of the
+                physical device will be used. This parameter must be the same
+                for all devices exposed by the same physical device.
+              </para>
+            </listitem>
+          </varlistentry>
+
+        </variablelist>
+    -->
+    <method name="ReportKernelEvent">
+      <arg name="properties" type="a{sv}" direction="in" />
+    </method>
+
   </interface>
 </node>
