@@ -95,7 +95,6 @@ dnl Build dependencies
 dnl
 
 GLIB_MIN_VERSION=2.36.0
-GUDEV_MIN_VERSION=147
 
 PKG_CHECK_MODULES(MM,
                   glib-2.0 >= $GLIB_MIN_VERSION
@@ -120,10 +119,6 @@ PKG_CHECK_MODULES(MMCLI,
                   gio-2.0)
 AC_SUBST(MMCLI_CFLAGS)
 AC_SUBST(MMCLI_LIBS)
-
-PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= $GUDEV_MIN_VERSION)
-AC_SUBST(GUDEV_CFLAGS)
-AC_SUBST(GUDEV_LIBS)
 
 dnl Some required utilities
 GLIB_MKENUMS=`$PKG_CONFIG --variable=glib_mkenums glib-2.0`
@@ -181,6 +176,30 @@ if test "x$with_systemdsystemunitdir" != xno; then
     AC_SUBST([SYSTEMD_UNIT_DIR],  [$with_systemdsystemunitdir])
 fi
 AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
+
+dnl-----------------------------------------------------------------------------
+dnl udev support (enabled by default)
+dnl
+
+GUDEV_VERSION=147
+
+AC_ARG_WITH(udev, AS_HELP_STRING([--without-udev], [Build without udev support]), [], [with_udev=yes])
+AM_CONDITIONAL(WITH_UDEV, test "x$with_udev" = "xyes")
+case $with_udev in
+    yes)
+        PKG_CHECK_MODULES(GUDEV, [gudev-1.0 >= $GUDEV_VERSION], [have_gudev=yes],[have_gudev=no])
+        if test "x$have_gudev" = "xno"; then
+            AC_MSG_ERROR([Couldn't find gudev >= $GUDEV_VERSION. Install it, or otherwise configure using --without-udev to disable udev support.])
+        else
+            AC_DEFINE(WITH_UDEV, 1, [Define if you want udev support])
+            AC_SUBST(GUDEV_CFLAGS)
+            AC_SUBST(GUDEV_LIBS)
+        fi
+        ;;
+    *)
+        with_udev=no
+        ;;
+esac
 
 dnl-----------------------------------------------------------------------------
 dnl Suspend/resume support
@@ -396,6 +415,7 @@ echo "
       systemd unit directory:  ${with_systemdsystemunitdir}
 
     Features:
+      udev support:            ${with_udev}
       policykit support:       ${with_polkit}
       mbim support:            ${with_mbim}
       qmi support:             ${with_qmi}

@@ -56,6 +56,7 @@ Makefile.in
 /src/tests/test-at-serial-port
 /src/tests/test-sms-part-3gpp
 /src/tests/test-sms-part-cdma
+/src/tests/test-udev-rules
 
 /cli/mmcli
 
@@ -158,6 +159,7 @@ Makefile.in
 /uml290/uml290mode
 
 /plugins/test-suite.log
+/plugins/test-udev-rules
 /plugins/test-modem-helpers-huawei*
 /plugins/test-modem-helpers-altair*
 /plugins/test-modem-helpers-cinterion*
@@ -169,6 +171,7 @@ Makefile.in
 
 /test/lsudev
 /test/mmtty
+/test/mmrules
 
 /ModemManager-*-coverage.info
 /ModemManager-*-coverage/

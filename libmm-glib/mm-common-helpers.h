@@ -143,6 +143,8 @@ gboolean  mm_get_int_from_match_info             (GMatchInfo *match_info,
                                                   gint *out);
 gboolean  mm_get_uint_from_str                   (const gchar *str,
                                                   guint *out);
+gboolean  mm_get_uint_from_hex_str               (const gchar *str,
+                                                  guint       *out);
 gboolean  mm_get_uint_from_match_info            (GMatchInfo *match_info,
                                                   guint32 match_index,
                                                   guint *out);

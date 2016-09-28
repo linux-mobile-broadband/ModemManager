@@ -306,6 +306,8 @@ libmm_plugin_huawei_la_LIBADD   = $(builddir)/libhelpers-huawei.la
 
 dist_udevrules_DATA += huawei/77-mm-huawei-net-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_HUAWEI=\"${srcdir}/huawei\"
+
 ################################################################################
 # plugin: ericsson mbm
 ################################################################################
@@ -320,6 +322,8 @@ libmm_plugin_ericsson_mbm_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_ericsson_mbm_la_LIBADD   = $(MBM_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_MBM=\"${srcdir}/mbm\"
 
 ################################################################################
 # plugin: option
@@ -423,6 +427,8 @@ libmm_plugin_nokia_icera_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_NOKIA=\"${srcdir}/nokia\"
+
 ################################################################################
 # plugin: zte
 ################################################################################
@@ -444,6 +450,8 @@ libmm_plugin_zte_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += zte/77-mm-zte-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_ZTE=\"${srcdir}/zte\"
+
 ################################################################################
 # plugin: longcheer (and rebranded dongles)
 ################################################################################
@@ -459,6 +467,8 @@ libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_longcheer_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += longcheer/77-mm-longcheer-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_LONGCHEER=\"${srcdir}/longcheer\"
 
 ################################################################################
 # plugin: anydata cdma
@@ -504,6 +514,8 @@ libmm_plugin_simtech_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += simtech/77-mm-simtech-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_SIMTECH=\"${srcdir}/simtech\"
+
 ################################################################################
 # plugin: alcatel/TCT/JRD x220D and possibly others
 ################################################################################
@@ -519,6 +531,8 @@ libmm_plugin_x22x_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_x22x_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += x22x/77-mm-x22x-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_X22X=\"${srcdir}/x22x\"
 
 ################################################################################
 # plugin: pantech
@@ -594,6 +608,8 @@ libmm_plugin_cinterion_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_cinterion_la_LIBADD   = $(builddir)/libhelpers-cinterion.la
 
 dist_udevrules_DATA += cinterion/77-mm-cinterion-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_CINTERION=\"${srcdir}/cinterion\"
 
 ################################################################################
 # plugin: iridium
@@ -694,6 +710,8 @@ libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_L
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
+
 ################################################################################
 # plugin: altair lte
 ################################################################################
@@ -778,6 +796,8 @@ libmm_plugin_telit_la_LIBADD   = $(builddir)/libhelpers-telit.la $(TELIT_COMMON_
 
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_TELIT=\"${srcdir}/telit\"
+
 ################################################################################
 # plugin: mtk
 ################################################################################
@@ -794,6 +814,8 @@ libmm_plugin_mtk_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += mtk/77-mm-mtk-port-types.rules
 
+AM_CFLAGS += -DTESTUDEVRULESDIR_MTK=\"${srcdir}/mtk\"
+
 ################################################################################
 # plugin: haier
 ################################################################################
@@ -807,6 +829,22 @@ libmm_plugin_haier_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_haier_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += haier/77-mm-haier-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_HAIER=\"${srcdir}/haier\"
+
+################################################################################
+# udev rules tester
+################################################################################
+
+noinst_PROGRAMS += test-udev-rules
+test_udev_rules_SOURCES = \
+	tests/test-udev-rules.c \
+	$(NULL)
+test_udev_rules_LDADD = \
+	$(top_builddir)/src/libkerneldevice.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 
 ################################################################################
 

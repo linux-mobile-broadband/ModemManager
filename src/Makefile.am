@@ -102,13 +102,28 @@ endif
 
 noinst_LTLIBRARIES += libkerneldevice.la
 
+libkerneldevice_la_CPPFLAGS = \
+	-DUDEVRULESDIR=\"$(udevrulesdir)\" \
+	$(NULL)
+
 libkerneldevice_la_SOURCES = \
 	kerneldevice/mm-kernel-device.h \
 	kerneldevice/mm-kernel-device.c \
 	kerneldevice/mm-kernel-device-generic.h \
 	kerneldevice/mm-kernel-device-generic.c \
+	kerneldevice/mm-kernel-device-generic-rules.h \
+	kerneldevice/mm-kernel-device-generic-rules.c \
+	$(NULL)
+
+if WITH_UDEV
+libkerneldevice_la_SOURCES += \
 	kerneldevice/mm-kernel-device-udev.h \
 	kerneldevice/mm-kernel-device-udev.c \
+	$(NULL)
+endif
+
+libkerneldevice_la_LIBADD = \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
 ################################################################################

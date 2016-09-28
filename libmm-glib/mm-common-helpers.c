@@ -1386,6 +1386,49 @@ mm_get_uint_from_str (const gchar *str,
     return FALSE;
 }
 
+/**
+ * mm_get_uint_from_hex_str:
+ * @str: the hex string to convert to an unsigned int
+ * @out: on success, the number
+ *
+ * Converts a string to an unsigned number.  All characters in the string
+ * MUST be valid hexadecimal digits (0-9, A-F, a-f), otherwise FALSE is
+ * returned.
+ *
+ * An optional "0x" prefix may be given in @str.
+ *
+ * Returns: %TRUE if the string was converted, %FALSE if it was not or if it
+ * did not contain only digits.
+ */
+gboolean
+mm_get_uint_from_hex_str (const gchar *str,
+                          guint       *out)
+{
+    gulong num;
+
+    if (!str)
+        return FALSE;
+
+    if (g_str_has_prefix (str, "0x"))
+        str = &str[2];
+
+    if (!str[0])
+        return FALSE;
+
+    for (num = 0; str[num]; num++) {
+        if (!g_ascii_isxdigit (str[num]))
+            return FALSE;
+    }
+
+    errno = 0;
+    num = strtoul (str, NULL, 16);
+    if (!errno && num <= G_MAXUINT) {
+        *out = (guint)num;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 gboolean
 mm_get_uint_from_match_info (GMatchInfo *match_info,
                              guint32 match_index,

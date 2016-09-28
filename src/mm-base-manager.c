@@ -17,11 +17,17 @@
  * Copyright (C) 2011 - 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
+#include <config.h>
+
 #include <string.h>
 #include <ctype.h>
 
 #include <gmodule.h>
-#include "mm-kernel-device-udev.h"
+
+#if WITH_UDEV
+# include "mm-kernel-device-udev.h"
+#endif
+#include "mm-kernel-device-generic.h"
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
@@ -62,8 +68,6 @@ struct _MMBaseManagerPrivate {
     gchar *plugin_dir;
     /* Path to the list of initial kernel events */
     gchar *initial_kernel_events;
-    /* The UDev client */
-    GUdevClient *udev;
     /* The authorization provider */
     MMAuthProvider *authp;
     GCancellable *authp_cancellable;
@@ -76,6 +80,11 @@ struct _MMBaseManagerPrivate {
 
     /* The Test interface support */
     MmGdbusTest *test_skeleton;
+
+#if WITH_UDEV
+    /* The UDev client */
+    GUdevClient *udev;
+#endif
 };
 
 /*****************************************************************************/
@@ -346,7 +355,11 @@ handle_kernel_event (MMBaseManager            *self,
     mm_dbg ("  name:      %s", name);
     mm_dbg ("  uid:       %s", uid ? uid : "n/a");
 
+#if WITH_UDEV
     kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
+#else
+    kernel_device = mm_kernel_device_generic_new (properties, error);
+#endif
 
     if (!kernel_device)
         return FALSE;
@@ -361,6 +374,8 @@ handle_kernel_event (MMBaseManager            *self,
 
     return TRUE;
 }
+
+#if WITH_UDEV
 
 static void
 handle_uevent (GUdevClient *client,
@@ -474,6 +489,8 @@ process_scan (MMBaseManager *self,
     g_list_free (devices);
 }
 
+#endif
+
 static void
 process_initial_kernel_events (MMBaseManager *self)
 {
@@ -534,9 +551,13 @@ mm_base_manager_start (MMBaseManager *self,
         return;
     }
 
+#if WITH_UDEV
     mm_dbg ("Starting %s device scan...", manual_scan ? "manual" : "automatic");
     process_scan (self, manual_scan);
     mm_dbg ("Finished device scan...");
+#else
+    mm_dbg ("Unsupported %s device scan...", manual_scan ? "manual" : "automatic");
+#endif
 }
 
 /*****************************************************************************/
@@ -714,11 +735,17 @@ scan_devices_auth_ready (MMAuthProvider *authp,
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
+#if WITH_UDEV
         /* Otherwise relaunch device scan */
         mm_base_manager_start (MM_BASE_MANAGER (ctx->self), TRUE);
         mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
             ctx->invocation);
+#else
+        g_dbus_method_invocation_return_error_literal (
+            ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+            "Cannot request manual scan of devices: unsupported");
+#endif
     }
 
     scan_devices_context_free (ctx);
@@ -771,12 +798,14 @@ report_kernel_event_auth_ready (MMAuthProvider           *authp,
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
         goto out;
 
+#if WITH_UDEV
     if (ctx->self->priv->auto_scan) {
         error = g_error_new_literal (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                      "Cannot report kernel event: "
                                      "udev monitoring already in place");
         goto out;
     }
+#endif
 
     properties = mm_kernel_event_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties)
@@ -990,7 +1019,6 @@ static void
 mm_base_manager_init (MMBaseManager *manager)
 {
     MMBaseManagerPrivate *priv;
-    const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
 
     /* Setup private data */
     manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
@@ -1004,8 +1032,14 @@ mm_base_manager_init (MMBaseManager *manager)
     /* Setup internal lists of device objects */
     priv->devices = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
-    /* Setup UDev client */
-    priv->udev = g_udev_client_new (subsys);
+#if WITH_UDEV
+    {
+        const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
+
+        /* Setup UDev client */
+        priv->udev = g_udev_client_new (subsys);
+    }
+#endif
 
     /* By default, enable autoscan */
     priv->auto_scan = TRUE;
@@ -1038,9 +1072,11 @@ initable_init (GInitable *initable,
 {
     MMBaseManagerPrivate *priv = MM_BASE_MANAGER (initable)->priv;
 
+#if WITH_UDEV
     /* If autoscan enabled, list for udev events */
     if (priv->auto_scan)
         g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
+#endif
 
     /* Create plugin manager */
     priv->plugin_manager = mm_plugin_manager_new (priv->plugin_dir, error);
@@ -1086,8 +1122,10 @@ finalize (GObject *object)
 
     g_hash_table_destroy (priv->devices);
 
+#if WITH_UDEV
     if (priv->udev)
         g_object_unref (priv->udev);
+#endif
 
     if (priv->plugin_manager)
         g_object_unref (priv->plugin_manager);

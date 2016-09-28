@@ -17,6 +17,7 @@ AM_CFLAGS = \
 	-I${top_srcdir}/src/ \
 	-I${top_builddir}/src/ \
 	-I${top_srcdir}/src/kerneldevice \
+	-DTESTUDEVRULESDIR=\"${top_srcdir}/src/\" \
 	$(NULL)
 
 AM_LDFLAGS = \
@@ -24,6 +25,7 @@ AM_LDFLAGS = \
 	$(CODE_COVERAGE_LDFLAGS) \
 	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/src/libport.la \
+	$(top_builddir)/src/libkerneldevice.la \
 	-lutil \
 	$(NULL)
 
@@ -39,7 +41,7 @@ endif
 
 ################################################################################
 # tests
-#  note: we abuse AM_LDFLAGS to include libhelpers and libport.
+#  note: we abuse AM_LDFLAGS to include the libraries being tested
 ################################################################################
 
 noinst_PROGRAMS = \
@@ -49,6 +51,7 @@ noinst_PROGRAMS = \
 	test-at-serial-port \
 	test-sms-part-3gpp \
 	test-sms-part-cdma \
+	test-udev-rules \
 	$(NULL)
 
 if WITH_QMI

@@ -13,6 +13,7 @@
  * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
+#include <config.h>
 #include <stdlib.h>
 
 #include "mm-context.h"
@@ -20,14 +21,20 @@
 /*****************************************************************************/
 /* Application context */
 
-static gboolean version_flag;
-static gboolean debug;
+static gboolean     version_flag;
+static gboolean     debug;
 static const gchar *log_level;
 static const gchar *log_file;
-static gboolean show_ts;
-static gboolean rel_ts;
+static gboolean     show_ts;
+static gboolean     rel_ts;
+
+#if WITH_UDEV
+static gboolean no_auto_scan = FALSE;
+#else
+static gboolean no_auto_scan = TRUE;
+#endif
+
 static const gchar *initial_kernel_events;
-static gboolean no_auto_scan;
 
 static const GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag, "Print version", NULL },
@@ -36,8 +43,14 @@ static const GOptionEntry entries[] = {
     { "log-file", 0, 0, G_OPTION_ARG_FILENAME, &log_file, "Path to log file", "[PATH]" },
     { "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
     { "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
+#if WITH_UDEV
     { "no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &no_auto_scan, "Don't auto-scan looking for devices", NULL },
-    { "initial-kernel-events", 0, 0, G_OPTION_ARG_FILENAME, &initial_kernel_events, "Path to initial kernel events file (requires --no-auto-scan)", "[PATH]" },
+#else
+    /* Keep the option when udev disabled, just so that the unit test setup can
+     * unconditionally use --no-auto-scan */
+    { "no-auto-scan", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &no_auto_scan, NULL, NULL },
+#endif
+    { "initial-kernel-events", 0, 0, G_OPTION_ARG_FILENAME, &initial_kernel_events, "Path to initial kernel events file", "[PATH]" },
     { NULL }
 };
 
@@ -176,8 +189,10 @@ mm_context_init (gint argc,
         print_version ();
 
     /* Initial kernel events processing may only be used if autoscan is disabled */
+#if WITH_UDEV
     if (!no_auto_scan && initial_kernel_events) {
         g_warning ("error: --initial-kernel-events must be used only if --no-auto-scan is also used");
         exit (1);
     }
+#endif
 }

@@ -29,7 +29,9 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#include <gudev/gudev.h>
+#if WITH_UDEV
+# include <gudev/gudev.h>
+#endif
 
 #define _LIBMM_INSIDE_MMCLI
 #include "libmm-glib.h"
@@ -41,7 +43,9 @@
 typedef struct {
     MMManager *manager;
     GCancellable *cancellable;
+#if WITH_UDEV
     GUdevClient *udev;
+#endif
 } Context;
 static Context *ctx;
 
@@ -51,7 +55,10 @@ static gboolean monitor_modems_flag;
 static gboolean scan_modems_flag;
 static gchar *set_logging_str;
 static gchar *report_kernel_event_str;
+
+#if WITH_UDEV
 static gboolean report_kernel_event_auto_scan;
+#endif
 
 static GOptionEntry entries[] = {
     { "set-logging", 'G', 0, G_OPTION_ARG_STRING, &set_logging_str,
@@ -74,10 +81,12 @@ static GOptionEntry entries[] = {
       "Report kernel event",
       "[\"key=value,...\"]"
     },
+#if WITH_UDEV
     { "report-kernel-event-auto-scan", 0, 0, G_OPTION_ARG_NONE, &report_kernel_event_auto_scan,
       "Automatically report kernel events based on udev notifications",
       NULL
     },
+#endif
     { NULL }
 };
 
@@ -110,8 +119,11 @@ mmcli_manager_options_enabled (void)
                  monitor_modems_flag +
                  scan_modems_flag +
                  !!set_logging_str +
-                 !!report_kernel_event_str +
-                 report_kernel_event_auto_scan);
+                 !!report_kernel_event_str);
+
+#if WITH_UDEV
+    n_actions += report_kernel_event_auto_scan;
+#endif
 
     if (n_actions > 1) {
         g_printerr ("error: too many manager actions requested\n");
@@ -121,8 +133,10 @@ mmcli_manager_options_enabled (void)
     if (monitor_modems_flag)
         mmcli_force_async_operation ();
 
+#if WITH_UDEV
     if (report_kernel_event_auto_scan)
         mmcli_force_async_operation ();
+#endif
 
     checked = TRUE;
     return !!n_actions;
@@ -134,8 +148,11 @@ context_free (Context *ctx)
     if (!ctx)
         return;
 
+#if WITH_UDEV
     if (ctx->udev)
         g_object_unref (ctx->udev);
+#endif
+
     if (ctx->manager)
         g_object_unref (ctx->manager);
     if (ctx->cancellable)
@@ -308,6 +325,8 @@ cancelled (GCancellable *cancellable)
     mmcli_async_operation_done ();
 }
 
+#if WITH_UDEV
+
 static void
 handle_uevent (GUdevClient *client,
                const char  *action,
@@ -323,6 +342,8 @@ handle_uevent (GUdevClient *client,
     mm_manager_report_kernel_event (ctx->manager, properties, NULL, NULL, NULL);
     g_object_unref (properties);
 }
+
+#endif
 
 static void
 get_manager_ready (GObject      *source,
@@ -367,6 +388,7 @@ get_manager_ready (GObject      *source,
         return;
     }
 
+#if WITH_UDEV
     if (report_kernel_event_auto_scan) {
         const gchar *subsys[] = { "tty", "usbmisc", "net", NULL };
         guint i;
@@ -400,6 +422,7 @@ get_manager_ready (GObject      *source,
                                NULL);
         return;
     }
+#endif
 
     /* Request to monitor modems? */
     if (monitor_modems_flag) {
@@ -457,10 +480,12 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
         exit (EXIT_FAILURE);
     }
 
+#if WITH_UDEV
     if (report_kernel_event_auto_scan) {
         g_printerr ("error: monitoring udev events cannot be done synchronously\n");
         exit (EXIT_FAILURE);
     }
+#endif
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
