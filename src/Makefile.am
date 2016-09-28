@@ -105,6 +105,8 @@ noinst_LTLIBRARIES += libkerneldevice.la
 libkerneldevice_la_SOURCES = \
 	kerneldevice/mm-kernel-device.h \
 	kerneldevice/mm-kernel-device.c \
+	kerneldevice/mm-kernel-device-generic.h \
+	kerneldevice/mm-kernel-device-generic.c \
 	kerneldevice/mm-kernel-device-udev.h \
 	kerneldevice/mm-kernel-device-udev.c \
 	$(NULL)
@@ -173,6 +175,7 @@ libport_la_LIBADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(builddir)/libhelpers.la \
+	$(builddir)/libkerneldevice.la \
 	$(NULL)
 
 # Request to build enum types before anything else
@@ -220,9 +223,7 @@ ModemManager_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(top_builddir)/libmm-glib/generated/tests/libmm-test-generated.la \
-	$(builddir)/libhelpers.la \
 	$(builddir)/libport.la \
-	$(builddir)/libkerneldevice.la \
 	$(NULL)
 
 ModemManager_SOURCES = \

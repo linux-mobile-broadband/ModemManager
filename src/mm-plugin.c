@@ -29,6 +29,7 @@
 #include "mm-plugin.h"
 #include "mm-device.h"
 #include "mm-kernel-device.h"
+#include "mm-kernel-device-generic.h"
 #include "mm-port-serial-at.h"
 #include "mm-port-serial-qcdm.h"
 #include "mm-serial-parsers.h"
@@ -902,9 +903,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                         mm_port_probe_get_port_subsys (probe),
                         mm_port_probe_get_port_name (probe));
                 grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_get_port_subsys (probe),
-                                                   mm_port_probe_get_port_name (probe),
-                                                   mm_port_probe_get_parent_path (probe),
+                                                   mm_port_probe_peek_port (probe),
                                                    MM_PORT_TYPE_IGNORED,
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
@@ -914,9 +913,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                      !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "qmi_wwan")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_get_port_subsys (probe),
-                                                   mm_port_probe_get_port_name (probe),
-                                                   mm_port_probe_get_parent_path (probe),
+                                                   mm_port_probe_peek_port (probe),
                                                    MM_PORT_TYPE_IGNORED,
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
@@ -927,9 +924,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                      !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "cdc_mbim")) {
                 /* Try to generically grab the port, but flagged as ignored */
                 grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_get_port_subsys (probe),
-                                                   mm_port_probe_get_port_name (probe),
-                                                   mm_port_probe_get_parent_path (probe),
+                                                   mm_port_probe_peek_port (probe),
                                                    MM_PORT_TYPE_IGNORED,
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
@@ -942,9 +937,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                                  &inner_error);
             else
                 grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_get_port_subsys (probe),
-                                                   mm_port_probe_get_port_name (probe),
-                                                   mm_port_probe_get_parent_path (probe),
+                                                   mm_port_probe_peek_port (probe),
                                                    mm_port_probe_get_port_type (probe),
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
@@ -960,20 +953,35 @@ mm_plugin_create_modem (MMPlugin  *self,
         guint i;
 
         for (i = 0; virtual_ports[i]; i++) {
-            GError *inner_error = NULL;
+            GError                  *inner_error = NULL;
+            MMKernelDevice          *kernel_device;
+            MMKernelEventProperties *properties;
 
-            if (!mm_base_modem_grab_port (modem,
-                                          "virtual",
-                                          virtual_ports[i],
-                                          NULL,
-                                          MM_PORT_TYPE_AT,
-                                          MM_PORT_SERIAL_AT_FLAG_NONE,
-                                          &inner_error)) {
+            properties = mm_kernel_event_properties_new ();
+            mm_kernel_event_properties_set_action (properties, "add");
+            mm_kernel_event_properties_set_subsystem (properties, "virtual");
+            mm_kernel_event_properties_set_name (properties, virtual_ports[i]);
+
+            kernel_device = mm_kernel_device_generic_new (properties, &inner_error);
+            if (!kernel_device) {
+                mm_warn ("Could not grab port (virtual/%s): '%s'",
+                         virtual_ports[i],
+                         inner_error ? inner_error->message : "unknown error");
+                g_clear_error (&inner_error);
+            } else if (!mm_base_modem_grab_port (modem,
+                                                 kernel_device,
+                                                 MM_PORT_TYPE_AT,
+                                                 MM_PORT_SERIAL_AT_FLAG_NONE,
+                                                 &inner_error)) {
                 mm_warn ("Could not grab port (virtual/%s): '%s'",
                          virtual_ports[i],
                          inner_error ? inner_error->message : "unknown error");
                 g_clear_error (&inner_error);
             }
+
+            if (kernel_device)
+                g_object_unref (kernel_device);
+            g_object_unref (properties);
         }
     }
 

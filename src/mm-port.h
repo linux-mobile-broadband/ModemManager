@@ -20,6 +20,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include "mm-kernel-device.h"
+
 typedef enum { /*< underscore_name=mm_port_subsys >*/
     MM_PORT_SUBSYS_UNKNOWN = 0x0,
     MM_PORT_SUBSYS_TTY,
@@ -49,11 +51,11 @@ typedef enum { /*< underscore_name=mm_port_type >*/
 #define MM_IS_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT))
 #define MM_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT, MMPortClass))
 
-#define MM_PORT_DEVICE      "device"
-#define MM_PORT_SUBSYS      "subsys"
-#define MM_PORT_TYPE        "type"
-#define MM_PORT_CONNECTED   "connected"
-#define MM_PORT_PARENT_PATH "parent-path"
+#define MM_PORT_DEVICE        "device"
+#define MM_PORT_SUBSYS        "subsys"
+#define MM_PORT_TYPE          "type"
+#define MM_PORT_CONNECTED     "connected"
+#define MM_PORT_KERNEL_DEVICE "kernel-device"
 
 typedef struct _MMPort MMPort;
 typedef struct _MMPortClass MMPortClass;
@@ -70,11 +72,11 @@ struct _MMPortClass {
 
 GType mm_port_get_type (void);
 
-const gchar  *mm_port_get_device      (MMPort *self);
-MMPortSubsys  mm_port_get_subsys      (MMPort *self);
-MMPortType    mm_port_get_port_type   (MMPort *self);
-const gchar  *mm_port_get_parent_path (MMPort *self);
-gboolean      mm_port_get_connected   (MMPort *self);
-void          mm_port_set_connected   (MMPort *self, gboolean connected);
+const gchar    *mm_port_get_device         (MMPort *self);
+MMPortSubsys    mm_port_get_subsys         (MMPort *self);
+MMPortType      mm_port_get_port_type      (MMPort *self);
+gboolean        mm_port_get_connected      (MMPort *self);
+void            mm_port_set_connected      (MMPort *self, gboolean connected);
+MMKernelDevice *mm_port_peek_kernel_device (MMPort *self);
 
 #endif /* MM_PORT_H */

@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
-#include <gudev/gudev.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -2311,7 +2310,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
     const gchar *net_port_parent_path;
 
     g_warn_if_fail (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET);
-    net_port_parent_path = mm_port_get_parent_path (port);
+    net_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (port));
     if (!net_port_parent_path) {
         mm_warn ("(%s) no parent path for net port", mm_port_get_device (port));
         return NULL;
@@ -2326,7 +2325,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
         const gchar  *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_SERIAL_AT (l->data));
-        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        wdm_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
             return MM_PORT_SERIAL_AT (l->data);
     }
@@ -2354,44 +2353,30 @@ static void
 ensure_ndisdup_support_checked (MMBroadbandModemHuawei *self,
                                 MMPort *port)
 {
-    GUdevClient *client;
-    GUdevDevice *data_device;
-
     /* Check NDISDUP support the first time we need it */
     if (self->priv->ndisdup_support != FEATURE_SUPPORT_UNKNOWN)
         return;
 
     /* First, check for devices which support NDISDUP on any AT port. These
      * devices are tagged by udev */
-    client = g_udev_client_new (NULL);
-    data_device = (g_udev_client_query_by_subsystem_and_name (
-                       client,
-                       "net",
-                       mm_port_get_device (port)));
-    if (data_device && g_udev_device_get_property_as_boolean (data_device, "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+    if (mm_kernel_device_get_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
         mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
         self->priv->ndisdup_support = FEATURE_SUPPORTED;
-        goto out;
     }
-
     /* Then, look for devices which have both a net port and a cdc-wdm
      * AT-capable port. We assume that these devices allow NDISDUP only
      * when issued in the cdc-wdm port. */
-    if (peek_port_at_for_data (self, port)) {
+    else if (peek_port_at_for_data (self, port)) {
         mm_dbg ("This device (%s) can support ndisdup feature on non-serial AT port",
                 mm_port_get_device (port));
         self->priv->ndisdup_support = FEATURE_SUPPORTED;
-        goto out;
     }
+
+    if (self->priv->ndisdup_support != FEATURE_SUPPORT_UNKNOWN)
+        return;
 
     mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
     self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
-
-out:
-    if (data_device)
-        g_object_unref (data_device);
-    if (client)
-        g_object_unref (client);
 }
 
 static void

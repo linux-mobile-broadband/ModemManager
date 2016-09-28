@@ -30,6 +30,7 @@
 
 #include "mm-auth.h"
 #include "mm-port.h"
+#include "mm-kernel-device.h"
 #include "mm-port-serial-at.h"
 #include "mm-port-serial-qcdm.h"
 #include "mm-port-serial-gps.h"
@@ -104,13 +105,11 @@ struct _MMBaseModemClass {
 
 GType mm_base_modem_get_type (void);
 
-gboolean  mm_base_modem_grab_port    (MMBaseModem *self,
-                                      const gchar *subsys,
-                                      const gchar *name,
-                                      const gchar *parent_path,
-                                      MMPortType ptype,
-                                      MMPortSerialAtFlag at_pflags,
-                                      GError **error);
+gboolean  mm_base_modem_grab_port    (MMBaseModem         *self,
+                                      MMKernelDevice      *kernel_device,
+                                      MMPortType           ptype,
+                                      MMPortSerialAtFlag   at_pflags,
+                                      GError             **error);
 
 gboolean  mm_base_modem_has_at_port  (MMBaseModem *self);
 

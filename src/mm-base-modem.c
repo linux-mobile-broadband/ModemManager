@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <gudev/gudev.h>
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
@@ -129,18 +128,23 @@ serial_port_timed_out_cb (MMPortSerial *port,
 }
 
 gboolean
-mm_base_modem_grab_port (MMBaseModem *self,
-                         const gchar *subsys,
-                         const gchar *name,
-                         const gchar *parent_path,
-                         MMPortType ptype,
-                         MMPortSerialAtFlag at_pflags,
-                         GError **error)
+mm_base_modem_grab_port (MMBaseModem         *self,
+                         MMKernelDevice      *kernel_device,
+                         MMPortType           ptype,
+                         MMPortSerialAtFlag   at_pflags,
+                         GError             **error)
 {
-    MMPort *port;
-    gchar *key;
+    MMPort      *port;
+    gchar       *key;
+    const gchar *subsys;
+    const gchar *name;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (kernel_device), FALSE);
+
+    subsys = mm_kernel_device_get_subsystem (kernel_device);
+    name   = mm_kernel_device_get_name      (kernel_device);
+
     g_return_val_if_fail (subsys != NULL, FALSE);
     g_return_val_if_fail (name != NULL, FALSE);
 
@@ -285,9 +289,9 @@ mm_base_modem_grab_port (MMBaseModem *self,
      * Note: 'key' and 'port' now owned by the HT. */
     g_hash_table_insert (self->priv->ports, key, port);
 
-    /* Store parent path */
+    /* Store kernel device */
     g_object_set (port,
-                  MM_PORT_PARENT_PATH, parent_path,
+                  MM_PORT_KERNEL_DEVICE, kernel_device,
                   NULL);
 
     return TRUE;
@@ -555,7 +559,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
     const gchar *net_port_parent_path;
 
     g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
-    net_port_parent_path = mm_port_get_parent_path (data);
+    net_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (data));
     if (!net_port_parent_path) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -574,7 +578,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
         const gchar *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_QMI (l->data));
-        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        wdm_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
             return MM_PORT_QMI (l->data);
     }
@@ -629,7 +633,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
     const gchar *net_port_parent_path;
 
     g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
-    net_port_parent_path = mm_port_get_parent_path (data);
+    net_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (data));
     if (!net_port_parent_path) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -648,7 +652,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
         const gchar *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_MBIM (l->data));
-        wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
+        wdm_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
             return MM_PORT_MBIM (l->data);
     }

@@ -160,9 +160,7 @@ grab_port (MMPlugin *self,
     }
 
     return mm_base_modem_grab_port (modem,
-                                    subsys,
-                                    mm_port_probe_get_port_name (probe),
-                                    mm_port_probe_get_parent_path (probe),
+                                    mm_port_probe_peek_port (probe),
                                     port_type,
                                     pflags,
                                     error);

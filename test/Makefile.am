@@ -24,6 +24,7 @@ mmtty_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/kerneldevice \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
 	-I$(top_srcdir)/libmm-glib \
@@ -33,7 +34,6 @@ mmtty_CPPFLAGS = \
 
 mmtty_LDADD = \
 	$(MM_LIBS) \
-	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/src/libport.la \
 	$(NULL)
 

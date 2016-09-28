@@ -29,8 +29,7 @@ enum {
     PROP_SUBSYS,
     PROP_TYPE,
     PROP_CONNECTED,
-    PROP_PARENT_PATH,
-
+    PROP_KERNEL_DEVICE,
     LAST_PROP
 };
 
@@ -39,7 +38,7 @@ struct _MMPortPrivate {
     MMPortSubsys subsys;
     MMPortType ptype;
     gboolean connected;
-    gchar *parent_path;
+    MMKernelDevice *kernel_device;
 };
 
 /*****************************************************************************/
@@ -96,12 +95,12 @@ mm_port_set_connected (MMPort *self, gboolean connected)
     }
 }
 
-const gchar *
-mm_port_get_parent_path (MMPort *self)
+MMKernelDevice *
+mm_port_peek_kernel_device (MMPort *self)
 {
     g_return_val_if_fail (MM_IS_PORT (self), NULL);
 
-    return self->priv->parent_path;
+    return self->priv->kernel_device;
 }
 
 /*****************************************************************************/
@@ -136,9 +135,10 @@ set_property (GObject *object,
     case PROP_CONNECTED:
         self->priv->connected = g_value_get_boolean (value);
         break;
-    case PROP_PARENT_PATH:
-        g_free (self->priv->parent_path);
-        self->priv->parent_path = g_value_dup_string (value);
+    case PROP_KERNEL_DEVICE:
+        /* Not construct only, but only set once */
+        g_assert (!self->priv->kernel_device);
+        self->priv->kernel_device = g_value_dup_object (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -165,8 +165,8 @@ get_property (GObject *object, guint prop_id,
     case PROP_CONNECTED:
         g_value_set_boolean (value, self->priv->connected);
         break;
-    case PROP_PARENT_PATH:
-        g_value_set_string (value, self->priv->parent_path);
+    case PROP_KERNEL_DEVICE:
+        g_value_set_object (value, self->priv->kernel_device);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -180,9 +180,18 @@ finalize (GObject *object)
     MMPort *self = MM_PORT (object);
 
     g_free (self->priv->device);
-    g_free (self->priv->parent_path);
 
     G_OBJECT_CLASS (mm_port_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMPort *self = MM_PORT (object);
+
+    g_clear_object (&self->priv->kernel_device);
+
+    G_OBJECT_CLASS (mm_port_parent_class)->dispose (object);
 }
 
 static void
@@ -196,6 +205,7 @@ mm_port_class_init (MMPortClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->finalize = finalize;
+    object_class->dispose = dispose;
 
     g_object_class_install_property
         (object_class, PROP_DEVICE,
@@ -234,10 +244,10 @@ mm_port_class_init (MMPortClass *klass)
                                G_PARAM_READWRITE));
 
     g_object_class_install_property
-        (object_class, PROP_PARENT_PATH,
-         g_param_spec_string (MM_PORT_PARENT_PATH,
-                              "Parent path",
-                              "sysfs path of the parent device",
-                              NULL,
+        (object_class, PROP_KERNEL_DEVICE,
+         g_param_spec_object (MM_PORT_KERNEL_DEVICE,
+                              "Kernel device",
+                              "kernel device object",
+                              MM_TYPE_KERNEL_DEVICE,
                               G_PARAM_READWRITE));
 }
