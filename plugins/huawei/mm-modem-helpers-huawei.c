@@ -904,6 +904,12 @@ mm_huawei_parse_syscfg_response (const gchar *response,
         return NULL;
     }
 
+    /* Fix invalid modes with non-sensical acquisition orders */
+    if (mode == 14 && acqorder != 0)  /* WCDMA only but acqorder != "Automatic" */
+        acqorder = 0;
+    else if (mode == 13 && acqorder != 0)  /* GSM only but acqorder != "Automatic" */
+        acqorder = 0;
+
     /* Look for current modes among the supported ones */
     for (i = 0; i < supported_mode_combinations->len; i++) {
         const MMHuaweiSyscfgCombination *combination;
