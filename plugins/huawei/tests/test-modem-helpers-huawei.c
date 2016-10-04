@@ -707,6 +707,20 @@ static const SyscfgResponseTest syscfg_response_tests[] = {
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = MM_MODEM_MODE_3G,
         .preferred = MM_MODEM_MODE_NONE
+    },
+    {
+        /* Non-sensical acquisition order (WCDMA-only but acquire WCDMA-then-GSM */
+        .str = "^SYSCFG: 14,2,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = MM_MODEM_MODE_3G,
+        .preferred = MM_MODEM_MODE_NONE
+    },
+    {
+        /* Non-sensical acquisition order (GSM-only but acquire GSM-then-WCDMA */
+        .str = "^SYSCFG: 13,1,400000,0,3\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = MM_MODEM_MODE_2G,
+        .preferred = MM_MODEM_MODE_NONE
     }
 };
 
