@@ -544,6 +544,9 @@ mm_broadband_bearer_ublox_class_init (MMBroadbandBearerUbloxClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
+    /* Note: the ublox plugin uses the generic AT+CGACT? based check to monitor
+     * the connection status (i.e. default load_connection_status()) */
+
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
     broadband_bearer_class->dial_3gpp = dial_3gpp;

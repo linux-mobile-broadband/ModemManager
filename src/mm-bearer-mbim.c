@@ -1375,6 +1375,8 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->reload_stats = reload_stats;
     base_bearer_class->reload_stats_finish = reload_stats_finish;
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
 
     properties[PROP_SESSION_ID] =
         g_param_spec_uint (MM_BEARER_MBIM_SESSION_ID,

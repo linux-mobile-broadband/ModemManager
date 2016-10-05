@@ -1674,4 +1674,6 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->reload_stats = reload_stats;
     base_bearer_class->reload_stats_finish = reload_stats_finish;
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
 }

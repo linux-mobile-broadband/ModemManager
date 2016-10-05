@@ -921,7 +921,11 @@ mm_broadband_bearer_huawei_class_init (MMBroadbandBearerHuaweiClass *klass)
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHuaweiPrivate));
 
     object_class->dispose = dispose;
+
     base_bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
+
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;

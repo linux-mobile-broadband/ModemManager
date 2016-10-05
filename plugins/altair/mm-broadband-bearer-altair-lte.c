@@ -409,7 +409,11 @@ mm_broadband_bearer_altair_lte_init (MMBroadbandBearerAltairLte *self)
 static void
 mm_broadband_bearer_altair_lte_class_init (MMBroadbandBearerAltairLteClass *klass)
 {
+    MMBaseBearerClass      *base_bearer_class      = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
+
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;

@@ -270,4 +270,6 @@ mm_bearer_iridium_class_init (MMBearerIridiumClass *klass)
     /* Virtual methods */
     base_bearer_class->connect = connect;
     base_bearer_class->connect_finish = connect_finish;
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
 }

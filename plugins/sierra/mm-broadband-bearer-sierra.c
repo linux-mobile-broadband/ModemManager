@@ -533,13 +533,18 @@ mm_broadband_bearer_sierra_init (MMBroadbandBearerSierra *self)
 static void
 mm_broadband_bearer_sierra_class_init (MMBroadbandBearerSierraClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GObjectClass           *object_class           = G_OBJECT_CLASS (klass);
+    MMBaseBearerClass      *base_bearer_class      = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerSierraPrivate));
 
     object_class->set_property = set_property;
     object_class->get_property = get_property;
+
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
+
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;

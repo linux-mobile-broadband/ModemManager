@@ -1910,6 +1910,99 @@ disconnect (MMBaseBearer *self,
 }
 
 /*****************************************************************************/
+/* Connection status monitoring */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *bearer,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), error);
+    return (value < 0 ? MM_BEARER_CONNECTION_STATUS_UNKNOWN : (MMBearerConnectionStatus) value);
+}
+
+static void
+cgact_periodic_query_ready (MMBaseModem  *modem,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    MMBroadbandBearer        *self;
+    const gchar              *response;
+    GError                   *error = NULL;
+    GList                    *pdp_active_list = NULL;
+    GList                    *l;
+    MMBearerConnectionStatus  status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+
+    self = MM_BROADBAND_BEARER (g_task_get_source_object (task));
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (response)
+        pdp_active_list = mm_3gpp_parse_cgact_read_response (response, &error);
+
+    if (error) {
+        g_assert (!pdp_active_list);
+        g_prefix_error (&error, "Couldn't check current list of active PDP contexts: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    for (l = pdp_active_list; l; l = g_list_next (l)) {
+        MM3gppPdpContextActive *pdp_active;
+
+        /* We look for he just assume the first active PDP context found is the one we're
+         * looking for. */
+        pdp_active = (MM3gppPdpContextActive *)(l->data);
+        if (pdp_active->cid == self->priv->cid) {
+            status = (pdp_active->active ? MM_BEARER_CONNECTION_STATUS_CONNECTED : MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+            break;
+        }
+    }
+    mm_3gpp_pdp_context_active_list_free (pdp_active_list);
+
+    /* PDP context not found? This shouldn't happen, error out */
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "PDP context not found in the known contexts list");
+    else
+        g_task_return_int (task, (gssize) status);
+    g_object_unref (task);
+}
+
+static void
+load_connection_status (MMBaseBearer        *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask       *task;
+    MMBaseModem *modem = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!MM_BROADBAND_BEARER (self)->priv->cid) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't load connection status: cid not defined");
+        g_object_unref (task);
+        return;
+    }
+
+    g_object_get (MM_BASE_BEARER (self),
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (modem),
+                              "+CGACT?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) cgact_periodic_query_ready,
+                              task);
+
+    g_object_unref (modem);
+}
+
+/*****************************************************************************/
 
 static void
 report_connection_status (MMBaseBearer *self,
@@ -2184,6 +2277,8 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     base_bearer_class->disconnect = disconnect;
     base_bearer_class->disconnect_finish = disconnect_finish;
     base_bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->load_connection_status = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;

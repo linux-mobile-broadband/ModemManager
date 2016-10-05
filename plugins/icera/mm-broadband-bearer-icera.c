@@ -1091,7 +1091,11 @@ mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+
     base_bearer_class->report_connection_status = report_connection_status;
+    base_bearer_class->load_connection_status = NULL;
+    base_bearer_class->load_connection_status_finish = NULL;
+
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;
