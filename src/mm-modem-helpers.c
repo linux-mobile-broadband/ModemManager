@@ -1428,13 +1428,19 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
 
     /* Status */
     str = g_match_info_fetch (info, istat);
-    stat = parse_uint (str, 10, 0, 5, &success);
+    stat = parse_uint (str, 10, 0, G_MAXUINT, &success);
     g_free (str);
     if (!success) {
         g_set_error_literal (error,
                              MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse the registration status response");
         return FALSE;
+    }
+
+    /* 'roaming (csfb not preferred)' is the last valid state */
+    if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
+        mm_warn ("Registration State '%lu' is unknown", stat);
+        stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
 
     /* Location Area Code */
@@ -1461,12 +1467,6 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
         g_free (str);
         if (!foo)
             act = -1;
-    }
-
-    /* 'roaming' is the last valid state */
-    if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        mm_warn ("Registration State '%lu' is unknown", stat);
-        stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
 
     *out_reg_state = (MMModem3gppRegistrationState) stat;

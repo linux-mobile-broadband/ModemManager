@@ -1027,6 +1027,28 @@ test_creg2_leading_zeros_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_ublox_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const gchar *reply = "\r\n+CREG: 2,6,\"8B37\",\"0A265185\",7\r\n";
+    /* NOTE: '6' means registered for "SMS only", home network; we just assume UNKNOWN in this case */
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY, 0x8B37, 0x0A265185, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 8, FALSE, FALSE };
+
+    test_creg_match ("Ublox Toby-L2 solicited while on LTE", TRUE, reply, data, &result);
+}
+
+static void
+test_creg2_ublox_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const gchar *reply = "\r\n+CREG: 6,\"8B37\",\"0A265185\",7\r\n";
+    /* NOTE: '6' means registered for "SMS only", home network; we just assume UNKNOWN in this case */
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY, 0x8B37, 0x0A265185, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, FALSE };
+
+    test_creg_match ("Ublox Toby-L2 unsolicited while on LTE", FALSE, reply, data, &result);
+}
+
+static void
 test_cgreg1_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
@@ -3255,6 +3277,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_no_leading_zeros_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_ublox_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_ublox_unsolicited, reg_data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, reg_data));

@@ -978,16 +978,26 @@ typedef enum { /*< underscore_name=mm_modem_cdma_rm_protocol >*/
  * @MM_MODEM_3GPP_REGISTRATION_STATE_DENIED: Registration denied.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN: Unknown registration status.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING: Registered on a roaming network.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY: Registered for "SMS only", home network (applicable only when on LTE).
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY: Registered for "SMS only", roaming network (applicable only when on LTE).
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY: Emergency services only.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", home network (applicable only when on LTE).
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", roaming network (applicable only when on LTE).
  *
- * GSM registration code as defined in 3GPP TS 27.007 section 10.1.19.
+ * GSM registration code as defined in 3GPP TS 27.007.
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_registration_state >*/
-    MM_MODEM_3GPP_REGISTRATION_STATE_IDLE      = 0,
-    MM_MODEM_3GPP_REGISTRATION_STATE_HOME      = 1,
-    MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING = 2,
-    MM_MODEM_3GPP_REGISTRATION_STATE_DENIED    = 3,
-    MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN   = 4,
-    MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING   = 5,
+    MM_MODEM_3GPP_REGISTRATION_STATE_IDLE                       = 0,
+    MM_MODEM_3GPP_REGISTRATION_STATE_HOME                       = 1,
+    MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING                  = 2,
+    MM_MODEM_3GPP_REGISTRATION_STATE_DENIED                     = 3,
+    MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN                    = 4,
+    MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING                    = 5,
+    MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY              = 6,
+    MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY           = 7,
+    MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY             = 8,
+    MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED    = 9,
+    MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED = 10,
 } MMModem3gppRegistrationState;
 
 /**

@@ -246,10 +246,13 @@ status_process_reply (MMSimpleStatus *result,
                  VALIDATE_UNKNOWN (bands_str),
                  VALIDATE_UNKNOWN (access_tech_str));
 
-        if ((mm_simple_status_get_3gpp_registration_state (result) ==
-             MM_MODEM_3GPP_REGISTRATION_STATE_HOME) ||
-            (mm_simple_status_get_3gpp_registration_state (result) ==
-             MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)) {
+        switch (mm_simple_status_get_3gpp_registration_state (result)) {
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED:
             g_print ("  -------------------------\n"
                      "  3GPP   |   registration: '%s'\n"
                      "         |  operator code: '%s'\n"
@@ -261,6 +264,9 @@ status_process_reply (MMSimpleStatus *result,
                      VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_name (result)),
                      mm_modem_3gpp_subscription_state_get_string (
                          mm_simple_status_get_3gpp_subscription_state (result)));
+            break;
+        default:
+            break;
         }
 
         if ((mm_simple_status_get_cdma_cdma1x_registration_state (result) !=

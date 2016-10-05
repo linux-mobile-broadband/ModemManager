@@ -54,6 +54,7 @@ typedef enum {
     CONNECTION_FORBIDDEN_REASON_NONE,
     CONNECTION_FORBIDDEN_REASON_UNREGISTERED,
     CONNECTION_FORBIDDEN_REASON_ROAMING,
+    CONNECTION_FORBIDDEN_REASON_EMERGENCY_ONLY,
     CONNECTION_FORBIDDEN_REASON_LAST
 } ConnectionForbiddenReason;
 
@@ -120,7 +121,8 @@ struct _MMBaseBearerPrivate {
 static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON_LAST] = {
     "none",
     "Not registered in the network",
-    "Registered in roaming network, and roaming not allowed"
+    "Registered in roaming network, and roaming not allowed",
+    "Emergency services only",
 };
 
 /*****************************************************************************/
@@ -401,14 +403,21 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED:
     case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED:
         if (mm_bearer_properties_get_allow_roaming (mm_base_bearer_peek_config (self)))
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         else
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_ROAMING;
+        break;
+    case MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY:
+        self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_EMERGENCY_ONLY;
         break;
     }
 
@@ -424,6 +433,14 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
     /* Modem is roaming and roaming not allowed, report right away */
     if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
         mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
+        reset_deferred_unregistration (self);
+        mm_base_bearer_disconnect_force (self);
+        return;
+    }
+
+    /* Modem is registered under emergency services only? */
+    if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_EMERGENCY_ONLY) {
+        mm_dbg ("Bearer not allowed to connect, emergency services only");
         reset_deferred_unregistration (self);
         mm_base_bearer_disconnect_force (self);
         return;
