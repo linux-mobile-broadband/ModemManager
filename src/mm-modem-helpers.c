@@ -1393,6 +1393,98 @@ mm_3gpp_parse_crsm_response (const gchar *reply,
 }
 
 /*************************************************************************/
+/* +CESQ response parser */
+
+gboolean
+mm_3gpp_parse_cesq_response (const gchar  *response,
+                             guint        *out_rxlev,
+                             guint        *out_ber,
+                             guint        *out_rscp,
+                             guint        *out_ecn0,
+                             guint        *out_rsrq,
+                             guint        *out_rsrp,
+                             GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    guint       rxlev = 0;
+    guint       ber = 0;
+    guint       rscp = 0;
+    guint       ecn0 = 0;
+    guint       rsrq = 0;
+    guint       rsrp = 0;
+    gboolean    success = FALSE;
+
+    g_assert (out_rxlev);
+    g_assert (out_ber);
+    g_assert (out_rscp);
+    g_assert (out_ecn0);
+    g_assert (out_rsrq);
+    g_assert (out_rsrp);
+
+    /* Response may be e.g.:
+     * +CESQ: 99,99,255,255,20,80
+     */
+    r = g_regex_new ("\\+CESQ: (\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        if (!mm_get_uint_from_match_info (match_info, 1, &rxlev)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RXLEV");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 2, &ber)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read BER");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 3, &rscp)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSCP");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 4, &ecn0)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read Ec/N0");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 5, &rsrq)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRQ");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 6, &rsrp)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRP");
+            goto out;
+        }
+        success = TRUE;
+    }
+
+out:
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (!success) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +CESQ response: %s", response);
+        return FALSE;
+    }
+
+    *out_rxlev = rxlev;
+    *out_ber = ber;
+    *out_rscp = rscp;
+    *out_ecn0 = ecn0;
+    *out_rsrq = rsrq;
+    *out_rsrp = rsrp;
+    return TRUE;
+}
+
+/*************************************************************************/
 
 static MMSmsStorage
 storage_from_str (const gchar *str)

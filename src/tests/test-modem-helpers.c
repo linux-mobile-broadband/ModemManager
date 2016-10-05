@@ -2733,6 +2733,81 @@ test_crsm_response (void)
 }
 
 /*****************************************************************************/
+/* Test +CESQ responses */
+
+typedef struct {
+    const gchar *str;
+    guint rxlev;
+    guint ber;
+    guint rscp;
+    guint ecn0;
+    guint rsrq;
+    guint rsrp;
+} CesqResponseTest;
+
+static const CesqResponseTest cesq_response_tests[] = {
+    {
+        .str   = "+CESQ: 99,99,255,255,20,80",
+        .rxlev = 99,
+        .ber   = 99,
+        .rscp  = 255,
+        .ecn0  = 255,
+        .rsrq  = 20,
+        .rsrp  = 80
+    },
+    {
+        .str   = "+CESQ: 99,99,95,40,255,255",
+        .rxlev = 99,
+        .ber   = 99,
+        .rscp  = 95,
+        .ecn0  = 40,
+        .rsrq  = 255,
+        .rsrp  = 255
+    },
+    {
+        .str   = "+CESQ: 10,6,255,255,255,255",
+        .rxlev = 10,
+        .ber   = 6,
+        .rscp  = 255,
+        .ecn0  = 255,
+        .rsrq  = 255,
+        .rsrp  = 255
+    }
+};
+
+static void
+test_cesq_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cesq_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint rxlev = G_MAXUINT;
+        guint ber = G_MAXUINT;
+        guint rscp = G_MAXUINT;
+        guint ecn0 = G_MAXUINT;
+        guint rsrq = G_MAXUINT;
+        guint rsrp = G_MAXUINT;
+
+        success = mm_3gpp_parse_cesq_response (cesq_response_tests[i].str,
+                                               &rxlev, &ber,
+                                               &rscp, &ecn0,
+                                               &rsrq, &rsrp,
+                                               &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        g_assert_cmpuint (cesq_response_tests[i].rxlev, ==, rxlev);
+        g_assert_cmpuint (cesq_response_tests[i].ber,   ==, ber);
+        g_assert_cmpuint (cesq_response_tests[i].rscp,  ==, rscp);
+        g_assert_cmpuint (cesq_response_tests[i].ecn0,  ==, ecn0);
+        g_assert_cmpuint (cesq_response_tests[i].rsrq,  ==, rsrq);
+        g_assert_cmpuint (cesq_response_tests[i].rsrp,  ==, rsrp);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -2909,6 +2984,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cclk_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_crsm_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cesq_response, NULL));
 
     result = g_test_run ();
 
