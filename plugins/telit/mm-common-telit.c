@@ -26,6 +26,8 @@
 #define TAG_TELIT_AUX_PORT         "ID_MM_TELIT_PORT_TYPE_AUX"
 #define TAG_TELIT_NMEA_PORT        "ID_MM_TELIT_PORT_TYPE_NMEA"
 
+#define TELIT_GE910_FAMILY_PID     0x0022
+
 gboolean
 telit_grab_port (MMPlugin *self,
                  MMBaseModem *modem,
@@ -143,6 +145,7 @@ cache_port_mode (MMDevice *device,
 
     /* Reference for port configurations:
      * HE910/UE910/UL865 Families Ports Arrangements User Guide
+     * GE910 Family Ports Arrangements User Guide
      */
     switch (portcfg_current) {
     case 0:
@@ -154,7 +157,11 @@ cache_port_mode (MMDevice *device,
     case 10:
     case 11:
         g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, "00");
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
+
+        if (mm_device_get_product (device) == TELIT_GE910_FAMILY_PID)
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "02");
+        else
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
         break;
     case 2:
     case 3:
@@ -164,8 +171,14 @@ cache_port_mode (MMDevice *device,
     case 8:
     case 12:
         g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, "00");
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, "0a");
+
+        if (mm_device_get_product (device) == TELIT_GE910_FAMILY_PID) {
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "02");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, "04");
+        } else {
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, "0a");
+        }
         break;
     default:
         /* portcfg value not supported */
