@@ -8262,6 +8262,71 @@ modem_time_check_support (MMIfaceModemTime *self,
 }
 
 /*****************************************************************************/
+/* Check support (Signal interface) */
+
+static gboolean
+modem_signal_check_support_finish (MMIfaceModemSignal  *self,
+                                   GAsyncResult        *res,
+                                   GError             **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_signal_check_support (MMIfaceModemSignal  *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CESQ=?",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Load extended signal information (Signal interface) */
+
+static gboolean
+modem_signal_load_values_finish (MMIfaceModemSignal  *self,
+                                 GAsyncResult        *res,
+                                 MMSignal           **cdma,
+                                 MMSignal           **evdo,
+                                 MMSignal           **gsm,
+                                 MMSignal           **umts,
+                                 MMSignal           **lte,
+                                 GError             **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response || !mm_3gpp_cesq_response_to_signal_info (response, gsm, umts, lte, error))
+        return FALSE;
+
+    /* No 3GPP2 support */
+    if (cdma)
+        *cdma = NULL;
+    if (evdo)
+        *evdo = NULL;
+    return TRUE;
+}
+
+static void
+modem_signal_load_values (MMIfaceModemSignal  *self,
+                          GCancellable        *cancellable,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CESQ",
+                              3,
+                              TRUE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 static const gchar *primary_init_sequence[] = {
     /* Ensure echo is off */
@@ -10830,6 +10895,10 @@ iface_modem_time_init (MMIfaceModemTime *iface)
 static void
 iface_modem_signal_init (MMIfaceModemSignal *iface)
 {
+    iface->check_support        = modem_signal_check_support;
+    iface->check_support_finish = modem_signal_check_support_finish;
+    iface->load_values          = modem_signal_load_values;
+    iface->load_values_finish   = modem_signal_load_values_finish;
 }
 
 static void
