@@ -1484,6 +1484,155 @@ out:
     return TRUE;
 }
 
+static gboolean
+rxlev_to_rssi (guint    rxlev,
+               gdouble *out_rssi)
+{
+    if (rxlev <= 63) {
+        *out_rssi = -111.0 + rxlev;
+        return TRUE;
+    }
+
+    if (rxlev != 99)
+        mm_warn ("unexpected rxlev: %u", rxlev);
+    return FALSE;
+}
+
+static gboolean
+rscp_level_to_rscp (guint    rscp_level,
+                    gdouble *out_rscp)
+{
+    if (rscp_level <= 96) {
+        *out_rscp = -121.0 + rscp_level;
+        return TRUE;
+    }
+
+    if (rscp_level != 255)
+        mm_warn ("unexpected rscp level: %u", rscp_level);
+    return FALSE;
+}
+
+static gboolean
+ecn0_level_to_ecio (guint    ecn0_level,
+                    gdouble *out_ecio)
+{
+    if (ecn0_level <= 49) {
+        *out_ecio = -24.5 + (((gdouble) ecn0_level) * 0.5);
+        return TRUE;
+    }
+
+    if (ecn0_level != 255)
+        mm_warn ("unexpected Ec/N0 level: %u", ecn0_level);
+    return FALSE;
+}
+
+static gboolean
+rsrq_level_to_rsrq (guint    rsrq_level,
+                    gdouble *out_rsrq)
+{
+    if (rsrq_level <= 34) {
+        *out_rsrq = -20.0 + (((gdouble) rsrq_level) * 0.5);
+        return TRUE;
+    }
+
+    if (rsrq_level != 255)
+        mm_warn ("unexpected RSRQ level: %u", rsrq_level);
+    return FALSE;
+}
+
+static gboolean
+rsrp_level_to_rsrp (guint    rsrp_level,
+                    gdouble *out_rsrp)
+{
+    if (rsrp_level <= 97) {
+        *out_rsrp = -141.0 + rsrp_level;
+        return TRUE;
+    }
+
+    if (rsrp_level != 255)
+        mm_warn ("unexpected RSRP level: %u", rsrp_level);
+    return FALSE;
+}
+
+gboolean
+mm_3gpp_cesq_response_to_signal_info (const gchar  *response,
+                                      MMSignal    **out_gsm,
+                                      MMSignal    **out_umts,
+                                      MMSignal    **out_lte,
+                                      GError      **error)
+{
+    guint     rxlev = 0;
+    guint     ber = 0;
+    guint     rscp_level = 0;
+    guint     ecn0_level = 0;
+    guint     rsrq_level = 0;
+    guint     rsrp_level = 0;
+    gdouble   rssi = -G_MAXDOUBLE;
+    gdouble   rscp = -G_MAXDOUBLE;
+    gdouble   ecio = -G_MAXDOUBLE;
+    gdouble   rsrq = -G_MAXDOUBLE;
+    gdouble   rsrp = -G_MAXDOUBLE;
+    MMSignal *gsm = NULL;
+    MMSignal *umts = NULL;
+    MMSignal *lte = NULL;
+
+    if (!mm_3gpp_parse_cesq_response (response,
+                                      &rxlev, &ber,
+                                      &rscp_level, &ecn0_level,
+                                      &rsrq_level, &rsrp_level,
+                                      error))
+        return FALSE;
+
+    /* GERAN RSSI */
+    if (rxlev_to_rssi (rxlev, &rssi)) {
+        gsm = mm_signal_new ();
+        mm_signal_set_rssi (gsm, rssi);
+    }
+
+    /* ignore BER */
+
+    /* UMTS RSCP */
+    if (rscp_level_to_rscp (rscp_level, &rscp)) {
+        umts = mm_signal_new ();
+        mm_signal_set_rscp (umts, rscp);
+    }
+
+    /* UMTS EcIo (assumed EcN0) */
+    if (ecn0_level_to_ecio (ecn0_level, &ecio)) {
+        if (!umts)
+            umts = mm_signal_new ();
+        mm_signal_set_ecio (umts, ecio);
+    }
+
+    /* LTE RSRQ */
+    if (rsrq_level_to_rsrq (rsrq_level, &rsrq)) {
+        lte = mm_signal_new ();
+        mm_signal_set_rsrq (lte, rsrq);
+    }
+
+    /* LTE RSRP */
+    if (rsrp_level_to_rsrp (rsrp_level, &rsrp)) {
+        if (!lte)
+            lte = mm_signal_new ();
+        mm_signal_set_rsrp (lte, rsrp);
+    }
+
+    if (!gsm && !umts && !lte) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't build detailed signal info");
+        return FALSE;
+    }
+
+    if (gsm)
+        *out_gsm = gsm;
+    if (umts)
+        *out_umts = umts;
+    if (lte)
+        *out_lte = lte;
+
+    return TRUE;
+}
+
 /*************************************************************************/
 
 static MMSmsStorage
