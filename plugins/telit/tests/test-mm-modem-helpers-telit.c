@@ -160,6 +160,10 @@ typedef struct {
 } BNDResponseTest;
 
 static BNDResponseTest supported_band_mapping_tests [] = {
+    { "#BND: (0-3)", TRUE, FALSE, FALSE, 4, { MM_MODEM_BAND_EGSM,
+                                              MM_MODEM_BAND_DCS,
+                                              MM_MODEM_BAND_PCS,
+                                              MM_MODEM_BAND_G850} },
     { "#BND: (0-3),(0,2,5,6)", TRUE, TRUE, FALSE, 7, { MM_MODEM_BAND_EGSM,
                                                       MM_MODEM_BAND_DCS,
                                                       MM_MODEM_BAND_PCS,
@@ -242,6 +246,10 @@ test_parse_supported_bands_response (void) {
 
 
 static BNDResponseTest current_band_mapping_tests [] = {
+    { "#BND: 0", TRUE, FALSE, FALSE, 2, { MM_MODEM_BAND_EGSM,
+                                          MM_MODEM_BAND_DCS
+                                        }
+    },
     { "#BND: 0,5", TRUE, TRUE, FALSE, 3, { MM_MODEM_BAND_EGSM,
                                            MM_MODEM_BAND_DCS,
                                            MM_MODEM_BAND_U900
