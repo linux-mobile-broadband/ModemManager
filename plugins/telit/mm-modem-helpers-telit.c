@@ -162,9 +162,9 @@ mm_telit_parse_csim_response (const guint step,
     return retries;
 }
 
-#define SUPP_BAND_RESPONSE_REGEX          "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\)"
+#define SUPP_BAND_RESPONSE_REGEX          "#BND:\\s*\\((?P<Bands2G>[0-9\\-,]*)\\)(,\\s*\\((?P<Bands3G>.*)\\))?"
 #define SUPP_BAND_4G_MODEM_RESPONSE_REGEX "#BND:\\s*\\((?P<Bands2G>.*)\\),\\s*\\((?P<Bands3G>.*)\\),\\s*\\((?P<Bands4G>\\d+-\\d+)\\)"
-#define CURR_BAND_RESPONSE_REGEX          "#BND:\\s*(?P<Bands2G>\\d+),\\s*(?P<Bands3G>\\d+)"
+#define CURR_BAND_RESPONSE_REGEX          "#BND:\\s*(?P<Bands2G>\\d+)(,\\s*(?P<Bands3G>\\d+))?"
 #define CURR_BAND_4G_MODEM_RESPONSE_REGEX "#BND:\\s*(?P<Bands2G>\\d+),\\s*(?P<Bands3G>\\d+),\\s*(?P<Bands4G>\\d+)"
 
 /*****************************************************************************/
