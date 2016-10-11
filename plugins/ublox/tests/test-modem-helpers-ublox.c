@@ -182,6 +182,42 @@ test_uipaddr_response (void)
 }
 
 /*****************************************************************************/
+/* Test CFUN? response */
+
+typedef struct {
+    const gchar       *str;
+    MMModemPowerState  state;
+} CfunQueryTest;
+
+static const CfunQueryTest cfun_query_tests[] = {
+    { "+CFUN: 1",    MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 1,0",  MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 0",    MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 0,0",  MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 4",    MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 4,0",  MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 19",   MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 19,0", MM_MODEM_POWER_STATE_LOW },
+};
+
+static void
+test_cfun_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_query_tests); i++) {
+        GError            *error = NULL;
+        gboolean           success;
+        MMModemPowerState  state = MM_MODEM_POWER_STATE_UNKNOWN;
+
+        success = mm_ublox_parse_cfun_response (cfun_query_tests[i].str, &state, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cfun_query_tests[i].state, ==, state);
+    }
+}
+
+/*****************************************************************************/
 /* Test URAT=? responses and model based filtering */
 
 static void
@@ -398,9 +434,11 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
+
     g_test_add_func ("/MM/ublox/uusbconf/response", test_uusbconf_response);
     g_test_add_func ("/MM/ublox/ubmconf/response",  test_ubmconf_response);
     g_test_add_func ("/MM/ublox/uipaddr/response",  test_uipaddr_response);
+    g_test_add_func ("/MM/ublox/cfun/response",     test_cfun_response);
     g_test_add_func ("/MM/ublox/urat/test/response/2g",        test_urat_test_response_2g);
     g_test_add_func ("/MM/ublox/urat/test/response/2g3g",      test_urat_test_response_2g3g);
     g_test_add_func ("/MM/ublox/urat/test/response/2g3g4g",    test_urat_test_response_2g3g4g);

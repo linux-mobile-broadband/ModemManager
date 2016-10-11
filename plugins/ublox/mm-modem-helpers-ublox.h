@@ -59,6 +59,13 @@ gboolean mm_ublox_parse_uipaddr_response (const gchar  *response,
                                           GError      **error);
 
 /*****************************************************************************/
+/* CFUN? response parser */
+
+gboolean mm_ublox_parse_cfun_response (const gchar        *response,
+                                       MMModemPowerState  *out_state,
+                                       GError            **error);
+
+/*****************************************************************************/
 /* URAT=? response parser */
 
 GArray *mm_ublox_parse_urat_test_response (const gchar  *response,

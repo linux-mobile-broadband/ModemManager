@@ -242,6 +242,38 @@ out:
 }
 
 /*****************************************************************************/
+/* CFUN? response parser */
+
+gboolean
+mm_ublox_parse_cfun_response (const gchar        *response,
+                              MMModemPowerState  *out_state,
+                              GError            **error)
+{
+    guint state;
+
+    if (!mm_3gpp_parse_cfun_query_response (response, &state, error))
+        return FALSE;
+
+    switch (state) {
+    case 1:
+        *out_state = MM_MODEM_POWER_STATE_ON;
+        return TRUE;
+    case 0:
+        /* minimum functionality */
+    case 4:
+        /* airplane mode */
+    case 19:
+        /* minimum functionality with SIM deactivated */
+        *out_state = MM_MODEM_POWER_STATE_LOW;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown +CFUN state: %u", state);
+        return FALSE;
+    }
+}
+
+/*****************************************************************************/
 /* URAT=? response parser */
 
 /* Index of the array is the ublox-specific value */
