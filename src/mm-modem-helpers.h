@@ -253,6 +253,17 @@ gboolean mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
                                            gchar       **out_dns_secondary_address,
                                            GError      **error);
 
+/* CFUN? response parser
+ * Note: a custom method with values not translated into MMModemPowerState is
+ * provided, because they may be vendor specific.
+ */
+gboolean mm_3gpp_parse_cfun_query_response         (const gchar        *response,
+                                                    guint              *out_state,
+                                                    GError            **error);
+gboolean mm_3gpp_parse_cfun_query_generic_response (const gchar        *response,
+                                                    MMModemPowerState  *out_state,
+                                                    GError            **error);
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);

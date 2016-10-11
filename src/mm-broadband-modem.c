@@ -3150,46 +3150,14 @@ cfun_query_ready (MMBaseModem *self,
                   GSimpleAsyncResult *simple)
 {
     const gchar *result;
-    guint state;
+    MMModemPowerState state;
     GError *error = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!result) {
+    if (!result || !mm_3gpp_parse_cfun_query_generic_response (result, &state, &error))
         g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-        return;
-    }
-
-    /* Parse power state reply */
-    result = mm_strip_tag (result, "+CFUN:");
-    if (!mm_get_uint_from_str (result, &state)) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse +CFUN? response '%s'",
-                                         result);
-    } else {
-        switch (state) {
-        case 0:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
-            break;
-        case 1:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
-            break;
-        case 4:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
-            break;
-        default:
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled power state: '%u'",
-                                             state);
-            break;
-        }
-    }
-
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (state), NULL);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }

@@ -3059,6 +3059,71 @@ test_cgcontrdp_response (void)
 }
 
 /*****************************************************************************/
+/* Test CFUN? response */
+
+typedef struct {
+    const gchar *str;
+    guint        state;
+} CfunQueryTest;
+
+static const CfunQueryTest cfun_query_tests[] = {
+    { "+CFUN: 1",     1 },
+    { "+CFUN: 1,0",   1 },
+    { "+CFUN: 0",     0 },
+    { "+CFUN: 0,0",   0 },
+    { "+CFUN: 19",   19 },
+    { "+CFUN: 19,0", 19 },
+};
+
+static void
+test_cfun_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_query_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint     state = G_MAXUINT;
+
+        success = mm_3gpp_parse_cfun_query_response (cfun_query_tests[i].str, &state, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cfun_query_tests[i].state, ==, state);
+    }
+}
+
+typedef struct {
+    const gchar       *str;
+    MMModemPowerState  state;
+} CfunQueryGenericTest;
+
+static const CfunQueryGenericTest cfun_query_generic_tests[] = {
+    { "+CFUN: 1",     MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 1,0",   MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 0",     MM_MODEM_POWER_STATE_OFF },
+    { "+CFUN: 0,0",   MM_MODEM_POWER_STATE_OFF },
+    { "+CFUN: 4",     MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 4,0",   MM_MODEM_POWER_STATE_LOW },
+};
+
+static void
+test_cfun_generic_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_query_generic_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        MMModemPowerState state = MM_MODEM_POWER_STATE_UNKNOWN;
+
+        success = mm_3gpp_parse_cfun_query_generic_response (cfun_query_generic_tests[i].str, &state, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cfun_query_generic_tests[i].state, ==, state);
+    }
+}
+
+/*****************************************************************************/
 
 typedef struct {
     gchar *str;
@@ -3287,6 +3352,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_crsm_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgcontrdp_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cfun_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cfun_generic_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 
