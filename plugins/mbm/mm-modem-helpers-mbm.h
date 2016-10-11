@@ -38,4 +38,13 @@ gboolean mm_mbm_parse_cfun_test (const gchar *response,
                                  guint32 *supported_mask,
                                  GError **error);
 
+/* AT+CFUN? response parsers */
+gboolean mm_mbm_parse_cfun_query_power_state   (const gchar        *response,
+                                                MMModemPowerState  *out_state,
+                                                GError            **error);
+gboolean mm_mbm_parse_cfun_query_current_modes (const gchar        *response,
+                                                MMModemMode        *allowed,
+                                                gint               *mbm_mode,
+                                                GError            **error);
+
 #endif  /* MM_MODEM_HELPERS_MBM_H */

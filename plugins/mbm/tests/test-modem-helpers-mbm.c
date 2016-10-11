@@ -172,7 +172,7 @@ static const CfunTest cfun_tests[] = {
 };
 
 static void
-test_cfun (void)
+test_cfun_test (void)
 {
     guint i;
 
@@ -185,6 +185,71 @@ test_cfun (void)
         g_assert_no_error (error);
         g_assert (success);
         g_assert_cmpuint (mask, ==, cfun_tests[i].expected_mask);
+    }
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    const gchar       *str;
+    MMModemPowerState  state;
+} CfunQueryPowerStateTest;
+
+static const CfunQueryPowerStateTest cfun_query_power_state_tests[] = {
+    { "+CFUN: 0",   MM_MODEM_POWER_STATE_OFF },
+    { "+CFUN: 1",   MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 4",   MM_MODEM_POWER_STATE_LOW },
+    { "+CFUN: 5",   MM_MODEM_POWER_STATE_ON  },
+    { "+CFUN: 6",   MM_MODEM_POWER_STATE_ON  },
+};
+
+static void
+test_cfun_query_power_state (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_query_power_state_tests); i++) {
+        GError            *error = NULL;
+        gboolean           success;
+        MMModemPowerState  state;
+
+        success = mm_mbm_parse_cfun_query_power_state (cfun_query_power_state_tests[i].str, &state, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cfun_query_power_state_tests[i].state, ==, state);
+    }
+}
+
+typedef struct {
+    const gchar *str;
+    MMModemMode  allowed;
+    gint         mbm_mode;
+} CfunQueryCurrentModeTest;
+
+static const CfunQueryCurrentModeTest cfun_query_current_mode_tests[] = {
+    { "+CFUN: 0",   MM_MODEM_MODE_NONE,                  -1                  },
+    { "+CFUN: 1",   MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, -1                  },
+    { "+CFUN: 4",   MM_MODEM_MODE_NONE,                  -1                  },
+    { "+CFUN: 5",   MM_MODEM_MODE_2G,                    MBM_NETWORK_MODE_2G },
+    { "+CFUN: 6",   MM_MODEM_MODE_3G,                    MBM_NETWORK_MODE_3G },
+};
+
+static void
+test_cfun_query_current_modes (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cfun_query_current_mode_tests); i++) {
+        GError      *error = NULL;
+        gboolean     success;
+        MMModemMode  allowed = MM_MODEM_MODE_NONE;
+        gint         mbm_mode = -1;
+
+        success = mm_mbm_parse_cfun_query_current_modes (cfun_query_current_mode_tests[i].str, &allowed, &mbm_mode, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+        g_assert_cmpuint (cfun_query_current_mode_tests[i].allowed,  ==, allowed);
+        g_assert_cmpint  (cfun_query_current_mode_tests[i].mbm_mode, ==, mbm_mode);
     }
 }
 
@@ -217,8 +282,10 @@ int main (int argc, char **argv)
     g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/mbm/e2ipcfg", test_e2ipcfg);
-    g_test_add_func ("/MM/mbm/cfun", test_cfun);
+    g_test_add_func ("/MM/mbm/e2ipcfg",                  test_e2ipcfg);
+    g_test_add_func ("/MM/mbm/cfun/test",                test_cfun_test);
+    g_test_add_func ("/MM/mbm/cfun/query/power-state",   test_cfun_query_power_state);
+    g_test_add_func ("/MM/mbm/cfun/query/current-modes", test_cfun_query_current_modes);
 
     return g_test_run ();
 }

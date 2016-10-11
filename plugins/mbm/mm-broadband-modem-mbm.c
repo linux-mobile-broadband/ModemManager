@@ -275,45 +275,22 @@ load_current_modes_finish (MMIfaceModem *_self,
 {
     MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
     const gchar *response;
-    guint a;
+    gint mbm_mode = -1;
+
+    g_assert (allowed);
+    g_assert (preferred);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
+    if (!response || !mm_mbm_parse_cfun_query_current_modes (response, allowed, &mbm_mode, error))
         return FALSE;
 
-    if (mm_get_uint_from_str (mm_strip_tag (response, "+CFUN:"), &a)) {
-        /* No settings to set preferred */
-        *preferred = MM_MODEM_MODE_NONE;
+    /* No settings to set preferred */
+    *preferred = MM_MODEM_MODE_NONE;
 
-        switch (a) {
-        case MBM_NETWORK_MODE_OFFLINE:
-        case MBM_NETWORK_MODE_LOW_POWER:
-            /* Do not update internal mbm_mode */
-            *allowed = MM_MODEM_MODE_NONE;
-            break;
-        case MBM_NETWORK_MODE_2G:
-            self->priv->mbm_mode = MBM_NETWORK_MODE_2G;
-            *allowed = MM_MODEM_MODE_2G;
-            break;
-        case MBM_NETWORK_MODE_3G:
-            self->priv->mbm_mode = MBM_NETWORK_MODE_3G;
-            *allowed = MM_MODEM_MODE_3G;
-            break;
-        default:
-            /* Do not update internal mbm_mode */
-            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-            break;
-        }
+    if (mbm_mode != -1)
+        self->priv->mbm_mode = mbm_mode;
 
-        return TRUE;
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Couldn't parse +CFUN response: '%s'",
-                 response);
-    return FALSE;
+    return TRUE;
 }
 
 static void
@@ -615,36 +592,14 @@ load_power_state_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    const gchar *response;
-    guint a;
+    const gchar       *response;
+    MMModemPowerState  state;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
-        return FALSE;
+    if (!response || !mm_mbm_parse_cfun_query_power_state (response, &state, error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
 
-    if (mm_get_uint_from_str (mm_strip_tag (response, "+CFUN:"), &a)) {
-        switch (a) {
-        case MBM_NETWORK_MODE_OFFLINE:
-            return MM_MODEM_POWER_STATE_OFF;
-
-        case MBM_NETWORK_MODE_LOW_POWER:
-            return MM_MODEM_POWER_STATE_LOW;
-
-        case MBM_NETWORK_MODE_ANY:
-        case MBM_NETWORK_MODE_2G:
-        case MBM_NETWORK_MODE_3G:
-            return MM_MODEM_POWER_STATE_ON;
-        default:
-            break;
-        }
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Couldn't parse +CFUN response: '%s'",
-                 response);
-    return MM_MODEM_POWER_STATE_UNKNOWN;
+    return state;
 }
 
 static void

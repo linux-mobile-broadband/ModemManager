@@ -263,3 +263,74 @@ mm_mbm_parse_cfun_test (const gchar *response,
         *supported_mask = mask;
     return !!mask;
 }
+
+/*****************************************************************************/
+/* AT+CFUN? response parsers */
+
+gboolean
+mm_mbm_parse_cfun_query_power_state (const gchar        *response,
+                                     MMModemPowerState  *out_state,
+                                     GError            **error)
+{
+    guint state;
+
+    if (!mm_3gpp_parse_cfun_query_response (response, &state, error))
+        return FALSE;
+
+    switch (state) {
+    case MBM_NETWORK_MODE_OFFLINE:
+        *out_state = MM_MODEM_POWER_STATE_OFF;
+        return TRUE;
+    case MBM_NETWORK_MODE_LOW_POWER:
+        *out_state = MM_MODEM_POWER_STATE_LOW;
+        return TRUE;
+    case MBM_NETWORK_MODE_ANY:
+    case MBM_NETWORK_MODE_2G:
+    case MBM_NETWORK_MODE_3G:
+        *out_state = MM_MODEM_POWER_STATE_ON;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown +CFUN pòwer state: '%u'", state);
+        return FALSE;
+    }
+}
+
+gboolean
+mm_mbm_parse_cfun_query_current_modes (const gchar  *response,
+                                       MMModemMode  *allowed,
+                                       gint         *mbm_mode,
+                                       GError      **error)
+{
+    guint state;
+
+    g_assert (mbm_mode);
+    g_assert (allowed);
+
+    if (!mm_3gpp_parse_cfun_query_response (response, &state, error))
+        return FALSE;
+
+    switch (state) {
+    case MBM_NETWORK_MODE_OFFLINE:
+    case MBM_NETWORK_MODE_LOW_POWER:
+        /* Do not update mbm_mode */
+        *allowed = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case MBM_NETWORK_MODE_2G:
+        *mbm_mode = MBM_NETWORK_MODE_2G;
+        *allowed = MM_MODEM_MODE_2G;
+        return TRUE;
+    case MBM_NETWORK_MODE_3G:
+        *mbm_mode = MBM_NETWORK_MODE_3G;
+        *allowed = MM_MODEM_MODE_3G;
+        return TRUE;
+    case MBM_NETWORK_MODE_ANY:
+        /* Do not update mbm_mode */
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown +CFUN current mode: '%u'", state);
+        return FALSE;
+    }
+}
