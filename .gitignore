@@ -168,6 +168,7 @@ Makefile.in
 /plugins/test-modem-helpers-telit*
 /plugins/test-modem-helpers-thuraya*
 /plugins/test-modem-helpers-ublox*
+/plugins/test-modem-helpers-linktop*
 /plugins/test-service-*
 
 /plugins/ublox/mm-ublox-enums-types.[ch]

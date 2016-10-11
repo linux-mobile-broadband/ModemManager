@@ -518,6 +518,25 @@ libmm_plugin_anydata_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: linktop cdma
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-linktop.la
+libhelpers_linktop_la_SOURCES = \
+	linktop/mm-modem-helpers-linktop.c \
+	linktop/mm-modem-helpers-linktop.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-linktop
+test_modem_helpers_linktop_SOURCES = \
+	linktop/tests/test-modem-helpers-linktop.c \
+	$(NULL)
+test_modem_helpers_linktop_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/linktop \
+	$(NULL)
+test_modem_helpers_linktop_LDADD = \
+	$(builddir)/libhelpers-linktop.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 pkglib_LTLIBRARIES += libmm-plugin-linktop.la
 libmm_plugin_linktop_la_SOURCES = \
 	linktop/mm-plugin-linktop.c \
@@ -527,6 +546,7 @@ libmm_plugin_linktop_la_SOURCES = \
 	$(NULL)
 libmm_plugin_linktop_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_linktop_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_linktop_la_LIBADD   = $(builddir)/libhelpers-linktop.la
 
 ################################################################################
 # plugin: simtech

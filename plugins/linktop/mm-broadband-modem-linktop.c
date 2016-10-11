@@ -33,10 +33,7 @@
 #include "mm-iface-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-linktop.h"
-
-#define LINKTOP_MODE_ANY  1
-#define LINKTOP_MODE_2G   5
-#define LINKTOP_MODE_3G   6
+#include "mm-modem-helpers-linktop.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -130,44 +127,13 @@ load_current_modes_finish (MMIfaceModem *self,
                            GError **error)
 {
     const gchar *response;
-    const gchar *str;
-    guint aux;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
+    if (!response || !mm_linktop_parse_cfun_query_current_modes (response, allowed, error))
         return FALSE;
 
-    str = mm_strip_tag (response, "CFUN:");
-    if (!mm_get_uint_from_str (str, &aux)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't parse CFUN? response: '%s'",
-                     response);
-        return FALSE;
-    }
-
-    switch (aux) {
-    case LINKTOP_MODE_2G:
-        *allowed = MM_MODEM_MODE_2G;
-        *preferred = MM_MODEM_MODE_NONE;
-        break;
-
-    case LINKTOP_MODE_3G:
-        *allowed = MM_MODEM_MODE_3G;
-        *preferred = MM_MODEM_MODE_NONE;
-        break;
-
-    case LINKTOP_MODE_ANY:
-        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        *preferred = MM_MODEM_MODE_NONE;
-        break;
-
-    default:
-        *allowed = MM_MODEM_MODE_ANY;
-        *preferred = MM_MODEM_MODE_NONE;
-        break;
-    }
+    /* None preferred always */
+    *preferred = MM_MODEM_MODE_NONE;
 
     return TRUE;
 }
