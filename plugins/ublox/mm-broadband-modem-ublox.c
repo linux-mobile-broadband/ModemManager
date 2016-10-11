@@ -509,6 +509,50 @@ modem_power_up (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    const gchar     *response;
+    MMUnlockRetries *retries;
+    guint            pin_attempts = 0;
+    guint            pin2_attempts = 0;
+    guint            puk_attempts = 0;
+    guint            puk2_attempts = 0;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response || !mm_ublox_parse_upincnt_response (response,
+                                                       &pin_attempts, &pin2_attempts,
+                                                       &puk_attempts, &puk2_attempts,
+                                                       error))
+        return NULL;
+
+    retries = mm_unlock_retries_new ();
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN,  pin_attempts);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK,  puk_attempts);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, pin2_attempts);
+    mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2_attempts);
+
+    return retries;
+}
+
+static void
+load_unlock_retries (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+UPINCNT",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 typedef enum {
@@ -788,6 +832,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer        = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->load_unlock_retries        = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
     iface->load_power_state        = load_power_state;
     iface->load_power_state_finish = load_power_state_finish;
     iface->modem_power_up        = modem_power_up;
