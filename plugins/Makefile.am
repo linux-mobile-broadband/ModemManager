@@ -42,6 +42,7 @@ PLUGIN_COMMON_COMPILER_FLAGS = \
 PLUGIN_COMMON_LINKER_FLAGS = \
 	-module        \
 	-avoid-version \
+	-export-symbols-regex '^mm_plugin_major_version$$|^mm_plugin_minor_version$$|^mm_plugin_create$$' \
 	$(NULL)
 
 # UDev rules
