@@ -222,6 +222,26 @@ NOVATEL_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-novatel.la
 # common telit support
 ################################################################################
 
+# Common telit helpers library
+noinst_LTLIBRARIES += libhelpers-telit.la
+libhelpers_telit_la_SOURCES = \
+	telit/mm-modem-helpers-telit.c \
+	telit/mm-modem-helpers-telit.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-telit
+test_modem_helpers_telit_SOURCES = \
+	telit/tests/test-mm-modem-helpers-telit.c \
+	$(NULL)
+test_modem_helpers_telit_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	$(NULL)
+test_modem_helpers_telit_LDADD = \
+	$(builddir)/libhelpers-telit.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 # Common telit modem support library
 noinst_LTLIBRARIES += libmm-utils-telit.la
 libmm_utils_telit_la_SOURCES = \
@@ -232,7 +252,10 @@ libmm_utils_telit_la_SOURCES = \
 	$(NULL)
 
 TELIT_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/telit
-TELIT_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-telit.la
+TELIT_COMMON_LIBADD_FLAGS   = \
+	$(builddir)/libhelpers-telit.la \
+	$(builddir)/libmm-utils-telit.la \
+	$(NULL)
 
 ################################################################################
 # plugin: generic
@@ -767,25 +790,6 @@ libmm_plugin_via_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: telit
 ################################################################################
 
-noinst_LTLIBRARIES += libhelpers-telit.la
-libhelpers_telit_la_SOURCES = \
-	telit/mm-modem-helpers-telit.c \
-	telit/mm-modem-helpers-telit.h \
-	$(NULL)
-
-noinst_PROGRAMS += test-modem-helpers-telit
-test_modem_helpers_telit_SOURCES = \
-	telit/tests/test-mm-modem-helpers-telit.c \
-	$(NULL)
-test_modem_helpers_telit_CPPFLAGS = \
-	-I$(top_srcdir)/plugins/telit \
-	$(NULL)
-test_modem_helpers_telit_LDADD = \
-	$(builddir)/libhelpers-telit.la \
-	$(top_builddir)/src/libhelpers.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la \
-	$(NULL)
-
 pkglib_LTLIBRARIES += libmm-plugin-telit.la
 libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
@@ -793,7 +797,7 @@ libmm_plugin_telit_la_SOURCES = \
 	$(NULL)
 libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_telit_la_LIBADD   = $(builddir)/libhelpers-telit.la $(TELIT_COMMON_LIBADD_FLAGS)
+libmm_plugin_telit_la_LIBADD   = $(TELIT_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
