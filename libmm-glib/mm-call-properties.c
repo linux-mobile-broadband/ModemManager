@@ -180,7 +180,7 @@ mm_call_properties_set_state_reason (MMCallProperties *self,
 MMCallStateReason
 mm_call_properties_get_state_reason (MMCallProperties *self)
 {
-    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), MM_CALL_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), MM_CALL_STATE_REASON_UNKNOWN);
 
     return self->priv->state_reason;
 }
