@@ -881,10 +881,15 @@ test_udev_rules_LDADD = \
 # plugin: u-blox
 ################################################################################
 
+PLUGIN_UBLOX_COMPILER_FLAGS = \
+	-I$(top_srcdir)/plugins/ublox \
+	-I$(top_builddir)/plugins/ublox \
+	$(NULL)
+
 noinst_LTLIBRARIES += libhelpers-ublox.la
 
 UBLOX_ENUMS_INPUTS = \
-	ublox/mm-modem-helpers-ublox.h \
+	$(top_srcdir)/plugins/ublox/mm-modem-helpers-ublox.h \
 	$(NULL)
 
 UBLOX_ENUMS_GENERATED = \
@@ -912,6 +917,8 @@ libhelpers_ublox_la_SOURCES = \
 
 nodist_libhelpers_ublox_la_SOURCES = $(UBLOX_ENUMS_GENERATED)
 
+libhelpers_ublox_la_CPPFLAGS = $(PLUGIN_UBLOX_COMPILER_FLAGS)
+
 BUILT_SOURCES += $(UBLOX_ENUMS_GENERATED)
 CLEANFILES    += $(UBLOX_ENUMS_GENERATED)
 
@@ -919,9 +926,7 @@ noinst_PROGRAMS += test-modem-helpers-ublox
 test_modem_helpers_ublox_SOURCES = \
 	ublox/tests/test-modem-helpers-ublox.c \
 	$(NULL)
-test_modem_helpers_ublox_CPPFLAGS = \
-	-I$(top_srcdir)/plugins/ublox \
-	$(NULL)
+test_modem_helpers_ublox_CPPFLAGS = $(PLUGIN_UBLOX_COMPILER_FLAGS)
 test_modem_helpers_ublox_LDADD = \
 	$(builddir)/libhelpers-ublox.la \
 	$(top_builddir)/src/libhelpers.la \
@@ -937,7 +942,7 @@ libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-broadband-modem-ublox.h \
 	ublox/mm-broadband-modem-ublox.c \
 	$(NULL)
-libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_UBLOX_COMPILER_FLAGS)
 libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_ublox_la_LIBADD   = $(builddir)/libhelpers-ublox.la
 
