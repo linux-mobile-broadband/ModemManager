@@ -8,6 +8,12 @@ BusName=org.freedesktop.ModemManager1
 ExecStart=@sbindir@/ModemManager
 StandardError=null
 Restart=on-abort
+CapabilityBoundingSet=CAP_SYS_ADMIN
+ProtectSystem=true
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_NETLINK AF_UNIX
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
