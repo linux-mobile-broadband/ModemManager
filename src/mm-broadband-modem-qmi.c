@@ -1792,8 +1792,14 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             &current_status,
             NULL, /* verify_retries_left */
             NULL, /* unblock_retries_left */
-            NULL))
-        lock = mm_modem_lock_from_qmi_uim_pin_status (current_status, FALSE);
+            NULL)) {
+        MMModemLock lock2;
+
+        /* We only use the PIN2 status if it isn't unknown */
+        lock2 = mm_modem_lock_from_qmi_uim_pin_status (current_status, FALSE);
+        if (lock2 != MM_MODEM_LOCK_UNKNOWN)
+            lock = lock2;
+    }
 
     /* We're done! */
     g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
