@@ -646,6 +646,8 @@ libmm_plugin_cinterion_la_SOURCES = \
 	cinterion/mm-common-cinterion.h \
 	cinterion/mm-broadband-modem-cinterion.c \
 	cinterion/mm-broadband-modem-cinterion.h \
+	cinterion/mm-broadband-bearer-cinterion.c \
+	cinterion/mm-broadband-bearer-cinterion.h \
 	$(NULL)
 if WITH_QMI
 libmm_plugin_cinterion_la_SOURCES += \

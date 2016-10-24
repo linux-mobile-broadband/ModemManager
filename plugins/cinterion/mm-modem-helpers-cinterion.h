@@ -10,7 +10,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2016 Trimble Navigation Limited
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
+ * Contributor: Matthew Stanger <matthew_stanger@trimble.com>
  */
 
 #ifndef MM_MODEM_HELPERS_CINTERION_H
@@ -63,4 +65,9 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
                                            guint *value,
                                            GError **error);
 
+/*****************************************************************************/
+/* ^SWWAN response parser */
+gboolean mm_cinterion_parse_swwan_response (const gchar *response,
+                                        GList **result,
+                                        GError **error);
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

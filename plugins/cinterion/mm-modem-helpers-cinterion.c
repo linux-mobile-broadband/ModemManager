@@ -10,12 +10,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2016 Trimble Navigation Limited
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
+ * Contributor: Matthew Stanger <matthew_stanger@trimble.com>
  */
 
 #include <config.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "ModemManager.h"
 #define _LIBMM_INSIDE_MM
@@ -24,6 +27,7 @@
 #include "mm-charsets.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers-cinterion.h"
+#include "mm-modem-helpers.h"
 
 /* Setup relationship between the 3G band bitmask in the modem and the bitmask
  * in ModemManager. */
@@ -479,6 +483,83 @@ mm_cinterion_parse_sind_response (const gchar *response,
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Failed parsing ^SIND response");
         return FALSE;
     }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* ^SWWAN read parser
+ * Description: Parses <cid>, <state>[, <WWAN adapter>] or CME ERROR from SWWAN.
+ * Return: False if error occured while trying to parse SWWAN.
+     * Read Command
+     *     AT^SWWAN?
+     *     Response(s)
+     *     [^SWWAN: <cid>, <state>[, <WWAN adapter>]]
+     *     [^SWWAN: ...]
+     *     OK
+     *     ERROR
+     *     +CME ERROR: <err>
+     *
+     * Examples:
+     *     OK              - If no WWAN connection is active, then read command just returns OK
+     *     ^SWWAN: 3,1,1   - 3rd PDP Context, Activated, First WWAN Adaptor
+     *     +CME ERROR: ?   -
+*/
+
+gboolean
+mm_cinterion_parse_swwan_response (const gchar *response,
+                                   GList **result,
+                                   GError **error)
+{
+    if (*error)
+        return FALSE;
+
+    if (!response) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Recieved NULL from SWWAN response.");
+        return FALSE;
+    }
+
+    /* Parse for [^SWWAN: <cid>, <state>[, <WWAN adapter>]] */
+    if (strcasestr (response, "SWWAN")) {
+        gint matched;
+        guint cid, state, wwan_adapter;
+        matched = sscanf (response, "^SWWAN: %d,%d,%d",
+                          &cid,
+                          &state,
+                          &wwan_adapter);
+
+        if (matched != 3 ||
+            cid < 1 || cid > 16 ||
+            state < 0 || state > 1 ||
+            wwan_adapter < 1 || wwan_adapter > 2) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Invalid format for SWWAN response: '%s'",
+                         response);
+            return FALSE;
+        }
+
+        *result = g_list_append (*result, GINT_TO_POINTER(cid));
+        *result = g_list_append (*result, GINT_TO_POINTER(state));
+        *result = g_list_append (*result, GINT_TO_POINTER(wwan_adapter));
+    }
+    /* TODO: It'd be nice to get 'OK' from response so we don't have to assume that
+     * zero length response means 'OK' or am I doing it wrong?... */
+    else if (!g_utf8_strlen (response, 100))
+        *result = g_list_append (*result, GINT_TO_POINTER(0));
+    else {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse SWWAN response: '%s'",
+                     response);
+        return FALSE;
+    }
+
 
     return TRUE;
 }

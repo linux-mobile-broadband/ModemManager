@@ -131,6 +131,7 @@ MMPortMbim       *mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self, MMPo
 #endif
 MMPortSerialAt   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self, MMPortType type);
+MMPort           *mm_base_modem_peek_current_data_port (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
 
 MMPortSerialAt   *mm_base_modem_get_port_primary      (MMBaseModem *self);

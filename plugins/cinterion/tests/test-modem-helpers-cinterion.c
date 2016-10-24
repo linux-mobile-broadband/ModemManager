@@ -329,6 +329,140 @@ test_cnmi_phs8 (void)
     g_array_unref (expected_ds);
     g_array_unref (expected_bfr);}
 
+static void
+test_swwan_parser (const GArray *expected_cid,
+                   const GArray *expected_state,
+                   const GArray *expected_adapter,
+                   const gchar *at_cmd,
+                   const gboolean test_for_errors)
+{
+    GError *error = NULL;
+    gboolean res = TRUE;
+    gchar *response;
+    guint i, j, k;
+
+    g_assert (expected_cid != NULL);
+    g_assert (expected_state != NULL);
+    g_assert (expected_adapter != NULL);
+
+    /* For each expected_cid */
+    for (i = 0; i < expected_cid->len; i++) {
+        /* For each expected_state */
+        for (j = 0; j < expected_state->len; j++) {
+            /* For each expected_adapter */
+            for (k = 0; k < expected_adapter->len; k++) {
+                GList *response_parsed = NULL;
+
+                /* Build a unique at_cmd string */
+                response = g_strdup_printf ("%s: %i,%i,%i\r\n\r\n",
+                                            at_cmd,
+                                            g_array_index (expected_cid, guint, i),
+                                            g_array_index (expected_state, guint, j),
+                                            g_array_index (expected_adapter, guint, k));
+
+                /* and send it to the parser */
+                res = mm_cinterion_parse_swwan_response (response,
+                                                         &response_parsed,
+                                                         &error);
+
+                if (test_for_errors) {
+                    /* There should be errors raised */
+                    g_assert (res == FALSE);
+                    g_assert (error != NULL);
+
+                    /* reset the error's everytime */
+                    res = TRUE;
+                    g_clear_error (&error);
+                }
+                else {
+                    /* The parsed values we get back should match the AT string we sent */
+                    g_assert (g_array_index (expected_cid, guint, i) ==
+                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 0)));
+                    g_assert (g_array_index (expected_state, guint, j) ==
+                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 1)));
+                    g_assert (g_array_index (expected_adapter, guint, k) ==
+                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 2)));
+
+                    /* and there should be no errors raised */
+                    g_assert (res == TRUE);
+                    g_assert_no_error (error);
+                }
+
+                g_list_free(response_parsed);
+            }
+        }
+    }
+}
+
+static void
+test_swwan_pls8 (void)
+{
+    GArray *good_cid;
+    GArray *good_state;
+    GArray *good_adapter;
+    GArray *bad_cid;
+    GArray *bad_state;
+    GArray *bad_adapter;
+    guint i;
+    guint val;
+
+    /* AT^SWWAN=? -> '^SWWAN: (0,1),(1-16),(1,2)' */
+    /* Setup array with good SWWAN values */
+    good_cid = g_array_sized_new (FALSE, FALSE, sizeof (guint), 16);
+    for (i = 1; i < 17; i++)
+        val = i, g_array_append_val (good_cid, val);
+
+    good_state = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 0, g_array_append_val (good_state, val);
+    val = 1, g_array_append_val (good_state, val);
+
+    good_adapter = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 1, g_array_append_val (good_adapter, val);
+    val = 2, g_array_append_val (good_adapter, val);
+
+    /* and test */
+    test_swwan_parser (good_cid,
+                       good_state,
+                       good_adapter,
+                       "^SWWAN",
+                       FALSE);
+
+    /* Setup array with bad SWWAN values */
+    bad_cid = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = -1, g_array_append_val (bad_cid, val);
+    val = 17, g_array_append_val (bad_cid, val);
+
+    bad_state = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = -1, g_array_append_val (bad_state, val);
+    val = 2, g_array_append_val (bad_state, val);
+
+    bad_adapter = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = -1, g_array_append_val (bad_adapter, val);
+    val = 0, g_array_append_val (bad_adapter, val);
+    val = 3, g_array_append_val (bad_adapter, val);
+
+    /* and test */
+    test_swwan_parser (bad_cid,
+                       bad_state,
+                       bad_adapter,
+                       "^SWWAN",
+                       TRUE);
+
+    /* and again with a bad cmd */
+    test_swwan_parser (bad_cid,
+                       bad_state,
+                       bad_adapter,
+                       "^GARBAGE",
+                       TRUE);
+
+
+    g_array_unref (good_cid);
+    g_array_unref (good_state);
+    g_array_unref (good_adapter);
+    g_array_unref (bad_cid);
+    g_array_unref (bad_state);
+    g_array_unref (bad_adapter);
+}
 /*****************************************************************************/
 /* Test ^SIND responses */
 
@@ -399,6 +533,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
     g_test_add_func ("/MM/cinterion/cnmi/phs8",               test_cnmi_phs8);
+    g_test_add_func ("/MM/cinterion/swwan/pls8",              test_swwan_pls8);
     g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
 
     return g_test_run ();

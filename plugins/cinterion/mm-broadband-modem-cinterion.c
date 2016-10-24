@@ -12,7 +12,9 @@
  *
  * Copyright (C) 2011 Ammonit Measurement GmbH
  * Copyright (C) 2011 Google Inc.
+ * Copyright (C) 2016 Trimble Navigation Limited
  * Author: Aleksander Morgado <aleksander@lanedo.com>
+ * Contributor: Matthew Stanger <matthew_stanger@trimble.com>
  */
 
 #include <config.h>
@@ -36,6 +38,7 @@
 #include "mm-broadband-modem-cinterion.h"
 #include "mm-modem-helpers-cinterion.h"
 #include "mm-common-cinterion.h"
+#include "mm-broadband-bearer-cinterion.h"
 
 static void iface_modem_init      (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -49,6 +52,12 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
+
+typedef enum {
+    FeatureSupportUnknown,
+    FeatureNotSupported,
+    FeatureSupported
+} FeatureSupport;
 
 struct _MMBroadbandModemCinterionPrivate {
     /* Flag to know if we should try AT^SIND or not to get psinfo */
@@ -69,6 +78,9 @@ struct _MMBroadbandModemCinterionPrivate {
     GArray *cnmi_supported_bm;
     GArray *cnmi_supported_ds;
     GArray *cnmi_supported_bfr;
+
+    /*Flags for SWWAN support*/
+    FeatureSupport swwan_support;
 };
 
 /*****************************************************************************/
@@ -727,10 +739,16 @@ get_access_technology_from_psinfo (const gchar *psinfo,
         case 9:
         case 10:
             return (MM_MODEM_ACCESS_TECHNOLOGY_HSDPA | MM_MODEM_ACCESS_TECHNOLOGY_HSUPA);
+        case 16:
+        case 17:
+            return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
         default:
+            mm_dbg ("Unable to identify access technology in case:%i", psinfoval);
             break;
         }
     }
+    else
+        mm_err ("FAILED get_access_technology_from_psinfo-int");
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -811,6 +829,7 @@ load_access_technologies (MMIfaceModem *self,
                                         load_access_technologies);
 
     if (broadband->priv->sind_psinfo) {
+        /* TODO: Trigger off psinfo URC instead of this polling. */
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
             "^SIND?",
@@ -1636,6 +1655,99 @@ after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Initializing the modem (during first enabling) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMBroadbandModemCinterion *self;
+} EnablingModemInitContext;
+
+static void
+enabling_modem_init_context_complete_and_free (EnablingModemInitContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_slice_free (EnablingModemInitContext, ctx);
+}
+
+static gboolean
+enabling_modem_init_finish (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+swwan_test_ready (MMBaseModem *self,
+                  GAsyncResult *res,
+                  EnablingModemInitContext *ctx)
+{
+    MMPort *port = NULL;
+    GError *error = NULL;
+
+    /* Fetch the result to the SWWAN test */
+    mm_base_modem_at_command_full_finish (self, res, &error);
+
+    port = mm_base_modem_peek_best_data_port (self, MM_PORT_TYPE_NET);
+
+    /* SWWAN requires a net port & valid test response*/
+    if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET &&
+            !error) {
+        mm_dbg ("SWWAN supported");
+        ctx->self->priv->swwan_support = FeatureSupported;
+    }
+    else {
+        mm_dbg ("SWWAN unsupported");
+        ctx->self->priv->swwan_support = FeatureNotSupported;
+    }
+
+    if (error) /* Error is not valid */
+        g_clear_error (&error);
+
+    enabling_modem_init_context_complete_and_free (ctx);
+}
+
+static void
+check_for_swwan_support (EnablingModemInitContext *ctx)
+{
+    mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+                                   "^SWWAN=?",
+                                   6,
+                                   FALSE,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)swwan_test_ready,
+                                   ctx);
+}
+
+static void
+enabling_modem_init (MMBroadbandModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    EnablingModemInitContext *ctx;
+
+    ctx = g_slice_new0 (EnablingModemInitContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enabling_modem_init);
+    ctx->self = g_object_ref (self);
+
+    /* Newer Cinterion modems may support SWWAN, which is the same as WWAN.
+     * Check to see if current modem supports it.*/
+    check_for_swwan_support (ctx);
+
+    /* TODO: Before upstream merge. This needs check_for_swwan_support to block
+     * until it's finish. Otherwise there is race conidion with swwan_support assert?
+	 * I'm really not sure how else to do this other than move it or use sleep :? */
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -1645,6 +1757,116 @@ setup_ports (MMBroadbandModem *self)
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_cinterion_parent_class)->setup_ports (self);
 
     mm_common_cinterion_setup_gps_port (self);
+}
+
+/*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemCinterion *self;
+    GSimpleAsyncResult *result;
+    MMBearerProperties *properties;
+} CreateBearerContext;
+
+static void
+create_bearer_context_complete_and_free (CreateBearerContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->properties);
+    g_slice_free (CreateBearerContext, ctx);
+}
+
+static MMBaseBearer *
+cinterion_modem_create_bearer_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    MMBaseBearer *bearer;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New cinterion bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
+    return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_cinterion_new_ready (GObject *source,
+                                   GAsyncResult *res,
+                                   CreateBearerContext *ctx)
+{
+    MMBaseBearer *bearer;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_cinterion_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+    create_bearer_context_complete_and_free (ctx);
+}
+
+static void
+broadband_bearer_new_ready (GObject *source,
+                            GAsyncResult *res,
+                            CreateBearerContext *ctx)
+{
+    MMBaseBearer *bearer;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+    create_bearer_context_complete_and_free (ctx);
+}
+
+static void
+create_bearer_for_net_port (CreateBearerContext *ctx)
+{
+    switch (ctx->self->priv->swwan_support) {
+    case FeatureNotSupported:
+        mm_dbg ("^SWWAN not supported, creating default bearer...");
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
+                                 ctx->properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_new_ready,
+                                 ctx);
+        return;
+    case FeatureSupported:
+        mm_dbg ("^SWWAN supported, creating cinterion bearer...");
+        mm_broadband_bearer_cinterion_new (MM_BROADBAND_MODEM_CINTERION (ctx->self),
+                                        ctx->properties,
+                                        NULL, /* cancellable */
+                                        (GAsyncReadyCallback)broadband_bearer_cinterion_new_ready,
+                                        ctx);
+        return;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+cinterion_modem_create_bearer (MMIfaceModem *self,
+                            MMBearerProperties *properties,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    CreateBearerContext *ctx = NULL;
+
+    ctx = g_slice_new0 (CreateBearerContext);
+    ctx->self = g_object_ref (self);
+    ctx->properties = g_object_ref (properties);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             cinterion_modem_create_bearer);
+
+    create_bearer_for_net_port (ctx);
 }
 
 /*****************************************************************************/
@@ -1673,8 +1895,9 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                               MM_TYPE_BROADBAND_MODEM_CINTERION,
                                               MMBroadbandModemCinterionPrivate);
 
-    /* Set defaults */
+    /* Initialize private variables */
     self->priv->sind_psinfo = TRUE; /* Initially, always try to get psinfo */
+    self->priv->swwan_support = FeatureSupportUnknown;
 }
 
 static void
@@ -1704,6 +1927,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->create_bearer = cinterion_modem_create_bearer;
+    iface->create_bearer_finish = cinterion_modem_create_bearer_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->set_current_modes = set_current_modes;
@@ -1770,4 +1995,6 @@ mm_broadband_modem_cinterion_class_init (MMBroadbandModemCinterionClass *klass)
     /* Virtual methods */
     object_class->finalize = finalize;
     broadband_modem_class->setup_ports = setup_ports;
+    broadband_modem_class->enabling_modem_init = enabling_modem_init;
+    broadband_modem_class->enabling_modem_init_finish = enabling_modem_init_finish;
 }
