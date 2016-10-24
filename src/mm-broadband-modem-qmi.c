@@ -3823,7 +3823,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
     mm_dbg ("Scanning networks...");
     qmi_client_nas_network_scan (QMI_CLIENT_NAS (client),
                                  NULL,
-                                 100,
+                                 300,
                                  NULL,
                                  (GAsyncReadyCallback)nas_network_scan_ready,
                                  result);
