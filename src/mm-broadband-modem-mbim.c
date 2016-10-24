@@ -2873,7 +2873,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
     message = mbim_message_visible_providers_query_new (MBIM_VISIBLE_PROVIDERS_ACTION_FULL_SCAN, NULL);
     mbim_device_command (device,
                          message,
-                         120,
+                         300,
                          NULL,
                          (GAsyncReadyCallback)visible_providers_query_ready,
                          result);
