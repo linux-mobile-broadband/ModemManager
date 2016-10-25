@@ -1740,7 +1740,10 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
         /* We get InvalidQmiCommand on newer devices which don't like the legacy way */
         if (g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NOT_SUPPORTED)) {
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
             /* Flag that the command is unsupported, and try with the new way */
