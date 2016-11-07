@@ -1352,6 +1352,15 @@ mm_port_probe_run (MMPortProbe                *self,
     /* The context will be owned by the task */
     g_task_set_task_data (self->priv->task, ctx, (GDestroyNotify) port_probe_run_context_free);
 
+    /* If we're told to completely ignore the port, don't do any probing */
+    if (self->priv->is_ignored) {
+        mm_dbg ("(%s/%s) port probing finished: skipping for blacklisted port",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+        port_probe_task_return_boolean (self, TRUE);
+        return;
+    }
+
     /* Check if we already have the requested probing results.
      * We will fix here the 'ctx->flags' so that we only request probing
      * for the missing things. */
