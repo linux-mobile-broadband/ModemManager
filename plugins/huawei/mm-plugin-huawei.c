@@ -227,9 +227,9 @@ try_next_usbif (MMDevice *device)
 
         /* Only expect ttys for next probing attempt */
         if (g_str_equal (mm_port_probe_get_port_subsys (probe), "tty")) {
-            gint usbif;
+            guint usbif;
 
-            usbif = mm_kernel_device_get_property_as_int (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
+            usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
             if (usbif == fi_ctx->first_usbif) {
                 /* This is the one we just probed, which wasn't yet removed, so just skip it */
             } else if (usbif > fi_ctx->first_usbif &&
@@ -390,8 +390,8 @@ huawei_custom_init (MMPortProbe *probe,
     ctx->getportmode_retries = 3;
 
     /* Custom init only to be run in the first interface */
-    if (mm_kernel_device_get_property_as_int (mm_port_probe_peek_port (probe),
-                                              "ID_USB_INTERFACE_NUM") != fi_ctx->first_usbif) {
+    if (mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe),
+                                                  "ID_USB_INTERFACE_NUM") != fi_ctx->first_usbif) {
 
         if (fi_ctx->custom_init_run)
             /* If custom init was run already, we can consider this as successfully run */
@@ -431,9 +431,9 @@ propagate_port_mode_results (GList *probes)
     /* Now we propagate the tags to the specific port probes */
     for (l = probes; l; l = g_list_next (l)) {
         MMPortSerialAtFlag at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
-        gint usbif;
+        guint usbif;
 
-        usbif = mm_kernel_device_get_property_as_int (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
+        usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
 
         if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
             if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {

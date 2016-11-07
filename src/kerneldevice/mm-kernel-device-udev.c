@@ -579,6 +579,25 @@ kernel_device_get_property_as_int (MMKernelDevice *_self,
     return g_udev_device_get_property_as_int (self->priv->device, property);
 }
 
+static guint
+kernel_device_get_property_as_int_hex (MMKernelDevice *_self,
+                                       const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+    const gchar        *s;
+    guint               out = 0;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    if (!self->priv->device)
+        return -1;
+
+    s = g_udev_device_get_property (self->priv->device, property);
+    return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
+}
+
 /*****************************************************************************/
 
 MMKernelDevice *
@@ -767,6 +786,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_property            = kernel_device_get_property;
     kernel_device_class->get_property_as_boolean = kernel_device_get_property_as_boolean;
     kernel_device_class->get_property_as_int     = kernel_device_get_property_as_int;
+    kernel_device_class->get_property_as_int_hex = kernel_device_get_property_as_int_hex;
 
     properties[PROP_UDEV_DEVICE] =
         g_param_spec_object ("udev-device",

@@ -166,6 +166,17 @@ mm_kernel_device_get_property_as_int (MMKernelDevice *self,
             -1);
 }
 
+guint
+mm_kernel_device_get_property_as_int_hex (MMKernelDevice *self,
+                                          const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), 0);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int_hex ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int_hex (self, property) :
+            0);
+}
+
 /*****************************************************************************/
 
 static void

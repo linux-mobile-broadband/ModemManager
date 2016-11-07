@@ -61,6 +61,7 @@ struct _MMKernelDeviceClass {
     const gchar * (* get_property)            (MMKernelDevice *self, const gchar *property);
     gboolean      (* get_property_as_boolean) (MMKernelDevice *self, const gchar *property);
     gint          (* get_property_as_int)     (MMKernelDevice *self, const gchar *property);
+    guint         (* get_property_as_int_hex) (MMKernelDevice *self, const gchar *property);
 };
 
 GType mm_kernel_device_get_type (void);
@@ -85,5 +86,6 @@ gboolean     mm_kernel_device_has_property            (MMKernelDevice *self, con
 const gchar *mm_kernel_device_get_property            (MMKernelDevice *self, const gchar *property);
 gboolean     mm_kernel_device_get_property_as_boolean (MMKernelDevice *self, const gchar *property);
 gint         mm_kernel_device_get_property_as_int     (MMKernelDevice *self, const gchar *property);
+guint        mm_kernel_device_get_property_as_int_hex (MMKernelDevice *self, const gchar *property);
 
 #endif /* MM_KERNEL_DEVICE_H */
