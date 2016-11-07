@@ -587,12 +587,12 @@ kernel_device_get_property_as_int_hex (MMKernelDevice *_self,
     const gchar        *s;
     guint               out = 0;
 
-    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), G_MAXUINT);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
 
     if (!self->priv->device)
-        return -1;
+        return G_MAXUINT;
 
     s = g_udev_device_get_property (self->priv->device, property);
     return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
