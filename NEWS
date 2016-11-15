@@ -1,4 +1,24 @@
 
+ModemManager 1.4.18
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored new Infineon flashloader devices.
+   ** Ignored Sigma Sport docking stations.
+
+ * Core:
+   ** USSD: don't rely on lock status to allow actions.
+   ** 3GPP: always use 300s by default in the network scan operation.
+
+ * Plugins:
+   ** zte: fix SUBSYSTEMS and ATTRS{idVendor} checks.
+
+ * and some other minor fixes...
+
+
 ModemManager 1.4.16
 -------------------------------------------
 This is a new bugfix release of ModemManager.
