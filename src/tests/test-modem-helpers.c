@@ -2849,6 +2849,13 @@ typedef struct {
 } CclkTest;
 
 static const CclkTest cclk_tests[] = {
+    { "+CCLK: \"14/08/05,04:00:21\"", TRUE, TRUE, FALSE,
+        "2014-08-05T04:00:21+00:00", 0 },
+    { "+CCLK: \"14/08/05,04:00:21\"", TRUE, FALSE, TRUE,
+        "2014-08-05T04:00:21+00:00", 0 },
+    { "+CCLK: \"14/08/05,04:00:21\"", TRUE, TRUE, TRUE,
+        "2014-08-05T04:00:21+00:00", 0 },
+
     { "+CCLK: \"14/08/05,04:00:21+40\"", TRUE, TRUE, FALSE,
         "2014-08-05T04:00:21+10:00", 600 },
     { "+CCLK: \"14/08/05,04:00:21+40\"", TRUE, FALSE, TRUE,

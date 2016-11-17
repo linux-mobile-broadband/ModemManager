@@ -3773,7 +3773,7 @@ mm_parse_cclk_response (const char *response,
     g_assert (iso8601p || tzp); /* at least one */
 
     /* Sample reply: +CCLK: "15/03/05,14:14:26-32" */
-    r = g_regex_new ("[+]CCLK: \"(\\d+)/(\\d+)/(\\d+),(\\d+):(\\d+):(\\d+)([-+]\\d+)\"", 0, 0, NULL);
+    r = g_regex_new ("[+]CCLK: \"(\\d+)/(\\d+)/(\\d+),(\\d+):(\\d+):(\\d+)([-+]\\d+)?\"", 0, 0, NULL);
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
@@ -3781,46 +3781,68 @@ mm_parse_cclk_response (const char *response,
             g_propagate_error (error, match_error);
             g_prefix_error (error, "Could not parse +CCLK results: ");
         } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't match +CCLK reply");
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Couldn't match +CCLK reply: %s", response);
         }
-    } else {
-        /* Remember that g_match_info_get_match_count() includes match #0 */
-        g_assert (g_match_info_get_match_count (match_info) >= 8);
-
-        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
-            mm_get_uint_from_match_info (match_info, 2, &month) &&
-            mm_get_uint_from_match_info (match_info, 3, &day) &&
-            mm_get_uint_from_match_info (match_info, 4, &hour) &&
-            mm_get_uint_from_match_info (match_info, 5, &minute) &&
-            mm_get_uint_from_match_info (match_info, 6, &second) &&
-            mm_get_int_from_match_info  (match_info, 7, &tz)) {
-            /* adjust year */
-            year += 2000;
-            /*
-             * tz = timezone offset in 15 minute intervals
-             */
-            if (iso8601p) {
-                /* Return ISO-8601 format date/time string */
-                *iso8601p = mm_new_iso8601_time (year, month, day, hour,
-                                                 minute, second,
-                                                 TRUE, (tz * 15));
-            }
-            if (tzp) {
-                *tzp = mm_network_timezone_new ();
-                mm_network_timezone_set_offset (*tzp, tz * 15);
-            }
-
-            ret = TRUE;
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to parse +CCLK reply");
-        }
+        goto out;
     }
+
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    g_assert (g_match_info_get_match_count (match_info) >= 7);
+
+    /* Parse mandatory date and time fields */
+    if (!mm_get_uint_from_match_info (match_info, 1, &year)   ||
+        !mm_get_uint_from_match_info (match_info, 2, &month)  ||
+        !mm_get_uint_from_match_info (match_info, 3, &day)    ||
+        !mm_get_uint_from_match_info (match_info, 4, &hour)   ||
+        !mm_get_uint_from_match_info (match_info, 5, &minute) ||
+        !mm_get_uint_from_match_info (match_info, 6, &second)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse +CCLK reply: %s", response);
+        goto out;
+    }
+
+    /* Read optional time zone offset; if not given assume UTC (tz = 0).
+     * Note that timezone offset is given in 15 minute intervals.
+     */
+    if ((g_match_info_get_match_count (match_info) >= 8) &&
+        (!mm_get_int_from_match_info (match_info, 7, &tz))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse timezone in +CCLK reply: %s", response);
+        goto out;
+    }
+
+    /* Adjust year to support YYYY format, as per +CSDF in 3GPP TS 27.007. Also,
+     * don't assume the reported date is actually the current real one, as some
+     * devices report an initial date of e.g. January 1st 1980. */
+    if (year < 100) {
+        if (year >= 70)
+            year += 1900;
+        else
+            year += 2000;
+    }
+
+    if (tzp) {
+        *tzp = mm_network_timezone_new ();
+        mm_network_timezone_set_offset (*tzp, tz * 15);
+    }
+
+    if (iso8601p) {
+        /* Return ISO-8601 format date/time string */
+        *iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                         minute, second,
+                                         TRUE, (tz * 15));
+    }
+
+    ret = TRUE;
+
+ out:
 
     if (match_info)
         g_match_info_free (match_info);
