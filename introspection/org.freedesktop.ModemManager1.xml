@@ -50,7 +50,6 @@
         possible keys are:
 
         <variablelist>
-
           <varlistentry><term><literal>action</literal></term>
             <listitem>
               <para>
@@ -72,7 +71,6 @@
               </variablelist>
             </listitem>
           </varlistentry>
-
           <varlistentry><term><literal>name</literal></term>
             <listitem>
               <para>
@@ -82,7 +80,6 @@
               </para>
             </listitem>
           </varlistentry>
-
           <varlistentry><term><literal>subsystem</literal></term>
             <listitem>
               <para>
@@ -92,7 +89,6 @@
               </para>
             </listitem>
           </varlistentry>
-
           <varlistentry><term><literal>uid</literal></term>
             <listitem>
               <para>
@@ -104,7 +100,6 @@
               </para>
             </listitem>
           </varlistentry>
-
         </variablelist>
     -->
     <method name="ReportKernelEvent">
