@@ -894,7 +894,8 @@ mm_kernel_device_generic_new_with_rules (MMKernelEventProperties  *properties,
                                          GError                  **error)
 {
     g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (properties), NULL);
-    g_return_val_if_fail (rules != NULL, NULL);
+
+    /* Note: we allow NULL rules, e.g. for virtual devices */
 
     return MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_GENERIC,
                                              NULL,

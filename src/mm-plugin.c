@@ -962,7 +962,10 @@ mm_plugin_create_modem (MMPlugin  *self,
             mm_kernel_event_properties_set_subsystem (properties, "virtual");
             mm_kernel_event_properties_set_name (properties, virtual_ports[i]);
 
-            kernel_device = mm_kernel_device_generic_new (properties, &inner_error);
+            /* Give an empty set of rules, because we don't want them to be
+             * loaded from the udev rules path (as there may not be any
+             * installed yet). */
+            kernel_device = mm_kernel_device_generic_new_with_rules (properties, NULL, &inner_error);
             if (!kernel_device) {
                 mm_warn ("Could not grab port (virtual/%s): '%s'",
                          virtual_ports[i],
