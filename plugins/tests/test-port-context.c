@@ -278,7 +278,9 @@ create_socket_service (TestPortContext *self)
     address = (g_unix_socket_address_new_with_type (
                    self->name,
                    -1,
-                   G_UNIX_SOCKET_ADDRESS_ABSTRACT));
+                   (g_str_has_prefix (self->name, "abstract:") ?
+                    G_UNIX_SOCKET_ADDRESS_ABSTRACT :
+                    G_UNIX_SOCKET_ADDRESS_PATH)));
     if (!g_socket_bind (socket, address, TRUE, &error))
         g_error ("Cannot bind socket: %s", error->message);
     g_object_unref (address);
