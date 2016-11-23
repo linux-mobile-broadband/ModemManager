@@ -38,28 +38,28 @@ G_DEFINE_TYPE (MMBroadbandBearerCinterion, mm_broadband_bearer_cinterion, MM_TYP
 #define SECOND_USB_INTERFACE 2
 
 typedef enum {
-    BearerCinterionAuthUnknown   = -1,
-    BearerCinterionAuthNone      =  0,
-    BearerCinterionAuthPap       =  1,
-    BearerCinterionAuthChap      =  2,
-    BearerCinterionAuthMsChapV2  =  3,
+    BEARER_CINTERION_AUTH_UNKNOWN   = -1,
+    BEARER_CINTERION_AUTH_NONE      =  0,
+    BEARER_CINTERION_AUTH_PAP       =  1,
+    BEARER_CINTERION_AUTH_CHAP      =  2,
+    BEARER_CINTERION_AUTH_MSCHAPV2  =  3,
 } BearerCinterionAuthType;
 
 typedef enum {
-    Connect3gppContextStepInit = 0,
-    Connect3gppContextStepAuth,
-    Connect3gppContextStepPdpCtx,
-    Connect3gppContextStepStartSwwan,
-    Connect3gppContextStepValidateConnection,
-    Connect3gppContextStepIpConfig,
-    Connect3gppContextStepFinalizeBearer,
+    CONNECT_3GPP_CONTEXT_STEP_INIT = 0,
+    CONNECT_3GPP_CONTEXT_STEP_AUTH,
+    CONNECT_3GPP_CONTEXT_STEP_PDP_CTX,
+    CONNECT_3GPP_CONTEXT_STEP_START_SWWAN,
+    CONNECT_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION,
+    CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG,
+    CONNECT_3GPP_CONTEXT_STEP_FINALIZE_BEARER,
 } Connect3gppContextStep;
 
 typedef enum {
-    Disconnect3gppContextStepStopSwwan = 0,
-    Disconnect3gppContextStepConnectionStatus,
-    Disconnect3gppContextStepFinish
-} Disconnect3gppContextStep;
+    DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN = 0,
+    DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS,
+    DISCONNECT_3GPP_CONTEXT_STEP_FINISH,
+} Disconnect3gppContextStep;;
 
 typedef struct {
     MMBroadbandBearerCinterion *self;
@@ -162,15 +162,15 @@ cinterion_parse_auth_type (MMBearerAllowedAuth mm_auth)
 {
     switch (mm_auth) {
     case MM_BEARER_ALLOWED_AUTH_NONE:
-        return BearerCinterionAuthNone;
+        return BEARER_CINTERION_AUTH_NONE;
     case MM_BEARER_ALLOWED_AUTH_PAP:
-        return BearerCinterionAuthPap;
+        return BEARER_CINTERION_AUTH_PAP;
     case MM_BEARER_ALLOWED_AUTH_CHAP:
-        return BearerCinterionAuthChap;
+        return BEARER_CINTERION_AUTH_CHAP;
     case MM_BEARER_ALLOWED_AUTH_MSCHAPV2:
-        return BearerCinterionAuthMsChapV2;
+        return BEARER_CINTERION_AUTH_MSCHAPV2;
     default:
-        return BearerCinterionAuthUnknown;
+        return BEARER_CINTERION_AUTH_UNKNOWN;
     }
 }
 
@@ -306,7 +306,7 @@ build_cinterion_auth_string (Connect3gppContext *ctx)
     const gchar         *user = NULL;
     const gchar         *passwd = NULL;
     MMBearerAllowedAuth  auth;
-    gint                 encoded_auth = BearerCinterionAuthUnknown;
+    gint                 encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
     gchar               *command = NULL;
 
     user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
@@ -320,8 +320,8 @@ build_cinterion_auth_string (Connect3gppContext *ctx)
     encoded_auth = cinterion_parse_auth_type (auth);
 
     /* Default to no authentication if not specified */
-    if (encoded_auth == BearerCinterionAuthUnknown) {
-        encoded_auth = BearerCinterionAuthNone;
+    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
+        encoded_auth = BEARER_CINTERION_AUTH_NONE;
         mm_dbg ("Unable to detect authentication type. Defaulting to:%i", encoded_auth);
     }
 
@@ -489,14 +489,14 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
     g_assert (ctx->self->priv->network_disconnect_pending_id == 0);
 
     switch (ctx->connect) {
-    case Connect3gppContextStepInit:
+    case CONNECT_3GPP_CONTEXT_STEP_INIT:
 
         /* Insure no connection is currently
          * active with the bearer we're creating.*/
         send_swwan_disconnect_command_ctx_connect (ctx);
 
         return;
-    case Connect3gppContextStepAuth: {
+    case CONNECT_3GPP_CONTEXT_STEP_AUTH: {
 
         gchar *command = NULL;
 
@@ -517,7 +517,7 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         /* GOTO next step - Fall down below */
         ctx->connect++;
     }
-    case Connect3gppContextStepPdpCtx: {
+    case CONNECT_3GPP_CONTEXT_STEP_PDP_CTX: {
         gchar *command = NULL;
 
         command = build_cinterion_pdp_context_string (ctx);
@@ -528,23 +528,23 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         g_free (command);
         return;
     }
-    case Connect3gppContextStepStartSwwan:
+    case CONNECT_3GPP_CONTEXT_STEP_START_SWWAN:
 
         send_swwan_connect_command_ctx_connect (ctx);
 
         return;
-    case Connect3gppContextStepValidateConnection:
+    case CONNECT_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION:
 
         send_swwan_read_command_ctx_connect (ctx);
 
         return;
-    case Connect3gppContextStepIpConfig:
+    case CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG:
 
         setup_ip_settings (ctx);
 
         /* GOTO next step - Fall down below */
         ctx->connect++;
-    case Connect3gppContextStepFinalizeBearer:
+    case CONNECT_3GPP_CONTEXT_STEP_FINALIZE_BEARER:
         /* Setup bearer */
         create_cinterion_bearer (ctx);
 
@@ -580,7 +580,7 @@ connect_3gpp (MMBroadbandBearer *self,
                                              MM_CORE_ERROR_NOT_FOUND,
                                              "No valid data port found to launch connection");
         return;
-    }    
+    }
 
     /* Setup connection context */
     ctx = g_slice_new0 (Connect3gppContext);
@@ -598,7 +598,7 @@ connect_3gpp (MMBroadbandBearer *self,
     pdp_cid_connect (ctx);
 
     /* Initialize */
-    ctx->connect = Connect3gppContextStepInit;
+    ctx->connect = CONNECT_3GPP_CONTEXT_STEP_INIT;
 
     /* Run! */
     connect_3gpp_context_step (ctx);
@@ -746,20 +746,20 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
     mm_dbg ("Disconnect Step:%i", ctx->disconnect);
 
     switch (ctx->disconnect) {
-    case Disconnect3gppContextStepStopSwwan:
+    case DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN:
 
         /* Has call back to next state */
         send_swwan_disconnect_command_ctx_disconnect (ctx);
 
         return;
-    case Disconnect3gppContextStepConnectionStatus:
+    case DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS:
 
          /* Has call back to next state */
          send_swwan_read_command_ctx_disconnect (ctx);
 
          return;
 
-    case Disconnect3gppContextStepFinish:
+    case DISCONNECT_3GPP_CONTEXT_STEP_FINISH:
 
         ctx->self->priv->pdp_cid = 0;
 
@@ -801,7 +801,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     pdp_cid_disconnect (ctx);
 
     /* Initialize */
-    ctx->disconnect = Disconnect3gppContextStepStopSwwan;
+    ctx->disconnect = DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN;
 
     /* Start */
     disconnect_3gpp_context_step (ctx);

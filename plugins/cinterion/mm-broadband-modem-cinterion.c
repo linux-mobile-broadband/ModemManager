@@ -54,9 +54,9 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
 
 typedef enum {
-    FeatureSupportUnknown,
-    FeatureNotSupported,
-    FeatureSupported
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED,
 } FeatureSupport;
 
 struct _MMBroadbandModemCinterionPrivate {
@@ -1697,11 +1697,11 @@ swwan_test_ready (MMBaseModem *self,
     if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET &&
             !error) {
         mm_dbg ("SWWAN supported");
-        ctx->self->priv->swwan_support = FeatureSupported;
+        ctx->self->priv->swwan_support = FEATURE_SUPPORTED;
     }
     else {
         mm_dbg ("SWWAN unsupported");
-        ctx->self->priv->swwan_support = FeatureNotSupported;
+        ctx->self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
     }
 
     if (error) /* Error is not valid */
@@ -1829,7 +1829,7 @@ static void
 create_bearer_for_net_port (CreateBearerContext *ctx)
 {
     switch (ctx->self->priv->swwan_support) {
-    case FeatureNotSupported:
+    case FEATURE_NOT_SUPPORTED:
         mm_dbg ("^SWWAN not supported, creating default bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
                                  ctx->properties,
@@ -1837,7 +1837,7 @@ create_bearer_for_net_port (CreateBearerContext *ctx)
                                  (GAsyncReadyCallback)broadband_bearer_new_ready,
                                  ctx);
         return;
-    case FeatureSupported:
+    case FEATURE_SUPPORTED:
         mm_dbg ("^SWWAN supported, creating cinterion bearer...");
         mm_broadband_bearer_cinterion_new (MM_BROADBAND_MODEM_CINTERION (ctx->self),
                                         ctx->properties,
@@ -1897,7 +1897,7 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
 
     /* Initialize private variables */
     self->priv->sind_psinfo = TRUE; /* Initially, always try to get psinfo */
-    self->priv->swwan_support = FeatureSupportUnknown;
+    self->priv->swwan_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
