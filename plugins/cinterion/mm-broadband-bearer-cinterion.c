@@ -194,7 +194,7 @@ verify_connection_state_from_swwan_response (GList *result, GError **error)
 /*****************************************************************************/
 /* Connect - Helper Functions*/
 
-static gint
+static BearerCinterionAuthType
 cinterion_parse_auth_type (MMBearerAllowedAuth mm_auth)
 {
     switch (mm_auth) {
@@ -321,11 +321,11 @@ setup_ip_settings (Connect3gppContext *ctx)
 static gchar *
 build_cinterion_auth_string (Connect3gppContext *ctx)
 {
-    const gchar         *user = NULL;
-    const gchar         *passwd = NULL;
-    MMBearerAllowedAuth  auth;
-    gint                 encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
-    gchar               *command = NULL;
+    const gchar             *user = NULL;
+    const gchar             *passwd = NULL;
+    MMBearerAllowedAuth      auth;
+    BearerCinterionAuthType  encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
+    gchar                   *command = NULL;
 
     user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
     passwd = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
@@ -340,7 +340,7 @@ build_cinterion_auth_string (Connect3gppContext *ctx)
     /* Default to no authentication if not specified */
     if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
         encoded_auth = BEARER_CINTERION_AUTH_NONE;
-        mm_dbg ("Unable to detect authentication type. Defaulting to:%i", encoded_auth);
+        mm_dbg ("Unable to detect authentication type. Defaulting to 'none'");
     }
 
     /* TODO: Haven't tested this as I can't get a hold of a SIM w/ this feature atm.
@@ -351,7 +351,7 @@ build_cinterion_auth_string (Connect3gppContext *ctx)
      * ERROR
      * +CME ERROR: <err>
      */
-    command = g_strdup_printf ("^SGAUTH=%u,%i,%s,%s",
+    command = g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
                                usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
                                encoded_auth,
                                passwd,
