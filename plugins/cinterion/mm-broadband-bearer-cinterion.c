@@ -107,12 +107,6 @@ typedef enum {
     CONNECT_3GPP_CONTEXT_STEP_FINALIZE_BEARER,
 } Connect3gppContextStep;
 
-typedef enum {
-    DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN = 0,
-    DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS,
-    DISCONNECT_3GPP_CONTEXT_STEP_FINISH,
-} Disconnect3gppContextStep;;
-
 typedef struct {
     MMBroadbandBearerCinterion *self;
     MMBaseModem *modem;
@@ -125,16 +119,6 @@ typedef struct {
     GSimpleAsyncResult *result;
 } Connect3gppContext;
 
-typedef struct {
-    MMBroadbandBearerCinterion *self;
-    MMBaseModem *modem;
-    MMPortSerialAt *primary;
-    MMPort *data;
-    gint usb_interface_config_index;
-    Disconnect3gppContextStep disconnect;
-    GSimpleAsyncResult *result;
-} Disconnect3gppContext;
-
 struct _MMBroadbandBearerCinterionPrivate {
     /* Flag for network-initiated disconnect */
     guint network_disconnect_pending_id;
@@ -143,9 +127,7 @@ struct _MMBroadbandBearerCinterionPrivate {
 /*****************************************************************************/
 /* Common 3GPP Function Declarations */
 static void connect_3gpp_context_step (Connect3gppContext *ctx);
-static void disconnect_3gpp_context_step (Disconnect3gppContext *ctx);
 static void connect_3gpp_context_complete_and_free (Connect3gppContext *ctx);
-static void disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ctx);
 
 /*****************************************************************************/
 /* Common - Helper Functions*/
@@ -625,34 +607,63 @@ connect_3gpp (MMBroadbandBearer *self,
     connect_3gpp_context_step (ctx);
 }
 
-
 /*****************************************************************************/
-/* Disconnect - Helper Functions*/
+/* Disconnect 3GPP */
+
+typedef enum {
+    DISCONNECT_3GPP_CONTEXT_STEP_FIRST,
+    DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN,
+    DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS,
+    DISCONNECT_3GPP_CONTEXT_STEP_LAST,
+} Disconnect3gppContextStep;
+
+typedef struct {
+    MMBroadbandBearerCinterion *self;
+    MMBaseModem                *modem;
+    MMPortSerialAt             *primary;
+    MMPort                     *data;
+    gint                        usb_interface_config_index;
+    Disconnect3gppContextStep   step;
+    GSimpleAsyncResult         *result;
+} Disconnect3gppContext;
 
 static void
-get_cmd_write_response_ctx_disconnect (MMBaseModem *modem,
-                                       GAsyncResult *res,
-                                       Disconnect3gppContext *ctx)
+disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ctx)
 {
-    /* We don't bother to check error or response here since, ctx flow's
-     * next step checks it */
-
-    /* GOTO next step */
-    ctx->disconnect++;
-    disconnect_3gpp_context_step (ctx);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->modem);
+    g_slice_free (Disconnect3gppContext, ctx);
 }
 
+static gboolean
+disconnect_3gpp_finish (MMBroadbandBearer  *self,
+                        GAsyncResult       *res,
+                        GError            **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void disconnect_3gpp_context_step (Disconnect3gppContext *ctx);
+
 static void
-get_swwan_read_response_ctx_disconnect (MMBaseModem *modem,
-                                        GAsyncResult *res,
-                                        Disconnect3gppContext *ctx)
+swwan_disconnect_check_status_ready (MMBaseModem           *modem,
+                                     GAsyncResult          *res,
+                                     Disconnect3gppContext *ctx)
 {
     const gchar *response;
-    GError *error = NULL;
-    GList *response_parsed = NULL;
+    GList       *response_parsed = NULL;
+    GError      *error = NULL;
 
-    /* Get the SWWAN response */
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_3gpp_context_complete_and_free (ctx);
+        return;
+    }
 
     /* Return if the SWWAN read threw an error or parsing it fails */
     if (!mm_cinterion_parse_swwan_response (response, &response_parsed, &error)) {
@@ -663,127 +674,98 @@ get_swwan_read_response_ctx_disconnect (MMBaseModem *modem,
 
     /* Check parsed SWWAN reponse to see if we are now disconnected */
     if (verify_connection_state_from_swwan_response (response_parsed, &error) != 1) {
-
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Disconnection attempt failed");
-
+        g_prefix_error (&error, "Disconnection attempt failed: ");
+        g_simple_async_result_take_error (ctx->result, error);
         disconnect_3gpp_context_complete_and_free (ctx);
+        g_list_free (response_parsed);
         return;
     }
 
     g_list_free (response_parsed);
-    g_clear_error (&error);
 
-    /* GOTO next step */
-    ctx->disconnect++;
+    /* Go on to next step */
+    ctx->step++;
     disconnect_3gpp_context_step (ctx);
 }
 
-/*****************************************************************************/
-/* Disconnect - AT Command Wrappers*/
-
 static void
-send_swwan_disconnect_command_ctx_disconnect (Disconnect3gppContext *ctx)
+swwan_disconnect_ready (MMBaseModem           *modem,
+                        GAsyncResult          *res,
+                        Disconnect3gppContext *ctx)
 {
-    /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
-    gchar               *command;
-    command = g_strdup_printf ("^SWWAN=0,%u,%u",
-                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
-                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+    /* We don't bother to check error or response here since, ctx flow's
+     * next step checks it */
+    mm_base_modem_at_command_full_finish (modem, res, NULL);
 
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   command,
-                                   10,/*Seen it take 5 seconds :0 */
-                                   FALSE,
-                                   FALSE,
-                                   NULL,
-                                   (GAsyncReadyCallback)get_cmd_write_response_ctx_disconnect,
-                                   ctx);
-
-    g_free (command);
-}
-
-static void
-send_swwan_read_command_ctx_disconnect (Disconnect3gppContext *ctx)
-{
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   "^SWWAN?",
-                                   5,
-                                   FALSE,
-                                   FALSE,
-                                   NULL,
-                                   (GAsyncReadyCallback)get_swwan_read_response_ctx_disconnect,
-                                   ctx);
-}
-
-/*****************************************************************************/
-/* Disconnect - Bearer */
-
-static void
-disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_clear_object (&ctx->data);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->primary);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->modem);
-    g_slice_free (Disconnect3gppContext, ctx);
-}
-
-static gboolean
-disconnect_3gpp_finish (MMBroadbandBearer *self,
-                        GAsyncResult *res,
-                        GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    /* Go on to next step */
+    ctx->step++;
+    disconnect_3gpp_context_step (ctx);
 }
 
 static void
 disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
 {
-    mm_dbg ("Disconnect Step:%i", ctx->disconnect);
+    switch (ctx->step) {
+    case DISCONNECT_3GPP_CONTEXT_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
 
-    switch (ctx->disconnect) {
-    case DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN:
+    case DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN: {
+        gchar *command;
 
-        /* Has call back to next state */
-        send_swwan_disconnect_command_ctx_disconnect (ctx);
+        command = g_strdup_printf ("^SWWAN=0,%u,%u",
+                                   usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                                   usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
 
+        mm_dbg ("cinterion disconnect step 1/3: disconnecting PDP CID %u...",
+                usb_interface_configs[ctx->usb_interface_config_index].pdp_context);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       command,
+                                       10,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)swwan_disconnect_ready,
+                                       ctx);
+        g_free (command);
         return;
+    }
     case DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS:
-
-         /* Has call back to next state */
-         send_swwan_read_command_ctx_disconnect (ctx);
-
+        mm_dbg ("cinterion disconnect step 2/3: checking SWWAN interface %u status...",
+                usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       "^SWWAN?",
+                                       5,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)swwan_disconnect_check_status_ready,
+                                       ctx);
          return;
 
-    case DISCONNECT_3GPP_CONTEXT_STEP_FINISH:
-
+    case DISCONNECT_3GPP_CONTEXT_STEP_LAST:
+        mm_dbg ("cinterion disconnect step 3/3: finished");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disconnect_3gpp_context_complete_and_free (ctx);
-
         return;
     }
 }
 
 static void
-disconnect_3gpp (MMBroadbandBearer *self,
-                 MMBroadbandModem *modem,
-                 MMPortSerialAt *primary,
-                 MMPortSerialAt *secondary,
-                 MMPort *data,
-                 guint cid,
+disconnect_3gpp (MMBroadbandBearer  *self,
+                 MMBroadbandModem   *modem,
+                 MMPortSerialAt     *primary,
+                 MMPortSerialAt     *secondary,
+                 MMPort             *data,
+                 guint               cid,
                  GAsyncReadyCallback callback,
-                 gpointer user_data)
+                 gpointer            user_data)
 {
     Disconnect3gppContext *ctx;
-    gint usb_interface_config_index;
-    GError *error = NULL;
+    gint                   usb_interface_config_index;
+    GError                *error = NULL;
 
     g_assert (primary != NULL);
     g_assert (data != NULL);
@@ -798,6 +780,9 @@ disconnect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
+    /* Input CID must match */
+    g_warn_if_fail (cid == usb_interface_configs[usb_interface_config_index].pdp_context);
+
     /* Setup connection context */
     ctx = g_slice_new0 (Disconnect3gppContext);
     ctx->self = g_object_ref (self);
@@ -811,7 +796,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     ctx->usb_interface_config_index = usb_interface_config_index;
 
     /* Initialize */
-    ctx->disconnect = DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN;
+    ctx->step = DISCONNECT_3GPP_CONTEXT_STEP_FIRST;
 
     /* Start */
     disconnect_3gpp_context_step (ctx);
