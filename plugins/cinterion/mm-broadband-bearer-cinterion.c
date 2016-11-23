@@ -781,24 +781,9 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     Disconnect3gppContext *ctx;
-    MMPort *port;
 
     g_assert (primary != NULL);
-
-    /* Note: Not sure how else to get active data port? Can this be done without adding this
-     * function to mm-base-modem.c?
-     * TODO: Dual SIM how do we know which interface to grab/disconnect if two are active? */
-    /* Get the Net port to be torn down */
-    port = mm_base_modem_peek_current_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
-    if (!port) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "No valid data port found to tear down.");
-        return;
-    }
+    g_assert (data != NULL);
 
     /* Setup connection context */
     ctx = g_slice_new0 (Disconnect3gppContext);
@@ -808,7 +793,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              disconnect_3gpp);
-    ctx->data = g_object_ref (port);
+    ctx->data = g_object_ref (data);
     ctx->primary = g_object_ref (primary);
 
     /* Maps Bearer->Net Interface-> PDP Context
