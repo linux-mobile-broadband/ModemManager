@@ -32,10 +32,62 @@
 G_DEFINE_TYPE (MMBroadbandBearerCinterion, mm_broadband_bearer_cinterion, MM_TYPE_BROADBAND_BEARER)
 
 /*****************************************************************************/
-/* Common enums and structs */
+/* WWAN interface mapping */
 
-#define FIRST_USB_INTERFACE 1
-#define SECOND_USB_INTERFACE 2
+typedef struct {
+    guint swwan_index;
+    guint usb_iface_num;
+    guint pdp_context;
+} UsbInterfaceConfig;
+
+/* Map SWWAN index, USB interface number and preferred PDP context.
+ *
+ * The expected USB interface mapping is:
+ *   INTERFACE=usb0 -> ID_USB_INTERFACE_NUM=0a
+ *   INTERFACE=usb1 -> ID_USB_INTERFACE_NUM=0c
+ *
+ * The preferred PDP context CIDs are:
+ *   INTERFACE=usb0 -> PDP CID #3
+ *   INTERFACE=usb1 -> PDP CID #1
+ *
+ * The PDP context mapping is as suggested by Cinterion, although it looks like
+ * this isn't strictly enforced by the modem; i.e. SWWAN could work fine with
+ * any PDP context vs SWWAN interface mapping.
+ */
+static const UsbInterfaceConfig usb_interface_configs[] = {
+    {
+        .swwan_index   = 1,
+        .usb_iface_num = 0x0a,
+        .pdp_context   = 3
+    },
+    {
+        .swwan_index   = 2,
+        .usb_iface_num = 0x0c,
+        .pdp_context   = 1
+    },
+};
+
+static gint
+get_usb_interface_config_index (MMPort  *data,
+                                GError **error)
+{
+    guint usb_iface_num;
+    guint i;
+
+    usb_iface_num = mm_kernel_device_get_property_as_int_hex (mm_port_peek_kernel_device (data), "ID_USB_INTERFACE_NUM");
+
+    for (i = 0; i < G_N_ELEMENTS (usb_interface_configs); i++) {
+        if (usb_interface_configs[i].usb_iface_num == usb_iface_num)
+            return (gint) i;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Unsupported WWAN interface: unexpected interface number: 0x%02x", usb_iface_num);
+    return -1;
+}
+
+/*****************************************************************************/
+/* Common enums and structs */
 
 typedef enum {
     BEARER_CINTERION_AUTH_UNKNOWN   = -1,
@@ -66,6 +118,7 @@ typedef struct {
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
+    gint usb_interface_config_index;
     Connect3gppContextStep connect;
     MMBearerIpConfig *ipv4_config;
     GCancellable *cancellable;
@@ -77,13 +130,14 @@ typedef struct {
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
+    gint usb_interface_config_index;
     Disconnect3gppContextStep disconnect;
     GSimpleAsyncResult *result;
 } Disconnect3gppContext;
 
 struct _MMBroadbandBearerCinterionPrivate {
-    guint network_disconnect_pending_id;/* Flag for network-initiated disconnect */
-    guint pdp_cid;/* Mapping for PDP Context to network (SWWAN) interface */
+    /* Flag for network-initiated disconnect */
+    guint network_disconnect_pending_id;
 };
 
 /*****************************************************************************/
@@ -95,23 +149,6 @@ static void disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ct
 
 /*****************************************************************************/
 /* Common - Helper Functions*/
-
-static void
-pdp_cid_map (MMBroadbandBearerCinterion *self, const gchar *bearer_interface)
-{
-    /* Map PDP context from the current Bearer. USB0 -> 3rd context, USB1 -> 1st context.
-     * Note - Cinterion told me specifically to map the contexts to the interfaces this way, though
-     * I've seen that SWWAN appear's to work fine with any PDP to any interface */
-
-    if (g_strcmp0 (bearer_interface, "0a") == 0)
-        self->priv->pdp_cid = 3;
-    else if (g_strcmp0 (bearer_interface, "0c") == 0)
-        self->priv->pdp_cid = 1;
-    else
-        /* Shouldn't be able to create a bearer for SWWAN and not be able to
-         * find the net interface. Otherwise connects/disconnects will get wrecked */
-        g_assert_not_reached ();
-}
 
 static gint
 verify_connection_state_from_swwan_response (GList *result, GError **error)
@@ -197,25 +234,6 @@ connect_3gpp_finish (MMBroadbandBearer *self,
         return NULL;
 
     return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-
-
-static void
-pdp_cid_connect (Connect3gppContext *ctx)
-{
-    const gchar *bearer_interface;
-
-    /* For E: INTERFACE=usb0 -> E: ID_USB_INTERFACE_NUM=0a
-     * For E: INTERFACE=usb1 -> E: ID_USB_INTERFACE_NUM=0c */
-
-    /* Look up the net port to associate with this bearer */
-    bearer_interface = mm_kernel_device_get_property (mm_port_peek_kernel_device (ctx->data),
-                                   "ID_USB_INTERFACE_NUM");
-
-    pdp_cid_map (ctx->self, bearer_interface);
-
-    return;
 }
 
 static void
@@ -333,9 +351,8 @@ build_cinterion_auth_string (Connect3gppContext *ctx)
      * ERROR
      * +CME ERROR: <err>
      */
-
-    command = g_strdup_printf ("^SGAUTH=%i,%i,%s,%s",
-                               ctx->self->priv->pdp_cid,
+    command = g_strdup_printf ("^SGAUTH=%u,%i,%s,%s",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
                                encoded_auth,
                                passwd,
                                user);
@@ -353,9 +370,9 @@ build_cinterion_pdp_context_string (Connect3gppContext *ctx)
 
     /* TODO: Get IP type if protocol was specified. Hardcoded to IPV4 for now */
 
-    command = g_strdup_printf ("+CGDCONT=%i,\"IP\",\"%s\"",
-                               ctx->self->priv->pdp_cid,
-                               apn == NULL ? "" : apn);
+    command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                               apn ? apn : "");
 
     return command;
 }
@@ -366,10 +383,9 @@ handle_cancel_connect (Connect3gppContext *ctx)
     gchar               *command;
 
     /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
-    command = g_strdup_printf ("^SWWAN=%s,%i,%i",
-                               "0",
-                               ctx->self->priv->pdp_cid,
-                               ctx->self->priv->pdp_cid == 3  ? FIRST_USB_INTERFACE : SECOND_USB_INTERFACE);
+    command = g_strdup_printf ("^SWWAN=0,%u,%u",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
 
     /* Disconnect, may not succeed. Will not check response on cancel */
     mm_base_modem_at_command_full (ctx->modem,
@@ -445,10 +461,9 @@ send_swwan_connect_command_ctx_connect (Connect3gppContext *ctx)
 {
     /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
     gchar               *command;
-    command = g_strdup_printf ("^SWWAN=%s,%i,%i",
-                               "1",
-                               ctx->self->priv->pdp_cid,
-                               ctx->self->priv->pdp_cid == 3  ? FIRST_USB_INTERFACE : SECOND_USB_INTERFACE);
+    command = g_strdup_printf ("^SWWAN=1,%u,%u",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
 
     send_write_command_ctx_connect(ctx, &command);
 
@@ -460,10 +475,9 @@ send_swwan_disconnect_command_ctx_connect (Connect3gppContext *ctx)
 {
     /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
     gchar               *command;
-    command = g_strdup_printf ("^SWWAN=%s,%i,%i",
-                               "0",
-                               ctx->self->priv->pdp_cid,
-                               ctx->self->priv->pdp_cid == 3  ? FIRST_USB_INTERFACE : SECOND_USB_INTERFACE);
+    command = g_strdup_printf ("^SWWAN=0,%u,%u",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
 
     send_write_command_ctx_connect(ctx, &command);
 
@@ -548,9 +562,6 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         /* Setup bearer */
         create_cinterion_bearer (ctx);
 
-        /* Clear context */
-        ctx->self->priv->pdp_cid = 0;
-
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
@@ -567,6 +578,8 @@ connect_3gpp (MMBroadbandBearer *self,
 {
     Connect3gppContext  *ctx;
     MMPort *port;
+    gint usb_interface_config_index;
+    GError *error = NULL;
 
     g_assert (primary != NULL);
 
@@ -582,20 +595,28 @@ connect_3gpp (MMBroadbandBearer *self,
         return;
     }
 
+    /* Validate configuration */
+    usb_interface_config_index = get_usb_interface_config_index (port, &error);
+    if (usb_interface_config_index < 0) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
+
     /* Setup connection context */
     ctx = g_slice_new0 (Connect3gppContext);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->data = g_object_ref (port);
+    ctx->usb_interface_config_index = usb_interface_config_index;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              connect_3gpp);
     ctx->cancellable = g_object_ref (cancellable);
     ctx->primary = g_object_ref (primary);
-
-    /* Maps Bearer-> Net Interface-> PDP Context */
-    pdp_cid_connect (ctx);
 
     /* Initialize */
     ctx->connect = CONNECT_3GPP_CONTEXT_STEP_INIT;
@@ -607,23 +628,6 @@ connect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 /* Disconnect - Helper Functions*/
-
-static void
-pdp_cid_disconnect(Disconnect3gppContext *ctx)
-{
-    const gchar *bearer_interface;
-
-    /* For E: INTERFACE=usb0 -> E: ID_USB_INTERFACE_NUM=0a
-     * For E: INTERFACE=usb1 -> E: ID_USB_INTERFACE_NUM=0c */
-
-    /* Look up the net port to associate with this bearer */
-    bearer_interface = mm_kernel_device_get_property (mm_port_peek_kernel_device (ctx->data),
-                                   "ID_USB_INTERFACE_NUM");
-
-    pdp_cid_map (ctx->self, bearer_interface);
-
-    return;
-}
 
 static void
 get_cmd_write_response_ctx_disconnect (MMBaseModem *modem,
@@ -685,10 +689,9 @@ send_swwan_disconnect_command_ctx_disconnect (Disconnect3gppContext *ctx)
 {
     /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
     gchar               *command;
-    command = g_strdup_printf ("^SWWAN=%s,%i,%i",
-                               "0",
-                               ctx->self->priv->pdp_cid,
-                               ctx->self->priv->pdp_cid == 3  ? FIRST_USB_INTERFACE : SECOND_USB_INTERFACE);
+    command = g_strdup_printf ("^SWWAN=0,%u,%u",
+                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
 
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
@@ -761,8 +764,6 @@ disconnect_3gpp_context_step (Disconnect3gppContext *ctx)
 
     case DISCONNECT_3GPP_CONTEXT_STEP_FINISH:
 
-        ctx->self->priv->pdp_cid = 0;
-
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disconnect_3gpp_context_complete_and_free (ctx);
 
@@ -781,9 +782,21 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     Disconnect3gppContext *ctx;
+    gint usb_interface_config_index;
+    GError *error = NULL;
 
     g_assert (primary != NULL);
     g_assert (data != NULL);
+
+    /* Validate configuration */
+    usb_interface_config_index = get_usb_interface_config_index (data, &error);
+    if (usb_interface_config_index < 0) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
 
     /* Setup connection context */
     ctx = g_slice_new0 (Disconnect3gppContext);
@@ -793,12 +806,9 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                              callback,
                                              user_data,
                                              disconnect_3gpp);
-    ctx->data = g_object_ref (data);
     ctx->primary = g_object_ref (primary);
-
-    /* Maps Bearer->Net Interface-> PDP Context
-     * We can't disconnect if we don't know which context to disconnect from. */
-    pdp_cid_disconnect (ctx);
+    ctx->data = g_object_ref (data);
+    ctx->usb_interface_config_index = usb_interface_config_index;
 
     /* Initialize */
     ctx->disconnect = DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN;
