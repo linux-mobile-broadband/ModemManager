@@ -18,7 +18,7 @@
 #ifndef LIBWMC_PROTOCOL_H
 #define LIBWMC_PROTOCOL_H
 
-#define WMC_CMD_MARKER ((u_int8_t) 0xC8)
+#define WMC_CMD_MARKER ((uint8_t) 0xC8)
 
 enum {
     WMC_CMD_GET_GLOBAL_MODE = 0x03,
@@ -51,108 +51,108 @@ enum {
 
 /* Generic WMC command header */
 struct WmcCmdHeader {
-    u_int8_t marker;  /* Always 0xC8 */
-    u_int8_t cmd;
+    uint8_t marker;  /* Always 0xC8 */
+    uint8_t cmd;
 } __attribute__ ((packed));
 typedef struct WmcCmdHeader WmcCmdHeader;
 
 /* Used on newer devices like the UML190 and later */
 struct WmcCmdInit2 {
     WmcCmdHeader hdr;
-    u_int16_t year;
-    u_int8_t  month;
-    u_int16_t day;        /* big endian */
-    u_int16_t hours;      /* big endian */
-    u_int16_t minutes;    /* big endian */
-    u_int16_t seconds;    /* big endian */
-    u_int8_t _unknown1[3];
+    uint16_t year;
+    uint8_t  month;
+    uint16_t day;        /* big endian */
+    uint16_t hours;      /* big endian */
+    uint16_t minutes;    /* big endian */
+    uint16_t seconds;    /* big endian */
+    uint8_t _unknown1[3];
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2 WmcCmdInit2;
 
 struct WmcCmdInit2Rsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1[4];
+    uint8_t _unknown1[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2Rsp WmcCmdInit2Rsp;
 
 struct WmcCmdDeviceInfoRsp {
     WmcCmdHeader hdr;
-    u_int8_t  _unknown1[27];
+    uint8_t  _unknown1[27];
     char      manf[64];
     char      model[64];
     char      fwrev[64];
     char      hwrev[64];
-    u_int8_t  _unknown2[64];
-    u_int8_t  _unknown3[64];
+    uint8_t  _unknown2[64];
+    uint8_t  _unknown3[64];
     char      min[10];        /* CDMA2000/IS-95 MIN */
-    u_int8_t  _unknown4[12];
-    u_int16_t home_sid;
-    u_int8_t  _unknown5[2];
-    u_int16_t prlver;
-    u_int8_t  _unknown6[2];
-    u_int16_t eriver;
-    u_int8_t _unknown7[4];
+    uint8_t  _unknown4[12];
+    uint16_t home_sid;
+    uint8_t  _unknown5[2];
+    uint16_t prlver;
+    uint8_t  _unknown6[2];
+    uint16_t eriver;
+    uint8_t _unknown7[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfoRsp WmcCmdDeviceInfoRsp;
 
 struct WmcCmdDeviceInfo2Rsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1[27];
+    uint8_t _unknown1[27];
     char     manf[64];
     char     model[64];
     char     fwrev[64];
     char     hwrev[64];
-    u_int8_t _unknown2[64];
-    u_int8_t _unknown3[64];
-    u_int8_t min[10];        /* CDMA2000/IS-95 MIN */
-    u_int8_t _unknown4[12];
-    u_int16_t home_sid;
-    u_int8_t _unknown5[2];
-    u_int16_t prlver;
-    u_int8_t _unknown6[2];
-    u_int16_t eriver;
-    u_int8_t _unknown7[4];
-    u_int8_t _unknown8[64];
-    u_int8_t meid[14];
-    u_int8_t _unknown10[6];  /* always zero */
-    u_int8_t imei[16];
-    u_int8_t _unknown11[6];  /* always zero */
-    u_int8_t _unknown12[16];
-    u_int8_t iccid[20];
-    u_int8_t _unknown13[6];
+    uint8_t _unknown2[64];
+    uint8_t _unknown3[64];
+    uint8_t min[10];        /* CDMA2000/IS-95 MIN */
+    uint8_t _unknown4[12];
+    uint16_t home_sid;
+    uint8_t _unknown5[2];
+    uint16_t prlver;
+    uint8_t _unknown6[2];
+    uint16_t eriver;
+    uint8_t _unknown7[4];
+    uint8_t _unknown8[64];
+    uint8_t meid[14];
+    uint8_t _unknown10[6];  /* always zero */
+    uint8_t imei[16];
+    uint8_t _unknown11[6];  /* always zero */
+    uint8_t _unknown12[16];
+    uint8_t iccid[20];
+    uint8_t _unknown13[6];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
 
 struct WmcCmdDeviceInfo3Rsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1[27];
+    uint8_t _unknown1[27];
     char     manf[64];
     char     model[64];
     char     fwrev[64];
     char     hwrev[64];
-    u_int8_t _unknown2[64];
-    u_int8_t _unknown3[64];
-    u_int8_t min[10];        /* CDMA2000/IS-95 MIN */
-    u_int8_t _unknown4[12];
-    u_int16_t home_sid;
-    u_int8_t _unknown5[2];
-    u_int16_t prlver;
-    u_int8_t _unknown6[2];
-    u_int16_t eri_ver;
-    u_int8_t _unknown7[4];
-    u_int8_t _unknown8[64];
-    u_int8_t meid[14];
-    u_int8_t _unknown10[6];  /* always zero */
-    u_int8_t imei[16];
-    u_int8_t _unknown11[6];  /* always zero */
-    u_int8_t _unknown12[16];
-    u_int8_t iccid[20];
-    u_int8_t _unknown13[6];
-    u_int8_t mcc[16];
-    u_int8_t mnc[16];
-    u_int8_t _unknown14[4];
-    u_int8_t _unknown15[4];
-    u_int8_t _unknown16[4];
+    uint8_t _unknown2[64];
+    uint8_t _unknown3[64];
+    uint8_t min[10];        /* CDMA2000/IS-95 MIN */
+    uint8_t _unknown4[12];
+    uint16_t home_sid;
+    uint8_t _unknown5[2];
+    uint16_t prlver;
+    uint8_t _unknown6[2];
+    uint16_t eri_ver;
+    uint8_t _unknown7[4];
+    uint8_t _unknown8[64];
+    uint8_t meid[14];
+    uint8_t _unknown10[6];  /* always zero */
+    uint8_t imei[16];
+    uint8_t _unknown11[6];  /* always zero */
+    uint8_t _unknown12[16];
+    uint8_t iccid[20];
+    uint8_t _unknown13[6];
+    uint8_t mcc[16];
+    uint8_t mnc[16];
+    uint8_t _unknown14[4];
+    uint8_t _unknown15[4];
+    uint8_t _unknown16[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo3Rsp WmcCmdDeviceInfo3Rsp;
 
@@ -180,94 +180,94 @@ enum {
 /* PC5740 response */
 struct WmcCmdNetworkInfoRsp {
     WmcCmdHeader hdr;
-    u_int8_t  _unknown1;
-    u_int8_t  _unknown2[3];    /* Always zero */
-    u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown3;       /* Either 0x00 or 0x01 */
-    u_int16_t ts_year;
-    u_int8_t  ts_month;
-    u_int16_t ts_day;          /* BE */
-    u_int16_t ts_hours;        /* BE */
-    u_int16_t ts_minutes;      /* BE */
-    u_int16_t ts_seconds;      /* BE */
-    u_int16_t counter1;        /* A timestamp/counter? */
-    u_int16_t _unknown4;
-    u_int8_t  _unknown5[3];    /* Always 0xFE 0xFF 0xFF */
-    u_int8_t  two_g_dbm;       /* 0x7D = no signal */
-    u_int8_t  _unknown6[37];   /* Always zero */
+    uint8_t  _unknown1;
+    uint8_t  _unknown2[3];    /* Always zero */
+    uint8_t  service;         /* One of WMC_SERVICE_* */
+    uint8_t  _unknown3;       /* Either 0x00 or 0x01 */
+    uint16_t ts_year;
+    uint8_t  ts_month;
+    uint16_t ts_day;          /* BE */
+    uint16_t ts_hours;        /* BE */
+    uint16_t ts_minutes;      /* BE */
+    uint16_t ts_seconds;      /* BE */
+    uint16_t counter1;        /* A timestamp/counter? */
+    uint16_t _unknown4;
+    uint8_t  _unknown5[3];    /* Always 0xFE 0xFF 0xFF */
+    uint8_t  two_g_dbm;       /* 0x7D = no signal */
+    uint8_t  _unknown6[37];   /* Always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfoRsp WmcCmdNetworkInfoRsp;
 
 /* UML190 response */
 struct WmcCmdNetworkInfo2Rsp {
     WmcCmdHeader hdr;
-    u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
-    u_int8_t  _unknown2[3];    /* Always zero */
-    u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown3;
-    u_int16_t ts_year;
-    u_int8_t  ts_month;
-    u_int16_t ts_day;          /* BE */
-    u_int16_t ts_hours;        /* BE */
-    u_int16_t ts_minutes;      /* BE */
-    u_int16_t ts_seconds;      /* BE */
-    u_int8_t  _unknown4;       /* always zero */
-    u_int16_t uptime_secs;
-    u_int8_t  _unknown5;
-    u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
-    u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
-    u_int8_t  _unknown7[3];    /* Always zero */
-    u_int8_t  cdma_opname[16]; /* Zero terminated? */
-    u_int8_t  _unknown8[18];   /* Always zero */
-    u_int8_t  three_g_dbm;     /* 0x7D = no signal */
-    u_int8_t  _unknown9[3];    /* Always zero */
-    u_int8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
-    u_int8_t  _unknown11[3];   /* Always zero */
-    u_int8_t  _unknown12;      /* Always 0x01 */
-    u_int8_t  tgpp_opname[8];  /* 3GPP operator name (Zero terminated? Sometimes "MCC MNC" too */
-    u_int8_t  _unknown13[4];   /* Always zero */
-    u_int32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
-    u_int32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
-    u_int8_t  _unknown16[44];  /* Always zero */
-    u_int32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
+    uint8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
+    uint8_t  _unknown2[3];    /* Always zero */
+    uint8_t  service;         /* One of WMC_SERVICE_* */
+    uint8_t  _unknown3;
+    uint16_t ts_year;
+    uint8_t  ts_month;
+    uint16_t ts_day;          /* BE */
+    uint16_t ts_hours;        /* BE */
+    uint16_t ts_minutes;      /* BE */
+    uint16_t ts_seconds;      /* BE */
+    uint8_t  _unknown4;       /* always zero */
+    uint16_t uptime_secs;
+    uint8_t  _unknown5;
+    uint8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
+    uint8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
+    uint8_t  _unknown7[3];    /* Always zero */
+    uint8_t  cdma_opname[16]; /* Zero terminated? */
+    uint8_t  _unknown8[18];   /* Always zero */
+    uint8_t  three_g_dbm;     /* 0x7D = no signal */
+    uint8_t  _unknown9[3];    /* Always zero */
+    uint8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
+    uint8_t  _unknown11[3];   /* Always zero */
+    uint8_t  _unknown12;      /* Always 0x01 */
+    uint8_t  tgpp_opname[8];  /* 3GPP operator name (Zero terminated? Sometimes "MCC MNC" too */
+    uint8_t  _unknown13[4];   /* Always zero */
+    uint32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
+    uint32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
+    uint8_t  _unknown16[44];  /* Always zero */
+    uint32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfo2Rsp WmcCmdNetworkInfo2Rsp;
 
 /* UML290 response */
 struct WmcCmdNetworkInfo3Rsp {
     WmcCmdHeader hdr;
-    u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
-    u_int8_t  _unknown2[3];    /* Always zero */
-    u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown3;
-    u_int16_t ts_year;
-    u_int8_t  ts_month;
-    u_int16_t ts_day;          /* BE */
-    u_int16_t ts_hours;        /* BE */
-    u_int16_t ts_minutes;      /* BE */
-    u_int16_t ts_seconds;      /* BE */
-    u_int8_t  _unknown4;       /* always zero */
-    u_int16_t uptime_secs;
-    u_int8_t  _unknown5;
-    u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
-    u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
-    u_int8_t  _unknown7[3];    /* Always zero */
-    u_int8_t  cdma_opname[16]; /* Zero terminated? */
-    u_int8_t  _unknown8[18];   /* Always zero */
-    u_int8_t  three_g_dbm;     /* 0x7D = no signal */
-    u_int8_t  _unknown9[3];    /* Always zero */
-    u_int8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
-    u_int8_t  _unknown11[3];   /* Always zero */
-    u_int8_t  _unknown12;      /* Always 0x01 */
-    u_int8_t  tgpp_opname[8];   /* Zero terminated? Sometimes "MCC MNC" too */
-    u_int8_t  _unknown13[4];   /* Always zero */
-    u_int32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
-    u_int32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
-    u_int8_t  _unknown16[44];  /* Always zero */
-    u_int32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
-    u_int8_t  lte_dbm;         /* 0x00 if not in LTE mode */
-    u_int8_t  _unknown17[3];   /* Always zero */
-    u_int8_t  _unknown18[4];
+    uint8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
+    uint8_t  _unknown2[3];    /* Always zero */
+    uint8_t  service;         /* One of WMC_SERVICE_* */
+    uint8_t  _unknown3;
+    uint16_t ts_year;
+    uint8_t  ts_month;
+    uint16_t ts_day;          /* BE */
+    uint16_t ts_hours;        /* BE */
+    uint16_t ts_minutes;      /* BE */
+    uint16_t ts_seconds;      /* BE */
+    uint8_t  _unknown4;       /* always zero */
+    uint16_t uptime_secs;
+    uint8_t  _unknown5;
+    uint8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
+    uint8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
+    uint8_t  _unknown7[3];    /* Always zero */
+    uint8_t  cdma_opname[16]; /* Zero terminated? */
+    uint8_t  _unknown8[18];   /* Always zero */
+    uint8_t  three_g_dbm;     /* 0x7D = no signal */
+    uint8_t  _unknown9[3];    /* Always zero */
+    uint8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
+    uint8_t  _unknown11[3];   /* Always zero */
+    uint8_t  _unknown12;      /* Always 0x01 */
+    uint8_t  tgpp_opname[8];   /* Zero terminated? Sometimes "MCC MNC" too */
+    uint8_t  _unknown13[4];   /* Always zero */
+    uint32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
+    uint32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
+    uint8_t  _unknown16[44];  /* Always zero */
+    uint32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
+    uint8_t  lte_dbm;         /* 0x00 if not in LTE mode */
+    uint8_t  _unknown17[3];   /* Always zero */
+    uint8_t  _unknown18[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfo3Rsp WmcCmdNetworkInfo3Rsp;
 
@@ -291,26 +291,26 @@ enum {
 /* Used on UML190 */
 struct WmcCmdConnectionInfoRsp {
     WmcCmdHeader hdr;
-    u_int32_t rx_bytes;
-    u_int32_t tx_bytes;
-    u_int8_t  _unknown1[8];
-    u_int8_t  state;           /* One of WMC_CONNECTION_STATE_* */
-    u_int8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
+    uint32_t rx_bytes;
+    uint32_t tx_bytes;
+    uint8_t  _unknown1[8];
+    uint8_t  state;           /* One of WMC_CONNECTION_STATE_* */
+    uint8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
 } __attribute__ ((packed));
 typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
 
 /* Used on UML290 */
 struct WmcCmdConnectionInfo2Rsp {
     WmcCmdHeader hdr;
-    u_int32_t rx_bytes;
-    u_int32_t tx_bytes;
-    u_int8_t  _unknown1[8];
-    u_int8_t  state;           /* One of WMC_CONNECTION_STATE_* */
-    u_int8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
-    u_int8_t  _unknown3[4];    /* Always 0x01 0x00 0x00 0x00 */
-    u_int8_t  ip4_address[16]; /* String format, ie "10.156.45.3" */
-    u_int8_t  _unknown4[8];    /* Netmask? */
-    u_int8_t  ip6_address[40]; /* String format */
+    uint32_t rx_bytes;
+    uint32_t tx_bytes;
+    uint8_t  _unknown1[8];
+    uint8_t  state;           /* One of WMC_CONNECTION_STATE_* */
+    uint8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
+    uint8_t  _unknown3[4];    /* Always 0x01 0x00 0x00 0x00 */
+    uint8_t  ip4_address[16]; /* String format, ie "10.156.45.3" */
+    uint8_t  _unknown4[8];    /* Netmask? */
+    uint8_t  ip6_address[40]; /* String format */
 } __attribute__ ((packed));
 typedef struct WmcCmdConnection2InfoRsp WmcCmdConnection2InfoRsp;
 
@@ -329,16 +329,16 @@ enum {
 
 struct WmcCmdGetGlobalMode {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1;  /* always 0 */
+    uint8_t _unknown1;  /* always 0 */
 } __attribute__ ((packed));
 typedef struct WmcCmdGetGlobalMode WmcCmdGetGlobalMode;
 
 struct WmcCmdGetGlobalModeRsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1;  /* always 0x01 */
-    u_int8_t mode;       /* one of WMC_GLOBAL_MODE_* */
-    u_int8_t _unknown2;  /* always 0x05 */
-    u_int8_t _unknown3;  /* always 0x00 */
+    uint8_t _unknown1;  /* always 0x01 */
+    uint8_t mode;       /* one of WMC_GLOBAL_MODE_* */
+    uint8_t _unknown2;  /* always 0x05 */
+    uint8_t _unknown3;  /* always 0x00 */
 } __attribute__ ((packed));
 typedef struct WmcCmdGetGlobalModeRsp WmcCmdGetGlobalModeRsp;
 
@@ -346,17 +346,17 @@ typedef struct WmcCmdGetGlobalModeRsp WmcCmdGetGlobalModeRsp;
 
 struct WmcCmdSetGlobalMode {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1;  /* always 0x01 */
-    u_int8_t mode;       /* one of WMC_GLOBAL_MODE_* */
-    u_int8_t _unknown2;  /* always 0x05 */
-    u_int8_t _unknown3;  /* always 0x00 */
+    uint8_t _unknown1;  /* always 0x01 */
+    uint8_t mode;       /* one of WMC_GLOBAL_MODE_* */
+    uint8_t _unknown2;  /* always 0x05 */
+    uint8_t _unknown3;  /* always 0x00 */
 } __attribute__ ((packed));
 typedef struct WmcCmdSetGlobalMode WmcCmdSetGlobalMode;
 
 struct WmcCmdSetGlobalModeRsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1;   /* always 0x01 */
-    u_int32_t _unknown2;  /* always zero */
+    uint8_t _unknown1;   /* always 0x01 */
+    uint32_t _unknown2;  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdSetGlobalModeRsp WmcCmdSetGlobalModeRsp;
 
@@ -364,11 +364,11 @@ typedef struct WmcCmdSetGlobalModeRsp WmcCmdSetGlobalModeRsp;
 
 struct WmcCmdSetOperator {
     WmcCmdHeader hdr;
-    u_int8_t automatic;      /* 0x00 = manual, 0x01 = auto */
-    u_int8_t _unknown1;      /* always 0x50 */
-    u_int8_t _unknown2[3];   /* always zero */
-    u_int32_t mcc_mnc;       /* MCC/MNC for manual reg (see format note), zero for auto */
-    u_int8_t _unknown3[56];  /* always zero */
+    uint8_t automatic;      /* 0x00 = manual, 0x01 = auto */
+    uint8_t _unknown1;      /* always 0x50 */
+    uint8_t _unknown2[3];   /* always zero */
+    uint32_t mcc_mnc;       /* MCC/MNC for manual reg (see format note), zero for auto */
+    uint8_t _unknown3[56];  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdSetOperator WmcCmdSetOperator;
 
@@ -380,8 +380,8 @@ enum {
 
 struct WmcCmdSetOperatorRsp {
     WmcCmdHeader hdr;
-    u_int8_t status;        /* one of WMC_SET_OPERATOR_STATUS_* */
-    u_int8_t _unknown1[3];  /* always zero */
+    uint8_t status;        /* one of WMC_SET_OPERATOR_STATUS_* */
+    uint8_t _unknown1[3];  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdSetOperatorRsp WmcCmdSetOperatorRsp;
 
@@ -396,18 +396,18 @@ enum {
 /* Response for both GET_FIRST_OPERATOR and GET_NEXT_OPERATOR */
 struct WmcCmdGetOperatorRsp {
     WmcCmdHeader hdr;
-    u_int8_t  _unknown1;     /* Usually 0x50, sometimes 0x00 */
-    u_int8_t  _unknown2[3];  /* always zero */
-    u_int32_t mcc_mnc;       /* see format note */
-    u_int8_t  opname[8];
-    u_int8_t  _unknown3[56]; /* always zero */
-    u_int8_t  stat;          /* follows 3GPP TS27.007 +COPS <stat> ? */
-    u_int8_t  _unknown4[3];  /* always zero */
-    u_int8_t  service;       /* one of WMC_OPERATOR_SERVICE_* */
-    u_int8_t  _unknown5[3];  /* always zero */
-    u_int8_t  _unknown6;     /* 0x63 (GET_FIRST_OP) might mean "wait" */
-    u_int8_t  _unknown7;     /* 0x00 or 0x01 */
-    u_int8_t  _unknown8[2];  /* always zero */
+    uint8_t  _unknown1;     /* Usually 0x50, sometimes 0x00 */
+    uint8_t  _unknown2[3];  /* always zero */
+    uint32_t mcc_mnc;       /* see format note */
+    uint8_t  opname[8];
+    uint8_t  _unknown3[56]; /* always zero */
+    uint8_t  stat;          /* follows 3GPP TS27.007 +COPS <stat> ? */
+    uint8_t  _unknown4[3];  /* always zero */
+    uint8_t  service;       /* one of WMC_OPERATOR_SERVICE_* */
+    uint8_t  _unknown5[3];  /* always zero */
+    uint8_t  _unknown6;     /* 0x63 (GET_FIRST_OP) might mean "wait" */
+    uint8_t  _unknown7;     /* 0x00 or 0x01 */
+    uint8_t  _unknown8[2];  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdGetOperatorRsp WmcCmdGetOperatorRsp;
 
@@ -422,38 +422,38 @@ enum {
 /* Later devices return all zeros for this command */
 struct WmcCmdFieldTestRsp {
     WmcCmdHeader hdr;
-    u_int8_t  prl_requirements;
-    u_int8_t  eri_support;
+    uint8_t  prl_requirements;
+    uint8_t  eri_support;
     char      nam_name[7];
-    u_int8_t  _unknown1;         /* always zero */
-    u_int8_t  _unknown2[3];      /* always 0x0A 0x0A 0x0A */
-    u_int8_t  _unknown3[5];      /* always zero */
-    u_int8_t  _unknown4[10];     /* all 0x0F */
-    u_int16_t home_sid;
-    u_int16_t home_nid;
+    uint8_t  _unknown1;         /* always zero */
+    uint8_t  _unknown2[3];      /* always 0x0A 0x0A 0x0A */
+    uint8_t  _unknown3[5];      /* always zero */
+    uint8_t  _unknown4[10];     /* all 0x0F */
+    uint16_t home_sid;
+    uint16_t home_nid;
     char      min1[7];
     char      min2[3];
     char      mcc[3];
     char      imsi_s[10];
     char      mnc[2];
-    u_int16_t primary_cdma_chan_a;
-    u_int16_t secondary_cdma_chan_a;
-    u_int16_t primary_cdma_chan_b;
-    u_int16_t secondary_cdma_chan_b;
-    u_int8_t  accolc;
+    uint16_t primary_cdma_chan_a;
+    uint16_t secondary_cdma_chan_a;
+    uint16_t primary_cdma_chan_b;
+    uint16_t secondary_cdma_chan_b;
+    uint8_t  accolc;
     char      sw_version[64];
     char      hw_version[64];
-    u_int16_t prlver;
-    u_int16_t eriver;
-    u_int16_t nid;
-    u_int8_t  last_call_end_reason;  /* ? */
-    u_int8_t  rssi;
-    u_int16_t channel;
-    u_int8_t  prev;
-    u_int16_t pn_offset;
-    u_int8_t  sys_select_pref;
-    u_int8_t  mip_pref;
-    u_int8_t  hybrid_pref;
+    uint16_t prlver;
+    uint16_t eriver;
+    uint16_t nid;
+    uint8_t  last_call_end_reason;  /* ? */
+    uint8_t  rssi;
+    uint16_t channel;
+    uint8_t  prev;
+    uint16_t pn_offset;
+    uint8_t  sys_select_pref;
+    uint8_t  mip_pref;
+    uint8_t  hybrid_pref;
 } __attribute__ ((packed));
 typedef struct WmcCmdFieldTestRsp WmcCmdFieldTestRsp;
 

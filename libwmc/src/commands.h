@@ -107,7 +107,7 @@ WmcResult * wmc_cmd_get_global_mode_result (const char *buf, size_t len);
 
 /**********************************************************************/
 
-size_t      wmc_cmd_set_global_mode_new    (char *buf, size_t buflen, u_int8_t mode);
+size_t      wmc_cmd_set_global_mode_new    (char *buf, size_t buflen, uint8_t mode);
 
 WmcResult * wmc_cmd_set_global_mode_result (const char *buf, size_t len);
 

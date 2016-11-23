@@ -33,7 +33,7 @@
  */
 
 /* Table of CRCs for each possible byte, with a generator polynomial of 0x8408 */
-static const u_int16_t crc_table[256] = {
+static const uint16_t crc_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
     0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -69,10 +69,10 @@ static const u_int16_t crc_table[256] = {
 };
 
 /* Calculate the CRC for a buffer using a seed of 0xffff */
-u_int16_t
+uint16_t
 dm_crc16 (const char *buffer, size_t len)
 {
-    u_int16_t crc = 0xffff;
+    uint16_t crc = 0xffff;
 
     while (len--)
             crc = crc_table[(crc ^ *buffer++) & 0xff] ^ (crc >> 8);
@@ -102,7 +102,7 @@ dm_escape (const char *inbuf,
 
     /* Since escaping potentially doubles the # of bytes, short-circuit the
      * length check if destination buffer is clearly large enough.  Note the
-     * 
+     *
      */
     if (outbuf_len <= inbuf_len << 1) {
         size_t outbuf_required = inbuf_len + 1; /* +1 for the trailing control char */
@@ -187,7 +187,7 @@ dm_encapsulate_buffer (char *inbuf,
                        char *outbuf,
                        size_t outbuf_len)
 {
-    u_int16_t crc;
+    uint16_t crc;
     size_t escaped_len;
 
     qcdm_return_val_if_fail (inbuf != NULL, 0);
@@ -242,7 +242,7 @@ dm_decapsulate_buffer (const char *inbuf,
 {
     qcdmbool escaping = FALSE;
     size_t i, pkt_len = 0, unesc_len;
-    u_int16_t crc, pkt_crc;
+    uint16_t crc, pkt_crc;
 
     qcdm_return_val_if_fail (inbuf != NULL, FALSE);
     qcdm_return_val_if_fail (outbuf != NULL, FALSE);
@@ -309,4 +309,3 @@ dm_decapsulate_buffer (const char *inbuf,
     *out_decap_len = unesc_len - 2; /* decap_len should not include the CRC */
     return TRUE;
 }
-

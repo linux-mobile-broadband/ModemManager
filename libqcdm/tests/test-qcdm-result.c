@@ -76,8 +76,8 @@ test_result_uint8 (void *f, void *data)
 void
 test_result_uint8_array (void *f, void *data)
 {
-    u_int8_t array[] = { 0, 1, 255, 32, 128, 127 };
-    const u_int8_t *tmp = NULL;
+    uint8_t array[] = { 0, 1, 255, 32, 128, 127 };
+    const uint8_t *tmp = NULL;
     size_t tmp_len = 0;
     QcdmResult *result;
 
@@ -90,4 +90,3 @@ test_result_uint8_array (void *f, void *data)
 
     qcdm_result_unref (result);
 }
-

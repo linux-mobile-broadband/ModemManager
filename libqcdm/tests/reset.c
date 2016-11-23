@@ -40,7 +40,7 @@ print_buf (const char *detail, const char *buf, size_t len)
     int i = 0, z;
     qcdmbool newline = FALSE;
     char tmp[500];
-    u_int32_t flen;
+    uint32_t flen;
 
     flen = snprintf (tmp, sizeof (tmp) - 1, "%s (%zu)  ", detail, len);
     fprintf (stdout, "%s", tmp);
@@ -174,7 +174,7 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 }
 
 static int
-qcdm_set_mode (int fd, u_int8_t mode)
+qcdm_set_mode (int fd, uint8_t mode)
 {
     int err;
     char buf[512];

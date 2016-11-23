@@ -44,7 +44,7 @@ print_buf (const char *detail, const char *buf, size_t len)
 	int i = 0, z;
 	wmcbool newline = FALSE;
 	char tmp[500];
-	u_int32_t flen;
+	uint32_t flen;
 
 	flen = snprintf (tmp, sizeof (tmp) - 1, "%s (%zu)  ", detail, len);
 	fprintf (stdout, "%s", tmp);
@@ -191,7 +191,7 @@ wmc_wait_reply (int fd, char *buf, size_t len)
 }
 
 static int
-wmc_set_global_mode (const char *port, u_int8_t mode)
+wmc_set_global_mode (const char *port, uint8_t mode)
 {
 	int fd, err;
 	char buf[1024];
@@ -248,7 +248,7 @@ wmc_get_global_mode (const char *port)
 	size_t len;
 	WmcResult *result;
 	size_t reply_len;
-	u_int8_t mode = 0;
+	uint8_t mode = 0;
 	const char *smode = NULL;
 
 	fd = com_setup (port);
@@ -414,7 +414,7 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 }
 
 static int
-qcdm_set_hdr_pref (const char *port, u_int8_t hdrpref)
+qcdm_set_hdr_pref (const char *port, uint8_t hdrpref)
 {
 	int fd, err;
 	char buf[512];
@@ -472,7 +472,7 @@ qcdm_get_hdr_pref (const char *port)
 	size_t len;
 	QcdmResult *result = NULL;
 	size_t reply_len;
-    u_int8_t pref;
+    uint8_t pref;
     const char *spref = NULL;
 
 	fd = com_setup (port);
@@ -538,7 +538,7 @@ error:
 }
 
 static int
-qcdm_set_mode (const char *port, u_int8_t mode)
+qcdm_set_mode (const char *port, uint8_t mode)
 {
 	int fd, err;
 	char buf[512];
@@ -600,8 +600,8 @@ usage (const char *prog)
 
 static wmcbool
 parse_mode (const char *s,
-            u_int8_t *out_mode,
-            u_int8_t *out_hdrpref,
+            uint8_t *out_mode,
+            uint8_t *out_hdrpref,
             wmcbool *out_set_evdo)
 {
 	if (strcasecmp (s, "lte") == 0) {
@@ -664,8 +664,8 @@ parse_mode (const char *s,
 int
 main (int argc, char *argv[])
 {
-	u_int8_t mode = WMC_NETWORK_MODE_AUTO;
-	u_int8_t hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
+	uint8_t mode = WMC_NETWORK_MODE_AUTO;
+	uint8_t hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
 	const char *wmcport = argv[1];
 	const char *dmport = argv[2];
 	const char *msg = NULL;
@@ -719,4 +719,3 @@ main (int argc, char *argv[])
 
 	return 0;
 }
-

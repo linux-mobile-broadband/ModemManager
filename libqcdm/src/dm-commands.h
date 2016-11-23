@@ -236,15 +236,15 @@ enum {
 
 /* Generic DM command header */
 struct DMCmdHeader {
-    u_int8_t code;
+    uint8_t code;
 } __attribute__ ((packed));
 typedef struct DMCmdHeader DMCmdHeader;
 
 /* DIAG_CMD_SUBSYS */
 struct DMCmdSubsysHeader {
-    u_int8_t code;
-    u_int8_t subsys_id;
-    u_int16_t subsys_cmd;
+    uint8_t code;
+    uint8_t subsys_id;
+    uint16_t subsys_cmd;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysHeader DMCmdSubsysHeader;
 
@@ -255,82 +255,82 @@ typedef enum {
 
 /* DIAG_CMD_CONTROL */
 struct DMCmdControl {
-    u_int8_t code;
+    uint8_t code;
     /* DMControlMode */
-    u_int16_t mode;
+    uint16_t mode;
 } __attribute__ ((packed));
 typedef struct DMCmdControl DMCmdControl;
 
 /* DIAG_CMD_NV_READ / DIAG_CMD_NV_WRITE */
 struct DMCmdNVReadWrite {
-    u_int8_t code;
-    u_int16_t nv_item;
-    u_int8_t data[128];
-    u_int16_t status;
+    uint8_t code;
+    uint16_t nv_item;
+    uint8_t data[128];
+    uint16_t status;
 } __attribute__ ((packed));
 typedef struct DMCmdNVReadWrite DMCmdNVReadWrite;
 
 /* DIAG_CMD_VERSION_INFO */
 struct DMCmdVersionInfoRsp {
-    u_int8_t code;
+    uint8_t code;
     char comp_date[11];
     char comp_time[8];
     char rel_date[11];
     char rel_time[8];
     char model[8];
-    u_int8_t scm;
-    u_int8_t mob_cai_rev;
-    u_int8_t mob_model;
-    u_int16_t mob_firmware_rev;
-    u_int8_t slot_cycle_index;
-    u_int8_t msm_ver;
-    u_int8_t _unknown;
+    uint8_t scm;
+    uint8_t mob_cai_rev;
+    uint8_t mob_model;
+    uint16_t mob_firmware_rev;
+    uint8_t slot_cycle_index;
+    uint8_t msm_ver;
+    uint8_t _unknown;
 } __attribute__ ((packed));
 typedef struct DMCmdVersionInfoRsp DMCmdVersionInfoRsp;
 
 /* DIAG_CMD_ESN */
 struct DMCmdEsnRsp {
-    u_int8_t code;
-    u_int8_t esn[4];
+    uint8_t code;
+    uint8_t esn[4];
 } __attribute__ ((packed));
 typedef struct DMCmdEsnRsp DMCmdEsnRsp;
 
 /* DIAG_CMD_STATUS */
 struct DMCmdStatusRsp {
-    u_int8_t code;
-    u_int8_t _unknown[3];
-    u_int8_t esn[4];
-    u_int16_t rf_mode;
-    u_int8_t min1_analog[4];
-    u_int8_t min1_cdma[4];
-    u_int8_t min2_analog[2];
-    u_int8_t min2_cdma[2];
-    u_int8_t _unknown1;
-    u_int16_t cdma_rx_state;
-    u_int8_t good_frames;
-    u_int16_t analog_corrected_frames;
-    u_int16_t analog_bad_frames;
-    u_int16_t analog_word_syncs;
-    u_int16_t entry_reason;
-    u_int16_t curr_chan;
-    u_int8_t cdma_code_chan;
-    u_int16_t pilot_base;
-    u_int16_t sid;
-    u_int16_t nid;
-    u_int16_t analog_locaid;
-    u_int16_t analog_rssi;
-    u_int8_t analog_power;
+    uint8_t code;
+    uint8_t _unknown[3];
+    uint8_t esn[4];
+    uint16_t rf_mode;
+    uint8_t min1_analog[4];
+    uint8_t min1_cdma[4];
+    uint8_t min2_analog[2];
+    uint8_t min2_cdma[2];
+    uint8_t _unknown1;
+    uint16_t cdma_rx_state;
+    uint8_t good_frames;
+    uint16_t analog_corrected_frames;
+    uint16_t analog_bad_frames;
+    uint16_t analog_word_syncs;
+    uint16_t entry_reason;
+    uint16_t curr_chan;
+    uint8_t cdma_code_chan;
+    uint16_t pilot_base;
+    uint16_t sid;
+    uint16_t nid;
+    uint16_t analog_locaid;
+    uint16_t analog_rssi;
+    uint8_t analog_power;
 } __attribute__ ((packed));
 typedef struct DMCmdStatusRsp DMCmdStatusRsp;
 
 /* DIAG_CMD_SW_VERSION */
 struct DMCmdSwVersionRsp {
-    u_int8_t code;
+    uint8_t code;
     char version[31];
     char comp_date[11];
-    u_int8_t _unknown1[2];
+    uint8_t _unknown1[2];
     char comp_time[8];
-    u_int8_t _unknown2[2];
+    uint8_t _unknown2[2];
 } __attribute__ ((packed));
 typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
@@ -347,55 +347,55 @@ typedef enum {
 
 /* DIAG_CMD_STATUS_SNAPSHOT */
 struct DMCmdStatusSnapshotRsp {
-    u_int8_t code;
-    u_int8_t esn[4];
-    u_int8_t imsi_s1[4];
-    u_int8_t imsi_s2[2];
-    u_int8_t imsi_s[8];
-    u_int8_t imsi_11_12;
-    u_int16_t mcc;
-    u_int8_t imsi_addr_num;
-    u_int16_t sid;
-    u_int16_t nid;
-    u_int8_t prev;
-    u_int8_t prev_in_use;
-    u_int8_t mob_prev;
-    u_int8_t band_class;
-    u_int16_t frequency;
-    u_int8_t oper_mode;
-    u_int8_t state;
-    u_int8_t sub_state;
+    uint8_t code;
+    uint8_t esn[4];
+    uint8_t imsi_s1[4];
+    uint8_t imsi_s2[2];
+    uint8_t imsi_s[8];
+    uint8_t imsi_11_12;
+    uint16_t mcc;
+    uint8_t imsi_addr_num;
+    uint16_t sid;
+    uint16_t nid;
+    uint8_t prev;
+    uint8_t prev_in_use;
+    uint8_t mob_prev;
+    uint8_t band_class;
+    uint16_t frequency;
+    uint8_t oper_mode;
+    uint8_t state;
+    uint8_t sub_state;
 } __attribute__ ((packed));
 typedef struct DMCmdStatusSnapshotRsp DMCmdStatusSnapshotRsp;
 
 /* DIAG_SUBSYS_CM_STATE_INFO subsys command */
 struct DMCmdSubsysCMStateInfoRsp {
     DMCmdSubsysHeader header;
-    u_int32_t call_state;
-    u_int32_t oper_mode;
-    u_int32_t system_mode;
-    u_int32_t mode_pref;
-    u_int32_t band_pref;
-    u_int32_t roam_pref;
-    u_int32_t srv_domain_pref;
-    u_int32_t acq_order_pref;
-    u_int32_t hybrid_pref;
-    u_int32_t network_sel_mode_pref;
+    uint32_t call_state;
+    uint32_t oper_mode;
+    uint32_t system_mode;
+    uint32_t mode_pref;
+    uint32_t band_pref;
+    uint32_t roam_pref;
+    uint32_t srv_domain_pref;
+    uint32_t acq_order_pref;
+    uint32_t hybrid_pref;
+    uint32_t network_sel_mode_pref;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysCMStateInfoRsp DMCmdSubsysCMStateInfoRsp;
 
 /* DIAG_SUBSYS_HDR_STATE_INFO subsys command */
 struct DMCmdSubsysHDRStateInfoRsp {
     DMCmdSubsysHeader header;
-    u_int8_t at_state;
-    u_int8_t session_state;
-    u_int8_t almp_state;
-    u_int8_t init_state;
-    u_int8_t idle_state;
-    u_int8_t connected_state;
-    u_int8_t route_update_state;
-    u_int8_t overhead_msg_state;
-    u_int8_t hdr_hybrid_mode;
+    uint8_t at_state;
+    uint8_t session_state;
+    uint8_t almp_state;
+    uint8_t init_state;
+    uint8_t idle_state;
+    uint8_t connected_state;
+    uint8_t route_update_state;
+    uint8_t overhead_msg_state;
+    uint8_t hdr_hybrid_mode;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysHDRStateInfoRsp DMCmdSubsysHDRStateInfoRsp;
 
@@ -403,124 +403,124 @@ typedef struct DMCmdSubsysHDRStateInfoRsp DMCmdSubsysHDRStateInfoRsp;
 /* DIAG_SUBSYS_ZTE_STATUS subsys command */
 struct DMCmdSubsysZteStatusRsp {
     DMCmdSubsysHeader header;
-    u_int8_t _unknown1[8];
-    u_int8_t signal_ind;
-    u_int8_t _unknown2;
+    uint8_t _unknown1[8];
+    uint8_t signal_ind;
+    uint8_t _unknown2;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysZteStatusRsp DMCmdSubsysZteStatusRsp;
 
 /* DIAG_CMD_PILOT_SETS command */
 struct DMCmdPilotSetsSet {
-    u_int16_t pn_offset;
-    u_int16_t ecio;
+    uint16_t pn_offset;
+    uint16_t ecio;
 } __attribute__ ((packed));
 typedef struct DMCmdPilotSetsSet DMCmdPilotSetsSet;
 
 struct DMCmdPilotSetsRsp {
-    u_int8_t code;
-    u_int16_t pilot_inc;
-    u_int8_t active_count;
-    u_int8_t candidate_count;
-    u_int8_t neighbor_count;
+    uint8_t code;
+    uint16_t pilot_inc;
+    uint8_t active_count;
+    uint8_t candidate_count;
+    uint8_t neighbor_count;
     DMCmdPilotSetsSet sets[52];
 } __attribute__ ((packed));
 typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
 
 struct DMCmdLog {
-    u_int8_t code;
-    u_int8_t more;
-    u_int16_t len;       /* size of packet after this member */
-    u_int16_t _unknown2; /* contains same value as len */
-    u_int16_t log_code;
-    u_int64_t timestamp;
-    u_int8_t data[0];
+    uint8_t code;
+    uint8_t more;
+    uint16_t len;       /* size of packet after this member */
+    uint16_t _unknown2; /* contains same value as len */
+    uint16_t log_code;
+    uint64_t timestamp;
+    uint8_t data[0];
 } __attribute__ ((packed));
 typedef struct DMCmdLog DMCmdLog;
 
 struct DMCmdExtLogMask {
-    u_int8_t code;
+    uint8_t code;
     /* Bit number of highest '1' in 'mask'; set to 0 to get current mask. */
-    u_int16_t len;
+    uint16_t len;
     /* Bitfield of log messages to receive */
-    u_int8_t mask[512];
+    uint8_t mask[512];
 } __attribute__ ((packed));
 typedef struct DMCmdExtLogMask DMCmdExtLogMask;
 
 struct DMCmdEventReport {
-    u_int8_t code;
-    u_int8_t on;
+    uint8_t code;
+    uint8_t on;
 } __attribute__ ((packed));
 typedef struct DMCmdEventReport DMCmdEventReport;
 
 struct DMCmdEventReportRsp {
-    u_int8_t code;
-    u_int16_t len;
-    u_int16_t event_id;
-    u_int8_t data[0];
+    uint8_t code;
+    uint16_t len;
+    uint16_t event_id;
+    uint8_t data[0];
 } __attribute__ ((packed));
 typedef struct DMCmdEventReportRsp DMCmdEventReportRsp;
 
 /* DIAG_SUBSYS_NOVATEL_* subsys command */
 struct DMCmdSubsysNwSnapshotReq {
     DMCmdSubsysHeader hdr;
-    u_int8_t technology;        /* DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT_TECH_* */
-    u_int32_t snapshot_mask;
+    uint8_t technology;        /* DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT_TECH_* */
+    uint32_t snapshot_mask;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotReq DMCmdSubsysNwSnapshotReq;
 
 /* DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT response */
 struct DMCmdSubsysNwSnapshotRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t response_code;
-    u_int32_t bitfield1;
-    u_int32_t bitfield2;
-    u_int8_t data[100];     /* DMCmdSubsysNwSnapshotCdma */
+    uint8_t response_code;
+    uint32_t bitfield1;
+    uint32_t bitfield2;
+    uint8_t data[100];     /* DMCmdSubsysNwSnapshotCdma */
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotRsp DMCmdSubsysNwSnapshotRsp;
 
 struct DMCmdSubsysNwSnapshotCdma {
-    u_int32_t rssi;
-    u_int32_t battery_level;
-    u_int8_t call_info;
-    u_int8_t new_sms_ind;
-    u_int8_t missed_calls;
-    u_int32_t voicemail_ind;
-    u_int8_t pkt_call_ctrl_state;
-    u_int8_t mip_rrp_err_code;
-    u_int8_t cur_packet_zone_id;
-    u_int8_t prev;
-    u_int8_t band_class;
-    u_int8_t eri;
-    u_int8_t eri_alert_id;
-    u_int32_t cur_call_total_time;
-    u_int32_t cur_call_active_time;
-    u_int32_t cur_call_tx_ip_bytes;
-    u_int32_t cur_call_rx_ip_bytes;
-    u_int8_t connection_status;
-    u_int16_t dominant_pn;
-    u_int8_t wdisable_mask;
-    u_int8_t hdr_rev;
+    uint32_t rssi;
+    uint32_t battery_level;
+    uint8_t call_info;
+    uint8_t new_sms_ind;
+    uint8_t missed_calls;
+    uint32_t voicemail_ind;
+    uint8_t pkt_call_ctrl_state;
+    uint8_t mip_rrp_err_code;
+    uint8_t cur_packet_zone_id;
+    uint8_t prev;
+    uint8_t band_class;
+    uint8_t eri;
+    uint8_t eri_alert_id;
+    uint32_t cur_call_total_time;
+    uint32_t cur_call_active_time;
+    uint32_t cur_call_tx_ip_bytes;
+    uint32_t cur_call_rx_ip_bytes;
+    uint8_t connection_status;
+    uint16_t dominant_pn;
+    uint8_t wdisable_mask;
+    uint8_t hdr_rev;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotCdma DMCmdSubsysNwSnapshotCdma;
 
 /* DIAG_SUBSYS_NOVATEL_MODEM_SNAPSHOT response */
 struct DMCmdSubsysNwEriRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t status;
-    u_int16_t error;
-    u_int8_t roam;
-    u_int8_t eri_header[6];
-    u_int8_t eri_call_prompt[38];
+    uint8_t status;
+    uint16_t error;
+    uint8_t roam;
+    uint8_t eri_header[6];
+    uint8_t eri_call_prompt[38];
 
     /* Roaming Indicator */
-    u_int8_t indicator_id;
-    u_int8_t icon_id;
-    u_int8_t icon_mode;
-    u_int8_t call_prompt_id;  /* Call Guard? */
-    u_int8_t alert_id;        /* Ringer? */
-    u_int8_t encoding_type;
-    u_int8_t text_len;
-    u_int8_t text[32];
+    uint8_t indicator_id;
+    uint8_t icon_id;
+    uint8_t icon_mode;
+    uint8_t call_prompt_id;  /* Call Guard? */
+    uint8_t alert_id;        /* Ringer? */
+    uint8_t encoding_type;
+    uint8_t text_len;
+    uint8_t text[32];
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwEriRsp DMCmdSubsysNwEriRsp;
 
@@ -531,26 +531,26 @@ enum {
 };
 
 struct DMCmdLogConfig {
-    u_int8_t code;
-    u_int8_t pad[3];
-    u_int32_t op;
-    u_int32_t equipid;
-    u_int32_t num_items;
-    u_int8_t mask[0];
+    uint8_t code;
+    uint8_t pad[3];
+    uint32_t op;
+    uint32_t equipid;
+    uint32_t num_items;
+    uint8_t mask[0];
 } __attribute__ ((packed));
 typedef struct DMCmdLogConfig DMCmdLogConfig;
 
 struct DMCmdLogConfigRsp {
-    u_int8_t code;
-    u_int8_t pad[3];
-    u_int32_t op;
-    u_int32_t result;  /* 0 = success */
-    u_int32_t equipid;
+    uint8_t code;
+    uint8_t pad[3];
+    uint32_t op;
+    uint32_t result;  /* 0 = success */
+    uint32_t equipid;
     union {
-        u_int32_t get_range_items[16];
+        uint32_t get_range_items[16];
         struct {
-            u_int32_t num_items;
-            u_int8_t mask[0];
+            uint32_t num_items;
+            uint8_t mask[0];
         } get_set_items;
     } u;
 } __attribute__ ((packed));
@@ -559,51 +559,50 @@ typedef struct DMCmdLogConfigRsp DMCmdLogConfigRsp;
 /* DIAG_SUBSYS_WCDMA_CALL_START command */
 struct DMCmdSubsysWcdmaCallStart {
     DMCmdSubsysHeader hdr;
-    u_int8_t number_len;
-    u_int8_t number_digits[32];
-    u_int8_t amr_rate;  /* default to 7 */
+    uint8_t number_len;
+    uint8_t number_digits[32];
+    uint8_t amr_rate;  /* default to 7 */
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysWcdmaCallStart DMCmdSubsysWcdmaCallStart;
 
 /* DIAG_SUBSYS_WCDMA_STATE_INFO response */
 struct DMCmdSubsysWcdmaStateInfoRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t imei_len;
-    u_int8_t imei[8];
-    u_int8_t imsi_len;
-    u_int8_t imsi[8];
-    u_int8_t l1_state;
+    uint8_t imei_len;
+    uint8_t imei[8];
+    uint8_t imsi_len;
+    uint8_t imsi[8];
+    uint8_t l1_state;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysWcdmaStateInfoRsp DMCmdSubsysWcdmaStateInfoRsp;
 
 /* DIAG_SUBSYS_GSM_STATE_INFO response */
 struct DMCmdSubsysGsmStateInfoRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t imei_len;
-    u_int8_t imei[8];
-    u_int8_t imsi_len;
-    u_int8_t imsi[8];
-    u_int8_t lai[5];
-    u_int16_t cellid;
-    u_int8_t cm_call_state;
-    u_int8_t cm_opmode;
-    u_int8_t cm_sysmode;
+    uint8_t imei_len;
+    uint8_t imei[8];
+    uint8_t imsi_len;
+    uint8_t imsi[8];
+    uint8_t lai[5];
+    uint16_t cellid;
+    uint8_t cm_call_state;
+    uint8_t cm_opmode;
+    uint8_t cm_sysmode;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysGsmStateInfoRsp DMCmdSubsysGsmStateInfoRsp;
 
 /* DIAG_CMD_SAMSUNG_IND response */
 struct DMCmdSamsungIndRsp {
     DMCmdHeader hdr;
-    u_int8_t _unknown1;  /* always zero */
-    u_int8_t _unknown2;  /* 0x0c */
-    u_int8_t  _unknown3[4];  /* always zero */
-    u_int8_t _unknown4;  /* 0x05 */
-    u_int8_t _unknown5;  /* always zero */
-    u_int8_t _unknown6;  /* 0x01 */
-    u_int8_t _unknown7;  /* always zero */
-    u_int8_t signal;  /* 0 - 5 */
+    uint8_t _unknown1;  /* always zero */
+    uint8_t _unknown2;  /* 0x0c */
+    uint8_t  _unknown3[4];  /* always zero */
+    uint8_t _unknown4;  /* 0x05 */
+    uint8_t _unknown5;  /* always zero */
+    uint8_t _unknown6;  /* 0x01 */
+    uint8_t _unknown7;  /* always zero */
+    uint8_t signal;  /* 0 - 5 */
 } __attribute__ ((packed));
 typedef struct DMCmdSamsungIndRsp DMCmdSamsungIndRsp;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
-

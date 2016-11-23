@@ -347,7 +347,7 @@ test_com_device_info (void *f, void *data)
 }
 
 static const char *
-service_to_string (u_int8_t service)
+service_to_string (uint8_t service)
 {
     switch (service) {
     case WMC_NETWORK_SERVICE_NONE:
@@ -392,7 +392,7 @@ test_com_network_info (void *f, void *data)
     wmcbool success;
     char buf[1024];
     const char *str;
-    u_int8_t dbm, service;
+    uint8_t dbm, service;
     gint len;
     WmcResult *result;
     size_t reply_len;
@@ -445,7 +445,7 @@ test_com_network_info (void *f, void *data)
 }
 
 static const char *
-mode_to_string (u_int8_t service)
+mode_to_string (uint8_t service)
 {
     switch (service) {
     case WMC_NETWORK_MODE_AUTO_CDMA:
@@ -475,7 +475,7 @@ test_com_get_global_mode (void *f, void *data)
     TestComData *d = data;
     wmcbool success;
     char buf[1024];
-    u_int8_t mode;
+    uint8_t mode;
     gint len;
     WmcResult *result;
     size_t reply_len;
@@ -502,4 +502,3 @@ test_com_get_global_mode (void *f, void *data)
 
     wmc_result_unref (result);
 }
-

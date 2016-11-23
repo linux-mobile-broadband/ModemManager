@@ -33,7 +33,7 @@
  */
 
 /* Table of CRCs for each possible byte, with a generator polynomial of 0x8408 */
-static const u_int16_t crc_table[256] = {
+static const uint16_t crc_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
     0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -69,10 +69,10 @@ static const u_int16_t crc_table[256] = {
 };
 
 /* Calculate the CRC for a buffer using a seed of 0xffff */
-u_int16_t
-wmc_crc16 (const char *buffer, size_t len, u_int16_t seed)
+uint16_t
+wmc_crc16 (const char *buffer, size_t len, uint16_t seed)
 {
-    u_int16_t crc = seed ? seed : 0xFFFF;
+    uint16_t crc = seed ? seed : 0xFFFF;
 
     while (len--)
             crc = crc_table[(crc ^ *buffer++) & 0xff] ^ (crc >> 8);
@@ -103,7 +103,7 @@ hdlc_escape (const char *inbuf,
 
     /* Since escaping potentially doubles the # of bytes, short-circuit the
      * length check if destination buffer is clearly large enough.  Note the
-     * 
+     *
      */
     if (outbuf_len <= inbuf_len << 1) {
         size_t outbuf_required = inbuf_len + 1; /* +1 for the trailing control char */
@@ -129,7 +129,7 @@ hdlc_escape (const char *inbuf,
     src = inbuf;
     i = inbuf_len;
     while (i--) {
-        u_int8_t byte = (u_int8_t) *src++;
+        uint8_t byte = (uint8_t) *src++;
 
         if (   byte == DIAG_CONTROL_CHAR
             || byte == DIAG_ESC_CHAR
@@ -194,13 +194,13 @@ size_t
 hdlc_encapsulate_buffer (char *inbuf,
                          size_t cmd_len,
                          size_t inbuf_len,
-                         u_int16_t crc_seed,
+                         uint16_t crc_seed,
                          wmcbool add_trailer,
                          wmcbool escape_all_ctrl,
                          char *outbuf,
                          size_t outbuf_len)
 {
-    u_int16_t crc;
+    uint16_t crc;
     size_t escaped_len;
 
     wmc_return_val_if_fail (inbuf != NULL, 0);
@@ -338,7 +338,7 @@ wmcbool
 hdlc_decapsulate_buffer (const char *inbuf,
                          size_t inbuf_len,
                          wmcbool check_known_crc,
-                         u_int16_t known_crc,
+                         uint16_t known_crc,
                          char *outbuf,
                          size_t outbuf_len,
                          size_t *out_decap_len,
@@ -347,7 +347,7 @@ hdlc_decapsulate_buffer (const char *inbuf,
 {
     wmcbool escaping = FALSE;
     size_t i, pkt_len = 0, unesc_len;
-    u_int16_t crc, pkt_crc;
+    uint16_t crc, pkt_crc;
 
     wmc_return_val_if_fail (inbuf != NULL, FALSE);
     wmc_return_val_if_fail (outbuf != NULL, FALSE);
@@ -457,4 +457,3 @@ wmc_decapsulate (const char *inbuf,
                                     outbuf, outbuf_len,
                                     out_decap_len, out_used, out_need_more);
 }
-

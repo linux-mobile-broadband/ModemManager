@@ -19,20 +19,20 @@
 #define LIBQCDM_UTILS_H
 
 #include <config.h>
-#include <sys/types.h>
+#include <stdint.h>
 
-typedef u_int8_t qcdmbool;
+typedef uint8_t qcdmbool;
 #ifndef TRUE
-#define TRUE ((u_int8_t) 1)
+#define TRUE ((uint8_t) 1)
 #endif
 #ifndef FALSE
-#define FALSE ((u_int8_t) 0)
+#define FALSE ((uint8_t) 0)
 #endif
 
 #define DIAG_CONTROL_CHAR 0x7E
 #define DIAG_TRAILER_LEN  3
 
-u_int16_t dm_crc16 (const char *buffer, size_t len);
+uint16_t dm_crc16 (const char *buffer, size_t len);
 
 size_t dm_escape (const char *inbuf,
                   size_t inbuf_len,
@@ -60,4 +60,3 @@ qcdmbool dm_decapsulate_buffer (const char *inbuf,
                                 qcdmbool *out_need_more);
 
 #endif  /* LIBQCDM_UTILS_H */
-

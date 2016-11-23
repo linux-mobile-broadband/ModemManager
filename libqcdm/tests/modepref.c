@@ -39,7 +39,7 @@ print_buf (const char *detail, const char *buf, size_t len)
 	int i = 0, z;
 	qcdmbool newline = FALSE;
 	char tmp[500];
-	u_int32_t flen;
+	uint32_t flen;
 
 	flen = snprintf (tmp, sizeof (tmp) - 1, "%s (%zu)  ", detail, len);
 	fprintf (stdout, "%s", tmp);
@@ -173,7 +173,7 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 }
 
 static int
-qcdm_set_mode_pref (int fd, u_int8_t modepref)
+qcdm_set_mode_pref (int fd, uint8_t modepref)
 {
 	int err;
 	char buf[512];
@@ -217,7 +217,7 @@ qcdm_get_mode_pref (int fd)
 	QcdmResult *result;
 	size_t reply_len;
 	const char *smode = NULL;
-	u_int8_t mode = 0;
+	uint8_t mode = 0;
 
 	len = qcdm_cmd_nv_get_mode_pref_new (buf, sizeof (buf), 0);
 	assert (len);
@@ -291,7 +291,7 @@ qcdm_get_mode_pref (int fd)
 }
 
 static int
-qcdm_set_hdr_pref (int fd, u_int8_t hdrpref)
+qcdm_set_hdr_pref (int fd, uint8_t hdrpref)
 {
 	int err;
 	char buf[512];
@@ -334,7 +334,7 @@ qcdm_get_hdr_pref (int fd)
 	size_t len;
 	QcdmResult *result = NULL;
 	size_t reply_len;
-    u_int8_t pref;
+    uint8_t pref;
     const char *spref = NULL;
 
     len = qcdm_cmd_nv_get_hdr_rev_pref_new (buf, sizeof (buf));
@@ -385,7 +385,7 @@ error:
 }
 
 static int
-qcdm_set_mode (int fd, u_int8_t mode)
+qcdm_set_mode (int fd, uint8_t mode)
 {
 	int err;
 	char buf[512];
@@ -435,8 +435,8 @@ usage (const char *prog)
 
 static qcdmbool
 parse_mode (const char *s,
-            u_int8_t *out_mode,
-            u_int8_t *out_hdrpref,
+            uint8_t *out_mode,
+            uint8_t *out_hdrpref,
             qcdmbool *out_set_evdo)
 {
 	if (strcasecmp (s, "lte") == 0) {
@@ -506,8 +506,8 @@ parse_mode (const char *s,
 int
 main (int argc, char *argv[])
 {
-	u_int8_t mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO;
-	u_int8_t hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
+	uint8_t mode = QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO;
+	uint8_t hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
 	const char *dmport = argv[1];
 	const char *smode = argv[2];
 	const char *msg;
@@ -570,4 +570,3 @@ main (int argc, char *argv[])
 
 	return 0;
 }
-

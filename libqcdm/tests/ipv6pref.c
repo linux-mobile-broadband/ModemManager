@@ -39,7 +39,7 @@ print_buf (const char *detail, const char *buf, size_t len)
 	int i = 0, z;
 	qcdmbool newline = FALSE;
 	char tmp[500];
-	u_int32_t flen;
+	uint32_t flen;
 
 	flen = snprintf (tmp, sizeof (tmp) - 1, "%s (%zu)  ", detail, len);
 	fprintf (stdout, "%s", tmp);
@@ -173,7 +173,7 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 }
 
 static int
-qcdm_set_ipv6_enabled (int fd, u_int8_t ipv6pref)
+qcdm_set_ipv6_enabled (int fd, uint8_t ipv6pref)
 {
 	int err;
 	char buf[512];
@@ -216,7 +216,7 @@ qcdm_get_ipv6_enabled (int fd)
 	size_t len;
 	QcdmResult *result;
 	size_t reply_len;
-	u_int8_t mode;
+	uint8_t mode;
 
 	len = qcdm_cmd_nv_get_ipv6_enabled_new (buf, sizeof (buf));
 	assert (len);
@@ -313,4 +313,3 @@ main (int argc, char *argv[])
 
 	return 0;
 }
-

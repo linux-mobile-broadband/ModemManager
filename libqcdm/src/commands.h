@@ -110,7 +110,7 @@ enum {
     QCDM_CMD_CONTROL_MODE_RESET = 2,
 };
 
-size_t      qcdm_cmd_control_new    (char *buf, size_t len, u_int8_t mode);
+size_t      qcdm_cmd_control_new    (char *buf, size_t len, uint8_t mode);
 
 QcdmResult *qcdm_cmd_control_result (const char *buf,
                                      size_t len,
@@ -236,14 +236,14 @@ QcdmResult *qcdm_cmd_pilot_sets_result (const char *buf,
                                         int *out_error);
 
 qcdmbool    qcdm_cmd_pilot_sets_result_get_num   (QcdmResult *result,
-                                                  u_int32_t set_type,
-                                                  u_int32_t *out_num);
+                                                  uint32_t set_type,
+                                                  uint32_t *out_num);
 
 qcdmbool    qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
-                                                  u_int32_t set_type,
-                                                  u_int32_t num,
-                                                  u_int32_t *out_pn_offset,
-                                                  u_int32_t *out_ecio,
+                                                  uint32_t set_type,
+                                                  uint32_t num,
+                                                  uint32_t *out_pn_offset,
+                                                  uint32_t *out_ecio,
                                                   float *out_db);
 
 /**********************************************************************/
@@ -251,7 +251,7 @@ qcdmbool    qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
 #define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
 #define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
 
-size_t      qcdm_cmd_nv_get_mdn_new    (char *buf, size_t len, u_int8_t profile);
+size_t      qcdm_cmd_nv_get_mdn_new    (char *buf, size_t len, uint8_t profile);
 
 QcdmResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
                                         size_t len,
@@ -271,7 +271,7 @@ enum {
 
 size_t      qcdm_cmd_nv_get_roam_pref_new    (char *buf,
                                               size_t len,
-                                              u_int8_t profile);
+                                              uint8_t profile);
 
 QcdmResult *qcdm_cmd_nv_get_roam_pref_result (const char *buf,
                                               size_t len,
@@ -279,8 +279,8 @@ QcdmResult *qcdm_cmd_nv_get_roam_pref_result (const char *buf,
 
 size_t      qcdm_cmd_nv_set_roam_pref_new    (char *buf,
                                               size_t len,
-                                              u_int8_t profile,
-                                              u_int8_t roam_pref);
+                                              uint8_t profile,
+                                              uint8_t roam_pref);
 
 QcdmResult *qcdm_cmd_nv_set_roam_pref_result (const char *buf,
                                               size_t len,
@@ -311,7 +311,7 @@ enum {
 
 size_t      qcdm_cmd_nv_get_mode_pref_new    (char *buf,
                                               size_t len,
-                                              u_int8_t profile);
+                                              uint8_t profile);
 
 QcdmResult *qcdm_cmd_nv_get_mode_pref_result (const char *buf,
                                               size_t len,
@@ -319,8 +319,8 @@ QcdmResult *qcdm_cmd_nv_get_mode_pref_result (const char *buf,
 
 size_t      qcdm_cmd_nv_set_mode_pref_new    (char *buf,
                                               size_t len,
-                                              u_int8_t profile,
-                                              u_int8_t mode_pref);
+                                              uint8_t profile,
+                                              uint8_t mode_pref);
 
 QcdmResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
                                               size_t len,
@@ -343,7 +343,7 @@ QcdmResult *qcdm_cmd_nv_get_hybrid_pref_result (const char *buf,
 
 size_t      qcdm_cmd_nv_set_hybrid_pref_new    (char *buf,
                                                 size_t len,
-                                                u_int8_t hybrid_pref);
+                                                uint8_t hybrid_pref);
 
 QcdmResult *qcdm_cmd_nv_set_hybrid_pref_result (const char *buf,
                                                 size_t len,
@@ -366,7 +366,7 @@ QcdmResult *qcdm_cmd_nv_get_ipv6_enabled_result (const char *buf,
 
 size_t      qcdm_cmd_nv_set_ipv6_enabled_new    (char *buf,
                                                 size_t len,
-                                                u_int8_t enabled);
+                                                uint8_t enabled);
 
 QcdmResult *qcdm_cmd_nv_set_ipv6_enabled_result (const char *buf,
                                                 size_t len,
@@ -391,7 +391,7 @@ QcdmResult *qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf,
 
 size_t      qcdm_cmd_nv_set_hdr_rev_pref_new    (char *buf,
                                                  size_t len,
-                                                 u_int8_t rev_pref);
+                                                 uint8_t rev_pref);
 
 QcdmResult *qcdm_cmd_nv_set_hdr_rev_pref_result (const char *buf,
                                                  size_t len,
@@ -568,8 +568,8 @@ QcdmResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
 
 size_t      qcdm_cmd_ext_logmask_new    (char *buf,
                                          size_t len,
-                                         u_int32_t items[], /* terminated by 0 */
-                                         u_int16_t maxlog);
+                                         uint32_t items[], /* terminated by 0 */
+                                         uint16_t maxlog);
 
 QcdmResult *qcdm_cmd_ext_logmask_result (const char *buf,
                                          size_t len,
@@ -577,7 +577,7 @@ QcdmResult *qcdm_cmd_ext_logmask_result (const char *buf,
 
 /* Returns TRUE if 'item' is set in the log mask */
 qcdmbool    qcmd_cmd_ext_logmask_result_get_item (QcdmResult *result,
-                                                  u_int16_t item);
+                                                  uint16_t item);
 
 /**********************************************************************/
 
@@ -593,12 +593,12 @@ QcdmResult *qcdm_cmd_event_report_result (const char *buf,
 
 size_t qcdm_cmd_log_config_get_mask_new (char *buf,
                                          size_t len,
-                                         u_int32_t equip_id);
+                                         uint32_t equip_id);
 
 size_t qcdm_cmd_log_config_set_mask_new (char *buf,
                                          size_t len,
-                                         u_int32_t equip_id,
-                                         u_int16_t items[]);
+                                         uint32_t equip_id,
+                                         uint16_t items[]);
 
 #define QCDM_CMD_LOG_CONFIG_MASK_ITEM_EQUIP_ID  "equip-id"
 
@@ -615,8 +615,8 @@ QcdmResult *qcdm_cmd_log_config_set_mask_result (const char *buf,
                                                  int *out_error);
 
 qcdmbool    qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
-                                                      u_int32_t equipid,
-                                                      u_int16_t log_code);
+                                                      uint32_t equipid,
+                                                      uint16_t log_code);
 
 /**********************************************************************/
 
@@ -651,7 +651,7 @@ enum {
 
 size_t      qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
                                                            size_t len,
-                                                           u_int8_t chipset);
+                                                           uint8_t chipset);
 
 QcdmResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
                                                            size_t len,
@@ -677,7 +677,7 @@ QcdmResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
 
 size_t      qcdm_cmd_nw_subsys_eri_new    (char *buf,
                                            size_t len,
-                                           u_int8_t chipset);
+                                           uint8_t chipset);
 
 QcdmResult *qcdm_cmd_nw_subsys_eri_result (const char *buf,
                                            size_t len,

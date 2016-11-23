@@ -18,14 +18,14 @@
 #ifndef LIBWMC_UTILS_H
 #define LIBWMC_UTILS_H
 
-#include <sys/types.h>
+#include <stdint.h>
 
-typedef u_int8_t wmcbool;
+typedef uint8_t wmcbool;
 #ifndef TRUE
-#define TRUE ((u_int8_t) 1)
+#define TRUE ((uint8_t) 1)
 #endif
 #ifndef FALSE
-#define FALSE ((u_int8_t) 0)
+#define FALSE ((uint8_t) 0)
 #endif
 
 #define DIAG_CONTROL_CHAR 0x7E
@@ -33,7 +33,7 @@ typedef u_int8_t wmcbool;
 
 /* Utility and testcase functions */
 
-u_int16_t wmc_crc16 (const char *buffer, size_t len, u_int16_t seed);
+uint16_t wmc_crc16 (const char *buffer, size_t len, uint16_t seed);
 
 size_t hdlc_escape (const char *inbuf,
                     size_t inbuf_len,
@@ -50,7 +50,7 @@ size_t hdlc_unescape (const char *inbuf,
 size_t hdlc_encapsulate_buffer (char *inbuf,
                                 size_t cmd_len,
                                 size_t inbuf_len,
-                                u_int16_t crc_seed,
+                                uint16_t crc_seed,
                                 wmcbool add_trailer,
                                 wmcbool escape_all_ctrl,
                                 char *outbuf,
@@ -59,7 +59,7 @@ size_t hdlc_encapsulate_buffer (char *inbuf,
 wmcbool hdlc_decapsulate_buffer (const char *inbuf,
                                  size_t inbuf_len,
                                  wmcbool check_known_crc,
-                                 u_int16_t known_crc,
+                                 uint16_t known_crc,
                                  char *outbuf,
                                  size_t outbuf_len,
                                  size_t *out_decap_len,
@@ -85,4 +85,3 @@ wmcbool wmc_decapsulate (const char *inbuf,
                          wmcbool uml290);
 
 #endif  /* LIBWMC_UTILS_H */
-

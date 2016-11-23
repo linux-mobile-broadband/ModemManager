@@ -35,14 +35,14 @@ QcdmResult *qcdm_log_item_evdo_pilot_sets_v2_new       (const char *buf,
                                                         int *out_error);
 
 qcdmbool    qcdm_log_item_evdo_pilot_sets_v2_get_num   (QcdmResult *result,
-                                                        u_int32_t set_type,
-                                                        u_int32_t *out_num);
+                                                        uint32_t set_type,
+                                                        uint32_t *out_num);
 
 qcdmbool    qcdm_log_item_evdo_pilot_sets_v2_get_pilot (QcdmResult *result,
-                                                        u_int32_t set_type,
-                                                        u_int32_t num,
-                                                        u_int32_t *out_pilot_pn,
-                                                        u_int32_t *out_pilot_energy,
+                                                        uint32_t set_type,
+                                                        uint32_t num,
+                                                        uint32_t *out_pilot_pn,
+                                                        uint32_t *out_pilot_energy,
                                                         int32_t *out_rssi_dbm);
 
 /**********************************************************************/

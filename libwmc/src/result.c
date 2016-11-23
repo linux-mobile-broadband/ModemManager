@@ -38,8 +38,8 @@ struct Val {
     ValType type;
     union {
         char *s;
-        u_int8_t u8;
-        u_int32_t u32;
+        uint8_t u8;
+        uint32_t u32;
     } u;
     Val *next;
 };
@@ -76,7 +76,7 @@ val_new_string (const char *key, const char *value)
 }
 
 static Val *
-val_new_u8 (const char *key, u_int8_t u)
+val_new_u8 (const char *key, uint8_t u)
 {
     Val *v;
 
@@ -94,7 +94,7 @@ val_new_u8 (const char *key, u_int8_t u)
 }
 
 static Val *
-val_new_u32 (const char *key, u_int32_t u)
+val_new_u32 (const char *key, uint32_t u)
 {
     Val *v;
 
@@ -114,7 +114,7 @@ val_new_u32 (const char *key, u_int32_t u)
 /*********************************************************/
 
 struct WmcResult {
-    u_int32_t refcount;
+    uint32_t refcount;
     Val *first;
 };
 
@@ -225,7 +225,7 @@ wmc_result_get_string (WmcResult *r,
 void
 wmc_result_add_u8 (WmcResult *r,
                    const char *key,
-                   u_int8_t num)
+                   uint8_t num)
 {
     Val *v;
 
@@ -242,7 +242,7 @@ wmc_result_add_u8 (WmcResult *r,
 int
 wmc_result_get_u8  (WmcResult *r,
                     const char *key,
-                    u_int8_t *out_val)
+                    uint8_t *out_val)
 {
     Val *v;
 
@@ -262,7 +262,7 @@ wmc_result_get_u8  (WmcResult *r,
 void
 wmc_result_add_u32 (WmcResult *r,
                     const char *key,
-                    u_int32_t num)
+                    uint32_t num)
 {
     Val *v;
 
@@ -279,7 +279,7 @@ wmc_result_add_u32 (WmcResult *r,
 int
 wmc_result_get_u32 (WmcResult *r,
                     const char *key,
-                    u_int32_t *out_val)
+                    uint32_t *out_val)
 {
     Val *v;
 
@@ -295,4 +295,3 @@ wmc_result_get_u32 (WmcResult *r,
     *out_val = v->u.u32;
     return 0;
 }
-

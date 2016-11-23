@@ -28,22 +28,22 @@
 /**********************************************************************/
 
 static int
-check_command (const char *buf, size_t len, u_int8_t cmd, size_t min_len)
+check_command (const char *buf, size_t len, uint8_t cmd, size_t min_len)
 {
     if (len < 1) {
         wmc_err (0, "Zero-length response");
         return -WMC_ERROR_RESPONSE_BAD_LENGTH;
     }
 
-    if ((u_int8_t) buf[0] != WMC_CMD_MARKER) {
+    if ((uint8_t) buf[0] != WMC_CMD_MARKER) {
         wmc_err (0, "Missing WMC command marker (expected 0x%02X, got 0x%02X)",
-                 WMC_CMD_MARKER, (u_int8_t) buf[0]);
+                 WMC_CMD_MARKER, (uint8_t) buf[0]);
         return -WMC_ERROR_RESPONSE_UNEXPECTED;
     }
 
-    if ((u_int8_t) buf[1] != cmd) {
+    if ((uint8_t) buf[1] != cmd) {
         wmc_err (0, "Unexpected WMC command response (expected 0x%02X, got 0x%02X)",
-                 (u_int8_t) cmd, (u_int8_t) buf[1]);
+                 (uint8_t) cmd, (uint8_t) buf[1]);
         return -WMC_ERROR_RESPONSE_UNEXPECTED;
     }
 
@@ -245,40 +245,40 @@ wmc_cmd_network_info_new (char *buf, size_t buflen)
 }
 
 static wmcbool
-is_gsm_service (u_int8_t service)
+is_gsm_service (uint8_t service)
 {
     return (service == WMC_SERVICE_GSM || service == WMC_SERVICE_GPRS || service == WMC_SERVICE_EDGE);
 }
 
 static wmcbool
-is_umts_service (u_int8_t service)
+is_umts_service (uint8_t service)
 {
     return (service == WMC_SERVICE_UMTS || service == WMC_SERVICE_HSDPA
             || service == WMC_SERVICE_HSUPA || service == WMC_SERVICE_HSPA);
 }
 
 static wmcbool
-is_cdma_service (u_int8_t service)
+is_cdma_service (uint8_t service)
 {
     return (service == WMC_SERVICE_IS95A || service == WMC_SERVICE_IS95B || service == WMC_SERVICE_1XRTT);
 }
 
 static wmcbool
-is_evdo_service (u_int8_t service)
+is_evdo_service (uint8_t service)
 {
     return (service == WMC_SERVICE_EVDO_0 || service == WMC_SERVICE_EVDO_A || service == WMC_SERVICE_EVDO_A_EHRPD);
 }
 
 static wmcbool
-is_lte_service (u_int8_t service)
+is_lte_service (uint8_t service)
 {
     return (service == WMC_SERVICE_LTE);
 }
 
-static u_int8_t
-sanitize_dbm (u_int8_t in_dbm, u_int8_t service)
+static uint8_t
+sanitize_dbm (uint8_t in_dbm, uint8_t service)
 {
-    u_int8_t cutoff;
+    uint8_t cutoff;
 
     /* 0x6A (-106 dBm) = no signal for GSM/GPRS/EDGE */
     /* 0x7D (-125 dBm) = no signal for everything else */
@@ -297,7 +297,7 @@ wmc_cmd_network_info_result (const char *buf, size_t buflen)
     WmcCmdNetworkInfo3Rsp *rsp3 = (WmcCmdNetworkInfo3Rsp *) buf;
     char tmp[65];
     int err;
-    u_int32_t mccmnc = 0, mcc, mnc;
+    uint32_t mccmnc = 0, mcc, mnc;
 
     wmc_return_val_if_fail (buf != NULL, NULL);
 
@@ -415,7 +415,7 @@ wmc_cmd_get_global_mode_result (const char *buf, size_t buflen)
 /**********************************************************************/
 
 static wmcbool
-validate_mode (u_int8_t mode)
+validate_mode (uint8_t mode)
 {
     switch (mode) {
     case WMC_NETWORK_MODE_AUTO_CDMA:
@@ -434,7 +434,7 @@ validate_mode (u_int8_t mode)
 }
 
 size_t
-wmc_cmd_set_global_mode_new (char *buf, size_t buflen, u_int8_t mode)
+wmc_cmd_set_global_mode_new (char *buf, size_t buflen, uint8_t mode)
 {
     WmcCmdSetGlobalMode *cmd = (WmcCmdSetGlobalMode *) buf;
 
@@ -464,4 +464,3 @@ wmc_cmd_set_global_mode_result (const char *buf, size_t buflen)
 }
 
 /**********************************************************************/
-

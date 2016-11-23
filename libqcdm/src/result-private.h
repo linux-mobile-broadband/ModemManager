@@ -28,26 +28,25 @@ void qcdm_result_add_string (QcdmResult *result,
 
 void qcdm_result_add_u8     (QcdmResult *result,
                              const char *key,
-                             u_int8_t num);
+                             uint8_t num);
 
 void qcdm_result_add_u8_array (QcdmResult *result,
                                const char *key,
-                               const u_int8_t *array,
+                               const uint8_t *array,
                                size_t array_len);
 
 int qcdm_result_get_u8_array  (QcdmResult *result,
                                const char *key,
-                               const u_int8_t **out_val,
+                               const uint8_t **out_val,
                                size_t *out_len);
 
 void qcdm_result_add_u16_array (QcdmResult *result,
                                 const char *key,
-                                const u_int16_t *array,
+                                const uint16_t *array,
                                 size_t array_len);
 
 void qcdm_result_add_u32    (QcdmResult *result,
                              const char *key,
-                             u_int32_t num);
+                             uint32_t num);
 
 #endif  /* LIBQCDM_RESULT_PRIVATE_H */
-

@@ -37,15 +37,15 @@ typedef enum {
 
 struct Val {
     char *key;
-    u_int8_t type;
+    uint8_t type;
     union {
         char *s;
-        u_int8_t u8;
-        u_int32_t u32;
-        u_int8_t *u8_array;
-        u_int16_t *u16_array;
+        uint8_t u8;
+        uint32_t u32;
+        uint8_t *u8_array;
+        uint16_t *u16_array;
     } u;
-    u_int32_t array_len;
+    uint32_t array_len;
     Val *next;
 };
 
@@ -84,7 +84,7 @@ val_new_string (const char *key, const char *value)
 }
 
 static Val *
-val_new_u8 (const char *key, u_int8_t u)
+val_new_u8 (const char *key, uint8_t u)
 {
     Val *v;
 
@@ -102,7 +102,7 @@ val_new_u8 (const char *key, u_int8_t u)
 }
 
 static Val *
-val_new_u8_array (const char *key, const u_int8_t *array, size_t array_len)
+val_new_u8_array (const char *key, const uint8_t *array, size_t array_len)
 {
     Val *v;
 
@@ -129,7 +129,7 @@ val_new_u8_array (const char *key, const u_int8_t *array, size_t array_len)
 }
 
 static Val *
-val_new_u32 (const char *key, u_int32_t u)
+val_new_u32 (const char *key, uint32_t u)
 {
     Val *v;
 
@@ -147,7 +147,7 @@ val_new_u32 (const char *key, u_int32_t u)
 }
 
 static Val *
-val_new_u16_array (const char *key, const u_int16_t *array, size_t array_len)
+val_new_u16_array (const char *key, const uint16_t *array, size_t array_len)
 {
     Val *v;
     size_t sz;
@@ -163,7 +163,7 @@ val_new_u16_array (const char *key, const u_int16_t *array, size_t array_len)
 
     v->key = strdup (key);
     v->type = VAL_TYPE_U16_ARRAY;
-    sz = sizeof (u_int16_t) * array_len;
+    sz = sizeof (uint16_t) * array_len;
     v->u.u16_array = malloc (sz);
     if (v->u.u16_array == NULL) {
         val_free (v);
@@ -178,7 +178,7 @@ val_new_u16_array (const char *key, const u_int16_t *array, size_t array_len)
 /*********************************************************/
 
 struct QcdmResult {
-    u_int32_t refcount;
+    uint32_t refcount;
     Val *first;
 };
 
@@ -289,7 +289,7 @@ qcdm_result_get_string (QcdmResult *r,
 void
 qcdm_result_add_u8 (QcdmResult *r,
                    const char *key,
-                   u_int8_t num)
+                   uint8_t num)
 {
     Val *v;
 
@@ -306,7 +306,7 @@ qcdm_result_add_u8 (QcdmResult *r,
 int
 qcdm_result_get_u8  (QcdmResult *r,
                     const char *key,
-                    u_int8_t *out_val)
+                    uint8_t *out_val)
 {
     Val *v;
 
@@ -326,7 +326,7 @@ qcdm_result_get_u8  (QcdmResult *r,
 void
 qcdm_result_add_u8_array (QcdmResult *r,
                           const char *key,
-                          const u_int8_t *array,
+                          const uint8_t *array,
                           size_t array_len)
 {
     Val *v;
@@ -346,7 +346,7 @@ qcdm_result_add_u8_array (QcdmResult *r,
 int
 qcdm_result_get_u8_array (QcdmResult *r,
                           const char *key,
-                          const u_int8_t **out_val,
+                          const uint8_t **out_val,
                           size_t *out_len)
 {
     Val *v;
@@ -369,7 +369,7 @@ qcdm_result_get_u8_array (QcdmResult *r,
 void
 qcdm_result_add_u32 (QcdmResult *r,
                     const char *key,
-                    u_int32_t num)
+                    uint32_t num)
 {
     Val *v;
 
@@ -386,7 +386,7 @@ qcdm_result_add_u32 (QcdmResult *r,
 int
 qcdm_result_get_u32 (QcdmResult *r,
                     const char *key,
-                    u_int32_t *out_val)
+                    uint32_t *out_val)
 {
     Val *v;
 
@@ -406,7 +406,7 @@ qcdm_result_get_u32 (QcdmResult *r,
 void
 qcdm_result_add_u16_array (QcdmResult *r,
                            const char *key,
-                           const u_int16_t *array,
+                           const uint16_t *array,
                            size_t array_len)
 {
     Val *v;
@@ -426,7 +426,7 @@ qcdm_result_add_u16_array (QcdmResult *r,
 int
 qcdm_result_get_u16_array (QcdmResult *r,
                            const char *key,
-                           const u_int16_t **out_val,
+                           const uint16_t **out_val,
                            size_t *out_len)
 {
     Val *v;
@@ -445,4 +445,3 @@ qcdm_result_get_u16_array (QcdmResult *r,
     *out_len = v->array_len;
     return 0;
 }
-

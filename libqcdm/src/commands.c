@@ -29,8 +29,8 @@
 
 /**********************************************************************/
 
-static u_int8_t
-cdma_prev_to_qcdm (u_int8_t cdma)
+static uint8_t
+cdma_prev_to_qcdm (uint8_t cdma)
 {
     switch (cdma) {
     case CDMA_PREV_IS_95:
@@ -53,8 +53,8 @@ cdma_prev_to_qcdm (u_int8_t cdma)
     return QCDM_CDMA_PREV_UNKNOWN;
 }
 
-static u_int8_t
-cdma_band_class_to_qcdm (u_int8_t cdma)
+static uint8_t
+cdma_band_class_to_qcdm (uint8_t cdma)
 {
     switch (cdma) {
     case CDMA_BAND_CLASS_0_CELLULAR_800:
@@ -103,8 +103,8 @@ cdma_band_class_to_qcdm (u_int8_t cdma)
     return QCDM_CDMA_BAND_CLASS_UNKNOWN;
 }
 
-static u_int8_t
-nv_mode_pref_from_qcdm (u_int8_t qcdm)
+static uint8_t
+nv_mode_pref_from_qcdm (uint8_t qcdm)
 {
     switch (qcdm) {
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_DIGITAL:
@@ -152,7 +152,7 @@ nv_mode_pref_from_qcdm (u_int8_t qcdm)
  *
  */
 static char *
-bin2hexstr (const u_int8_t *bytes, int len)
+bin2hexstr (const uint8_t *bytes, int len)
 {
     static char hex_digits[] = "0123456789abcdef";
     char *result;
@@ -178,7 +178,7 @@ bin2hexstr (const u_int8_t *bytes, int len)
 /**********************************************************************/
 
 static qcdmbool
-check_command (const char *buf, size_t len, u_int8_t cmd, size_t min_len, int *out_error)
+check_command (const char *buf, size_t len, uint8_t cmd, size_t min_len, int *out_error)
 {
     if (len < 1) {
         qcdm_err (0, "DM command response malformed (must be at least 1 byte in length)");
@@ -241,7 +241,7 @@ check_command (const char *buf, size_t len, u_int8_t cmd, size_t min_len, int *o
 }
 
 static int
-nv_status_to_qcdm_error (u_int16_t status)
+nv_status_to_qcdm_error (uint16_t status)
 {
     switch (status) {
     case DIAG_NV_STATUS_OK:
@@ -266,9 +266,9 @@ nv_status_to_qcdm_error (u_int16_t status)
 }
 
 static qcdmbool
-check_nv_cmd (DMCmdNVReadWrite *cmd, u_int16_t nv_item, int *out_error)
+check_nv_cmd (DMCmdNVReadWrite *cmd, uint16_t nv_item, int *out_error)
 {
-    u_int16_t cmd_item;
+    uint16_t cmd_item;
 
     qcdm_return_val_if_fail (cmd != NULL, FALSE);
     qcdm_return_val_if_fail ((cmd->code == DIAG_CMD_NV_READ) || (cmd->code == DIAG_CMD_NV_WRITE), FALSE);
@@ -375,7 +375,7 @@ qcdm_cmd_esn_result (const char *buf, size_t len, int *out_error)
     QcdmResult *result = NULL;
     DMCmdEsnRsp *rsp = (DMCmdEsnRsp *) buf;
     char *tmp;
-    u_int8_t swapped[4];
+    uint8_t swapped[4];
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -403,7 +403,7 @@ qcdm_cmd_esn_result (const char *buf, size_t len, int *out_error)
 /**********************************************************************/
 
 size_t
-qcdm_cmd_control_new (char *buf, size_t len, u_int8_t mode)
+qcdm_cmd_control_new (char *buf, size_t len, uint8_t mode)
 {
     char cmdbuf[5];
     DMCmdControl *cmd = (DMCmdControl *) &cmdbuf[0];
@@ -413,7 +413,7 @@ qcdm_cmd_control_new (char *buf, size_t len, u_int8_t mode)
 
     memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_CONTROL;
-    cmd->mode = htole16 ((u_int16_t) mode);
+    cmd->mode = htole16 ((uint16_t) mode);
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
 }
@@ -452,8 +452,8 @@ qcdm_cmd_cdma_status_result (const char *buf, size_t len, int *out_error)
     QcdmResult *result = NULL;
     DMCmdStatusRsp *rsp = (DMCmdStatusRsp *) buf;
     char *tmp;
-    u_int8_t swapped[4];
-    u_int32_t tmp_num;
+    uint8_t swapped[4];
+    uint32_t tmp_num;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -474,27 +474,27 @@ qcdm_cmd_cdma_status_result (const char *buf, size_t len, int *out_error)
     qcdm_result_add_string (result, QCDM_CMD_CDMA_STATUS_ITEM_ESN, tmp);
     free (tmp);
 
-    tmp_num = (u_int32_t) le16toh (rsp->rf_mode);
+    tmp_num = (uint32_t) le16toh (rsp->rf_mode);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RF_MODE, tmp_num);
 
-    tmp_num = (u_int32_t) le16toh (rsp->cdma_rx_state);
+    tmp_num = (uint32_t) le16toh (rsp->cdma_rx_state);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, tmp_num);
 
-    tmp_num = (u_int32_t) le16toh (rsp->entry_reason);
+    tmp_num = (uint32_t) le16toh (rsp->entry_reason);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_ENTRY_REASON, tmp_num);
 
-    tmp_num = (u_int32_t) le16toh (rsp->curr_chan);
+    tmp_num = (uint32_t) le16toh (rsp->curr_chan);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_CURRENT_CHANNEL, tmp_num);
 
     qcdm_result_add_u8 (result, QCDM_CMD_CDMA_STATUS_ITEM_CODE_CHANNEL, rsp->cdma_code_chan);
 
-    tmp_num = (u_int32_t) le16toh (rsp->pilot_base);
+    tmp_num = (uint32_t) le16toh (rsp->pilot_base);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_PILOT_BASE, tmp_num);
 
-    tmp_num = (u_int32_t) le16toh (rsp->sid);
+    tmp_num = (uint32_t) le16toh (rsp->sid);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, tmp_num);
 
-    tmp_num = (u_int32_t) le16toh (rsp->nid);
+    tmp_num = (uint32_t) le16toh (rsp->nid);
     qcdm_result_add_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_NID, tmp_num);
 
     return result;
@@ -566,15 +566,15 @@ qcdm_cmd_status_snapshot_new (char *buf, size_t len)
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
 }
 
-static u_int8_t
-snapshot_state_to_qcdm (u_int8_t cdma_state)
+static uint8_t
+snapshot_state_to_qcdm (uint8_t cdma_state)
 {
     /* CDMA_STATUS_SNAPSHOT_STATE_* -> QCDM_STATUS_SNAPSHOT_STATE_* */
     return cdma_state + 1;
 }
 
-static inline u_int8_t
-digit_fixup (u_int8_t d)
+static inline uint8_t
+digit_fixup (uint8_t d)
 {
     /* CDMA MCC/IMSI conversion adds 1 to each digit, and digits equal to
      * 10 are really zero.
@@ -590,9 +590,9 @@ qcdm_cmd_status_snapshot_result (const char *buf, size_t len, int *out_error)
     QcdmResult *result = NULL;
     DMCmdStatusSnapshotRsp *rsp = (DMCmdStatusSnapshotRsp *) buf;
     char *tmp;
-    u_int8_t swapped[4];
-    u_int8_t tmcc[3];
-    u_int16_t mcc, hmcc;
+    uint8_t swapped[4];
+    uint8_t tmcc[3];
+    uint16_t mcc, hmcc;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -653,7 +653,7 @@ qcdm_cmd_pilot_sets_new (char *buf, size_t len)
 #define PILOT_SETS_CMD_NEIGHBOR_SET  "neighbor-set"
 
 static const char *
-set_num_to_str (u_int32_t num)
+set_num_to_str (uint32_t num)
 {
     if (num == QCDM_CMD_PILOT_SETS_TYPE_ACTIVE)
         return PILOT_SETS_CMD_ACTIVE_SET;
@@ -682,7 +682,7 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_CMD_ACTIVE_SET,
-                                  (const u_int8_t *) &rsp->sets[0],
+                                  (const uint8_t *) &rsp->sets[0],
                                   sets_len);
     }
 
@@ -690,7 +690,7 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_CMD_CANDIDATE_SET,
-                                  (const u_int8_t *) &rsp->sets[rsp->active_count],
+                                  (const uint8_t *) &rsp->sets[rsp->active_count],
                                   sets_len);
     }
 
@@ -698,7 +698,7 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_CMD_NEIGHBOR_SET,
-                                  (const u_int8_t *) &rsp->sets[rsp->active_count + rsp->candidate_count],
+                                  (const uint8_t *) &rsp->sets[rsp->active_count + rsp->candidate_count],
                                   sets_len);
     }
 
@@ -707,11 +707,11 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
 
 qcdmbool
 qcdm_cmd_pilot_sets_result_get_num (QcdmResult *result,
-                                    u_int32_t set_type,
-                                    u_int32_t *out_num)
+                                    uint32_t set_type,
+                                    uint32_t *out_num)
 {
     const char *set_name;
-    const u_int8_t *array = NULL;
+    const uint8_t *array = NULL;
     size_t array_len = 0;
 
     qcdm_return_val_if_fail (result != NULL, FALSE);
@@ -728,15 +728,15 @@ qcdm_cmd_pilot_sets_result_get_num (QcdmResult *result,
 
 qcdmbool
 qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
-                                      u_int32_t set_type,
-                                      u_int32_t num,
-                                      u_int32_t *out_pn_offset,
-                                      u_int32_t *out_ecio,
+                                      uint32_t set_type,
+                                      uint32_t num,
+                                      uint32_t *out_pn_offset,
+                                      uint32_t *out_ecio,
                                       float *out_db)
 {
     const char *set_name;
     DMCmdPilotSetsSet *set;
-    const u_int8_t *array = NULL;
+    const uint8_t *array = NULL;
     size_t array_len = 0;
 
     qcdm_return_val_if_fail (result != NULL, FALSE);
@@ -760,7 +760,7 @@ qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
 /**********************************************************************/
 
 size_t
-qcdm_cmd_nv_get_mdn_new (char *buf, size_t len, u_int8_t profile)
+qcdm_cmd_nv_get_mdn_new (char *buf, size_t len, uint8_t profile)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -812,7 +812,7 @@ qcdm_cmd_nv_get_mdn_result (const char *buf, size_t len, int *out_error)
 /**********************************************************************/
 
 static qcdmbool
-roam_pref_validate (u_int8_t dm)
+roam_pref_validate (uint8_t dm)
 {
     if (   dm == DIAG_NV_ROAM_PREF_HOME_ONLY
         || dm == DIAG_NV_ROAM_PREF_ROAM_ONLY
@@ -822,7 +822,7 @@ roam_pref_validate (u_int8_t dm)
 }
 
 size_t
-qcdm_cmd_nv_get_roam_pref_new (char *buf, size_t len, u_int8_t profile)
+qcdm_cmd_nv_get_roam_pref_new (char *buf, size_t len, uint8_t profile)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -873,8 +873,8 @@ qcdm_cmd_nv_get_roam_pref_result (const char *buf, size_t len, int *out_error)
 size_t
 qcdm_cmd_nv_set_roam_pref_new (char *buf,
                                size_t len,
-                               u_int8_t profile,
-                               u_int8_t roam_pref)
+                               uint8_t profile,
+                               uint8_t roam_pref)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -916,7 +916,7 @@ qcdm_cmd_nv_set_roam_pref_result (const char *buf, size_t len, int *out_error)
 /**********************************************************************/
 
 size_t
-qcdm_cmd_nv_get_mode_pref_new (char *buf, size_t len, u_int8_t profile)
+qcdm_cmd_nv_get_mode_pref_new (char *buf, size_t len, uint8_t profile)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -962,8 +962,8 @@ qcdm_cmd_nv_get_mode_pref_result (const char *buf, size_t len, int *out_error)
 size_t
 qcdm_cmd_nv_set_mode_pref_new (char *buf,
                                size_t len,
-                               u_int8_t profile,
-                               u_int8_t mode_pref)
+                               uint8_t profile,
+                               uint8_t mode_pref)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -1044,7 +1044,7 @@ qcdm_cmd_nv_get_hybrid_pref_result (const char *buf, size_t len, int *out_error)
 size_t
 qcdm_cmd_nv_set_hybrid_pref_new (char *buf,
                                  size_t len,
-                                 u_int8_t hybrid_pref)
+                                 uint8_t hybrid_pref)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -1132,7 +1132,7 @@ qcdm_cmd_nv_get_ipv6_enabled_result (const char *buf, size_t len, int *out_error
 size_t
 qcdm_cmd_nv_set_ipv6_enabled_new (char *buf,
                                  size_t len,
-                                 u_int8_t enabled)
+                                 uint8_t enabled)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -1176,7 +1176,7 @@ qcdm_cmd_nv_set_ipv6_enabled_result (const char *buf, size_t len, int *out_error
 /**********************************************************************/
 
 static qcdmbool
-hdr_rev_pref_validate (u_int8_t dm)
+hdr_rev_pref_validate (uint8_t dm)
 {
     if (   dm == DIAG_NV_HDR_REV_PREF_0
         || dm == DIAG_NV_HDR_REV_PREF_A
@@ -1232,7 +1232,7 @@ qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf, size_t len, int *out_error
 size_t
 qcdm_cmd_nv_set_hdr_rev_pref_new (char *buf,
                                   size_t len,
-                                  u_int8_t rev_pref)
+                                  uint8_t rev_pref)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
@@ -1294,15 +1294,15 @@ qcdm_cmd_cm_subsys_state_info_result (const char *buf, size_t len, int *out_erro
 {
     QcdmResult *result = NULL;
     DMCmdSubsysCMStateInfoRsp *rsp = (DMCmdSubsysCMStateInfoRsp *) buf;
-    u_int32_t tmp_num;
-    u_int32_t roam_pref;
+    uint32_t tmp_num;
+    uint32_t roam_pref;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
     if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysCMStateInfoRsp), out_error))
         return NULL;
 
-    roam_pref = (u_int32_t) le32toh (rsp->roam_pref);
+    roam_pref = (uint32_t) le32toh (rsp->roam_pref);
     if (!roam_pref_validate (roam_pref)) {
         qcdm_err (0, "Unknown roam preference 0x%X", roam_pref);
         return NULL;
@@ -1310,33 +1310,33 @@ qcdm_cmd_cm_subsys_state_info_result (const char *buf, size_t len, int *out_erro
 
     result = qcdm_result_new ();
 
-    tmp_num = (u_int32_t) le32toh (rsp->call_state);
+    tmp_num = (uint32_t) le32toh (rsp->call_state);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->oper_mode);
+    tmp_num = (uint32_t) le32toh (rsp->oper_mode);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->system_mode);
+    tmp_num = (uint32_t) le32toh (rsp->system_mode);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->mode_pref);
+    tmp_num = (uint32_t) le32toh (rsp->mode_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->band_pref);
+    tmp_num = (uint32_t) le32toh (rsp->band_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF, tmp_num);
 
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, roam_pref);
 
-    tmp_num = (u_int32_t) le32toh (rsp->srv_domain_pref);
+    tmp_num = (uint32_t) le32toh (rsp->srv_domain_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->acq_order_pref);
+    tmp_num = (uint32_t) le32toh (rsp->acq_order_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ACQ_ORDER_PREF, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->hybrid_pref);
+    tmp_num = (uint32_t) le32toh (rsp->hybrid_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF, tmp_num);
 
-    tmp_num = (u_int32_t) le32toh (rsp->network_sel_mode_pref);
+    tmp_num = (uint32_t) le32toh (rsp->network_sel_mode_pref);
     qcdm_result_add_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_NETWORK_SELECTION_PREF, tmp_num);
 
     return result;
@@ -1392,14 +1392,14 @@ qcdm_cmd_hdr_subsys_state_info_result (const char *buf, size_t len, int *out_err
 size_t
 qcdm_cmd_ext_logmask_new (char *buf,
                           size_t len,
-                          u_int32_t items[],
-                          u_int16_t maxlog)
+                          uint32_t items[],
+                          uint16_t maxlog)
 {
     char cmdbuf[sizeof (DMCmdExtLogMask) + 2];
     DMCmdExtLogMask *cmd = (DMCmdExtLogMask *) &cmdbuf[0];
-    u_int16_t highest = 0;
+    uint16_t highest = 0;
     size_t total = 3;
-    u_int32_t i;
+    uint32_t i;
 
     qcdm_return_val_if_fail (buf != NULL, 0);
     qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
@@ -1432,7 +1432,7 @@ qcdm_cmd_ext_logmask_result (const char *buf, size_t len, int *out_error)
 {
     QcdmResult *result = NULL;
     DMCmdExtLogMask *rsp = (DMCmdExtLogMask *) buf;
-    u_int32_t masklen = 0, maxlog = 0;
+    uint32_t masklen = 0, maxlog = 0;
     size_t minlen = 0;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
@@ -1479,7 +1479,7 @@ qcdm_cmd_ext_logmask_result (const char *buf, size_t len, int *out_error)
 
 qcdmbool
 qcmd_cmd_ext_logmask_result_get_item (QcdmResult *result,
-                                      u_int16_t item)
+                                      uint16_t item)
 {
     return FALSE;
 }
@@ -1555,7 +1555,7 @@ qcdm_cmd_zte_subsys_status_result (const char *buf, size_t len, int *out_error)
 size_t
 qcdm_cmd_nw_subsys_modem_snapshot_cdma_new (char *buf,
                                             size_t len,
-                                            u_int8_t chipset)
+                                            uint8_t chipset)
 {
     char cmdbuf[sizeof (DMCmdSubsysNwSnapshotReq) + 2];
     DMCmdSubsysNwSnapshotReq *cmd = (DMCmdSubsysNwSnapshotReq *) &cmdbuf[0];
@@ -1594,8 +1594,8 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, size_t len, int 
     QcdmResult *result = NULL;
     DMCmdSubsysNwSnapshotRsp *rsp = (DMCmdSubsysNwSnapshotRsp *) buf;
     DMCmdSubsysNwSnapshotCdma *cdma = (DMCmdSubsysNwSnapshotCdma *) &rsp->data;
-    u_int32_t num;
-    u_int8_t num8;
+    uint32_t num;
+    uint8_t num8;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -1638,7 +1638,7 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, size_t len, int 
 size_t
 qcdm_cmd_nw_subsys_eri_new (char *buf,
                             size_t len,
-                            u_int8_t chipset)
+                            uint8_t chipset)
 {
     char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
     DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
@@ -1708,16 +1708,16 @@ qcdm_cmd_nw_subsys_eri_result (const char *buf, size_t len, int *out_error)
 static size_t
 qcdm_cmd_log_config_new (char *buf,
                          size_t len,
-                         u_int32_t op,
-                         u_int32_t equip_id,
-                         u_int16_t items[])
+                         uint32_t op,
+                         uint32_t equip_id,
+                         uint16_t items[])
 {
     DMCmdLogConfig *cmd;
-    u_int16_t highest = 0;
-    u_int32_t items_len = 0;
+    uint16_t highest = 0;
+    uint32_t items_len = 0;
     size_t cmdsize = 0, cmdbufsize;
-    u_int32_t i;
-    u_int16_t log_code;
+    uint32_t i;
+    uint16_t log_code;
 
     qcdm_return_val_if_fail (buf != NULL, 0);
     qcdm_return_val_if_fail ((equip_id & 0xFFF0) == 0, 0);
@@ -1757,7 +1757,7 @@ qcdm_cmd_log_config_new (char *buf,
 size_t
 qcdm_cmd_log_config_get_mask_new (char *buf,
                                   size_t len,
-                                  u_int32_t equip_id)
+                                  uint32_t equip_id)
 {
     return qcdm_cmd_log_config_new (buf,
                                     len,
@@ -1767,7 +1767,7 @@ qcdm_cmd_log_config_get_mask_new (char *buf,
 }
 
 static int
-check_log_config_respose (const char *buf, size_t len, u_int32_t op)
+check_log_config_respose (const char *buf, size_t len, uint32_t op)
 {
     DMCmdLogConfigRsp *rsp = (DMCmdLogConfigRsp *) buf;
     size_t minlen = 16; /* minimum valid resposne */
@@ -1781,7 +1781,7 @@ check_log_config_respose (const char *buf, size_t len, u_int32_t op)
     }
 
     if (rsp->code == DIAG_CMD_LOG_CONFIG) {
-        u_int32_t rspop;
+        uint32_t rspop;
 
         if (len < 16) {
             /* At least enough for code + op + result + equipid */
@@ -1833,13 +1833,13 @@ check_log_config_respose (const char *buf, size_t len, u_int32_t op)
 #define LOG_CODE_SET(mask, code)  (mask[code / 8] & (1 << (code % 8)))
 
 static QcdmResult *
-log_config_get_set_result (const char *buf, size_t len, u_int32_t op, int *out_error)
+log_config_get_set_result (const char *buf, size_t len, uint32_t op, int *out_error)
 {
     QcdmResult *result = NULL;
     DMCmdLogConfigRsp *rsp = (DMCmdLogConfigRsp *) buf;
     int err;
-    u_int32_t num_items;
-    u_int32_t equipid;
+    uint32_t num_items;
+    uint32_t equipid;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -1859,8 +1859,8 @@ log_config_get_set_result (const char *buf, size_t len, u_int32_t op, int *out_e
     qcdm_result_add_u32 (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_NUM_ITEMS, num_items);
 
     if (num_items > 0) {
-        u_int32_t i, num_result_items = 0, count = 0;
-        u_int16_t *items;
+        uint32_t i, num_result_items = 0, count = 0;
+        uint16_t *items;
 
         /* First pass to find out how many are actually enabled */
         for (i = 0; i < num_items; i++) {
@@ -1893,8 +1893,8 @@ qcdm_cmd_log_config_get_mask_result (const char *buf, size_t len, int *out_error
 size_t
 qcdm_cmd_log_config_set_mask_new (char *buf,
                                   size_t len,
-                                  u_int32_t equip_id,
-                                  u_int16_t items[])
+                                  uint32_t equip_id,
+                                  uint16_t items[])
 {
     return qcdm_cmd_log_config_new (buf,
                                     len,
@@ -1911,12 +1911,12 @@ qcdm_cmd_log_config_set_mask_result (const char *buf, size_t len, int *out_error
 
 qcdmbool
 qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
-                                          u_int32_t equipid,
-                                          u_int16_t log_code)
+                                          uint32_t equipid,
+                                          uint16_t log_code)
 {
-    const u_int16_t *items = NULL;
+    const uint16_t *items = NULL;
     size_t len = 0;
-    u_int32_t i, tmp;
+    uint32_t i, tmp;
 
     qcdm_return_val_if_fail (result != NULL, FALSE);
 
@@ -1941,10 +1941,10 @@ qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
 static char bcd_chars[] = "0123456789\0\0\0\0\0\0";
 
 static qcdmbool
-imxi_bcd_to_string (u_int8_t bytes[8], size_t len, char *buf, size_t buflen)
+imxi_bcd_to_string (uint8_t bytes[8], size_t len, char *buf, size_t buflen)
 {
     char *p;
-    u_int32_t i;
+    uint32_t i;
 
     if (bytes[0] == 0)
         return TRUE;
@@ -2042,8 +2042,8 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
     QcdmResult *result = NULL;
     DMCmdSubsysGsmStateInfoRsp *rsp = (DMCmdSubsysGsmStateInfoRsp *) buf;
     char imxi[18];
-    u_int32_t mcc = 0, mnc = 0;
-    u_int8_t mnc3;
+    uint32_t mcc = 0, mnc = 0;
+    uint8_t mnc3;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
@@ -2090,4 +2090,3 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
 }
 
 /**********************************************************************/
-

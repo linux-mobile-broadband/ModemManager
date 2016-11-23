@@ -18,7 +18,7 @@
 #ifndef LIBWMC_RESULT_H
 #define LIBWMC_RESULT_H
 
-#include <sys/types.h>
+#include <stdint.h>
 
 typedef struct WmcResult WmcResult;
 
@@ -28,15 +28,14 @@ int wmc_result_get_string (WmcResult *r,
 
 int wmc_result_get_u8     (WmcResult *r,
                            const char *key,
-                           u_int8_t *out_val);
+                           uint8_t *out_val);
 
 int wmc_result_get_u32    (WmcResult *r,
                            const char *key,
-                           u_int32_t *out_val);
+                           uint32_t *out_val);
 
 WmcResult *wmc_result_ref     (WmcResult *r);
 
 void       wmc_result_unref   (WmcResult *r);
 
 #endif  /* LIBWMC_RESULT_H */
-

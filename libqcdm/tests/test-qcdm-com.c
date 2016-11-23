@@ -156,7 +156,7 @@ status_snapshot_state_to_string (guint8 state)
 }
 
 static const char *
-cm_call_state_to_string (u_int32_t state)
+cm_call_state_to_string (uint32_t state)
 {
     switch (state) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_IDLE:
@@ -176,7 +176,7 @@ cm_call_state_to_string (u_int32_t state)
 }
 
 static const char *
-cm_system_mode_to_string (u_int32_t mode)
+cm_system_mode_to_string (uint32_t mode)
 {
     switch (mode) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE:
@@ -1480,7 +1480,7 @@ test_com_ext_logmask (void *f, void *data)
     gint len;
     QcdmResult *result;
     gsize reply_len;
-    u_int32_t items[] = { 0x002C, 0x002E, 0 };
+    uint32_t items[] = { 0x002C, 0x002E, 0 };
     guint32 maxlog = 0;
 
     /* First get # of items the device supports */
@@ -1505,7 +1505,7 @@ test_com_ext_logmask (void *f, void *data)
     qcdm_result_unref (result);
 
     /* Now enable some log items */
-    len = qcdm_cmd_ext_logmask_new (buf, sizeof (buf), items, (u_int16_t) maxlog);
+    len = qcdm_cmd_ext_logmask_new (buf, sizeof (buf), items, (uint16_t) maxlog);
 
     /* Send the command */
     success = send_command (d, buf, len);
@@ -1581,11 +1581,11 @@ test_com_log_config (void *f, void *data)
     gint len;
     QcdmResult *result;
     gsize reply_len;
-    u_int32_t num_items = 0;
-    const u_int16_t *items = NULL, *reread_items;
+    uint32_t num_items = 0;
+    const uint16_t *items = NULL, *reread_items;
     size_t items_len = 0, reread_len;
-    u_int32_t i;
-    u_int16_t test_items[] = { 0x1004, 0x1005, 0x1006, 0x1007, 0x1008, 0x102C, 0x102E, 0 };
+    uint32_t i;
+    uint16_t test_items[] = { 0x1004, 0x1005, 0x1006, 0x1007, 0x1008, 0x102C, 0x102E, 0 };
 
     /* Get existing mask for CDMA/EVDO equip ID */
     len = qcdm_cmd_log_config_get_mask_new (buf, sizeof (buf), 0x01);
@@ -1916,8 +1916,8 @@ test_com_gsm_subsys_state_info (void *f, void *data)
     QcdmResult *result;
     gsize reply_len;
     const char *str;
-    u_int32_t num;
-    u_int8_t u8;
+    uint32_t num;
+    uint8_t u8;
 
     len = qcdm_cmd_gsm_subsys_state_info_new (buf, sizeof (buf));
     g_assert (len == 7);
@@ -1978,4 +1978,3 @@ test_com_gsm_subsys_state_info (void *f, void *data)
 
     qcdm_result_unref (result);
 }
-

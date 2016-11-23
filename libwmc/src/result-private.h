@@ -28,11 +28,10 @@ void wmc_result_add_string (WmcResult *result,
 
 void wmc_result_add_u8     (WmcResult *result,
                             const char *key,
-                            u_int8_t num);
+                            uint8_t num);
 
 void wmc_result_add_u32    (WmcResult *result,
                             const char *key,
-                            u_int32_t num);
+                            uint32_t num);
 
 #endif  /* LIBWMC_RESULT_PRIVATE_H */
-

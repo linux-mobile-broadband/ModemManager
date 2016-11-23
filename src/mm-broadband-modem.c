@@ -603,7 +603,7 @@ mode_pref_qcdm_ready (MMPortSerialQcdm *port,
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
-    u_int8_t pref = 0;
+    uint8_t pref = 0;
     GError *error = NULL;
     GByteArray *response;
 
@@ -1726,9 +1726,9 @@ qcdm_evdo_pilot_sets_log_handle (MMPortSerialQcdm *port,
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (user_data);
     QcdmResult *result;
-    u_int32_t num_active = 0;
-    u_int32_t pilot_pn = 0;
-    u_int32_t pilot_energy = 0;
+    uint32_t num_active = 0;
+    uint32_t pilot_pn = 0;
+    uint32_t pilot_energy = 0;
     int32_t rssi_dbm = 0;
 
     result = qcdm_log_item_evdo_pilot_sets_v2_new ((const char *) log_buffer->data,
@@ -6854,7 +6854,7 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
 {
     CdmaUnsolicitedEventsContext *ctx;
     GByteArray *logcmd;
-    u_int16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
+    uint16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
     GError *error = NULL;
 
     ctx = g_new0 (CdmaUnsolicitedEventsContext, 1);

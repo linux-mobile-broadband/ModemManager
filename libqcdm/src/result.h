@@ -18,7 +18,7 @@
 #ifndef LIBQCDM_RESULT_H
 #define LIBQCDM_RESULT_H
 
-#include <sys/types.h>
+#include <stdint.h>
 
 typedef struct QcdmResult QcdmResult;
 
@@ -28,15 +28,15 @@ int qcdm_result_get_string (QcdmResult *r,
 
 int qcdm_result_get_u8     (QcdmResult *r,
                             const char *key,
-                            u_int8_t *out_val);
+                            uint8_t *out_val);
 
 int qcdm_result_get_u32    (QcdmResult *r,
                             const char *key,
-                            u_int32_t *out_val);
+                            uint32_t *out_val);
 
 int qcdm_result_get_u16_array  (QcdmResult *result,
                                 const char *key,
-                                const u_int16_t **out_val,
+                                const uint16_t **out_val,
                                 size_t *out_len);
 
 QcdmResult *qcdm_result_ref    (QcdmResult *r);
@@ -44,4 +44,3 @@ QcdmResult *qcdm_result_ref    (QcdmResult *r);
 void       qcdm_result_unref   (QcdmResult *r);
 
 #endif  /* LIBQCDM_RESULT_H */
-

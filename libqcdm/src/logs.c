@@ -30,7 +30,7 @@
 /**********************************************************************/
 
 static qcdmbool
-check_log_item (const char *buf, size_t len, u_int16_t log_code, size_t min_len, int *out_error)
+check_log_item (const char *buf, size_t len, uint16_t log_code, size_t min_len, int *out_error)
 {
     DMCmdLog *log_cmd = (DMCmdLog *) buf;
 
@@ -71,7 +71,7 @@ check_log_item (const char *buf, size_t len, u_int16_t log_code, size_t min_len,
 #define PILOT_SETS_LOG_REMAINING_SET  "remaining-set"
 
 static const char *
-set_num_to_str (u_int32_t num)
+set_num_to_str (uint32_t num)
 {
     if (num == QCDM_LOG_ITEM_EVDO_PILOT_SETS_V2_TYPE_ACTIVE)
         return PILOT_SETS_LOG_ACTIVE_SET;
@@ -103,7 +103,7 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_LOG_ACTIVE_SET,
-                                  (const u_int8_t *) &pilot_sets->sets[0],
+                                  (const uint8_t *) &pilot_sets->sets[0],
                                   sets_len);
     }
 
@@ -111,7 +111,7 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_LOG_CANDIDATE_SET,
-                                  (const u_int8_t *) &pilot_sets->sets[pilot_sets->active_count],
+                                  (const uint8_t *) &pilot_sets->sets[pilot_sets->active_count],
                                   sets_len);
     }
 
@@ -119,21 +119,21 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
     if (sets_len > 0) {
         qcdm_result_add_u8_array (result,
                                   PILOT_SETS_LOG_REMAINING_SET,
-                                  (const u_int8_t *) &pilot_sets->sets[pilot_sets->active_count + pilot_sets->candidate_count],
+                                  (const uint8_t *) &pilot_sets->sets[pilot_sets->active_count + pilot_sets->candidate_count],
                                   sets_len);
     }
 
     return result;
-    
+
 }
 
 qcdmbool
 qcdm_log_item_evdo_pilot_sets_v2_get_num (QcdmResult *result,
-                                          u_int32_t set_type,
-                                          u_int32_t *out_num)
+                                          uint32_t set_type,
+                                          uint32_t *out_num)
 {
     const char *set_name;
-    const u_int8_t *array = NULL;
+    const uint8_t *array = NULL;
     size_t array_len = 0;
 
     qcdm_return_val_if_fail (result != NULL, FALSE);
@@ -152,15 +152,15 @@ qcdm_log_item_evdo_pilot_sets_v2_get_num (QcdmResult *result,
 
 qcdmbool
 qcdm_log_item_evdo_pilot_sets_v2_get_pilot (QcdmResult *result,
-                                            u_int32_t set_type,
-                                            u_int32_t num,
-                                            u_int32_t *out_pilot_pn,
-                                            u_int32_t *out_pilot_energy,
+                                            uint32_t set_type,
+                                            uint32_t num,
+                                            uint32_t *out_pilot_pn,
+                                            uint32_t *out_pilot_energy,
                                             int32_t *out_rssi_dbm)
 {
     const char *set_name;
     DMLogItemEvdoPilotSetsV2Pilot *pilot;
-    const u_int8_t *array = NULL;
+    const uint8_t *array = NULL;
     size_t array_len = 0;
 
     qcdm_return_val_if_fail (result != NULL, FALSE);
@@ -181,4 +181,3 @@ qcdm_log_item_evdo_pilot_sets_v2_get_pilot (QcdmResult *result,
 }
 
 /**********************************************************************/
-

@@ -64,15 +64,15 @@ enum {
 
 /* DIAG_NV_MODE_PREF */
 struct DMNVItemModePref {
-    u_int8_t profile;
-    u_int8_t mode_pref;
+    uint8_t profile;
+    uint8_t mode_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemModePref DMNVItemModePref;
 
 /* DIAG_NV_DIR_NUMBER */
 struct DMNVItemMdn {
-  u_int8_t profile;
-  u_int8_t mdn[10];
+  uint8_t profile;
+  uint8_t mdn[10];
 } __attribute__ ((packed));
 typedef struct DMNVItemMdn DMNVItemMdn;
 
@@ -85,8 +85,8 @@ enum {
 
 /* DIAG_NV_ROAM_PREF */
 struct DMNVItemRoamPref {
-    u_int8_t profile;
-    u_int8_t roam_pref;
+    uint8_t profile;
+    uint8_t roam_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemRoamPref DMNVItemRoamPref;
 
@@ -99,7 +99,7 @@ enum {
 
 /* DIAG_NV_HDR_REV_PREF */
 struct DMNVItemHdrRevPref {
-    u_int8_t rev_pref;
+    uint8_t rev_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemHdrRevPref DMNVItemHdrRevPref;
 
@@ -111,7 +111,7 @@ enum {
 
 /* DIAG_NV_HYBRID_PREF */
 struct DMNVItemHybridPref {
-    u_int8_t hybrid_pref;
+    uint8_t hybrid_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemHybridPref DMNVItemHybridPref;
 
@@ -123,9 +123,8 @@ enum {
 
 /* DIAG_NV_IPV6_ENABLED */
 struct DMNVItemIPv6Enabled {
-    u_int8_t enabled;
+    uint8_t enabled;
 } __attribute__ ((packed));
 typedef struct DMNVItemIPv6Enabled DMNVItemIPv6Enabled;
 
 #endif  /* LIBQCDM_NV_ITEMS_H */
-

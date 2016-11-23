@@ -18,6 +18,8 @@
 #ifndef LIBQCDM_LOG_ITEMS_H
 #define LIBQCDM_LOG_ITEMS_H
 
+#include <stdint.h>
+
 enum {
     /* CDMA and EVDO items */
     DM_LOG_ITEM_CDMA_ACCESS_CHANNEL_MSG         = 0x1004,
@@ -60,39 +62,39 @@ enum {
 
 /* DM_LOG_ITEM_CDMA_PAGING_CHANNEL_MSG */
 struct DMLogItemPagingChannelMsg {
-    u_int8_t msg_len;  /* size of entire struct including this field */
-    u_int8_t msg_type; /* MSG_TYPE as in 3GPP2 C.S0004 Table 3.1.2.3.1.1.2 */
-    u_int8_t data[0];  /* Packed message as in 3GPP2 C.S0005 3.7.2.3.2.x */
+    uint8_t msg_len;  /* size of entire struct including this field */
+    uint8_t msg_type; /* MSG_TYPE as in 3GPP2 C.S0004 Table 3.1.2.3.1.1.2 */
+    uint8_t data[0];  /* Packed message as in 3GPP2 C.S0005 3.7.2.3.2.x */
 } __attribute ((packed));
 typedef struct DMLogItemPagingChannelMsg DMLogItemPagingChannelMsg;
 
 
 /* DM_LOG_ITEM_CDMA_REVERSE_POWER_CONTROL */
 struct DMLogItemRPCItem {
-    u_int8_t channel_set_mask;
-    u_int16_t frame_count;
-    u_int8_t len_per_frame;
-    u_int16_t dec_history;
-    u_int8_t rx_agc_vals;
-    u_int8_t tx_power_vals;
-    u_int8_t tx_gain_adjust;
+    uint8_t channel_set_mask;
+    uint16_t frame_count;
+    uint8_t len_per_frame;
+    uint16_t dec_history;
+    uint8_t rx_agc_vals;
+    uint8_t tx_power_vals;
+    uint8_t tx_gain_adjust;
 } __attribute__ ((packed));
 typedef struct DMLogItemRPCItem DMLogItemRPCItem;
 
 struct DMLogItemCdmaReversePowerControl {
-    u_int8_t frame_offset;
-    u_int8_t band_class;
-    u_int16_t rev_chan_rc;
-    u_int8_t pilot_gating_rate;
-    u_int8_t step_size;
-    u_int8_t num_records;
+    uint8_t frame_offset;
+    uint8_t band_class;
+    uint16_t rev_chan_rc;
+    uint8_t pilot_gating_rate;
+    uint8_t step_size;
+    uint8_t num_records;
     DMLogItemRPCItem records[];
 } __attribute__ ((packed));
 typedef struct DMLogItemCdmaReversePowerControl DMLogItemCdmaReversePowerControl;
 
 /* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
 struct DMLogItemEvdoPilotSetsV2Pilot {
-    u_int16_t pilot_pn;
+    uint16_t pilot_pn;
     /* HDR pilot energy doesn't appear to be in the same units as 1x pilot
      * energy (eg, -0.5 dBm increments).  Instead it appears roughly correlated
      * to RSSI dBm by using this formula empirically derived from simultaneous
@@ -100,25 +102,25 @@ struct DMLogItemEvdoPilotSetsV2Pilot {
      *
      * RSSI dBm = -110 + (MAX(pilot_energy - 50, 0) / 14)
      */
-    u_int16_t pilot_energy;
+    uint16_t pilot_energy;
     union {
         struct {
-            u_int16_t mac_index;
-            u_int8_t unknown1;
-            u_int8_t unknown2;
-            u_int16_t window_center;
+            uint16_t mac_index;
+            uint8_t unknown1;
+            uint8_t unknown2;
+            uint16_t window_center;
         } Active;
         struct {
-            u_int16_t channel_number;
-            u_int8_t unknown1;
-            u_int8_t unknown2;
-            u_int16_t window_center;
+            uint16_t channel_number;
+            uint8_t unknown1;
+            uint8_t unknown2;
+            uint16_t window_center;
         } Candidate;
         struct {
-            u_int16_t channel_number;
-            u_int16_t window_center;
-            u_int8_t unknown1; // Offset?
-            u_int8_t unknown2; // Age?
+            uint16_t channel_number;
+            uint16_t window_center;
+            uint8_t unknown1; // Offset?
+            uint8_t unknown2; // Age?
         } Remaining;
     };
 } __attribute__ ((packed));
@@ -126,16 +128,16 @@ typedef struct DMLogItemEvdoPilotSetsV2Pilot DMLogItemEvdoPilotSetsV2Pilot;
 
 /* DM_LOG_ITEM_EVDO_PILOT_SETS_V2 */
 struct DMLogItemEvdoPilotSetsV2 {
-    u_int8_t pn_offset;
-    u_int8_t active_count;
-    u_int8_t active_window;
-    u_int16_t active_channel;
-    u_int8_t unknown1;
-    u_int8_t candidate_count;
-    u_int8_t candidate_window;
-    u_int8_t remaining_count;
-    u_int8_t remaining_window;
-    u_int8_t unknown2;
+    uint8_t pn_offset;
+    uint8_t active_count;
+    uint8_t active_window;
+    uint16_t active_channel;
+    uint8_t unknown1;
+    uint8_t candidate_count;
+    uint8_t candidate_window;
+    uint8_t remaining_count;
+    uint8_t remaining_window;
+    uint8_t unknown2;
 
     DMLogItemEvdoPilotSetsV2Pilot sets[];
 } __attribute__ ((packed));
@@ -145,29 +147,29 @@ typedef struct DMLogItemEvdoPilotSetsV2 DMLogItemEvdoPilotSetsV2;
 struct DMLogItemWcdmaTaFingerInfo {
     int32_t tx_pos;
     int16_t coherent_interval_len;
-    u_int8_t non_coherent_interval_len;
-    u_int8_t num_paths;
-    u_int32_t path_enr;
+    uint8_t non_coherent_interval_len;
+    uint8_t num_paths;
+    uint32_t path_enr;
     int32_t pn_pos_path;
     int16_t pri_cpich_psc;
-    u_int8_t unknown1;
-    u_int8_t sec_cpich_ssc;
-    u_int8_t finger_channel_code_index;
-    u_int8_t finger_index;
+    uint8_t unknown1;
+    uint8_t sec_cpich_ssc;
+    uint8_t finger_channel_code_index;
+    uint8_t finger_index;
 } __attribute__ ((packed));
 typedef struct DMLogItemWcdmaTaFingerInfo DMLogItemWcdmaTaFingerInfo;
 
 
 /* DM_LOG_ITEM_WCDMA_AGC_INFO */
 struct DMLogItemWcdmaAgcInfo {
-    u_int8_t num_samples;
-    u_int16_t rx_agc;
-    u_int16_t tx_agc;
-    u_int16_t rx_agc_adj_pdm;
-    u_int16_t tx_agc_adj_pdm;
-    u_int16_t max_tx;
+    uint8_t num_samples;
+    uint16_t rx_agc;
+    uint16_t tx_agc;
+    uint16_t rx_agc_adj_pdm;
+    uint16_t tx_agc_adj_pdm;
+    uint16_t max_tx;
     /* Bit 4 means tx_agc is valid */
-    u_int8_t agc_info;
+    uint8_t agc_info;
 } __attribute__ ((packed));
 typedef struct DMLogItemWcdmaAgcInfo DMLogItemWcdmaAgcInfo;
 
@@ -183,37 +185,37 @@ enum {
 };
 
 struct DMLogItemWcdmaRrcState {
-    u_int8_t rrc_state;
+    uint8_t rrc_state;
 } __attribute__ ((packed));
 typedef struct DMLogItemWcdmaRrcState DMLogItemWcdmaRrcState;
 
 
 /* DM_LOG_ITEM_WCDMA_CELL_ID */
 struct DMLogItemWcdmaCellId {
-    u_int8_t unknown1[8];
-    u_int32_t cellid;
-    u_int8_t unknown2[4];
+    uint8_t unknown1[8];
+    uint32_t cellid;
+    uint8_t unknown2[4];
 } __attribute__ ((packed));
 typedef struct DMLogItemWcdmaCellId DMLogItemWcdmaCellId;
 
 
 /* DM_LOG_ITEM_GSM_BURST_METRICS */
 struct DMLogItemGsmBurstMetric {
-    u_int32_t fn;
-    u_int16_t arfcn;
-    u_int32_t rssi;
-    u_int16_t power;
-    u_int16_t dc_offset_i;
-    u_int16_t dc_offset_q;
-    u_int16_t freq_offset;
-    u_int16_t timing_offset;
-    u_int16_t snr;
-    u_int8_t gain_state;
+    uint32_t fn;
+    uint16_t arfcn;
+    uint32_t rssi;
+    uint16_t power;
+    uint16_t dc_offset_i;
+    uint16_t dc_offset_q;
+    uint16_t freq_offset;
+    uint16_t timing_offset;
+    uint16_t snr;
+    uint8_t gain_state;
 } __attribute__ ((packed));
 typedef struct DMLogItemGsmBurstMetric DMLogItemGsmBurstMetric;
 
 struct DMLogItemGsmBurstMetrics {
-    u_int8_t channel;
+    uint8_t channel;
     DMLogItemGsmBurstMetric metrics[4];
 } __attribute__ ((packed));
 typedef struct DMLogItemGsmBurstMetrics DMLogItemGsmBurstMetrics;
@@ -231,12 +233,12 @@ enum {
 
 struct DMLogItemGsmBcchMessage {
     /* Band is top 4 bits; lower 12 is ARFCN */
-    u_int16_t bcch_arfcn;
-    u_int16_t bsic;
-    u_int16_t cell_id;
-    u_int8_t lai[5];
-    u_int8_t cell_selection_prio;
-    u_int8_t ncc_permitted;
+    uint16_t bcch_arfcn;
+    uint16_t bsic;
+    uint16_t cell_id;
+    uint8_t lai[5];
+    uint8_t cell_selection_prio;
+    uint8_t ncc_permitted;
 } __attribute__ ((packed));
 typedef struct DMLogItemGsmBcchMessage DMLogItemGsmBcchMessage;
 
