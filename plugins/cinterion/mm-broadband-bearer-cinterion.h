@@ -30,7 +30,7 @@
 #define MM_IS_BROADBAND_BEARER_CINTERION_CLASS(klass)     (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_CINTERION))
 #define MM_BROADBAND_BEARER_CINTERION_GET_CLASS(obj)      (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_CINTERION, MMBroadbandBearerCinterionClass))
 
-typedef struct _MMBroadbandBearerCinterion MMBroadbandBearerCinterion;
+typedef struct _MMBroadbandBearerCinterion      MMBroadbandBearerCinterion;
 typedef struct _MMBroadbandBearerCinterionClass MMBroadbandBearerCinterionClass;
 
 struct _MMBroadbandBearerCinterion {
@@ -43,13 +43,12 @@ struct _MMBroadbandBearerCinterionClass {
 
 GType mm_broadband_bearer_cinterion_get_type (void);
 
-void          mm_broadband_bearer_cinterion_new     (MMBroadbandModemCinterion *modem,
-                                                     MMBearerProperties *config,
-                                                     GCancellable *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
-
-MMBaseBearer *mm_broadband_bearer_cinterion_new_finish (GAsyncResult *res,
-                                                     GError **error);
+void          mm_broadband_bearer_cinterion_new        (MMBroadbandModemCinterion  *modem,
+                                                        MMBearerProperties         *config,
+                                                        GCancellable               *cancellable,
+                                                        GAsyncReadyCallback         callback,
+                                                        gpointer                    user_data);
+MMBaseBearer *mm_broadband_bearer_cinterion_new_finish (GAsyncResult               *res,
+                                                        GError                    **error);
 
 #endif /* MM_BROADBAND_BEARER_CINTERION_H */

@@ -1694,8 +1694,7 @@ swwan_test_ready (MMBaseModem *self,
     port = mm_base_modem_peek_best_data_port (self, MM_PORT_TYPE_NET);
 
     /* SWWAN requires a net port & valid test response*/
-    if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET &&
-            !error) {
+    if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET && !error) {
         mm_dbg ("SWWAN supported");
         ctx->self->priv->swwan_support = FEATURE_SUPPORTED;
     }
@@ -1764,8 +1763,8 @@ setup_ports (MMBroadbandModem *self)
 
 typedef struct {
     MMBroadbandModemCinterion *self;
-    GSimpleAsyncResult *result;
-    MMBearerProperties *properties;
+    GSimpleAsyncResult        *result;
+    MMBearerProperties        *properties;
 } CreateBearerContext;
 
 static void
@@ -1779,9 +1778,9 @@ create_bearer_context_complete_and_free (CreateBearerContext *ctx)
 }
 
 static MMBaseBearer *
-cinterion_modem_create_bearer_finish (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GError **error)
+cinterion_modem_create_bearer_finish (MMIfaceModem  *self,
+                                      GAsyncResult  *res,
+                                      GError       **error)
 {
     MMBaseBearer *bearer;
 
@@ -1794,9 +1793,9 @@ cinterion_modem_create_bearer_finish (MMIfaceModem *self,
 }
 
 static void
-broadband_bearer_cinterion_new_ready (GObject *source,
-                                   GAsyncResult *res,
-                                   CreateBearerContext *ctx)
+broadband_bearer_cinterion_new_ready (GObject             *source,
+                                      GAsyncResult        *res,
+                                      CreateBearerContext *ctx)
 {
     MMBaseBearer *bearer;
     GError *error = NULL;
@@ -1810,8 +1809,8 @@ broadband_bearer_cinterion_new_ready (GObject *source,
 }
 
 static void
-broadband_bearer_new_ready (GObject *source,
-                            GAsyncResult *res,
+broadband_bearer_new_ready (GObject             *source,
+                            GAsyncResult        *res,
                             CreateBearerContext *ctx)
 {
     MMBaseBearer *bearer;
@@ -1851,12 +1850,12 @@ create_bearer_for_net_port (CreateBearerContext *ctx)
 }
 
 static void
-cinterion_modem_create_bearer (MMIfaceModem *self,
-                            MMBearerProperties *properties,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+cinterion_modem_create_bearer (MMIfaceModem        *self,
+                               MMBearerProperties  *properties,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
 {
-    CreateBearerContext *ctx = NULL;
+    CreateBearerContext *ctx;
 
     ctx = g_slice_new0 (CreateBearerContext);
     ctx->self = g_object_ref (self);

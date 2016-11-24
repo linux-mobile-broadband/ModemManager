@@ -689,8 +689,8 @@ disconnect_3gpp (MMBroadbandBearer  *self,
 /* Setup and Init Bearers */
 
 MMBaseBearer *
-mm_broadband_bearer_cinterion_new_finish (GAsyncResult *res,
-                                          GError **error)
+mm_broadband_bearer_cinterion_new_finish (GAsyncResult  *res,
+                                          GError       **error)
 {
     GObject *bearer;
     GObject *source;
@@ -710,10 +710,10 @@ mm_broadband_bearer_cinterion_new_finish (GAsyncResult *res,
 
 void
 mm_broadband_bearer_cinterion_new (MMBroadbandModemCinterion *modem,
-                                   MMBearerProperties *config,
-                                   GCancellable *cancellable,
-                                   GAsyncReadyCallback callback,
-                                   gpointer user_data)
+                                   MMBearerProperties        *config,
+                                   GCancellable              *cancellable,
+                                   GAsyncReadyCallback        callback,
+                                   gpointer                   user_data)
 {
     g_async_initable_new_async (
         MM_TYPE_BROADBAND_BEARER_CINTERION,
@@ -736,8 +736,8 @@ mm_broadband_bearer_cinterion_class_init (MMBroadbandBearerCinterionClass *klass
 {
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
-    broadband_bearer_class->connect_3gpp = connect_3gpp;
-    broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
-    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->connect_3gpp           = connect_3gpp;
+    broadband_bearer_class->connect_3gpp_finish    = connect_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp        = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 }
