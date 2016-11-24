@@ -32,11 +32,9 @@
 
 typedef struct _MMBroadbandBearerCinterion MMBroadbandBearerCinterion;
 typedef struct _MMBroadbandBearerCinterionClass MMBroadbandBearerCinterionClass;
-typedef struct _MMBroadbandBearerCinterionPrivate MMBroadbandBearerCinterionPrivate;
 
 struct _MMBroadbandBearerCinterion {
     MMBroadbandBearer parent;
-    MMBroadbandBearerCinterionPrivate *priv;
 };
 
 struct _MMBroadbandBearerCinterionClass {

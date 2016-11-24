@@ -87,14 +87,6 @@ get_usb_interface_config_index (MMPort  *data,
 }
 
 /*****************************************************************************/
-/* Common enums and structs */
-
-struct _MMBroadbandBearerCinterionPrivate {
-    /* Flag for network-initiated disconnect */
-    guint network_disconnect_pending_id;
-};
-
-/*****************************************************************************/
 /* Common - Helper Functions*/
 
 static gint
@@ -346,10 +338,6 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         handle_cancel_connect (ctx);
         return;
     }
-
-    /* Network-initiated disconnect should not be outstanding at this point,
-     * because it interferes with the connect attempt.*/
-    g_assert (ctx->self->priv->network_disconnect_pending_id == 0);
 
     switch (ctx->step) {
     case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
@@ -758,19 +746,6 @@ mm_broadband_bearer_cinterion_new_finish (GAsyncResult *res,
     return MM_BASE_BEARER (bearer);
 }
 
-static void
-dispose (GObject *object)
-{
-    MMBroadbandBearerCinterion *self = MM_BROADBAND_BEARER_CINTERION (object);
-
-    if (self->priv->network_disconnect_pending_id != 0) {
-        g_source_remove (self->priv->network_disconnect_pending_id);
-        self->priv->network_disconnect_pending_id = 0;
-    }
-
-    G_OBJECT_CLASS (mm_broadband_bearer_cinterion_parent_class)->dispose (object);
-}
-
 void
 mm_broadband_bearer_cinterion_new (MMBroadbandModemCinterion *modem,
                                    MMBearerProperties *config,
@@ -792,21 +767,12 @@ mm_broadband_bearer_cinterion_new (MMBroadbandModemCinterion *modem,
 static void
 mm_broadband_bearer_cinterion_init (MMBroadbandBearerCinterion *self)
 {
-    /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BROADBAND_BEARER_CINTERION,
-                                              MMBroadbandBearerCinterionPrivate);
 }
 
 static void
 mm_broadband_bearer_cinterion_class_init (MMBroadbandBearerCinterionClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
-
-    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerCinterionPrivate));
-
-    object_class->dispose = dispose;
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
