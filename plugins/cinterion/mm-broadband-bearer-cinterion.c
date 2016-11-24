@@ -89,45 +89,10 @@ get_usb_interface_config_index (MMPort  *data,
 /*****************************************************************************/
 /* Common enums and structs */
 
-typedef enum {
-    BEARER_CINTERION_AUTH_UNKNOWN   = -1,
-    BEARER_CINTERION_AUTH_NONE      =  0,
-    BEARER_CINTERION_AUTH_PAP       =  1,
-    BEARER_CINTERION_AUTH_CHAP      =  2,
-    BEARER_CINTERION_AUTH_MSCHAPV2  =  3,
-} BearerCinterionAuthType;
-
-typedef enum {
-    CONNECT_3GPP_CONTEXT_STEP_INIT = 0,
-    CONNECT_3GPP_CONTEXT_STEP_AUTH,
-    CONNECT_3GPP_CONTEXT_STEP_PDP_CTX,
-    CONNECT_3GPP_CONTEXT_STEP_START_SWWAN,
-    CONNECT_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION,
-    CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG,
-    CONNECT_3GPP_CONTEXT_STEP_FINALIZE_BEARER,
-} Connect3gppContextStep;
-
-typedef struct {
-    MMBroadbandBearerCinterion *self;
-    MMBaseModem *modem;
-    MMPortSerialAt *primary;
-    MMPort *data;
-    gint usb_interface_config_index;
-    Connect3gppContextStep connect;
-    MMBearerIpConfig *ipv4_config;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
-} Connect3gppContext;
-
 struct _MMBroadbandBearerCinterionPrivate {
     /* Flag for network-initiated disconnect */
     guint network_disconnect_pending_id;
 };
-
-/*****************************************************************************/
-/* Common 3GPP Function Declarations */
-static void connect_3gpp_context_step (Connect3gppContext *ctx);
-static void connect_3gpp_context_complete_and_free (Connect3gppContext *ctx);
 
 /*****************************************************************************/
 /* Common - Helper Functions*/
@@ -172,12 +137,19 @@ verify_connection_state_from_swwan_response (GList *result, GError **error)
      }
 }
 
-
 /*****************************************************************************/
-/* Connect - Helper Functions*/
+/* Auth helpers */
+
+typedef enum {
+    BEARER_CINTERION_AUTH_UNKNOWN   = -1,
+    BEARER_CINTERION_AUTH_NONE      =  0,
+    BEARER_CINTERION_AUTH_PAP       =  1,
+    BEARER_CINTERION_AUTH_CHAP      =  2,
+    BEARER_CINTERION_AUTH_MSCHAPV2  =  3,
+} BearerCinterionAuthType;
 
 static BearerCinterionAuthType
-cinterion_parse_auth_type (MMBearerAllowedAuth mm_auth)
+parse_auth_type (MMBearerAllowedAuth mm_auth)
 {
     switch (mm_auth) {
     case MM_BEARER_ALLOWED_AUTH_NONE:
@@ -192,6 +164,71 @@ cinterion_parse_auth_type (MMBearerAllowedAuth mm_auth)
         return BEARER_CINTERION_AUTH_UNKNOWN;
     }
 }
+
+static gchar *
+build_auth_string (MMBearerProperties *config,
+                   gint                usb_interface_config_index)
+{
+    const gchar             *user;
+    const gchar             *passwd;
+    MMBearerAllowedAuth      auth;
+    BearerCinterionAuthType  encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
+
+    user = mm_bearer_properties_get_user (config);
+    passwd = mm_bearer_properties_get_password (config);
+
+    /* Normal use case is no user & pass so return as quick as possible */
+    if (!user && !passwd)
+        return NULL;
+
+    auth = mm_bearer_properties_get_allowed_auth (config);
+    encoded_auth = parse_auth_type (auth);
+
+    /* Default to no authentication if not specified */
+    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
+        encoded_auth = BEARER_CINTERION_AUTH_NONE;
+        mm_dbg ("Unable to detect authentication type. Defaulting to 'none'");
+    }
+
+    /* TODO: Haven't tested this as I can't get a hold of a SIM w/ this feature atm.
+     * Write Command
+     * AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]]
+     * Response(s)
+     * OK
+     * ERROR
+     * +CME ERROR: <err>
+     */
+    return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
+                            usb_interface_configs[usb_interface_config_index].pdp_context,
+                            encoded_auth,
+                            passwd,
+                            user);
+}
+
+/*****************************************************************************/
+/* Connect 3GPP */
+
+typedef enum {
+    CONNECT_3GPP_CONTEXT_STEP_FIRST = 0,
+    CONNECT_3GPP_CONTEXT_STEP_AUTH,
+    CONNECT_3GPP_CONTEXT_STEP_PDP_CTX,
+    CONNECT_3GPP_CONTEXT_STEP_START_SWWAN,
+    CONNECT_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION,
+    CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG,
+    CONNECT_3GPP_CONTEXT_STEP_LAST,
+} Connect3gppContextStep;
+
+typedef struct {
+    MMBroadbandBearerCinterion *self;
+    MMBaseModem                *modem;
+    MMPortSerialAt             *primary;
+    MMPort                     *data;
+    gint                        usb_interface_config_index;
+    Connect3gppContextStep      step;
+    MMBearerIpConfig           *ipv4_config;
+    GCancellable               *cancellable;
+    GSimpleAsyncResult         *result;
+} Connect3gppContext;
 
 static void
 connect_3gpp_context_complete_and_free (Connect3gppContext *ctx)
@@ -208,9 +245,9 @@ connect_3gpp_context_complete_and_free (Connect3gppContext *ctx)
 }
 
 static MMBearerConnectResult *
-connect_3gpp_finish (MMBroadbandBearer *self,
-                     GAsyncResult *res,
-                     GError **error)
+connect_3gpp_finish (MMBroadbandBearer  *self,
+                     GAsyncResult       *res,
+                     GError            **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
@@ -218,42 +255,23 @@ connect_3gpp_finish (MMBroadbandBearer *self,
     return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
+static void connect_3gpp_context_step (Connect3gppContext *ctx);
+
 static void
-get_cmd_write_response_ctx_connect (MMBaseModem *modem,
-                                    GAsyncResult *res,
-                                    Connect3gppContext *ctx)
+swwan_connect_check_status_ready (MMBaseModem        *modem,
+                                  GAsyncResult       *res,
+                                  Connect3gppContext *ctx)
 {
-    /* Only use this to parse responses that respond 'Ok' or 'ERROR' */
-    GError *error = NULL;
+    const gchar *response;
+    GList       *response_parsed = NULL;
+    GError      *error = NULL;
 
-    /* Check to see if the command had an error */
-    mm_base_modem_at_command_finish (modem, res, &error);
-
-    /* We expect either OK or an error */
-    if (error != NULL) {
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
+    if (!response) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
-
-    g_clear_error (&error);
-
-    /*GOTO next step */
-    ctx->connect++;
-    connect_3gpp_context_step (ctx);
-}
-
-static void
-get_swwan_read_response_ctx_connect (MMBaseModem *modem,
-                                     GAsyncResult *res,
-                                     Connect3gppContext *ctx)
-{
-    const gchar *response;
-    GError *error = NULL;
-    GList *response_parsed = NULL;
-
-    /* Get the SWWAN read response */
-    response = mm_base_modem_at_command_finish (modem, res, &error);
 
     /* Error if parsing SWWAN read response fails */
     if (!mm_cinterion_parse_swwan_response (response, &response_parsed, &error)) {
@@ -262,109 +280,44 @@ get_swwan_read_response_ctx_connect (MMBaseModem *modem,
         return;
     }
 
-    /*Check parsed SWWAN reponse to see if we are now connected */
-    if (verify_connection_state_from_swwan_response(response_parsed, &error)) {
+    /* Check parsed SWWAN reponse to see if we are now connected */
+    if (verify_connection_state_from_swwan_response (response_parsed, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        connect_3gpp_context_complete_and_free (ctx);
+        g_list_free (response_parsed);
+        return;
+    }
+
+    g_list_free (response_parsed);
+
+    /* Go to next step */
+    ctx->step++;
+    connect_3gpp_context_step (ctx);
+}
+
+static void
+common_connect_operation_ready (MMBaseModem        *modem,
+                                GAsyncResult       *res,
+                                Connect3gppContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    g_list_free(response_parsed);
-    g_clear_error (&error);
-
-    /* GOTO next step */
-    ctx->connect++;
+    /* Go to next step */
+    ctx->step++;
     connect_3gpp_context_step (ctx);
-}
-
-static void
-setup_ip_settings (Connect3gppContext *ctx)
-{
-    MMBearerIpFamily ip_family;
-
-    ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-
-    if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
-        ip_family == MM_BEARER_IP_FAMILY_ANY) {
-        gchar *ip_family_str;
-
-        ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (ctx->self));
-        ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-        mm_dbg ("No specific IP family requested, defaulting to %s",
-                ip_family_str);
-        g_free (ip_family_str);
-    }
-
-    /* Default to automatic/DHCP addressing */
-    ctx->ipv4_config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
-}
-
-static gchar *
-build_cinterion_auth_string (Connect3gppContext *ctx)
-{
-    const gchar             *user = NULL;
-    const gchar             *passwd = NULL;
-    MMBearerAllowedAuth      auth;
-    BearerCinterionAuthType  encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
-    gchar                   *command = NULL;
-
-    user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-    passwd = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-
-    /* Normal use case is no user & pass so return as quick as possible */
-    if (!user && !passwd)
-        return NULL;
-
-    auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-    encoded_auth = cinterion_parse_auth_type (auth);
-
-    /* Default to no authentication if not specified */
-    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
-        encoded_auth = BEARER_CINTERION_AUTH_NONE;
-        mm_dbg ("Unable to detect authentication type. Defaulting to 'none'");
-    }
-
-    /* TODO: Haven't tested this as I can't get a hold of a SIM w/ this feature atm.
-     * Write Command
-     * AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]]
-     * Response(s)
-     * OK
-     * ERROR
-     * +CME ERROR: <err>
-     */
-    command = g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
-                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
-                               encoded_auth,
-                               passwd,
-                               user);
-
-    return command;
-}
-
-static gchar *
-build_cinterion_pdp_context_string (Connect3gppContext *ctx)
-{
-    const gchar         *apn = NULL;
-    gchar               *command;
-
-    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-
-    /* TODO: Get IP type if protocol was specified. Hardcoded to IPV4 for now */
-
-    command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
-                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
-                               apn ? apn : "");
-
-    return command;
 }
 
 static void
 handle_cancel_connect (Connect3gppContext *ctx)
 {
-    gchar               *command;
+    gchar *command;
 
-    /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
     command = g_strdup_printf ("^SWWAN=0,%u,%u",
                                usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
                                usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
@@ -380,192 +333,172 @@ handle_cancel_connect (Connect3gppContext *ctx)
                                    NULL,
                                    NULL);
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Cinterion connection operation has been cancelled");
+    g_simple_async_result_set_error (ctx->result, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+                                     "Connection operation has been cancelled");
     connect_3gpp_context_complete_and_free (ctx);
-
 }
-
-static void
-create_cinterion_bearer (Connect3gppContext *ctx)
-{
-    if (ctx->ipv4_config) {
-        g_simple_async_result_set_op_res_gpointer (
-            ctx->result,
-            mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
-            (GDestroyNotify)mm_bearer_connect_result_unref);
-    }
-    else {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cinterion connection failed to set IP protocol");
-    }
-}
-
-/*****************************************************************************/
-/* Connect - AT Command Wrappers*/
-
-static void
-send_swwan_read_command_ctx_connect (Connect3gppContext *ctx)
-{
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   "^SWWAN?",
-                                   5,
-                                   FALSE,
-                                   FALSE,
-                                   NULL,
-                                   (GAsyncReadyCallback)get_swwan_read_response_ctx_connect,
-                                   ctx);
-}
-
-
-static void
-send_write_command_ctx_connect (Connect3gppContext *ctx,
-                                gchar **command)
-{
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   *command,
-                                   10,/*Seen it take 5 seconds :0 */
-                                   FALSE,
-                                   FALSE,
-                                   NULL,
-                                   (GAsyncReadyCallback)get_cmd_write_response_ctx_connect,
-                                   ctx);
-}
-
-static void
-send_swwan_connect_command_ctx_connect (Connect3gppContext *ctx)
-{
-    /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
-    gchar               *command;
-    command = g_strdup_printf ("^SWWAN=1,%u,%u",
-                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
-                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
-
-    send_write_command_ctx_connect(ctx, &command);
-
-    g_free (command);
-}
-
-static void
-send_swwan_disconnect_command_ctx_connect (Connect3gppContext *ctx)
-{
-    /* 3rd context -> 1st wwan adapt / 1st context -> 2nd wwan adapt */
-    gchar               *command;
-    command = g_strdup_printf ("^SWWAN=0,%u,%u",
-                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
-                               usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
-
-    send_write_command_ctx_connect(ctx, &command);
-
-    g_free (command);
-}
-
-/*****************************************************************************/
-/* Connect - Bearer */
 
 static void
 connect_3gpp_context_step (Connect3gppContext *ctx)
 {
     /* Check for cancellation */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        handle_cancel_connect(ctx);
+        handle_cancel_connect (ctx);
         return;
     }
 
-    mm_dbg ("Connect Step:%i", ctx->connect);
-
     /* Network-initiated disconnect should not be outstanding at this point,
-       because it interferes with the connect attempt.*/
+     * because it interferes with the connect attempt.*/
     g_assert (ctx->self->priv->network_disconnect_pending_id == 0);
 
-    switch (ctx->connect) {
-    case CONNECT_3GPP_CONTEXT_STEP_INIT:
+    switch (ctx->step) {
+    case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
+        MMBearerIpFamily ip_family;
 
-        /* Insure no connection is currently
-         * active with the bearer we're creating.*/
-        send_swwan_disconnect_command_ctx_connect (ctx);
+        /* Only IPv4 supported by this bearer implementation for now */
+        ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY) {
+            gchar *ip_family_str;
 
-        return;
+            ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (ctx->self));
+            ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+            mm_dbg ("No specific IP family requested, defaulting to %s", ip_family_str);
+            g_free (ip_family_str);
+        }
+
+        if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Only IPv4 is supported by this modem");
+            connect_3gpp_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
     case CONNECT_3GPP_CONTEXT_STEP_AUTH: {
+        gchar *command;
 
-        gchar *command = NULL;
+        command = build_auth_string (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)),
+                                     ctx->usb_interface_config_index);
 
-        command = build_cinterion_auth_string (ctx);
-
-        mm_dbg ("Auth String:%s", command);
-
-        /* Send SGAUTH write, if User & Pass are provided.
-         * advance to next state by callback */
-        if (command != NULL) {
-            mm_dbg ("Sending auth");
-
-            send_write_command_ctx_connect (ctx, &command);
+        if (command) {
+            mm_dbg ("cinterion connect step 1/6: authenticating...");
+            /* Send SGAUTH write, if User & Pass are provided.
+             * advance to next state by callback */
+            mm_base_modem_at_command_full (ctx->modem,
+                                           ctx->primary,
+                                           command,
+                                           10,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback) common_connect_operation_ready,
+                                           ctx);
             g_free (command);
             return;
         }
 
-        /* GOTO next step - Fall down below */
-        ctx->connect++;
+        /* Fall down to next step */
+        mm_dbg ("cinterion connect step 1/6: authentication not required");
+        ctx->step++;
     }
     case CONNECT_3GPP_CONTEXT_STEP_PDP_CTX: {
-        gchar *command = NULL;
+        gchar       *command;
+        const gchar *apn;
 
-        command = build_cinterion_pdp_context_string (ctx);
+        apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
-        /*Set the PDP context with cgdcont.*/
-        send_write_command_ctx_connect (ctx, &command);
+        mm_dbg ("cinterion connect step 2/6: configuring PDP context %u with APN '%s'",
+                usb_interface_configs[ctx->usb_interface_config_index].pdp_context, apn);
 
+        /* TODO: Get IP type if protocol was specified. Hardcoded to IPV4 for now */
+        command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
+                                   usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                                   apn ? apn : "");
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       command,
+                                       5,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback) common_connect_operation_ready,
+                                       ctx);
         g_free (command);
         return;
     }
-    case CONNECT_3GPP_CONTEXT_STEP_START_SWWAN:
+    case CONNECT_3GPP_CONTEXT_STEP_START_SWWAN: {
+        gchar *command;
 
-        send_swwan_connect_command_ctx_connect (ctx);
-
+        mm_dbg ("cinterion connect step 3/6: starting SWWAN interface %u connection...",
+                usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+        command = g_strdup_printf ("^SWWAN=1,%u,%u",
+                                   usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                                   usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       command,
+                                       90,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback) common_connect_operation_ready,
+                                       ctx);
+        g_free (command);
         return;
+    }
     case CONNECT_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION:
-
-        send_swwan_read_command_ctx_connect (ctx);
-
+        mm_dbg ("cinterion connect step 4/6: checking SWWAN interface %u status...",
+                usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       "^SWWAN?",
+                                       5,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback) swwan_connect_check_status_ready,
+                                       ctx);
         return;
+
     case CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG:
+        mm_dbg ("cinterion connect step 5/6: creating IP config...");
+        /* Default to automatic/DHCP addressing */
+        ctx->ipv4_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+        /* Fall down to next step */
+        ctx->step++;
 
-        setup_ip_settings (ctx);
-
-        /* GOTO next step - Fall down below */
-        ctx->connect++;
-    case CONNECT_3GPP_CONTEXT_STEP_FINALIZE_BEARER:
-        /* Setup bearer */
-        create_cinterion_bearer (ctx);
-
+    case CONNECT_3GPP_CONTEXT_STEP_LAST:
+        mm_dbg ("cinterion connect step 6/6: finished");
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
+                                                   (GDestroyNotify) mm_bearer_connect_result_unref);
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
 }
 
 static void
-connect_3gpp (MMBroadbandBearer *self,
-              MMBroadbandModem *modem,
-              MMPortSerialAt *primary,
-              MMPortSerialAt *secondary,
-              GCancellable *cancellable,
-              GAsyncReadyCallback callback,
-              gpointer user_data)
+connect_3gpp (MMBroadbandBearer   *self,
+              MMBroadbandModem    *modem,
+              MMPortSerialAt      *primary,
+              MMPortSerialAt      *secondary,
+              GCancellable        *cancellable,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
 {
-    Connect3gppContext  *ctx;
-    MMPort *port;
-    gint usb_interface_config_index;
-    GError *error = NULL;
+    Connect3gppContext *ctx;
+    MMPort             *port;
+    gint                usb_interface_config_index;
+    GError             *error = NULL;
 
     g_assert (primary != NULL);
 
-    /* Get a Net port to setup the connection on */
+    /* Get a tet port to setup the connection on */
     port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
     if (!port) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
@@ -601,7 +534,7 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx->primary = g_object_ref (primary);
 
     /* Initialize */
-    ctx->connect = CONNECT_3GPP_CONTEXT_STEP_INIT;
+    ctx->step = CONNECT_3GPP_CONTEXT_STEP_FIRST;
 
     /* Run! */
     connect_3gpp_context_step (ctx);
