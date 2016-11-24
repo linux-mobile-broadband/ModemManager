@@ -327,142 +327,158 @@ test_cnmi_phs8 (void)
     g_array_unref (expected_mt);
     g_array_unref (expected_bm);
     g_array_unref (expected_ds);
-    g_array_unref (expected_bfr);}
+    g_array_unref (expected_bfr);
+}
 
-static void
-test_swwan_parser (const GArray *expected_cid,
-                   const GArray *expected_state,
-                   const GArray *expected_adapter,
-                   const gchar *at_cmd,
-                   const gboolean test_for_errors)
-{
-    GError *error = NULL;
-    gboolean res = TRUE;
-    gchar *response;
-    guint i, j, k;
+/*****************************************************************************/
+/* Test ^SWWAN read */
 
-    g_assert (expected_cid != NULL);
-    g_assert (expected_state != NULL);
-    g_assert (expected_adapter != NULL);
+#define SWWAN_TEST_MAX_CIDS 2
 
-    /* For each expected_cid */
-    for (i = 0; i < expected_cid->len; i++) {
-        /* For each expected_state */
-        for (j = 0; j < expected_state->len; j++) {
-            /* For each expected_adapter */
-            for (k = 0; k < expected_adapter->len; k++) {
-                GList *response_parsed = NULL;
+typedef struct {
+    guint        cid;
+    MMSwwanState state;
+} PdpContextState;
 
-                /* Build a unique at_cmd string */
-                response = g_strdup_printf ("%s: %i,%i,%i\r\n\r\n",
-                                            at_cmd,
-                                            g_array_index (expected_cid, guint, i),
-                                            g_array_index (expected_state, guint, j),
-                                            g_array_index (expected_adapter, guint, k));
+typedef struct {
+    const gchar     *response;
+    PdpContextState  expected_items[SWWAN_TEST_MAX_CIDS];
+    gboolean         skip_test_other_cids;
+} SwwanTest;
 
-                /* and send it to the parser */
-                res = mm_cinterion_parse_swwan_response (response,
-                                                         &response_parsed,
-                                                         &error);
-
-                if (test_for_errors) {
-                    /* There should be errors raised */
-                    g_assert (res == FALSE);
-                    g_assert (error != NULL);
-
-                    /* reset the error's everytime */
-                    res = TRUE;
-                    g_clear_error (&error);
-                }
-                else {
-                    /* The parsed values we get back should match the AT string we sent */
-                    g_assert (g_array_index (expected_cid, guint, i) ==
-                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 0)));
-                    g_assert (g_array_index (expected_state, guint, j) ==
-                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 1)));
-                    g_assert (g_array_index (expected_adapter, guint, k) ==
-                              GPOINTER_TO_INT(g_list_nth_data (response_parsed, 2)));
-
-                    /* and there should be no errors raised */
-                    g_assert (res == TRUE);
-                    g_assert_no_error (error);
-                }
-
-                g_list_free(response_parsed);
-            }
+/* Note: all tests are based on checking CIDs 2 and 3 */
+static const SwwanTest swwan_tests[] = {
+    /* No active PDP context reported (all disconnected) */
+    {
+        .response = "",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+        },
+        /* Don't test other CIDs because for those we would also return
+         * DISCONNECTED, not UNKNOWN. */
+        .skip_test_other_cids = TRUE
+    },
+    /* Single PDP context active (short version without interface index) */
+    {
+        .response = "^SWWAN: 3,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN   },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+        }
+    },
+    /* Single PDP context active (long version with interface index) */
+    {
+        .response = "^SWWAN: 3,1,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN   },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+        }
+    },
+    /* Single PDP context inactive (short version without interface index) */
+    {
+        .response = "^SWWAN: 3,0\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN      },
+            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+        }
+    },
+    /* Single PDP context inactive (long version with interface index) */
+    {
+        .response = "^SWWAN: 3,0,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN      },
+            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+        }
+    },
+    /* Multiple PDP contexts active (short version without interface index) */
+    {
+        .response = "^SWWAN: 2,1\r\n^SWWAN: 3,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_CONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+        }
+    },
+    /* Multiple PDP contexts active (long version with interface index) */
+    {
+        .response = "^SWWAN: 2,1,3\r\n^SWWAN: 3,1,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_CONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+        }
+    },
+    /* Multiple PDP contexts inactive (short version without interface index) */
+    {
+        .response = "^SWWAN: 2,0\r\n^SWWAN: 3,0\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+        }
+    },
+    /* Multiple PDP contexts inactive (long version with interface index) */
+    {
+        .response = "^SWWAN: 2,0,3\r\n^SWWAN: 3,0,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+        }
+    },
+    /* Multiple PDP contexts active/inactive (short version without interface index) */
+    {
+        .response = "^SWWAN: 2,0\r\n^SWWAN: 3,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED    }
+        }
+    },
+    /* Multiple PDP contexts active/inactive (long version with interface index) */
+    {
+        .response = "^SWWAN: 2,0,3\r\n^SWWAN: 3,1,1\r\n",
+        .expected_items = {
+            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
+            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED    }
         }
     }
-}
+};
 
 static void
 test_swwan_pls8 (void)
 {
-    GArray *good_cid;
-    GArray *good_state;
-    GArray *good_adapter;
-    GArray *bad_cid;
-    GArray *bad_state;
-    GArray *bad_adapter;
-    guint i;
-    guint val;
+    MMSwwanState  read_state;
+    GError       *error = NULL;
+    guint         i;
 
-    /* AT^SWWAN=? -> '^SWWAN: (0,1),(1-16),(1,2)' */
-    /* Setup array with good SWWAN values */
-    good_cid = g_array_sized_new (FALSE, FALSE, sizeof (guint), 16);
-    for (i = 1; i < 17; i++)
-        val = i, g_array_append_val (good_cid, val);
+    /* Base tests for successful responses */
+    for (i = 0; i < G_N_ELEMENTS (swwan_tests); i++) {
+        guint j;
 
-    good_state = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
-    val = 0, g_array_append_val (good_state, val);
-    val = 1, g_array_append_val (good_state, val);
+        /* Query for the expected items (CIDs 2 and 3) */
+        for (j = 0; j < SWWAN_TEST_MAX_CIDS; j++) {
+            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, swwan_tests[i].expected_items[j].cid, &error);
+            if (swwan_tests[i].expected_items[j].state == MM_SWWAN_STATE_UNKNOWN) {
+                g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+                g_clear_error (&error);
+            } else
+                g_assert_no_error (error);
+            g_assert_cmpint (read_state, ==, swwan_tests[i].expected_items[j].state);
+        }
 
-    good_adapter = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
-    val = 1, g_array_append_val (good_adapter, val);
-    val = 2, g_array_append_val (good_adapter, val);
+        /* Query for a CID which isn't replied (e.g. 12) */
+        if (!swwan_tests[i].skip_test_other_cids) {
+            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, 12, &error);
+            g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+            g_assert_cmpint (read_state, ==, MM_SWWAN_STATE_UNKNOWN);
+            g_clear_error (&error);
+        }
+    }
 
-    /* and test */
-    test_swwan_parser (good_cid,
-                       good_state,
-                       good_adapter,
-                       "^SWWAN",
-                       FALSE);
-
-    /* Setup array with bad SWWAN values */
-    bad_cid = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
-    val = -1, g_array_append_val (bad_cid, val);
-    val = 17, g_array_append_val (bad_cid, val);
-
-    bad_state = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
-    val = -1, g_array_append_val (bad_state, val);
-    val = 2, g_array_append_val (bad_state, val);
-
-    bad_adapter = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
-    val = -1, g_array_append_val (bad_adapter, val);
-    val = 0, g_array_append_val (bad_adapter, val);
-    val = 3, g_array_append_val (bad_adapter, val);
-
-    /* and test */
-    test_swwan_parser (bad_cid,
-                       bad_state,
-                       bad_adapter,
-                       "^SWWAN",
-                       TRUE);
-
-    /* and again with a bad cmd */
-    test_swwan_parser (bad_cid,
-                       bad_state,
-                       bad_adapter,
-                       "^GARBAGE",
-                       TRUE);
-
-
-    g_array_unref (good_cid);
-    g_array_unref (good_state);
-    g_array_unref (good_adapter);
-    g_array_unref (bad_cid);
-    g_array_unref (bad_state);
-    g_array_unref (bad_adapter);
+    /* Additional tests for errors */
+    read_state = mm_cinterion_parse_swwan_response ("^GARBAGE", 2, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_assert_cmpint (read_state, ==, MM_SWWAN_STATE_UNKNOWN);
+    g_clear_error (&error);
 }
+
 /*****************************************************************************/
 /* Test ^SIND responses */
 

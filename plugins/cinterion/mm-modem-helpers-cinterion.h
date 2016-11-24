@@ -67,7 +67,15 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
 
 /*****************************************************************************/
 /* ^SWWAN response parser */
-gboolean mm_cinterion_parse_swwan_response (const gchar *response,
-                                        GList **result,
-                                        GError **error);
+
+typedef enum {
+    MM_SWWAN_STATE_UNKNOWN      = -1,
+    MM_SWWAN_STATE_DISCONNECTED =  0,
+    MM_SWWAN_STATE_CONNECTED    =  1,
+} MMSwwanState;
+
+MMSwwanState mm_cinterion_parse_swwan_response (const gchar  *response,
+                                                guint         swwan_index,
+                                                GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

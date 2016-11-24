@@ -489,77 +489,83 @@ mm_cinterion_parse_sind_response (const gchar *response,
 
 /*****************************************************************************/
 /* ^SWWAN read parser
+ *
  * Description: Parses <cid>, <state>[, <WWAN adapter>] or CME ERROR from SWWAN.
- * Return: False if error occured while trying to parse SWWAN.
-     * Read Command
-     *     AT^SWWAN?
-     *     Response(s)
-     *     [^SWWAN: <cid>, <state>[, <WWAN adapter>]]
-     *     [^SWWAN: ...]
-     *     OK
-     *     ERROR
-     *     +CME ERROR: <err>
-     *
-     * Examples:
-     *     OK              - If no WWAN connection is active, then read command just returns OK
-     *     ^SWWAN: 3,1,1   - 3rd PDP Context, Activated, First WWAN Adaptor
-     *     +CME ERROR: ?   -
-*/
-
-gboolean
-mm_cinterion_parse_swwan_response (const gchar *response,
-                                   GList **result,
-                                   GError **error)
+ *
+ * The method returns a MMSwwanState with the connection status of a single
+ * PDP context, the one being queried via the cid given as input.
+ *
+ * Note that we use CID for matching because the WWAN adapter field is optional
+ * it seems.
+ *
+ *     Read Command
+ *         AT^SWWAN?
+ *         Response(s)
+ *         [^SWWAN: <cid>, <state>[, <WWAN adapter>]]
+ *         [^SWWAN: ...]
+ *         OK
+ *         ERROR
+ *         +CME ERROR: <err>
+ *
+ *     Examples:
+ *         OK              - If no WWAN connection is active, then read command just returns OK
+ *         ^SWWAN: 3,1,1   - 3rd PDP Context, Activated, First WWAN Adaptor
+ *         +CME ERROR: ?   -
+ */
+MMSwwanState
+mm_cinterion_parse_swwan_response (const gchar  *response,
+                                   guint         cid,
+                                   GError      **error)
 {
-    if (*error)
-        return FALSE;
+    GRegex       *r;
+    GMatchInfo   *match_info;
+    GError       *inner_error = NULL;
+    MMSwwanState  state;
 
-    if (!response) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Recieved NULL from SWWAN response.");
-        return FALSE;
+    g_assert (response);
+
+    /* If no WWAN connection is active, then ^SWWAN read command just returns OK
+     * (which we receive as an empty string) */
+    if (!response[0])
+        return MM_SWWAN_STATE_DISCONNECTED;
+
+    if (!g_str_has_prefix (response, "^SWWAN:")) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse ^SWWAN response: '%s'", response);
+        return MM_SWWAN_STATE_UNKNOWN;
     }
 
-    /* Parse for [^SWWAN: <cid>, <state>[, <WWAN adapter>]] */
-    if (strcasestr (response, "SWWAN")) {
-        gint matched;
-        guint cid, state, wwan_adapter;
-        matched = sscanf (response, "^SWWAN: %d,%d,%d",
-                          &cid,
-                          &state,
-                          &wwan_adapter);
+    r = g_regex_new ("\\^SWWAN:\\s*(\\d+),\\s*(\\d+)(?:,\\s*(\\d+))?(?:\\r\\n)?",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
 
-        if (matched != 3 ||
-            cid < 1 || cid > 16 ||
-            state < 0 || state > 1 ||
-            wwan_adapter < 1 || wwan_adapter > 2) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Invalid format for SWWAN response: '%s'",
-                         response);
-            return FALSE;
+    state = MM_SWWAN_STATE_UNKNOWN;
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    while (!inner_error && g_match_info_matches (match_info)) {
+        guint read_state;
+        guint read_cid;
+
+        if (!mm_get_uint_from_match_info (match_info, 1, &read_cid))
+            mm_warn ("Couldn't read cid in ^SWWAN response: '%s'", response);
+        else if (!mm_get_uint_from_match_info (match_info, 2, &read_state))
+            mm_warn ("Couldn't read state in ^SWWAN response: '%s'", response);
+        else if (read_cid == cid) {
+            if (read_state == MM_SWWAN_STATE_CONNECTED || read_state == MM_SWWAN_STATE_DISCONNECTED) {
+                state = (MMSwwanState) read_state;
+                break;
+            }
+            mm_warn ("Invalid state read in ^SWWAN response: %u", read_state);
         }
 
-        *result = g_list_append (*result, GINT_TO_POINTER(cid));
-        *result = g_list_append (*result, GINT_TO_POINTER(state));
-        *result = g_list_append (*result, GINT_TO_POINTER(wwan_adapter));
-    }
-    /* TODO: It'd be nice to get 'OK' from response so we don't have to assume that
-     * zero length response means 'OK' or am I doing it wrong?... */
-    else if (!g_utf8_strlen (response, 100))
-        *result = g_list_append (*result, GINT_TO_POINTER(0));
-    else {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Could not parse SWWAN response: '%s'",
-                     response);
-        return FALSE;
+        g_match_info_next (match_info, &inner_error);
     }
 
+    g_match_info_free (match_info);
+    g_regex_unref (r);
 
-    return TRUE;
+    if (state == MM_SWWAN_STATE_UNKNOWN)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No state returned for CID %u", cid);
+
+    return state;
 }

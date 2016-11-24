@@ -87,49 +87,6 @@ get_usb_interface_config_index (MMPort  *data,
 }
 
 /*****************************************************************************/
-/* Common - Helper Functions*/
-
-static gint
-verify_connection_state_from_swwan_response (GList *result, GError **error)
-{
-    /* Returns 0 if SWWAN is connected, 1 if not connected, -1 on error
-     * for the bearer's target interface */
-
-    if (g_list_length(result) != 0) {
-        int first_result = GPOINTER_TO_INT(result->data);
-
-        /* Received an 'OK'(0) response */
-        if (first_result == 0)
-            return 1;
-        /* 1 || 3 result is the CID, given when that context is activated.
-         * TODO: Rework for dual sim connections. */
-        else if (first_result == 1 || first_result ==3)
-            return 0;
-        else {
-            for (; result; result = g_list_next(result))
-                mm_err ("Unknown SWWAN response data:%i", GPOINTER_TO_INT(result->data));
-
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_INVALID_ARGS,
-                         "Unparsable SWWAN response format.");
-
-            return -1;
-        }
-     }
-     else {
-        mm_err ("Unable to parse zero length SWWAN response.");
-
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Unparsable SWWAN response format.");
-
-        return -1;
-     }
-}
-
-/*****************************************************************************/
 /* Auth helpers */
 
 typedef enum {
@@ -254,9 +211,9 @@ swwan_connect_check_status_ready (MMBaseModem        *modem,
                                   GAsyncResult       *res,
                                   Connect3gppContext *ctx)
 {
-    const gchar *response;
-    GList       *response_parsed = NULL;
-    GError      *error = NULL;
+    const gchar  *response;
+    GError       *error = NULL;
+    MMSwwanState  state;
 
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!response) {
@@ -265,22 +222,24 @@ swwan_connect_check_status_ready (MMBaseModem        *modem,
         return;
     }
 
-    /* Error if parsing SWWAN read response fails */
-    if (!mm_cinterion_parse_swwan_response (response, &response_parsed, &error)) {
+    state = mm_cinterion_parse_swwan_response (response,
+                                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                                               &error);
+    if (state == MM_SWWAN_STATE_UNKNOWN) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    /* Check parsed SWWAN reponse to see if we are now connected */
-    if (verify_connection_state_from_swwan_response (response_parsed, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
+    if (state == MM_SWWAN_STATE_DISCONNECTED) {
+        g_simple_async_result_set_error (ctx->result, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "CID %u is reported disconnected",
+                                         usb_interface_configs[ctx->usb_interface_config_index].pdp_context);
         connect_3gpp_context_complete_and_free (ctx);
-        g_list_free (response_parsed);
         return;
     }
 
-    g_list_free (response_parsed);
+    g_assert (state == MM_SWWAN_STATE_CONNECTED);
 
     /* Go to next step */
     ctx->step++;
@@ -575,9 +534,9 @@ swwan_disconnect_check_status_ready (MMBaseModem           *modem,
                                      GAsyncResult          *res,
                                      Disconnect3gppContext *ctx)
 {
-    const gchar *response;
-    GList       *response_parsed = NULL;
-    GError      *error = NULL;
+    const gchar  *response;
+    GError       *error = NULL;
+    MMSwwanState  state;
 
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
@@ -586,23 +545,26 @@ swwan_disconnect_check_status_ready (MMBaseModem           *modem,
         return;
     }
 
-    /* Return if the SWWAN read threw an error or parsing it fails */
-    if (!mm_cinterion_parse_swwan_response (response, &response_parsed, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
+    state = mm_cinterion_parse_swwan_response (response,
+                                               usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                                               &error);
+
+    if (state == MM_SWWAN_STATE_CONNECTED) {
+        g_simple_async_result_set_error (ctx->result, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "CID %u is reported connected",
+                                         usb_interface_configs[ctx->usb_interface_config_index].pdp_context);
         disconnect_3gpp_context_complete_and_free (ctx);
         return;
     }
 
-    /* Check parsed SWWAN reponse to see if we are now disconnected */
-    if (verify_connection_state_from_swwan_response (response_parsed, &error) != 1) {
-        g_prefix_error (&error, "Disconnection attempt failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disconnect_3gpp_context_complete_and_free (ctx);
-        g_list_free (response_parsed);
-        return;
-    }
-
-    g_list_free (response_parsed);
+    if (state == MM_SWWAN_STATE_UNKNOWN) {
+        /* Assume disconnected */
+        mm_dbg ("couldn't get CID %u status, assume disconnected: %s",
+                usb_interface_configs[ctx->usb_interface_config_index].pdp_context,
+                error->message);
+        g_error_free (error);
+    } else
+        g_assert (state == MM_SWWAN_STATE_DISCONNECTED);
 
     /* Go on to next step */
     ctx->step++;
