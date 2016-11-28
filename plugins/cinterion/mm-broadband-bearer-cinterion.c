@@ -445,7 +445,7 @@ connect_3gpp (MMBroadbandBearer   *self,
 
     g_assert (primary != NULL);
 
-    /* Get a tet port to setup the connection on */
+    /* Get a net port to setup the connection on */
     port = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
     if (!port) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
