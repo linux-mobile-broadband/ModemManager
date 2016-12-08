@@ -17,6 +17,7 @@
 #include <glib-object.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <libmm-glib.h>
 #include "mm-modem-helpers.h"
@@ -27,6 +28,9 @@
 #else
 #define trace(...)
 #endif
+
+#define g_assert_cmpfloat_tolerance(val1, val2, tolerance)  \
+    g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
 /*****************************************************************************/
 /* Test CMGL responses */
@@ -2733,6 +2737,126 @@ test_crsm_response (void)
 }
 
 /*****************************************************************************/
+/* Test +CESQ responses */
+
+typedef struct {
+    const gchar *str;
+
+    gboolean gsm_info;
+    guint    rxlev;
+    gdouble  rssi;
+    guint    ber;
+
+    gboolean umts_info;
+    guint    rscp_level;
+    gdouble  rscp;
+    guint    ecn0_level;
+    gdouble  ecio;
+
+    gboolean lte_info;
+    guint    rsrq_level;
+    gdouble  rsrq;
+    guint    rsrp_level;
+    gdouble  rsrp;
+} CesqResponseTest;
+
+static const CesqResponseTest cesq_response_tests[] = {
+    {
+        .str       = "+CESQ: 99,99,255,255,20,80",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = TRUE,  .rsrq_level = 20, .rsrq = -10.0, .rsrp_level = 80, .rsrp = -61.0,
+    },
+    {
+        .str       = "+CESQ: 99,99,95,40,255,255",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = TRUE,  .rscp_level = 95, .rscp = -26.0, .ecn0_level = 40, .ecio = -4.5,
+        .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255,
+    },
+    {
+        .str       = "+CESQ: 10,6,255,255,255,255",
+        .gsm_info  = TRUE,  .rxlev = 10, .rssi = -101.0, .ber = 6,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255,
+    }
+};
+
+static void
+test_cesq_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cesq_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint rxlev = G_MAXUINT;
+        guint ber = G_MAXUINT;
+        guint rscp = G_MAXUINT;
+        guint ecn0 = G_MAXUINT;
+        guint rsrq = G_MAXUINT;
+        guint rsrp = G_MAXUINT;
+
+        success = mm_3gpp_parse_cesq_response (cesq_response_tests[i].str,
+                                               &rxlev, &ber,
+                                               &rscp, &ecn0,
+                                               &rsrq, &rsrp,
+                                               &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        g_assert_cmpuint (cesq_response_tests[i].rxlev,      ==, rxlev);
+        g_assert_cmpuint (cesq_response_tests[i].ber,        ==, ber);
+        g_assert_cmpuint (cesq_response_tests[i].rscp_level, ==, rscp);
+        g_assert_cmpuint (cesq_response_tests[i].ecn0_level, ==, ecn0);
+        g_assert_cmpuint (cesq_response_tests[i].rsrq_level, ==, rsrq);
+        g_assert_cmpuint (cesq_response_tests[i].rsrp_level, ==, rsrp);
+    }
+}
+
+static void
+test_cesq_response_to_signal (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cesq_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        MMSignal *gsm  = NULL;
+        MMSignal *umts = NULL;
+        MMSignal *lte  = NULL;
+
+        success = mm_3gpp_cesq_response_to_signal_info (cesq_response_tests[i].str,
+                                                        &gsm, &umts, &lte,
+                                                        &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        if (cesq_response_tests[i].gsm_info) {
+            g_assert (gsm);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rssi (gsm), cesq_response_tests[i].rssi, 0.1);
+            g_object_unref (gsm);
+        } else
+            g_assert (!gsm);
+
+        if (cesq_response_tests[i].umts_info) {
+            g_assert (umts);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rscp (umts), cesq_response_tests[i].rscp, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_ecio (umts), cesq_response_tests[i].ecio, 0.1);
+            g_object_unref (umts);
+        } else
+            g_assert (!umts);
+
+        if (cesq_response_tests[i].lte_info) {
+            g_assert (lte);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrq (lte), cesq_response_tests[i].rsrq, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrp (lte), cesq_response_tests[i].rsrp, 0.1);
+            g_object_unref (lte);
+        } else
+            g_assert (!lte);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -2909,6 +3033,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cclk_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_crsm_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cesq_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cesq_response_to_signal, NULL));
 
     result = g_test_run ();
 

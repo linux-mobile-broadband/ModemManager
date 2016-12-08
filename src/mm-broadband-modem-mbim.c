@@ -36,20 +36,23 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-messaging.h"
+#include "mm-iface-modem-signal.h"
 #include "mm-sms-part-3gpp.h"
 
 #if defined WITH_QMI
 # include <libqmi-glib.h>
 #endif
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init           (MMIfaceModem          *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_signal_init    (MMIfaceModemSignal    *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init))
 
 typedef enum {
     PROCESS_NOTIFICATION_FLAG_NONE                 = 0,
@@ -3304,6 +3307,15 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->disable_unsolicited_events = disable_unsolicited_events_messaging;
     iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
     iface->create_sms = messaging_create_sms;
+}
+
+static void
+iface_modem_signal_init (MMIfaceModemSignal *iface)
+{
+    iface->check_support = NULL;
+    iface->check_support_finish = NULL;
+    iface->load_values = NULL;
+    iface->load_values_finish = NULL;
 }
 
 static void

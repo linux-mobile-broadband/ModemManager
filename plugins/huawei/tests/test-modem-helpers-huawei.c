@@ -1206,6 +1206,66 @@ test_time (void)
 }
 
 /*****************************************************************************/
+/* Test ^HCSQ responses */
+
+typedef struct {
+    const gchar *str;
+    gboolean ret;
+    MMModemAccessTechnology act;
+    guint value1;
+    guint value2;
+    guint value3;
+    guint value4;
+    guint value5;
+} HcsqTest;
+
+static const HcsqTest hcsq_tests[] = {
+    { "^HCSQ:\"LTE\",30,19,66,0\r\n",  TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_LTE,     30, 19,  66, 0, 0 },
+    { "^HCSQ: \"WCDMA\",30,30,58\r\n", TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_UMTS,    30, 30,  58, 0, 0 },
+    { "^HCSQ: \"GSM\",36,255\r\n",     TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_GSM,     36, 255,  0, 0, 0 },
+    { "^HCSQ: \"NOSERVICE\"\r\n",      FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,  0, 0, 0 },
+    { NULL,                            FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,  0, 0, 0 }
+};
+
+static void
+test_hcsq (void)
+{
+    guint i;
+
+    for (i = 0; hcsq_tests[i].str; i++) {
+        GError *error = NULL;
+        MMModemAccessTechnology act;
+        guint value1 = 0;
+        guint value2 = 0;
+        guint value3 = 0;
+        guint value4 = 0;
+        guint value5 = 0;
+        gboolean ret;
+
+        ret = mm_huawei_parse_hcsq_response (hcsq_tests[i].str,
+                                             &act,
+                                             &value1,
+                                             &value2,
+                                             &value3,
+                                             &value4,
+                                             &value5,
+                                             &error);
+        g_assert (ret == hcsq_tests[i].ret);
+        if (ret) {
+            g_assert_no_error (error);
+            g_assert_cmpint (hcsq_tests[i].act, ==, act);
+            g_assert_cmpint (hcsq_tests[i].value1, ==, value1);
+            g_assert_cmpint (hcsq_tests[i].value2, ==, value2);
+            g_assert_cmpint (hcsq_tests[i].value3, ==, value3);
+            g_assert_cmpint (hcsq_tests[i].value4, ==, value4);
+            g_assert_cmpint (hcsq_tests[i].value5, ==, value5);
+        } else
+            g_assert (error);
+        g_clear_error (&error);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1246,6 +1306,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/syscfgex/response", test_syscfgex_response);
     g_test_add_func ("/MM/huawei/nwtime", test_nwtime);
     g_test_add_func ("/MM/huawei/time", test_time);
+    g_test_add_func ("/MM/huawei/hcsq", test_hcsq);
 
     return g_test_run ();
 }

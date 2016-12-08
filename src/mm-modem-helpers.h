@@ -221,6 +221,22 @@ gboolean mm_3gpp_parse_crsm_response (const gchar *reply,
                                       gchar **hex,
                                       GError **error);
 
+/* +CESQ response parser */
+gboolean mm_3gpp_parse_cesq_response (const gchar  *response,
+                                      guint        *out_rxlev,
+                                      guint        *out_ber,
+                                      guint        *out_rscp,
+                                      guint        *out_ecn0,
+                                      guint        *out_rsrq,
+                                      guint        *out_rsrp,
+                                      GError      **error);
+
+gboolean mm_3gpp_cesq_response_to_signal_info (const gchar  *response,
+                                               MMSignal    **out_gsm,
+                                               MMSignal    **out_umts,
+                                               MMSignal    **out_lte,
+                                               GError      **error);
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);

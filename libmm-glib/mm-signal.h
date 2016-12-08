@@ -63,6 +63,7 @@ struct _MMSignalClass {
 GType mm_signal_get_type (void);
 
 gdouble  mm_signal_get_rssi (MMSignal *self);
+gdouble  mm_signal_get_rscp (MMSignal *self);
 gdouble  mm_signal_get_ecio (MMSignal *self);
 gdouble  mm_signal_get_sinr (MMSignal *self);
 gdouble  mm_signal_get_io   (MMSignal *self);
@@ -84,6 +85,7 @@ MMSignal *mm_signal_new_from_dictionary (GVariant *dictionary,
                                          GError **error);
 
 void mm_signal_set_rssi (MMSignal *self, gdouble value);
+void mm_signal_set_rscp (MMSignal *self, gdouble value);
 void mm_signal_set_ecio (MMSignal *self, gdouble value);
 void mm_signal_set_sinr (MMSignal *self, gdouble value);
 void mm_signal_set_io   (MMSignal *self, gdouble value);

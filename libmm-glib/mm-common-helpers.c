@@ -1343,7 +1343,8 @@ mm_get_int_from_match_info (GMatchInfo *match_info,
     gboolean ret;
 
     s = g_match_info_fetch (match_info, match_index);
-    g_return_val_if_fail (s != NULL, FALSE);
+    if (!s)
+        return FALSE;
 
     ret = mm_get_int_from_str (s, out);
     g_free (s);
@@ -1394,7 +1395,8 @@ mm_get_uint_from_match_info (GMatchInfo *match_info,
     gboolean ret;
 
     s = g_match_info_fetch (match_info, match_index);
-    g_return_val_if_fail (s != NULL, FALSE);
+    if (!s)
+        return FALSE;
 
     ret = mm_get_uint_from_str (s, out);
     g_free (s);
@@ -1439,7 +1441,8 @@ mm_get_double_from_match_info (GMatchInfo *match_info,
     gboolean ret;
 
     s = g_match_info_fetch (match_info, match_index);
-    g_return_val_if_fail (s != NULL, FALSE);
+    if (!s)
+        return FALSE;
 
     ret = mm_get_double_from_str (s, out);
     g_free (s);
