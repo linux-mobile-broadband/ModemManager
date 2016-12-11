@@ -821,8 +821,7 @@ common_setup_cleanup_unsolicited_events (MMBearerQmi *self,
                               "packet-service-status",
                               G_CALLBACK (packet_service_status_indication_cb),
                               self);
-    } else {
-        g_assert (*indication_id != 0);
+    } else if (*indication_id != 0) {
         g_signal_handler_disconnect (client, *indication_id);
         *indication_id = 0;
     }
