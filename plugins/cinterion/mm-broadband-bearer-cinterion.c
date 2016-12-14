@@ -103,39 +103,44 @@ parse_auth_type (MMBearerAllowedAuth mm_auth)
     }
 }
 
+/* AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]] */
 static gchar *
 build_auth_string (MMBearerProperties *config,
                    guint               cid)
 {
     const gchar             *user;
     const gchar             *passwd;
+    gboolean                 has_user;
+    gboolean                 has_passwd;
     MMBearerAllowedAuth      auth;
     BearerCinterionAuthType  encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
 
-    user = mm_bearer_properties_get_user (config);
-    passwd = mm_bearer_properties_get_password (config);
+    user   = mm_bearer_properties_get_user         (config);
+    passwd = mm_bearer_properties_get_password     (config);
+    auth   = mm_bearer_properties_get_allowed_auth (config);
 
-    /* Normal use case is no user & pass so return as quick as possible */
-    if (!user && !passwd)
-        return NULL;
-
-    auth = mm_bearer_properties_get_allowed_auth (config);
+    has_user     = (user   && user[0]);
+    has_passwd   = (passwd && passwd[0]);
     encoded_auth = parse_auth_type (auth);
 
-    /* Default to no authentication if not specified */
-    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
-        encoded_auth = BEARER_CINTERION_AUTH_NONE;
-        mm_dbg ("Unable to detect authentication type. Defaulting to 'none'");
+    /* When 'none' requested, we won't require user/password */
+    if (encoded_auth == BEARER_CINTERION_AUTH_NONE) {
+        if (has_user || has_passwd)
+            mm_warn ("APN user/password given but 'none' authentication requested");
+        return g_strdup_printf ("^SGAUTH=%u,%d", cid, encoded_auth);
     }
 
-    /* TODO: Haven't tested this as I can't get a hold of a SIM w/ this feature atm.
-     * Write Command
-     * AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]]
-     * Response(s)
-     * OK
-     * ERROR
-     * +CME ERROR: <err>
-     */
+    /* No explicit auth type requested? */
+    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
+        /* If no user/passwd given, do nothing */
+        if (!has_user && !has_passwd)
+            return NULL;
+
+        /* If user/passwd given, default to PAP */
+        mm_dbg ("APN user/password given but no authentication type explicitly requested: defaulting to 'PAP'");
+        encoded_auth = BEARER_CINTERION_AUTH_PAP;
+    }
+
     return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s", cid, encoded_auth, passwd, user);
 }
 
