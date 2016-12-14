@@ -512,34 +512,40 @@ mm_cinterion_parse_sind_response (const gchar *response,
  *         ^SWWAN: 3,1,1   - 3rd PDP Context, Activated, First WWAN Adaptor
  *         +CME ERROR: ?   -
  */
-MMSwwanState
+
+enum {
+    MM_SWWAN_STATE_DISCONNECTED =  0,
+    MM_SWWAN_STATE_CONNECTED    =  1,
+};
+
+MMBearerConnectionStatus
 mm_cinterion_parse_swwan_response (const gchar  *response,
                                    guint         cid,
                                    GError      **error)
 {
-    GRegex       *r;
-    GMatchInfo   *match_info;
-    GError       *inner_error = NULL;
-    MMSwwanState  state;
+    GRegex                   *r;
+    GMatchInfo               *match_info;
+    GError                   *inner_error = NULL;
+    MMBearerConnectionStatus  status;
 
     g_assert (response);
 
     /* If no WWAN connection is active, then ^SWWAN read command just returns OK
      * (which we receive as an empty string) */
     if (!response[0])
-        return MM_SWWAN_STATE_DISCONNECTED;
+        return MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
 
     if (!g_str_has_prefix (response, "^SWWAN:")) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Couldn't parse ^SWWAN response: '%s'", response);
-        return MM_SWWAN_STATE_UNKNOWN;
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
     }
 
     r = g_regex_new ("\\^SWWAN:\\s*(\\d+),\\s*(\\d+)(?:,\\s*(\\d+))?(?:\\r\\n)?",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
     g_assert (r != NULL);
 
-    state = MM_SWWAN_STATE_UNKNOWN;
+    status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     while (!inner_error && g_match_info_matches (match_info)) {
         guint read_state;
@@ -550,22 +556,26 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
         else if (!mm_get_uint_from_match_info (match_info, 2, &read_state))
             mm_warn ("Couldn't read state in ^SWWAN response: '%s'", response);
         else if (read_cid == cid) {
-            if (read_state == MM_SWWAN_STATE_CONNECTED || read_state == MM_SWWAN_STATE_DISCONNECTED) {
-                state = (MMSwwanState) read_state;
+            if (read_state == MM_SWWAN_STATE_CONNECTED) {
+                status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
+                break;
+            }
+            if (read_state == MM_SWWAN_STATE_DISCONNECTED) {
+                status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
                 break;
             }
             mm_warn ("Invalid state read in ^SWWAN response: %u", read_state);
+            break;
         }
-
         g_match_info_next (match_info, &inner_error);
     }
 
     g_match_info_free (match_info);
     g_regex_unref (r);
 
-    if (state == MM_SWWAN_STATE_UNKNOWN)
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "No state returned for CID %u", cid);
 
-    return state;
+    return status;
 }

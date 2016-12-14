@@ -336,8 +336,8 @@ test_cnmi_phs8 (void)
 #define SWWAN_TEST_MAX_CIDS 2
 
 typedef struct {
-    guint        cid;
-    MMSwwanState state;
+    guint                    cid;
+    MMBearerConnectionStatus state;
 } PdpContextState;
 
 typedef struct {
@@ -352,8 +352,8 @@ static const SwwanTest swwan_tests[] = {
     {
         .response = "",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED }
         },
         /* Don't test other CIDs because for those we would also return
          * DISCONNECTED, not UNKNOWN. */
@@ -363,80 +363,80 @@ static const SwwanTest swwan_tests[] = {
     {
         .response = "^SWWAN: 3,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN   },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_UNKNOWN   },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED }
         }
     },
     /* Single PDP context active (long version with interface index) */
     {
         .response = "^SWWAN: 3,1,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN   },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_UNKNOWN   },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED }
         }
     },
     /* Single PDP context inactive (short version without interface index) */
     {
         .response = "^SWWAN: 3,0\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN      },
-            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_UNKNOWN      },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED }
         }
     },
     /* Single PDP context inactive (long version with interface index) */
     {
         .response = "^SWWAN: 3,0,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_UNKNOWN      },
-            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_UNKNOWN      },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED }
         }
     },
     /* Multiple PDP contexts active (short version without interface index) */
     {
         .response = "^SWWAN: 2,1\r\n^SWWAN: 3,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_CONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED }
         }
     },
     /* Multiple PDP contexts active (long version with interface index) */
     {
         .response = "^SWWAN: 2,1,3\r\n^SWWAN: 3,1,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_CONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED }
         }
     },
     /* Multiple PDP contexts inactive (short version without interface index) */
     {
         .response = "^SWWAN: 2,0\r\n^SWWAN: 3,0\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED }
         }
     },
     /* Multiple PDP contexts inactive (long version with interface index) */
     {
         .response = "^SWWAN: 2,0,3\r\n^SWWAN: 3,0,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_DISCONNECTED }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED }
         }
     },
     /* Multiple PDP contexts active/inactive (short version without interface index) */
     {
         .response = "^SWWAN: 2,0\r\n^SWWAN: 3,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED    }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED    }
         }
     },
     /* Multiple PDP contexts active/inactive (long version with interface index) */
     {
         .response = "^SWWAN: 2,0,3\r\n^SWWAN: 3,1,1\r\n",
         .expected_items = {
-            { .cid = 2, .state = MM_SWWAN_STATE_DISCONNECTED },
-            { .cid = 3, .state = MM_SWWAN_STATE_CONNECTED    }
+            { .cid = 2, .state = MM_BEARER_CONNECTION_STATUS_DISCONNECTED },
+            { .cid = 3, .state = MM_BEARER_CONNECTION_STATUS_CONNECTED    }
         }
     }
 };
@@ -444,9 +444,9 @@ static const SwwanTest swwan_tests[] = {
 static void
 test_swwan_pls8 (void)
 {
-    MMSwwanState  read_state;
-    GError       *error = NULL;
-    guint         i;
+    MMBearerConnectionStatus  read_state;
+    GError                   *error = NULL;
+    guint                     i;
 
     /* Base tests for successful responses */
     for (i = 0; i < G_N_ELEMENTS (swwan_tests); i++) {
@@ -455,7 +455,7 @@ test_swwan_pls8 (void)
         /* Query for the expected items (CIDs 2 and 3) */
         for (j = 0; j < SWWAN_TEST_MAX_CIDS; j++) {
             read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, swwan_tests[i].expected_items[j].cid, &error);
-            if (swwan_tests[i].expected_items[j].state == MM_SWWAN_STATE_UNKNOWN) {
+            if (swwan_tests[i].expected_items[j].state == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
                 g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
                 g_clear_error (&error);
             } else
@@ -467,7 +467,7 @@ test_swwan_pls8 (void)
         if (!swwan_tests[i].skip_test_other_cids) {
             read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, 12, &error);
             g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-            g_assert_cmpint (read_state, ==, MM_SWWAN_STATE_UNKNOWN);
+            g_assert_cmpint (read_state, ==, MM_BEARER_CONNECTION_STATUS_UNKNOWN);
             g_clear_error (&error);
         }
     }
@@ -475,7 +475,7 @@ test_swwan_pls8 (void)
     /* Additional tests for errors */
     read_state = mm_cinterion_parse_swwan_response ("^GARBAGE", 2, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-    g_assert_cmpint (read_state, ==, MM_SWWAN_STATE_UNKNOWN);
+    g_assert_cmpint (read_state, ==, MM_BEARER_CONNECTION_STATUS_UNKNOWN);
     g_clear_error (&error);
 }
 

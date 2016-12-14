@@ -18,7 +18,9 @@
 #ifndef MM_MODEM_HELPERS_CINTERION_H
 #define MM_MODEM_HELPERS_CINTERION_H
 
-#include "glib.h"
+#include <glib.h>
+
+#include <mm-base-bearer.h>
 
 /*****************************************************************************/
 /* ^SCFG test parser */
@@ -68,14 +70,8 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
 /*****************************************************************************/
 /* ^SWWAN response parser */
 
-typedef enum {
-    MM_SWWAN_STATE_UNKNOWN      = -1,
-    MM_SWWAN_STATE_DISCONNECTED =  0,
-    MM_SWWAN_STATE_CONNECTED    =  1,
-} MMSwwanState;
-
-MMSwwanState mm_cinterion_parse_swwan_response (const gchar  *response,
-                                                guint         swwan_index,
-                                                GError      **error);
+MMBearerConnectionStatus mm_cinterion_parse_swwan_response (const gchar  *response,
+                                                            guint         swwan_index,
+                                                            GError      **error);
 
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

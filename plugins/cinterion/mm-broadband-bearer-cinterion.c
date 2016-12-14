@@ -76,6 +76,90 @@ get_usb_interface_config_index (MMPort  *data,
 }
 
 /*****************************************************************************/
+/* Connection status loading
+ * NOTE: only CONNECTED or DISCONNECTED should be reported here.
+ */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *bearer,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gssize aux;
+
+    aux = g_task_propagate_int (G_TASK (res), error);
+    return (aux < 0 ? MM_BEARER_CONNECTION_STATUS_UNKNOWN : (MMBearerConnectionStatus) aux);
+}
+
+static void
+swwan_check_status_ready (MMBaseModem  *modem,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    const gchar              *response;
+    GError                   *error = NULL;
+    MMBearerConnectionStatus  status;
+    guint                     cid;
+
+    cid = GPOINTER_TO_UINT (g_task_get_task_data (task));
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        goto out;
+    }
+
+    status = mm_cinterion_parse_swwan_response (response, cid, &error);
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
+        g_task_return_error (task, error);
+        goto out;
+    }
+
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||
+              status == MM_BEARER_CONNECTION_STATUS_CONNECTED);
+    g_task_return_int (task, (gssize) status);
+
+out:
+    g_object_unref (task);
+}
+
+static void
+load_connection_status_by_cid (MMBroadbandBearerCinterion *bearer,
+                               guint                       cid,
+                               GAsyncReadyCallback         callback,
+                               gpointer                    user_data)
+{
+    GTask       *task;
+    MMBaseModem *modem;
+
+    task = g_task_new (bearer, NULL, callback, user_data);
+    g_task_set_task_data (task, GUINT_TO_POINTER (cid), NULL);
+
+    g_object_get (bearer,
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+
+    mm_base_modem_at_command (modem,
+                              "^SWWAN?",
+                              5,
+                              FALSE,
+                              (GAsyncReadyCallback) swwan_check_status_ready,
+                              task);
+    g_object_unref (modem);
+}
+
+static void
+load_connection_status (MMBaseBearer        *bearer,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (bearer),
+                                   mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)),
+                                   callback,
+                                   user_data);
+}
+
+/*****************************************************************************/
 /* Auth helpers */
 
 typedef enum {
@@ -186,39 +270,31 @@ dial_3gpp_finish (MMBroadbandBearer  *self,
 static void dial_3gpp_context_step (GTask *task);
 
 static void
-swwan_dial_check_status_ready (MMBaseModem  *modem,
-                               GAsyncResult *res,
-                               GTask        *task)
+dial_connection_status_ready (MMBroadbandBearerCinterion *self,
+                              GAsyncResult               *res,
+                              GTask                      *task)
 {
-    Dial3gppContext *ctx;
-    const gchar     *response;
-    GError          *error = NULL;
-    MMSwwanState     state;
+    MMBearerConnectionStatus  status;
+    Dial3gppContext          *ctx;
+    GError                   *error = NULL;
 
     ctx = (Dial3gppContext *) g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (!response) {
+    status = load_connection_status_finish (MM_BASE_BEARER (self), res, &error);
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    state = mm_cinterion_parse_swwan_response (response, ctx->cid, &error);
-    if (state == MM_SWWAN_STATE_UNKNOWN) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    if (state == MM_SWWAN_STATE_DISCONNECTED) {
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "CID %u is reported disconnected", ctx->cid);
         g_object_unref (task);
         return;
     }
 
-    g_assert (state == MM_SWWAN_STATE_CONNECTED);
+    g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED);
 
     /* Go to next step */
     ctx->step++;
@@ -362,14 +438,9 @@ dial_3gpp_context_step (GTask *task)
     case DIAL_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION:
         mm_dbg ("cinterion dial step %u/%u: checking SWWAN interface %u status...",
                 ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
-        mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
-                                       "^SWWAN?",
-                                       5,
-                                       FALSE,
-                                       FALSE,
-                                       NULL,
-                                       (GAsyncReadyCallback) swwan_dial_check_status_ready,
+        load_connection_status_by_cid (ctx->self,
+                                       ctx->cid,
+                                       (GAsyncReadyCallback) dial_connection_status_ready,
                                        task);
         return;
 
@@ -471,38 +542,33 @@ disconnect_3gpp_finish (MMBroadbandBearer  *self,
 static void disconnect_3gpp_context_step (GTask *task);
 
 static void
-swwan_disconnect_check_status_ready (MMBaseModem  *modem,
-                                     GAsyncResult *res,
-                                     GTask        *task)
+disconnect_connection_status_ready (MMBroadbandBearerCinterion *self,
+                                    GAsyncResult               *res,
+                                    GTask                      *task)
 {
-    Disconnect3gppContext *ctx;
-    const gchar           *response;
-    GError                *error = NULL;
-    MMSwwanState           state;
+    MMBearerConnectionStatus  status;
+    Disconnect3gppContext    *ctx;
+    GError                   *error = NULL;
 
     ctx = (Disconnect3gppContext *) g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (error) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    state = mm_cinterion_parse_swwan_response (response, ctx->cid, &error);
-    if (state == MM_SWWAN_STATE_CONNECTED) {
+    status = load_connection_status_finish (MM_BASE_BEARER (self), res, &error);
+    switch (status) {
+    case MM_BEARER_CONNECTION_STATUS_UNKNOWN:
+        /* Assume disconnected */
+        mm_dbg ("couldn't get CID %u status, assume disconnected: %s", ctx->cid, error->message);
+        g_clear_error (&error);
+        break;
+    case MM_BEARER_CONNECTION_STATUS_DISCONNECTED:
+        break;
+    case MM_BEARER_CONNECTION_STATUS_CONNECTED:
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "CID %u is reported connected", ctx->cid);
         g_object_unref (task);
         return;
+    default:
+        g_assert_not_reached ();
     }
-
-    if (state == MM_SWWAN_STATE_UNKNOWN) {
-        /* Assume disconnected */
-        mm_dbg ("couldn't get CID %u status, assume disconnected: %s", ctx->cid, error->message);
-        g_error_free (error);
-    } else
-        g_assert (state == MM_SWWAN_STATE_DISCONNECTED);
 
     /* Go on to next step */
     ctx->step++;
@@ -563,14 +629,9 @@ disconnect_3gpp_context_step (GTask *task)
         mm_dbg ("cinterion disconnect step %u/%u: checking SWWAN interface %u status...",
                 ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST,
                 usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
-        mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
-                                       "^SWWAN?",
-                                       5,
-                                       FALSE,
-                                       FALSE,
-                                       NULL,
-                                       (GAsyncReadyCallback) swwan_disconnect_check_status_ready,
+        load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (ctx->self),
+                                       ctx->cid,
+                                       (GAsyncReadyCallback) disconnect_connection_status_ready,
                                        task);
          return;
 
@@ -674,7 +735,11 @@ mm_broadband_bearer_cinterion_init (MMBroadbandBearerCinterion *self)
 static void
 mm_broadband_bearer_cinterion_class_init (MMBroadbandBearerCinterionClass *klass)
 {
+    MMBaseBearerClass      *base_bearer_class      = MM_BASE_BEARER_CLASS      (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
+
+    base_bearer_class->load_connection_status        = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 
     broadband_bearer_class->dial_3gpp              = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish       = dial_3gpp_finish;
