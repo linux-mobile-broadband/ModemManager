@@ -156,7 +156,7 @@ telit_qss_toggle_ready (MMBaseModem *self,
         pattern = g_regex_new ("#QSS:\\s*([0-3])\\r\\n", G_REGEX_RAW, 0, NULL);
         g_assert (pattern);
 
-        primary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
+        primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self));
         mm_port_serial_at_add_unsolicited_msg_handler (
             primary,
             pattern,
