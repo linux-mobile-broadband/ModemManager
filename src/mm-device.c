@@ -316,21 +316,27 @@ modem_valid (MMBaseModem *modem,
              MMDevice    *self)
 {
     if (!mm_base_modem_get_valid (modem)) {
+        GDBusObjectManagerServer *object_manager;
+
+        object_manager = g_object_ref (self->priv->object_manager);
+
         /* Modem no longer valid */
         mm_device_remove_modem (self);
 
         if (mm_base_modem_get_reprobe (modem)) {
             GError *error = NULL;
 
-            if (!mm_device_create_modem (self, self->priv->object_manager, &error)) {
-                 mm_warn ("Could not recreate modem for device '%s': %s",
-                          self->priv->uid,
-                          error ? error->message : "unknown");
+            if (!mm_device_create_modem (self, object_manager, &error)) {
+                mm_warn ("Could not recreate modem for device '%s': %s",
+                         self->priv->uid,
+                         error ? error->message : "unknown");
                 g_error_free (error);
             } else {
                 mm_dbg ("Modem recreated for device '%s'", self->priv->uid);
             }
         }
+
+        g_object_unref (object_manager);
     } else {
         /* Modem now valid, export it, but only if we really have it around.
          * It may happen that the initialization sequence fails because the
