@@ -3008,6 +3008,8 @@ finalize (GObject *object)
         g_array_unref (self->priv->supported_bands);
     if (self->priv->current_bands)
         g_array_unref (self->priv->current_bands);
+    if (self->priv->ports)
+       g_array_unref (self->priv->ports);
 
     G_OBJECT_CLASS (mm_modem_parent_class)->finalize (object);
 }
