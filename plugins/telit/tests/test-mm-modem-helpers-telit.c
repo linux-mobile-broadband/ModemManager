@@ -101,9 +101,9 @@ test_mm_bands_contains (void) {
     for (i = 0; i < 3; i++)
         g_array_append_val (mm_bands, i);
 
-    g_assert_true (mm_telit_bands_contains (mm_bands, 2));
-    g_assert_true (mm_telit_bands_contains (mm_bands, 2));
-    g_assert_false (mm_telit_bands_contains (mm_bands, 3));
+    g_assert (mm_telit_bands_contains (mm_bands, 2));
+    g_assert (mm_telit_bands_contains (mm_bands, 2));
+    g_assert (!mm_telit_bands_contains (mm_bands, 3));
 
     g_array_free (mm_bands, TRUE);
 }
@@ -134,7 +134,7 @@ test_parse_band_flag_str (void) {
                                                    &band_flags,
                                                    &error);
         g_assert_no_error (error);
-        g_assert_true (res);
+        g_assert (res);
 
         for (j = 0; j < band_flag_test[i].band_flags_len; j++) {
             guint ref;
@@ -143,7 +143,7 @@ test_parse_band_flag_str (void) {
             ref = band_flag_test[i].band_flags[j];
             cur = g_array_index (band_flags, guint, j);
 
-            g_assert_true (ref == cur);
+            g_assert (ref == cur);
         }
 
         g_array_free (band_flags, TRUE);
@@ -225,7 +225,7 @@ test_parse_supported_bands_response (void) {
                                            &bands,
                                            &error);
         g_assert_no_error (error);
-        g_assert_true (res);
+        g_assert (res);
 
 
         for (j = 0; j < supported_band_mapping_tests[i].mm_bands_len; j++) {
@@ -302,7 +302,7 @@ test_parse_current_bands_response (void) {
                                            &bands,
                                            &error);
         g_assert_no_error (error);
-        g_assert_true (res);
+        g_assert (res);
 
 
         for (j = 0; j < current_band_mapping_tests[i].mm_bands_len; j++) {
