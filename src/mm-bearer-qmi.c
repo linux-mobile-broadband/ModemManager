@@ -771,11 +771,11 @@ packet_service_status_indication_cb (QmiClientWds *client,
             &connection_status,
             NULL,
             NULL)) {
-        MMBearerConnectionStatus bearer_status = mm_base_bearer_get_status (MM_BASE_BEARER (self));
+        MMBearerStatus bearer_status = mm_base_bearer_get_status (MM_BASE_BEARER (self));
 
         if (connection_status == QMI_WDS_CONNECTION_STATUS_DISCONNECTED &&
-            bearer_status != MM_BEARER_CONNECTION_STATUS_DISCONNECTED &&
-            bearer_status != MM_BEARER_CONNECTION_STATUS_DISCONNECTING) {
+            bearer_status != MM_BEARER_STATUS_DISCONNECTED &&
+            bearer_status != MM_BEARER_STATUS_DISCONNECTING) {
             QmiWdsCallEndReason cer;
             QmiWdsVerboseCallEndReasonType verbose_cer_type;
             gint16 verbose_cer_reason;
