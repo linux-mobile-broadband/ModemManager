@@ -970,7 +970,7 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
                                          GError      **error)
 {
     GRegex     *r;
-    GMatchInfo *match_info;
+    GMatchInfo *match_info = NULL;
     GError     *inner_error = NULL;
     guint       session_tx_bytes = 0;
     guint       session_rx_bytes = 0;
