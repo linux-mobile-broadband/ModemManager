@@ -634,7 +634,7 @@ port_serial_process_command (MMPortSerial *self,
             /* Just keep on, will retry... */
             written = 0;
         } else
-          written = bytes_sent;
+            written = bytes_sent;
 
         ctx->idx += written;
     } else
