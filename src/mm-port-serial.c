@@ -974,12 +974,14 @@ common_input_available (MMPortSerial *self,
                 g_clear_error (&error);
             }
         } else if (self->priv->socket) {
-            bytes_read = g_socket_receive (self->priv->socket,
-                                           buf,
-                                           SERIAL_BUF_SIZE,
-                                           NULL, /* cancellable */
-                                           &error);
-            if (bytes_read == -1) {
+            gssize sbytes_read;
+
+            sbytes_read = g_socket_receive (self->priv->socket,
+                                            buf,
+                                            SERIAL_BUF_SIZE,
+                                            NULL, /* cancellable */
+                                            &error);
+            if (sbytes_read < 0) {
                 bytes_read = 0;
                 if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK))
                     status = G_IO_STATUS_AGAIN;
@@ -989,8 +991,10 @@ common_input_available (MMPortSerial *self,
                          mm_port_get_device (MM_PORT (self)),
                          error->message);
                 g_clear_error (&error);
-            } else
+            } else {
+                bytes_read = (gsize) sbytes_read;
                 status = G_IO_STATUS_NORMAL;
+            }
         }
 
         /* If no bytes read, just wait for more data */
