@@ -86,7 +86,6 @@ _mm_log (const char *loc,
 
 int main (int argc, char **argv)
 {
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/ModemManager/AT-serial/echo-removal", at_serial_echo_removal);

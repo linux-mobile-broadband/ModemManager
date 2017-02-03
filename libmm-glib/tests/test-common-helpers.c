@@ -490,7 +490,6 @@ field_parser_double (void)
 
 int main (int argc, char **argv)
 {
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/Common/KeyValue/standard", key_value_test_standard);

@@ -3387,7 +3387,6 @@ int main (int argc, char **argv)
     gint result;
     DevidItem *item = &devids[0];
 
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     suite = g_test_get_root ();

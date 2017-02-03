@@ -136,8 +136,6 @@ main (int argc, char *argv[])
     GError *err = NULL;
     guint name_id;
 
-    g_type_init ();
-
     /* Setup application context */
     mm_context_init (argc, argv);
 

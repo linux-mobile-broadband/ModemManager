@@ -828,7 +828,6 @@ int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
 
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/ublox/upincnt/response",  test_upincnt_response);

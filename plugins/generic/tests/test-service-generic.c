@@ -82,7 +82,6 @@ test_enable_disable (TestFixture *fixture)
 int main (int   argc,
           char *argv[])
 {
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     TEST_ADD ("/MM/Service/Generic/enable-disable", test_enable_disable);

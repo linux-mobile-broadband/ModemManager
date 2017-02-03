@@ -156,8 +156,6 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	g_type_init ();
-
 	loop = g_main_loop_new (NULL, FALSE);
 
 	setup_signals ();

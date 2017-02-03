@@ -213,9 +213,6 @@ qcdm_test_child (int fd, GAsyncReadyCallback cb)
     gboolean success;
     GError *error = NULL;
 
-    /* In the child */
-    g_type_init ();
-
     loop = g_main_loop_new (NULL, FALSE);
 
     port = mm_port_serial_qcdm_new_fd (fd);

@@ -184,8 +184,6 @@ main (gint argc, gchar **argv)
 
     setlocale (LC_ALL, "");
 
-    g_type_init ();
-
     /* Setup option context, process it and destroy it */
     context = g_option_context_new ("- Control and monitor the ModemManager");
     g_option_context_add_group (context,

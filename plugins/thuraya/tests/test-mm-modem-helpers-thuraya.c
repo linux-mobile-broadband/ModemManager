@@ -118,7 +118,6 @@ int main (int argc, char **argv)
     GTestSuite *suite;
     gint result;
 
-    g_type_init ();
     g_test_init (&argc, &argv, NULL);
 
     suite = g_test_get_root ();
