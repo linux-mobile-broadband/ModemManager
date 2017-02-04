@@ -175,4 +175,8 @@ ATTRS{idVendor}=="1d9d", ATTRS{idProduct}=="1011", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Analog Devices ADALM-PLUTO (PlutoSDR)
 ATTRS{idVendor}=="0456", ATTRS{idProduct}=="b673", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Renesas development and promotion boards
+ATTRS{idVendor}=="045B", ATTRS{idProduct}=="0212", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="0409", ATTRS{idProduct}=="0063", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
