@@ -1257,6 +1257,10 @@ mm_call_dup_number
 mm_call_get_direction
 mm_call_get_state
 mm_call_get_state_reason
+mm_call_get_audio_port
+mm_call_dup_audio_port
+mm_call_get_audio_format
+mm_call_peek_audio_format
 <SUBSECTION Methods>
 mm_call_start
 mm_call_start_finish
@@ -1339,6 +1343,34 @@ MM_PCO_CLASS
 MM_PCO_GET_CLASS
 MM_TYPE_PCO
 mm_pco_get_type
+</SECTION>
+
+<SECTION>
+<FILE>mm-call-audio-format</FILE>
+<TITLE>MMCallAudioFormat</TITLE>
+MMCallAudioFormat
+<SUBSECTION Getters>
+mm_call_audio_format_get_encoding
+mm_call_audio_format_get_resolution
+mm_call_audio_format_get_rate
+<SUBSECTION Private>
+mm_call_audio_format_get_dictionary
+mm_call_audio_format_new
+mm_call_audio_format_new_from_dictionary
+mm_call_audio_format_set_encoding
+mm_call_audio_format_set_resolution
+mm_call_audio_format_set_rate
+mm_call_audio_format_dup
+<SUBSECTION Standard>
+MMCallAudioFormatClass
+MMCallAudioFormatPrivate
+MM_CALL_AUDIO_FORMAT
+MM_CALL_AUDIO_FORMAT_CLASS
+MM_CALL_AUDIO_FORMAT_GET_CLASS
+MM_IS_CALL_AUDIO_FORMAT
+MM_IS_CALL_AUDIO_FORMAT_CLASS
+MM_TYPE_CALL_AUDIO_FORMAT
+mm_call_audio_format_get_type
 </SECTION>
 
 <SECTION>

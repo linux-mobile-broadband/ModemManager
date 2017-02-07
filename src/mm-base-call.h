@@ -23,6 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-base-modem.h"
+#include "mm-call-audio-format.h"
 
 #define MM_TYPE_BASE_CALL            (mm_base_call_get_type ())
 #define MM_BASE_CALL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_CALL, MMBaseCall))
@@ -103,6 +104,11 @@ const gchar *mm_base_call_get_path (MMBaseCall *self);
 void         mm_base_call_change_state (MMBaseCall *self,
                                         MMCallState new_state,
                                         MMCallStateReason reason);
+
+void         mm_base_call_set_audio_port   (MMBaseCall *self,
+                                            const gchar *port);
+void         mm_base_call_set_audio_format (MMBaseCall *self,
+                                            MMCallAudioFormat *audio_format);
 
 void         mm_base_call_received_dtmf (MMBaseCall *self,
                                          const gchar *dtmf);

@@ -111,5 +111,44 @@
         The remote phone number.
     -->
     <property name="Number" type="s" access="read" />
+
+    <!--
+        AudioPort:
+
+        If call audio is routed via the host, the name of the kernel device that
+        provides the audio.  For example, with certain Huawei USB modems, this
+        property might be "ttyUSB2" indicating audio is available via ttyUSB2 in
+        the format described by the AudioFormat property.
+    -->
+    <property name="AudioPort" type="s" access="read" />
+
+    <!--
+        AudioFormat:
+
+        If call audio is routed via the host, a description of the audio format
+        supported by the audio port.
+
+        This property may include the following items:
+        <variablelist>
+          <varlistentry><term><literal>"encoding"</literal></term>
+            <listitem>
+              The audio encoding format.  For example, "pcm" for PCM audio.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"resolution"</literal></term>
+            <listitem>
+              The sampling precision and its encoding format. For example,
+              "s16le" for signed 16-bit little-endian samples.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"rate"</literal></term>
+            <listitem>
+              The sampling rate as an unsigned integer.  For example, 8000 for
+              8000hz.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+    -->
+    <property name="AudioFormat" type="a{sv}" access="read" />
   </interface>
 </node>

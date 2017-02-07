@@ -145,6 +145,12 @@ mmcli_call_shutdown (void)
 static void
 print_call_info (MMCall *call)
 {
+    const gchar *audio_port;
+    MMCallAudioFormat *audio_format;
+
+    audio_port = mm_call_get_audio_port (call);
+    audio_format = mm_call_peek_audio_format (call);
+
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
 #undef VALIDATE
@@ -161,6 +167,23 @@ print_call_info (MMCall *call)
     if (mm_call_get_state_reason(call) != MM_CALL_STATE_REASON_UNKNOWN)
         g_print ("             |    state reason: '%s'\n",
                  mm_call_state_reason_get_string(mm_call_get_state_reason (call)));
+
+    if (audio_port)
+        g_print ("             |      audio port: '%s'\n", VALIDATE (audio_port));
+
+    if (audio_format) {
+        guint rate = mm_call_audio_format_get_rate (audio_format);
+        gchar *rate_str = rate ? g_strdup_printf ("%u", rate) : NULL;
+
+        g_print ("  -------------------------\n"
+                 "  Audio Format       |    encoding: '%s'\n"
+                 "                     |  resolution: '%s'\n"
+                 "                     |        rate: '%s'\n",
+                 VALIDATE (mm_call_audio_format_get_encoding (audio_format)),
+                 VALIDATE (mm_call_audio_format_get_resolution (audio_format)),
+                 VALIDATE (rate_str));
+        g_free (rate_str);
+    }
 }
 
 static void

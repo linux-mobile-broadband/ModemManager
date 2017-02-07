@@ -724,6 +724,21 @@ mm_base_call_received_dtmf (MMBaseCall *self,
     mm_gdbus_call_emit_dtmf_received (MM_GDBUS_CALL (self), dtmf);
 }
 
+void
+mm_base_call_set_audio_port (MMBaseCall *self, const gchar *port)
+{
+    mm_gdbus_call_set_audio_port (MM_GDBUS_CALL (self), port);
+}
+
+void
+mm_base_call_set_audio_format (MMBaseCall *self,
+                               MMCallAudioFormat *audio_format)
+{
+    mm_gdbus_call_set_audio_format (
+        MM_GDBUS_CALL (self),
+        mm_call_audio_format_get_dictionary (audio_format));
+}
+
 /*****************************************************************************/
 /* Start the CALL */
 

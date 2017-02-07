@@ -85,6 +85,8 @@ libmm_glib_la_SOURCES = \
 	mm-kernel-event-properties.c \
 	mm-pco.h \
 	mm-pco.c \
+	mm-call-audio-format.h \
+	mm-call-audio-format.c \
 	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
@@ -155,6 +157,7 @@ include_HEADERS = \
 	mm-signal.h \
 	mm-kernel-event-properties.h \
 	mm-pco.h \
+	mm-call-audio-format.h \
 	$(NULL)
 
 CLEANFILES =
