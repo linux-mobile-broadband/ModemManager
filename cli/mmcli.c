@@ -392,7 +392,7 @@ main (gint argc, gchar **argv)
     } else if (mmcli_modem_messaging_options_enabled ()) {
         mmcli_modem_messaging_shutdown ();
     } else if (mmcli_modem_voice_options_enabled ()) {
-           mmcli_modem_voice_shutdown ();
+        mmcli_modem_voice_shutdown ();
     } else if (mmcli_modem_time_options_enabled ()) {
         mmcli_modem_time_shutdown ();
     } else if (mmcli_modem_firmware_options_enabled ()) {
