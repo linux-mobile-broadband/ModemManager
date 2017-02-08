@@ -171,6 +171,7 @@ simple_connect_ready (MMModemSimple *self,
                                 "g-object-path",    bearer_path,
                                 "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
                                 NULL);
+    g_free (bearer_path);
 }
 
 /**
