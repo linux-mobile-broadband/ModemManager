@@ -219,6 +219,12 @@ mm_common_sms_storages_garray_to_variant (GArray *array)
     return mm_common_sms_storages_array_to_variant (NULL, 0);
 }
 
+static void
+clear_modem_port_info (MMModemPortInfo *info)
+{
+    g_free (info->name);
+}
+
 GArray *
 mm_common_ports_variant_to_garray (GVariant *variant)
 {
@@ -232,6 +238,7 @@ mm_common_ports_variant_to_garray (GVariant *variant)
 
         if (n > 0) {
             array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), n);
+            g_array_set_clear_func (array, (GDestroyNotify) clear_modem_port_info);
             for (i = 0; i < n; i++) {
                 MMModemPortInfo info;
 
