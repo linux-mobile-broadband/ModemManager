@@ -71,6 +71,7 @@ struct _MMDevicePrivate {
 
     /* The Modem object for this device */
     MMBaseModem *modem;
+    gulong       modem_valid_id;
 
     /* When exported, a reference to the object manager */
     GDBusObjectManagerServer *object_manager;
@@ -293,6 +294,20 @@ export_modem (MMDevice *self)
 
 /*****************************************************************************/
 
+static void
+clear_modem (MMDevice *self)
+{
+    if (self->priv->modem_valid_id) {
+        g_signal_handler_disconnect (self->priv->modem, self->priv->modem_valid_id);
+        self->priv->modem_valid_id = 0;
+    }
+
+    /* Run dispose before unref-ing, in order to cleanup the SIM object,
+     * if any (which also holds a reference to the modem object) */
+    g_object_run_dispose (G_OBJECT (self->priv->modem));
+    g_clear_object (&(self->priv->modem));
+}
+
 void
 mm_device_remove_modem (MMDevice  *self)
 {
@@ -300,11 +315,7 @@ mm_device_remove_modem (MMDevice  *self)
         return;
 
     unexport_modem (self);
-
-    /* Run dispose before unref-ing, in order to cleanup the SIM object,
-     * if any (which also holds a reference to the modem object) */
-    g_object_run_dispose (G_OBJECT (self->priv->modem));
-    g_clear_object (&(self->priv->modem));
+    clear_modem (self);
     g_clear_object (&(self->priv->object_manager));
 }
 
@@ -391,10 +402,10 @@ mm_device_create_modem (MMDevice                  *self,
         self->priv->object_manager = g_object_ref (object_manager);
 
         /* We want to get notified when the modem becomes valid/invalid */
-        g_signal_connect (self->priv->modem,
-                          "notify::" MM_BASE_MODEM_VALID,
-                          G_CALLBACK (modem_valid),
-                          self);
+        self->priv->modem_valid_id = g_signal_connect (self->priv->modem,
+                                                       "notify::" MM_BASE_MODEM_VALID,
+                                                       G_CALLBACK (modem_valid),
+                                                       self);
     }
 
     return !!self->priv->modem;
@@ -582,7 +593,7 @@ set_property (GObject *object,
         self->priv->plugin = g_value_dup_object (value);
         break;
     case PROP_MODEM:
-        g_clear_object (&(self->priv->modem));
+        clear_modem (self);
         self->priv->modem = g_value_dup_object (value);
         break;
     case PROP_HOTPLUGGED:
@@ -635,7 +646,8 @@ dispose (GObject *object)
     g_clear_object (&(self->priv->plugin));
     g_list_free_full (self->priv->port_probes, (GDestroyNotify)g_object_unref);
     g_list_free_full (self->priv->ignored_port_probes, (GDestroyNotify)g_object_unref);
-    g_clear_object (&(self->priv->modem));
+
+    clear_modem (self);
 
     G_OBJECT_CLASS (mm_device_parent_class)->dispose (object);
 }
