@@ -247,43 +247,6 @@ mm_cinterion_parse_scfg_response (const gchar *response,
  *   +CNMI: (0,1,2),(0,1),(0,2),(0),(1)
  */
 
-static GArray *
-read_number_list (const gchar *str)
-{
-    GError *inner_error = NULL;
-    GArray *out = NULL;
-    GRegex *r;
-    GMatchInfo *match_info;
-
-    if (!str)
-        return NULL;
-
-    r = g_regex_new ("(\\d),?", G_REGEX_UNGREEDY, 0, NULL);
-    g_assert (r != NULL);
-
-    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
-    while (!inner_error && g_match_info_matches (match_info)) {
-        guint aux;
-
-        if (mm_get_uint_from_match_info (match_info, 1, &aux)) {
-            if (!out)
-                out = g_array_sized_new (FALSE, FALSE, sizeof (guint), 3);
-            g_array_append_val (out, aux);
-        }
-        g_match_info_next (match_info, &inner_error);
-    }
-
-    if (inner_error) {
-        mm_warn ("Unexpected error matching +CNMI response: '%s'", inner_error->message);
-        g_error_free (inner_error);
-    }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return out;
-}
-
 gboolean
 mm_cinterion_parse_cnmi_test (const gchar *response,
                               GArray **supported_mode,
@@ -296,6 +259,11 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
     GRegex *r;
     GMatchInfo *match_info;
     GError *inner_error = NULL;
+    GArray *tmp_supported_mode = NULL;
+    GArray *tmp_supported_mt = NULL;
+    GArray *tmp_supported_bm = NULL;
+    GArray *tmp_supported_ds = NULL;
+    GArray *tmp_supported_bfr = NULL;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
@@ -313,76 +281,75 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
             gchar *str;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 1);
-            *supported_mode = read_number_list (str);
+            tmp_supported_mode = mm_parse_uint_list (str, &inner_error);
             g_free (str);
+            if (inner_error)
+                goto out;
         }
         if (supported_mt) {
             gchar *str;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 2);
-            *supported_mt = read_number_list (str);
+            tmp_supported_mt = mm_parse_uint_list (str, &inner_error);
             g_free (str);
+            if (inner_error)
+                goto out;
         }
         if (supported_bm) {
             gchar *str;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 3);
-            *supported_bm = read_number_list (str);
+            tmp_supported_bm = mm_parse_uint_list (str, &inner_error);
             g_free (str);
+            if (inner_error)
+                goto out;
         }
         if (supported_ds) {
             gchar *str;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 4);
-            *supported_ds = read_number_list (str);
+            tmp_supported_ds = mm_parse_uint_list (str, &inner_error);
             g_free (str);
+            if (inner_error)
+                goto out;
         }
         if (supported_bfr) {
             gchar *str;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 5);
-            *supported_bfr = read_number_list (str);
+            tmp_supported_bfr = mm_parse_uint_list (str, &inner_error);
             g_free (str);
+            if (inner_error)
+                goto out;
         }
     }
+
+out:
 
     if (match_info)
         g_match_info_free (match_info);
     g_regex_unref (r);
 
-    if ((supported_mode && *supported_mode == NULL) ||
-        (supported_mt   && *supported_mt == NULL) ||
-        (supported_bm   && *supported_bm == NULL) ||
-        (supported_ds   && *supported_ds == NULL) ||
-        (supported_bfr  && *supported_bfr == NULL))
-        inner_error = g_error_new (MM_CORE_ERROR,
-                                   MM_CORE_ERROR_FAILED,
-                                   "Error parsing +CNMI=? response");
-
     if (inner_error) {
-        if (supported_mode && *supported_mode) {
-            g_array_unref (*supported_mode);
-            *supported_mode = NULL;
-        }
-        if (supported_mt && *supported_mt) {
-            g_array_unref (*supported_mt);
-            *supported_mt = NULL;
-        }
-        if (supported_bm && *supported_bm) {
-            g_array_unref (*supported_bm);
-            *supported_bm = NULL;
-        }
-        if (supported_ds && *supported_ds) {
-            g_array_unref (*supported_ds);
-            *supported_ds = NULL;
-        }
-        if (supported_bfr && *supported_bfr) {
-            g_array_unref (*supported_bfr);
-            *supported_bfr = NULL;
-        }
+        g_clear_pointer (&tmp_supported_mode, g_array_unref);
+        g_clear_pointer (&tmp_supported_mt,   g_array_unref);
+        g_clear_pointer (&tmp_supported_bm,   g_array_unref);
+        g_clear_pointer (&tmp_supported_ds,   g_array_unref);
+        g_clear_pointer (&tmp_supported_bfr,  g_array_unref);
         g_propagate_error (error, inner_error);
         return FALSE;
     }
+
+    if (supported_mode)
+        *supported_mode = tmp_supported_mode;
+    if (supported_mt)
+        *supported_mt = tmp_supported_mt;
+    if (supported_bm)
+        *supported_bm = tmp_supported_bm;
+    if (supported_ds)
+        *supported_ds = tmp_supported_ds;
+    if (supported_bfr)
+        *supported_bfr = tmp_supported_bfr;
 
     return TRUE;
 }

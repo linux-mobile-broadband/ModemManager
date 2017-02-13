@@ -330,6 +330,55 @@ test_cnmi_phs8 (void)
     g_array_unref (expected_bfr);
 }
 
+static void
+test_cnmi_other (void)
+{
+    GArray *expected_mode;
+    GArray *expected_mt;
+    GArray *expected_bm;
+    GArray *expected_ds;
+    GArray *expected_bfr;
+    guint val;
+    const gchar *response =
+        "+CNMI: (0-3),(0,1),(0,2,3),(0,2),(1)\r\n"
+        "\r\n";
+
+    expected_mode = g_array_sized_new (FALSE, FALSE, sizeof (guint), 3);
+    val = 0, g_array_append_val (expected_mode, val);
+    val = 1, g_array_append_val (expected_mode, val);
+    val = 2, g_array_append_val (expected_mode, val);
+    val = 3, g_array_append_val (expected_mode, val);
+
+    expected_mt = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 0, g_array_append_val (expected_mt, val);
+    val = 1, g_array_append_val (expected_mt, val);
+
+    expected_bm = g_array_sized_new (FALSE, FALSE, sizeof (guint), 2);
+    val = 0, g_array_append_val (expected_bm, val);
+    val = 2, g_array_append_val (expected_bm, val);
+    val = 3, g_array_append_val (expected_bm, val);
+
+    expected_ds = g_array_sized_new (FALSE, FALSE, sizeof (guint), 1);
+    val = 0, g_array_append_val (expected_ds, val);
+    val = 2, g_array_append_val (expected_ds, val);
+
+    expected_bfr = g_array_sized_new (FALSE, FALSE, sizeof (guint), 1);
+    val = 1, g_array_append_val (expected_bfr, val);
+
+    common_test_cnmi (response,
+                      expected_mode,
+                      expected_mt,
+                      expected_bm,
+                      expected_ds,
+                      expected_bfr);
+
+    g_array_unref (expected_mode);
+    g_array_unref (expected_mt);
+    g_array_unref (expected_bm);
+    g_array_unref (expected_ds);
+    g_array_unref (expected_bfr);
+}
+
 /*****************************************************************************/
 /* Test ^SWWAN read */
 
@@ -548,6 +597,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
     g_test_add_func ("/MM/cinterion/cnmi/phs8",               test_cnmi_phs8);
+    g_test_add_func ("/MM/cinterion/cnmi/other",              test_cnmi_other);
     g_test_add_func ("/MM/cinterion/swwan/pls8",              test_swwan_pls8);
     g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
 
