@@ -16,7 +16,9 @@
 #ifndef MM_MODEM_HELPERS_CINTERION_H
 #define MM_MODEM_HELPERS_CINTERION_H
 
-#include "glib.h"
+#include <glib.h>
+
+#include <ModemManager.h>
 
 /*****************************************************************************/
 /* ^SCFG test parser */
@@ -62,5 +64,12 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
                                            guint *mode,
                                            guint *value,
                                            GError **error);
+
+/*****************************************************************************/
+/* ^SMONG response parser */
+
+gboolean mm_cinterion_parse_smong_response (const gchar              *response,
+                                            MMModemAccessTechnology  *access_tech,
+                                            GError                  **error);
 
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
