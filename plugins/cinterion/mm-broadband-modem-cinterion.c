@@ -618,97 +618,28 @@ load_access_technologies_finish (MMIfaceModem *self,
     return TRUE;
 }
 
-static MMModemAccessTechnology
-get_access_technology_from_smong_gprs_status (const gchar *gprs_status,
-                                              GError **error)
-{
-    if (strlen (gprs_status) == 1) {
-        switch (gprs_status[0]) {
-        case '0':
-            return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-        case '1':
-        case '2':
-            return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
-        case '3':
-        case '4':
-            return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-        default:
-            break;
-        }
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't get network capabilities, "
-                 "invalid GPRS status value: '%s'",
-                 gprs_status);
-    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-}
-
 static void
 smong_query_ready (MMBroadbandModemCinterion *self,
                    GAsyncResult *res,
                    GSimpleAsyncResult *operation_result)
 {
-    const gchar *response;
-    GError *error = NULL;
-    GMatchInfo *match_info = NULL;
-    GRegex *regex;
+    const gchar             *response;
+    GError                  *error = NULL;
+    MMModemAccessTechnology  access_tech;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         /* Let the error be critical. */
         g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
-
-    /* The AT^SMONG command returns a cell info table, where the second
-     * column identifies the "GPRS status", which is exactly what we want.
-     * So we'll try to read that second number in the values row.
-     *
-     * AT^SMONG
-     * GPRS Monitor
-     * BCCH  G  PBCCH  PAT MCC  MNC  NOM  TA      RAC    # Cell #
-     * 0776  1  -      -   214   03  2    00      01
-     * OK
-     */
-    regex = g_regex_new (".*GPRS Monitor\\r\\n"
-                         "BCCH\\s*G.*\\r\\n"
-                         "(\\d*)\\s*(\\d*)\\s*", 0, 0, NULL);
-    if (g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, NULL)) {
-        gchar *gprs_status;
-        MMModemAccessTechnology act;
-
-        gprs_status = g_match_info_fetch (match_info, 2);
-        act = get_access_technology_from_smong_gprs_status (gprs_status, &error);
-        g_free (gprs_status);
-
-        if (error)
-            g_simple_async_result_take_error (operation_result, error);
-        else {
-            /* We'll default to use SMONG then */
-            self->priv->sind_psinfo = FALSE;
-            g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                       GUINT_TO_POINTER (act),
-                                                       NULL);
-        }
-    } else {
+    } else if (!mm_cinterion_parse_smong_response (response, &access_tech, &error)) {
         /* We'll reset here the flag to try to use SIND/psinfo the next time */
         self->priv->sind_psinfo = TRUE;
-
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_INVALID_ARGS,
-                                         "Couldn't get network capabilities, "
-                                         "invalid SMONG reply: '%s'",
-                                         response);
+        g_simple_async_result_take_error (operation_result, error);
+    } else {
+        /* We'll default to use SMONG then */
+        self->priv->sind_psinfo = FALSE;
+        g_simple_async_result_set_op_res_gpointer (operation_result, GUINT_TO_POINTER (access_tech), NULL);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
 
     g_simple_async_result_complete (operation_result);
     g_object_unref (operation_result);

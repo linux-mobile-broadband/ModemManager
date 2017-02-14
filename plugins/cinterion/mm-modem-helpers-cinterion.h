@@ -20,6 +20,7 @@
 
 #include <glib.h>
 
+#include <ModemManager.h>
 #include <mm-base-bearer.h>
 
 /*****************************************************************************/
@@ -73,5 +74,12 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
 MMBearerConnectionStatus mm_cinterion_parse_swwan_response (const gchar  *response,
                                                             guint         swwan_index,
                                                             GError      **error);
+
+/*****************************************************************************/
+/* ^SMONG response parser */
+
+gboolean mm_cinterion_parse_smong_response (const gchar              *response,
+                                            MMModemAccessTechnology  *access_tech,
+                                            GError                  **error);
 
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

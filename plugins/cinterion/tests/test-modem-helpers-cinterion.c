@@ -565,6 +565,47 @@ test_sind_response_simstatus (void)
 }
 
 /*****************************************************************************/
+/* Test ^SMONG responses */
+
+static void
+common_test_smong_response (const gchar             *response,
+                            MMModemAccessTechnology  expected_access_tech)
+{
+    GError                  *error = NULL;
+    gboolean                 res;
+    MMModemAccessTechnology  access_tech;
+
+    res = mm_cinterion_parse_smong_response (response, &access_tech, &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+
+    g_assert_cmpuint (access_tech, ==, expected_access_tech);
+}
+
+static void
+test_smong_response_tc63i (void)
+{
+    const gchar *response =
+        "\r\n"
+        "GPRS Monitor\r\n"
+        "BCCH  G  PBCCH  PAT MCC  MNC  NOM  TA      RAC                               # Cell #\r\n"
+        "0073  1  -      -   262   02  2    00 01\r\n";
+    common_test_smong_response (response, MM_MODEM_ACCESS_TECHNOLOGY_GPRS);
+}
+
+static void
+test_smong_response_other (void)
+{
+    const gchar *response =
+        "\r\n"
+        "GPRS Monitor\r\n"
+        "\r\n"
+        "BCCH  G  PBCCH  PAT MCC  MNC  NOM  TA      RAC                              # Cell #\r\n"
+        "  44  1  -      -   234   10  -    -       -                                             \r\n";
+    common_test_smong_response (response, MM_MODEM_ACCESS_TECHNOLOGY_GPRS);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -600,6 +641,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/cnmi/other",              test_cnmi_other);
     g_test_add_func ("/MM/cinterion/swwan/pls8",              test_swwan_pls8);
     g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
+    g_test_add_func ("/MM/cinterion/smong/response/tc63i",    test_smong_response_tc63i);
+    g_test_add_func ("/MM/cinterion/smong/response/other",    test_smong_response_other);
 
     return g_test_run ();
 }
