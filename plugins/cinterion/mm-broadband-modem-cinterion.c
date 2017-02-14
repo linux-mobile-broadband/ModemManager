@@ -200,7 +200,7 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
     if (!error) {
         if (value_supported (self->priv->cnmi_supported_ds, 2))
             g_string_append_printf (cmd, "%u,", 2);
-        if (value_supported (self->priv->cnmi_supported_ds, 1))
+        else if (value_supported (self->priv->cnmi_supported_ds, 1))
             g_string_append_printf (cmd, "%u,", 1);
         else if (value_supported (self->priv->cnmi_supported_ds, 0))
             g_string_append_printf (cmd, "%u,", 0);
