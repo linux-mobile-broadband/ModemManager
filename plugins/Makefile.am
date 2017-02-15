@@ -900,17 +900,21 @@ UBLOX_ENUMS_GENERATED = \
 	$(NULL)
 
 ublox/mm-ublox-enums-types.h: Makefile.am $(UBLOX_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
-	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-modem-helpers-ublox.h\"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.h \
-		--ftail "#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n" \
-		$(UBLOX_ENUMS_INPUTS) > $@
+	$(AM_V_GEN) \
+		$(MKDIR_P) ublox; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-modem-helpers-ublox.h\"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--ftail "#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n" \
+			$(UBLOX_ENUMS_INPUTS) > $@
 
 ublox/mm-ublox-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c ublox/mm-ublox-enums-types.h
-	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-ublox-enums-types.h\"" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.c \
-		$(UBLOX_ENUMS_INPUTS) > $@
+	$(AM_V_GEN) \
+		$(MKDIR_P) ublox; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-ublox-enums-types.h\"" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			$(UBLOX_ENUMS_INPUTS) > $@
 
 libhelpers_ublox_la_SOURCES = \
 	ublox/mm-modem-helpers-ublox.c \

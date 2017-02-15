@@ -44,6 +44,7 @@ dnl Required programs
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
+AC_PROG_MKDIR_P
 
 dnl Initialize libtool
 LT_PREREQ([2.2])
