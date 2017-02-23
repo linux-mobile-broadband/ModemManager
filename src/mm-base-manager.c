@@ -183,8 +183,7 @@ find_physical_device (GUdevDevice *child)
     GUdevDevice *physdev = NULL;
     const char *subsys, *type, *name;
     guint32 i = 0;
-    gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE, is_platform = FALSE;
-    gboolean is_pnp = FALSE, is_sdio = FALSE;
+    gboolean is_usb = FALSE, is_pcmcia = FALSE;
 
     g_return_val_if_fail (child != NULL, NULL);
 
@@ -226,21 +225,11 @@ find_physical_device (GUdevDevice *child)
                     if (physdev)
                         break;
                 }
-            } else if (is_platform || !strcmp (subsys, "platform")) {
-                /* Take the first platform parent as the physical device */
-                is_platform = TRUE;
-                physdev = iter;
-                break;
-            } else if (is_pci || !strcmp (subsys, "pci")) {
-                is_pci = TRUE;
-                physdev = iter;
-                break;
-            } else if (is_pnp || !strcmp (subsys, "pnp")) {
-                is_pnp = TRUE;
-                physdev = iter;
-                break;
-            } else if (is_sdio || !strcmp (subsys, "sdio")) {
-                is_sdio = TRUE;
+            } else if (!strcmp (subsys, "platform") ||
+                       !strcmp (subsys, "pci") ||
+                       !strcmp (subsys, "pnp") ||
+                       !strcmp (subsys, "sdio")) {
+                /* Take the first parent as the physical device */
                 physdev = iter;
                 break;
             }
