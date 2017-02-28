@@ -2193,7 +2193,6 @@ access_tech_context_complete_and_free (AccessTechContext *ctx,
             mask = MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK;
             break;
         case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GSM:
-        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
         case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GW:
             if (ctx->wcdma_open) {
                 /* Assume UMTS; can't yet determine UMTS/HSxPA/HSPA+ with QCDM */
@@ -2201,6 +2200,13 @@ access_tech_context_complete_and_free (AccessTechContext *ctx,
             } else {
                 /* Assume GPRS; can't yet determine GSM/GPRS/EDGE with QCDM */
                 act = MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+            }
+            mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+            break;
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
+            if (ctx->wcdma_open) {
+                /* Assume UMTS; can't yet determine UMTS/HSxPA/HSPA+ with QCDM */
+                act = MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
             }
             mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
             break;
@@ -2259,7 +2265,8 @@ access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
 
         if (l1 == QCDM_WCDMA_L1_STATE_PCH ||
             l1 == QCDM_WCDMA_L1_STATE_FACH ||
-            l1 == QCDM_WCDMA_L1_STATE_DCH)
+            l1 == QCDM_WCDMA_L1_STATE_DCH ||
+            l1 == QCDM_WCDMA_L1_STATE_PCH_SLEEP)
             ctx->wcdma_open = TRUE;
     }
 
