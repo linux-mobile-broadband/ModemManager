@@ -3061,13 +3061,21 @@ dms_set_operating_mode_ready (QmiClientDms *client,
     if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
         QmiDmsOperatingMode mode;
 
-        /* Some new devices, like the Dell DW5770, will return an internal error when
-         * trying to bring the power mode to online. We can avoid this by sending the
-         * magic "DMS Set FCC Auth" message before trying. */
+        /*
+         * Some new devices, like the Dell DW5770, will return an internal error when
+         * trying to bring the power mode to online.
+         *
+         * Other devices, like some rebranded EM7455 modules, will return a "invalid
+         * transition" instead when trying to bring the power mode to online.
+         *
+         * We can avoid this by sending the magic "DMS Set FCC Auth" message before
+         * retrying.
+         */
         if (ctx->step == SET_OPERATING_MODE_STEP_FIRST &&
             qmi_message_dms_set_operating_mode_input_get_mode (ctx->input, &mode, NULL) &&
             mode == QMI_DMS_OPERATING_MODE_ONLINE &&
-            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INTERNAL)) {
+            (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INTERNAL) ||
+             g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_TRANSITION))) {
             g_error_free (error);
             /* Go on to FCC auth */
             ctx->step++;
