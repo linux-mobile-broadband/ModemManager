@@ -2920,6 +2920,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_charset_finish = NULL;
     iface->load_signal_quality = NULL;
     iface->load_signal_quality_finish = NULL;
+    iface->load_access_technologies = NULL;
+    iface->load_access_technologies_finish = NULL;
 
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
