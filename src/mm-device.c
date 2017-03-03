@@ -470,10 +470,12 @@ clear_modem (MMDevice *self)
         self->priv->modem_valid_id = 0;
     }
 
-    /* Run dispose before unref-ing, in order to cleanup the SIM object,
-     * if any (which also holds a reference to the modem object) */
-    g_object_run_dispose (G_OBJECT (self->priv->modem));
-    g_clear_object (&(self->priv->modem));
+    if (self->priv->modem) {
+        /* Run dispose before unref-ing, in order to cleanup the SIM object,
+         * if any (which also holds a reference to the modem object) */
+        g_object_run_dispose (G_OBJECT (self->priv->modem));
+        g_clear_object (&(self->priv->modem));
+    }
 }
 
 void
