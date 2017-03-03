@@ -219,6 +219,12 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                           "timed-out",
                           G_CALLBACK (serial_port_timed_out_cb),
                           self);
+
+        /* For serial ports, optionally use a specific baudrate */
+        if (mm_kernel_device_has_property (kernel_device, "ID_MM_TTY_BAUDRATE"))
+            g_object_set (port,
+                          MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (kernel_device, "ID_MM_TTY_BAUDRATE"),
+                          NULL);
     }
     /* Net ports... */
     else if (g_str_equal (subsys, "net")) {

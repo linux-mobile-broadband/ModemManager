@@ -712,6 +712,11 @@ serial_probe_qcdm (MMPortProbe *self)
         return G_SOURCE_REMOVE;
     }
 
+    if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
+        g_object_set (ctx->serial,
+                      MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                      NULL);
+
     /* Try to open the port */
     if (!mm_port_serial_open (ctx->serial, &error)) {
         port_probe_task_return_error (self,
@@ -1219,6 +1224,11 @@ serial_open_at (MMPortProbe *self)
                       MM_PORT_SERIAL_AT_REMOVE_ECHO, ctx->at_remove_echo,
                       MM_PORT_SERIAL_AT_SEND_LF,     ctx->at_send_lf,
                       NULL);
+
+        if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
+            g_object_set (ctx->serial,
+                          MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                          NULL);
 
         parser = mm_serial_parser_v1_new ();
         mm_serial_parser_v1_add_filter (parser,

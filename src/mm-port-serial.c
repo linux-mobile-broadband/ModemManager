@@ -210,95 +210,13 @@ mm_port_serial_command (MMPortSerial *self,
 
 /*****************************************************************************/
 
-#if 0
-static const char *
-baud_to_string (int baud)
+static gboolean
+parse_baudrate (guint  baudrate_num,
+                guint *out_baudrate_speed)
 {
-    const char *speed = NULL;
+    guint speed;
 
-    switch (baud) {
-    case B0:
-        speed = "0";
-        break;
-    case B50:
-        speed = "50";
-        break;
-    case B75:
-        speed = "75";
-        break;
-    case B110:
-        speed = "110";
-        break;
-    case B150:
-        speed = "150";
-        break;
-    case B300:
-        speed = "300";
-        break;
-    case B600:
-        speed = "600";
-        break;
-    case B1200:
-        speed = "1200";
-        break;
-    case B2400:
-        speed = "2400";
-        break;
-    case B4800:
-        speed = "4800";
-        break;
-    case B9600:
-        speed = "9600";
-        break;
-    case B19200:
-        speed = "19200";
-        break;
-    case B38400:
-        speed = "38400";
-        break;
-    case B57600:
-        speed = "57600";
-        break;
-    case B115200:
-        speed = "115200";
-        break;
-    case B460800:
-        speed = "460800";
-        break;
-    default:
-        break;
-    }
-
-    return speed;
-}
-
-void
-mm_port_serial_print_config (MMPortSerial *port,
-                             const char *detail)
-{
-    struct termios stbuf;
-    int err;
-
-    err = tcgetattr (self->priv->fd, &stbuf);
-    if (err) {
-        mm_warn ("*** %s (%s): (%s) tcgetattr() error %d",
-                 __func__, detail, mm_port_get_device (MM_PORT (port)), errno);
-        return;
-    }
-
-    mm_info ("(%s): (%s) baud rate: %d (%s)",
-             detail, mm_port_get_device (MM_PORT (port)),
-             stbuf.c_cflag & CBAUD,
-             baud_to_string (stbuf.c_cflag & CBAUD));
-}
-#endif
-
-static int
-parse_baudrate (guint i)
-{
-    int speed;
-
-    switch (i) {
+    switch (baudrate_num) {
     case 0:
         speed = B0;
         break;
@@ -348,11 +266,12 @@ parse_baudrate (guint i)
         speed = B460800;
         break;
     default:
-        mm_warn ("Invalid baudrate '%d'", i);
-        speed = B9600;
+        return FALSE;
     }
 
-    return speed;
+    if (out_baudrate_speed)
+        *out_baudrate_speed = speed;
+    return TRUE;
 }
 
 static int
@@ -431,16 +350,25 @@ static gboolean
 real_config_fd (MMPortSerial *self, int fd, GError **error)
 {
     struct termios stbuf, other;
-    int speed;
-    int bits;
-    int parity;
-    int stopbits;
+    guint speed;
+    gint bits;
+    gint parity;
+    gint stopbits;
 
     /* No setup if not a tty */
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY)
         return TRUE;
 
-    speed = parse_baudrate (self->priv->baud);
+    mm_dbg ("(%s): setting up baudrate: %u",
+            mm_port_get_device (MM_PORT (self)),
+            self->priv->baud);
+    if (!parse_baudrate (self->priv->baud, &speed) || speed == B0) {
+        mm_warn ("(%s): baudrate invalid: %u; defaulting to 57600",
+                 mm_port_get_device (MM_PORT (self)),
+                 self->priv->baud);
+        speed = B57600;
+    }
+
     bits = parse_bits (self->priv->bits);
     parity = parse_parity (self->priv->parity);
     stopbits = parse_stopbits (self->priv->stopbits);
