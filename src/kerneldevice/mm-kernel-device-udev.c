@@ -347,20 +347,25 @@ kernel_device_get_physdev_uid (MMKernelDevice *_self)
     self = MM_KERNEL_DEVICE_UDEV (_self);
 
     /* Prefer the one coming in the properties, if any */
-    if (self->priv->properties)
-        uid = mm_kernel_event_properties_get_uid (MM_KERNEL_DEVICE_UDEV (self)->priv->properties);
-
-    if (!uid) {
-        ensure_physdev (self);
-        if (!self->priv->physdev)
-            return NULL;
-
-        uid = g_udev_device_get_property (self->priv->physdev, "ID_MM_PHYSDEV_UID");
-        if (!uid)
-            uid = g_udev_device_get_sysfs_path (self->priv->physdev);
+    if (self->priv->properties) {
+        if ((uid = mm_kernel_event_properties_get_uid (self->priv->properties)) != NULL)
+            return uid;
     }
 
-    return uid;
+    ensure_physdev (self);
+    if (self->priv->physdev) {
+        /* Try to load from properties set on the physical device */
+        if ((uid = g_udev_device_get_property (self->priv->physdev, "ID_MM_PHYSDEV_UID")) != NULL)
+            return uid;
+
+        /* Use physical device sysfs path, if any */
+        if ((uid = g_udev_device_get_sysfs_path (self->priv->physdev)) != NULL)
+            return uid;
+    }
+
+    /* If there is no physical device sysfs path, use the device sysfs itself */
+    g_assert (self->priv->device);
+    return g_udev_device_get_sysfs_path (self->priv->device);
 }
 
 static guint16
