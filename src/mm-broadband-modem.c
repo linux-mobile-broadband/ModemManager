@@ -7107,13 +7107,10 @@ typedef struct {
 } CallManagerStateContext;
 
 static void
-call_manager_state_context_complete_and_free (CallManagerStateContext *ctx)
+cm_state_cleanup_port (MMPortSerial *port)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->qcdm);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
+    mm_port_serial_close (port);
+    g_object_unref (port);
 }
 
 static gboolean
@@ -7123,21 +7120,23 @@ modem_cdma_get_call_manager_state_finish (MMIfaceModemCdma *self,
                                           guint *operating_mode,
                                           GError **error)
 {
-    CallManagerStateResults *results;
+    CallManagerStateResults *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *system_mode = results->system_mode;
-    *operating_mode = results->operating_mode;
+    *system_mode = result->system_mode;
+    *operating_mode = result->operating_mode;
+    g_free (result);
+
     return TRUE;
 }
 
 static void
 cm_subsys_state_info_ready (MMPortSerialQcdm *port,
                             GAsyncResult *res,
-                            CallManagerStateContext *ctx)
+                            GTask *task)
 {
     QcdmResult *result;
     CallManagerStateResults *results;
@@ -7147,8 +7146,8 @@ cm_subsys_state_info_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        call_manager_state_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7158,12 +7157,12 @@ cm_subsys_state_info_ready (MMPortSerialQcdm *port,
                                                    &err);
     g_byte_array_unref (response);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse CM subsys state info command result: %d",
-                                         err);
-        call_manager_state_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse CM subsys state info command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
 
@@ -7173,8 +7172,8 @@ cm_subsys_state_info_ready (MMPortSerialQcdm *port,
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &results->system_mode);
     qcdm_result_unref (result);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    call_manager_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task, results, g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -7183,40 +7182,43 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
                                    gpointer user_data)
 {
     MMPortSerialQcdm *qcdm;
-    CallManagerStateContext *ctx;
+    GTask *task;
     GByteArray *cmstate;
+    GError *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (!qcdm) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Cannot get call manager state without a QCDM port");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot get call manager state without a QCDM port");
+        g_object_unref (task);
         return;
     }
 
-    /* Setup context */
-    ctx = g_new0 (CallManagerStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_get_call_manager_state);
-    ctx->qcdm = g_object_ref (qcdm);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (qcdm), &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_set_task_data (task,
+                          g_object_ref (qcdm),
+                          (GDestroyNotify) cm_state_cleanup_port);
 
     /* Setup command */
     cmstate = g_byte_array_sized_new (25);
     cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((gchar *) cmstate->data, 25);
     g_assert (cmstate->len);
 
-    mm_port_serial_qcdm_command (ctx->qcdm,
+    mm_port_serial_qcdm_command (qcdm,
                                  cmstate,
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)cm_subsys_state_info_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (cmstate);
 }
 
