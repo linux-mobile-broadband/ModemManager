@@ -2232,8 +2232,10 @@ done:
 
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    if (ctx->port)
+    if (ctx->port) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
         g_object_unref (ctx->port);
+    }
     g_free (ctx);
 }
 
@@ -2458,65 +2460,74 @@ modem_load_access_technologies (MMIfaceModem *self,
      */
     ctx = g_new0 (AccessTechContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              modem_load_access_technologies);
 
-    if (!ctx->port) {
-        if (mm_iface_modem_is_cdma (self)) {
-            /* If we don't have a QCDM port but the modem is CDMA-only, then
-             * guess access technologies from the registration information.
+    ctx->port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
+    if (ctx->port) {
+        /* Need to open QCDM port as it may be closed/blocked */
+        if (mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
+            g_object_ref (ctx->port);
+
+            mm_dbg ("loading access technologies via QCDM...");
+
+            /* FIXME: we may want to run both the CDMA and 3GPP in sequence to ensure
+             * that a multi-mode device that's in CDMA-mode but still has 3GPP capabilities
+             * will get the correct access tech, since the 3GPP check is run first.
              */
-            access_tech_from_cdma_registration_state (MM_BROADBAND_MODEM (self), ctx);
-        } else {
-            error = g_error_new_literal (MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Cannot get 3GPP access technology without a QCDM port");
+
+            if (mm_iface_modem_is_3gpp (self)) {
+                cmd = g_byte_array_sized_new (50);
+                cmd->len = qcdm_cmd_gsm_subsys_state_info_new ((char *) cmd->data, 50);
+                g_assert (cmd->len);
+
+                mm_port_serial_qcdm_command (ctx->port,
+                                             cmd,
+                                             3,
+                                             NULL,
+                                             (GAsyncReadyCallback)access_tech_qcdm_gsm_ready,
+                                             ctx);
+                g_byte_array_unref (cmd);
+                return;
+            }
+
+            if (mm_iface_modem_is_cdma (self)) {
+                cmd = g_byte_array_sized_new (50);
+                cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
+                g_assert (cmd->len);
+
+                mm_port_serial_qcdm_command (ctx->port,
+                                             cmd,
+                                             3,
+                                             NULL,
+                                             (GAsyncReadyCallback)access_tech_qcdm_cdma_ready,
+                                             ctx);
+                g_byte_array_unref (cmd);
+                return;
+            }
+
+            g_assert_not_reached ();
         }
-        access_tech_context_complete_and_free (ctx, error, TRUE);
-        return;
+
+        ctx->port = NULL;
+        mm_dbg ("Couldn't open QCDM port: %s", error->message);
+        g_clear_error (&error);
     }
 
-    mm_dbg ("loading access technologies via QCDM...");
-
-    /* FIXME: we may want to run both the CDMA and 3GPP in sequence to ensure
-     * that a multi-mode device that's in CDMA-mode but still has 3GPP capabilities
-     * will get the correct access tech, since the 3GPP check is run first.
-     */
-
-    if (mm_iface_modem_is_3gpp (self)) {
-        cmd = g_byte_array_sized_new (50);
-        cmd->len = qcdm_cmd_gsm_subsys_state_info_new ((char *) cmd->data, 50);
-        g_assert (cmd->len);
-
-        mm_port_serial_qcdm_command (ctx->port,
-                                     cmd,
-                                     3,
-                                     NULL,
-                                     (GAsyncReadyCallback)access_tech_qcdm_gsm_ready,
-                                     ctx);
-        g_byte_array_unref (cmd);
-        return;
-    }
-
+    /* Fall back if we don't have a QCDM port or it couldn't be opened */
     if (mm_iface_modem_is_cdma (self)) {
-        cmd = g_byte_array_sized_new (50);
-        cmd->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmd->data, 50);
-        g_assert (cmd->len);
-
-        mm_port_serial_qcdm_command (ctx->port,
-                                     cmd,
-                                     3,
-                                     NULL,
-                                     (GAsyncReadyCallback)access_tech_qcdm_cdma_ready,
-                                     ctx);
-        g_byte_array_unref (cmd);
-        return;
+        /* If we don't have a QCDM port but the modem is CDMA-only, then
+         * guess access technologies from the registration information.
+         */
+        access_tech_from_cdma_registration_state (MM_BROADBAND_MODEM (self), ctx);
+    } else {
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "Cannot get 3GPP access technology without a QCDM port");
     }
-
-    g_assert_not_reached ();
+    access_tech_context_complete_and_free (ctx, error, TRUE);
 }
 
 /*****************************************************************************/
