@@ -62,6 +62,12 @@ struct _MMKernelDeviceClass {
     gboolean      (* get_property_as_boolean) (MMKernelDevice *self, const gchar *property);
     gint          (* get_property_as_int)     (MMKernelDevice *self, const gchar *property);
     guint         (* get_property_as_int_hex) (MMKernelDevice *self, const gchar *property);
+
+    gboolean      (* has_global_property)            (MMKernelDevice *self, const gchar *property);
+    const gchar * (* get_global_property)            (MMKernelDevice *self, const gchar *property);
+    gboolean      (* get_global_property_as_boolean) (MMKernelDevice *self, const gchar *property);
+    gint          (* get_global_property_as_int)     (MMKernelDevice *self, const gchar *property);
+    guint         (* get_global_property_as_int_hex) (MMKernelDevice *self, const gchar *property);
 };
 
 GType mm_kernel_device_get_type (void);
@@ -82,10 +88,18 @@ guint16      mm_kernel_device_get_physdev_pid (MMKernelDevice *self);
 
 gboolean     mm_kernel_device_cmp (MMKernelDevice *a, MMKernelDevice *b);
 
+/* Standard properties are usually associated to single ports */
 gboolean     mm_kernel_device_has_property            (MMKernelDevice *self, const gchar *property);
 const gchar *mm_kernel_device_get_property            (MMKernelDevice *self, const gchar *property);
 gboolean     mm_kernel_device_get_property_as_boolean (MMKernelDevice *self, const gchar *property);
 gint         mm_kernel_device_get_property_as_int     (MMKernelDevice *self, const gchar *property);
 guint        mm_kernel_device_get_property_as_int_hex (MMKernelDevice *self, const gchar *property);
+
+/* Global properties are usually associated to full devices */
+gboolean     mm_kernel_device_has_global_property            (MMKernelDevice *self, const gchar *property);
+const gchar *mm_kernel_device_get_global_property            (MMKernelDevice *self, const gchar *property);
+gboolean     mm_kernel_device_get_global_property_as_boolean (MMKernelDevice *self, const gchar *property);
+gint         mm_kernel_device_get_global_property_as_int     (MMKernelDevice *self, const gchar *property);
+guint        mm_kernel_device_get_global_property_as_int_hex (MMKernelDevice *self, const gchar *property);
 
 #endif /* MM_KERNEL_DEVICE_H */

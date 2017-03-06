@@ -2367,7 +2367,7 @@ ensure_ndisdup_support_checked (MMBroadbandModemHuawei *self,
 
     /* First, check for devices which support NDISDUP on any AT port. These
      * devices are tagged by udev */
-    if (mm_kernel_device_get_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
+    if (mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
         mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
         self->priv->ndisdup_support = FEATURE_SUPPORTED;
     }

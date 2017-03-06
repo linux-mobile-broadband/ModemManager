@@ -352,16 +352,13 @@ kernel_device_get_physdev_uid (MMKernelDevice *_self)
             return uid;
     }
 
-    ensure_physdev (self);
-    if (self->priv->physdev) {
-        /* Try to load from properties set on the physical device */
-        if ((uid = g_udev_device_get_property (self->priv->physdev, "ID_MM_PHYSDEV_UID")) != NULL)
-            return uid;
+    /* Try to load from properties set on the physical device */
+    if ((uid = mm_kernel_device_get_global_property (MM_KERNEL_DEVICE (self), "ID_MM_PHYSDEV_UID")) != NULL)
+        return uid;
 
-        /* Use physical device sysfs path, if any */
-        if ((uid = g_udev_device_get_sysfs_path (self->priv->physdev)) != NULL)
-            return uid;
-    }
+    /* Use physical device sysfs path, if any */
+    if (self->priv->physdev && (uid = g_udev_device_get_sysfs_path (self->priv->physdev)) != NULL)
+        return uid;
 
     /* If there is no physical device sysfs path, use the device sysfs itself */
     g_assert (self->priv->device);
@@ -436,9 +433,9 @@ kernel_device_is_candidate (MMKernelDevice *_self,
      * the device to a specific ModemManager driver, we need to ensure that all
      * rules have been processed before handling a device.
      *
-     * The udev tag applies to each port in a device. In other words, the flag
+     * This udev tag applies to each port in a device. In other words, the flag
      * may be set in some ports, but not in others */
-    if (!g_udev_device_get_property_as_boolean (self->priv->device, "ID_MM_CANDIDATE"))
+    if (!mm_kernel_device_get_property_as_boolean (MM_KERNEL_DEVICE (self), "ID_MM_CANDIDATE"))
         return FALSE;
 
     /* Load physical device. If there is no physical device, we don't process
@@ -457,16 +454,15 @@ kernel_device_is_candidate (MMKernelDevice *_self,
         return FALSE;
     }
 
-    /* The blacklist applies to the device as a whole, and therefore the flag
-     * will be applied always in the physical device, not in each port. */
-    if (g_udev_device_get_property_as_boolean (self->priv->physdev, "ID_MM_DEVICE_IGNORE")) {
+    /* Ignore blacklisted devices. */
+    if (mm_kernel_device_get_global_property_as_boolean (MM_KERNEL_DEVICE (self), "ID_MM_DEVICE_IGNORE")) {
         mm_dbg ("(%s/%s): device is blacklisted", subsys, name);
         return FALSE;
     }
 
     /* Is the device in the manual-only greylist? If so, return if this is an
      * automatic scan. */
-    if (!manual_scan && g_udev_device_get_property_as_boolean (self->priv->physdev, "ID_MM_DEVICE_MANUAL_SCAN_ONLY")) {
+    if (!manual_scan && mm_kernel_device_get_global_property_as_boolean (MM_KERNEL_DEVICE (self), "ID_MM_DEVICE_MANUAL_SCAN_ONLY")) {
         mm_dbg ("(%s/%s): device probed only in manual scan", subsys, name);
         return FALSE;
     }
@@ -474,7 +470,7 @@ kernel_device_is_candidate (MMKernelDevice *_self,
     /* If the physdev is a 'platform' or 'pnp' device that's not whitelisted, ignore it */
     physdev_subsys = g_udev_device_get_subsystem (self->priv->physdev);
     if ((!g_strcmp0 (physdev_subsys, "platform") || !g_strcmp0 (physdev_subsys, "pnp")) &&
-        (!g_udev_device_get_property_as_boolean (self->priv->physdev, "ID_MM_PLATFORM_DRIVER_PROBE"))) {
+        (!mm_kernel_device_get_global_property_as_boolean (MM_KERNEL_DEVICE (self), "ID_MM_PLATFORM_DRIVER_PROBE"))) {
         mm_dbg ("(%s/%s): port's parent platform driver is not whitelisted", subsys, name);
         return FALSE;
     }
@@ -594,6 +590,103 @@ kernel_device_get_property_as_int_hex (MMKernelDevice *_self,
 
     s = g_udev_device_get_property (self->priv->device, property);
     return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
+}
+
+static gboolean
+kernel_device_has_global_property (MMKernelDevice *_self,
+                                   const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), FALSE);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    ensure_physdev (self);
+    if (self->priv->physdev && g_udev_device_has_property (self->priv->physdev, property))
+        return TRUE;
+
+    return kernel_device_has_property (_self, property);
+}
+
+static const gchar *
+kernel_device_get_global_property (MMKernelDevice *_self,
+                                   const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+    const gchar        *str;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    ensure_physdev (self);
+    if (self->priv->physdev &&
+        g_udev_device_has_property (self->priv->physdev, property) &&
+        (str = g_udev_device_get_property (self->priv->physdev, property)) != NULL)
+        return str;
+
+    return kernel_device_get_property (_self, property);
+}
+
+static gboolean
+kernel_device_get_global_property_as_boolean (MMKernelDevice *_self,
+                                              const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), FALSE);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    ensure_physdev (self);
+    if (self->priv->physdev &&
+        g_udev_device_has_property (self->priv->physdev, property) &&
+        g_udev_device_get_property (self->priv->physdev, property))
+        return TRUE;
+
+    return kernel_device_get_property_as_boolean (_self, property);
+}
+
+static gint
+kernel_device_get_global_property_as_int (MMKernelDevice *_self,
+                                          const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+    gint                value;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    ensure_physdev (self);
+    if (self->priv->physdev &&
+        g_udev_device_has_property (self->priv->physdev, property) &&
+        (value = g_udev_device_get_property_as_int (self->priv->physdev, property)) >= 0)
+        return value;
+
+    return kernel_device_get_property_as_int (_self, property);
+}
+
+static guint
+kernel_device_get_global_property_as_int_hex (MMKernelDevice *_self,
+                                              const gchar    *property)
+{
+    MMKernelDeviceUdev *self;
+    const gchar        *s;
+    guint               out = 0;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), G_MAXUINT);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+
+    ensure_physdev (self);
+    if (self->priv->physdev &&
+        g_udev_device_has_property (self->priv->physdev, property) &&
+        (s = g_udev_device_get_property (self->priv->physdev, property)) != NULL)
+        return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
+
+    return kernel_device_get_property_as_int_hex (_self, property);
 }
 
 /*****************************************************************************/
@@ -770,21 +863,26 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
-    kernel_device_class->get_subsystem           = kernel_device_get_subsystem;
-    kernel_device_class->get_name                = kernel_device_get_name;
-    kernel_device_class->get_driver              = kernel_device_get_driver;
-    kernel_device_class->get_sysfs_path          = kernel_device_get_sysfs_path;
-    kernel_device_class->get_physdev_uid         = kernel_device_get_physdev_uid;
-    kernel_device_class->get_physdev_vid         = kernel_device_get_physdev_vid;
-    kernel_device_class->get_physdev_pid         = kernel_device_get_physdev_pid;
-    kernel_device_class->get_parent_sysfs_path   = kernel_device_get_parent_sysfs_path;
-    kernel_device_class->is_candidate            = kernel_device_is_candidate;
-    kernel_device_class->cmp                     = kernel_device_cmp;
-    kernel_device_class->has_property            = kernel_device_has_property;
-    kernel_device_class->get_property            = kernel_device_get_property;
-    kernel_device_class->get_property_as_boolean = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_property_as_int     = kernel_device_get_property_as_int;
-    kernel_device_class->get_property_as_int_hex = kernel_device_get_property_as_int_hex;
+    kernel_device_class->get_subsystem                  = kernel_device_get_subsystem;
+    kernel_device_class->get_name                       = kernel_device_get_name;
+    kernel_device_class->get_driver                     = kernel_device_get_driver;
+    kernel_device_class->get_sysfs_path                 = kernel_device_get_sysfs_path;
+    kernel_device_class->get_physdev_uid                = kernel_device_get_physdev_uid;
+    kernel_device_class->get_physdev_vid                = kernel_device_get_physdev_vid;
+    kernel_device_class->get_physdev_pid                = kernel_device_get_physdev_pid;
+    kernel_device_class->get_parent_sysfs_path          = kernel_device_get_parent_sysfs_path;
+    kernel_device_class->is_candidate                   = kernel_device_is_candidate;
+    kernel_device_class->cmp                            = kernel_device_cmp;
+    kernel_device_class->has_property                   = kernel_device_has_property;
+    kernel_device_class->get_property                   = kernel_device_get_property;
+    kernel_device_class->get_property_as_boolean        = kernel_device_get_property_as_boolean;
+    kernel_device_class->get_property_as_int            = kernel_device_get_property_as_int;
+    kernel_device_class->get_property_as_int_hex        = kernel_device_get_property_as_int_hex;
+    kernel_device_class->has_global_property            = kernel_device_has_global_property;
+    kernel_device_class->get_global_property            = kernel_device_get_global_property;
+    kernel_device_class->get_global_property_as_boolean = kernel_device_get_global_property_as_boolean;
+    kernel_device_class->get_global_property_as_int     = kernel_device_get_global_property_as_int;
+    kernel_device_class->get_global_property_as_int_hex = kernel_device_get_global_property_as_int_hex;
 
     properties[PROP_UDEV_DEVICE] =
         g_param_spec_object ("udev-device",

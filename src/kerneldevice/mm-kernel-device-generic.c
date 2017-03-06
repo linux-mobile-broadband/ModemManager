@@ -1067,6 +1067,13 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->get_property_as_int     = kernel_device_get_property_as_int;
     kernel_device_class->get_property_as_int_hex = kernel_device_get_property_as_int_hex;
 
+    /* Device-wide properties are stored per-port in the generic backend */
+    kernel_device_class->has_global_property            = kernel_device_has_property;
+    kernel_device_class->get_global_property            = kernel_device_get_property;
+    kernel_device_class->get_global_property_as_boolean = kernel_device_get_property_as_boolean;
+    kernel_device_class->get_global_property_as_int     = kernel_device_get_property_as_int;
+    kernel_device_class->get_global_property_as_int_hex = kernel_device_get_property_as_int_hex;
+
     properties[PROP_PROPERTIES] =
         g_param_spec_object ("properties",
                              "Properties",

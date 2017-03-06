@@ -342,7 +342,7 @@ dell_custom_init (MMPortProbe *probe,
 
     /* Dell-branded Telit modems always answer to +GMI
      * Avoid +CGMI and ATI sending for minimizing port probing time */
-    if (mm_kernel_device_get_property_as_boolean (port_device, "ID_MM_TELIT_PORTS_TAGGED")) {
+    if (mm_kernel_device_get_global_property_as_boolean (port_device, "ID_MM_TELIT_PORTS_TAGGED")) {
         ctx->cgmi_retries = 0;
         ctx->ati_retries = 0;
     }

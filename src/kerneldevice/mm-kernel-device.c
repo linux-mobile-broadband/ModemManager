@@ -177,6 +177,61 @@ mm_kernel_device_get_property_as_int_hex (MMKernelDevice *self,
             0);
 }
 
+gboolean
+mm_kernel_device_has_global_property (MMKernelDevice *self,
+                                      const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), FALSE);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->has_global_property ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->has_global_property (self, property) :
+            FALSE);
+}
+
+const gchar *
+mm_kernel_device_get_global_property (MMKernelDevice *self,
+                                      const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property (self, property) :
+            NULL);
+}
+
+gboolean
+mm_kernel_device_get_global_property_as_boolean (MMKernelDevice *self,
+                                                 const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), FALSE);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_boolean ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_boolean (self, property) :
+            FALSE);
+}
+
+gint
+mm_kernel_device_get_global_property_as_int (MMKernelDevice *self,
+                                             const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), -1);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int (self, property) :
+            -1);
+}
+
+guint
+mm_kernel_device_get_global_property_as_int_hex (MMKernelDevice *self,
+                                                 const gchar    *property)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), 0);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int_hex ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int_hex (self, property) :
+            0);
+}
+
 /*****************************************************************************/
 
 static void

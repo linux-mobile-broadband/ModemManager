@@ -417,8 +417,8 @@ apply_pre_probing_filters (MMPlugin       *self,
      * supported. If that is the case, filter by udev tag */
     if (self->priv->udev_tags) {
         for (i = 0; self->priv->udev_tags[i]; i++) {
-            /* Check if the port was tagged */
-            if (mm_kernel_device_get_property_as_boolean (port, self->priv->udev_tags[i]))
+            /* Check if the port or device was tagged */
+            if (mm_kernel_device_get_global_property_as_boolean (port, self->priv->udev_tags[i]))
                 break;
         }
 

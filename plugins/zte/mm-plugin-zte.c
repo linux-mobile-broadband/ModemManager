@@ -141,7 +141,7 @@ grab_port (MMPlugin *self,
         }
     }
 
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_ZTE_ICERA_DHCP")) {
+    if (mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_ZTE_ICERA_DHCP")) {
         mm_dbg ("ZTE: Icera-based modem will use DHCP");
         g_object_set (modem,
                       MM_BROADBAND_MODEM_ICERA_DEFAULT_IP_METHOD, MM_BEARER_IP_METHOD_DHCP,

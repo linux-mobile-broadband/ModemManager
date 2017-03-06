@@ -98,7 +98,7 @@ grab_port (MMPlugin *self,
          * to show up with more than two AT-capable ports.
          */
         if (pflags == MM_PORT_SERIAL_AT_FLAG_NONE &&
-            mm_kernel_device_get_property_as_boolean (port, "ID_MM_SIMTECH_TAGGED"))
+            mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_SIMTECH_TAGGED"))
             ptype = MM_PORT_TYPE_IGNORED;
     }
 
