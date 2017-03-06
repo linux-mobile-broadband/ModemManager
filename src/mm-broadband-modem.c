@@ -6971,20 +6971,11 @@ typedef struct {
     guint8 almp_state;
 } HdrStateResults;
 
-typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    MMPortSerialQcdm *qcdm;
-} HdrStateContext;
-
 static void
-hdr_state_context_complete_and_free (HdrStateContext *ctx)
+hdr_state_cleanup_port (MMPortSerial *port)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->qcdm);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
+    mm_port_serial_close (port);
+    g_object_unref (port);
 }
 
 static gboolean
@@ -6997,20 +6988,22 @@ modem_cdma_get_hdr_state_finish (MMIfaceModemCdma *self,
 {
     HdrStateResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *hybrid_mode = results->hybrid_mode;
     *session_state = results->session_state;
     *almp_state = results->almp_state;
+    g_free (results);
+
     return TRUE;
 }
 
 static void
 hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
                              GAsyncResult *res,
-                             HdrStateContext *ctx)
+                             GTask *task)
 {
     QcdmResult *result;
     HdrStateResults *results;
@@ -7020,8 +7013,8 @@ hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_set_from_error (ctx->result, error);
-        hdr_state_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7031,12 +7024,12 @@ hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
                                                     &err);
     g_byte_array_unref (response);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse HDR subsys state info command result: %d",
-                                         err);
-        hdr_state_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse HDR subsys state info command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
 
@@ -7049,8 +7042,8 @@ hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
     qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &results->almp_state);
     qcdm_result_unref (result);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    hdr_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task, results, g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -7059,40 +7052,43 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
                           gpointer user_data)
 {
     MMPortSerialQcdm *qcdm;
-    HdrStateContext *ctx;
+    GTask *task;
     GByteArray *hdrstate;
+    GError *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (!qcdm) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Cannot get HDR state without a QCDM port");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot get HDR state without a QCDM port");
+        g_object_unref (task);
         return;
     }
 
-    /* Setup context */
-    ctx = g_new0 (HdrStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_get_hdr_state);
-    ctx->qcdm = g_object_ref (qcdm);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (qcdm), &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_set_task_data (task,
+                          g_object_ref (qcdm),
+                          (GDestroyNotify) hdr_state_cleanup_port);
 
     /* Setup command */
     hdrstate = g_byte_array_sized_new (25);
     hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((gchar *) hdrstate->data, 25);
     g_assert (hdrstate->len);
 
-    mm_port_serial_qcdm_command (ctx->qcdm,
+    mm_port_serial_qcdm_command (qcdm,
                                  hdrstate,
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)hdr_subsys_state_info_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (hdrstate);
 }
 
