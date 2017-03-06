@@ -160,12 +160,18 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     GError   *error = NULL;
     MMPlugin *plugin;
 
+    /* If the device support check fails, either with an error, or afterwards
+     * when trying to create a modem object, we must remove the MMDevice from
+     * the tracking table of devices, so that a manual scan request afterwards
+     * re-scans all ports. */
+
     /* Receive plugin result from the plugin manager */
     plugin = mm_plugin_manager_device_support_check_finish (plugin_manager, res, &error);
     if (!plugin) {
         mm_info ("Couldn't check support for device '%s': %s",
                  mm_device_get_uid (ctx->device), error->message);
         g_error_free (error);
+        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (ctx->device));
         find_device_support_context_free (ctx);
         return;
     }
@@ -178,6 +184,7 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
         mm_warn ("Couldn't create modem for device '%s': %s",
                  mm_device_get_uid (ctx->device), error->message);
         g_error_free (error);
+        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (ctx->device));
         find_device_support_context_free (ctx);
         return;
     }
