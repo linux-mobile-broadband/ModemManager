@@ -7232,21 +7232,30 @@ typedef struct {
     guint band;
 } Cdma1xServingSystemResults;
 
-typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    MMPortSerialQcdm *qcdm;
-} Cdma1xServingSystemContext;
+static void
+cdma1x_serving_system_state_cleanup_port (MMPortSerial *port)
+{
+    mm_port_serial_close (port);
+    g_object_unref (port);
+}
 
 static void
-cdma1x_serving_system_context_complete_and_free (Cdma1xServingSystemContext *ctx)
+cdma1x_serving_system_complete_and_free (GTask *task,
+                                         guint sid,
+                                         guint nid,
+                                         guint class,
+                                         guint band)
 {
-    g_simple_async_result_complete (ctx->result);
-    if (ctx->qcdm)
-        g_object_unref (ctx->qcdm);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
+    Cdma1xServingSystemResults *results;
+
+    results = g_new0 (Cdma1xServingSystemResults, 1);
+    results->sid = sid;
+    results->band = band;
+    results->class = class;
+    results->nid = nid;
+
+    g_task_return_pointer (task, results, g_free);
+    g_object_unref (task);
 }
 
 static GError *
@@ -7270,21 +7279,23 @@ modem_cdma_get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
 {
     Cdma1xServingSystemResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = (Cdma1xServingSystemResults *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *sid = results->sid;
     *nid = results->nid;
     *class = results->class;
     *band = results->band;
+    g_free (results);
+
     return TRUE;
 }
 
 static void
 css_query_ready (MMIfaceModemCdma *self,
                  GAsyncResult *res,
-                 Cdma1xServingSystemContext *ctx)
+                 GTask *task)
 {
     GError *error = NULL;
     const gchar *result;
@@ -7295,12 +7306,11 @@ css_query_ready (MMIfaceModemCdma *self,
     gboolean class_ok = FALSE;
     gboolean band_ok = FALSE;
     gboolean success = FALSE;
-    Cdma1xServingSystemResults *results;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        cdma1x_serving_system_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7321,15 +7331,7 @@ css_query_ready (MMIfaceModemCdma *self,
 
         /* Format is "<band_class>,<band>,<sid>" */
         r = g_regex_new ("\\s*([^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        if (!r) {
-            g_simple_async_result_set_error (
-                ctx->result,
-                MM_CORE_ERROR,
-                MM_CORE_ERROR_FAILED,
-                "Could not parse Serving System results (regex creation failed).");
-            cdma1x_serving_system_context_complete_and_free (ctx);
-            return;
-        }
+        g_assert (r);
 
         g_regex_match (r, result, 0, &match_info);
         if (g_match_info_get_match_count (match_info) >= 3) {
@@ -7362,12 +7364,11 @@ css_query_ready (MMIfaceModemCdma *self,
     }
 
     if (!success) {
-        g_simple_async_result_set_error (
-            ctx->result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Could not parse Serving System results");
-        cdma1x_serving_system_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Could not parse Serving System results");
+        g_object_unref (task);
         return;
     }
 
@@ -7391,29 +7392,31 @@ css_query_ready (MMIfaceModemCdma *self,
 
     /* 99999 means unknown/no service */
     if (sid == MM_MODEM_CDMA_SID_UNKNOWN) {
-        g_simple_async_result_take_error (ctx->result,
-                                          cdma1x_serving_system_no_service_error ());
-        cdma1x_serving_system_context_complete_and_free (ctx);
+        g_task_return_error (task, cdma1x_serving_system_no_service_error ());
+        g_object_unref (task);
         return;
     }
 
-    results = g_new0 (Cdma1xServingSystemResults, 1);
-    results->sid = sid;
-    results->band = band;
-    results->class = class;
     /* No means to get NID with AT commands right now */
-    results->nid = MM_MODEM_CDMA_NID_UNKNOWN;
+    cdma1x_serving_system_complete_and_free (task, sid, MM_MODEM_CDMA_NID_UNKNOWN, class, band);
+}
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    cdma1x_serving_system_context_complete_and_free (ctx);
+static void
+serving_system_query_css (GTask *task)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (g_task_get_source_object (task)),
+                              "+CSS?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)css_query_ready,
+                              task);
 }
 
 static void
 qcdm_cdma_status_ready (MMPortSerialQcdm *port,
                         GAsyncResult *res,
-                        Cdma1xServingSystemContext *ctx)
+                        GTask *task)
 {
-    Cdma1xServingSystemResults *results;
     QcdmResult *result = NULL;
     guint32 sid = MM_MODEM_CDMA_SID_UNKNOWN;
     guint32 nid = MM_MODEM_CDMA_NID_UNKNOWN;
@@ -7423,23 +7426,25 @@ qcdm_cdma_status_ready (MMPortSerialQcdm *port,
     GByteArray *response;
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
-    if (error ||
-        (result = qcdm_cmd_cdma_status_result ((const gchar *) response->data,
-                                               response->len,
-                                               &err)) == NULL) {
+    if (error) {
+        mm_dbg ("Failed to get cdma status: %s", error->message);
+        g_clear_error (&error);
+
+        /* Fall back to AT+CSS */
+        serving_system_query_css (task);
+        return;
+    }
+
+    result = qcdm_cmd_cdma_status_result ((const gchar *) response->data,
+                                          response->len,
+                                          &err);
+    if (!result) {
         if (err != QCDM_SUCCESS)
             mm_dbg ("Failed to parse cdma status command result: %d", err);
-        /* If there was some error, fall back to use +CSS like we did before QCDM */
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                                  "+CSS?",
-                                  3,
-                                  FALSE,
-                                  (GAsyncReadyCallback)css_query_ready,
-                                  ctx);
-        if (error)
-            g_error_free (error);
-        if (response)
-            g_byte_array_unref (response);
+        g_byte_array_unref (response);
+
+        /* Fall back to AT+CSS */
+        serving_system_query_css (task);
         return;
     }
 
@@ -7460,16 +7465,11 @@ qcdm_cdma_status_ready (MMPortSerialQcdm *port,
     mm_dbg ("CDMA 1x Status SID: %d", sid);
     mm_dbg ("CDMA 1x Status NID: %d", nid);
 
-    results = g_new0 (Cdma1xServingSystemResults, 1);
-    results->sid = sid;
-    results->nid = nid;
-    if (sid != MM_MODEM_CDMA_SID_UNKNOWN) {
-        results->band = 'Z';
-        results->class = 0;
-    }
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    cdma1x_serving_system_context_complete_and_free (ctx);
+    cdma1x_serving_system_complete_and_free (task,
+                                             sid,
+                                             nid,
+                                             0,
+                                             (sid == MM_MODEM_CDMA_SID_UNKNOWN) ? 0 : 'Z');
 }
 
 static void
@@ -7477,41 +7477,44 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    Cdma1xServingSystemContext *ctx;
+    GError *error = NULL;
+    GByteArray *cdma_status;
+    GTask *task;
+    MMPortSerialQcdm *qcdm;
 
-    /* Setup context */
-    ctx = g_new0 (Cdma1xServingSystemContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_get_cdma1x_serving_system);
-    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    task = g_task_new (self, NULL, callback, user_data);
 
-    if (ctx->qcdm) {
-        GByteArray *cdma_status;
-
-        /* Setup command */
-        cdma_status = g_byte_array_sized_new (25);
-        cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
-        g_assert (cdma_status->len);
-        mm_port_serial_qcdm_command (ctx->qcdm,
-                                     cdma_status,
-                                     3,
-                                     NULL,
-                                     (GAsyncReadyCallback)qcdm_cdma_status_ready,
-                                     ctx);
-        g_byte_array_unref (cdma_status);
+    qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
+    if (!qcdm) {
+        /* Fall back to AT+CSS */
+        serving_system_query_css (task);
         return;
     }
 
-    /* Try with AT if we don't have QCDM */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CSS?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)css_query_ready,
-                              ctx);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (qcdm), &error)) {
+        mm_dbg ("Failed to open QCDM port for serving-system request: %s", error->message);
+        g_error_free (error);
+
+        /* Fall back to AT+CSS */
+        serving_system_query_css (task);
+        return;
+    }
+
+    g_task_set_task_data (task,
+                          g_object_ref (qcdm),
+                          (GDestroyNotify) cdma1x_serving_system_state_cleanup_port);
+
+    /* Setup command */
+    cdma_status = g_byte_array_sized_new (25);
+    cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
+    g_assert (cdma_status->len);
+    mm_port_serial_qcdm_command (qcdm,
+                                 cdma_status,
+                                 3,
+                                 NULL,
+                                 (GAsyncReadyCallback) qcdm_cdma_status_ready,
+                                 task);
+    g_byte_array_unref (cdma_status);
 }
 
 /*****************************************************************************/
