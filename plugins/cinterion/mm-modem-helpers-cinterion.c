@@ -76,6 +76,7 @@ static const CinterionBand cinterion_bands[] = {
  *     ^SCFG: "Radio/NWSM",("0","1","2")
  *     ...
  *
+ *     ^SCFG: "Radio/Band\",("1"-"147")
  */
 
 gboolean
@@ -94,7 +95,7 @@ mm_cinterion_parse_scfg_test (const gchar *response,
         return FALSE;
     }
 
-    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\(\"([0-9a-fA-F]*)-([0-9a-fA-F]*)\",.*\\)",
+    r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\((?:\")?([0-9]*)(?:\")?-(?:\")?([0-9]*)(?:\")?.*\\)",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, NULL);
     g_assert (r != NULL);
