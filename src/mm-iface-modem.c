@@ -20,6 +20,8 @@
 
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-sim.h"
@@ -3899,6 +3901,25 @@ load_current_capabilities_ready (MMIfaceModem *self,
         ctx->step = INITIALIZATION_STEP_LAST;
         interface_initialization_step (ctx);
         return;
+    }
+
+    /* If LTE capability is reported, enable EPS network registration checks */
+    if (caps & MM_MODEM_CAPABILITY_LTE) {
+        mm_dbg ("Setting EPS network as supported");
+        g_object_set (G_OBJECT (ctx->self),
+                      MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, TRUE,
+                      NULL);
+    }
+
+    /* If LTE capability is the only one reported, disable all other network registration checks */
+    if (caps == MM_MODEM_CAPABILITY_LTE) {
+        mm_dbg ("Setting CS/PS/CDMA1x/EVDO networks as unsupported");
+        g_object_set (G_OBJECT (ctx->self),
+                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED,     FALSE,
+                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED,     FALSE,
+                      MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, FALSE,
+                      MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,   FALSE,
+                      NULL);
     }
 
     /* Update current caps right away, even if we may fix them during the
