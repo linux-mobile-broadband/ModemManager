@@ -118,6 +118,74 @@ test_scfg (void)
     g_array_unref (expected_bands);
 }
 
+static void
+test_scfg_ehs5 (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+    const gchar *response =
+        "^SCFG: \"Audio/Loop\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Call/ECC\",(\"0\"-\"255\")\r\n"
+        "^SCFG: \"Call/Ecall/AckTimeout\",(\"0-2147483646\")\r\n"
+        "^SCFG: \"Call/Ecall/Callback\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Call/Ecall/CallbackTimeout\",(\"0-2147483646\")\r\n"
+        "^SCFG: \"Call/Ecall/Msd\",(\"280\")\r\n"
+        "^SCFG: \"Call/Ecall/Pullmode\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Call/Ecall/SessionTimeout\",(\"0-2147483646\")\r\n"
+        "^SCFG: \"Call/Ecall/StartTimeout\",(\"0-2147483646\")\r\n"
+        "^SCFG: \"Call/Speech/Codec\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"GPRS/AutoAttach\",(\"disabled\",\"enabled\")\r\n"
+        "^SCFG: \"Gpio/mode/ASC1\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/DAI\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/DCD0\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/DSR0\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/DTR0\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/FSR\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/PULSE\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/PWM\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/RING0\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/SPI\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Gpio/mode/SYNC\",(\"std\",\"gpio\",\"rsv\")\r\n"
+        "^SCFG: \"Ident/Manufacturer\",(25)\r\n"
+        "^SCFG: \"Ident/Product\",(25)\r\n"
+        "^SCFG: \"MEShutdown/Fso\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"MEShutdown/sVsup/threshold\",(\"-4\",\"-3\",\"-2\",\"-1\",\"0\",\"1\",\"2\",\"3\",\"4\"),(\"0\")\r\n"
+        "^SCFG: \"MEopMode/CFUN\",(\"0\",\"1\"),(\"1\",\"4\")\r\n"
+        "^SCFG: \"MEopMode/Dormancy\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"MEopMode/SoR\",(\"off\",\"on\")\r\n"
+        "^SCFG: \"Radio/Band\",(\"1\"-\"147\")\r\n"
+        "^SCFG: \"Radio/Mtpl\",(\"0\"-\"3\"),(\"1\"-\"8\"),(\"1\",\"8\"),(\"18\"-\"33\"),(\"18\"-\"27\")\r\n"
+        "^SCFG: \"Radio/Mtpl\",(\"0\"-\"3\"),(\"1\"-\"8\"),(\"16\",\"32\",\"64\",\"128\",\"256\"),(\"18\"-\"24\")\r\n"
+        "^SCFG: \"Radio/Mtpl\",(\"0\"-\"3\"),(\"1\"-\"8\"),(\"2\",\"4\"),(\"18\"-\"30\"),(\"18\"-\"26\")\r\n"
+        "^SCFG: \"Radio/OutputPowerReduction\",(\"0\",\"1\",\"2\",\"3\",\"4\")\r\n"
+        "^SCFG: \"Serial/Interface/Allocation\",(\"0\",\"1\",\"2\"),(\"0\",\"1\",\"2\")\r\n"
+        "^SCFG: \"Serial/USB/DDD\",(\"0\",\"1\"),(\"0\"),(4),(4),(4),(63),(63),(4)\r\n"
+        "^SCFG: \"Tcp/IRT\",(\"1\"-\"60\")\r\n"
+        "^SCFG: \"Tcp/MR\",(\"1\"-\"30\")\r\n"
+        "^SCFG: \"Tcp/OT\",(\"1\"-\"6000\")\r\n"
+        "^SCFG: \"Tcp/WithURCs\",(\"on\",\"off\")\r\n"
+        "^SCFG: \"Trace/Syslog/OTAP\",(\"0\",\"1\"),(\"null\",\"asc0\",\"asc1\",\"usb\",\"usb1\",\"usb2\",\"usb3\",\"usb4\",\"usb5\",\"file\",\"udp\",\"system\"),(\"1\"-\"65535\"),(125),(\"buffered\",\"secure\"),(\"off\",\"on\")\r\n"
+        "^SCFG: \"URC/Ringline\",(\"off\",\"local\",\"asc0\")\r\n"
+        "^SCFG: \"URC/Ringline/ActiveTime\",(\"0\",\"1\",\"2\")\r\n"
+        "^SCFG: \"Userware/Autostart\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Userware/Autostart/Delay\",(\"0\"-\"10000\")\r\n"
+        "^SCFG: \"Userware/DebugInterface\",(\"0\"-\"255\")|(\"FE80::\"-\"FE80::FFFFFFFFFFFFFFFF\"),(\"0\"-\"255\")|(\"FE80::\"-\"FE80::FFFFFFFFFFFFFFFF\"),(\"0\",\"1\")\r\n"
+        "^SCFG: \"Userware/DebugMode\",(\"off\",\"on\")\r\n"
+        "^SCFG: \"Userware/Passwd\",(\"0\"-\"8\")\r\n"
+        "^SCFG: \"Userware/Stdout\",(\"null\",\"asc0\",\"asc1\",\"usb\",\"usb1\",\"usb2\",\"usb3\",\"usb4\",\"usb5\",\"file\",\"udp\",\"system\"),(\"1\"-\"65535\"),(\"0\"-\"125\"),(\"buffered\",\"secure\"),(\"off\",\"on\")\r\n"
+        "^SCFG: \"Userware/Watchdog\",(\"0\",\"1\",\"2\")\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_U2100, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_U900,  g_array_append_val (expected_bands, single);
+
+    common_test_scfg (response, expected_bands);
+
+    g_array_unref (expected_bands);
+}
+
 /*****************************************************************************/
 /* Test ^SCFG responses */
 
@@ -436,6 +504,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/cinterion/scfg",                    test_scfg);
+    g_test_add_func ("/MM/cinterion/scfg/ehs5",               test_scfg_ehs5);
     g_test_add_func ("/MM/cinterion/scfg/response/3g",        test_scfg_response_3g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
