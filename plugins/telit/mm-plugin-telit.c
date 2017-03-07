@@ -59,6 +59,7 @@ mm_plugin_create (void)
     static const gchar *subsystems[] = { "tty", NULL };
     /* Vendors: Telit */
     static const guint16 vendor_ids[] = { 0x1bc7, 0 };
+    static const gchar *vendor_strings[] = { "telit", NULL };
     /* Only handle TELIT tagged devices here. */
     static const gchar *udev_tags[] = {
         "ID_MM_TELIT_TAGGED",
@@ -72,12 +73,13 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_TELIT,
-                      MM_PLUGIN_NAME,               "Telit",
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_ALLOWED_AT,         TRUE,
-                      MM_PLUGIN_ALLOWED_UDEV_TAGS,  udev_tags,
-                      MM_PLUGIN_CUSTOM_INIT,        &custom_init,
+                      MM_PLUGIN_NAME,                   "Telit",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
+                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
+                      MM_PLUGIN_ALLOWED_AT,             TRUE,
+                      MM_PLUGIN_ALLOWED_UDEV_TAGS,      udev_tags,
+                      MM_PLUGIN_CUSTOM_INIT,            &custom_init,
                       NULL));
 }
 
