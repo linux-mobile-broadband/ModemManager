@@ -397,6 +397,21 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
             break;
         }
     }
+
+    /* The +CGSM capability is saying that the modem is a 3GPP modem, but that
+     * doesn't necessarily mean it's a GSM/UMTS modem, it could be a LTE-only
+     * device. We did add the GSM_UMTS capability when +CGSM was found, so now
+     * we'll check if the device only reports 4G-only mode, and remove the
+     * capability if so.
+     *
+     * Note that we don't change the default +CGSM -> GSM/UMTS logic, we just
+     * fix it up.
+     */
+    if ((modes->len == 1) && (g_array_index (modes, MMModemMode, 0) == MM_MODEM_MODE_4G)) {
+        g_assert (ctx->caps & MM_MODEM_CAPABILITY_LTE);
+        ctx->caps &= ~MM_MODEM_CAPABILITY_GSM_UMTS;
+    }
+
     g_array_unref (modes);
 
 out:
