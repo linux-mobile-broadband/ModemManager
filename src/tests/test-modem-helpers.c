@@ -33,6 +33,102 @@
     g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
 /*****************************************************************************/
+/* Test WS46=? responses */
+
+static void
+test_ws46_response (const gchar       *str,
+                    const MMModemMode *expected,
+                    guint              n_expected)
+{
+    guint   i;
+    GArray *modes;
+    GError *error = NULL;
+
+    modes = mm_3gpp_parse_ws46_test_response (str, &error);
+    g_assert_no_error (error);
+    g_assert (modes != NULL);
+    g_assert_cmpuint (modes->len, ==, n_expected);
+
+    for (i = 0; i < n_expected; i++) {
+        guint j;
+
+        for (j = 0; j < modes->len; j++) {
+            if (expected[i] == g_array_index (modes, MMModemMode, j))
+                break;
+        }
+        g_assert_cmpuint (j, !=, modes->len);
+    }
+    g_array_unref (modes);
+}
+
+static void
+test_ws46_response_generic_2g3g4g (void)
+{
+    static const MMModemMode expected[] = {
+        MM_MODEM_MODE_2G,
+        MM_MODEM_MODE_3G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        MM_MODEM_MODE_4G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+    };
+    const gchar *str = "+WS46: (12,22,25,28,29)";
+
+    test_ws46_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_ws46_response_generic_2g3g (void)
+{
+    static const MMModemMode expected[] = {
+        MM_MODEM_MODE_2G,
+        MM_MODEM_MODE_3G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+    };
+    const gchar *str = "+WS46: (12,22,25)";
+
+    test_ws46_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_ws46_response_generic_2g3g_v2 (void)
+{
+    static const MMModemMode expected[] = {
+        MM_MODEM_MODE_2G,
+        MM_MODEM_MODE_3G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+    };
+    const gchar *str = "+WS46: (12,22,29)";
+
+    test_ws46_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_ws46_response_cinterion (void)
+{
+    static const MMModemMode expected[] = {
+        MM_MODEM_MODE_2G,
+        MM_MODEM_MODE_3G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        MM_MODEM_MODE_4G,
+        MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+    };
+    const gchar *str = "(12,22,25,28,29)";
+
+    test_ws46_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+static void
+test_ws46_response_telit_le866 (void)
+{
+    static const MMModemMode expected[] = {
+        MM_MODEM_MODE_4G,
+    };
+    const gchar *str = "(28)";
+
+    test_ws46_response (str, expected, G_N_ELEMENTS (expected));
+}
+
+/*****************************************************************************/
 /* Test CMGL responses */
 
 static void
@@ -2892,6 +2988,12 @@ int main (int argc, char **argv)
 
     suite = g_test_get_root ();
     reg_data = reg_test_data_new ();
+
+    g_test_suite_add (suite, TESTCASE (test_ws46_response_generic_2g3g4g, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ws46_response_generic_2g3g, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ws46_response_generic_2g3g_v2, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ws46_response_cinterion, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ws46_response_telit_le866, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_tm506, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_gt3gplus, NULL));
