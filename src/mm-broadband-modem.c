@@ -361,17 +361,28 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
                                       LoadCapabilitiesContext *ctx)
 {
     const gchar *response;
+    GArray      *modes;
+    guint        i;
 
     /* Completely ignore errors in AT+WS46=? */
     response = mm_base_modem_at_command_finish (self, res, NULL);
-    if (response &&
-        (strstr (response, "28") != NULL ||   /* 4G only */
-         strstr (response, "30") != NULL ||   /* 2G/4G */
-         strstr (response, "31") != NULL)) {  /* 3G/4G */
-        /* Add LTE caps */
-        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
-    }
+    if (!response)
+        goto out;
 
+    modes = mm_3gpp_parse_ws46_test_response (response, NULL);
+    if (!modes)
+        goto out;
+
+    /* Add LTE caps if any of the reported modes supports 4G */
+    for (i = 0; i < modes->len; i++) {
+        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_4G) {
+            ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+            break;
+        }
+    }
+    g_array_unref (modes);
+
+out:
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
         GUINT_TO_POINTER (ctx->caps),
@@ -1412,78 +1423,40 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
                                  LoadSupportedModesContext *ctx)
 {
     const gchar *response;
-    GError *error = NULL;
+    GArray      *modes;
+    GError      *error = NULL;
+    guint        i;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!error) {
-        MMModemMode mode = MM_MODEM_MODE_NONE;
-
-        /*
-         * More than one numeric ID may appear in the list, that's why
-         * they are checked separately.
-         *
-         * NOTE: Do not skip WS46 prefix; it would break Cinterion handling.
-         *
-         * From 3GPP TS 27.007 v.11.2.0, section 5.9
-         * 12	GSM Digital Cellular Systems (GERAN only)
-         * 22	UTRAN only
-         * 25	3GPP Systems (GERAN, UTRAN and E-UTRAN)
-         * 28	E-UTRAN only
-         * 29	GERAN and UTRAN
-         * 30	GERAN and E-UTRAN
-         * 31	UTRAN and E-UTRAN
-         */
-
-        if (strstr (response, "12") != NULL) {
-            mm_dbg ("Device allows (3GPP) 2G-only network mode");
-            mode |= MM_MODEM_MODE_2G;
-        }
-
-        if (strstr (response, "22") != NULL) {
-            mm_dbg ("Device allows (3GPP) 3G-only network mode");
-            mode |= MM_MODEM_MODE_3G;
-        }
-
-        if (strstr (response, "28") != NULL) {
-            mm_dbg ("Device allows (3GPP) 4G-only network mode");
-            mode |= MM_MODEM_MODE_4G;
-        }
-
-        if (strstr (response, "29") != NULL) {
-            mm_dbg ("Device allows (3GPP) 2G/3G network mode");
-            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        }
-
-        if (strstr (response, "30") != NULL) {
-            mm_dbg ("Device allows (3GPP) 2G/4G network mode");
-            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
-        }
-
-        if (strstr (response, "31") != NULL) {
-            mm_dbg ("Device allows (3GPP) 3G/4G network mode");
-            mode |= (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-        }
-
-        if (strstr (response, "25") != NULL) {
-            if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-                mm_dbg ("Device allows every supported 3GPP network mode (2G/3G/4G)");
-                mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-            } else {
-                mm_dbg ("Device allows every supported 3GPP network mode (2G/3G)");
-                mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-            }
-        }
-
-        /* If no expected ID found, log error */
-        if (mode == MM_MODEM_MODE_NONE)
-            mm_dbg ("Invalid list of supported networks reported by WS46=?: '%s'", response);
-        else
-            ctx->mode |= mode;
-    } else {
+    if (error) {
         mm_dbg ("Generic query of supported 3GPP networks with WS46=? failed: '%s'", error->message);
         g_error_free (error);
+        goto out;
     }
 
+    modes = mm_3gpp_parse_ws46_test_response (response, &error);
+    if (!modes) {
+        mm_dbg ("Parsing WS46=? response failed: '%s'", error->message);
+        g_error_free (error);
+        goto out;
+    }
+
+    for (i = 0; i < modes->len; i++) {
+        MMModemMode  mode;
+        gchar       *str;
+
+        mode = g_array_index (modes, MMModemMode, i);
+
+        ctx->mode |= mode;
+
+        str = mm_modem_mode_build_string_from_mask (mode);
+        mm_dbg ("Device allows (3GPP) mode combination: %s", str);
+        g_free (str);
+    }
+
+    g_array_unref (modes);
+
+out:
     /* Now keep on with the loading, we may need CDMA-specific checks */
     ctx->run_ws46 = FALSE;
     load_supported_modes_step (ctx);

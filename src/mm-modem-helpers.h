@@ -94,6 +94,9 @@ GRegex    *mm_3gpp_cusd_regex_get (void);
 GRegex    *mm_3gpp_cmti_regex_get (void);
 GRegex    *mm_3gpp_cds_regex_get (void);
 
+/* AT+WS46=? response parser: returns array of MMModemMode values */
+GArray *mm_3gpp_parse_ws46_test_response (const gchar  *response,
+                                          GError      **error);
 
 /* AT+COPS=? (network scan) response parser */
 typedef struct {

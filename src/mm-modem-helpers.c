@@ -523,6 +523,149 @@ mm_3gpp_cds_regex_get (void)
 }
 
 /*************************************************************************/
+/* AT+WS46=? response parser
+ *
+ * More than one numeric ID may appear in the list, that's why
+ * they are checked separately.
+ *
+ * NOTE: ignore WS46 prefix or it will break Cinterion handling.
+ *
+ * For the specific case of '25', we will check if any other mode supports
+ * 4G, and if there is none, we'll remove 4G caps from it.
+ */
+
+typedef struct {
+    guint       ws46;
+    MMModemMode mode;
+} Ws46Mode;
+
+/* 3GPP TS 27.007 r14, section 5.9: select wireless network +WS46 */
+static const Ws46Mode ws46_modes[] = {
+    /* GSM Digital Cellular Systems (GERAN only) */
+    { 12, MM_MODEM_MODE_2G },
+    /* UTRAN only */
+    { 22, MM_MODEM_MODE_3G },
+    /* 3GPP Systems (GERAN, UTRAN and E-UTRAN) */
+    { 25, MM_MODEM_MODE_ANY },
+    /* E-UTRAN only */
+    { 28, MM_MODEM_MODE_4G },
+    /* GERAN and UTRAN */
+    { 29, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G },
+    /* GERAN and E-UTRAN */
+    { 30, MM_MODEM_MODE_2G | MM_MODEM_MODE_4G },
+    /* UERAN and E-UTRAN */
+    { 31, MM_MODEM_MODE_3G | MM_MODEM_MODE_4G },
+};
+
+GArray *
+mm_3gpp_parse_ws46_test_response (const gchar  *response,
+                                  GError      **error)
+{
+    GArray     *modes = NULL;
+    GRegex     *r;
+    GError     *inner_error = NULL;
+    GMatchInfo *match_info = NULL;
+    gchar      *full_list = NULL;
+    gchar     **split;
+    guint       i;
+    gboolean    supported_4g = FALSE;
+    gboolean    supported_3g = FALSE;
+    gboolean    supported_2g = FALSE;
+
+    r = g_regex_new ("(?:\\+WS46:)?\\s*\\((.*)\\)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    if (!(full_list = mm_get_string_unquoted_from_match_info (match_info, 1))) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing full list string");
+        goto out;
+    }
+
+    split = g_strsplit (full_list, ",", -1);
+    modes = g_array_new (FALSE, FALSE, sizeof (MMModemMode));
+
+    for (i = 0; split && split[i]; i++) {
+        guint val;
+        guint j;
+
+        if (!mm_get_uint_from_str (split[i], &val)) {
+            g_warning ("Invalid +WS46 mode reported: %s", split[i]);
+            continue;
+        }
+
+        for (j = 0; j < G_N_ELEMENTS (ws46_modes); j++) {
+            if (ws46_modes[j].ws46 == val) {
+                if (val != 25) {
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_4G)
+                        supported_4g = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_3G)
+                        supported_3g = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_2G)
+                        supported_2g = TRUE;
+                }
+                g_array_append_val (modes, ws46_modes[j].mode);
+                break;
+            }
+        }
+
+        if (j == G_N_ELEMENTS (ws46_modes))
+            g_warning ("Unknown +WS46 mode reported: %s", split[i]);
+    }
+
+    g_strfreev (split);
+
+    if (modes->len == 0) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No valid modes reported");
+        g_clear_pointer (&modes, g_array_unref);
+        goto out;
+    }
+
+    /* Fixup the ANY value, based on which are the supported modes */
+    for (i = 0; i < modes->len; i++) {
+        MMModemMode *mode;
+
+        mode = &g_array_index (modes, MMModemMode, i);
+        if (*mode == MM_MODEM_MODE_ANY) {
+            *mode = 0;
+            if (supported_2g)
+                *mode |= MM_MODEM_MODE_2G;
+            if (supported_3g)
+                *mode |= MM_MODEM_MODE_3G;
+            if (supported_4g)
+                *mode |= MM_MODEM_MODE_4G;
+
+            if (*mode == 0) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No way to fixup the ANY value");
+                g_clear_pointer (&modes, g_array_unref);
+                goto out;
+            }
+        }
+    }
+
+out:
+    g_free (full_list);
+
+    g_clear_pointer (&match_info, g_match_info_free);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
+    g_assert (modes && modes->len);
+    return modes;
+}
+
+/*************************************************************************/
 
 static void
 mm_3gpp_network_info_free (MM3gppNetworkInfo *info)
