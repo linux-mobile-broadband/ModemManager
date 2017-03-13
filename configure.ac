@@ -317,7 +317,7 @@ dnl-----------------------------------------------------------------------------
 dnl QMI support (enabled by default)
 dnl
 
-LIBQMI_VERSION=1.16.0
+LIBQMI_VERSION=1.17.900
 
 AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
 AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
