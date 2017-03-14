@@ -450,8 +450,17 @@ modem_load_supported_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load unlock retries (Modem interface) */
+/* Load unlock retries (Modem interface)
+ *
+ * NOTE: the logic must make sure that LOAD_UNLOCK_RETRIES_STEP_UNLOCK is always
+ * run if LOAD_UNLOCK_RETRIES_STEP_LOCK has been run. Currently, the logic just
+ * runs all intermediate steps ignoring errors (i.e. not completing the
+ * operation if something fails), so the LOAD_UNLOCK_RETRIES_STEP_UNLOCK is
+ * always run.
+ */
 
+#define CSIM_LOCK_STR               "+CSIM=1"
+#define CSIM_UNLOCK_STR             "+CSIM=0"
 #define CSIM_QUERY_PIN_RETRIES_STR  "+CSIM=10,0020000100"
 #define CSIM_QUERY_PUK_RETRIES_STR  "+CSIM=10,002C000100"
 #define CSIM_QUERY_PIN2_RETRIES_STR "+CSIM=10,0020008100"
@@ -460,10 +469,12 @@ modem_load_supported_bands (MMIfaceModem *self,
 
 typedef enum {
     LOAD_UNLOCK_RETRIES_STEP_FIRST,
+    LOAD_UNLOCK_RETRIES_STEP_LOCK,
     LOAD_UNLOCK_RETRIES_STEP_PIN,
     LOAD_UNLOCK_RETRIES_STEP_PUK,
     LOAD_UNLOCK_RETRIES_STEP_PIN2,
     LOAD_UNLOCK_RETRIES_STEP_PUK2,
+    LOAD_UNLOCK_RETRIES_STEP_UNLOCK,
     LOAD_UNLOCK_RETRIES_STEP_LAST
 } LoadUnlockRetriesStep;
 
@@ -497,6 +508,25 @@ modem_load_unlock_retries_finish (MMIfaceModem *self,
 
     return (MMUnlockRetries*) g_object_ref (g_simple_async_result_get_op_res_gpointer (
                                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+csim_unlock_ready (MMBaseModem              *self,
+                   GAsyncResult             *res,
+                   LoadUnlockRetriesContext *ctx)
+{
+    const gchar *response;
+    GError      *error = NULL;
+
+    /* Ignore errors */
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        mm_warn ("Couldn't unlock SIM card: %s", error->message);
+        g_error_free (error);
+    }
+
+    ctx->step++;
+    load_unlock_retries_step (ctx);
 }
 
 static void
@@ -542,10 +572,31 @@ csim_query_ready (MMBaseModem *self,
             mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK2, unlock_retries);
             break;
         default:
+            g_assert_not_reached ();
             break;
     }
 
 next_step:
+    ctx->step++;
+    load_unlock_retries_step (ctx);
+}
+
+static void
+csim_lock_ready (MMBaseModem              *self,
+                 GAsyncResult             *res,
+                 LoadUnlockRetriesContext *ctx)
+{
+    const gchar *response;
+    GError      *error = NULL;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_prefix_error (&error, "Couldn't lock SIM card: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        load_unlock_retries_context_complete_and_free (ctx);
+        return;
+    }
+
     ctx->step++;
     load_unlock_retries_step (ctx);
 }
@@ -557,6 +608,14 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
         case LOAD_UNLOCK_RETRIES_STEP_FIRST:
             /* Fall back on next step */
             ctx->step++;
+        case LOAD_UNLOCK_RETRIES_STEP_LOCK:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_LOCK_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_lock_ready,
+                                      ctx);
+            break;
         case LOAD_UNLOCK_RETRIES_STEP_PIN:
             mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                                       CSIM_QUERY_PIN_RETRIES_STR,
@@ -587,6 +646,14 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
                                       CSIM_QUERY_TIMEOUT,
                                       FALSE,
                                       (GAsyncReadyCallback) csim_query_ready,
+                                      ctx);
+            break;
+        case LOAD_UNLOCK_RETRIES_STEP_UNLOCK:
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      CSIM_UNLOCK_STR,
+                                      CSIM_QUERY_TIMEOUT,
+                                      FALSE,
+                                      (GAsyncReadyCallback) csim_unlock_ready,
                                       ctx);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_LAST:
