@@ -859,34 +859,6 @@ load_operator_name_ready (MMIfaceModem3gpp *self,
     reload_current_registration_info_context_step (ctx);
 }
 
-static gboolean
-parse_mcc_mnc (const gchar *mccmnc,
-               guint *mcc_out,
-               guint *mnc_out)
-{
-    guint mccmnc_len;
-    gchar mcc[4] = { 0, 0, 0, 0 };
-    gchar mnc[4] = { 0, 0, 0, 0 };
-
-    mccmnc_len = (mccmnc ? strlen (mccmnc) : 0);
-    if (mccmnc_len != 5 &&
-        mccmnc_len != 6) {
-        mm_dbg ("Unexpected MCC/MNC string '%s'", mccmnc);
-        return FALSE;
-    }
-
-    memcpy (mcc, mccmnc, 3);
-    /* Not all modems report 6-digit MNCs */
-    memcpy (mnc, mccmnc + 3, 2);
-    if (mccmnc_len == 6)
-        mnc[2] = mccmnc[5];
-
-    *mcc_out = atoi (mcc);
-    *mnc_out = atoi (mnc);
-
-    return TRUE;
-}
-
 static void
 load_operator_code_ready (MMIfaceModem3gpp *self,
                           GAsyncResult *res,
@@ -894,24 +866,25 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
 {
     GError *error = NULL;
     gchar *str;
+    guint16 mcc = 0;
+    guint16 mnc = 0;
 
     str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish (self, res, &error);
     if (error) {
         mm_warn ("Couldn't load Operator Code: '%s'", error->message);
-        g_error_free (error);
+    } else if (!mm_3gpp_parse_operator_id (str, &mcc, &mnc, &error)) {
+        mm_dbg ("Unexpected MCC/MNC string '%s': '%s'", str, error->message);
+        g_clear_pointer (&str, g_free);
     }
+    g_clear_error (&error);
 
     if (ctx->skeleton)
         mm_gdbus_modem3gpp_set_operator_code (ctx->skeleton, str);
 
     /* If we also implement the location interface, update the 3GPP location */
-    if (str && MM_IS_IFACE_MODEM_LOCATION (self)) {
-        guint mcc = 0;
-        guint mnc = 0;
+    if (mcc && MM_IS_IFACE_MODEM_LOCATION (self))
+        mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), mcc, mnc);
 
-        if (parse_mcc_mnc (str, &mcc, &mnc))
-            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), mcc, mnc);
-    }
     g_free (str);
 
     ctx->operator_code_loaded = TRUE;
