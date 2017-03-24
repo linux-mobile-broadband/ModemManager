@@ -60,11 +60,6 @@ mm_plugin_create (void)
     /* Vendors: Telit */
     static const guint16 vendor_ids[] = { 0x1bc7, 0 };
     static const gchar *vendor_strings[] = { "telit", NULL };
-    /* Only handle TELIT tagged devices here. */
-    static const gchar *udev_tags[] = {
-        "ID_MM_TELIT_TAGGED",
-        NULL
-    };
     /* Custom init for port identification */
     static const MMAsyncMethod custom_init = {
         .async  = G_CALLBACK (telit_custom_init),
@@ -78,7 +73,6 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
                       MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
                       MM_PLUGIN_ALLOWED_AT,             TRUE,
-                      MM_PLUGIN_ALLOWED_UDEV_TAGS,      udev_tags,
                       MM_PLUGIN_CUSTOM_INIT,            &custom_init,
                       NULL));
 }
