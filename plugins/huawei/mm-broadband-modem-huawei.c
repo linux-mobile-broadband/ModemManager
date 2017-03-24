@@ -110,6 +110,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *cend_regex;
     GRegex *ddtmf_regex;
     GRegex *cschannelinfo_regex;
+    GRegex *eons_regex;
 
     /* Regex to ignore */
     GRegex *boot_regex;
@@ -3149,6 +3150,12 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             port,
             self->priv->cschannelinfo_regex,
             NULL, NULL, NULL);
+
+        /* Ignore this message (Huawei ME909s-120 firmware. 23.613.61.00.00) */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->eons_regex,
+            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, (GDestroyNotify)g_object_unref);
@@ -4474,6 +4481,11 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->cschannelinfo_regex = g_regex_new ("\\r\\n\\^CSCHANNELINFO:\\s*(\\d+),(\\d+)\\r\\n",
                                                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
+    /* Voice: Unknown message that's broke ATA command
+     * <CR><LF>^EONS:<type><CR><LF>
+     */
+    self->priv->eons_regex = g_regex_new ("\\r\\n\\^EONS:\\s*(\\d+)\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
@@ -4529,6 +4541,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->cend_regex);
     g_regex_unref (self->priv->ddtmf_regex);
     g_regex_unref (self->priv->cschannelinfo_regex);
+    g_regex_unref (self->priv->eons_regex);
 
     if (self->priv->syscfg_supported_modes)
         g_array_unref (self->priv->syscfg_supported_modes);
