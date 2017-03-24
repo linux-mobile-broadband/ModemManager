@@ -33,6 +33,93 @@
     g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
 /*****************************************************************************/
+/* Test IFC=? responses */
+
+static void
+test_ifc_response (const gchar         *str,
+                   const MMFlowControl  expected)
+{
+    MMFlowControl  mask;
+    GError        *error = NULL;
+
+    mask = mm_parse_ifc_test_response (str, &error);
+    g_assert_no_error (error);
+    g_assert_cmpuint (mask, ==, expected);
+}
+
+static void
+test_ifc_response_all_simple (void)
+{
+    test_ifc_response ("+IFC (0,1,2),(0,1,2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_all_groups (void)
+{
+    test_ifc_response ("+IFC (0-2),(0-2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_none_only (void)
+{
+    test_ifc_response ("+IFC (0),(0)", MM_FLOW_CONTROL_NONE);
+}
+
+static void
+test_ifc_response_xon_xoff_only (void)
+{
+    test_ifc_response ("+IFC (1),(1)", MM_FLOW_CONTROL_XON_XOFF);
+}
+
+static void
+test_ifc_response_rts_cts_only (void)
+{
+    test_ifc_response ("+IFC (2),(2)", MM_FLOW_CONTROL_RTS_CTS);
+}
+
+static void
+test_ifc_response_no_xon_xoff (void)
+{
+    test_ifc_response ("+IFC (0,2),(0,2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_no_xon_xoff_in_ta (void)
+{
+    test_ifc_response ("+IFC (0,1,2),(0,2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_no_xon_xoff_in_te (void)
+{
+    test_ifc_response ("+IFC (0,2),(0,1,2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_no_rts_cts_simple (void)
+{
+    test_ifc_response ("+IFC (0,1),(0,1)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF));
+}
+
+static void
+test_ifc_response_no_rts_cts_groups (void)
+{
+    test_ifc_response ("+IFC (0-1),(0-1)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF));
+}
+
+static void
+test_ifc_response_all_simple_and_unknown (void)
+{
+    test_ifc_response ("+IFC (0,1,2,3),(0,1,2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+static void
+test_ifc_response_all_groups_and_unknown (void)
+{
+    test_ifc_response ("+IFC (0-3),(0-2)", (MM_FLOW_CONTROL_NONE | MM_FLOW_CONTROL_XON_XOFF | MM_FLOW_CONTROL_RTS_CTS));
+}
+
+/*****************************************************************************/
 /* Test WS46=? responses */
 
 static void
@@ -3535,6 +3622,19 @@ int main (int argc, char **argv)
 
     suite = g_test_get_root ();
     reg_data = reg_test_data_new ();
+
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_all_simple, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_all_groups, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_none_only, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_xon_xoff_only, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_rts_cts_only, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_no_xon_xoff, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_no_xon_xoff_in_ta, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_no_xon_xoff_in_te, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_no_rts_cts_simple, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_no_rts_cts_groups, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_all_simple_and_unknown, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ifc_response_all_groups_and_unknown, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_ws46_response_generic_2g3g4g, NULL));
     g_test_suite_add (suite, TESTCASE (test_ws46_response_generic_2g3g, NULL));

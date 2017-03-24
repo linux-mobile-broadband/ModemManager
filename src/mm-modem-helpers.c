@@ -525,6 +525,119 @@ mm_voice_clip_regex_get (void)
 
 /*************************************************************************/
 
+static MMFlowControl
+flow_control_array_to_mask (GArray      *array,
+                            const gchar *item)
+{
+    MMFlowControl mask = MM_FLOW_CONTROL_UNKNOWN;
+    guint         i;
+
+    for (i = 0; i < array->len; i++) {
+        guint mode;
+
+        mode = g_array_index (array, guint, i);
+        switch (mode) {
+            case 0:
+                mm_dbg ("%s supports no flow control", item);
+                mask |= MM_FLOW_CONTROL_NONE;
+                break;
+            case 1:
+                mm_dbg ("%s supports XON/XOFF flow control", item);
+                mask |= MM_FLOW_CONTROL_XON_XOFF;
+                break;
+            case 2:
+                mm_dbg ("%s supports RTS/CTS flow control", item);
+                mask |= MM_FLOW_CONTROL_RTS_CTS;
+                break;
+            default:
+                break;
+        }
+    }
+
+    return mask;
+}
+
+static MMFlowControl
+flow_control_match_info_to_mask (GMatchInfo   *match_info,
+                                 guint         index,
+                                 const gchar  *item,
+                                 GError      **error)
+{
+    MMFlowControl  mask  = MM_FLOW_CONTROL_UNKNOWN;
+    gchar         *aux   = NULL;
+    GArray        *array = NULL;
+
+    if (!(aux = mm_get_string_unquoted_from_match_info (match_info, index))) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Error retrieving list of supported %s flow control methods", item);
+        goto out;
+    }
+
+    if (!(array = mm_parse_uint_list (aux, error))) {
+        g_prefix_error (error, "Error parsing list of supported %s flow control methods: ", item);
+        goto out;
+    }
+
+    if ((mask = flow_control_array_to_mask (array, item)) == MM_FLOW_CONTROL_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No known %s flow control method given", item);
+        goto out;
+    }
+
+out:
+    g_clear_pointer (&aux,  g_free);
+    g_clear_pointer (&array, g_array_unref);
+
+    return mask;
+}
+
+MMFlowControl
+mm_parse_ifc_test_response (const gchar  *response,
+                            GError      **error)
+{
+    GRegex        *r;
+    GError        *inner_error = NULL;
+    GMatchInfo    *match_info  = NULL;
+    MMFlowControl  te_mask     = MM_FLOW_CONTROL_UNKNOWN;
+    MMFlowControl  ta_mask     = MM_FLOW_CONTROL_UNKNOWN;
+    MMFlowControl  mask        = MM_FLOW_CONTROL_UNKNOWN;
+
+    r = g_regex_new ("(?:\\+IFC:)?\\s*\\((.*)\\),\\((.*)\\)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    /* Parse TE flow control methods */
+    if ((te_mask = flow_control_match_info_to_mask (match_info, 1, "TE", &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
+        goto out;
+
+    /* Parse TA flow control methods */
+    if ((ta_mask = flow_control_match_info_to_mask (match_info, 2, "TA", &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
+        goto out;
+
+    /* Only those methods in both TA and TE will be the ones we report */
+    mask = te_mask & ta_mask;
+
+out:
+
+    g_clear_pointer (&match_info, g_match_info_free);
+    g_regex_unref (r);
+
+    if (inner_error)
+        g_propagate_error (error, inner_error);
+
+    return mask;
+}
+
+/*************************************************************************/
+
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
 #define CREG1 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])"
 

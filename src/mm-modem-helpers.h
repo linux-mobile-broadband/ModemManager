@@ -95,6 +95,23 @@ GRegex *mm_voice_cring_regex_get(void);
 GRegex *mm_voice_clip_regex_get (void);
 
 /*****************************************************************************/
+/* SERIAL specific helpers and utilities */
+
+/* AT+IFC=? response parser.
+ * For simplicity, we'll only consider flow control methods available in both
+ * TE and TA. */
+
+typedef enum {
+    MM_FLOW_CONTROL_UNKNOWN   = 0,
+    MM_FLOW_CONTROL_NONE      = 1 << 0,  /* IFC=0,0 */
+    MM_FLOW_CONTROL_XON_XOFF  = 1 << 1,  /* IFC=1,1 */
+    MM_FLOW_CONTROL_RTS_CTS   = 1 << 2,  /* IFC=2,2 */
+} MMFlowControl;
+
+MMFlowControl mm_parse_ifc_test_response (const gchar  *response,
+                                          GError      **error);
+
+/*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/
 
