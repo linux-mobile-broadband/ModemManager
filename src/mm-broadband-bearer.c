@@ -1992,30 +1992,45 @@ load_connection_status (MMBaseBearer        *self,
                         GAsyncReadyCallback  callback,
                         gpointer             user_data)
 {
-    GTask       *task;
-    MMBaseModem *modem = NULL;
+    GTask          *task;
+    MMBaseModem    *modem = NULL;
+    MMPortSerialAt *port;
 
     task = g_task_new (self, NULL, callback, user_data);
-
-    if (!MM_BROADBAND_BEARER (self)->priv->cid) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't load connection status: cid not defined");
-        g_object_unref (task);
-        return;
-    }
 
     g_object_get (MM_BASE_BEARER (self),
                   MM_BASE_BEARER_MODEM, &modem,
                   NULL);
 
-    mm_base_modem_at_command (MM_BASE_MODEM (modem),
-                              "+CGACT?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) cgact_periodic_query_ready,
-                              task);
+    /* If CID not defined, error out */
+    if (!MM_BROADBAND_BEARER (self)->priv->cid) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't load connection status: cid not defined");
+        g_object_unref (task);
+        goto out;
+    }
 
-    g_object_unref (modem);
+    /* If no control port available, error out */
+    port = mm_base_modem_peek_best_at_port (modem, NULL);
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Couldn't load connection status: no control port available");
+        g_object_unref (task);
+        goto out;
+    }
+
+    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                   port,
+                                   "+CGACT?",
+                                   3,
+                                   FALSE, /* allow cached */
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback) cgact_periodic_query_ready,
+                                   task);
+
+out:
+    g_clear_object (&modem);
 }
 
 /*****************************************************************************/

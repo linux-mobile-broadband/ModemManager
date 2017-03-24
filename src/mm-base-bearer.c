@@ -92,6 +92,8 @@ struct _MMBaseBearerPrivate {
 
     /* Connection status monitoring */
     guint connection_monitor_id;
+    /* Flag to specify whether connection monitoring is supported or not */
+    gboolean load_connection_status_unsupported;
 
     /*-- 3GPP specific --*/
     guint deferred_3gpp_unregistration_id;
@@ -162,7 +164,18 @@ load_connection_status_ready (MMBaseBearer *self,
 
     status = MM_BASE_BEARER_GET_CLASS (self)->load_connection_status_finish (self, res, &error);
     if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
-        mm_warn ("checking if connected failed: %s", error->message);
+        /* Only warn if not reporting an "unsupported" error */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            mm_warn ("checking if connected failed: %s", error->message);
+            g_error_free (error);
+            return;
+        }
+
+        /* If we're being told that connection monitoring is unsupported, just
+         * ignore the error and remove the timeout. */
+        mm_dbg ("Connection monitoring is unsupported by the device");
+        self->priv->load_connection_status_unsupported = TRUE;
+        connection_monitor_stop (self);
         g_error_free (error);
         return;
     }
@@ -176,7 +189,7 @@ load_connection_status_ready (MMBaseBearer *self,
 static gboolean
 connection_monitor_cb (MMBaseBearer *self)
 {
-    /* If the implementation knows how to update stat values, run it */
+    /* If the implementation knows how to load connection status, run it */
     MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
             self,
             (GAsyncReadyCallback)load_connection_status_ready,
@@ -190,6 +203,9 @@ connection_monitor_start (MMBaseBearer *self)
     /* If not implemented, don't schedule anything */
     if (!MM_BASE_BEARER_GET_CLASS (self)->load_connection_status ||
         !MM_BASE_BEARER_GET_CLASS (self)->load_connection_status_finish)
+        return;
+
+    if (self->priv->load_connection_status_unsupported)
         return;
 
     /* Schedule */
