@@ -246,7 +246,10 @@ dial_cdma_ready (MMBaseModem *modem,
         return;
     }
 
-    /* else... Yuhu! */
+    /* The ATD command has succeeded, and therefore the TTY is in data mode now.
+     * Instead of waiting for setting the port as connected later in
+     * connect_succeeded(), we do it right away so that we stop our polling. */
+    mm_port_set_connected (ctx->data, TRUE);
 
     /* Keep port open during connection */
     ctx->close_data_on_exit = FALSE;
@@ -564,6 +567,11 @@ atd_ready (MMBaseModem *modem,
                                        ctx);
         return;
     }
+
+    /* The ATD command has succeeded, and therefore the TTY is in data mode now.
+     * Instead of waiting for setting the port as connected later in
+     * connect_succeeded(), we do it right away so that we stop our polling. */
+    mm_port_set_connected (MM_PORT (ctx->dial_port), TRUE);
 
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                g_object_ref (ctx->dial_port),
@@ -1089,7 +1097,8 @@ connect_succeeded (ConnectContext *ctx,
     ctx->self->priv->port = g_object_ref (mm_bearer_connect_result_peek_data (result));
     ctx->self->priv->connection_type = connection_type;
 
-    /* Port is connected; update the state */
+    /* Port is connected; update the state. For ATD based connections, the port
+     * may already be set as connected, but no big deal. */
     mm_port_set_connected (ctx->self->priv->port, TRUE);
 
     /* Set operation result */
