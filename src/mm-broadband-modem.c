@@ -3116,12 +3116,59 @@ modem_load_supported_charsets (MMIfaceModem *self,
 /* configuring flow control (Modem interface) */
 
 static gboolean
-modem_setup_flow_control_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 GError **error)
+modem_setup_flow_control_finish (MMIfaceModem  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
 {
-    /* Completely ignore errors */
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+ifc_test_ready (MMBaseModem  *self,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    GError        *error = NULL;
+    const gchar   *response;
+    MMFlowControl  mask;
+    const gchar   *cmd;
+
+    /* Completely ignore errors in AT+IFC=? */
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        goto out;
+
+    /* Parse response */
+    mask = mm_parse_ifc_test_response (response, &error);
+    if (mask == MM_FLOW_CONTROL_UNKNOWN)
+        goto out;
+
+    /* We prefer the methods in this order:
+     *  RTS/CTS
+     *  XON/XOFF
+     *  None.
+     */
+    if (mask & MM_FLOW_CONTROL_RTS_CTS)
+        cmd = "+IFC=2,2";
+    else if (mask & MM_FLOW_CONTROL_XON_XOFF)
+        cmd = "+IFC=1,1";
+    else if (mask & MM_FLOW_CONTROL_NONE)
+        cmd = "+IFC=0,0";
+    else
+        g_assert_not_reached ();
+
+    /* Set flow control settings and ignore result */
+    mm_base_modem_at_command (self, cmd, 3, FALSE, NULL, NULL);
+
+out:
+    /* Ignore errors */
+    if (error) {
+        mm_dbg ("couldn't load supported flow control methods: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -3129,23 +3176,17 @@ modem_setup_flow_control (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    /* By default, try to set XOFF/XON flow control */
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Query supported flow control methods */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+IFC=1,1",
+                              "+IFC=?",
                               3,
-                              FALSE,
-                              NULL,
-                              NULL);
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_setup_flow_control);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+                              TRUE,
+                              (GAsyncReadyCallback)ifc_test_ready,
+                              task);
 }
 
 /*****************************************************************************/
