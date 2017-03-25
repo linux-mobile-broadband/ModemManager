@@ -1242,31 +1242,6 @@ modem_after_sim_unlock (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Flow control (Modem interface) */
-
-static gboolean
-setup_flow_control_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           GError **error)
-{
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-}
-
-static void
-setup_flow_control (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
-{
-    /* Wavecom doesn't have XOFF/XON flow control, so we enable RTS/CTS */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+IFC=2,2",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
-
-/*****************************************************************************/
 /* Modem power up (Modem interface) */
 
 static gboolean
@@ -1420,8 +1395,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
-    iface->setup_flow_control = setup_flow_control;
-    iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
     iface->modem_power_down = modem_power_down;
