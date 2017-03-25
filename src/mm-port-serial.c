@@ -1778,6 +1778,56 @@ mm_port_serial_flash (MMPortSerial *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_port_serial_set_flow_control (MMPortSerial   *self,
+                                 MMFlowControl   flow_control,
+                                 GError        **error)
+{
+    struct termios options;
+    gboolean       had_xon_xoff;
+    gboolean       had_rts_cts;
+
+    /* retrieve current settings */
+    memset (&options, 0, sizeof (struct termios));
+    if (tcgetattr (self->priv->fd, &options) != 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "couldn't get serial port attributes: %s", g_strerror (errno));
+        return FALSE;
+    }
+
+    /* clear all flow control flags */
+
+    had_xon_xoff = !!(options.c_iflag & (IXON | IXOFF));
+    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+
+    had_rts_cts  = !!(options.c_cflag & (CRTSCTS));
+    options.c_cflag &= ~(CRTSCTS);
+
+    /* setup the requested flags */
+    switch (flow_control) {
+        case MM_FLOW_CONTROL_XON_XOFF:
+            mm_dbg ("(%s): enabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+            options.c_iflag |= (IXON | IXOFF | IXANY);
+            break;
+        case MM_FLOW_CONTROL_RTS_CTS:
+            mm_dbg ("(%s): enabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+            options.c_cflag |= (CRTSCTS);
+            break;
+        case MM_FLOW_CONTROL_NONE:
+            if (had_xon_xoff)
+                mm_dbg ("(%s): disabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+            if (had_rts_cts)
+                mm_dbg ("(%s): disabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+            break;
+        default:
+            g_assert_not_reached ();
+    }
+
+    return internal_tcsetattr (self, self->priv->fd, &options, error);
+}
+
+/*****************************************************************************/
+
 MMPortSerial *
 mm_port_serial_new (const char *name, MMPortType ptype)
 {
