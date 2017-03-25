@@ -876,13 +876,18 @@ typedef struct {
 static const NormalizeOperatorTest normalize_operator_tests[] = {
     /* charset unknown */
     { "Verizon", MM_MODEM_CHARSET_UNKNOWN, "Verizon" },
+    { "311480",  MM_MODEM_CHARSET_UNKNOWN, "311480"  },
     /* charset configured as IRA (ASCII) */
     { "Verizon", MM_MODEM_CHARSET_IRA, "Verizon" },
+    { "311480",  MM_MODEM_CHARSET_IRA, "311480"  },
     /* charset configured as GSM7 */
     { "Verizon", MM_MODEM_CHARSET_GSM, "Verizon" },
+    { "311480",  MM_MODEM_CHARSET_GSM, "311480"  },
     /* charset configured as UCS2 */
     { "0056006500720069007A006F006E", MM_MODEM_CHARSET_UCS2, "Verizon" },
+    { "003300310031003400380030",     MM_MODEM_CHARSET_UCS2, "311480"  },
     { "Verizon",                      MM_MODEM_CHARSET_UCS2, "Verizon" },
+    { "311480",                       MM_MODEM_CHARSET_UCS2, "311480"  },
 };
 
 static void
@@ -891,7 +896,7 @@ common_test_normalize_operator (const NormalizeOperatorTest *t)
     gchar *str;
 
     str = g_strdup (t->input);
-    mm_3gpp_normalize_operator_name (&str, t->charset);
+    mm_3gpp_normalize_operator (&str, t->charset);
     if (!t->normalized)
         g_assert (!str);
     else

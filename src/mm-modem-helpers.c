@@ -3123,8 +3123,8 @@ mm_string_to_access_tech (const gchar *string)
 /*************************************************************************/
 
 void
-mm_3gpp_normalize_operator_name (gchar          **operator,
-                                 MMModemCharset   cur_charset)
+mm_3gpp_normalize_operator (gchar          **operator,
+                            MMModemCharset   cur_charset)
 {
     g_assert (operator);
 
