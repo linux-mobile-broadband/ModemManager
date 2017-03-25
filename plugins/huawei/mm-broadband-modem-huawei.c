@@ -2172,55 +2172,6 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Operator Name loading (3GPP interface) */
-
-static gchar *
-modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
-                                      GAsyncResult *res,
-                                      GError **error)
-{
-    const gchar *result;
-    gchar *operator_name = NULL;
-
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!result)
-        return NULL;
-
-    if (!mm_3gpp_parse_cops_read_response (result,
-                                           NULL, /* mode */
-                                           NULL, /* format */
-                                           &operator_name,
-                                           NULL, /* act */
-                                           error))
-        return NULL;
-
-    /* Despite +CSCS? may claim supporting UCS2, Huawei modems always report the
-     * operator name in ASCII in a +COPS response. Thus, we ignore the current
-     * charset claimed by the modem and assume the charset is IRA when parsing
-     * the operator name.
-     */
-    mm_3gpp_normalize_operator_name (&operator_name, MM_MODEM_CHARSET_IRA);
-    if (operator_name)
-        mm_dbg ("loaded Operator Name: %s", operator_name);
-
-    return operator_name;
-}
-
-static void
-modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
-                               GAsyncReadyCallback callback,
-                               gpointer user_data)
-{
-    mm_dbg ("loading Operator Name (huawei)...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+COPS=3,0;+COPS?",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
-
-/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 typedef struct {
@@ -4603,8 +4554,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_3gpp_disable_unsolicited_events_finish;
-    iface->load_operator_name = modem_3gpp_load_operator_name;
-    iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
 }
 
 static void

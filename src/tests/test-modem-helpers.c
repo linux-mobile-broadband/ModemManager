@@ -866,6 +866,49 @@ test_cops_query (void)
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    const gchar    *input;
+    MMModemCharset  charset;
+    const gchar    *normalized;
+} NormalizeOperatorTest;
+
+static const NormalizeOperatorTest normalize_operator_tests[] = {
+    /* charset unknown */
+    { "Verizon", MM_MODEM_CHARSET_UNKNOWN, "Verizon" },
+    /* charset configured as IRA (ASCII) */
+    { "Verizon", MM_MODEM_CHARSET_IRA, "Verizon" },
+    /* charset configured as GSM7 */
+    { "Verizon", MM_MODEM_CHARSET_GSM, "Verizon" },
+    /* charset configured as UCS2 */
+    { "0056006500720069007A006F006E", MM_MODEM_CHARSET_UCS2, "Verizon" },
+    { "Verizon",                      MM_MODEM_CHARSET_UCS2, "Verizon" },
+};
+
+static void
+common_test_normalize_operator (const NormalizeOperatorTest *t)
+{
+    gchar *str;
+
+    str = g_strdup (t->input);
+    mm_3gpp_normalize_operator_name (&str, t->charset);
+    if (!t->normalized)
+        g_assert (!str);
+    else
+        g_assert_cmpstr (str, ==, t->normalized);
+    g_free (str);
+}
+
+static void
+test_normalize_operator (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (normalize_operator_tests); i++)
+        common_test_normalize_operator (&normalize_operator_tests[i]);
+}
+
+/*****************************************************************************/
 /* Test CREG/CGREG responses and unsolicited messages */
 
 typedef struct {
@@ -3526,6 +3569,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_query, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_normalize_operator, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_creg1_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, reg_data));

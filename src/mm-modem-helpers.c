@@ -3131,19 +3131,27 @@ mm_3gpp_normalize_operator_name (gchar          **operator,
     if (*operator == NULL)
         return;
 
-    /* Some modems (Option & HSO) return the operator name as a hexadecimal
-     * string of the bytes of the operator name as encoded by the current
-     * character set.
-     */
+    /* Despite +CSCS? may claim supporting UCS2, Some modems (e.g. Huawei)
+     * always report the operator name in ASCII in a +COPS response. */
     if (cur_charset == MM_MODEM_CHARSET_UCS2) {
+        gchar *tmp;
+
+        tmp = g_strdup (*operator);
         /* In this case we're already checking UTF-8 validity */
-        *operator = mm_charset_take_and_convert_to_utf8 (*operator, MM_MODEM_CHARSET_UCS2);
+        tmp = mm_charset_take_and_convert_to_utf8 (tmp, cur_charset);
+        if (tmp) {
+            g_clear_pointer (operator, g_free);
+            *operator = tmp;
+            goto out;
+        }
     }
-    /* Ensure the operator name is valid UTF-8 so that we can send it
-     * through D-Bus and such.
-     */
-    else if (!g_utf8_validate (*operator, -1, NULL))
+
+    /* Charset is unknown or there was an error in conversion; try to see
+     * if the contents we got are valid UTF-8 already. */
+    if (!g_utf8_validate (*operator, -1, NULL))
         g_clear_pointer (operator, g_free);
+
+out:
 
     /* Some modems (Novatel LTE) return the operator name as "Unknown" when
      * it fails to obtain the operator name. Return NULL in such case.
