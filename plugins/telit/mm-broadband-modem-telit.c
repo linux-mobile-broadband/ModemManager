@@ -938,52 +938,6 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Flow control (Modem interface) */
-
-static gboolean
-setup_flow_control_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           GError **error)
-{
-    /* Completely ignore errors */
-    return TRUE;
-}
-
-static void
-setup_flow_control (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-    gchar *cmd;
-    guint flow_control = 1; /* Default flow control: XON/XOFF */
-
-    switch (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF) {
-    case 0x0021:
-        flow_control = 2; /* Telit IMC modems support only RTS/CTS mode */
-        break;
-    default:
-        break;
-    }
-
-    cmd = g_strdup_printf ("+IFC=%u,%u", flow_control, flow_control);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              cmd,
-                              3,
-                              FALSE,
-                              NULL,
-                              NULL);
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        setup_flow_control);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
-    g_free (cmd);
-}
-
-/*****************************************************************************/
 /* Load current mode (Modem interface) */
 
 static gboolean
@@ -1345,8 +1299,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
-    iface->setup_flow_control = setup_flow_control;
-    iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_current_modes = load_current_modes;
