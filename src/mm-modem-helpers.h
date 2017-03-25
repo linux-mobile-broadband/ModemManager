@@ -101,7 +101,7 @@ GRegex *mm_voice_clip_regex_get (void);
  * For simplicity, we'll only consider flow control methods available in both
  * TE and TA. */
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_flow_control >*/
     MM_FLOW_CONTROL_UNKNOWN   = 0,
     MM_FLOW_CONTROL_NONE      = 1 << 0,  /* IFC=0,0 */
     MM_FLOW_CONTROL_XON_XOFF  = 1 << 1,  /* IFC=1,1 */

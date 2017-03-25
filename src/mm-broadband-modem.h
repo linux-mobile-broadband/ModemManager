@@ -24,6 +24,7 @@
 
 #include <ModemManager.h>
 
+#include "mm-modem-helpers.h"
 #include "mm-charsets.h"
 #include "mm-base-modem.h"
 
@@ -37,6 +38,8 @@
 typedef struct _MMBroadbandModem MMBroadbandModem;
 typedef struct _MMBroadbandModemClass MMBroadbandModemClass;
 typedef struct _MMBroadbandModemPrivate MMBroadbandModemPrivate;
+
+#define MM_BROADBAND_MODEM_FLOW_CONTROL "broadband-modem-flow-control"
 
 struct _MMBroadbandModem {
     MMBaseModem parent;

@@ -55,6 +55,7 @@
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/logs.h"
 #include "libqcdm/src/log-items.h"
+#include "mm-helper-enums-types.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -115,8 +116,11 @@ enum {
     PROP_MODEM_VOICE_CALL_LIST,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
+    PROP_FLOW_CONTROL,
     PROP_LAST
 };
+
+static GParamSpec *properties[PROP_LAST];
 
 /* When CIND is supported, invalid indicators are marked with this value */
 #define CIND_INDICATOR_INVALID 255
@@ -146,6 +150,7 @@ struct _MMBroadbandModemPrivate {
     guint modem_cind_max_signal_quality;
     guint modem_cind_indicator_roaming;
     guint modem_cind_indicator_service;
+    MMFlowControl flow_control;
 
     /*<--- Modem 3GPP interface --->*/
     /* Properties */
@@ -3124,17 +3129,20 @@ modem_setup_flow_control_finish (MMIfaceModem  *self,
 }
 
 static void
-ifc_test_ready (MMBaseModem  *self,
+ifc_test_ready (MMBaseModem  *_self,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    GError        *error = NULL;
-    const gchar   *response;
-    MMFlowControl  mask;
-    const gchar   *cmd;
+    MMBroadbandModem *self;
+    GError           *error = NULL;
+    const gchar      *response;
+    MMFlowControl     mask;
+    const gchar      *cmd;
+
+    self = MM_BROADBAND_MODEM (_self);
 
     /* Completely ignore errors in AT+IFC=? */
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
         goto out;
 
@@ -3148,17 +3156,23 @@ ifc_test_ready (MMBaseModem  *self,
      *  XON/XOFF
      *  None.
      */
-    if (mask & MM_FLOW_CONTROL_RTS_CTS)
+    if (mask & MM_FLOW_CONTROL_RTS_CTS) {
+        self->priv->flow_control = MM_FLOW_CONTROL_RTS_CTS;
         cmd = "+IFC=2,2";
-    else if (mask & MM_FLOW_CONTROL_XON_XOFF)
+    } else if (mask & MM_FLOW_CONTROL_XON_XOFF) {
+        self->priv->flow_control = MM_FLOW_CONTROL_XON_XOFF;
         cmd = "+IFC=1,1";
-    else if (mask & MM_FLOW_CONTROL_NONE)
+    } else if (mask & MM_FLOW_CONTROL_NONE) {
+        self->priv->flow_control = MM_FLOW_CONTROL_NONE;
         cmd = "+IFC=0,0";
-    else
+    } else
         g_assert_not_reached ();
 
+    /* Notify the flow control property update */
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_FLOW_CONTROL]);
+
     /* Set flow control settings and ignore result */
-    mm_base_modem_at_command (self, cmd, 3, FALSE, NULL, NULL);
+    mm_base_modem_at_command (_self, cmd, 3, FALSE, NULL, NULL);
 
 out:
     /* Ignore errors */
@@ -10647,6 +10661,9 @@ get_property (GObject *object,
     case PROP_MODEM_SIM_HOT_SWAP_SUPPORTED:
         g_value_set_boolean (value, self->priv->sim_hot_swap_supported);
         break;
+    case PROP_FLOW_CONTROL:
+        g_value_set_flags (value, self->priv->flow_control);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -10676,6 +10693,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->sim_hot_swap_supported = FALSE;
+    self->priv->flow_control = MM_FLOW_CONTROL_NONE;
 }
 
 static void
@@ -11138,4 +11156,13 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
                                       MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED);
+
+    properties[PROP_FLOW_CONTROL] =
+        g_param_spec_flags (MM_BROADBAND_MODEM_FLOW_CONTROL,
+                            "Flow control",
+                            "Flow control settings to use in the connected TTY",
+                            MM_TYPE_FLOW_CONTROL,
+                            MM_FLOW_CONTROL_NONE,
+                            G_PARAM_READABLE);
+    g_object_class_install_property (object_class, PROP_FLOW_CONTROL, properties[PROP_FLOW_CONTROL]);
 }

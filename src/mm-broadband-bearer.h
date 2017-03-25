@@ -25,6 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-modem-helpers.h"
 #include "mm-base-bearer.h"
 #include "mm-broadband-modem.h"
 
@@ -38,6 +39,8 @@
 typedef struct _MMBroadbandBearer MMBroadbandBearer;
 typedef struct _MMBroadbandBearerClass MMBroadbandBearerClass;
 typedef struct _MMBroadbandBearerPrivate MMBroadbandBearerPrivate;
+
+#define MM_BROADBAND_BEARER_FLOW_CONTROL "broadband-bearer-flow-control"
 
 struct _MMBroadbandBearer {
     MMBaseBearer parent;
