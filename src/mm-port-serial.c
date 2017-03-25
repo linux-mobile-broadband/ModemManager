@@ -56,7 +56,6 @@ enum {
     PROP_SEND_DELAY,
     PROP_FD,
     PROP_SPEW_CONTROL,
-    PROP_RTS_CTS,
     PROP_FLASH_OK,
 
     LAST_PROP
@@ -97,7 +96,6 @@ struct _MMPortSerialPrivate {
     guint stopbits;
     guint64 send_delay;
     gboolean spew_control;
-    gboolean rts_cts;
     gboolean flash_ok;
 
     guint queue_id;
@@ -433,21 +431,19 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
                  errno);
     }
 
-    stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY );
+    stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | PARODD | CRTSCTS);
+    stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXOFF | IXANY );
     stbuf.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
     stbuf.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL);
     stbuf.c_cc[VMIN] = 1;
     stbuf.c_cc[VTIME] = 0;
     stbuf.c_cc[VEOF] = 1;
 
-    /* Use software handshaking and ignore parity/framing errors */
-    stbuf.c_iflag |= (IXON | IXOFF | IXANY | IGNPAR);
+    /* Ignore parity/framing errors */
+    stbuf.c_iflag |= IGNPAR;
 
-    /* Set up port speed and serial attributes; also ignore modem control
-     * lines since most drivers don't implement RTS/CTS anyway.
-     */
-    stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | CRTSCTS);
-    stbuf.c_cflag |= (bits | CREAD | 0 | parity | stopbits | CLOCAL);
+    /* Set up port speed and serial attributes and enable receiver in local mode */
+    stbuf.c_cflag |= (bits | parity | stopbits | CLOCAL | CREAD);
 
     errno = 0;
     if (cfsetispeed (&stbuf, speed) != 0) {
@@ -1621,10 +1617,6 @@ set_speed (MMPortSerial *self, speed_t speed, GError **error)
     cfsetospeed (&options, speed);
     options.c_cflag |= (CLOCAL | CREAD);
 
-    /* Configure flow control as well here */
-    if (self->priv->rts_cts)
-        options.c_cflag |= (CRTSCTS);
-
     return internal_tcsetattr (self, self->priv->fd, &options, error);
 }
 
@@ -1928,9 +1920,6 @@ set_property (GObject *object,
     case PROP_SPEW_CONTROL:
         self->priv->spew_control = g_value_get_boolean (value);
         break;
-    case PROP_RTS_CTS:
-        self->priv->rts_cts = g_value_get_boolean (value);
-        break;
     case PROP_FLASH_OK:
         self->priv->flash_ok = g_value_get_boolean (value);
         break;
@@ -1969,9 +1958,6 @@ get_property (GObject *object,
         break;
     case PROP_SPEW_CONTROL:
         g_value_set_boolean (value, self->priv->spew_control);
-        break;
-    case PROP_RTS_CTS:
-        g_value_set_boolean (value, self->priv->rts_cts);
         break;
     case PROP_FLASH_OK:
         g_value_set_boolean (value, self->priv->flash_ok);
@@ -2077,14 +2063,6 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
          g_param_spec_boolean (MM_PORT_SERIAL_SPEW_CONTROL,
                                "SpewControl",
                                "Spew control",
-                               FALSE,
-                               G_PARAM_READWRITE));
-
-    g_object_class_install_property
-        (object_class, PROP_RTS_CTS,
-         g_param_spec_boolean (MM_PORT_SERIAL_RTS_CTS,
-                               "RTSCTS",
-                               "Enable RTS/CTS flow control",
                                FALSE,
                                G_PARAM_READWRITE));
 
