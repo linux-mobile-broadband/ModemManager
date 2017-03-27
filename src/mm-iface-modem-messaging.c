@@ -789,7 +789,7 @@ set_default_storage_ready (MMIfaceModemMessaging *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish (self, res, &error)) {
-        mm_dbg ("Couldn't set default storage: '%s'", error->message);
+        mm_warn ("Could not set default storage: '%s'", error->message);
         g_error_free (error);
     }
 

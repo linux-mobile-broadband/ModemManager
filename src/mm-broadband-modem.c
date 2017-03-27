@@ -5365,7 +5365,7 @@ typedef struct {
 static void
 lock_sms_storages_context_complete_and_free (LockSmsStoragesContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     g_slice_free (LockSmsStoragesContext, ctx);
@@ -5405,7 +5405,7 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
                                       gpointer user_data)
 {
     LockSmsStoragesContext *ctx;
-    gchar *cmd;
+    gchar *cmd = NULL;
     gchar *mem1_str = NULL;
     gchar *mem2_str = NULL;
 
@@ -5434,45 +5434,52 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
                                              user_data,
                                              mm_broadband_modem_lock_sms_storages);
 
+    /* Some modems may not support empty string parameters, then if mem1 is
+     * UNKNOWN, and current sms mem1 storage has a valid value, we send again
+     * the already locked mem1 value in place of an empty string.
+     * This way we also avoid to confuse the environment of other sync operation
+     * that have potentially locked mem1 previously.
+     */
     if (mem1 != MM_SMS_STORAGE_UNKNOWN) {
         ctx->mem1_locked = TRUE;
         ctx->previous_mem1 = self->priv->current_sms_mem1_storage;
-        self->priv->mem1_storage_locked = TRUE;
+
         self->priv->current_sms_mem1_storage = mem1;
-        mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+        self->priv->mem1_storage_locked = TRUE;
+    } else if (self->priv->current_sms_mem1_storage != MM_SMS_STORAGE_UNKNOWN) {
+        mm_dbg ("Given sms mem1 storage is unknown. Using current sms mem1 storage value '%s' instead",
+                mm_sms_storage_get_string (self->priv->current_sms_mem1_storage));
+    } else {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_RETRY,
+                                        "Cannot lock mem2 storage alone when current mem1 storage is unknown");
+        lock_sms_storages_context_complete_and_free (ctx);
+        return;
     }
+    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
 
     if (mem2 != MM_SMS_STORAGE_UNKNOWN) {
         ctx->mem2_locked = TRUE;
         ctx->previous_mem2 = self->priv->current_sms_mem2_storage;
+
         self->priv->mem2_storage_locked = TRUE;
         self->priv->current_sms_mem2_storage = mem2;
-        mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
 
-        if (mem1 == MM_SMS_STORAGE_UNKNOWN) {
-            /* Some modems may not support empty string parameters. Then if mem1 is
-             * UNKNOWN, we send again the already locked mem1 value in place of an
-             * empty string. This way we also avoid to confuse the environment of
-             * other async operation that have potentially locked mem1 previoulsy.
-             * */
-            mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
-        }
+        mem2_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem2_storage), -1);
     }
 
-    /* We don't touch 'mem3' here */
+    g_assert (mem1_str != NULL);
 
+    /* We don't touch 'mem3' here */
     mm_dbg ("Locking SMS storages to: mem1 (%s), mem2 (%s)...",
-            mem1_str ? mem1_str : "none",
+            mem1_str,
             mem2_str ? mem2_str : "none");
 
     if (mem2_str)
-        cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\"",
-                               mem1_str ? mem1_str : "",
-                               mem2_str);
-    else if (mem1_str)
-        cmd = g_strdup_printf ("+CPMS=\"%s\"", mem1_str);
+        cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\"", mem1_str, mem2_str);
     else
-        g_assert_not_reached ();
+        cmd = g_strdup_printf ("+CPMS=\"%s\"", mem1_str);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
@@ -5524,22 +5531,30 @@ modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
     gchar *mem1_str;
     gchar *mem_str;
 
+    /* We provide the current sms storage for mem1 if not UNKNOWN */
+    if (self->priv->current_sms_mem1_storage == MM_SMS_STORAGE_UNKNOWN) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_INVALID_ARGS,
+                                             "Cannot set default storage when current mem1 storage is unknown");
+        return;
+    }
+
+    /* Set defaults as current */
+    self->priv->current_sms_mem2_storage = storage;
+
+    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
+    mem_str = g_ascii_strup (mm_sms_storage_get_string (storage), -1);
+
+    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"", mem1_str, mem_str, mem_str);
+
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_messaging_set_default_storage);
 
-    /* Set defaults as current */
-    self->priv->current_sms_mem2_storage = storage;
-
-    /* We provide the current sms storage for mem1 if not UNKNOWN */
-    mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
-
-    mem_str = g_ascii_strup (mm_sms_storage_get_string (storage), -1);
-    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"",
-                           mem1_str ? mem1_str : "",
-                           mem_str,
-                           mem_str);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
