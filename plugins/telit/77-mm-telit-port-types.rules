@@ -42,7 +42,4 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0022", ENV{ID_MM_TELIT_PORTS_TAGGED}
 # LE910 V2
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0036", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
 
-# NOTE: Qualcomm Gobi-based devices like the LE920 should not be handled
-# by this plugin, but by the Gobi plugin.
-
 LABEL="mm_telit_port_types_end"

@@ -38,10 +38,16 @@ telit_grab_port (MMPlugin *self,
     MMDevice *device;
     MMPortType ptype;
     MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
+    const gchar *subsys;
 
     port = mm_port_probe_peek_port (probe);
     ptype = mm_port_probe_get_port_type (probe);
     device = mm_port_probe_peek_device (probe);
+    subsys = mm_port_probe_get_port_subsys (probe);
+
+    /* Just skip custom port identification for subsys different than tty */
+    if (!g_str_equal (subsys, "tty"))
+        goto out;
 
     /* Look for port type hints; just probing can't distinguish which port should
      * be the data/primary port on these devices.  We have to tag them based on
@@ -102,6 +108,7 @@ telit_grab_port (MMPlugin *self,
             ptype = MM_PORT_TYPE_IGNORED;
     }
 
+out:
     return mm_base_modem_grab_port (modem,
                                     port,
                                     ptype,
