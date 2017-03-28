@@ -59,7 +59,7 @@ typedef struct _MMBaseBearerPrivate MMBaseBearerPrivate;
 #define MM_BASE_BEARER_MODEM             "bearer-modem"
 #define MM_BASE_BEARER_STATUS            "bearer-status"
 #define MM_BASE_BEARER_CONFIG            "bearer-config"
-#define MM_BASE_BEARER_DEFAULT_IP_FAMILY "bearer-deafult-ip-family"
+#define MM_BASE_BEARER_DEFAULT_IP_FAMILY "bearer-default-ip-family"
 
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
