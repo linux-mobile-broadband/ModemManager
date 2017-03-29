@@ -647,7 +647,9 @@ dispose (GObject *object)
 
     g_clear_object (&(self->priv->plugin));
     g_list_free_full (self->priv->port_probes, g_object_unref);
+    self->priv->port_probes = NULL;
     g_list_free_full (self->priv->ignored_port_probes, g_object_unref);
+    self->priv->ignored_port_probes = NULL;
 
     clear_modem (self);
 
