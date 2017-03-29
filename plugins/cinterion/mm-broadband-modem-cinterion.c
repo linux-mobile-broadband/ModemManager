@@ -1438,7 +1438,7 @@ load_unlock_retries_context_step (LoadUnlockRetriesContext *ctx)
     if (ctx->i == G_N_ELEMENTS (unlock_retries_map)) {
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->retries),
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
         load_unlock_retries_context_complete_and_free (ctx);
         return;
     }
@@ -1643,7 +1643,7 @@ broadband_bearer_cinterion_new_ready (GObject             *source,
     if (!bearer)
         g_simple_async_result_take_error (ctx->result, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
     create_bearer_context_complete_and_free (ctx);
 }
 
@@ -1659,7 +1659,7 @@ broadband_bearer_new_ready (GObject             *source,
     if (!bearer)
         g_simple_async_result_take_error (ctx->result, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
     create_bearer_context_complete_and_free (ctx);
 }
 

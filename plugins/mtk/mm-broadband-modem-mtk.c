@@ -125,7 +125,7 @@ load_unlock_retries_ready (MMBaseModem *self,
 
         g_simple_async_result_set_op_res_gpointer (operation_result,
                                         retries,
-                                        (GDestroyNotify)g_object_unref);
+                                        g_object_unref);
     }
 
     if (match_info)

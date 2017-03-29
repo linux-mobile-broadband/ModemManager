@@ -363,7 +363,7 @@ load_unlock_retries_ready (MMBaseModem *self,
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2);
         g_simple_async_result_set_op_res_gpointer (operation_result,
                                                    retries,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
     } else {
         g_simple_async_result_set_error (operation_result,
                                          MM_CORE_ERROR,

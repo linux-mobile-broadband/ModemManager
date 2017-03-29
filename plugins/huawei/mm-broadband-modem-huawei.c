@@ -1933,7 +1933,7 @@ set_3gpp_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             NULL);
     }
 
-    g_list_free_full (ports, (GDestroyNotify)g_object_unref);
+    g_list_free_full (ports, g_object_unref);
 }
 
 static gboolean
@@ -2266,7 +2266,7 @@ broadband_bearer_huawei_new_ready (GObject *source,
     if (!bearer)
         g_simple_async_result_take_error (ctx->result, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
     create_bearer_context_complete_and_free (ctx);
 }
 
@@ -2282,7 +2282,7 @@ broadband_bearer_new_ready (GObject *source,
     if (!bearer)
         g_simple_async_result_take_error (ctx->result, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
     create_bearer_context_complete_and_free (ctx);
 }
 
@@ -2667,7 +2667,7 @@ set_cdma_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             NULL);
     }
 
-    g_list_free_full (ports, (GDestroyNotify)g_object_unref);
+    g_list_free_full (ports, g_object_unref);
 }
 
 static gboolean
@@ -3158,7 +3158,7 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             NULL, NULL, NULL);
     }
 
-    g_list_free_full (ports, (GDestroyNotify)g_object_unref);
+    g_list_free_full (ports, g_object_unref);
 }
 
 static gboolean
@@ -3486,7 +3486,7 @@ enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
             enable);
     }
 
-    g_list_free_full (ports, (GDestroyNotify)g_object_unref);
+    g_list_free_full (ports, g_object_unref);
 }
 
 static void
@@ -4333,7 +4333,7 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             NULL, NULL, NULL);
     }
 
-    g_list_free_full (ports, (GDestroyNotify)g_object_unref);
+    g_list_free_full (ports, g_object_unref);
 }
 
 static void

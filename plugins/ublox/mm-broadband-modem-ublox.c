@@ -871,7 +871,7 @@ create_bearer_step (GTask *task)
 
     case CREATE_BEARER_STEP_LAST:
         g_assert (ctx->bearer);
-        g_task_return_pointer (task, g_object_ref (ctx->bearer), (GDestroyNotify) g_object_unref);
+        g_task_return_pointer (task, g_object_ref (ctx->bearer), g_object_unref);
         g_object_unref (task);
         return;
     }

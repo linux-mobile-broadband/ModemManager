@@ -660,7 +660,7 @@ report_connect_status (MMBroadbandBearerIcera *self,
 
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
     }

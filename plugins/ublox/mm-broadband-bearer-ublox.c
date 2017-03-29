@@ -340,7 +340,7 @@ cgact_activate_ready (MMBaseModem  *modem,
     if (!response)
         g_task_return_error (task, error);
     else
-        g_task_return_pointer (task, g_object_ref (ctx->data), (GDestroyNotify) g_object_unref);
+        g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
     g_object_unref (task);
 }
 
@@ -595,7 +595,7 @@ ugcntrd_ready (MMBaseModem  *modem,
         result = g_new (StatsResult, 1);
         result->bytes_rx = rx_bytes;
         result->bytes_tx = tx_bytes;
-        g_task_return_pointer (task, result, (GDestroyNotify) g_free);
+        g_task_return_pointer (task, result, g_free);
     }
 
     g_object_unref (task);

@@ -665,7 +665,7 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
             } else {
                 g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                            g_object_ref (ctx->retries),
-                                                           (GDestroyNotify)g_object_unref);
+                                                           g_object_unref);
             }
 
             load_unlock_retries_context_complete_and_free (ctx);

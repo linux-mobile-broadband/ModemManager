@@ -135,7 +135,7 @@ common_get_modem (TestFixture *fixture,
             ready = TRUE;
         }
 
-        g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+        g_list_free_full (modems, g_object_unref);
         g_object_unref (manager);
 
         if (ready)

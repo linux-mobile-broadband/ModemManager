@@ -311,7 +311,7 @@ create_bearer (MMIfaceModem *self,
                                     properties);
     g_simple_async_result_set_op_res_gpointer (result,
                                                bearer,
-                                               (GDestroyNotify)g_object_unref);
+                                               g_object_unref);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }

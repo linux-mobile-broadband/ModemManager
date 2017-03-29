@@ -173,7 +173,7 @@ ip_config_ready (MMBaseModem *modem,
 
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    ip_config,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
     }
 
     get_ip_config_context_complete_and_free (ctx);
@@ -378,7 +378,7 @@ report_connection_status (MMBaseBearer *bearer,
 
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
     }

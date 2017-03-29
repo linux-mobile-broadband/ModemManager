@@ -98,7 +98,7 @@ broadband_bearer_new_ready (GObject *source,
     else
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    bearer,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }

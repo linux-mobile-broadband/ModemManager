@@ -178,7 +178,7 @@ handle_e2nap_connect_status (Dial3gppContext *ctx)
         mm_dbg ("Connected status indicated already by an unsolicited message");
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return TRUE;
     case MM_BEARER_CONNECTION_STATUS_DISCONNECTED:
@@ -220,7 +220,7 @@ connect_poll_ready (MMBaseModem *modem,
         /* Success!  Connected... */
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_object_ref (ctx->data),
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
         dial_3gpp_context_complete_and_free (ctx);
         return;
     }
