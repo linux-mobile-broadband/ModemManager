@@ -314,7 +314,7 @@ list_current_modems (MMManager *manager)
         for (l = modems; l; l = g_list_next (l)) {
             print_modem_short_info (MM_OBJECT (l->data));
         }
-        g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+        g_list_free_full (modems, g_object_unref);
     }
     g_print ("\n");
 }
@@ -412,7 +412,7 @@ get_manager_ready (GObject      *source,
                 mm_manager_report_kernel_event (ctx->manager, properties, NULL, NULL, NULL);
                 g_object_unref (properties);
             }
-            g_list_free_full (list, (GDestroyNotify) g_object_unref);
+            g_list_free_full (list, g_object_unref);
         }
 
         /* If we get cancelled, operation done */

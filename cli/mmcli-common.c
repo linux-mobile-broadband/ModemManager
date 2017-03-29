@@ -142,7 +142,7 @@ find_modem (MMManager *manager,
             break;
         }
     }
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
 
     if (!found) {
         if (modem_path)
@@ -339,7 +339,7 @@ get_bearer_context_free (GetBearerContext *ctx)
         g_object_unref (ctx->manager);
     if (ctx->bearer)
         g_object_unref (ctx->bearer);
-    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (ctx->modems, g_object_unref);
     g_free (ctx->bearer_path);
     g_free (ctx);
 }
@@ -404,7 +404,7 @@ list_bearers_ready (MMModem *modem,
     }
 
     ctx->bearer = find_bearer_in_list (bearers, ctx->bearer_path);
-    g_list_free_full (bearers, (GDestroyNotify) g_object_unref);
+    g_list_free_full (bearers, g_object_unref);
 
     /* Found! */
     if (ctx->bearer) {
@@ -574,7 +574,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
         }
 
         found = find_bearer_in_list (bearers, bearer_path);
-        g_list_free_full (bearers, (GDestroyNotify) g_object_unref);
+        g_list_free_full (bearers, g_object_unref);
 
         if (found && o_object)
             *o_object = g_object_ref (object);
@@ -588,7 +588,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
     g_free (bearer_path);
 
     if (o_manager)
@@ -709,7 +709,7 @@ get_sim_manager_ready (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
 }
 
 static gchar *
@@ -814,7 +814,7 @@ mmcli_get_sim_sync (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
     g_free (sim_path);
 
     if (o_manager)
@@ -846,7 +846,7 @@ get_sms_context_free (GetSmsContext *ctx)
         g_object_unref (ctx->manager);
     if (ctx->sms)
         g_object_unref (ctx->sms);
-    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (ctx->modems, g_object_unref);
     g_free (ctx->sms_path);
     g_free (ctx);
 }
@@ -911,7 +911,7 @@ list_sms_ready (MMModemMessaging *modem,
     }
 
     ctx->sms = find_sms_in_list (sms_list, ctx->sms_path);
-    g_list_free_full (sms_list, (GDestroyNotify) g_object_unref);
+    g_list_free_full (sms_list, g_object_unref);
 
     /* Found! */
     if (ctx->sms) {
@@ -1070,7 +1070,7 @@ mmcli_get_sms_sync (GDBusConnection *connection,
         }
 
         found = find_sms_in_list (sms_list, sms_path);
-        g_list_free_full (sms_list, (GDestroyNotify) g_object_unref);
+        g_list_free_full (sms_list, g_object_unref);
 
         if (found && o_object)
             *o_object = g_object_ref (object);
@@ -1084,7 +1084,7 @@ mmcli_get_sms_sync (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
     g_free (sms_path);
 
     if (o_manager)
@@ -1134,7 +1134,7 @@ get_voice_context_free (GetVoiceContext *ctx)
         g_object_unref (ctx->manager);
     if (ctx->call)
         g_object_unref (ctx->call);
-    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (ctx->modems, g_object_unref);
     g_free (ctx->call_path);
     g_free (ctx);
 }
@@ -1185,7 +1185,7 @@ list_call_ready (MMModemVoice *modem,
     }
 
     ctx->call = find_call_in_list (call_list, ctx->call_path);
-    g_list_free_full (call_list, (GDestroyNotify) g_object_unref);
+    g_list_free_full (call_list, g_object_unref);
 
     /* Found! */
     if (ctx->call) {
@@ -1359,7 +1359,7 @@ mmcli_get_call_sync (GDBusConnection *connection,
         }
 
         found = find_call_in_list (call_list, call_path);
-        g_list_free_full (call_list, (GDestroyNotify) g_object_unref);
+        g_list_free_full (call_list, g_object_unref);
 
         if (found && o_object)
             *o_object = g_object_ref (object);
@@ -1373,7 +1373,7 @@ mmcli_get_call_sync (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_list_free_full (modems, g_object_unref);
     g_free (call_path);
 
     if (o_manager)
