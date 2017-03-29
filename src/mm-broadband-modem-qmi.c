@@ -967,7 +967,7 @@ dms_get_manufacturer_ready (QmiClientDms *client,
         qmi_message_dms_get_manufacturer_output_get_manufacturer (output, &str, NULL);
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+                                                   g_free);
     }
 
     if (output)
@@ -1043,7 +1043,7 @@ dms_get_model_ready (QmiClientDms *client,
         qmi_message_dms_get_model_output_get_model (output, &str, NULL);
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+                                                   g_free);
     }
 
     if (output)
@@ -1119,7 +1119,7 @@ dms_get_revision_ready (QmiClientDms *client,
         qmi_message_dms_get_revision_output_get_revision (output, &str, NULL);
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+                                                   g_free);
     }
 
     if (output)
@@ -1262,7 +1262,7 @@ dms_get_ids_ready (QmiClientDms *client,
 
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                g_strdup (str),
-                                               (GDestroyNotify)g_free);
+                                               g_free);
 
     qmi_message_dms_get_ids_output_unref (output);
     load_equipment_identifier_context_complete_and_free (ctx);
@@ -1335,7 +1335,7 @@ modem_load_device_identifier (MMIfaceModem *self,
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "");
     g_simple_async_result_set_op_res_gpointer (result,
                                                device_identifier,
-                                               (GDestroyNotify)g_free);
+                                               g_free);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -1380,7 +1380,7 @@ dms_get_msisdn_ready (QmiClientDms *client,
         qmi_message_dms_get_msisdn_output_get_msisdn (output, &str, NULL);
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    g_strdup (str),
-                                                   (GDestroyNotify)g_free);
+                                                   g_free);
     }
 
     if (output)
@@ -3538,7 +3538,7 @@ get_technology_preference_ready (QmiClientNas *client,
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
         result,
-        (GDestroyNotify)g_free);
+        g_free);
     load_current_modes_context_complete_and_free (ctx);
 }
 
@@ -3606,7 +3606,7 @@ current_modes_get_system_selection_preference_ready (QmiClientNas *client,
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
         result,
-        (GDestroyNotify)g_free);
+        g_free);
     load_current_modes_context_complete_and_free (ctx);
 }
 
@@ -11372,7 +11372,7 @@ dispose (GObject *object)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (object);
 
-    g_list_free_full (self->priv->firmware_list, (GDestroyNotify)g_object_unref);
+    g_list_free_full (self->priv->firmware_list, g_object_unref);
     self->priv->firmware_list = NULL;
 
     g_clear_object (&self->priv->current_firmware);

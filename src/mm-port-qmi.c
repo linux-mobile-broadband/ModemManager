@@ -572,7 +572,7 @@ mm_port_qmi_close (MMPortQmi *self)
                                    3, NULL, NULL, NULL);
         g_clear_object (&info->client);
     }
-    g_list_free_full (self->priv->services, (GDestroyNotify)g_free);
+    g_list_free_full (self->priv->services, g_free);
     self->priv->services = NULL;
 
     /* Close and release the device */
@@ -616,7 +616,7 @@ dispose (GObject *object)
         if (info->client)
             g_object_unref (info->client);
     }
-    g_list_free_full (self->priv->services, (GDestroyNotify)g_free);
+    g_list_free_full (self->priv->services, g_free);
     self->priv->services = NULL;
 
     /* Clear device object */

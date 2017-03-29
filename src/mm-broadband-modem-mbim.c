@@ -387,7 +387,7 @@ modem_load_device_identifier (MMIfaceModem *self,
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "");
     g_simple_async_result_set_op_res_gpointer (result,
                                                device_identifier,
-                                               (GDestroyNotify)g_free);
+                                               g_free);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }

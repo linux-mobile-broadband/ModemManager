@@ -690,7 +690,7 @@ interface_enabling_step (EnablingContext *ctx)
         g_object_set_qdata_full (G_OBJECT (ctx->self),
                                  network_timezone_cancellable_quark,
                                  cancellable,
-                                 (GDestroyNotify)g_object_unref);
+                                 g_object_unref);
 
         update_network_timezone (ctx->self,
                                  cancellable,

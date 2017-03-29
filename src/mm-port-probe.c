@@ -1406,7 +1406,7 @@ mm_port_probe_run (MMPortProbe                *self,
             ctx->at_probing_cancellable_linked = g_cancellable_connect (cancellable,
                                                                         (GCallback) at_cancellable_cancel,
                                                                         g_object_ref (ctx->at_probing_cancellable),
-                                                                        (GDestroyNotify) g_object_unref);
+                                                                        g_object_unref);
         ctx->source_id = g_idle_add ((GSourceFunc) serial_open_at, self);
         return;
     }

@@ -118,7 +118,7 @@ dms_uim_get_iccid_ready (QmiClientDms *client,
         const gchar *str = NULL;
 
         qmi_message_dms_uim_get_iccid_output_get_iccid (output, &str, NULL);
-        g_task_return_pointer (task, g_strdup (str), (GDestroyNotify) g_free);
+        g_task_return_pointer (task, g_strdup (str), g_free);
     }
 
     if (output)
@@ -180,7 +180,7 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
         const gchar *str = NULL;
 
         qmi_message_dms_uim_get_imsi_output_get_imsi (output, &str, NULL);
-        g_task_return_pointer (task, g_strdup (str), (GDestroyNotify) g_free);
+        g_task_return_pointer (task, g_strdup (str), g_free);
     }
 
     if (output)
@@ -304,7 +304,7 @@ load_operator_identifier_ready (QmiClientNas *client,
         g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
     else
         g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
-    g_task_return_pointer (task, g_string_free (aux, FALSE), (GDestroyNotify) g_free);
+    g_task_return_pointer (task, g_string_free (aux, FALSE), g_free);
     g_object_unref (task);
 }
 
@@ -353,7 +353,7 @@ load_operator_name_ready (QmiClientNas *client,
     if (!get_home_network (client, res, NULL, NULL, NULL, &operator_name, &error))
         g_task_return_error (task, error);
     else
-        g_task_return_pointer (task, operator_name, (GDestroyNotify) g_free);
+        g_task_return_pointer (task, operator_name, g_free);
     g_object_unref (task);
 }
 
@@ -543,7 +543,7 @@ send_pin (MMBaseSim           *_self,
     self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
 
-    g_task_set_task_data (task, g_strdup (pin), (GDestroyNotify) g_free);
+    g_task_set_task_data (task, g_strdup (pin), g_free);
 
     mm_dbg ("Verifying PIN...");
     if (!self->priv->dms_uim_deprecated)

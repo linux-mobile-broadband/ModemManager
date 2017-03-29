@@ -87,7 +87,7 @@ plugin_manager_build_plugins_list (MMPluginManager *self,
         case MM_PLUGIN_SUPPORTS_HINT_SUPPORTED:
             /* Really supported, clean existing list and add it alone */
             if (list) {
-                g_list_free_full (list, (GDestroyNotify) g_object_unref);
+                g_list_free_full (list, g_object_unref);
                 list = NULL;
             }
             list = g_list_prepend (list, g_object_ref (l->data));
@@ -224,7 +224,7 @@ port_context_unref (PortContext *port_context)
         if (port_context->suggested_plugin)
             g_object_unref (port_context->suggested_plugin);
         if (port_context->plugins)
-            g_list_free_full (port_context->plugins, (GDestroyNotify) g_object_unref);
+            g_list_free_full (port_context->plugins, g_object_unref);
         if (port_context->cancellable)
             g_object_unref (port_context->cancellable);
         g_free (port_context->name);
@@ -837,7 +837,7 @@ device_context_complete (DeviceContext *device_context)
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "not supported by any plugin");
     else
-        g_task_return_pointer (task, g_object_ref (device_context->best_plugin), (GDestroyNotify) g_object_unref);
+        g_task_return_pointer (task, g_object_ref (device_context->best_plugin), g_object_unref);
     g_object_unref (task);
 }
 
@@ -1401,7 +1401,7 @@ device_context_run_ready (MMPluginManager    *self,
     if (!best_plugin)
         g_task_return_error (common->task, error);
     else
-        g_task_return_pointer (common->task, best_plugin, (GDestroyNotify) g_object_unref);
+        g_task_return_pointer (common->task, best_plugin, g_object_unref);
     common_async_context_free (common);
 }
 
@@ -1690,7 +1690,7 @@ dispose (GObject *object)
 
     /* Cleanup list of plugins */
     if (self->priv->plugins) {
-        g_list_free_full (self->priv->plugins, (GDestroyNotify)g_object_unref);
+        g_list_free_full (self->priv->plugins, g_object_unref);
         self->priv->plugins = NULL;
     }
     g_clear_object (&self->priv->generic);

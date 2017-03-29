@@ -97,7 +97,7 @@ simid_subscriber_ready_state_ready (MbimDevice *device,
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
             &error))
-        g_simple_async_result_set_op_res_gpointer (simple, sim_iccid, (GDestroyNotify)g_free);
+        g_simple_async_result_set_op_res_gpointer (simple, sim_iccid, g_free);
     else
         g_simple_async_result_take_error (simple, error);
 
@@ -165,7 +165,7 @@ imsi_subscriber_ready_state_ready (MbimDevice *device,
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
             &error))
-        g_simple_async_result_set_op_res_gpointer (simple, subscriber_id, (GDestroyNotify)g_free);
+        g_simple_async_result_set_op_res_gpointer (simple, subscriber_id, g_free);
     else
         g_simple_async_result_take_error (simple, error);
 

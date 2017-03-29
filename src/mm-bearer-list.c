@@ -189,7 +189,7 @@ disconnect_all_context_complete_and_free (DisconnectAllContext *ctx)
     g_object_unref (ctx->result);
     if (ctx->current)
         g_object_unref (ctx->current);
-    g_list_free_full (ctx->pending, (GDestroyNotify) g_object_unref);
+    g_list_free_full (ctx->pending, g_object_unref);
     g_free (ctx);
 }
 
@@ -339,7 +339,7 @@ dispose (GObject *object)
     MMBearerList *self = MM_BEARER_LIST (object);
 
     if (self->priv->bearers) {
-        g_list_free_full (self->priv->bearers, (GDestroyNotify) g_object_unref);
+        g_list_free_full (self->priv->bearers, g_object_unref);
         self->priv->bearers = NULL;
     }
 

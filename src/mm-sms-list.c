@@ -450,7 +450,7 @@ dispose (GObject *object)
     MMSmsList *self = MM_SMS_LIST (object);
 
     g_clear_object (&self->priv->modem);
-    g_list_free_full (self->priv->list, (GDestroyNotify)g_object_unref);
+    g_list_free_full (self->priv->list, g_object_unref);
 
     G_OBJECT_CLASS (mm_sms_list_parent_class)->dispose (object);
 }

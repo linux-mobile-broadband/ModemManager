@@ -50,7 +50,7 @@ static void
 handle_list_context_free (HandleListContext *ctx)
 {
     if (ctx->list)
-        g_list_free_full (ctx->list, (GDestroyNotify)g_object_unref);
+        g_list_free_full (ctx->list, g_object_unref);
     if (ctx->current)
         g_object_unref (ctx->current);
     g_object_unref (ctx->skeleton);

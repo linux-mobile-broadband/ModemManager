@@ -760,7 +760,7 @@ disconnection_context_free (DisconnectionContext *ctx)
     g_free (ctx->bearer_path);
     if (ctx->current)
         g_object_unref (ctx->current);
-    g_list_free_full (ctx->bearers, (GDestroyNotify) g_object_unref);
+    g_list_free_full (ctx->bearers, g_object_unref);
     g_free (ctx);
 }
 

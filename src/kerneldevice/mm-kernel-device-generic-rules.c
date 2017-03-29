@@ -434,7 +434,7 @@ mm_kernel_device_generic_rules_load (const gchar  *rules_dir,
 
 out:
     if (rule_files)
-        g_list_free_full (rule_files, (GDestroyNotify) g_free);
+        g_list_free_full (rule_files, g_free);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);

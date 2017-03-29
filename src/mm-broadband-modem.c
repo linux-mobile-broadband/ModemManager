@@ -280,7 +280,7 @@ broadband_bearer_new_ready (GObject *source,
     else
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    bearer,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
@@ -7024,7 +7024,7 @@ hdr_subsys_state_info_ready (MMPortSerialQcdm *port,
     qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &results->almp_state);
     qcdm_result_unref (result);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
     hdr_state_context_complete_and_free (ctx);
 }
 
@@ -7152,7 +7152,7 @@ cm_subsys_state_info_ready (MMPortSerialQcdm *port,
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &results->system_mode);
     qcdm_result_unref (result);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
     call_manager_state_context_complete_and_free (ctx);
 }
 
@@ -7381,7 +7381,7 @@ css_query_ready (MMIfaceModemCdma *self,
     /* No means to get NID with AT commands right now */
     results->nid = MM_MODEM_CDMA_NID_UNKNOWN;
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
     cdma1x_serving_system_context_complete_and_free (ctx);
 }
 
@@ -7445,7 +7445,7 @@ qcdm_cdma_status_ready (MMPortSerialQcdm *port,
         results->class = 0;
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
     cdma1x_serving_system_context_complete_and_free (ctx);
 }
 
