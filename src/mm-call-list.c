@@ -395,6 +395,7 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->modem);
     g_list_free_full (self->priv->list, (GDestroyNotify)g_object_unref);
+    self->priv->list = NULL;
 
     G_OBJECT_CLASS (mm_call_list_parent_class)->dispose (object);
 }
