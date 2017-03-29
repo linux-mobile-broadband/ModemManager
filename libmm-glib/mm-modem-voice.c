@@ -95,7 +95,7 @@ typedef struct {
 static void
 call_object_list_free (GList *list)
 {
-    g_list_free_full (list, (GDestroyNotify) g_object_unref);
+    g_list_free_full (list, g_object_unref);
 }
 
 static void
@@ -357,7 +357,7 @@ new_call_object_ready (GDBusConnection *connection,
     else
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    call,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
 
     create_call_context_complete_and_free (ctx);
 }

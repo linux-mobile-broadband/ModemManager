@@ -1763,7 +1763,7 @@ typedef struct {
 static void
 bearer_object_list_free (GList *list)
 {
-    g_list_free_full (list, (GDestroyNotify) g_object_unref);
+    g_list_free_full (list, g_object_unref);
 }
 
 static void
@@ -2027,7 +2027,7 @@ modem_new_bearer_ready (GDBusConnection *connection,
     else
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    bearer,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
 
     create_bearer_context_complete_and_free (ctx);
 }
@@ -2868,7 +2868,7 @@ modem_get_sim_ready (GDBusConnection *connection,
     else
         g_simple_async_result_set_op_res_gpointer (simple,
                                                    sim,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);

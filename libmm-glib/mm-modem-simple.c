@@ -138,7 +138,7 @@ new_bearer_ready (GDBusConnection *connection,
     else
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    bearer,
-                                                   (GDestroyNotify)g_object_unref);
+                                                   g_object_unref);
 
     connect_context_complete_and_free (ctx);
 }
