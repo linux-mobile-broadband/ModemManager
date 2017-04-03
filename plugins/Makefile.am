@@ -720,7 +720,7 @@ libmm_plugin_thuraya_la_LIBADD   = $(builddir)/libhelpers-thuraya.la
 # plugin: novatel lte
 ################################################################################
 
-pkglib_LTLIBRARIES += libmm-plugin-novatel_lte.la
+pkglib_LTLIBRARIES += libmm-plugin-novatel-lte.la
 libmm_plugin_novatel_lte_la_SOURCES = \
 	novatel/mm-plugin-novatel-lte.c \
 	novatel/mm-plugin-novatel-lte.h \
