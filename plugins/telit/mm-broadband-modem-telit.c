@@ -653,7 +653,7 @@ response_processor_service_ignore_at_errors (MMBaseModem *self,
                                              GVariant **result,
                                              GError **result_error)
 {
-    const gchar *service, *mode;
+    const gchar *service;
 
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
@@ -663,9 +663,8 @@ response_processor_service_ignore_at_errors (MMBaseModem *self,
     }
 
     service = mm_strip_tag (response, "+SERVICE:");
-    mode = strchr (service, ',');
-    if (mode) {
-        switch (atoi (++mode)) {
+    if (service) {
+        switch (atoi (service)) {
         case 1:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_1XRTT);
             return TRUE;
