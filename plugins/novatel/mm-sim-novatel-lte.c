@@ -39,20 +39,13 @@ load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    gchar *imsi;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    imsi = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("loaded IMSI: %s", imsi);
-    return g_strdup (imsi);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 imsi_read_ready (MMBaseModem *modem,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 GTask *task)
 {
     GError *error = NULL;
     const gchar *response, *str;
@@ -64,9 +57,8 @@ imsi_read_ready (MMBaseModem *modem,
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -76,13 +68,12 @@ imsi_read_ready (MMBaseModem *modem,
     /* With or without quotes... */
     if (sscanf (str, "%d,%d,\"%18c\"", &sw1, &sw2, (char *) &buf) != 3 &&
         sscanf (str, "%d,%d,%18c", &sw1, &sw2, (char *) &buf) != 3) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse the CRSM response: '%s'",
-                                         response);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse the CRSM response: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
@@ -90,13 +81,12 @@ imsi_read_ready (MMBaseModem *modem,
         (sw1 != 0x91) &&
         (sw1 != 0x92) &&
         (sw1 != 0x9f)) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
-                                         sw1, sw2);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                 sw1, sw2);
+        g_object_unref (task);
         return;
     }
 
@@ -114,25 +104,23 @@ imsi_read_ready (MMBaseModem *modem,
         }
 
         /* Invalid character */
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "CRSM IMSI response contained invalid character '%c'",
-                                         buf[len]);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "CRSM IMSI response contained invalid character '%c'",
+                                 buf[len]);
+        g_object_unref (task);
         return;
     }
 
     /* BCD encoded IMSIs plus the length byte and parity are 18 digits long */
     if (len != 18) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid +CRSM IMSI response size (was %zd, expected 18)",
-                                         len);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Invalid +CRSM IMSI response size (was %zd, expected 18)",
+                                 len);
+        g_object_unref (task);
         return;
     }
 
@@ -160,19 +148,17 @@ imsi_read_ready (MMBaseModem *modem,
     /* Ensure all 'F's, if any, are at the end */
     for (; i < 15; i++) {
         if (imsi[i] != 'F') {
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Invalid +CRSM IMSI length (unexpected F)");
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Invalid +CRSM IMSI length (unexpected F)");
+            g_object_unref (task);
             return;
         }
     }
 
-    g_simple_async_result_set_op_res_gpointer (simple, imsi, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, g_strdup (imsi), g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -193,10 +179,7 @@ load_imsi (MMBaseSim *self,
         3,
         FALSE,
         (GAsyncReadyCallback)imsi_read_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_imsi));
+        g_task_new (self, NULL, callback, user_data));
     g_object_unref (modem);
 }
 
