@@ -32,7 +32,6 @@
 /* Register in either a CDMA or a 3GPP network (or both) */
 
 typedef struct {
-    GSimpleAsyncResult *result;
     MMIfaceModemSimple *self;
     gchar *operator_id;
     guint remaining_tries_cdma;
@@ -41,11 +40,9 @@ typedef struct {
 } RegisterInNetworkContext;
 
 static void
-register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+register_in_network_context_free (RegisterInNetworkContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     g_free (ctx->operator_id);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -55,59 +52,69 @@ register_in_3gpp_or_cdma_network_finish (MMIfaceModemSimple *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void check_next_registration (RegisterInNetworkContext *ctx);
+static void check_next_registration (GTask *task);
 
 static void
 register_in_cdma_network_ready (MMIfaceModemCdma *self,
                                 GAsyncResult *res,
-                                RegisterInNetworkContext *ctx)
+                                GTask *task)
 {
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     ctx->remaining_tries_cdma--;
 
     if (!mm_iface_modem_cdma_register_in_network_finish (
             MM_IFACE_MODEM_CDMA (self), res, NULL)) {
         /* Retry check */
-        check_next_registration (ctx);
+        check_next_registration (task);
         return;
     }
 
     /* Registered we are! */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    register_in_network_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 register_in_3gpp_network_ready (MMIfaceModem3gpp *self,
                                 GAsyncResult *res,
-                                RegisterInNetworkContext *ctx)
+                                GTask *task)
 {
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     ctx->remaining_tries_3gpp--;
 
     if (!mm_iface_modem_3gpp_register_in_network_finish (
             MM_IFACE_MODEM_3GPP (self), res, NULL)) {
         /* Retry check */
-        check_next_registration (ctx);
+        check_next_registration (task);
         return;
     }
 
     /* Registered we are! */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    register_in_network_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-check_next_registration (RegisterInNetworkContext *ctx)
+check_next_registration (GTask *task)
 {
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (ctx->remaining_tries_cdma > ctx->remaining_tries_3gpp &&
         ctx->remaining_tries_cdma > 0) {
         mm_iface_modem_cdma_register_in_network (
             MM_IFACE_MODEM_CDMA (ctx->self),
             ctx->max_try_time,
             (GAsyncReadyCallback)register_in_cdma_network_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -117,15 +124,15 @@ check_next_registration (RegisterInNetworkContext *ctx)
             ctx->operator_id,
             ctx->max_try_time,
             (GAsyncReadyCallback)register_in_3gpp_network_ready,
-            ctx);
+            task);
         return;
     }
 
     /* No more tries of anything */
-    g_simple_async_result_take_error (
-        ctx->result,
+    g_task_return_error (
+        task,
         mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
-    register_in_network_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
@@ -135,14 +142,11 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
                                   gpointer user_data)
 {
     RegisterInNetworkContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (RegisterInNetworkContext, 1);
     ctx->self = g_object_ref (self);
     ctx->operator_id = g_strdup (operator_id);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             register_in_3gpp_or_cdma_network);
 
     /* 3GPP-only modems... */
     if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (ctx->self))) {
@@ -163,7 +167,12 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
         ctx->remaining_tries_3gpp = 6;
     }
 
-    check_next_registration (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)register_in_network_context_free);
+
+    check_next_registration (task);
 }
 
 /*****************************************************************************/
