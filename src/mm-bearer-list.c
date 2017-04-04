@@ -177,16 +177,13 @@ mm_bearer_list_find_by_path (MMBearerList *self,
 /*****************************************************************************/
 
 typedef struct {
-    GSimpleAsyncResult *result;
     GList *pending;
     MMBaseBearer *current;
 } DisconnectAllContext;
 
 static void
-disconnect_all_context_complete_and_free (DisconnectAllContext *ctx)
+disconnect_all_context_free (DisconnectAllContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->current)
         g_object_unref (ctx->current);
     g_list_free_full (ctx->pending, g_object_unref);
@@ -198,37 +195,40 @@ mm_bearer_list_disconnect_all_bearers_finish (MMBearerList *self,
                                               GAsyncResult *res,
                                               GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void disconnect_next_bearer (DisconnectAllContext *ctx);
+static void disconnect_next_bearer (GTask *task);
 
 static void
 disconnect_ready (MMBaseBearer *bearer,
                   GAsyncResult *res,
-                  DisconnectAllContext *ctx)
+                  GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_bearer_disconnect_finish (bearer, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disconnect_all_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    disconnect_next_bearer (ctx);
+    disconnect_next_bearer (task);
 }
 
 static void
-disconnect_next_bearer (DisconnectAllContext *ctx)
+disconnect_next_bearer (GTask *task)
 {
+    DisconnectAllContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     if (ctx->current)
         g_clear_object (&ctx->current);
 
     /* No more bearers? all done! */
     if (!ctx->pending) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disconnect_all_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -237,7 +237,7 @@ disconnect_next_bearer (DisconnectAllContext *ctx)
 
     mm_base_bearer_disconnect (ctx->current,
                                (GAsyncReadyCallback)disconnect_ready,
-                               ctx);
+                               task);
 }
 
 void
@@ -246,17 +246,19 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
                                        gpointer user_data)
 {
     DisconnectAllContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (DisconnectAllContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_bearer_list_disconnect_all_bearers);
     /* Get a copy of the list */
     ctx->pending = g_list_copy (self->priv->bearers);
     g_list_foreach (ctx->pending, (GFunc) g_object_ref, NULL);
 
-    disconnect_next_bearer (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)disconnect_all_context_free);
+
+    disconnect_next_bearer (task);
 }
 
 /*****************************************************************************/
