@@ -1172,23 +1172,22 @@ mm_base_modem_authorize_finish (MMBaseModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 authorize_ready (MMAuthProvider *authp,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 void
@@ -1198,18 +1197,14 @@ mm_base_modem_authorize (MMBaseModem *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_base_modem_authorize);
+    task = g_task_new (self, self->priv->authp_cancellable, callback, user_data);
 
     /* When running in the session bus for tests, default to always allow */
     if (mm_context_get_test_session ()) {
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1218,7 +1213,7 @@ mm_base_modem_authorize (MMBaseModem *self,
                                 authorization,
                                 self->priv->authp_cancellable,
                                 (GAsyncReadyCallback)authorize_ready,
-                                result);
+                                task);
 }
 
 /*****************************************************************************/
