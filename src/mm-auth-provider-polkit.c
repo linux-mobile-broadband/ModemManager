@@ -41,24 +41,16 @@ mm_auth_provider_polkit_new (void)
 /*****************************************************************************/
 
 typedef struct {
-    MMAuthProvider *self;
-    GCancellable *cancellable;
     PolkitSubject *subject;
     gchar *authorization;
     GDBusMethodInvocation *invocation;
-    GSimpleAsyncResult *result;
 } AuthorizeContext;
 
 static void
-authorize_context_complete_and_free (AuthorizeContext *ctx)
+authorize_context_free (AuthorizeContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->subject);
-    g_object_unref (ctx->self);
     g_free (ctx->authorization);
     g_free (ctx);
 }
@@ -68,54 +60,56 @@ authorize_finish (MMAuthProvider *self,
                      GAsyncResult *res,
                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 check_authorization_ready (PolkitAuthority *authority,
                            GAsyncResult *res,
-                           AuthorizeContext *ctx)
+                           GTask *task)
 {
     PolkitAuthorizationResult *pk_result;
     GError *error = NULL;
+    AuthorizeContext *ctx;
 
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "PolicyKit authorization attempt cancelled");
-        authorize_context_complete_and_free (ctx);
+    if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_CANCELLED,
+                                 "PolicyKit authorization attempt cancelled");
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
     pk_result = polkit_authority_check_authorization_finish (authority, res, &error);
     if (!pk_result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "PolicyKit authorization failed: '%s'",
-                                         error->message);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "PolicyKit authorization failed: '%s'",
+                                 error->message);
         g_error_free (error);
     } else {
         if (polkit_authorization_result_get_is_authorized (pk_result))
             /* Good! */
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            g_task_return_boolean (task, TRUE);
         else if (polkit_authorization_result_get_is_challenge (pk_result))
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNAUTHORIZED,
-                                             "PolicyKit authorization failed: challenge needed for '%s'",
-                                             ctx->authorization);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNAUTHORIZED,
+                                     "PolicyKit authorization failed: challenge needed for '%s'",
+                                     ctx->authorization);
         else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNAUTHORIZED,
-                                             "PolicyKit authorization failed: not authorized for '%s'",
-                                             ctx->authorization);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNAUTHORIZED,
+                                     "PolicyKit authorization failed: not authorized for '%s'",
+                                     ctx->authorization);
         g_object_unref (pk_result);
     }
 
-    authorize_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
@@ -128,31 +122,30 @@ authorize (MMAuthProvider *self,
 {
     MMAuthProviderPolkit *polkit = MM_AUTH_PROVIDER_POLKIT (self);
     AuthorizeContext *ctx;
+    GTask *task;
 
     /* When creating the object, we actually allowed errors when looking for the
      * authority. If that is the case, we'll just forbid any incoming
      * authentication request */
     if (!polkit->priv->authority) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "PolicyKit authorization error: "
-                                             "'authority not found'");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 authorize,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "PolicyKit authorization error: "
+                                 "'authority not found'");
         return;
     }
 
     ctx = g_new (AuthorizeContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     ctx->authorization = g_strdup (authorization);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             authorize);
     ctx->subject = polkit_system_bus_name_new (g_dbus_method_invocation_get_sender (ctx->invocation));
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)authorize_context_free);
 
     polkit_authority_check_authorization (polkit->priv->authority,
                                           ctx->subject,
@@ -161,7 +154,7 @@ authorize (MMAuthProvider *self,
                                           POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
                                           ctx->cancellable,
                                           (GAsyncReadyCallback)check_authorization_ready,
-                                          ctx);
+                                          task);
 }
 
 /*****************************************************************************/
