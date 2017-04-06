@@ -73,21 +73,16 @@ mm_port_qmi_get_client (MMPortQmi *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMPortQmi *self;
-    GSimpleAsyncResult *result;
     ServiceInfo *info;
 } AllocateClientContext;
 
 static void
-allocate_client_context_complete_and_free (AllocateClientContext *ctx)
+allocate_client_context_free (AllocateClientContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
     if (ctx->info) {
         g_assert (ctx->info->client == NULL);
         g_free (ctx->info);
     }
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -96,30 +91,34 @@ mm_port_qmi_allocate_client_finish (MMPortQmi *self,
                                     GAsyncResult *res,
                                     GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 allocate_client_ready (QmiDevice *qmi_device,
                        GAsyncResult *res,
-                       AllocateClientContext *ctx)
+                       GTask *task)
 {
+    MMPortQmi *self;
+    AllocateClientContext *ctx;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
     ctx->info->client = qmi_device_allocate_client_finish (qmi_device, res, &error);
     if (!ctx->info->client) {
         g_prefix_error (&error,
                         "Couldn't create client for service '%s': ",
                         qmi_service_get_string (ctx->info->service));
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
         /* Move the service info to our internal list */
-        ctx->self->priv->services = g_list_prepend (ctx->self->priv->services, ctx->info);
+        self->priv->services = g_list_prepend (self->priv->services, ctx->info);
         ctx->info = NULL;
     }
 
-    allocate_client_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 void
@@ -131,27 +130,29 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
                              gpointer user_data)
 {
     AllocateClientContext *ctx;
+    GTask *task;
 
     if (!!mm_port_qmi_peek_client (self, service, flag)) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_EXISTS,
-                                             "Client for service '%s' already allocated",
-                                             qmi_service_get_string (service));
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_port_qmi_allocate_client,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_EXISTS,
+                                 "Client for service '%s' already allocated",
+                                 qmi_service_get_string (service));
         return;
     }
 
     ctx = g_new0 (AllocateClientContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_port_qmi_allocate_client);
     ctx->info = g_new0 (ServiceInfo, 1);
     ctx->info->service = service;
     ctx->info->flag = flag;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)allocate_client_context_free);
 
     qmi_device_allocate_client (self->priv->qmi_device,
                                 service,
@@ -159,7 +160,7 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
                                 10,
                                 cancellable,
                                 (GAsyncReadyCallback)allocate_client_ready,
-                                ctx);
+                                task);
 }
 
 /*****************************************************************************/
