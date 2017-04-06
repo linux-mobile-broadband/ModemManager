@@ -113,28 +113,12 @@ mm_sms_list_get_paths (MMSmsList *self)
 
 /*****************************************************************************/
 
-typedef struct {
-    MMSmsList *self;
-    GSimpleAsyncResult *result;
-    gchar *path;
-} DeleteSmsContext;
-
-static void
-delete_sms_context_complete_and_free (DeleteSmsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx->path);
-    g_free (ctx);
-}
-
 gboolean
 mm_sms_list_delete_sms_finish (MMSmsList *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static guint
@@ -147,25 +131,29 @@ cmp_sms_by_path (MMBaseSms *sms,
 static void
 delete_ready (MMBaseSms *sms,
               GAsyncResult *res,
-              DeleteSmsContext *ctx)
+              GTask *task)
 {
+    MMSmsList *self;
+    const gchar *path;
     GError *error = NULL;
     GList *l;
 
     if (!mm_base_sms_delete_finish (sms, res, &error)) {
         /* We report the error */
-        g_simple_async_result_take_error (ctx->result, error);
-        delete_sms_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    self = g_task_get_source_object (task);
+    path = g_task_get_task_data (task);
     /* The SMS was properly deleted, we now remove it from our list */
-    l = g_list_find_custom (ctx->self->priv->list,
-                            ctx->path,
+    l = g_list_find_custom (self->priv->list,
+                            path,
                             (GCompareFunc)cmp_sms_by_path);
     if (l) {
         g_object_unref (MM_BASE_SMS (l->data));
-        ctx->self->priv->list = g_list_delete_link (ctx->self->priv->list, l);
+        self->priv->list = g_list_delete_link (self->priv->list, l);
     }
 
     /* We don't need to unref the SMS any more, but we can use the
@@ -173,12 +161,12 @@ delete_ready (MMBaseSms *sms,
      * during the async operation. */
     mm_base_sms_unexport (sms);
 
-    g_signal_emit (ctx->self,
+    g_signal_emit (self,
                    signals[SIGNAL_DELETED], 0,
-                   ctx->path);
+                   path);
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    delete_sms_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
@@ -187,35 +175,31 @@ mm_sms_list_delete_sms (MMSmsList *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    DeleteSmsContext *ctx;
     GList *l;
+    GTask *task;
 
     l = g_list_find_custom (self->priv->list,
                             (gpointer)sms_path,
                             (GCompareFunc)cmp_sms_by_path);
     if (!l) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "No SMS found with path '%s'",
-                                             sms_path);
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_sms_list_delete_sms,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "No SMS found with path '%s'",
+                                 sms_path);
         return;
     }
 
     /* Delete all SMS parts */
-    ctx = g_new0 (DeleteSmsContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->path = g_strdup (sms_path);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_sms_list_delete_sms);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_strdup (sms_path), g_free);
 
     mm_base_sms_delete (MM_BASE_SMS (l->data),
                         (GAsyncReadyCallback)delete_ready,
-                        ctx);
+                        task);
 }
 
 /*****************************************************************************/
