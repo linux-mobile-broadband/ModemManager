@@ -20,7 +20,6 @@
 /* Custom init */
 
 typedef struct {
-    MMPortProbe *probe;
     MMPortSerialAt *port;
     guint nwdmat_retries;
     guint wait_time;
@@ -30,7 +29,6 @@ static void
 custom_init_context_free (CustomInitContext *ctx)
 {
     g_object_unref (ctx->port);
-    g_object_unref (ctx->probe);
     g_slice_free (CustomInitContext, ctx);
 }
 
@@ -84,6 +82,7 @@ static void
 custom_init_step (GTask *task)
 {
     CustomInitContext *ctx;
+    MMPortProbe *probe;
 
     ctx = g_task_get_task_data (task);
 
@@ -96,8 +95,10 @@ custom_init_step (GTask *task)
         return;
     }
 
+    probe = g_task_get_source_object (task);
+
     /* If device has a QMI port, don't run $NWDMAT */
-    if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (ctx->probe)))) {
+    if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
         mm_dbg ("(Novatel) no need to run custom init in (%s): device has QMI port",
                 mm_port_get_device (MM_PORT (ctx->port)));
         g_task_return_boolean (task, TRUE);
@@ -142,7 +143,6 @@ mm_common_novatel_custom_init (MMPortProbe *probe,
     GTask *task;
 
     ctx = g_slice_new (CustomInitContext);
-    ctx->probe = g_object_ref (probe);
     ctx->port = g_object_ref (port);
     ctx->nwdmat_retries = 3;
     ctx->wait_time = 2;
