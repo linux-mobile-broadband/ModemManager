@@ -31,90 +31,58 @@ struct _MMPortMbimPrivate {
 
 /*****************************************************************************/
 
-typedef struct {
-    MMPortMbim *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-} PortContext;
-
-static void
-port_context_complete_and_free (PortContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (PortContext, ctx);
-}
-
-static PortContext *
-port_context_new (MMPortMbim *self,
-                  GCancellable *cancellable,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
-{
-    PortContext *ctx;
-
-    ctx = g_slice_new0 (PortContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             port_context_new);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
-    return ctx;
-}
-
-/*****************************************************************************/
-
 gboolean
 mm_port_mbim_open_finish (MMPortMbim *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 mbim_device_open_ready (MbimDevice *mbim_device,
                         GAsyncResult *res,
-                        PortContext *ctx)
+                        GTask *task)
 {
     GError *error = NULL;
+    MMPortMbim *self;
+
+    self = g_task_get_source_object (task);
 
     /* Reset the progress flag */
-    ctx->self->priv->in_progress = FALSE;
+    self->priv->in_progress = FALSE;
     if (!mbim_device_open_full_finish (mbim_device, res, &error)) {
-        g_clear_object (&ctx->self->priv->mbim_device);
-        g_simple_async_result_take_error (ctx->result, error);
+        g_clear_object (&self->priv->mbim_device);
+        g_task_return_error (task, error);
     } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    port_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
 mbim_device_new_ready (GObject *unused,
                        GAsyncResult *res,
-                       PortContext *ctx)
+                       GTask *task)
 {
     GError *error = NULL;
+    MMPortMbim *self;
 
-    ctx->self->priv->mbim_device = mbim_device_new_finish (res, &error);
-    if (!ctx->self->priv->mbim_device) {
-        g_simple_async_result_take_error (ctx->result, error);
-        port_context_complete_and_free (ctx);
+    self = g_task_get_source_object (task);
+    self->priv->mbim_device = mbim_device_new_finish (res, &error);
+    if (!self->priv->mbim_device) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Now open the MBIM device */
-    mbim_device_open_full (ctx->self->priv->mbim_device,
+    mbim_device_open_full (self->priv->mbim_device,
                            MBIM_DEVICE_OPEN_FLAGS_PROXY,
                            30,
-                           ctx->cancellable,
+                           g_task_get_cancellable (task),
                            (GAsyncReadyCallback)mbim_device_open_ready,
-                           ctx);
+                           task);
 }
 
 void
@@ -125,24 +93,24 @@ mm_port_mbim_open (MMPortMbim *self,
 {
     GFile *file;
     gchar *fullpath;
-    PortContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_PORT_MBIM (self));
 
-    ctx = port_context_new (self, cancellable, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     if (self->priv->in_progress) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "MBIM device open/close operation in progress");
-        port_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "MBIM device open/close operation in progress");
+        g_object_unref (task);
         return;
     }
 
     if (self->priv->mbim_device) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        port_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -151,9 +119,9 @@ mm_port_mbim_open (MMPortMbim *self,
 
     self->priv->in_progress = TRUE;
     mbim_device_new (file,
-                     ctx->cancellable,
+                     cancellable,
                      (GAsyncReadyCallback)mbim_device_new_ready,
-                     ctx);
+                     task);
 
     g_free (fullpath);
     g_object_unref (file);
@@ -176,25 +144,27 @@ mm_port_mbim_close_finish (MMPortMbim *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 mbim_device_close_ready (MbimDevice *device,
                          GAsyncResult *res,
-                         PortContext *ctx)
+                         GTask *task)
 {
     GError *error = NULL;
+    MMPortMbim *self;
+
+    self = g_task_get_source_object (task);
+    self->priv->in_progress = FALSE;
+    g_clear_object (&self->priv->mbim_device);
 
     if (!mbim_device_close_finish (device, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    ctx->self->priv->in_progress = FALSE;
-    g_clear_object (&ctx->self->priv->mbim_device);
-
-    port_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 void
@@ -202,24 +172,24 @@ mm_port_mbim_close (MMPortMbim *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    PortContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_PORT_MBIM (self));
 
-    ctx = port_context_new (self, NULL, callback, user_data);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->in_progress) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "MBIM device open/close operation in progress");
-        port_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "MBIM device open/close operation in progress");
+        g_object_unref (task);
         return;
     }
 
     if (!self->priv->mbim_device) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        port_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -228,7 +198,7 @@ mm_port_mbim_close (MMPortMbim *self,
                        5,
                        NULL,
                        (GAsyncReadyCallback)mbim_device_close_ready,
-                       ctx);
+                       task);
     g_clear_object (&self->priv->mbim_device);
 }
 
