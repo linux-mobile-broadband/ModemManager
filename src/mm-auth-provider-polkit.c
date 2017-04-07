@@ -152,7 +152,7 @@ authorize (MMAuthProvider *self,
                                           authorization,
                                           NULL, /* details */
                                           POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
-                                          ctx->cancellable,
+                                          cancellable,
                                           (GAsyncReadyCallback)check_authorization_ready,
                                           task);
 }
