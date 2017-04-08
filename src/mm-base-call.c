@@ -754,7 +754,6 @@ call_accept (MMBaseCall *self,
              gpointer user_data)
 {
     CallAcceptContext *ctx;
-    gchar *cmd;
 
     /* Setup the context */
     ctx = g_new0 (CallAcceptContext, 1);
@@ -765,14 +764,12 @@ call_accept (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("ATA");
     mm_base_modem_at_command (ctx->modem,
-                              cmd,
+                              "ATA",
                               2,
                               FALSE,
                               (GAsyncReadyCallback)call_accept_ready,
                               ctx);
-    g_free (cmd);
 }
 
 /*****************************************************************************/
@@ -843,7 +840,6 @@ call_hangup (MMBaseCall *self,
              gpointer user_data)
 {
     CallHangupContext *ctx;
-    gchar *cmd;
 
     /* Setup the context */
     ctx = g_new0 (CallHangupContext, 1);
@@ -854,14 +850,12 @@ call_hangup (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    cmd = g_strdup_printf ("+CHUP");
     mm_base_modem_at_command (ctx->modem,
-                              cmd,
+                              "+CHUP",
                               2,
                               FALSE,
                               (GAsyncReadyCallback)call_hangup_ready,
                               ctx);
-    g_free (cmd);
 }
 
 /*****************************************************************************/
