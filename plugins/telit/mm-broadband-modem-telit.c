@@ -42,6 +42,15 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED
+} FeatureSupport;
+
+struct _MMBroadbandModemTelitPrivate {
+    FeatureSupport csim_lock_support;
+};
 
 /*****************************************************************************/
 /* After Sim Unlock (Modem interface) */
@@ -521,8 +530,17 @@ csim_unlock_ready (MMBaseModem              *self,
     /* Ignore errors */
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
+            ctx->self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
+        }
         mm_warn ("Couldn't unlock SIM card: %s", error->message);
         g_error_free (error);
+    }
+
+    if (ctx->self->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
+        ctx->self->priv->csim_lock_support = FEATURE_SUPPORTED;
     }
 
     ctx->step++;
@@ -591,14 +609,60 @@ csim_lock_ready (MMBaseModem              *self,
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        g_prefix_error (&error, "Couldn't lock SIM card: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_retries_context_complete_and_free (ctx);
-        return;
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
+            ctx->self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
+            mm_warn ("Couldn't lock SIM card: %s. Continuing without CSIM lock.", error->message);
+            g_error_free (error);
+        } else {
+            g_prefix_error (&error, "Couldn't lock SIM card: ");
+            g_simple_async_result_take_error (ctx->result, error);
+            load_unlock_retries_context_complete_and_free (ctx);
+            return;
+        }
+    }
+
+    if (ctx->self->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
+        ctx->self->priv->csim_lock_support = FEATURE_SUPPORTED;
     }
 
     ctx->step++;
     load_unlock_retries_step (ctx);
+}
+
+static void
+handle_csim_locking (LoadUnlockRetriesContext *ctx, gboolean is_lock)
+{
+    switch (ctx->self->priv->csim_lock_support) {
+        case FEATURE_SUPPORT_UNKNOWN:
+        case FEATURE_SUPPORTED:
+            if (is_lock) {
+                mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                          CSIM_LOCK_STR,
+                                          CSIM_QUERY_TIMEOUT,
+                                          FALSE,
+                                          (GAsyncReadyCallback) csim_lock_ready,
+                                          ctx);
+            } else {
+                mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                          CSIM_UNLOCK_STR,
+                                          CSIM_QUERY_TIMEOUT,
+                                          FALSE,
+                                          (GAsyncReadyCallback) csim_unlock_ready,
+                                          ctx);
+            }
+            break;
+        case FEATURE_NOT_SUPPORTED:
+            mm_dbg ("CSIM lock not supported by this modem. Skipping %s command",
+                    is_lock ? "lock" : "unlock");
+            ctx->step++;
+            load_unlock_retries_step (ctx);
+            break;
+        default:
+            g_assert_not_reached ();
+            break;
+    }
 }
 
 static void
@@ -609,12 +673,7 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
             /* Fall back on next step */
             ctx->step++;
         case LOAD_UNLOCK_RETRIES_STEP_LOCK:
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                                      CSIM_LOCK_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_lock_ready,
-                                      ctx);
+            handle_csim_locking (ctx, TRUE);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PIN:
             mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
@@ -649,12 +708,7 @@ load_unlock_retries_step (LoadUnlockRetriesContext *ctx)
                                       ctx);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_UNLOCK:
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                                      CSIM_UNLOCK_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_unlock_ready,
-                                      ctx);
+            handle_csim_locking (ctx, FALSE);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_LAST:
             if (ctx->succeded_requests == 0) {
@@ -1265,6 +1319,11 @@ mm_broadband_modem_telit_new (const gchar *device,
 static void
 mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_BROADBAND_MODEM_TELIT,
+                                              MMBroadbandModemTelitPrivate);
+
+    self->priv->csim_lock_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -1310,4 +1369,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 mm_broadband_modem_telit_class_init (MMBroadbandModemTelitClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemTelitPrivate));
 }
