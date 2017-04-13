@@ -330,7 +330,7 @@ mm_iface_modem_signal_enable_finish (MMIfaceModemSignal *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
@@ -339,21 +339,17 @@ mm_iface_modem_signal_enable (MMIfaceModemSignal *self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     GError *error = NULL;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_signal_enable);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     if (!setup_refresh_context (self, FALSE, 0, &error))
-        g_simple_async_result_take_error (result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
