@@ -72,11 +72,7 @@ check_authorization_ready (PolkitAuthority *authority,
     GError *error = NULL;
     AuthorizeContext *ctx;
 
-    if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_CANCELLED,
-                                 "PolicyKit authorization attempt cancelled");
+    if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
         return;
     }

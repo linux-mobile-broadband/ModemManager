@@ -343,10 +343,6 @@ handle_cancel_dial (GTask *task)
                                    NULL,
                                    NULL);
     g_free (command);
-
-    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
-                             "Connection operation has been cancelled");
-    g_object_unref (task);
 }
 
 static void
@@ -357,8 +353,9 @@ dial_3gpp_context_step (GTask *task)
     ctx = (Dial3gppContext *) g_task_get_task_data (task);
 
     /* Check for cancellation */
-    if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
+    if (g_task_return_error_if_cancelled (task)) {
         handle_cancel_dial (task);
+        g_object_unref (task);
         return;
     }
 

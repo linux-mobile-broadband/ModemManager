@@ -87,10 +87,9 @@ custom_init_step (GTask *task)
     ctx = g_task_get_task_data (task);
 
     /* If cancelled, end */
-    if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
+    if (g_task_return_error_if_cancelled (task)) {
         mm_dbg ("(Novatel) no need to keep on running custom init in (%s)",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
