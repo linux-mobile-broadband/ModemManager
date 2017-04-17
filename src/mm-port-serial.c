@@ -1175,6 +1175,15 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         return FALSE;
     }
 
+    if (mm_port_get_connected (MM_PORT (self))) {
+        g_set_error (error,
+                     MM_SERIAL_ERROR,
+                     MM_SERIAL_ERROR_OPEN_FAILED,
+                     "Could not open serial device %s: port is connected",
+                     device);
+        return FALSE;
+    }
+
     if (self->priv->open_count) {
         /* Already open */
         goto success;
