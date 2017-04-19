@@ -487,6 +487,13 @@ typedef enum {
     LOAD_UNLOCK_RETRIES_STEP_LAST
 } LoadUnlockRetriesStep;
 
+static const gchar *step_lock_names[LOAD_UNLOCK_RETRIES_STEP_LAST] = {
+    [LOAD_UNLOCK_RETRIES_STEP_PIN] = "PIN",
+    [LOAD_UNLOCK_RETRIES_STEP_PUK] = "PUK",
+    [LOAD_UNLOCK_RETRIES_STEP_PIN2] = "PIN2",
+    [LOAD_UNLOCK_RETRIES_STEP_PUK2] = "PUK2",
+};
+
 typedef struct {
     MMBroadbandModemTelit *self;
     GSimpleAsyncResult *result;
@@ -559,34 +566,32 @@ csim_query_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (self, res, &error);
 
     if (!response) {
-        mm_warn ("load unlock retries: no respose for step %d: %s", ctx->step, error->message);
+        mm_warn ("load %s unlock retries got no response: %s", step_lock_names[ctx->step], error->message);
         g_error_free (error);
         goto next_step;
     }
 
     if ( (unlock_retries = mm_telit_parse_csim_response (response, &error)) < 0) {
-        mm_warn ("load unlock retries: parse error in step %d: %s.", ctx->step, error->message);
+        mm_warn ("load %s unlock retries parse error: %s.", step_lock_names[ctx->step], error->message);
         g_error_free (error);
         goto next_step;
     }
 
     ctx->succeded_requests++;
 
+    mm_dbg ("%s unlock retries left: %d", step_lock_names[ctx->step], unlock_retries);
+
     switch (ctx->step) {
         case LOAD_UNLOCK_RETRIES_STEP_PIN:
-            mm_dbg ("PIN unlock retries left: %d", unlock_retries);
             mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN, unlock_retries);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PUK:
-            mm_dbg ("PUK unlock retries left: %d", unlock_retries);
             mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK, unlock_retries);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PIN2:
-            mm_dbg ("PIN2 unlock retries left: %d", unlock_retries);
             mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN2, unlock_retries);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PUK2:
-            mm_dbg ("PUK2 unlock retries left: %d", unlock_retries);
             mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK2, unlock_retries);
             break;
         default:
