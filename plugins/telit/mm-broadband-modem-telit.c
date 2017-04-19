@@ -559,13 +559,13 @@ csim_query_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (self, res, &error);
 
     if (!response) {
-        mm_warn ("No respose for step %d: %s", ctx->step, error->message);
+        mm_warn ("load unlock retries: no respose for step %d: %s", ctx->step, error->message);
         g_error_free (error);
         goto next_step;
     }
 
-    if ( (unlock_retries = mm_telit_parse_csim_response (ctx->step, response, &error)) < 0) {
-        mm_warn ("Parse error in step %d: %s.", ctx->step, error->message);
+    if ( (unlock_retries = mm_telit_parse_csim_response (response, &error)) < 0) {
+        mm_warn ("load unlock retries: parse error in step %d: %s.", ctx->step, error->message);
         g_error_free (error);
         goto next_step;
     }

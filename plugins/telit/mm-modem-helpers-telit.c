@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MMCLI
@@ -113,54 +114,91 @@ mm_telit_get_band_flag (GArray *bands_array,
 
 /*****************************************************************************/
 /* +CSIM response parser */
+#define MM_TELIT_MIN_SIM_RETRY_HEX 0x63C0
+#define MM_TELIT_MAX_SIM_RETRY_HEX 0x63CF
 
 gint
-mm_telit_parse_csim_response (const guint step,
-                              const gchar *response,
+mm_telit_parse_csim_response (const gchar *response,
                               GError **error)
 {
-    GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
-    gchar *retries_hex_str;
-    guint retries;
+    GRegex *r = NULL;
+    gchar *str_code = NULL;
+    gint retries = -1;
+    guint64 hex_code = 0x0;
+    GError *inner_error = NULL;
 
-    r = g_regex_new ("\\+CSIM:\\s*[0-9]+,\\s*.*63C(.*)\"", G_REGEX_RAW, 0, NULL);
-
-    if (!g_regex_match (r, response, 0, &match_info)) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not parse reponse '%s'", response);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
-        return -1;
-    }
+    r = g_regex_new ("\\+CSIM:\\s*[0-9]+,\\s*\".*([0-9a-fA-F]{4})\"", G_REGEX_RAW, 0, NULL);
+    g_regex_match (r, response, 0, &match_info);
 
     if (!g_match_info_matches (match_info)) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not find matches in response '%s'", response);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
-        return -1;
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Could not recognize +CSIM response '%s'", response);
+        goto out;
     }
 
-    retries_hex_str = mm_get_string_unquoted_from_match_info (match_info, 1);
-    g_assert (NULL != retries_hex_str);
-
-    /* convert hex value to uint */
-    if (sscanf (retries_hex_str, "%x", &retries) != 1) {
-         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not get retry value from match '%s'",
-                     retries_hex_str);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
-        return -1;
+    str_code = mm_get_string_unquoted_from_match_info (match_info, 1);
+    if (str_code == NULL) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Could not find expected string code in response '%s'", response);
+        goto out;
     }
 
-    g_free (retries_hex_str);
-    g_match_info_free (match_info);
+    errno = 0;
+    hex_code = g_ascii_strtoull (str_code, NULL, 16);
+    if (hex_code == G_MAXUINT64 && errno == ERANGE) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Could not recognize expected hex code in response '%s'", response);
+        goto out;
+    }
+
+    switch (hex_code) {
+        case 0x6300:
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "SIM verification failed");
+            goto out;
+        case 0x6983:
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "SIM authentication method blocked");
+            goto out;
+        case 0x6984:
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "SIM reference data invalidated");
+            goto out;
+        case 0x6A86:
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "Incorrect parameters in SIM request");
+            goto out;
+        case 0x6A88:
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "SIM reference data not found");
+            goto out;
+        default:
+            break;
+    }
+
+    if (hex_code < MM_TELIT_MIN_SIM_RETRY_HEX || hex_code > MM_TELIT_MAX_SIM_RETRY_HEX) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Unknown error returned '0x%04lx'", hex_code);
+        goto out;
+    }
+
+    retries = (gint)(hex_code - MM_TELIT_MIN_SIM_RETRY_HEX);
+
+out:
     g_regex_unref (r);
+    g_match_info_free (match_info);
+    g_free (str_code);
 
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return -1;
+    }
+
+    g_assert (retries >= 0);
     return retries;
 }
+
 #define SUPP_BAND_RESPONSE_REGEX          "#BND:\\s*\\((?P<Bands2G>[0-9\\-,]*)\\)(,\\s*\\((?P<Bands3G>[0-9\\-,]*)\\))?(,\\s*\\((?P<Bands4G>[0-9\\-,]*)\\))?"
 #define CURR_BAND_RESPONSE_REGEX          "#BND:\\s*(?P<Bands2G>\\d+)(,\\s*(?P<Bands3G>\\d+))?(,\\s*(?P<Bands4G>\\d+))?"
 

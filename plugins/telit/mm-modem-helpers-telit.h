@@ -61,8 +61,7 @@ typedef struct {
 } TelitToMMBandMap;
 
 /* +CSIM response parser */
-gint mm_telit_parse_csim_response (const guint step,
-                                   const gchar *response,
+gint mm_telit_parse_csim_response (const gchar *response,
                                    GError **error);
 
 typedef enum {

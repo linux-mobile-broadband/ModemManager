@@ -28,66 +28,57 @@
 typedef struct {
     gchar *response;
     gint result;
+    gchar *error_message;
 } CSIMResponseTest;
 
-static CSIMResponseTest valid_csim_response_test_list [] = {
+static CSIMResponseTest csim_response_test_list [] = {
     /* The parser expects that 2nd arg contains
      * substring "63Cx" where x is an HEX string
      * representing the retry value */
-    {"+CSIM:8,\"xxxx63C1\"", 1},
-    {"+CSIM:8,\"xxxx63CA\"", 10},
-    {"+CSIM:8,\"xxxx63CF\"", 15},
+    {"+CSIM:8,\"000063C1\"", 1, NULL},
+    {"+CSIM:8,\"000063CA\"", 10, NULL},
+    {"+CSIM:8,\"000063CF\"", 15, NULL},
     /* The parser accepts spaces */
-    {"+CSIM:8,\"xxxx63C1\"", 1},
-    {"+CSIM:8, \"xxxx63C1\"", 1},
-    {"+CSIM: 8, \"xxxx63C1\"", 1},
-    {"+CSIM:  8, \"xxxx63C1\"", 1},
+    {"+CSIM:8, \"000063C1\"", 1, NULL},
+    {"+CSIM: 8, \"000063C1\"", 1, NULL},
+    {"+CSIM:  8, \"000063C1\"", 1, NULL},
     /* the parser expects an int as first argument (2nd arg's length),
      * but does not check if it is correct */
-    {"+CSIM: 10, \"63CF\"", 15},
-    /* the parser expect a quotation mark at the end
-     * of the response, but not at the begin */
-    {"+CSIM: 10, 63CF\"", 15},
-    { NULL, -1}
-};
-
-static CSIMResponseTest invalid_csim_response_test_list [] = {
-    /* Test missing final quotation mark */
-    {"+CSIM: 8, xxxx63CF", -1},
-    /* Negative test for substring "63Cx" */
-    {"+CSIM: 4, xxxx73CF\"", -1},
-    /* Test missing first argument */
-    {"+CSIM:xxxx63CF\"", -1},
-    { NULL, -1}
+    {"+CSIM: 10, \"63CF\"", 15, NULL},
+    /* Valid +CSIM Error codes */
+    {"+CSIM: 4, \"6300\"", -1, "SIM verification failed"},
+    {"+CSIM: 4, \"6983\"", -1, "SIM authentication method blocked"},
+    {"+CSIM: 4, \"6984\"", -1, "SIM reference data invalidated"},
+    {"+CSIM: 4, \"6A86\"", -1, "Incorrect parameters in SIM request"},
+    {"+CSIM: 4, \"6A88\"", -1, "SIM reference data not found"},
+    /* Test error: missing first argument */
+    {"+CSIM:000063CF\"", -1, "Could not recognize +CSIM response '+CSIM:000063CF\"'"},
+    /* Test error: missing quotation mark */
+    {"+CSIM: 8, 000063CF", -1, "Could not recognize +CSIM response '+CSIM: 8, 000063CF'"},
+    /* Test generic error */
+    {"+CSIM: 4, \"63BF\"", -1, "Unknown error returned '0x63bf'"},
+    {"+CSIM: 4, \"63D0\"", -1, "Unknown error returned '0x63d0'"}
 };
 
 static void
 test_mm_telit_parse_csim_response (void)
 {
-    const gint step = 1;
     guint i;
     gint res;
     GError* error = NULL;
 
-    /* Test valid responses */
-    for (i = 0; valid_csim_response_test_list[i].response != NULL; i++) {
-        res = mm_telit_parse_csim_response (step, valid_csim_response_test_list[i].response, &error);
+    for (i = 0; i < G_N_ELEMENTS (csim_response_test_list); i++) {
+        res = mm_telit_parse_csim_response (csim_response_test_list[i].response, &error);
 
-        g_assert_no_error (error);
-        g_assert_cmpint (res, ==, valid_csim_response_test_list[i].result);
-    }
-
-    /* Test invalid responses */
-    for (i = 0; invalid_csim_response_test_list[i].response != NULL; i++) {
-        res = mm_telit_parse_csim_response (step, invalid_csim_response_test_list[i].response, &error);
-
-        g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
-        g_assert_cmpint (res, ==, invalid_csim_response_test_list[i].result);
-
-        if (NULL != error) {
-            g_error_free (error);
-            error = NULL;
+        if (csim_response_test_list[i].error_message == NULL) {
+            g_assert_no_error (error);
+        } else {
+            g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+            g_assert_cmpstr (error->message, ==, csim_response_test_list[i].error_message);
+            g_clear_error (&error);
         }
+
+        g_assert_cmpint (res, ==, csim_response_test_list[i].result);
     }
 }
 
