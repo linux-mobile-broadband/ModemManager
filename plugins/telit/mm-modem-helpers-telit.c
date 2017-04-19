@@ -125,7 +125,7 @@ mm_telit_parse_csim_response (const gchar *response,
     GRegex *r = NULL;
     gchar *str_code = NULL;
     gint retries = -1;
-    guint64 hex_code = 0x0;
+    guint hex_code;
     GError *inner_error = NULL;
 
     r = g_regex_new ("\\+CSIM:\\s*[0-9]+,\\s*\".*([0-9a-fA-F]{4})\"", G_REGEX_RAW, 0, NULL);
@@ -144,9 +144,7 @@ mm_telit_parse_csim_response (const gchar *response,
         goto out;
     }
 
-    errno = 0;
-    hex_code = g_ascii_strtoull (str_code, NULL, 16);
-    if (hex_code == G_MAXUINT64 && errno == ERANGE) {
+    if (!mm_get_uint_from_hex_str (str_code, &hex_code)) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                    "Could not recognize expected hex code in response '%s'", response);
         goto out;
@@ -179,7 +177,7 @@ mm_telit_parse_csim_response (const gchar *response,
 
     if (hex_code < MM_TELIT_MIN_SIM_RETRY_HEX || hex_code > MM_TELIT_MAX_SIM_RETRY_HEX) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                   "Unknown error returned '0x%04lx'", hex_code);
+                                   "Unknown error returned '0x%04x'", hex_code);
         goto out;
     }
 
