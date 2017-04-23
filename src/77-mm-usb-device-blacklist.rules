@@ -179,4 +179,7 @@ ATTRS{idVendor}=="0456", ATTRS{idProduct}=="b673", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="045B", ATTRS{idProduct}=="0212", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="0409", ATTRS{idProduct}=="0063", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Analog Devices EVAL-ADXL362Z-DB
+ATTRS{idVendor}=="064B", ATTRS{idProduct}=="7825", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
