@@ -4683,8 +4683,10 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
                                  mcc,
                                  mnc);
 
-        g_free (self->priv->current_operator_description);
-        self->priv->current_operator_description = g_strdup (description);
+        g_clear_pointer (&self->priv->current_operator_description, g_free);
+        /* Some Telit modems apparently sometimes report non-UTF8 characters */
+        if (g_utf8_validate (description, -1, NULL))
+            self->priv->current_operator_description = g_strdup (description);
     }
 
     /* If MNC comes with PCS digit, we must make sure the additional
