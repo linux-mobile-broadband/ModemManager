@@ -33,13 +33,4 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="03", ENV{
 # CE910-DUAL
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_TELIT_PORT_TYPE_MODEM}="1"
 
-# HE910, UE910, UL865 (dynamic port identification supported)
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0021", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
-
-# GE910 (dynamic port identification supported)
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0022", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
-
-# LE910 V2
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0036", ENV{ID_MM_TELIT_PORTS_TAGGED}="1"
-
 LABEL="mm_telit_port_types_end"

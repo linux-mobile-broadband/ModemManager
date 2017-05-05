@@ -336,12 +336,5 @@ telit_custom_init (MMPortProbe *probe,
     ctx->getportcfg_done = FALSE;
     ctx->getportcfg_retries = 3;
 
-    /* If the device is tagged for supporting #PORTCFG do the custom init */
-    if (mm_kernel_device_get_global_property_as_boolean (port_device, "ID_MM_TELIT_PORTS_TAGGED")) {
-        telit_custom_init_step (ctx);
-        return;
-    }
-
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    telit_custom_init_context_complete_and_free (ctx);
+    telit_custom_init_step (ctx);
 }
