@@ -112,10 +112,10 @@ allocate_client_ready (QmiDevice *qmi_device,
                         qmi_service_get_string (ctx->info->service));
         g_task_return_error (task, error);
     } else {
-        g_task_return_boolean (task, TRUE);
         /* Move the service info to our internal list */
         self->priv->services = g_list_prepend (self->priv->services, ctx->info);
         ctx->info = NULL;
+        g_task_return_boolean (task, TRUE);
     }
 
     g_object_unref (task);
