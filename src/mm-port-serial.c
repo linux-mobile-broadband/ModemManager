@@ -260,8 +260,14 @@ parse_baudrate (guint  baudrate_num,
     case 115200:
         speed = B115200;
         break;
+    case 230400:
+        speed = B230400;
+        break;
     case 460800:
         speed = B460800;
+        break;
+    case 921600:
+        speed = B921600;
         break;
     default:
         return FALSE;
