@@ -69,12 +69,12 @@ mm_plugin_create (void)
     static const gchar *vendor_strings[] = { "u-blox", NULL };
 
     return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_UBLOX,
-                                    MM_PLUGIN_NAME,               "u-blox",
-                                    MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                                    MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                                    MM_PLUGIN_NAME,                   "u-blox",
+                                    MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
+                                    MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
                                     MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
-                                    MM_PLUGIN_ALLOWED_AT,         TRUE,
-                                    MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
+                                    MM_PLUGIN_ALLOWED_AT,             TRUE,
+                                    MM_PLUGIN_CUSTOM_AT_PROBE,        custom_at_probe,
                                     NULL));
 }
 
