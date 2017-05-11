@@ -1,4 +1,40 @@
 
+ModemManager 1.6.6
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored keyboard.io devices.
+   ** Ignored Analog Devices EVAL-ADXL362Z-DB.
+   ** Ignored promotion boards from Renesas.
+   ** Ignored Analog PlutoSDR.
+   ** Ignored Telit LE866 flashing device.
+
+ * Plugins:
+   ** Telit: fix AT+SERVICE 3GPP2 access technology reporting.
+   ** Telit: lock/unlock CSIM operations by default.
+   ** Telit: don't ignore AT ports without an explicit port type hint tag.
+   ** Cinterion: improve ^SMONG and ^SCFG=? response parsers.
+   ** Huawei: implement Signal interface based on ^HCSQ.
+   ** QMI: require FCC auth if InvalidTransition error is detected.
+   ** QMI: fix incorrect use of mm_base_bearer_get_status().
+   ** QMI: add WDS event reporting support.
+   ** MBIM: remove parent access tech loading.
+
+ * Core:
+   ** Added RSCP item in the Signal interface.
+   ** Implement Signal interface in the generic AT based modem based on ^CESQ.
+   ** Improve network registration checks for LTE devices.
+   ** Handle SDIO devices.
+   ** Fix QCDM access tech reporting for WCDMA system modes.
+   ** Fix capabilities in 4G-only devices.
+   ** Set TTY as connected as soon as ATD replies.
+
+ * and some other fixes...
+
+
 ModemManager 1.6.4
 -------------------------------------------
 This is a new bugfix release of ModemManager.
