@@ -3,7 +3,7 @@ AC_PREREQ([2.63])
 dnl The MM version number
 m4_define([mm_major_version], [1])
 m4_define([mm_minor_version], [4])
-m4_define([mm_micro_version], [19])
+m4_define([mm_micro_version], [20])
 m4_define([mm_version],
           [mm_major_version.mm_minor_version.mm_micro_version])
 
