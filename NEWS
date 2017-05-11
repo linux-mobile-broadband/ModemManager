@@ -1,4 +1,34 @@
 
+ModemManager 1.4.20
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored keyboard.io devices.
+   ** Ignored Analog Devices EVAL-ADXL362Z-DB.
+   ** Ignored promotion boards from Renesas.
+   ** Ignored Analog PlutoSDR.
+
+ * Plugins:
+   ** Cinterion: improve ^SMONG and ^SCFG=? response parsers.
+   ** QMI: require FCC auth if InvalidTransition error is detected.
+   ** MBIM: remove parent access tech loading.
+
+ * Core:
+   ** Improve network registration checks for LTE devices.
+   ** Handle SDIO devices.
+   ** Fix QCDM access tech reporting for WCDMA system modes.
+   ** Fix capabilities in 4G-only devices.
+   ** Set TTY as connected as soon as ATD replies.
+
+ * Build:
+   ** Work around automake-1.15 & intltool complaining about
+      translations in build dir.
+
+ * and some other fixes...
+
 ModemManager 1.4.18
 -------------------------------------------
 This is a new bugfix release of ModemManager.
