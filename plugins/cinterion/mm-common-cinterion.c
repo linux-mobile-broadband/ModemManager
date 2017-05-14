@@ -36,6 +36,7 @@ typedef enum {
 typedef struct {
     MMModemLocationSource enabled_sources;
     FeatureSupport        sgpss_support;
+    FeatureSupport        sgpsc_support;
 } LocationContext;
 
 static void
@@ -59,6 +60,7 @@ get_location_context (MMBaseModem *self)
         ctx = g_slice_new (LocationContext);
         ctx->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         ctx->sgpss_support = FEATURE_SUPPORT_UNKNOWN;
+        ctx->sgpsc_support = FEATURE_SUPPORT_UNKNOWN;
 
         g_object_set_qdata_full (
             G_OBJECT (self),
@@ -131,6 +133,30 @@ mm_common_cinterion_location_load_capabilities_finish (MMIfaceModemLocation  *se
 static void probe_gps_features (GTask *task);
 
 static void
+sgpsc_test_ready (MMBaseModem  *self,
+                  GAsyncResult *res,
+                  GTask        *task)
+{
+    LocationContext *location_ctx;
+
+    location_ctx = get_location_context (self);
+    if (!mm_base_modem_at_command_finish (self, res, NULL))
+        location_ctx->sgpsc_support = FEATURE_NOT_SUPPORTED;
+    else {
+        /* ^SGPSC supported! */
+        location_ctx->sgpsc_support = FEATURE_SUPPORTED;
+        /* It may happen that the modem was started with GPS already enabled, or
+         * maybe ModemManager got rebooted and it was left enabled before. We'll
+         * make sure that it is disabled when we initialize the modem. */
+        mm_base_modem_at_command (MM_BASE_MODEM (self), "AT^SGPSC=\"Engine\",\"0\"",          3, FALSE, NULL, NULL);
+        mm_base_modem_at_command (MM_BASE_MODEM (self), "AT^SGPSC=\"Power/Antenna\",\"off\"", 3, FALSE, NULL, NULL);
+        mm_base_modem_at_command (MM_BASE_MODEM (self), "AT^SGPSC=\"NMEA/Output\",\"off\"",   3, FALSE, NULL, NULL);
+    }
+
+    probe_gps_features (task);
+}
+
+static void
 sgpss_test_ready (MMBaseModem  *self,
                   GAsyncResult *res,
                   GTask        *task)
@@ -143,6 +169,11 @@ sgpss_test_ready (MMBaseModem  *self,
     else {
         /* ^SGPSS supported! */
         location_ctx->sgpss_support = FEATURE_SUPPORTED;
+
+        /* Flag ^SGPSC as unsupported, even if it may be supported, so that we
+         * only use one set of commands to enable/disable GPS. */
+        location_ctx->sgpsc_support = FEATURE_NOT_SUPPORTED;
+
         /* It may happen that the modem was started with GPS already enabled, or
          * maybe ModemManager got rebooted and it was left enabled before. We'll
          * make sure that it is disabled when we initialize the modem. */
@@ -169,8 +200,14 @@ probe_gps_features (GTask *task)
         return;
     }
 
+    /* Need to check if SGPSC supported... */
+    if (location_ctx->sgpsc_support == FEATURE_SUPPORT_UNKNOWN) {
+        mm_base_modem_at_command (self, "AT^SGPSC=?", 3, TRUE, (GAsyncReadyCallback) sgpsc_test_ready, task);
+        return;
+    }
+
     /* All GPS features probed, check if GPS supported */
-    if (location_ctx->sgpss_support == FEATURE_SUPPORTED) {
+    if (location_ctx->sgpss_support == FEATURE_SUPPORTED || location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
         mm_dbg ("GPS commands supported: GPS capabilities enabled");
         ctx->sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                          MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
@@ -244,6 +281,9 @@ mm_common_cinterion_location_load_capabilities (MMIfaceModemLocation *self,
 typedef enum {
     DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST,
     DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSS,
+    DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE,
+    DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA,
+    DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT,
     DISABLE_LOCATION_GATHERING_GPS_STEP_LAST,
 } DisableLocationGatheringGpsStep;
 
@@ -251,6 +291,7 @@ typedef struct {
     MMModemLocationSource            source;
     DisableLocationGatheringGpsStep  gps_step;
     GError                          *sgpss_error;
+    GError                          *sgpsc_error;
 } DisableLocationGatheringContext;
 
 static void
@@ -258,6 +299,8 @@ disable_location_gathering_context_free (DisableLocationGatheringContext *ctx)
 {
     if (ctx->sgpss_error)
         g_error_free (ctx->sgpss_error);
+    if (ctx->sgpsc_error)
+        g_error_free (ctx->sgpsc_error);
     g_slice_free (DisableLocationGatheringContext, ctx);
 }
 
@@ -270,6 +313,28 @@ mm_common_cinterion_disable_location_gathering_finish (MMIfaceModemLocation  *se
 }
 
 static void disable_location_gathering_context_gps_step (GTask *task);
+
+static void
+disable_sgpsc_ready (MMBaseModem  *self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    DisableLocationGatheringContext *ctx;
+    GError                          *error = NULL;
+
+    ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
+
+    /* Store error, if not one available already, and continue */
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        if (!ctx->sgpsc_error)
+            ctx->sgpsc_error = error;
+        else
+            g_error_free (error);
+    }
+
+    ctx->gps_step++;
+    disable_location_gathering_context_gps_step (task);
+}
 
 static void
 disable_sgpss_ready (MMBaseModem  *self,
@@ -299,22 +364,61 @@ disable_location_gathering_context_gps_step (GTask *task)
     ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
     location_ctx = get_location_context (MM_BASE_MODEM (self));
 
+    /* Only one of both supported */
+    g_assert ((location_ctx->sgpss_support == FEATURE_SUPPORTED) || (location_ctx->sgpsc_support == FEATURE_SUPPORTED));
+    g_assert (!((location_ctx->sgpss_support == FEATURE_SUPPORTED) && (location_ctx->sgpsc_support == FEATURE_SUPPORTED)));
+
     switch (ctx->gps_step) {
     case DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
         ctx->gps_step++;
         /* Fall down to next step */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
-        g_assert (location_ctx->sgpss_support == FEATURE_SUPPORTED);
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  "AT^SGPSS=0",
-                                  3, FALSE, (GAsyncReadyCallback) disable_sgpss_ready, task);
-        return;
+        if (location_ctx->sgpss_support == FEATURE_SUPPORTED) {
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSS=0",
+                                      3, FALSE, (GAsyncReadyCallback) disable_sgpss_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* Engine off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"Engine\",\"0\"",
+                                      3, FALSE, (GAsyncReadyCallback) disable_sgpsc_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* Antenna off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"Power/Antenna\",\"off\"",
+                                      3, FALSE, (GAsyncReadyCallback) disable_sgpsc_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* NMEA output off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"NMEA/Output\",\"off\"",
+                                      3, FALSE, (GAsyncReadyCallback) disable_sgpsc_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_LAST:
         /* Only use the GPS port in NMEA/RAW setups */
-        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                           MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
             MMPortSerialGps *gps_port;
 
             /* Even if we get an error here, we try to close the GPS port */
@@ -326,6 +430,9 @@ disable_location_gathering_context_gps_step (GTask *task)
         if (ctx->sgpss_error) {
             g_task_return_error (task, ctx->sgpss_error);
             g_clear_error (&ctx->sgpss_error);
+        } else if (ctx->sgpsc_error) {
+            g_task_return_error (task, ctx->sgpsc_error);
+            g_clear_error (&ctx->sgpsc_error);
         } else
             g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -429,13 +536,15 @@ mm_common_cinterion_disable_location_gathering (MMIfaceModemLocation  *self,
 typedef enum {
     ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST,
     ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS,
+    ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT,
+    ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA,
+    ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE,
     ENABLE_LOCATION_GATHERING_GPS_STEP_LAST,
 } EnableLocationGatheringGpsStep;
 
 typedef struct {
     MMModemLocationSource          source;
     EnableLocationGatheringGpsStep gps_step;
-    gboolean                       sgpss_success;
 } EnableLocationGatheringContext;
 
 static void
@@ -454,15 +563,26 @@ mm_common_cinterion_enable_location_gathering_finish (MMIfaceModemLocation  *sel
 
 static void enable_location_gathering_context_gps_step (GTask *task);
 
-static void
-enable_sgpss_ready (MMBaseModem  *self,
-                    GAsyncResult *res,
-                    GTask        *task)
+static gboolean
+enable_location_gathering_context_gps_step_next_cb (GTask *task)
 {
     EnableLocationGatheringContext *ctx;
-    GError                         *error = NULL;
 
     ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
+
+    /* We jump to the next step */
+    ctx->gps_step++;
+    enable_location_gathering_context_gps_step (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+enable_sgpsc_or_sgpss_ready (MMBaseModem  *self,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -470,12 +590,8 @@ enable_sgpss_ready (MMBaseModem  *self,
         return;
     }
 
-    /* Flag as success with this method */
-    ctx->sgpss_success = TRUE;
-
-    /* And jump to last step */
-    ctx->gps_step = ENABLE_LOCATION_GATHERING_GPS_STEP_LAST;
-    enable_location_gathering_context_gps_step (task);
+    /* Cinterion asks for 100ms between GPS commands... */
+    g_timeout_add (100, (GSourceFunc) enable_location_gathering_context_gps_step_next_cb, task);
 }
 
 static void
@@ -489,21 +605,60 @@ enable_location_gathering_context_gps_step (GTask *task)
     ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
     location_ctx = get_location_context (MM_BASE_MODEM (self));
 
+    /* Only one of both supported */
+    g_assert ((location_ctx->sgpss_support == FEATURE_SUPPORTED) || (location_ctx->sgpsc_support == FEATURE_SUPPORTED));
+    g_assert (!((location_ctx->sgpss_support == FEATURE_SUPPORTED) && (location_ctx->sgpsc_support == FEATURE_SUPPORTED)));
+
     switch (ctx->gps_step) {
     case ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
         ctx->gps_step++;
         /* Fall down to next step */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
-        g_assert (location_ctx->sgpss_support == FEATURE_SUPPORTED);
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  "AT^SGPSS=4",
-                                  3, FALSE, (GAsyncReadyCallback) enable_sgpss_ready, task);
-        return;
+        if (location_ctx->sgpss_support == FEATURE_SUPPORTED) {
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSS=4",
+                                      3, FALSE, (GAsyncReadyCallback) enable_sgpsc_or_sgpss_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* NMEA output off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"NMEA/Output\",\"on\"",
+                                      3, FALSE, (GAsyncReadyCallback) enable_sgpsc_or_sgpss_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* Antenna off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"Power/Antenna\",\"on\"",
+                                      3, FALSE, (GAsyncReadyCallback) enable_sgpsc_or_sgpss_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE:
+        if (location_ctx->sgpsc_support == FEATURE_SUPPORTED) {
+            /* Engine off */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT^SGPSC=\"Engine\",\"1\"",
+                                      3, FALSE, (GAsyncReadyCallback) enable_sgpsc_or_sgpss_ready, task);
+            return;
+        }
+        ctx->gps_step++;
+        /* Fall down to next step */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_LAST:
-        g_assert (ctx->sgpss_success);
-
         /* Only use the GPS port in NMEA/RAW setups */
         if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                            MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
