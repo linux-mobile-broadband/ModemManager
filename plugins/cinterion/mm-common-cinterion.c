@@ -26,8 +26,15 @@ static GQuark cinterion_location_context_quark;
 
 /*****************************************************************************/
 
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED,
+} FeatureSupport;
+
 typedef struct {
     MMModemLocationSource enabled_sources;
+    FeatureSupport        sgpss_support;
 } LocationContext;
 
 static void
@@ -50,6 +57,7 @@ get_location_context (MMBaseModem *self)
         /* Create context and keep it as object data */
         ctx = g_slice_new (LocationContext);
         ctx->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
+        ctx->sgpss_support = FEATURE_SUPPORT_UNKNOWN;
 
         g_object_set_qdata_full (
             G_OBJECT (self),
@@ -61,133 +69,234 @@ get_location_context (MMBaseModem *self)
     return ctx;
 }
 
-
 /*****************************************************************************/
 /* Location capabilities loading (Location interface) */
 
-MMModemLocationSource
-mm_common_cinterion_location_load_capabilities_finish (MMIfaceModemLocation *self,
-                                                       GAsyncResult *res,
-                                                       GError **error)
+typedef struct {
+    MMModemLocationSource sources;
+} LoadCapabilitiesContext;
+
+static void
+load_capabilities_context_free (LoadCapabilitiesContext *ctx)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    g_slice_free (LoadCapabilitiesContext, ctx);
+}
+
+MMModemLocationSource
+mm_common_cinterion_location_load_capabilities_finish (MMIfaceModemLocation  *self,
+                                                       GAsyncResult          *res,
+                                                       GError               **error)
+{
+    gssize aux;
+
+    if ((aux = g_task_propagate_int (G_TASK (res), error)) < 0)
         return MM_MODEM_LOCATION_SOURCE_NONE;
 
-    return (MMModemLocationSource) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                         G_SIMPLE_ASYNC_RESULT (res)));
+    return (MMModemLocationSource) aux;
+}
+
+static void probe_gps_features (GTask *task);
+
+static void
+sgpss_test_ready (MMBaseModem  *self,
+                  GAsyncResult *res,
+                  GTask        *task)
+{
+    LocationContext *location_ctx;
+
+    location_ctx = get_location_context (self);
+    if (!mm_base_modem_at_command_finish (self, res, NULL))
+        location_ctx->sgpss_support = FEATURE_NOT_SUPPORTED;
+    else
+        location_ctx->sgpss_support = FEATURE_SUPPORTED;
+    probe_gps_features (task);
+}
+
+static void
+probe_gps_features (GTask *task)
+{
+    LoadCapabilitiesContext *ctx;
+    MMBaseModem             *self;
+    LocationContext         *location_ctx;
+
+    ctx = (LoadCapabilitiesContext *) g_task_get_task_data (task);
+    self = MM_BASE_MODEM (g_task_get_source_object (task));
+    location_ctx = get_location_context (self);
+
+    /* Need to check if SGPSS supported... */
+    if (location_ctx->sgpss_support == FEATURE_SUPPORT_UNKNOWN) {
+        mm_base_modem_at_command (self, "AT^SGPSS=?", 3, TRUE, (GAsyncReadyCallback) sgpss_test_ready, task);
+        return;
+    }
+
+    /* All GPS features probed, check if GPS supported */
+    if (location_ctx->sgpss_support == FEATURE_SUPPORTED) {
+        mm_dbg ("GPS commands supported: GPS capabilities enabled");
+        ctx->sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                         MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                         MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
+    } else
+        mm_dbg ("No GPS command supported: no GPS capabilities");
+
+    g_task_return_int (task, (gssize) ctx->sources);
+    g_object_unref (task);
 }
 
 static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+                                GAsyncResult         *res,
+                                GTask                *task)
 {
-    MMModemLocationSource sources;
-    GError *error = NULL;
+    LoadCapabilitiesContext *ctx;
+    GError                  *error = NULL;
 
-    sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
+    ctx = (LoadCapabilitiesContext *) g_task_get_task_data (task);
+
+    ctx->sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    /* Now our own check. */
-    if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)))
-        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                    MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                    MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
+    /* Now our own check. If we don't have any GPS port, we're done */
+    if (!mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
+        mm_dbg ("No GPS data port found: no GPS capabilities");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
 
-    /* So we're done, complete */
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               GUINT_TO_POINTER (sources),
-                                               NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    /* Probe all GPS features */
+    probe_gps_features (task);
 }
 
 void
 mm_common_cinterion_location_load_capabilities (MMIfaceModemLocation *self,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data)
+                                                GAsyncReadyCallback   callback,
+                                                gpointer              user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask                   *task;
+    LoadCapabilitiesContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_common_cinterion_location_load_capabilities);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (LoadCapabilitiesContext);
+    ctx->sources = MM_MODEM_LOCATION_SOURCE_NONE;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) load_capabilities_context_free);
 
     /* Chain up parent's setup */
     iface_modem_location_parent->load_capabilities (
         self,
         (GAsyncReadyCallback)parent_load_capabilities_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
-/* Enable/Disable location gathering (Location interface) */
+/* Disable location gathering (Location interface) */
+
+typedef enum {
+    DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST,
+    DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSS,
+    DISABLE_LOCATION_GATHERING_GPS_STEP_LAST,
+} DisableLocationGatheringGpsStep;
 
 typedef struct {
-    MMBaseModem *self;
-    GSimpleAsyncResult *result;
-    MMModemLocationSource source;
-} LocationGatheringContext;
+    MMModemLocationSource            source;
+    DisableLocationGatheringGpsStep  gps_step;
+    GError                          *sgpss_error;
+} DisableLocationGatheringContext;
 
 static void
-location_gathering_context_complete_and_free (LocationGatheringContext *ctx)
+disable_location_gathering_context_free (DisableLocationGatheringContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LocationGatheringContext, ctx);
+    if (ctx->sgpss_error)
+        g_error_free (ctx->sgpss_error);
+    g_slice_free (DisableLocationGatheringContext, ctx);
 }
-
-/******************************/
-/* Disable location gathering */
 
 gboolean
-mm_common_cinterion_disable_location_gathering_finish (MMIfaceModemLocation *self,
-                                                       GAsyncResult *res,
-                                                       GError **error)
+mm_common_cinterion_disable_location_gathering_finish (MMIfaceModemLocation  *self,
+                                                       GAsyncResult          *res,
+                                                       GError               **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void disable_location_gathering_context_gps_step (GTask *task);
+
+static void
+disable_sgpss_ready (MMBaseModem  *self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    DisableLocationGatheringContext *ctx;
+
+    ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
+
+    /* Store error, if any, and continue */
+    g_assert (!ctx->sgpss_error);
+    mm_base_modem_at_command_finish (self, res, &ctx->sgpss_error);
+
+    ctx->gps_step++;
+    disable_location_gathering_context_gps_step (task);
 }
 
 static void
-gps_disabled_ready (MMBaseModem *self,
-                    GAsyncResult *res,
-                    LocationGatheringContext *ctx)
+disable_location_gathering_context_gps_step (GTask *task)
 {
-    GError *error = NULL;
+    DisableLocationGatheringContext *ctx;
+    MMBaseModem                     *self;
+    LocationContext                 *location_ctx;
 
-    if (!mm_base_modem_at_command_full_finish (self, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    self = MM_BASE_MODEM (g_task_get_source_object (task));
+    ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
+    location_ctx = get_location_context (MM_BASE_MODEM (self));
 
-    /* Only use the GPS port in NMEA/RAW setups */
-    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        MMPortSerialGps *gps_port;
+    switch (ctx->gps_step) {
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
+        ctx->gps_step++;
+        /* Fall down to next step */
 
-        /* Even if we get an error here, we try to close the GPS port */
-        gps_port = mm_base_modem_peek_port_gps (self);
-        if (gps_port)
-            mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
+        g_assert (location_ctx->sgpss_support == FEATURE_SUPPORTED);
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "AT^SGPSS=0",
+                                  3, FALSE, (GAsyncReadyCallback) disable_sgpss_ready, task);
+        return;
+
+    case DISABLE_LOCATION_GATHERING_GPS_STEP_LAST:
+        /* Only use the GPS port in NMEA/RAW setups */
+        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                           MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+            MMPortSerialGps *gps_port;
+
+            /* Even if we get an error here, we try to close the GPS port */
+            gps_port = mm_base_modem_peek_port_gps (self);
+            if (gps_port)
+                mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+        }
+
+        if (ctx->sgpss_error) {
+            g_task_return_error (task, ctx->sgpss_error);
+            g_clear_error (&ctx->sgpss_error);
+        } else
+            g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
     }
-
-    location_gathering_context_complete_and_free (ctx);
 }
 
 static void
-internal_disable_location_gathering (LocationGatheringContext *ctx)
+internal_disable_location_gathering (GTask *task)
 {
-    LocationContext *location_ctx;
-    gboolean stop_gps = FALSE;
+    DisableLocationGatheringContext *ctx;
+    LocationContext                 *location_ctx;
+    gboolean                         stop_gps = FALSE;
 
-    location_ctx = get_location_context (MM_BASE_MODEM (ctx->self));
+    ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
+
+    location_ctx = get_location_context (MM_BASE_MODEM (g_task_get_source_object (task)));
 
     /* Only stop GPS engine if no GPS-related sources enabled */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
@@ -201,64 +310,59 @@ internal_disable_location_gathering (LocationGatheringContext *ctx)
             stop_gps = TRUE;
     }
 
+    /* Run GPS stop sequence only if required to do so */
     if (stop_gps) {
-        /* We disable continuous GPS fixes */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
-                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (ctx->self), NULL),
-                                       "AT^SGPSS=0",
-                                       3,
-                                       FALSE,
-                                       FALSE, /* raw */
-                                       NULL, /* cancellable */
-                                       (GAsyncReadyCallback)gps_disabled_ready,
-                                       ctx);
+        disable_location_gathering_context_gps_step (task);
         return;
     }
 
     /* For any other location (e.g. 3GPP), or if still some GPS needed, just return */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    location_gathering_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 parent_disable_location_gathering_ready (MMIfaceModemLocation *self,
-                                         GAsyncResult *res,
-                                         LocationGatheringContext *ctx)
+                                         GAsyncResult         *res,
+                                         GTask                *task)
 {
-    GError *error = NULL;
+    DisableLocationGatheringContext *ctx;
+    GError                          *error = NULL;
+
+    ctx = (DisableLocationGatheringContext *) g_task_get_task_data (task);
 
     if (!iface_modem_location_parent->disable_location_gathering_finish (self, res, &error)) {
-        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                           MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                           MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-            /* Ignore errors when disabling GPS, we can try with AT commands */
-            g_error_free (error);
-        } else {
-            /* Fatal */
-            g_simple_async_result_take_error (ctx->result, error);
-            location_gathering_context_complete_and_free (ctx);
+        /* Errors when disabling non-GPS sources are fatal */
+        if (!(ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                             MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
+
+        /* Ignore errors when disabling GPS, we can try with AT commands */
+        g_error_free (error);
     }
 
-    internal_disable_location_gathering (ctx);
+    internal_disable_location_gathering (task);
 }
 
 void
-mm_common_cinterion_disable_location_gathering (MMIfaceModemLocation *self,
-                                                MMModemLocationSource source,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data)
+mm_common_cinterion_disable_location_gathering (MMIfaceModemLocation  *self,
+                                                MMModemLocationSource  source,
+                                                GAsyncReadyCallback    callback,
+                                                gpointer               user_data)
 {
-    LocationGatheringContext *ctx;
+    GTask                           *task;
+    DisableLocationGatheringContext *ctx;
 
-    ctx = g_slice_new (LocationGatheringContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_common_cinterion_disable_location_gathering);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (DisableLocationGatheringContext);
     ctx->source = source;
+    ctx->gps_step = DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) disable_location_gathering_context_free);
 
     /* Chain up parent's gathering enable */
     if (iface_modem_location_parent->disable_location_gathering) {
@@ -266,86 +370,129 @@ mm_common_cinterion_disable_location_gathering (MMIfaceModemLocation *self,
             self,
             source,
             (GAsyncReadyCallback)parent_disable_location_gathering_ready,
-            ctx);
+            task);
         return;
     }
 
-    internal_disable_location_gathering (ctx);
+    internal_disable_location_gathering (task);
 }
 
 /*****************************************************************************/
 /* Enable location gathering (Location interface) */
 
-gboolean
-mm_common_cinterion_enable_location_gathering_finish (MMIfaceModemLocation *self,
-                                                      GAsyncResult *res,
-                                                      GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
+typedef enum {
+    ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST,
+    ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS,
+    ENABLE_LOCATION_GATHERING_GPS_STEP_LAST,
+} EnableLocationGatheringGpsStep;
+
+typedef struct {
+    MMModemLocationSource          source;
+    EnableLocationGatheringGpsStep gps_step;
+    gboolean                       sgpss_success;
+} EnableLocationGatheringContext;
 
 static void
-gps_enabled_ready (MMBaseModem *self,
-                   GAsyncResult *res,
-                   LocationGatheringContext *ctx)
+enable_location_gathering_context_free (EnableLocationGatheringContext *ctx)
 {
-    GError *error = NULL;
+    g_slice_free (EnableLocationGatheringContext, ctx);
+}
 
-    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        location_gathering_context_complete_and_free (ctx);
+gboolean
+mm_common_cinterion_enable_location_gathering_finish (MMIfaceModemLocation  *self,
+                                                      GAsyncResult          *res,
+                                                      GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void enable_location_gathering_context_gps_step (GTask *task);
+
+static void
+enable_sgpss_ready (MMBaseModem  *self,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    EnableLocationGatheringContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    /* Only use the GPS port in NMEA/RAW setups */
-    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        MMPortSerialGps *gps_port;
+    /* Flag as success with this method */
+    ctx->sgpss_success = TRUE;
 
-        gps_port = mm_base_modem_peek_port_gps (self);
-        if (!gps_port ||
-            !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
-            if (error)
-                g_simple_async_result_take_error (ctx->result, error);
-            else
-                g_simple_async_result_set_error (ctx->result,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_FAILED,
-                                                 "Couldn't open raw GPS serial port");
-        } else
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-
-    location_gathering_context_complete_and_free (ctx);
+    /* And jump to last step */
+    ctx->gps_step = ENABLE_LOCATION_GATHERING_GPS_STEP_LAST;
+    enable_location_gathering_context_gps_step (task);
 }
 
 static void
-parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
-                                        GAsyncResult *res,
-                                        LocationGatheringContext *ctx)
+enable_location_gathering_context_gps_step (GTask *task)
 {
-    gboolean start_gps = FALSE;
-    GError *error = NULL;
-    LocationContext *location_ctx;
+    EnableLocationGatheringContext *ctx;
+    MMBaseModem                    *self;
+    LocationContext                *location_ctx;
 
-    if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
-        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                           MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                           MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-            /* Ignore errors when enabling GPS, we can try with AT commands */
-            g_error_free (error);
-        } else {
-            /* Fatal */
-            g_simple_async_result_take_error (ctx->result, error);
-            location_gathering_context_complete_and_free (ctx);
-            return;
-        }
-    }
-
-    /* Now our own enabling */
-
+    self = MM_BASE_MODEM (g_task_get_source_object (task));
+    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
     location_ctx = get_location_context (MM_BASE_MODEM (self));
+
+    switch (ctx->gps_step) {
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
+        ctx->gps_step++;
+        /* Fall down to next step */
+
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
+        g_assert (location_ctx->sgpss_support == FEATURE_SUPPORTED);
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "AT^SGPSS=4",
+                                  3, FALSE, (GAsyncReadyCallback) enable_sgpss_ready, task);
+        return;
+
+    case ENABLE_LOCATION_GATHERING_GPS_STEP_LAST:
+        g_assert (ctx->sgpss_success);
+
+        /* Only use the GPS port in NMEA/RAW setups */
+        if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                           MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+            MMPortSerialGps *gps_port;
+            GError          *error = NULL;
+
+            gps_port = mm_base_modem_peek_port_gps (self);
+            if (!gps_port || !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
+                if (error)
+                    g_task_return_error (task, error);
+                else
+                    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                             "Couldn't open raw GPS serial port");
+                g_object_unref (task);
+                return;
+            }
+        }
+
+        /* Success */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+}
+
+static void
+internal_enable_location_gathering (GTask *task)
+{
+    EnableLocationGatheringContext *ctx;
+    LocationContext                *location_ctx;
+    gboolean                        start_gps = FALSE;
+
+    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
+
+    location_ctx = get_location_context (MM_BASE_MODEM (g_task_get_source_object (task)));
 
     /* NMEA and RAW are both enabled in the same way */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
@@ -360,22 +507,41 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
     }
 
     if (start_gps) {
-        /* We enable continuous GPS fixes */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                       "AT^SGPSS=4",
-                                       3,
-                                       FALSE,
-                                       FALSE, /* raw */
-                                       NULL, /* cancellable */
-                                       (GAsyncReadyCallback)gps_enabled_ready,
-                                       ctx);
+        enable_location_gathering_context_gps_step (task);
         return;
     }
 
     /* For any other location (e.g. 3GPP), or if GPS already running just return */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    location_gathering_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
+                                        GAsyncResult         *res,
+                                        GTask                *task)
+{
+    EnableLocationGatheringContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
+
+    if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
+        /* Errors when enabling non-GPS sources are fatal */
+        if (!(ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                             MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+
+        /* Ignore errors when enabling GPS, we can try with AT commands */
+        g_error_free (error);
+    }
+
+    /* Now our own enabling */
+    internal_enable_location_gathering (task);
 }
 
 void
@@ -384,22 +550,22 @@ mm_common_cinterion_enable_location_gathering (MMIfaceModemLocation *self,
                                                GAsyncReadyCallback callback,
                                                gpointer user_data)
 {
-    LocationGatheringContext *ctx;
+    GTask                          *task;
+    EnableLocationGatheringContext *ctx;
 
-    ctx = g_slice_new (LocationGatheringContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_common_cinterion_enable_location_gathering);
-    ctx->source = source;
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (EnableLocationGatheringContext);
+    ctx->source   = source;
+    ctx->gps_step = ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) enable_location_gathering_context_free);
 
     /* Chain up parent's gathering enable */
     iface_modem_location_parent->enable_location_gathering (
         self,
         source,
         (GAsyncReadyCallback)parent_enable_location_gathering_ready,
-        ctx);
+        task);
 }
 
 /*****************************************************************************/
