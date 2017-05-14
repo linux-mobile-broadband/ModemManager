@@ -35,18 +35,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiCinterion, mm_broadband_modem_qmi_cin
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
 
 /*****************************************************************************/
-/* Setup ports (Broadband modem class) */
-
-static void
-setup_ports (MMBroadbandModem *self)
-{
-    /* Call parent's setup ports first always */
-    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_cinterion_parent_class)->setup_ports (self);
-
-    mm_common_cinterion_setup_gps_port (self);
-}
-
-/*****************************************************************************/
 
 MMBroadbandModemQmiCinterion *
 mm_broadband_modem_qmi_cinterion_new (const gchar *device,
@@ -85,8 +73,4 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 static void
 mm_broadband_modem_qmi_cinterion_class_init (MMBroadbandModemQmiCinterionClass *klass)
 {
-    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
-
-    /* Virtual methods */
-    broadband_modem_class->setup_ports = setup_ports;
 }

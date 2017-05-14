@@ -16,6 +16,7 @@
 
 #include "mm-common-cinterion.h"
 #include "mm-base-modem-at.h"
+#include "mm-log.h"
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
@@ -70,6 +71,38 @@ get_location_context (MMBaseModem *self)
 }
 
 /*****************************************************************************/
+/* GPS trace received */
+
+static void
+trace_received (MMPortSerialGps *port,
+                const gchar *trace,
+                MMIfaceModemLocation *self)
+{
+    /* Helper to debug GPS location related issues. Don't depend on a real GPS
+     * fix for debugging, just use some random values to update */
+#if 0
+    if (g_str_has_prefix (trace, "$GPGGA")) {
+        GString *str;
+        GDateTime *now;
+
+        now = g_date_time_new_now_utc ();
+        str = g_string_new ("");
+        g_string_append_printf (str,
+                                "$GPGGA,%02u%02u%02u,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
+                                g_date_time_get_hour (now),
+                                g_date_time_get_minute (now),
+                                g_date_time_get_second (now));
+        mm_iface_modem_location_gps_update (self, str->str);
+        g_string_free (str, TRUE);
+        g_date_time_unref (now);
+        return;
+    }
+#endif
+
+    mm_iface_modem_location_gps_update (self, trace);
+}
+
+/*****************************************************************************/
 /* Location capabilities loading (Location interface) */
 
 typedef struct {
@@ -107,8 +140,15 @@ sgpss_test_ready (MMBaseModem  *self,
     location_ctx = get_location_context (self);
     if (!mm_base_modem_at_command_finish (self, res, NULL))
         location_ctx->sgpss_support = FEATURE_NOT_SUPPORTED;
-    else
+    else {
+        /* ^SGPSS supported! */
         location_ctx->sgpss_support = FEATURE_SUPPORTED;
+        /* It may happen that the modem was started with GPS already enabled, or
+         * maybe ModemManager got rebooted and it was left enabled before. We'll
+         * make sure that it is disabled when we initialize the modem. */
+        mm_base_modem_at_command (MM_BASE_MODEM (self), "AT^SGPSS=0", 3, FALSE, NULL, NULL);
+    }
+
     probe_gps_features (task);
 }
 
@@ -135,6 +175,12 @@ probe_gps_features (GTask *task)
         ctx->sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                          MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
                          MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
+
+        /* Add handler for the NMEA traces in the GPS data port */
+        mm_port_serial_gps_add_trace_handler (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)),
+                                              (MMPortSerialGpsTraceFn)trace_received,
+                                              self,
+                                              NULL);
     } else
         mm_dbg ("No GPS command supported: no GPS capabilities");
 
@@ -566,61 +612,6 @@ mm_common_cinterion_enable_location_gathering (MMIfaceModemLocation *self,
         source,
         (GAsyncReadyCallback)parent_enable_location_gathering_ready,
         task);
-}
-
-/*****************************************************************************/
-/* Setup ports (Broadband modem class) */
-
-static void
-trace_received (MMPortSerialGps *port,
-                const gchar *trace,
-                MMIfaceModemLocation *self)
-{
-    /* Helper to debug GPS location related issues. Don't depend on a real GPS
-     * fix for debugging, just use some random values to update */
-#if 0
-    if (g_str_has_prefix (trace, "$GPGGA")) {
-        GString *str;
-        GDateTime *now;
-
-        now = g_date_time_new_now_utc ();
-        str = g_string_new ("");
-        g_string_append_printf (str,
-                                "$GPGGA,%02u%02u%02u,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
-                                g_date_time_get_hour (now),
-                                g_date_time_get_minute (now),
-                                g_date_time_get_second (now));
-        mm_iface_modem_location_gps_update (self, str->str);
-        g_string_free (str, TRUE);
-        g_date_time_unref (now);
-        return;
-    }
-#endif
-
-    mm_iface_modem_location_gps_update (self, trace);
-}
-
-void
-mm_common_cinterion_setup_gps_port (MMBroadbandModem *self)
-{
-    MMPortSerialGps *gps_data_port;
-
-    gps_data_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
-    if (gps_data_port) {
-        /* It may happen that the modem was started with GPS already enabled, or
-         * maybe ModemManager got rebooted and it was left enabled before. We'll make
-         * sure that it is disabled when we initialize the modem */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                       "AT^SGPSS=0",
-                                       3, FALSE, FALSE, NULL, NULL, NULL);
-
-        /* Add handler for the NMEA traces */
-        mm_port_serial_gps_add_trace_handler (gps_data_port,
-                                              (MMPortSerialGpsTraceFn)trace_received,
-                                              self,
-                                              NULL);
-    }
 }
 
 /*****************************************************************************/
