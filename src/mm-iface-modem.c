@@ -1454,9 +1454,9 @@ __iface_modem_update_state_internal (MMIfaceModem *self,
                                                reason);
         }
 
-        /* If we go to registered state (from unregistered), setup signal
-         * quality and access technologies periodic retrieval */
-        if (new_state == MM_MODEM_STATE_REGISTERED &&
+        /* If we go to a registered/connected state (from unregistered), setup
+         * signal quality and access technologies periodic retrieval */
+        if (new_state >= MM_MODEM_STATE_REGISTERED &&
             old_state < MM_MODEM_STATE_REGISTERED) {
             periodic_signal_quality_check_enable (self);
             periodic_access_technologies_check_enable (self);
