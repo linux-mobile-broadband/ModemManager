@@ -533,6 +533,15 @@ mm_common_cinterion_disable_location_gathering (MMIfaceModemLocation  *self,
 /*****************************************************************************/
 /* Enable location gathering (Location interface) */
 
+/* We will retry the SGPSC command that enables the Engine */
+#define MAX_SGPSC_ENGINE_RETRIES 3
+
+/* Cinterion asks for 100ms some time between GPS commands, but we'll give up
+ * to 2000ms before setting the Engine configuration as 100ms didn't seem always
+ * enough (we would get +CME ERROR: 767 errors reported). */
+#define GPS_COMMAND_TIMEOUT_DEFAULT_MS  100
+#define GPS_COMMAND_TIMEOUT_ENGINE_MS  2000
+
 typedef enum {
     ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST,
     ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS,
@@ -545,6 +554,7 @@ typedef enum {
 typedef struct {
     MMModemLocationSource          source;
     EnableLocationGatheringGpsStep gps_step;
+    guint                          sgpsc_engine_retries;
 } EnableLocationGatheringContext;
 
 static void
@@ -564,16 +574,10 @@ mm_common_cinterion_enable_location_gathering_finish (MMIfaceModemLocation  *sel
 static void enable_location_gathering_context_gps_step (GTask *task);
 
 static gboolean
-enable_location_gathering_context_gps_step_next_cb (GTask *task)
+enable_location_gathering_context_gps_step_schedule_cb (GTask *task)
 {
-    EnableLocationGatheringContext *ctx;
-
-    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
-
-    /* We jump to the next step */
-    ctx->gps_step++;
+    /* Run the scheduled step */
     enable_location_gathering_context_gps_step (task);
-
     return G_SOURCE_REMOVE;
 }
 
@@ -582,16 +586,33 @@ enable_sgpsc_or_sgpss_ready (MMBaseModem  *self,
                              GAsyncResult *res,
                              GTask        *task)
 {
-    GError *error = NULL;
+    EnableLocationGatheringContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = (EnableLocationGatheringContext *) g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        /* The GPS setup may sometimes report "+CME ERROR 767" when enabling the
+         * Engine; so we'll run some retries of the same command ourselves. */
+        if (ctx->gps_step == ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE) {
+            ctx->sgpsc_engine_retries++;
+            mm_dbg ("GPS Engine setup failed (%u/%u)", ctx->sgpsc_engine_retries, MAX_SGPSC_ENGINE_RETRIES);
+            if (ctx->sgpsc_engine_retries < MAX_SGPSC_ENGINE_RETRIES) {
+                g_clear_error (&error);
+                goto schedule;
+            }
+        }
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    /* Cinterion asks for 100ms between GPS commands... */
-    g_timeout_add (100, (GSourceFunc) enable_location_gathering_context_gps_step_next_cb, task);
+    /* Go on to next step */
+    ctx->gps_step++;
+
+schedule:
+    g_timeout_add (ctx->gps_step == ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE ? GPS_COMMAND_TIMEOUT_ENGINE_MS : GPS_COMMAND_TIMEOUT_DEFAULT_MS,
+                   (GSourceFunc) enable_location_gathering_context_gps_step_schedule_cb, task);
 }
 
 static void
