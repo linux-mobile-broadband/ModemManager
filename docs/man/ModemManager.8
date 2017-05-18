@@ -34,6 +34,14 @@ Show application and test options.
 Show test options.
 
 .SH APPLICATION OPTIONS
+.TP
+.B \-\-no\-auto\-scan
+Fully disable udev-based auto-scan looking for devices.
+.TP
+.B \-\-initial\-kernel\-events=<filename>
+Specify location of the file where the list of initial kernel events is
+available. The ModemManager daemon will process this file on startup.
+.TP
 .B \-\-debug
 Runs ModemManager with "DEBUG" log level and without daemonizing. This is useful
 for debugging, as it directs log output to the controlling terminal in addition to
@@ -58,9 +66,6 @@ Include timestamps, relative to the start time of the daemon, in the log output.
 .TP
 .B \-\-test\-session
 Run the ModemManager daemon in the Session bus instead of the System bus.
-.TP
-.B \-\-test\-no\-auto\-scan
-Fully disable udev-based auto-scan looking for devices.
 .TP
 .B \-\-test\-enable
 Enable the Test DBus interface in the daemon.
