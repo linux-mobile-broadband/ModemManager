@@ -23,16 +23,18 @@
 # define MM_DIST_VERSION VERSION
 #endif
 
-void mm_context_init (gint argc,
+void mm_context_init (gint    argc,
                       gchar **argv);
 
 gboolean     mm_context_get_debug                 (void);
-const gchar *mm_context_get_log_level             (void);
-const gchar *mm_context_get_log_file              (void);
-gboolean     mm_context_get_timestamps            (void);
-gboolean     mm_context_get_relative_timestamps   (void);
 const gchar *mm_context_get_initial_kernel_events (void);
 gboolean     mm_context_get_no_auto_scan          (void);
+
+/* Logging support */
+const gchar *mm_context_get_log_level               (void);
+const gchar *mm_context_get_log_file                (void);
+gboolean     mm_context_get_log_timestamps          (void);
+gboolean     mm_context_get_log_relative_timestamps (void);
 
 /* Testing support */
 gboolean     mm_context_get_test_session    (void);

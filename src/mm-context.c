@@ -21,36 +21,48 @@
 /*****************************************************************************/
 /* Application context */
 
-static gboolean     version_flag;
-static gboolean     debug;
-static const gchar *log_level;
-static const gchar *log_file;
-static gboolean     show_ts;
-static gboolean     rel_ts;
-
 #if WITH_UDEV
-static gboolean no_auto_scan = FALSE;
+# define NO_AUTO_SCAN_OPTION_FLAG 0
+# define NO_AUTO_SCAN_DEFAULT     FALSE
 #else
-static gboolean no_auto_scan = TRUE;
+/* Keep the option when udev disabled, just so that the unit test setup can
+ * unconditionally use --no-auto-scan */
+# define NO_AUTO_SCAN_OPTION_FLAG G_OPTION_FLAG_HIDDEN
+# define NO_AUTO_SCAN_DEFAULT     TRUE
 #endif
 
+static gboolean     help_flag;
+static gboolean     version_flag;
+static gboolean     debug;
+static gboolean     no_auto_scan = NO_AUTO_SCAN_DEFAULT;
 static const gchar *initial_kernel_events;
 
 static const GOptionEntry entries[] = {
-    { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag, "Print version", NULL },
-    { "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Run with extended debugging capabilities", NULL },
-    { "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of ERR, WARN, INFO, DEBUG", "[LEVEL]" },
-    { "log-file", 0, 0, G_OPTION_ARG_FILENAME, &log_file, "Path to log file", "[PATH]" },
-    { "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
-    { "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
-#if WITH_UDEV
-    { "no-auto-scan", 0, 0, G_OPTION_ARG_NONE, &no_auto_scan, "Don't auto-scan looking for devices", NULL },
-#else
-    /* Keep the option when udev disabled, just so that the unit test setup can
-     * unconditionally use --no-auto-scan */
-    { "no-auto-scan", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &no_auto_scan, NULL, NULL },
-#endif
-    { "initial-kernel-events", 0, 0, G_OPTION_ARG_FILENAME, &initial_kernel_events, "Path to initial kernel events file", "[PATH]" },
+    {
+        "no-auto-scan", 0, NO_AUTO_SCAN_OPTION_FLAG, G_OPTION_ARG_NONE, &no_auto_scan,
+        "Don't auto-scan looking for devices",
+        NULL
+    },
+    {
+        "initial-kernel-events", 0, 0, G_OPTION_ARG_FILENAME, &initial_kernel_events,
+        "Path to initial kernel events file",
+        "[PATH]"
+    },
+    {
+        "debug", 0, 0, G_OPTION_ARG_NONE, &debug,
+        "Run with extended debugging capabilities",
+        NULL
+    },
+    {
+        "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
+        "Print version",
+        NULL
+    },
+    {
+        "help", 'h', 0, G_OPTION_ARG_NONE, &help_flag,
+        "Show help",
+        NULL
+    },
     { NULL }
 };
 
@@ -58,30 +70,6 @@ gboolean
 mm_context_get_debug (void)
 {
     return debug;
-}
-
-const gchar *
-mm_context_get_log_level (void)
-{
-    return log_level;
-}
-
-const gchar *
-mm_context_get_log_file (void)
-{
-    return log_file;
-}
-
-gboolean
-mm_context_get_timestamps (void)
-{
-    return show_ts;
-}
-
-gboolean
-mm_context_get_relative_timestamps (void)
-{
-    return rel_ts;
 }
 
 const gchar *
@@ -97,16 +85,98 @@ mm_context_get_no_auto_scan (void)
 }
 
 /*****************************************************************************/
+/* Log context */
+
+static const gchar *log_level;
+static const gchar *log_file;
+static gboolean     log_show_ts;
+static gboolean     log_rel_ts;
+
+static const GOptionEntry log_entries[] = {
+    {
+        "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level,
+        "Log level: one of ERR, WARN, INFO, DEBUG",
+        "[LEVEL]"
+    },
+    {
+        "log-file", 0, 0, G_OPTION_ARG_FILENAME, &log_file,
+        "Path to log file",
+        "[PATH]"
+    },
+    {
+        "log-timestamps", 0, 0, G_OPTION_ARG_NONE, &log_show_ts,
+        "Show timestamps in log output",
+        NULL
+    },
+    {
+        "log-relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &log_rel_ts,
+        "Use relative timestamps (from MM start)",
+        NULL
+    },
+    { NULL }
+};
+
+static GOptionGroup *
+log_get_option_group (void)
+{
+    GOptionGroup *group;
+
+    group = g_option_group_new ("log",
+                                "Logging options",
+                                "Show logging options",
+                                NULL,
+                                NULL);
+    g_option_group_add_entries (group, log_entries);
+    return group;
+}
+
+const gchar *
+mm_context_get_log_level (void)
+{
+    return log_level;
+}
+
+const gchar *
+mm_context_get_log_file (void)
+{
+    return log_file;
+}
+
+gboolean
+mm_context_get_log_timestamps (void)
+{
+    return log_show_ts;
+}
+
+gboolean
+mm_context_get_log_relative_timestamps (void)
+{
+    return log_rel_ts;
+}
+
+/*****************************************************************************/
 /* Test context */
 
-static gboolean test_session;
-static gboolean test_enable;
-static gchar *test_plugin_dir;
+static gboolean  test_session;
+static gboolean  test_enable;
+static gchar    *test_plugin_dir;
 
 static const GOptionEntry test_entries[] = {
-    { "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session, "Run in session DBus", NULL },
-    { "test-enable", 0, 0, G_OPTION_ARG_NONE, &test_enable, "Enable the Test interface in the daemon", NULL },
-    { "test-plugin-dir", 0, 0, G_OPTION_ARG_FILENAME, &test_plugin_dir, "Path to look for plugins", "[PATH]" },
+    {
+        "test-session", 0, 0, G_OPTION_ARG_NONE, &test_session,
+        "Run in session DBus",
+        NULL
+    },
+    {
+        "test-enable", 0, 0, G_OPTION_ARG_NONE, &test_enable,
+        "Enable the Test interface in the daemon",
+        NULL
+    },
+    {
+        "test-plugin-dir", 0, 0, G_OPTION_ARG_FILENAME, &test_plugin_dir,
+        "Path to look for plugins",
+        "[PATH]"
+    },
     { NULL }
 };
 
@@ -149,12 +219,22 @@ print_version (void)
 {
     g_print ("\n"
              "ModemManager " MM_DIST_VERSION "\n"
-             "Copyright (2008 - 2016) The ModemManager authors\n"
+             "Copyright (C) 2008-2017 The ModemManager authors\n"
              "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl-2.0.html>\n"
              "This is free software: you are free to change and redistribute it.\n"
              "There is NO WARRANTY, to the extent permitted by law.\n"
              "\n");
-    exit (EXIT_SUCCESS);
+}
+
+static void
+print_help (GOptionContext *context)
+{
+    gchar *str;
+
+    /* Always print --help-all */
+    str = g_option_context_get_help (context, FALSE, NULL);
+    g_print ("%s", str);
+    g_free (str);
 }
 
 void
@@ -165,9 +245,11 @@ mm_context_init (gint argc,
     GOptionContext *ctx;
 
     ctx = g_option_context_new (NULL);
-    g_option_context_set_summary (ctx, "DBus system service to communicate with modems.");
+    g_option_context_set_summary (ctx, "DBus system service to control mobile broadband modems.");
     g_option_context_add_main_entries (ctx, entries, NULL);
+    g_option_context_add_group (ctx, log_get_option_group ());
     g_option_context_add_group (ctx, test_get_option_group ());
+    g_option_context_set_help_enabled (ctx, FALSE);
 
     if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
         g_warning ("error: %s", error->message);
@@ -175,18 +257,26 @@ mm_context_init (gint argc,
         exit (1);
     }
 
+    if (version_flag) {
+        print_version ();
+        g_option_context_free (ctx);
+        exit (EXIT_SUCCESS);
+    }
+
+    if (help_flag) {
+        print_help (ctx);
+        g_option_context_free (ctx);
+        exit (EXIT_SUCCESS);
+    }
+
     g_option_context_free (ctx);
 
     /* Additional setup to be done on debug mode */
     if (debug) {
         log_level = "DEBUG";
-        if (!show_ts && !rel_ts)
-            show_ts = TRUE;
+        if (!log_show_ts && !log_rel_ts)
+            log_show_ts = TRUE;
     }
-
-    /* If just version requested, print and exit */
-    if (version_flag)
-        print_version ();
 
     /* Initial kernel events processing may only be used if autoscan is disabled */
 #if WITH_UDEV

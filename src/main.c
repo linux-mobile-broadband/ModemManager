@@ -141,8 +141,8 @@ main (int argc, char *argv[])
 
     if (!mm_log_setup (mm_context_get_log_level (),
                        mm_context_get_log_file (),
-                       mm_context_get_timestamps (),
-                       mm_context_get_relative_timestamps (),
+                       mm_context_get_log_timestamps (),
+                       mm_context_get_log_relative_timestamps (),
                        mm_context_get_debug (),
                        &err)) {
         g_warning ("Failed to set up logging: %s", err->message);
