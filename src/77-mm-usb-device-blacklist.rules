@@ -189,4 +189,7 @@ ATTRS{idVendor}=="064B", ATTRS{idProduct}=="7825", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1209", ATTRS{idProduct}=="2300", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="1209", ATTRS{idProduct}=="2301", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Netchip Technology, Inc. Linux-USB Serial Gadget (CDC ACM mode)
+ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
