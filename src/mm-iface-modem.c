@@ -2532,6 +2532,7 @@ after_set_load_current_modes_ready (MMIfaceModem *self,
         mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", allowed, preferred));
 
     /* Done */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     set_current_modes_context_complete_and_free (ctx);
 }
 
