@@ -1062,6 +1062,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
         g_object_unref (simple);
+        return;
     }
 
     /* Our own enable now */
