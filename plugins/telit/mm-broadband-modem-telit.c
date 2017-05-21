@@ -37,6 +37,7 @@ static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 static MMIfaceModem *iface_modem_parent;
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -1220,40 +1221,69 @@ load_supported_modes (MMIfaceModem *self,
 /* Enabling unsolicited events (3GPP interface) */
 
 static gboolean
-modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
-                                             GAsyncResult *res,
-                                             GError **error)
+modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp  *self,
+                                             GAsyncResult      *res,
+                                             GError           **error)
 {
-   /* Ignore errors */
-    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self),
-                                           res,
-                                           NULL,
-                                           NULL);
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
-    /* Enable +CIEV only for: signal, service, roam */
-    { "AT+CIND=0,1,1,0,0,0,1,0,0", 5, FALSE, NULL },
-    /* Telit modems +CMER command supports only <ind>=2 */
-    { "+CMER=3,0,0,2", 5, FALSE, NULL },
-    { NULL }
-};
+static void
+cind_set_ready (MMBaseModem  *self,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        mm_warn ("Couldn't enable custom +CIND settings: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
 
 static void
-modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                        GAsyncResult     *res,
+                                        GTask            *task)
 {
-    mm_base_modem_at_sequence_full (
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't enable parent 3GPP unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* Our own enable now */
+    mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self)),
-        unsolicited_enable_sequence,
-        NULL,  /* response_processor_context */
-        NULL,  /* response_processor_context_free */
-        NULL,  /* cancellable */
-        callback,
-        user_data);
+        /* Enable +CIEV only for: signal, service, roam */
+        "AT+CIND=0,1,1,0,0,0,1,0,0",
+        5,
+        FALSE,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)cind_set_ready,
+        task);
+}
+
+static void
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp    *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Chain up parent's enable */
+    iface_modem_3gpp_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_enable_unsolicited_events_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -1319,6 +1349,8 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
     iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
 }
