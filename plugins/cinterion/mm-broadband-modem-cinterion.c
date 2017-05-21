@@ -84,34 +84,6 @@ struct _MMBroadbandModemCinterionPrivate {
 };
 
 /*****************************************************************************/
-/* Unsolicited events enabling */
-
-static gboolean
-enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
-                                  GAsyncResult *res,
-                                  GError **error)
-{
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-}
-
-static void
-enable_unsolicited_events (MMIfaceModem3gpp *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
-{
-    /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
-     *  but <ind> should be either not set, or equal to 0 or 2.
-     * Enabled with 2.
-     */
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CMER=3,0,0,2",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
-
-/*****************************************************************************/
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 
 static gboolean
@@ -1828,8 +1800,6 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
-    iface->enable_unsolicited_events = enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = enable_unsolicited_events_finish;
     iface->register_in_network = register_in_network;
     iface->register_in_network_finish = register_in_network_finish;
 }
