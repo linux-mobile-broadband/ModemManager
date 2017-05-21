@@ -784,20 +784,17 @@ load_access_technologies (MMIfaceModem *self,
 /* Load supported modes (Modem interface) */
 
 static GArray *
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+load_supported_modes_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_load_supported_modes_ready (MMIfaceModem *self,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+                                   GTask        *task)
 {
     GError *error = NULL;
     GArray *all;
@@ -807,9 +804,8 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
 
     all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
     if (!all) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -824,19 +820,30 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
     mode.allowed = MM_MODEM_MODE_3G;
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (combinations, mode);
-    /* 2G and 3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+
+    if (mm_iface_modem_is_4g (self)) {
+        /* 4G only */
+        mode.allowed = MM_MODEM_MODE_4G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+        /* 2G, 3G and 4G */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    } else {
+        /* 2G and 3G */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
 
     /* Filter out those unsupported modes */
     filtered = mm_filter_supported_modes (all, combinations);
     g_array_unref (all);
     g_array_unref (combinations);
 
-    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 static void
@@ -848,105 +855,90 @@ load_supported_modes (MMIfaceModem *self,
     iface_modem_parent->load_supported_modes (
         MM_IFACE_MODEM (self),
         (GAsyncReadyCallback)parent_load_supported_modes_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_supported_modes));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
 /* Set current modes (Modem interface) */
 
 static gboolean
-set_current_modes_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
+set_current_modes_finish (MMIfaceModem  *self,
+                          GAsyncResult  *res,
+                          GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
-                                        GAsyncResult *res,
-                                        GSimpleAsyncResult *operation_result)
+                                        GAsyncResult              *res,
+                                        GTask                     *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     else {
         /* Request immediate access tech update */
         mm_iface_modem_refresh_access_technologies (MM_IFACE_MODEM (self));
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_object_unref (task);
 }
 
 static void
-set_current_modes (MMIfaceModem *_self,
-                   MMModemMode allowed,
-                   MMModemMode preferred,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+set_current_modes (MMIfaceModem        *_self,
+                   MMModemMode          allowed,
+                   MMModemMode          preferred,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    gchar                     *command;
+    GTask                     *task;
 
     g_assert (preferred == MM_MODEM_MODE_NONE);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
-    /* For dual 2G/3G devices... */
-    if (mm_iface_modem_is_2g (_self) &&
-        mm_iface_modem_is_3g (_self)) {
-        gchar *command;
+    /* We will try to simulate the possible allowed modes here. The
+     * Cinterion devices do not seem to allow setting preferred access
+     * technology in devices, but they allow restricting to a given
+     * one:
+     * - 2G-only is forced by forcing GERAN RAT (AcT=0)
+     * - 3G-only is forced by forcing UTRAN RAT (AcT=2)
+     * - 4G-only is forced by forcing E-UTRAN RAT (AcT=7)
+     * - for the remaining ones, we default to automatic selection of RAT,
+     *   which is based on the quality of the connection.
+     */
 
-        /* We will try to simulate the possible allowed modes here. The
-         * Cinterion devices do not seem to allow setting preferred access
-         * technology in 3G devices, but they allow restricting to a given
-         * one:
-         * - 2G-only is forced by forcing GERAN RAT (AcT=0)
-         * - 3G-only is forced by forcing UTRAN RAT (AcT=2)
-         * - for the remaining ones, we default to automatic selection of RAT,
-         *   which is based on the quality of the connection.
-         */
-
-        if (allowed == MM_MODEM_MODE_3G)
-            command = g_strdup ("+COPS=,,,2");
-        else if (allowed == MM_MODEM_MODE_2G)
-            command = g_strdup ("+COPS=,,,0");
-        else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G)) {
-            /* no AcT given, defaults to Auto. For this case, we cannot provide
-             * AT+COPS=,,, (i.e. just without a last value). Instead, we need to
-             * re-run the last manual/automatic selection command which succeeded,
-             * (or auto by default if none was launched) */
-            if (self->priv->manual_operator_id)
-                command = g_strdup_printf ("+COPS=1,2,\"%s\"", self->priv->manual_operator_id);
-            else
-                command = g_strdup ("+COPS=0");
-        } else
-            g_assert_not_reached ();
-
-        mm_base_modem_at_command (
-            MM_BASE_MODEM (self),
-            command,
-            20,
-            FALSE,
-            (GAsyncReadyCallback)allowed_access_technology_update_ready,
-            result);
-        g_free (command);
-        return;
+    if (mm_iface_modem_is_4g (_self) && allowed == MM_MODEM_MODE_4G)
+        command = g_strdup ("+COPS=,,,7");
+    else if (mm_iface_modem_is_3g (_self) && allowed == MM_MODEM_MODE_3G)
+        command = g_strdup ("+COPS=,,,2");
+    else if (mm_iface_modem_is_2g (_self) && allowed == MM_MODEM_MODE_2G)
+        command = g_strdup ("+COPS=,,,0");
+    else {
+        /* For any other combination (e.g. ANY or  no AcT given, defaults to Auto. For this case, we cannot provide
+         * AT+COPS=,,, (i.e. just without a last value). Instead, we need to
+         * re-run the last manual/automatic selection command which succeeded,
+         * (or auto by default if none was launched) */
+        if (self->priv->manual_operator_id)
+            command = g_strdup_printf ("+COPS=1,2,\"%s\"", self->priv->manual_operator_id);
+        else
+            command = g_strdup ("+COPS=0");
     }
 
-    /* For 2G-only and 3G-only devices, we already stated that we don't
-     * support mode switching. */
-    g_assert_not_reached ();
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        20,
+        FALSE,
+        (GAsyncReadyCallback)allowed_access_technology_update_ready,
+        task);
+
+    g_free (command);
 }
 
 /*****************************************************************************/
