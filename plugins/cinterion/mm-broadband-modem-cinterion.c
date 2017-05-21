@@ -1560,7 +1560,7 @@ after_sim_unlock_context_step (AfterSimUnlockContext *ctx)
     /* Recheck */
     ctx->retries--;
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                              "^SIND=\"simstatus\",1",
+                              "^SIND=\"simstatus\",2",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)simstatus_check_ready,
