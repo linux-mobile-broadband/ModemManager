@@ -1867,6 +1867,70 @@ test_devid_item (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CMER test responses */
+
+static void
+test_cmer_response (const gchar    *str,
+                    MM3gppCmerMode  expected_modes,
+                    MM3gppCmerInd   expected_inds)
+{
+    gboolean        ret;
+    MM3gppCmerMode  modes = MM_3GPP_CMER_MODE_NONE;
+    MM3gppCmerInd   inds = MM_3GPP_CMER_IND_NONE;
+    GError         *error = NULL;
+
+    ret = mm_3gpp_parse_cmer_test_response (str, &modes, &inds, &error);
+    g_assert_no_error (error);
+    g_assert (ret);
+
+    g_assert_cmpuint (modes, ==, expected_modes);
+    g_assert_cmpuint (inds,  ==, expected_inds);
+}
+
+static void
+test_cmer_response_cinterion_pls8 (void)
+{
+    static const gchar *str = "+CMER: (0-3),(0),(0),(0-1),(0-1)";
+    static const MM3gppCmerMode expected_modes = (        \
+        MM_3GPP_CMER_MODE_DISCARD_URCS |                  \
+        MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED | \
+        MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED |  \
+        MM_3GPP_CMER_MODE_FORWARD_URCS);
+    static const MM3gppCmerInd expected_inds = (        \
+        MM_3GPP_CMER_IND_DISABLE |                      \
+        MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND);
+
+    test_cmer_response (str, expected_modes, expected_inds);
+}
+
+static void
+test_cmer_response_sierra_em7345 (void)
+{
+    static const gchar *str = "+CMER: 1,0,0,(0-1),0";
+    static const MM3gppCmerMode expected_modes = (          \
+        MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED);
+    static const MM3gppCmerInd expected_inds = (        \
+        MM_3GPP_CMER_IND_DISABLE |                      \
+        MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND);
+
+    test_cmer_response (str, expected_modes, expected_inds);
+}
+
+static void
+test_cmer_response_cinterion_ehs5 (void)
+{
+    static const gchar *str = "+CMER: (1,2),0,0,(0-1),0";
+    static const MM3gppCmerMode expected_modes = (        \
+        MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED | \
+        MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED);
+    static const MM3gppCmerInd expected_inds = (        \
+        MM_3GPP_CMER_IND_DISABLE |                      \
+        MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND);
+
+    test_cmer_response (str, expected_modes, expected_inds);
+}
+
+/*****************************************************************************/
 /* Test CIND responses */
 
 typedef struct {
@@ -3725,6 +3789,10 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, NULL));
     g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, NULL));
     g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cmer_response_cinterion_pls8, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmer_response_sierra_em7345, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cmer_response_cinterion_ehs5, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, NULL));
     g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, NULL));

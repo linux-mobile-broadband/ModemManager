@@ -57,6 +57,7 @@ GArray *mm_parse_uint_list (const gchar  *str,
                             GError      **error);
 
 guint mm_count_bits_set (gulong number);
+guint mm_find_bit_set   (gulong number);
 
 gchar *mm_create_device_identifier (guint vid,
                                     guint pid,
@@ -227,6 +228,30 @@ gboolean mm_3gpp_parse_clck_write_response (const gchar *reply,
 /* AT+CNUM (Own numbers) response parser */
 GStrv mm_3gpp_parse_cnum_exec_response (const gchar *reply,
                                         GError **error);
+
+/* AT+CMER=? (Mobile Equipment Event Reporting) response parser */
+typedef enum {  /*< underscore_name=mm_3gpp_cmer_mode >*/
+    MM_3GPP_CMER_MODE_NONE                          = 0,
+    MM_3GPP_CMER_MODE_DISCARD_URCS                  = 1 << 0,
+    MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED = 1 << 1,
+    MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED  = 1 << 2,
+    MM_3GPP_CMER_MODE_FORWARD_URCS                  = 1 << 3,
+} MM3gppCmerMode;
+typedef enum { /*< underscore_name=mm_3gpp_cmer_ind >*/
+    MM_3GPP_CMER_IND_NONE = 0,
+    /* no indicator event reporting */
+    MM_3GPP_CMER_IND_DISABLE = 1 << 0,
+    /* Only indicator events that are not caused by +CIND */
+    MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND = 1 << 1,
+    /* All indicator events */
+    MM_3GPP_CMER_IND_ENABLE_ALL = 1 << 2,
+} MM3gppCmerInd;
+gchar    *mm_3gpp_build_cmer_set_request   (MM3gppCmerMode   mode,
+                                            MM3gppCmerInd    ind);
+gboolean  mm_3gpp_parse_cmer_test_response (const gchar     *reply,
+                                            MM3gppCmerMode  *supported_modes,
+                                            MM3gppCmerInd   *supported_inds,
+                                            GError         **error);
 
 /* AT+CIND=? (Supported indicators) response parser */
 typedef struct MM3gppCindResponse MM3gppCindResponse;

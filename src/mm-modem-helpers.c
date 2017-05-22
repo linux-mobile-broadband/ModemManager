@@ -240,6 +240,16 @@ mm_count_bits_set (gulong number)
     return c;
 }
 
+guint
+mm_find_bit_set (gulong number)
+{
+    guint c = 0;
+
+    for (c = 0; !(number & 0x1); c++)
+        number >>= 1;
+    return c;
+}
+
 /*****************************************************************************/
 
 gchar *
@@ -2843,6 +2853,119 @@ mm_3gpp_parse_cnum_exec_response (const gchar *reply,
     g_regex_unref (r);
 
     return (array ? (GStrv) g_array_free (array, FALSE) : NULL);
+}
+
+/*************************************************************************/
+
+gchar *
+mm_3gpp_build_cmer_set_request (MM3gppCmerMode mode,
+                                MM3gppCmerInd  ind)
+{
+    guint mode_val;
+    guint ind_val;
+
+    if (mode == MM_3GPP_CMER_MODE_DISCARD_URCS)
+        return g_strdup ("+CMER=0");
+    if (mode < MM_3GPP_CMER_MODE_DISCARD_URCS || mode > MM_3GPP_CMER_MODE_FORWARD_URCS)
+        return NULL;
+    mode_val = mm_find_bit_set (mode);
+
+    if (ind < MM_3GPP_CMER_IND_DISABLE || ind > MM_3GPP_CMER_IND_ENABLE_ALL)
+        return NULL;
+    ind_val = mm_find_bit_set (ind);
+
+    return g_strdup_printf ("+CMER=%u,0,0,%u", mode_val, ind_val);
+}
+
+gboolean
+mm_3gpp_parse_cmer_test_response (const gchar     *response,
+                                  MM3gppCmerMode  *out_supported_modes,
+                                  MM3gppCmerInd   *out_supported_inds,
+                                  GError         **error)
+{
+    gchar          **split;
+    GError          *inner_error = NULL;
+    GArray          *array_supported_modes = NULL;
+    GArray          *array_supported_inds = NULL;
+    gchar           *aux   = NULL;
+    gboolean         ret = FALSE;
+    MM3gppCmerMode   supported_modes = 0;
+    MM3gppCmerInd    supported_inds = 0;
+    guint            i;
+
+    /*
+     * AT+CMER=?
+     *  +CMER: 1,0,0,(0-1),0
+     *
+     * AT+CMER=?
+     *  +CMER: (0-3),(0),(0),(0-1),(0-1)
+     *
+     * AT+CMER=?
+     *  +CMER: (1,2),0,0,(0-1),0
+     */
+
+    split = mm_split_string_groups (mm_strip_tag (response, "+CMER:"));
+    if (!split) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't split +CMER test response in groups");
+        goto out;
+    }
+
+    /* We want 1st and 4th groups */
+    if (g_strv_length (split) < 4) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing groups in +CMER test response (%u < 4)", g_strv_length (split));
+        goto out;
+    }
+
+    /* Modes in 1st group */
+    if (!(array_supported_modes = mm_parse_uint_list (split[0], &inner_error)))
+        goto out;
+    g_clear_pointer (&aux, g_free);
+
+    /* Ind settings in 4th group */
+    if (!(array_supported_inds = mm_parse_uint_list (split[3], &inner_error)))
+        goto out;
+    g_clear_pointer (&aux, g_free);
+
+    for (i = 0; i < array_supported_modes->len; i++) {
+        guint mode_val;
+
+        mode_val = g_array_index (array_supported_modes, guint, i);
+        if (mode_val >= 0 && mode_val <= 3)
+            supported_modes |= (MM3gppCmerMode) (1 << mode_val);
+        else
+            mm_dbg ("Unknown +CMER mode reported: %u", mode_val);
+    }
+
+    for (i = 0; i < array_supported_inds->len; i++) {
+        guint ind_val;
+
+        ind_val = g_array_index (array_supported_inds, guint, i);
+        if (ind_val >= 0 && ind_val <= 2)
+            supported_inds |= (MM3gppCmerInd) (1 << ind_val);
+        else
+            mm_dbg ("Unknown +CMER ind reported: %u", ind_val);
+    }
+
+    if (out_supported_modes)
+        *out_supported_modes = supported_modes;
+    if (out_supported_inds)
+        *out_supported_inds = supported_inds;
+    ret = TRUE;
+
+out:
+
+    if (array_supported_modes)
+        g_array_unref (array_supported_modes);
+    if (array_supported_inds)
+        g_array_unref (array_supported_inds);
+    g_clear_pointer (&aux, g_free);
+
+    g_strfreev (split);
+
+    if (inner_error)
+        g_propagate_error (error, inner_error);
+
+    return ret;
 }
 
 /*************************************************************************/
