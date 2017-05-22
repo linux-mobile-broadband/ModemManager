@@ -150,6 +150,9 @@ struct _MMBroadbandModemPrivate {
     guint modem_cind_max_signal_quality;
     guint modem_cind_indicator_roaming;
     guint modem_cind_indicator_service;
+    MM3gppCmerMode modem_cmer_enable_mode;
+    MM3gppCmerMode modem_cmer_disable_mode;
+    MM3gppCmerInd modem_cmer_ind;
     MMFlowControl flow_control;
 
     /*<--- Modem 3GPP interface --->*/
@@ -2617,6 +2620,72 @@ set_unsolicited_events_handlers (MMBroadbandModem *self,
 }
 
 static void
+cmer_format_check_ready (MMBroadbandModem   *self,
+                         GAsyncResult       *res,
+                         GSimpleAsyncResult *simple)
+{
+    MM3gppCmerMode  supported_modes = MM_3GPP_CMER_MODE_NONE;
+    MM3gppCmerInd   supported_inds = MM_3GPP_CMER_IND_NONE;
+    GError         *error = NULL;
+    const gchar    *result;
+    gchar          *aux;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error || !mm_3gpp_parse_cmer_test_response (result, &supported_modes, &supported_inds, &error)) {
+        mm_dbg ("+CMER check failed, marking indications as unsupported: '%s'", error->message);
+        g_error_free (error);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    aux = mm_3gpp_cmer_mode_build_string_from_mask (supported_modes);
+    mm_dbg ("Supported +CMER modes: %s", aux);
+    g_free (aux);
+
+    aux = mm_3gpp_cmer_ind_build_string_from_mask (supported_inds);
+    mm_dbg ("Supported +CMER indication settings: %s", aux);
+    g_free (aux);
+
+    /* Flag +CMER supported values */
+
+    if (supported_modes & MM_3GPP_CMER_MODE_FORWARD_URCS)
+        self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_FORWARD_URCS;
+    else if (supported_modes & MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED)
+        self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED;
+    else if (supported_modes & MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED)
+        self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_DISCARD_URCS_IF_LINK_RESERVED;
+
+    aux = mm_3gpp_cmer_mode_build_string_from_mask (self->priv->modem_cmer_enable_mode);
+    mm_dbg ("+CMER enable mode: %s", aux);
+    g_free (aux);
+
+    if (supported_modes & MM_3GPP_CMER_MODE_DISCARD_URCS)
+        self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_DISCARD_URCS;
+
+    aux = mm_3gpp_cmer_mode_build_string_from_mask (self->priv->modem_cmer_disable_mode);
+    mm_dbg ("+CMER disable mode: %s", aux);
+    g_free (aux);
+
+    if (supported_inds & MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND)
+        self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND;
+    else if (supported_inds & MM_3GPP_CMER_IND_ENABLE_ALL)
+        self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_ENABLE_ALL;
+
+    aux = mm_3gpp_cmer_ind_build_string_from_mask (self->priv->modem_cmer_ind);
+    mm_dbg ("+CMER indication setting: %s", aux);
+    g_free (aux);
+
+    /* Now, keep on setting up the ports */
+    set_unsolicited_events_handlers (self, TRUE);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
 cind_format_check_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
                          GSimpleAsyncResult *simple)
@@ -2630,7 +2699,7 @@ cind_format_check_ready (MMBroadbandModem *self,
     if (error ||
         !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
         /* unsupported indications */
-        mm_dbg ("Marking indications as unsupported: '%s'", error->message);
+        mm_dbg ("+CIND check failed, marking indications as unsupported: '%s'", error->message);
         g_error_free (error);
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
         g_simple_async_result_complete (simple);
@@ -2677,12 +2746,13 @@ cind_format_check_ready (MMBroadbandModem *self,
 
     g_hash_table_destroy (indicators);
 
-    /* Now, keep on setting up the ports */
-    set_unsolicited_events_handlers (self, TRUE);
-
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    /* Check +CMER required format */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CMER=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)cmer_format_check_ready,
+                              simple);
 }
 
 static void
@@ -2844,15 +2914,22 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
 
     /* If supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
-        UnsolicitedEventsContext *ctx;
+        gchar *cmd;
 
-        ctx = g_new0 (UnsolicitedEventsContext, 1);
-        ctx->self = g_object_ref (self);
-        ctx->enable = TRUE;
-        ctx->command = g_strdup ("+CMER=3,0,0,1");
-        ctx->result = result;
-        run_unsolicited_events_setup (ctx);
-        return;
+        /* If CMER command available, launch it */
+        cmd = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_enable_mode, self->priv->modem_cmer_ind);
+        if (cmd) {
+            UnsolicitedEventsContext *ctx;
+
+            ctx = g_new0 (UnsolicitedEventsContext, 1);
+            ctx->self = g_object_ref (self);
+            ctx->enable = TRUE;
+            ctx->command = cmd;
+            ctx->result = result;
+            run_unsolicited_events_setup (ctx);
+            return;
+        }
+        mm_dbg ("Skipping +CMER enable command: not supported");
     }
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
@@ -2873,16 +2950,23 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                         user_data,
                                         modem_3gpp_disable_unsolicited_events);
 
-    /* If supported, go on */
+    /* If CIND supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
-        UnsolicitedEventsContext *ctx;
+        gchar *cmd;
 
-        ctx = g_new0 (UnsolicitedEventsContext, 1);
-        ctx->self = g_object_ref (self);
-        ctx->command = g_strdup ("+CMER=0");
-        ctx->result = result;
-        run_unsolicited_events_setup (ctx);
-        return;
+        /* If CMER command available, launch it */
+        cmd = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_disable_mode, MM_3GPP_CMER_IND_NONE);
+        if (cmd) {
+            UnsolicitedEventsContext *ctx;
+
+            ctx = g_new0 (UnsolicitedEventsContext, 1);
+            ctx->self = g_object_ref (self);
+            ctx->command = cmd;
+            ctx->result = result;
+            run_unsolicited_events_setup (ctx);
+            return;
+        }
+        mm_dbg ("Skipping +CMER disable command: not supported");
     }
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
@@ -10697,6 +10781,9 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->sim_hot_swap_supported = FALSE;
+    self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_NONE;
+    self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_NONE;
+    self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_NONE;
     self->priv->flow_control = MM_FLOW_CONTROL_NONE;
 }
 

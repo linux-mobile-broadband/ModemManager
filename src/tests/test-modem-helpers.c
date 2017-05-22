@@ -1930,6 +1930,16 @@ test_cmer_response_cinterion_ehs5 (void)
     test_cmer_response (str, expected_modes, expected_inds);
 }
 
+static void
+test_cmer_request_cinterion_ehs5 (void)
+{
+    gchar *str;
+
+    str = mm_3gpp_build_cmer_set_request (MM_3GPP_CMER_MODE_BUFFER_URCS_IF_LINK_RESERVED, MM_3GPP_CMER_IND_ENABLE_NOT_CAUSED_BY_CIND);
+    g_assert_cmpstr (str, ==, "+CMER=2,0,0,1");
+    g_free (str);
+}
+
 /*****************************************************************************/
 /* Test CIND responses */
 
@@ -3793,6 +3803,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cmer_response_cinterion_pls8, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmer_response_sierra_em7345, NULL));
     g_test_suite_add (suite, TESTCASE (test_cmer_response_cinterion_ehs5, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cmer_request_cinterion_ehs5, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, NULL));
     g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, NULL));
