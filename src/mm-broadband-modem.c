@@ -10154,7 +10154,9 @@ initialize_step (InitializeContext *ctx)
         return;
 
     case INITIALIZE_STEP_SIM_HOT_SWAP:
-        {
+        /* Create the SIM hot swap ports context only if not already done before
+         * (we may be re-running the initialization step after SIM-PIN unlock) */
+        if (!ctx->self->priv->sim_hot_swap_ports_ctx) {
             gboolean is_sim_hot_swap_supported = FALSE;
 
             g_object_get (ctx->self,
@@ -10165,7 +10167,7 @@ initialize_step (InitializeContext *ctx)
                 PortsContext *ports;
                 GError *error = NULL;
 
-                mm_dbg ("Creating PortsContext for SIM hot swap.");
+                mm_dbg ("Creating ports context for SIM hot swap");
 
                 ports = g_new0 (PortsContext, 1);
                 ports->ref_count = 1;
@@ -10178,7 +10180,9 @@ initialize_step (InitializeContext *ctx)
 
                 ports_context_unref (ports);
             }
-        }
+        } else
+            mm_dbg ("Ports context for SIM hot swap already available");
+
         /* Fall down to next step */
         ctx->step++;
 
