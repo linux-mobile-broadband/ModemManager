@@ -75,6 +75,7 @@ mm_plugin_create (void)
                                     MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
                                     MM_PLUGIN_ALLOWED_AT,             TRUE,
                                     MM_PLUGIN_CUSTOM_AT_PROBE,        custom_at_probe,
+                                    MM_PLUGIN_SEND_DELAY,             0,
                                     NULL));
 }
 
