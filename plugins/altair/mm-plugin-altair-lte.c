@@ -83,6 +83,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_CUSTOM_AT_PROBE,     custom_at_probe,
                       MM_PLUGIN_ALLOWED_SINGLE_AT,   TRUE,
                       MM_PLUGIN_SEND_LF,             TRUE,
+                      MM_PLUGIN_SEND_DELAY,          0,
                       NULL));
 }
 

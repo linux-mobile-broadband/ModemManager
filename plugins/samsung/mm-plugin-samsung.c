@@ -65,6 +65,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
                       MM_PLUGIN_ALLOWED_PRODUCT_IDS, products,
                       MM_PLUGIN_ALLOWED_AT,          TRUE,
+                      MM_PLUGIN_SEND_DELAY,          0,
                       NULL));
 }
 
