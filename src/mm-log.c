@@ -47,7 +47,6 @@ static gboolean ts_flags = TS_FLAG_NONE;
 static guint32 log_level = LOGL_INFO | LOGL_WARN | LOGL_ERR;
 static GTimeVal rel_start = { 0, 0 };
 static int logfd = -1;
-static gboolean func_loc = FALSE;
 
 typedef struct {
     guint32 num;
@@ -117,8 +116,9 @@ _mm_log (const char *loc,
         g_string_append_printf (msgbuf, "[%06ld.%06ld] ", secs, usecs);
     }
 
-    if (func_loc && log_level & LOGL_DEBUG)
-        g_string_append_printf (msgbuf, "[%s] %s(): ", loc, func);
+#if defined MM_LOG_FUNC_LOC
+    g_string_append_printf (msgbuf, "[%s] %s(): ", loc, func);
+#endif
 
     va_start (args, fmt);
     g_string_append_vprintf (msgbuf, fmt, args);
@@ -209,14 +209,11 @@ mm_log_setup (const char *level,
               const char *log_file,
               gboolean show_timestamps,
               gboolean rel_timestamps,
-              gboolean debug_func_loc,
               GError **error)
 {
     /* levels */
     if (level && strlen (level) && !mm_log_set_level (level, error))
         return FALSE;
-
-    func_loc = debug_func_loc;
 
     if (show_timestamps)
         ts_flags = TS_FLAG_WALL;

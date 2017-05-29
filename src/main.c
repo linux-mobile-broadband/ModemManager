@@ -143,7 +143,6 @@ main (int argc, char *argv[])
                        mm_context_get_log_file (),
                        mm_context_get_log_timestamps (),
                        mm_context_get_log_relative_timestamps (),
-                       mm_context_get_debug (),
                        &err)) {
         g_warning ("Failed to set up logging: %s", err->message);
         g_error_free (err);
