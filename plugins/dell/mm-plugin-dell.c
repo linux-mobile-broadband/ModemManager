@@ -45,6 +45,8 @@
 #include "mm-broadband-modem-mbim.h"
 #endif
 
+#define MAX_PORT_PROBE_TIMEOUTS 3
+
 G_DEFINE_TYPE (MMPluginDell, mm_plugin_dell, MM_TYPE_PLUGIN)
 
 MM_PLUGIN_DEFINE_MAJOR_VERSION
@@ -70,6 +72,7 @@ typedef struct {
     guint gmi_retries;
     guint cgmi_retries;
     guint ati_retries;
+    guint timeouts;
 } CustomInitContext;
 
 static void
@@ -140,6 +143,8 @@ static void custom_init_step (CustomInitContext *ctx);
 static void
 custom_init_step_next_command (CustomInitContext *ctx)
 {
+    ctx->timeouts = 0;
+
     if (ctx->gmi_retries > 0)
         ctx->gmi_retries = 0;
     else if (ctx->cgmi_retries > 0)
@@ -169,6 +174,7 @@ response_ready (MMPortSerialAt *port,
             return;
         }
         /* Directly retry same command on timeout */
+        ctx->timeouts++;
         custom_init_step (ctx);
         g_error_free (error);
         return;
@@ -269,6 +275,13 @@ custom_init_step (CustomInitContext *ctx)
     }
 #endif
 
+    if (ctx->timeouts >= MAX_PORT_PROBE_TIMEOUTS) {
+        mm_dbg ("(Dell) couldn't detect real manufacturer in (%s): too many timeouts",
+                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_port_probe_set_result_at (ctx->probe, FALSE);
+        goto out;
+    }
+
     if (ctx->gmi_retries > 0) {
         ctx->gmi_retries--;
         mm_port_serial_at_command (ctx->port,
@@ -309,9 +322,10 @@ custom_init_step (CustomInitContext *ctx)
         return;
     }
 
-    /* Finish custom_init */
-    mm_dbg ("(Dell) couldn't flip secondary port to AT in (%s): all retries consumed",
+    mm_dbg ("(Dell) couldn't detect real manufacturer in (%s): all retries consumed",
             mm_port_get_device (MM_PORT (ctx->port)));
+out:
+    /* Finish custom_init */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     custom_init_context_complete_and_free (ctx);
 }
@@ -337,15 +351,8 @@ dell_custom_init (MMPortProbe *probe,
     ctx->port = g_object_ref (port);
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
     ctx->gmi_retries = 3;
-    ctx->cgmi_retries = 3;
-    ctx->ati_retries = 3;
-
-    /* Dell-branded Telit modems always answer to +GMI
-     * Avoid +CGMI and ATI sending for minimizing port probing time */
-    if (mm_kernel_device_get_global_property_as_boolean (port_device, "ID_MM_TELIT_PORTS_TAGGED")) {
-        ctx->cgmi_retries = 0;
-        ctx->ati_retries = 0;
-    }
+    ctx->cgmi_retries = 1;
+    ctx->ati_retries = 1;
 
     custom_init_step (ctx);
 }
