@@ -82,4 +82,9 @@ gboolean mm_cinterion_parse_smong_response (const gchar              *response,
                                             MMModemAccessTechnology  *access_tech,
                                             GError                  **error);
 
+/*****************************************************************************/
+/* ^SIND psinfo helper */
+
+MMModemAccessTechnology mm_cinterion_get_access_technology_from_sind_psinfo (guint val);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

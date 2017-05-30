@@ -624,3 +624,36 @@ mm_cinterion_parse_smong_response (const gchar              *response,
     g_assert (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
     return TRUE;
 }
+
+/*****************************************************************************/
+/* ^SIND psinfo helper */
+
+MMModemAccessTechnology
+mm_cinterion_get_access_technology_from_sind_psinfo (guint val)
+{
+    switch (val) {
+    case 0:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    case 1:
+    case 2:
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    case 3:
+    case 4:
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    case 5:
+    case 6:
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    case 7:
+    case 8:
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    case 9:
+    case 10:
+        return (MM_MODEM_ACCESS_TECHNOLOGY_HSDPA | MM_MODEM_ACCESS_TECHNOLOGY_HSUPA);
+    case 16:
+    case 17:
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    default:
+        mm_dbg ("Unable to identify access technology from psinfo reported value: %u", val);
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    }
+}
