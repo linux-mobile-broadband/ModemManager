@@ -307,8 +307,11 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
         current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY ||
         current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED ||
         current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
-        /* Request immediate access tech update */
-        mm_iface_modem_refresh_access_technologies (MM_IFACE_MODEM (ctx->self));
+        /* Request immediate access tech and signal update: we may have changed
+         * from home to roaming or viceversa, both registered states, so there
+         * wouldn't be an explicit refresh triggered from the modem interface as
+         * the modem never got un-registered during the sequence. */
+        mm_iface_modem_refresh_signal (MM_IFACE_MODEM (ctx->self));
         mm_dbg ("Modem is currently registered in a 3GPP network");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         register_in_network_context_complete_and_free (ctx);

@@ -29,21 +29,20 @@
 #include "mm-log.h"
 #include "mm-context.h"
 
-#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC        60
-#define SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC 3
-#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC         30
-#define ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC    30
+#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
 
-#define STATE_UPDATE_CONTEXT_TAG              "state-update-context-tag"
-#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG     "signal-quality-update-context-tag"
-#define SIGNAL_QUALITY_CHECK_CONTEXT_TAG      "signal-quality-check-context-tag"
-#define ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG "access-technologies-check-context-tag"
-#define RESTART_INITIALIZE_IDLE_TAG           "restart-initialize-tag"
+#define SIGNAL_CHECK_INITIAL_RETRIES      5
+#define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
+#define SIGNAL_CHECK_TIMEOUT_SEC          30
+
+#define STATE_UPDATE_CONTEXT_TAG          "state-update-context-tag"
+#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG "signal-quality-update-context-tag"
+#define SIGNAL_CHECK_CONTEXT_TAG          "signal-check-context-tag"
+#define RESTART_INITIALIZE_IDLE_TAG       "restart-initialize-tag"
 
 static GQuark state_update_context_quark;
 static GQuark signal_quality_update_context_quark;
-static GQuark signal_quality_check_context_quark;
-static GQuark access_technologies_check_context_quark;
+static GQuark signal_check_context_quark;
 static GQuark restart_initialize_idle_quark;
 
 /*****************************************************************************/
@@ -943,152 +942,6 @@ mm_iface_modem_update_access_technologies (MMIfaceModem *self,
 /*****************************************************************************/
 
 typedef struct {
-    guint timeout_source;
-    gboolean running;
-} AccessTechnologiesCheckContext;
-
-static void
-access_technologies_check_context_free (AccessTechnologiesCheckContext *ctx)
-{
-    if (ctx->timeout_source)
-        g_source_remove (ctx->timeout_source);
-    g_free (ctx);
-}
-
-static void
-access_technologies_check_ready (MMIfaceModem *self,
-                                 GAsyncResult *res)
-{
-    GError *error = NULL;
-    MMModemAccessTechnology access_technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    guint mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
-    AccessTechnologiesCheckContext *ctx;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish (
-            self,
-            res,
-            &access_technologies,
-            &mask,
-            &error)) {
-        /* Ignore issues when the operation is unsupported, don't even log */
-        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED))
-            mm_dbg ("Couldn't refresh access technologies: '%s'", error->message);
-        g_error_free (error);
-    } else
-        mm_iface_modem_update_access_technologies (self, access_technologies, mask);
-
-    /* Remove the running tag. Note that the context may have been removed by
-     * mm_iface_modem_shutdown when this function is invoked as a callback of
-     * load_access_technologies. */
-    ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
-    if (ctx)
-        ctx->running = FALSE;
-}
-
-static gboolean
-periodic_access_technologies_check (MMIfaceModem *self)
-{
-    AccessTechnologiesCheckContext *ctx;
-
-    ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
-
-    /* Only launch a new one if not one running already OR if the last one run
-     * was more than 15s ago. */
-    if (!ctx->running) {
-        ctx->running = TRUE;
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies (
-            self,
-            (GAsyncReadyCallback)access_technologies_check_ready,
-            NULL);
-    }
-
-    return G_SOURCE_CONTINUE;
-}
-
-void
-mm_iface_modem_refresh_access_technologies (MMIfaceModem *self)
-{
-    AccessTechnologiesCheckContext *ctx;
-
-    if (G_UNLIKELY (!access_technologies_check_context_quark))
-        access_technologies_check_context_quark = (g_quark_from_static_string (
-                                                       ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
-    if (!ctx)
-        return;
-
-    /* Re-set timeout */
-    if (ctx->timeout_source)
-        g_source_remove (ctx->timeout_source);
-    ctx->timeout_source = g_timeout_add_seconds (ACCESS_TECHNOLOGIES_CHECK_TIMEOUT_SEC,
-                                                 (GSourceFunc)periodic_access_technologies_check,
-                                                 self);
-
-    /* Get first access technology value */
-    periodic_access_technologies_check (self);
-}
-
-static void
-periodic_access_technologies_check_disable (MMIfaceModem *self)
-{
-    if (G_UNLIKELY (!access_technologies_check_context_quark))
-        access_technologies_check_context_quark = (g_quark_from_static_string (
-                                                       ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG));
-
-    /* Clear access technology */
-    mm_iface_modem_update_access_technologies (self,
-                                               MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                               MM_MODEM_ACCESS_TECHNOLOGY_ANY);
-
-    /* Overwriting the data will free the previous context */
-    g_object_set_qdata (G_OBJECT (self),
-                        access_technologies_check_context_quark,
-                        NULL);
-
-    mm_dbg ("Periodic access technology checks disabled");
-}
-
-static void
-periodic_access_technologies_check_enable (MMIfaceModem *self)
-{
-    AccessTechnologiesCheckContext *ctx;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish) {
-        /* If loading access technology not supported, don't even bother setting up
-         * a timeout */
-        return;
-    }
-
-    if (G_UNLIKELY (!access_technologies_check_context_quark))
-        access_technologies_check_context_quark = (g_quark_from_static_string (
-                                                       ACCESS_TECHNOLOGIES_CHECK_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), access_technologies_check_context_quark);
-
-    /* If context is already there, we're already enabled */
-    if (ctx) {
-        periodic_access_technologies_check (self);
-        return;
-    }
-
-    /* Create context and keep it as object data */
-    mm_dbg ("Periodic access technology checks enabled");
-    ctx = g_new0 (AccessTechnologiesCheckContext, 1);
-    g_object_set_qdata_full (G_OBJECT (self),
-                             access_technologies_check_context_quark,
-                             ctx,
-                             (GDestroyNotify)access_technologies_check_context_free);
-
-    /* Get first and setup timeout */
-    mm_iface_modem_refresh_access_technologies (self);
-}
-
-/*****************************************************************************/
-
-typedef struct {
-    time_t last_update;
     guint recent_timeout_source;
 } SignalQualityUpdateContext;
 
@@ -1098,20 +951,6 @@ signal_quality_update_context_free (SignalQualityUpdateContext *ctx)
     if (ctx->recent_timeout_source)
         g_source_remove (ctx->recent_timeout_source);
     g_free (ctx);
-}
-
-static time_t
-get_last_signal_quality_update_time (MMIfaceModem *self)
-{
-    SignalQualityUpdateContext *ctx;
-
-    if (G_UNLIKELY (!signal_quality_update_context_quark))
-        signal_quality_update_context_quark = (g_quark_from_static_string (
-                                                   SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
-
-    return (ctx ? ctx->last_update : 0);
 }
 
 static gboolean
@@ -1187,9 +1026,6 @@ update_signal_quality (MMIfaceModem *self,
             (GDestroyNotify)signal_quality_update_context_free);
     }
 
-    /* Keep current timestamp */
-    ctx->last_update = time (NULL);
-
     /* Note: we always set the new value, even if the signal quality level
      * is the same, in order to provide an up to date 'recent' flag.
      * The only exception being if 'expire' is FALSE; in that case we assume
@@ -1229,142 +1065,336 @@ mm_iface_modem_update_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Signal info (quality and access technology) polling */
+
+typedef enum {
+    SIGNAL_CHECK_STEP_NONE,
+    SIGNAL_CHECK_STEP_FIRST,
+    SIGNAL_CHECK_STEP_SIGNAL_QUALITY,
+    SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES,
+    SIGNAL_CHECK_STEP_LAST,
+} SignalCheckStep;
 
 typedef struct {
-    guint interval;
-    guint initial_retries;
-    guint timeout_source;
-    gboolean running;
-} SignalQualityCheckContext;
+    gboolean enabled;
+    guint    interval;
+    guint    initial_retries;
+    guint    timeout_source;
+
+    /* Values polled in this iteration */
+    guint                   signal_quality;
+    MMModemAccessTechnology access_technologies;
+    guint                   access_technologies_mask;
+
+    /* If both these are unset we'll automatically stop polling */
+    gboolean signal_quality_polling_supported;
+    gboolean access_technology_polling_supported;
+
+    /* Steps triggered when polling active */
+    SignalCheckStep running_step;
+} SignalCheckContext;
 
 static void
-signal_quality_check_context_free (SignalQualityCheckContext *ctx)
+signal_check_context_free (SignalCheckContext *ctx)
 {
     if (ctx->timeout_source)
         g_source_remove (ctx->timeout_source);
-    g_free (ctx);
+    g_slice_free (SignalCheckContext, ctx);
 }
 
-static gboolean periodic_signal_quality_check (MMIfaceModem *self);
+static SignalCheckContext *
+get_signal_check_context (MMIfaceModem *self)
+{
+    SignalCheckContext *ctx;
+
+    if (G_UNLIKELY (!signal_check_context_quark))
+        signal_check_context_quark = (g_quark_from_static_string (
+                                          SIGNAL_CHECK_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_check_context_quark);
+    if (!ctx) {
+        /* Create context and attach it to the object */
+        ctx = g_slice_new0 (SignalCheckContext);
+        ctx->running_step = SIGNAL_CHECK_STEP_NONE;
+
+        /* Initially assume supported if load_access_technologies() is
+         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
+         * this flag and no longer poll. */
+        ctx->access_technology_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies &&
+                                                    MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish);
+
+        /* Initially assume supported if load_signal_quality() is
+         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
+         * this flag and no longer poll. */
+        ctx->signal_quality_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality &&
+                                                 MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish);
+
+        g_object_set_qdata_full (G_OBJECT (self), signal_check_context_quark,
+                                 ctx, (GDestroyNotify) signal_check_context_free);
+    }
+
+    g_assert (ctx);
+    return ctx;
+}
+
+static void     periodic_signal_check_disable (MMIfaceModem *self,
+                                               gboolean      clear);
+static gboolean periodic_signal_check_cb      (MMIfaceModem *self);
+static void     peridic_signal_check_step     (MMIfaceModem *self);
+
+static void
+access_technologies_check_ready (MMIfaceModem *self,
+                                 GAsyncResult *res)
+{
+    GError             *error = NULL;
+    SignalCheckContext *ctx;
+
+    ctx = get_signal_check_context (self);
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish (
+            self,
+            res,
+            &ctx->access_technologies,
+            &ctx->access_technologies_mask,
+            &error)) {
+        /* Did the plugin report that polling access technology is unsupported? */
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            mm_dbg ("Polling to refresh access technologies is unsupported");
+            ctx->access_technology_polling_supported = FALSE;
+        } else
+            mm_dbg ("Couldn't refresh access technologies: '%s'", error->message);
+        g_error_free (error);
+    }
+    /* We may have been disabled while this command was running. */
+    else if (ctx->enabled)
+        mm_iface_modem_update_access_technologies (self, ctx->access_technologies, ctx->access_technologies_mask);
+
+    /* Go on */
+    ctx->running_step++;
+    peridic_signal_check_step (self);
+}
 
 static void
 signal_quality_check_ready (MMIfaceModem *self,
                             GAsyncResult *res)
 {
-    GError *error = NULL;
-    guint signal_quality;
-    SignalQualityCheckContext *ctx;
+    GError             *error = NULL;
+    SignalCheckContext *ctx;
 
-    signal_quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self,
-                                                                                      res,
-                                                                                      &error);
+    ctx = get_signal_check_context (self);
+
+    ctx->signal_quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self, res, &error);
     if (error) {
-        mm_dbg ("Couldn't refresh signal quality: '%s'", error->message);
+        /* Did the plugin report that polling signal quality is unsupported? */
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            mm_dbg ("Polling to refresh signal quality is unsupported");
+            ctx->signal_quality_polling_supported = FALSE;
+        } else
+            mm_dbg ("Couldn't refresh signal quality: '%s'", error->message);
         g_error_free (error);
-    } else
-        update_signal_quality (self, signal_quality, TRUE);
+    }
+    /* We may have been disabled while this command was running. */
+    else if (ctx->enabled)
+        update_signal_quality (self, ctx->signal_quality, TRUE);
 
-    /* Remove the running tag. Note that the context may have been removed by
-     * mm_iface_modem_shutdown when this function is invoked as a callback of
-     * load_signal_quality. */
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
-    if (ctx) {
-        if (ctx->interval == SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC &&
-            (signal_quality != 0 || --ctx->initial_retries == 0)) {
-            ctx->interval = SIGNAL_QUALITY_CHECK_TIMEOUT_SEC;
-            if (ctx->timeout_source) {
-                mm_dbg ("Periodic signal quality checks rescheduled (interval = %ds)", ctx->interval);
-                g_source_remove(ctx->timeout_source);
-                ctx->timeout_source = g_timeout_add_seconds (ctx->interval,
-                                                             (GSourceFunc)periodic_signal_quality_check,
-                                                             self);
+    /* Go on */
+    ctx->running_step++;
+    peridic_signal_check_step (self);
+}
+
+static void
+peridic_signal_check_step (MMIfaceModem *self)
+{
+    SignalCheckContext *ctx;
+
+    ctx = get_signal_check_context (self);
+
+    switch (ctx->running_step) {
+    case SIGNAL_CHECK_STEP_NONE:
+        g_assert_not_reached ();
+
+    case SIGNAL_CHECK_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->running_step++;
+
+    case SIGNAL_CHECK_STEP_SIGNAL_QUALITY:
+        if (ctx->enabled && ctx->signal_quality_polling_supported) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
+                self, (GAsyncReadyCallback)signal_quality_check_ready, NULL);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->running_step++;
+
+    case SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES:
+        if (ctx->enabled && ctx->access_technology_polling_supported) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies (
+                self, (GAsyncReadyCallback)access_technologies_check_ready, NULL);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->running_step++;
+
+    case SIGNAL_CHECK_STEP_LAST:
+        /* Flag as sequence finished */
+        ctx->running_step = SIGNAL_CHECK_STEP_NONE;
+
+        /* If we have been disabled while we were running the steps, we don't
+         * do anything else. */
+        if (!ctx->enabled) {
+            mm_dbg ("Periodic signal checks not rescheduled: disabled");
+            return;
+        }
+
+        /* If both tasks are unsupported, implicitly disable. Do NOT clear the
+         * values, because if we're told they are unsupported it may be that
+         * they're really updated via unsolicited messages. */
+        if (!ctx->access_technology_polling_supported && !ctx->signal_quality_polling_supported) {
+            mm_dbg ("Periodic signal checks not supported");
+            periodic_signal_check_disable (self, FALSE);
+            return;
+        }
+
+        /* Schedule when we poll next time.
+         * Initially we poll at a higher frequency until we get valid signal
+         * quality and access technology values. As soon as we get them, OR if
+         * we made too many retries at a high frequency, we fallback to the
+         * slower polling. */
+        if (ctx->interval == SIGNAL_CHECK_INITIAL_TIMEOUT_SEC) {
+            gboolean signal_quality_ready;
+            gboolean access_technology_ready;
+
+            /* Signal quality is ready if unsupported or if we got a valid
+             * value reported */
+            signal_quality_ready = (!ctx->signal_quality_polling_supported || (ctx->signal_quality != 0));
+            /* Access technology is ready if unsupported or if we got a valid
+             * value reported */
+            access_technology_ready = (!ctx->access_technology_polling_supported ||
+                                       ((ctx->access_technologies & ctx->access_technologies_mask) != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN));
+
+            if (signal_quality_ready && access_technology_ready) {
+                mm_dbg ("Initial signal quality and access technology ready: fallback to default frequency");
+                ctx->interval = SIGNAL_CHECK_TIMEOUT_SEC;
+            } else if (--ctx->initial_retries == 0) {
+                mm_dbg ("Too many periodic signal checks at high frequency: fallback to default frequency");
+                ctx->interval = SIGNAL_CHECK_TIMEOUT_SEC;
             }
         }
-        ctx->running = FALSE;
+
+        mm_dbg ("Periodic signal quality checks scheduled in %ds", ctx->interval);
+        g_assert (!ctx->timeout_source);
+        ctx->timeout_source = g_timeout_add_seconds (ctx->interval, (GSourceFunc) periodic_signal_check_cb, self);
+        return;
     }
 }
 
 static gboolean
-periodic_signal_quality_check (MMIfaceModem *self)
+periodic_signal_check_cb (MMIfaceModem *self)
 {
-    SignalQualityCheckContext *ctx;
+    SignalCheckContext *ctx;
 
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
+    ctx = get_signal_check_context (self);
+    g_assert (ctx->enabled);
 
-    /* Only launch a new one if not one running already OR if the last one run
-     * was more than 15s ago. */
-    if (!ctx->running ||
-        (time (NULL) - get_last_signal_quality_update_time (self) > (ctx->interval / 2))) {
-        ctx->running = TRUE;
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
-            self,
-            (GAsyncReadyCallback)signal_quality_check_ready,
-            NULL);
-    }
+    /* Start the sequence */
+    ctx->running_step             = SIGNAL_CHECK_STEP_FIRST;
+    ctx->signal_quality           = 0;
+    ctx->access_technologies      = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    ctx->access_technologies_mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    peridic_signal_check_step (self);
 
-    return G_SOURCE_CONTINUE;
+    /* Remove the timeout and clear the source id */
+    if (ctx->timeout_source)
+        ctx->timeout_source = 0;
+    return G_SOURCE_REMOVE;
 }
 
-static void
-periodic_signal_quality_check_disable (MMIfaceModem *self)
+void
+mm_iface_modem_refresh_signal (MMIfaceModem *self)
 {
-    if (G_UNLIKELY (!signal_quality_check_context_quark))
-        signal_quality_check_context_quark = (g_quark_from_static_string (
-                                                  SIGNAL_QUALITY_CHECK_CONTEXT_TAG));
+    SignalCheckContext *ctx;
 
-    /* Clear signal quality */
-    update_signal_quality (self, 0, FALSE);
-
-    /* Overwriting the data will free the previous context */
-    g_object_set_qdata (G_OBJECT (self),
-                        signal_quality_check_context_quark,
-                        NULL);
-
-    mm_dbg ("Periodic signal quality checks disabled");
-}
-
-static void
-periodic_signal_quality_check_enable (MMIfaceModem *self)
-{
-    SignalQualityCheckContext *ctx;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish) {
-        /* If loading signal quality not supported, don't even bother setting up
-         * a timeout */
+    /* Don't refresh polling if we're not enabled */
+    ctx = get_signal_check_context (self);
+    if (!ctx->enabled) {
+        mm_dbg ("Periodic signal check refresh ignored: checks not enabled");
         return;
     }
 
-    if (G_UNLIKELY (!signal_quality_check_context_quark))
-        signal_quality_check_context_quark = (g_quark_from_static_string (
-                                                  SIGNAL_QUALITY_CHECK_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
-
-    /* If context is already there, we're already enabled */
-    if (ctx) {
-        periodic_signal_quality_check (self);
+    /* Don't refresh if we're already doing it */
+    if (ctx->running_step != SIGNAL_CHECK_STEP_NONE) {
+        mm_dbg ("Periodic signal check refresh ignored: check already running");
         return;
     }
 
-    /* Create context and keep it as object data */
-    ctx = g_new0 (SignalQualityCheckContext, 1);
-    /* Schedule the signal quality check using a shorter period, up to 5
-     * periods, initially until a non-zero signal quality value is obtained
-     * and then switch back to the normal period. */
-    ctx->interval = SIGNAL_QUALITY_INITIAL_CHECK_TIMEOUT_SEC;
-    ctx->initial_retries = 5;
-    mm_dbg ("Periodic signal quality checks enabled (interval = %ds)", ctx->interval);
-    ctx->timeout_source = g_timeout_add_seconds (ctx->interval,
-                                                 (GSourceFunc)periodic_signal_quality_check,
-                                                 self);
-    g_object_set_qdata_full (G_OBJECT (self),
-                             signal_quality_check_context_quark,
-                             ctx,
-                             (GDestroyNotify)signal_quality_check_context_free);
+    mm_dbg ("Periodic signal check refresh requested");
 
-    /* Get first signal quality value */
-    periodic_signal_quality_check (self);
+    /* Remove the scheduled timeout as we're going to refresh
+     * right away */
+    if (ctx->timeout_source) {
+        g_source_remove (ctx->timeout_source);
+        ctx->timeout_source = 0;
+    }
+
+    /* Reset refresh rate and initial retries when we're asked to refresh signal
+     * so that we poll at a higher frequency */
+    ctx->interval        = SIGNAL_CHECK_INITIAL_TIMEOUT_SEC;
+    ctx->initial_retries = SIGNAL_CHECK_INITIAL_RETRIES;
+
+    /* Start sequence */
+    periodic_signal_check_cb (self);
+}
+
+static void
+periodic_signal_check_disable (MMIfaceModem *self,
+                               gboolean      clear)
+{
+    SignalCheckContext *ctx;
+
+    ctx = get_signal_check_context (self);
+    if (!ctx->enabled)
+        return;
+
+    /* Clear access technology and signal quality */
+    if (clear) {
+        update_signal_quality (self, 0, FALSE);
+        mm_iface_modem_update_access_technologies (self,
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_ANY);
+    }
+
+    /* Remove scheduled timeout */
+    if (ctx->timeout_source) {
+        g_source_remove (ctx->timeout_source);
+        ctx->timeout_source = 0;
+    }
+
+    ctx->enabled = FALSE;
+    mm_dbg ("Periodic signal checks disabled");
+}
+
+static void
+periodic_signal_check_enable (MMIfaceModem *self)
+{
+    SignalCheckContext *ctx;
+
+    ctx = get_signal_check_context (self);
+
+    /* If polling access technology and signal quality not supported, don't even
+     * bother trying. */
+    if (!ctx->signal_quality_polling_supported && !ctx->access_technology_polling_supported) {
+        mm_dbg ("Not enabling periodic signal checks: unsupported");
+        return;
+    }
+
+    /* Log and flag as enabled */
+    if (!ctx->enabled) {
+        mm_dbg ("Periodic signal checks enabled");
+        ctx->enabled = TRUE;
+    }
+
+    /* And refresh, which will trigger the first check at high frequency*/
+    mm_iface_modem_refresh_signal (self);
 }
 
 /*****************************************************************************/
@@ -1456,18 +1486,12 @@ __iface_modem_update_state_internal (MMIfaceModem *self,
 
         /* If we go to a registered/connected state (from unregistered), setup
          * signal quality and access technologies periodic retrieval */
-        if (new_state >= MM_MODEM_STATE_REGISTERED &&
-            old_state < MM_MODEM_STATE_REGISTERED) {
-            periodic_signal_quality_check_enable (self);
-            periodic_access_technologies_check_enable (self);
-        }
+        if (new_state >= MM_MODEM_STATE_REGISTERED && old_state < MM_MODEM_STATE_REGISTERED)
+            periodic_signal_check_enable (self);
         /* If we go from a registered/connected state to unregistered,
          * cleanup signal quality retrieval */
-        else if (old_state >= MM_MODEM_STATE_REGISTERED &&
-                 new_state < MM_MODEM_STATE_REGISTERED) {
-            periodic_signal_quality_check_disable (self);
-            periodic_access_technologies_check_disable (self);
-        }
+        else if (old_state >= MM_MODEM_STATE_REGISTERED && new_state < MM_MODEM_STATE_REGISTERED)
+            periodic_signal_check_disable (self, TRUE);
     }
 
     if (skeleton)
@@ -4906,14 +4930,9 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 void
 mm_iface_modem_shutdown (MMIfaceModem *self)
 {
-    /* Remove SignalQualityCheckContext object to make sure any pending
-     * invocation of periodic_signal_quality_check is cancelled before
-     * SignalQualityUpdateContext is removed (as signal_quality_check_ready may
-     * call update_signal_quality). */
-    if (G_LIKELY (signal_quality_check_context_quark))
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_check_context_quark,
-                            NULL);
+    /* Make sure signal polling is disabled. No real need to clear values, as
+     * we're shutting down the interface anyway. */
+    periodic_signal_check_disable (self, FALSE);
 
     /* Remove SignalQualityUpdateContext object to make sure any pending
      * invocation of expire_signal_quality is canceled before the DBus skeleton
@@ -4921,14 +4940,6 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
     if (G_LIKELY (signal_quality_update_context_quark))
         g_object_set_qdata (G_OBJECT (self),
                             signal_quality_update_context_quark,
-                            NULL);
-
-    /* Remove AccessTechnologiesCheckContext object to make sure any pending
-     * invocation of periodic_access_technologies_check is canceled before the
-     * DBus skeleton is removed. */
-    if (G_LIKELY (access_technologies_check_context_quark))
-        g_object_set_qdata (G_OBJECT (self),
-                            access_technologies_check_context_quark,
                             NULL);
 
     /* Remove running restart initialization idle, if any */

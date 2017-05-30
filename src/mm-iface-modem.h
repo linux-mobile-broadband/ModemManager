@@ -444,12 +444,12 @@ void mm_iface_modem_update_access_technologies (MMIfaceModem *self,
                                                 MMModemAccessTechnology access_tech,
                                                 guint32 mask);
 
-/* Allow requesting to refresh access tech */
-void mm_iface_modem_refresh_access_technologies (MMIfaceModem *self);
-
 /* Allow updating signal quality */
 void mm_iface_modem_update_signal_quality (MMIfaceModem *self,
                                            guint signal_quality);
+
+/* Allow requesting to refresh signal via polling */
+void mm_iface_modem_refresh_signal (MMIfaceModem *self);
 
 /* Allow setting allowed modes */
 void     mm_iface_modem_set_current_modes        (MMIfaceModem *self,
