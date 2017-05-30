@@ -207,9 +207,12 @@ mm_port_serial_at_add_unsolicited_msg_handler (MMPortSerialAt *self,
         if (handler->notify)
             handler->notify (handler->user_data);
     } else {
+        /* The new handler is always PREPENDED, so that e.g. plugins can provide
+         * more specific matches for URCs that are also handled by the generic
+         * plugin. */
         handler = g_slice_new (MMAtUnsolicitedMsgHandler);
-        self->priv->unsolicited_msg_handlers = g_slist_append (self->priv->unsolicited_msg_handlers, handler);
         handler->regex = g_regex_ref (regex);
+        self->priv->unsolicited_msg_handlers = g_slist_prepend (self->priv->unsolicited_msg_handlers, handler);
     }
 
     handler->callback = callback;
