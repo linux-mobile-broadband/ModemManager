@@ -492,7 +492,7 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
         if (!ports[i])
             continue;
 

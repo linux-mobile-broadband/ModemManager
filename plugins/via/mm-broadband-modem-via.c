@@ -321,7 +321,7 @@ set_unsolicited_events_handlers (MMBroadbandModemVia *self,
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events in given port */
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
         if (!ports[i])
             continue;
 
@@ -431,7 +431,7 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemVia *self)
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events in given port */
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
         if (!ports[i])
             continue;
 

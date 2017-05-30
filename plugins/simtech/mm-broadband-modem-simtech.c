@@ -99,7 +99,7 @@ set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     /* Enable unsolicited events in given port */
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
         if (!ports[i])
             continue;
 
