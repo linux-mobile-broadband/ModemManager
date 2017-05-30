@@ -852,11 +852,8 @@ allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
         g_task_return_error (task, error);
-    else {
-        /* Request immediate signal update */
-        mm_iface_modem_refresh_signal (MM_IFACE_MODEM (self));
+    else
         g_task_return_boolean (task, TRUE);
-    }
     g_object_unref (task);
 }
 
@@ -1139,11 +1136,8 @@ scfg_set_ready (MMBaseModem *self,
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
         /* Let the error be critical */
         g_simple_async_result_take_error (operation_result, error);
-    else {
-        /* Request immediate signal update */
-        mm_iface_modem_refresh_signal (MM_IFACE_MODEM (self));
+    else
         g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    }
 
     g_simple_async_result_complete (operation_result);
     g_object_unref (operation_result);

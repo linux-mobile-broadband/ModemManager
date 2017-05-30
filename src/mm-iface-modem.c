@@ -2058,8 +2058,12 @@ set_current_capabilities_ready (MMIfaceModem *self,
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        /* Capabilities updated: explicitly refresh signal and access technology */
+        mm_iface_modem_refresh_signal (self);
         mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
+    }
+
     handle_set_current_capabilities_context_free (ctx);
 }
 
@@ -2436,8 +2440,11 @@ handle_set_current_bands_ready (MMIfaceModem *self,
 
     if (!mm_iface_modem_set_current_bands_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        /* Bands updated: explicitly refresh signal and access technology */
+        mm_iface_modem_refresh_signal (self);
         mm_gdbus_modem_complete_set_current_bands (ctx->skeleton, ctx->invocation);
+    }
 
     handle_set_current_bands_context_free (ctx);
 }
@@ -2752,8 +2759,11 @@ handle_set_current_modes_ready (MMIfaceModem *self,
 
     if (!mm_iface_modem_set_current_modes_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        /* Modes updated: explicitly refresh signal and access technology */
+        mm_iface_modem_refresh_signal (self);
         mm_gdbus_modem_complete_set_current_modes (ctx->skeleton, ctx->invocation);
+    }
 
     handle_set_current_modes_context_free (ctx);
 }
