@@ -32,6 +32,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-telit.h"
 #include "mm-modem-helpers-telit.h"
+#include "mm-telit-enums-types.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -51,6 +52,7 @@ typedef enum {
 
 struct _MMBroadbandModemTelitPrivate {
     FeatureSupport csim_lock_support;
+    MMTelitQssStatus qss_status;
 };
 
 /*****************************************************************************/
@@ -91,49 +93,54 @@ modem_after_sim_unlock (MMIfaceModem *self,
 /*****************************************************************************/
 /* Setup SIM hot swap (Modem interface) */
 
+typedef enum {
+    QSS_SETUP_STEP_FIRST,
+    QSS_SETUP_STEP_QUERY,
+    QSS_SETUP_STEP_ENABLE_PRIMARY_PORT,
+    QSS_SETUP_STEP_ENABLE_SECONDARY_PORT,
+    QSS_SETUP_STEP_LAST
+} QssSetupStep;
+
+typedef struct {
+    QssSetupStep step;
+    GError *primary_error;
+    GError *secondary_error;
+} QssSetupContext;
+
+static void qss_setup_step (GTask *task);
+
 static void
 telit_qss_unsolicited_handler (MMPortSerialAt *port,
                                GMatchInfo *match_info,
                                MMBroadbandModemTelit *self)
 {
-    guint qss;
+    MMTelitQssStatus cur_qss_status;
+    MMTelitQssStatus prev_qss_status;
 
-    if (!mm_get_uint_from_match_info (match_info, 1, &qss))
+    if (!mm_get_int_from_match_info (match_info, 1, (gint*)&cur_qss_status))
         return;
 
-    switch (qss) {
-        case 0:
-            mm_info ("QSS: SIM removed");
-            break;
-        case 1:
-            mm_info ("QSS: SIM inserted");
-            break;
-        case 2:
-            mm_info ("QSS: SIM inserted and PIN unlocked");
-            break;
-        case 3:
-            mm_info ("QSS: SIM inserted and PIN locked");
-            break;
-        default:
-            mm_warn ("QSS: unknown QSS value %d", qss);
-            break;
-    }
+    prev_qss_status = self->priv->qss_status;
+    self->priv->qss_status = cur_qss_status;
 
-    mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    if (cur_qss_status != prev_qss_status)
+        mm_dbg ("QSS: status changed '%s -> %s",
+                mm_telit_qss_status_get_string (prev_qss_status),
+                mm_telit_qss_status_get_string (cur_qss_status));
+
+    if ((prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) ||
+        (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED)) {
+        mm_info ("QSS: SIM swap detected");
+        mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    }
 }
 
-typedef struct {
-    MMBroadbandModemTelit *self;
-    GSimpleAsyncResult *result;
-} ToggleQssUnsolicitedContext;
-
 static void
-toggle_qss_unsolicited_context_complete_and_free (ToggleQssUnsolicitedContext *ctx)
+qss_setup_context_free (QssSetupContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (ToggleQssUnsolicitedContext, ctx);
+    g_clear_error (&(ctx->primary_error));
+    g_clear_error (&(ctx->secondary_error));
+    g_slice_free (QssSetupContext, ctx);
 }
 
 static gboolean
@@ -141,87 +148,192 @@ modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-telit_qss_toggle_ready (MMBaseModem *self,
+telit_qss_enable_ready (MMBaseModem *modem,
                         GAsyncResult *res,
-                        ToggleQssUnsolicitedContext *ctx)
+                        GTask *task)
 {
     GError *error = NULL;
+    MMBroadbandModemTelit *self;
+    QssSetupContext *ctx;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+    GRegex *pattern;
 
-    mm_base_modem_at_command_finish (self, res, &error);
+    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
-        mm_warn ("Enable QSS failed: %s", error->message);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Could not enable QSS");
-    } else {
-        MMPortSerialAt *primary;
-        MMPortSerialAt *secondary;
-        GRegex *pattern;
+        if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
+            mm_warn ("QSS: error enabling unsolicited on primary port: %s", error->message);
+            ctx->primary_error = error;
+        } else if (ctx->step == QSS_SETUP_STEP_ENABLE_SECONDARY_PORT) {
+            mm_warn ("QSS: error enabling unsolicited on secondary port: %s", error->message);
+            ctx->secondary_error = error;
+        } else {
+            g_assert_not_reached ();
+        }
+        goto next_step;
+    }
 
-        pattern = g_regex_new ("#QSS:\\s*([0-3])\\r\\n", G_REGEX_RAW, 0, NULL);
-        g_assert (pattern);
+    pattern = g_regex_new ("#QSS:\\s*([0-3])\\r\\n", G_REGEX_RAW, 0, NULL);
+    g_assert (pattern);
 
-        primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self));
+    if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
+        primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
         mm_port_serial_at_add_unsolicited_msg_handler (
             primary,
             pattern,
             (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
-            ctx->self,
+            self,
             NULL);
+    }
 
-        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
-        if (secondary)
+    if (ctx->step == QSS_SETUP_STEP_ENABLE_SECONDARY_PORT) {
+        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+        if (!secondary) {
             mm_port_serial_at_add_unsolicited_msg_handler (
                 secondary,
                 pattern,
                 (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
-                ctx->self,
+                self,
                 NULL);
-
-        g_regex_unref (pattern);
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-
+        } else {
+            mm_warn ("QSS could not set handler on secondary port: no secondary port found.");
+            ctx->secondary_error = g_error_new (MM_CORE_ERROR,
+                                                MM_CORE_ERROR_FAILED,
+                                                "QSS could not set handler hat secondary port: no secondary port found.");
+        }
     }
 
-    toggle_qss_unsolicited_context_complete_and_free (ctx);
+    g_regex_unref (pattern);
+
+next_step:
+    ctx->step++;
+    qss_setup_step (task);
 }
 
+static void
+telit_qss_query_ready (MMBaseModem *modem,
+                       GAsyncResult *res,
+                       GTask *task)
+{
+    MMBroadbandModemTelit *self;
+    GError *error = NULL;
+    const gchar *response;
+    MMTelitQssStatus qss_status;
+    QssSetupContext *ctx;
+
+    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_warn ("Could not get \"#QSS?\" reply: %s", error->message);
+        g_error_free (error);
+        goto next_step;
+    }
+
+    qss_status = mm_telit_parse_qss_query (response, &error);
+    if (error) {
+        mm_warn ("QSS query parse error: %s", error->message);
+        g_error_free (error);
+        goto next_step;
+    }
+
+    mm_info ("QSS: current status is '%s'", mm_telit_qss_status_get_string (qss_status));
+    self->priv->qss_status = qss_status;
+
+next_step:
+    ctx->step++;
+    qss_setup_step (task);
+}
+
+static void
+qss_setup_step (GTask *task)
+{
+    QssSetupContext *ctx;
+    MMBroadbandModemTelit *self;
+
+    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+        case QSS_SETUP_STEP_FIRST:
+            /* Fall back on next step */
+            ctx->step++;
+        case QSS_SETUP_STEP_QUERY:
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "#QSS?",
+                                      3,
+                                      FALSE,
+                                      (GAsyncReadyCallback) telit_qss_query_ready,
+                                      task);
+            return;
+        case QSS_SETUP_STEP_ENABLE_PRIMARY_PORT:
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                           "#QSS=1",
+                                           3,
+                                           FALSE,
+                                           FALSE, /* raw */
+                                           NULL, /* cancellable */
+                                           (GAsyncReadyCallback) telit_qss_enable_ready,
+                                           task);
+            return;
+        case QSS_SETUP_STEP_ENABLE_SECONDARY_PORT: {
+            MMPortSerialAt *port;
+
+            port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+            if (port) {
+                mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           port,
+                                           "#QSS=1",
+                                           3,
+                                           FALSE,
+                                           FALSE, /* raw */
+                                           NULL, /* cancellable */
+                                           (GAsyncReadyCallback) telit_qss_enable_ready,
+                                           task);
+                return;
+            }
+
+            /* Fall back to next step */
+            ctx->step++;
+        }
+        case QSS_SETUP_STEP_LAST:
+            if (ctx->primary_error && ctx->secondary_error) {
+                g_task_return_new_error (task,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "QSS: couldn't enable unsolicited");
+            } else {
+                g_task_return_boolean (task, TRUE);
+            }
+            g_object_unref (task);
+            break;
+    }
+}
 
 static void
 modem_setup_sim_hot_swap (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    ToggleQssUnsolicitedContext *ctx;
-    MMPortSerialAt *port;
+    QssSetupContext *ctx;
+    GTask *task;
 
-    mm_dbg ("Telit SIM hot swap: Enable QSS");
+    task = g_task_new (self, NULL, callback, user_data);
 
-    ctx = g_slice_new0 (ToggleQssUnsolicitedContext);
-    ctx->self = g_object_ref (MM_BROADBAND_MODEM_TELIT (self));
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_setup_sim_hot_swap);
+    ctx = g_slice_new0 (QssSetupContext);
+    ctx->step = QSS_SETUP_STEP_FIRST;
 
-    port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-    if (!port)
-        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   port,
-                                   "#QSS=1",
-                                   3,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback) telit_qss_toggle_ready,
-                                   ctx);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) qss_setup_context_free);
+    qss_setup_step (task);
 }
 
 /*****************************************************************************/
@@ -426,7 +538,6 @@ modem_load_current_bands (MMIfaceModem *self,
                               (GAsyncReadyCallback) load_bands_ready,
                               ctx);
 }
-
 
 /*****************************************************************************/
 /* Load supported bands (Modem interface) */
@@ -1313,6 +1424,7 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
                                               MMBroadbandModemTelitPrivate);
 
     self->priv->csim_lock_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->qss_status = QSS_STATUS_UNKNOWN;
 }
 
 static void

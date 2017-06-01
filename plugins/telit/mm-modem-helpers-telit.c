@@ -587,3 +587,23 @@ mm_telit_get_band_flags_from_string (const gchar *flag_str,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* #QSS? response parser */
+MMTelitQssStatus
+mm_telit_parse_qss_query (const gchar *response,
+                          GError **error)
+{
+    gint qss_status;
+    gint qss_mode;
+
+    qss_status = QSS_STATUS_UNKNOWN;
+    if (sscanf (response, "#QSS: %d,%d", &qss_mode, &qss_status) != 2) {
+        g_propagate_error (error,
+                           g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                        "Could not parse \"#QSS?\" response: %s",
+                                        response));
+    }
+
+    return (MMTelitQssStatus)qss_status;
+}

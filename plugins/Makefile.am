@@ -225,45 +225,6 @@ NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
 NOVATEL_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-novatel.la
 
 ################################################################################
-# common telit support
-################################################################################
-
-# Common telit helpers library
-noinst_LTLIBRARIES += libhelpers-telit.la
-libhelpers_telit_la_SOURCES = \
-	telit/mm-modem-helpers-telit.c \
-	telit/mm-modem-helpers-telit.h \
-	$(NULL)
-
-noinst_PROGRAMS += test-modem-helpers-telit
-test_modem_helpers_telit_SOURCES = \
-	telit/tests/test-mm-modem-helpers-telit.c \
-	$(NULL)
-test_modem_helpers_telit_CPPFLAGS = \
-	-I$(top_srcdir)/plugins/telit \
-	$(NULL)
-test_modem_helpers_telit_LDADD = \
-	$(builddir)/libhelpers-telit.la \
-	$(top_builddir)/src/libhelpers.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la \
-	$(NULL)
-
-# Common telit modem support library
-noinst_LTLIBRARIES += libmm-utils-telit.la
-libmm_utils_telit_la_SOURCES = \
-	telit/mm-common-telit.c \
-	telit/mm-common-telit.h \
-	telit/mm-broadband-modem-telit.c \
-	telit/mm-broadband-modem-telit.h \
-	$(NULL)
-
-TELIT_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/telit
-TELIT_COMMON_LIBADD_FLAGS   = \
-	$(builddir)/libhelpers-telit.la \
-	$(builddir)/libmm-utils-telit.la \
-	$(NULL)
-
-################################################################################
 # plugin: generic
 ################################################################################
 
@@ -818,6 +779,46 @@ libmm_plugin_via_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: telit
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-telit.la
+
+TELIT_ENUMS_INPUTS = \
+	$(top_srcdir)/plugins/telit/mm-modem-helpers-telit.h \
+	$(NULL)
+
+TELIT_ENUMS_GENERATED = \
+	telit/mm-telit-enums-types.h \
+	telit/mm-telit-enums-types.c \
+	$(NULL)
+
+telit/mm-telit-enums-types.h: Makefile.am $(TELIT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) telit; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-modem-helpers-telit.h\"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--ftail "#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n" \
+			$(TELIT_ENUMS_INPUTS) > $@
+
+telit/mm-telit-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c telit/mm-telit-enums-types.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) telit; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-telit-enums-types.h\"" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			$(TELIT_ENUMS_INPUTS) > $@
+
+libhelpers_telit_la_SOURCES = \
+	telit/mm-modem-helpers-telit.c \
+	telit/mm-modem-helpers-telit.h \
+	$(NULL)
+
+nodist_libhelpers_telit_la_SOURCES = $(TELIT_ENUMS_GENERATED)
+
+libhelpers_telit_la_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
+
+BUILT_SOURCES += $(TELIT_ENUMS_GENERATED)
+CLEANFILES    += $(TELIT_ENUMS_GENERATED)
+
 pkglib_LTLIBRARIES += libmm-plugin-telit.la
 libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
@@ -830,6 +831,34 @@ libmm_plugin_telit_la_LIBADD   = $(TELIT_COMMON_LIBADD_FLAGS)
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
 AM_CFLAGS += -DTESTUDEVRULESDIR_TELIT=\"${srcdir}/telit\"
+
+noinst_PROGRAMS += test-modem-helpers-telit
+test_modem_helpers_telit_SOURCES = \
+	telit/tests/test-mm-modem-helpers-telit.c \
+	$(NULL)
+test_modem_helpers_telit_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	$(NULL)
+test_modem_helpers_telit_LDADD = \
+	$(builddir)/libhelpers-telit.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+# Common telit modem support library
+noinst_LTLIBRARIES += libmm-utils-telit.la
+libmm_utils_telit_la_SOURCES = \
+	telit/mm-common-telit.c \
+	telit/mm-common-telit.h \
+	telit/mm-broadband-modem-telit.c \
+	telit/mm-broadband-modem-telit.h \
+	$(NULL)
+
+TELIT_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/telit
+TELIT_COMMON_LIBADD_FLAGS   = \
+	$(builddir)/libhelpers-telit.la \
+	$(builddir)/libmm-utils-telit.la \
+	$(NULL)
 
 ################################################################################
 # plugin: mtk

@@ -502,6 +502,43 @@ test_telit_get_4g_bnd_flag (void)
     g_array_free (bands_array, TRUE);
 }
 
+typedef struct {
+    const char* response;
+    MMTelitQssStatus expected_qss;
+    const char *error_message;
+} QssParseTest;
+
+static QssParseTest qss_parse_tests [] = {
+    {"#QSS: 0,0", QSS_STATUS_SIM_REMOVED, NULL},
+    {"#QSS: 1,0", QSS_STATUS_SIM_REMOVED, NULL},
+    {"#QSS: 0,1", QSS_STATUS_SIM_INSERTED, NULL},
+    {"#QSS: 0,2", QSS_STATUS_SIM_INSERTED_AND_UNLOCKED, NULL},
+    {"#QSS: 0,3", QSS_STATUS_SIM_INSERTED_AND_READY, NULL},
+    {"#QSS:0,3", QSS_STATUS_SIM_INSERTED_AND_READY, NULL},
+    {"#QSS: 0, 3", QSS_STATUS_SIM_INSERTED_AND_READY, NULL},
+    {"#QSS: 0", QSS_STATUS_UNKNOWN, "Could not parse \"#QSS?\" response: #QSS: 0"},
+    {"QSS:0,1", QSS_STATUS_UNKNOWN, "Could not parse \"#QSS?\" response: QSS:0,1"},
+};
+
+static void
+test_telit_parse_qss_query (void)
+{
+    MMTelitQssStatus actual_qss_status;
+    GError *error = NULL;
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (qss_parse_tests); i++) {
+        actual_qss_status = mm_telit_parse_qss_query (qss_parse_tests[i].response, &error);
+
+        g_assert_cmpint (actual_qss_status, ==, qss_parse_tests[i].expected_qss);
+        if (qss_parse_tests[i].error_message) {
+            g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+            g_assert_cmpstr (error->message, ==, qss_parse_tests[i].error_message);
+            g_clear_error (&error);
+        }
+    }
+}
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -516,5 +553,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/current/set_bands/2g", test_telit_get_2g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/3g", test_telit_get_3g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
+    g_test_add_func ("/MM/telit/qss/query", test_telit_parse_qss_query);
     return g_test_run ();
 }
