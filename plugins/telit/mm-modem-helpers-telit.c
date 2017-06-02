@@ -590,6 +590,7 @@ mm_telit_get_band_flags_from_string (const gchar *flag_str,
 
 /*****************************************************************************/
 /* #QSS? response parser */
+
 MMTelitQssStatus
 mm_telit_parse_qss_query (const gchar *response,
                           GError **error)
@@ -599,11 +600,20 @@ mm_telit_parse_qss_query (const gchar *response,
 
     qss_status = QSS_STATUS_UNKNOWN;
     if (sscanf (response, "#QSS: %d,%d", &qss_mode, &qss_status) != 2) {
-        g_propagate_error (error,
-                           g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                        "Could not parse \"#QSS?\" response: %s",
-                                        response));
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not parse \"#QSS?\" response: %s", response);
+        return QSS_STATUS_UNKNOWN;
     }
 
-    return (MMTelitQssStatus)qss_status;
+    switch (qss_status) {
+    case QSS_STATUS_SIM_REMOVED:
+    case QSS_STATUS_SIM_INSERTED:
+    case QSS_STATUS_SIM_INSERTED_AND_UNLOCKED:
+    case QSS_STATUS_SIM_INSERTED_AND_READY:
+        return (MMTelitQssStatus) qss_status;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown QSS status value given: %d", qss_status);
+        return QSS_STATUS_UNKNOWN;
+    }
 }

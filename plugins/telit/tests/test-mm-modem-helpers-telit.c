@@ -518,6 +518,7 @@ static QssParseTest qss_parse_tests [] = {
     {"#QSS: 0, 3", QSS_STATUS_SIM_INSERTED_AND_READY, NULL},
     {"#QSS: 0", QSS_STATUS_UNKNOWN, "Could not parse \"#QSS?\" response: #QSS: 0"},
     {"QSS:0,1", QSS_STATUS_UNKNOWN, "Could not parse \"#QSS?\" response: QSS:0,1"},
+    {"#QSS: 0,5", QSS_STATUS_UNKNOWN, "Unknown QSS status value given: 5"},
 };
 
 static void
