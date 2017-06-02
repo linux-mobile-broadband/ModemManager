@@ -103,6 +103,8 @@ typedef enum {
 
 typedef struct {
     QssSetupStep step;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
     GError *primary_error;
     GError *secondary_error;
 } QssSetupContext;
@@ -138,6 +140,8 @@ telit_qss_unsolicited_handler (MMPortSerialAt *port,
 static void
 qss_setup_context_free (QssSetupContext *ctx)
 {
+    g_clear_object (&(ctx->primary));
+    g_clear_object (&(ctx->secondary));
     g_clear_error (&(ctx->primary_error));
     g_clear_error (&(ctx->secondary_error));
     g_slice_free (QssSetupContext, ctx);
@@ -156,60 +160,37 @@ telit_qss_enable_ready (MMBaseModem *modem,
                         GAsyncResult *res,
                         GTask *task)
 {
-    GError *error = NULL;
     MMBroadbandModemTelit *self;
     QssSetupContext *ctx;
-    MMPortSerialAt *primary;
-    MMPortSerialAt *secondary;
+    MMPortSerialAt *port;
+    GError **error;
     GRegex *pattern;
 
     self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
-    mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
-            mm_warn ("QSS: error enabling unsolicited on primary port: %s", error->message);
-            ctx->primary_error = error;
-        } else if (ctx->step == QSS_SETUP_STEP_ENABLE_SECONDARY_PORT) {
-            mm_warn ("QSS: error enabling unsolicited on secondary port: %s", error->message);
-            ctx->secondary_error = error;
-        } else {
-            g_assert_not_reached ();
-        }
+    if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
+        port = ctx->primary;
+        error = &ctx->primary_error;
+    } else if (ctx->step == QSS_SETUP_STEP_ENABLE_SECONDARY_PORT) {
+        port = ctx->secondary;
+        error = &ctx->secondary_error;
+    } else
+        g_assert_not_reached ();
+
+    if (!mm_base_modem_at_command_full_finish (modem, res, error)) {
+        mm_warn ("QSS: error enabling unsolicited on port %s: %s", mm_port_get_device (MM_PORT (port)), (*error)->message);
         goto next_step;
     }
 
     pattern = g_regex_new ("#QSS:\\s*([0-3])\\r\\n", G_REGEX_RAW, 0, NULL);
     g_assert (pattern);
-
-    if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
-        primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            primary,
-            pattern,
-            (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
-            self,
-            NULL);
-    }
-
-    if (ctx->step == QSS_SETUP_STEP_ENABLE_SECONDARY_PORT) {
-        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-        if (!secondary) {
-            mm_port_serial_at_add_unsolicited_msg_handler (
-                secondary,
-                pattern,
-                (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
-                self,
-                NULL);
-        } else {
-            mm_warn ("QSS could not set handler on secondary port: no secondary port found.");
-            ctx->secondary_error = g_error_new (MM_CORE_ERROR,
-                                                MM_CORE_ERROR_FAILED,
-                                                "QSS could not set handler hat secondary port: no secondary port found.");
-        }
-    }
-
+    mm_port_serial_at_add_unsolicited_msg_handler (
+        port,
+        pattern,
+        (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
+        self,
+        NULL);
     g_regex_unref (pattern);
 
 next_step:
@@ -276,7 +257,7 @@ qss_setup_step (GTask *task)
             return;
         case QSS_SETUP_STEP_ENABLE_PRIMARY_PORT:
             mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                           mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                           ctx->primary,
                                            "#QSS=1",
                                            3,
                                            FALSE,
@@ -285,35 +266,32 @@ qss_setup_step (GTask *task)
                                            (GAsyncReadyCallback) telit_qss_enable_ready,
                                            task);
             return;
-        case QSS_SETUP_STEP_ENABLE_SECONDARY_PORT: {
-            MMPortSerialAt *port;
-
-            port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-            if (port) {
+        case QSS_SETUP_STEP_ENABLE_SECONDARY_PORT:
+            if (ctx->secondary) {
                 mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                           port,
-                                           "#QSS=1",
-                                           3,
-                                           FALSE,
-                                           FALSE, /* raw */
-                                           NULL, /* cancellable */
-                                           (GAsyncReadyCallback) telit_qss_enable_ready,
-                                           task);
+                                               ctx->secondary,
+                                               "#QSS=1",
+                                               3,
+                                               FALSE,
+                                               FALSE, /* raw */
+                                               NULL, /* cancellable */
+                                               (GAsyncReadyCallback) telit_qss_enable_ready,
+                                               task);
                 return;
             }
-
             /* Fall back to next step */
             ctx->step++;
-        }
         case QSS_SETUP_STEP_LAST:
-            if (ctx->primary_error && ctx->secondary_error) {
+            /* If all enabling actions failed (either both, or only primary if
+             * there is no secondary), then we return an error */
+            if (ctx->primary_error &&
+                (ctx->secondary_error || !ctx->secondary))
                 g_task_return_new_error (task,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "QSS: couldn't enable unsolicited");
-            } else {
+            else
                 g_task_return_boolean (task, TRUE);
-            }
             g_object_unref (task);
             break;
     }
@@ -331,6 +309,8 @@ modem_setup_sim_hot_swap (MMIfaceModem *self,
 
     ctx = g_slice_new0 (QssSetupContext);
     ctx->step = QSS_SETUP_STEP_FIRST;
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) qss_setup_context_free);
     qss_setup_step (task);
