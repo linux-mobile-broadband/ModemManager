@@ -709,23 +709,6 @@ libmm_plugin_novatel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_novatel_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS)
 
 ################################################################################
-# plugin: dell (novatel, sierra or telit)
-################################################################################
-
-pkglib_LTLIBRARIES += libmm-plugin-dell.la
-libmm_plugin_dell_la_SOURCES = \
-	dell/mm-plugin-dell.c \
-	dell/mm-plugin-dell.h \
-	$(NULL)
-libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
-libmm_plugin_dell_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(TELIT_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)
-
-dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
-
-AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
-
-################################################################################
 # plugin: altair lte
 ################################################################################
 
@@ -984,6 +967,23 @@ libmm_plugin_ublox_la_SOURCES = \
 libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_UBLOX_COMPILER_FLAGS)
 libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_ublox_la_LIBADD   = $(builddir)/libhelpers-ublox.la
+
+################################################################################
+# plugin: dell (novatel, sierra or telit)
+################################################################################
+
+pkglib_LTLIBRARIES += libmm-plugin-dell.la
+libmm_plugin_dell_la_SOURCES = \
+	dell/mm-plugin-dell.c \
+	dell/mm-plugin-dell.h \
+	$(NULL)
+libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
+libmm_plugin_dell_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(TELIT_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)
+
+dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
 
 ################################################################################
 
