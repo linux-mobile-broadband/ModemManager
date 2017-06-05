@@ -779,6 +779,11 @@ libmm_plugin_via_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: telit
 ################################################################################
 
+PLUGIN_TELIT_COMPILER_FLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	-I$(top_builddir)/plugins/telit \
+	$(NULL)
+
 noinst_LTLIBRARIES += libhelpers-telit.la
 
 TELIT_ENUMS_INPUTS = \
@@ -824,7 +829,7 @@ libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
 	telit/mm-plugin-telit.h \
 	$(NULL)
-libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_TELIT_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_telit_la_LIBADD   = $(TELIT_COMMON_LIBADD_FLAGS)
 
@@ -836,9 +841,7 @@ noinst_PROGRAMS += test-modem-helpers-telit
 test_modem_helpers_telit_SOURCES = \
 	telit/tests/test-mm-modem-helpers-telit.c \
 	$(NULL)
-test_modem_helpers_telit_CPPFLAGS = \
-	-I$(top_srcdir)/plugins/telit \
-	$(NULL)
+test_modem_helpers_telit_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
 test_modem_helpers_telit_LDADD = \
 	$(builddir)/libhelpers-telit.la \
 	$(top_builddir)/src/libhelpers.la \
@@ -853,8 +856,9 @@ libmm_utils_telit_la_SOURCES = \
 	telit/mm-broadband-modem-telit.c \
 	telit/mm-broadband-modem-telit.h \
 	$(NULL)
+libmm_utils_telit_la_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
 
-TELIT_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/telit
+TELIT_COMMON_COMPILER_FLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
 TELIT_COMMON_LIBADD_FLAGS   = \
 	$(builddir)/libhelpers-telit.la \
 	$(builddir)/libmm-utils-telit.la \
