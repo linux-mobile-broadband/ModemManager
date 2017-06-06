@@ -2930,7 +2930,7 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
         guint mode_val;
 
         mode_val = g_array_index (array_supported_modes, guint, i);
-        if (mode_val >= 0 && mode_val <= 3)
+        if (mode_val <= 3)
             supported_modes |= (MM3gppCmerMode) (1 << mode_val);
         else
             mm_dbg ("Unknown +CMER mode reported: %u", mode_val);
@@ -2940,7 +2940,7 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
         guint ind_val;
 
         ind_val = g_array_index (array_supported_inds, guint, i);
-        if (ind_val >= 0 && ind_val <= 2)
+        if (ind_val <= 2)
             supported_inds |= (MM3gppCmerInd) (1 << ind_val);
         else
             mm_dbg ("Unknown +CMER ind reported: %u", ind_val);
