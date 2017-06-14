@@ -10149,6 +10149,28 @@ get_next_image_info (FirmwareCheckSupportContext *ctx)
     qmi_message_dms_get_stored_image_info_input_unref (input);
 }
 
+static gboolean
+match_images (const gchar *pri_id, const gchar *modem_id)
+{
+    gsize modem_id_len;
+
+    if (!pri_id || !modem_id)
+        return FALSE;
+
+    if (g_str_equal (pri_id, modem_id))
+        return TRUE;
+
+    /* If the Modem image build_id ends in '?' just use a prefix match.  eg,
+     * assume that modem="02.08.02.00_?" matches pri="02.08.02.00_ATT" or
+     * pri="02.08.02.00_GENERIC".
+     */
+    modem_id_len = strlen (modem_id);
+    if (modem_id[modem_id_len - 1] != '?')
+        return FALSE;
+
+    return strncmp (pri_id, modem_id, modem_id_len - 1) == 0;
+}
+
 static void
 list_stored_images_ready (QmiClientDms *client,
                           GAsyncResult *res,
@@ -10239,7 +10261,7 @@ list_stored_images_ready (QmiClientDms *client,
                                              QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement,
                                              j);
 
-            if (g_str_equal (subimage_pri->build_id, subimage_modem->build_id)) {
+            if (match_images (subimage_pri->build_id, subimage_modem->build_id)) {
                 FirmwarePair *pair;
 
                 mm_dbg ("Found pairing PRI+MODEM images with build ID '%s'", subimage_pri->build_id);
