@@ -887,12 +887,14 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
                                   GError      **error)
 {
     GArray     *modes = NULL;
+    GArray     *tech_values = NULL;
     GRegex     *r;
     GError     *inner_error = NULL;
     GMatchInfo *match_info = NULL;
     gchar      *full_list = NULL;
-    gchar     **split;
+    guint       val;
     guint       i;
+    guint       j;
     gboolean    supported_4g = FALSE;
     gboolean    supported_3g = FALSE;
     gboolean    supported_2g = FALSE;
@@ -914,17 +916,13 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
         goto out;
     }
 
-    split = g_strsplit (full_list, ",", -1);
+    if (!(tech_values = mm_parse_uint_list (full_list, &inner_error)))
+        goto out;
+
     modes = g_array_new (FALSE, FALSE, sizeof (MMModemMode));
 
-    for (i = 0; split && split[i]; i++) {
-        guint val;
-        guint j;
-
-        if (!mm_get_uint_from_str (split[i], &val)) {
-            g_warning ("Invalid +WS46 mode reported: %s", split[i]);
-            continue;
-        }
+    for (i = 0; i < tech_values->len; i++) {
+        val = g_array_index (tech_values, guint, i);
 
         for (j = 0; j < G_N_ELEMENTS (ws46_modes); j++) {
             if (ws46_modes[j].ws46 == val) {
@@ -942,10 +940,8 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
         }
 
         if (j == G_N_ELEMENTS (ws46_modes))
-            g_warning ("Unknown +WS46 mode reported: %s", split[i]);
+            g_warning ("Unknown +WS46 mode reported: %u", val);
     }
-
-    g_strfreev (split);
 
     if (modes->len == 0) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No valid modes reported");
@@ -976,6 +972,9 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
     }
 
 out:
+    if (tech_values)
+        g_array_unref (tech_values);
+
     g_free (full_list);
 
     g_clear_pointer (&match_info, g_match_info_free);
