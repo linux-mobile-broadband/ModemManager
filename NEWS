@@ -1,4 +1,28 @@
 
+ModemManager 1.6.8
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored default Linux USB Serial Gadget.
+
+ * QMI:
+   ** Fixed build with libqmi 1.16.
+   ** Allow prefix match for modem images ending with '?'.
+
+ * Plugins:
+   ** Telit: fix #PSNT values interpretation for HSDPA and LTE modems.
+   ** Telit: add LTE access technology reporting.
+   ** Huawei: let the E3372 run NDISDUP via TTY.
+   ** MBM: fix async method completion enabling unsolicited events.
+
+ * Core:
+   ** AT+WS46=? response parser extended to support ranges.
+   ** Fix setting up signal quality retrieval logic.
+
+
 ModemManager 1.6.6
 -------------------------------------------
 This is a new bugfix release of ModemManager.
