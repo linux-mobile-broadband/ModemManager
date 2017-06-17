@@ -216,15 +216,11 @@ static void common_setup_cleanup_packet_service_status_unsolicited_events (MMBea
                                                                            gboolean enable,
                                                                            guint *indication_id);
 
-static void setup_event_report_unsolicited_events (MMBearerQmi *self,
-                                                   QmiClientWds *client,
-                                                   GCancellable *cancellable,
-                                                   GAsyncReadyCallback callback,
-                                                   gpointer user_data);
-
+#if QMI_CHECK_VERSION (1,18,0)
 static void cleanup_event_report_unsolicited_events (MMBearerQmi *self,
                                                      QmiClientWds *client,
                                                      guint *indication_id);
+#endif
 
 typedef enum {
     CONNECT_STEP_FIRST,
@@ -295,22 +291,29 @@ connect_context_complete_and_free (ConnectContext *ctx)
                                                                        FALSE,
                                                                        &ctx->packet_service_status_ipv4_indication_id);
     }
+
+#if QMI_CHECK_VERSION (1,18,0)
     if (ctx->event_report_ipv4_indication_id) {
         cleanup_event_report_unsolicited_events (ctx->self,
                                                  ctx->client_ipv4,
                                                  &ctx->event_report_ipv4_indication_id);
     }
+#endif
+
     if (ctx->packet_service_status_ipv6_indication_id) {
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
                                                                        ctx->client_ipv6,
                                                                        FALSE,
                                                                        &ctx->packet_service_status_ipv6_indication_id);
     }
+
+#if QMI_CHECK_VERSION (1,18,0)
     if (ctx->event_report_ipv6_indication_id) {
         cleanup_event_report_unsolicited_events (ctx->self,
                                                  ctx->client_ipv6,
                                                  &ctx->event_report_ipv6_indication_id);
     }
+#endif
 
     g_clear_error (&ctx->error_ipv4);
     g_clear_error (&ctx->error_ipv6);
@@ -851,6 +854,8 @@ common_setup_cleanup_packet_service_status_unsolicited_events (MMBearerQmi *self
     }
 }
 
+#if QMI_CHECK_VERSION (1,18,0)
+
 static void
 event_report_indication_cb (QmiClientWds *client,
                             QmiIndicationWdsEventReportOutput *output,
@@ -978,6 +983,8 @@ cleanup_event_report_unsolicited_events (MMBearerQmi *self,
                                      NULL);
     qmi_message_wds_set_event_report_input_unref (input);
 }
+
+#endif /* QMI_CHECK_VERSION (1,18,0) */
 
 static void
 qmi_port_allocate_client_ready (MMPortQmi *qmi,
@@ -1142,11 +1149,14 @@ connect_context_step (ConnectContext *ctx)
                                                                        ctx->client_ipv4,
                                                                        TRUE,
                                                                        &ctx->packet_service_status_ipv4_indication_id);
+
+#if QMI_CHECK_VERSION (1,18,0)
         setup_event_report_unsolicited_events (ctx->self,
                                                ctx->client_ipv4,
                                                ctx->cancellable,
                                                (GAsyncReadyCallback) connect_enable_indications_ipv4_ready,
                                                ctx);
+#endif
         return;
 
     case CONNECT_STEP_START_NETWORK_IPV4: {
@@ -1243,11 +1253,13 @@ connect_context_step (ConnectContext *ctx)
                                                                        ctx->client_ipv6,
                                                                        TRUE,
                                                                        &ctx->packet_service_status_ipv6_indication_id);
+#if QMI_CHECK_VERSION (1,18,0)
         setup_event_report_unsolicited_events (ctx->self,
                                                ctx->client_ipv6,
                                                ctx->cancellable,
                                                (GAsyncReadyCallback) connect_enable_indications_ipv6_ready,
                                                ctx);
+#endif
         return;
 
     case CONNECT_STEP_START_NETWORK_IPV6: {
@@ -1644,9 +1656,12 @@ disconnect_context_step (DisconnectContext *ctx)
                                                                            ctx->client_ipv4,
                                                                            FALSE,
                                                                            &ctx->self->priv->packet_service_status_ipv4_indication_id);
+
+#if QMI_CHECK_VERSION (1,18,0)
             cleanup_event_report_unsolicited_events (ctx->self,
                                                      ctx->client_ipv4,
                                                      &ctx->self->priv->event_report_ipv4_indication_id);
+#endif
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
@@ -1673,9 +1688,12 @@ disconnect_context_step (DisconnectContext *ctx)
                                                                            ctx->client_ipv6,
                                                                            FALSE,
                                                                            &ctx->self->priv->packet_service_status_ipv6_indication_id);
+
+#if QMI_CHECK_VERSION (1,18,0)
             cleanup_event_report_unsolicited_events (ctx->self,
                                                      ctx->client_ipv6,
                                                      &ctx->self->priv->event_report_ipv6_indication_id);
+#endif
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
@@ -1811,22 +1829,26 @@ dispose (GObject *object)
                                                                        FALSE,
                                                                        &self->priv->packet_service_status_ipv4_indication_id);
     }
+#if QMI_CHECK_VERSION (1,18,0)
     if (self->priv->event_report_ipv4_indication_id) {
         cleanup_event_report_unsolicited_events (self,
                                                  self->priv->client_ipv4,
                                                  &self->priv->event_report_ipv4_indication_id);
     }
+#endif
     if (self->priv->packet_service_status_ipv6_indication_id) {
         common_setup_cleanup_packet_service_status_unsolicited_events (self,
                                                                        self->priv->client_ipv6,
                                                                        FALSE,
                                                                        &self->priv->packet_service_status_ipv6_indication_id);
     }
+#if QMI_CHECK_VERSION (1,18,0)
     if (self->priv->event_report_ipv6_indication_id) {
         cleanup_event_report_unsolicited_events (self,
                                                  self->priv->client_ipv6,
                                                  &self->priv->event_report_ipv6_indication_id);
     }
+#endif
 
     g_clear_object (&self->priv->data);
     g_clear_object (&self->priv->client_ipv4);
