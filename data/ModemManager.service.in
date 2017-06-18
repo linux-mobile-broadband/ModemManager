@@ -1,6 +1,5 @@
 [Unit]
 Description=Modem Manager
-After=syslog.target
 
 [Service]
 Type=dbus
