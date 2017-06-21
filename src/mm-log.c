@@ -82,6 +82,25 @@ mm_to_syslog_priority (MMLogLevel level)
     return 0;
 }
 
+static int
+glib_to_syslog_priority (GLogLevelFlags level)
+{
+    switch (level) {
+    case G_LOG_LEVEL_ERROR:
+        return LOG_CRIT;
+    case G_LOG_LEVEL_CRITICAL:
+        return LOG_ERR;
+    case G_LOG_LEVEL_WARNING:
+        return LOG_WARNING;
+    case G_LOG_LEVEL_MESSAGE:
+        return LOG_NOTICE;
+    case G_LOG_LEVEL_DEBUG:
+        return LOG_DEBUG;
+    default:
+        return LOG_INFO;
+    }
+}
+
 static const char *
 log_level_description (MMLogLevel level)
 {
@@ -166,33 +185,10 @@ log_handler (const gchar *log_domain,
              const gchar *message,
              gpointer ignored)
 {
-    int syslog_priority;
     ssize_t ign;
 
-    switch (level) {
-    case G_LOG_LEVEL_ERROR:
-        syslog_priority = LOG_CRIT;
-        break;
-    case G_LOG_LEVEL_CRITICAL:
-        syslog_priority = LOG_ERR;
-        break;
-    case G_LOG_LEVEL_WARNING:
-        syslog_priority = LOG_WARNING;
-        break;
-    case G_LOG_LEVEL_MESSAGE:
-        syslog_priority = LOG_NOTICE;
-        break;
-    case G_LOG_LEVEL_DEBUG:
-        syslog_priority = LOG_DEBUG;
-        break;
-    case G_LOG_LEVEL_INFO:
-    default:
-        syslog_priority = LOG_INFO;
-        break;
-    }
-
     if (logfd < 0)
-        syslog (syslog_priority, "%s", message);
+        syslog (glib_to_syslog_priority (level), "%s", message);
     else {
         ign = write (logfd, message, strlen (message));
         if (ign) {} /* whatever; really shut up about unused result */
