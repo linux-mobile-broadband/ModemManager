@@ -19,31 +19,31 @@
 #include <glib.h>
 
 /* Log levels */
-enum {
-    LOGL_ERR   = 0x00000001,
-    LOGL_WARN  = 0x00000002,
-    LOGL_INFO  = 0x00000004,
-    LOGL_DEBUG = 0x00000008
-};
+typedef enum {
+    MM_LOG_LEVEL_ERR   = 0x00000001,
+    MM_LOG_LEVEL_WARN  = 0x00000002,
+    MM_LOG_LEVEL_INFO  = 0x00000004,
+    MM_LOG_LEVEL_DEBUG = 0x00000008
+} MMLogLevel;
 
 #define mm_err(...) \
-    _mm_log (G_STRLOC, G_STRFUNC, LOGL_ERR, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_ERR, ## __VA_ARGS__ )
 
 #define mm_warn(...) \
-    _mm_log (G_STRLOC, G_STRFUNC, LOGL_WARN, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_WARN, ## __VA_ARGS__ )
 
 #define mm_info(...) \
-    _mm_log (G_STRLOC, G_STRFUNC, LOGL_INFO, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO, ## __VA_ARGS__ )
 
 #define mm_dbg(...) \
-    _mm_log (G_STRLOC, G_STRFUNC, LOGL_DEBUG, ## __VA_ARGS__ )
+    _mm_log (G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
 
 #define mm_log(level, ...) \
     _mm_log (G_STRLOC, G_STRFUNC, level, ## __VA_ARGS__ )
 
 void _mm_log (const char *loc,
               const char *func,
-              guint32 level,
+              MMLogLevel level,
               const char *fmt,
               ...)  __attribute__((__format__ (__printf__, 4, 5)));
 

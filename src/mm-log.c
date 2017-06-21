@@ -44,7 +44,7 @@ enum {
 };
 
 static gboolean ts_flags = TS_FLAG_NONE;
-static guint32 log_level = LOGL_INFO | LOGL_WARN | LOGL_ERR;
+static guint32 log_level = MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
 static GTimeVal rel_start = { 0, 0 };
 static int logfd = -1;
 
@@ -54,26 +54,42 @@ typedef struct {
 } LogDesc;
 
 static const LogDesc level_descs[] = {
-    { LOGL_ERR, "ERR" },
-    { LOGL_WARN | LOGL_ERR, "WARN" },
-    { LOGL_INFO | LOGL_WARN | LOGL_ERR, "INFO" },
-    { LOGL_DEBUG | LOGL_INFO | LOGL_WARN | LOGL_ERR, "DEBUG" },
+    { MM_LOG_LEVEL_ERR, "ERR" },
+    { MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "WARN" },
+    { MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "INFO" },
+    { MM_LOG_LEVEL_DEBUG | MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "DEBUG" },
     { 0, NULL }
 };
 
 static GString *msgbuf = NULL;
 static volatile gsize msgbuf_once = 0;
 
+static int
+mm_to_syslog_priority (MMLogLevel level)
+{
+    switch (level) {
+    case MM_LOG_LEVEL_DEBUG:
+        return LOG_DEBUG;
+    case MM_LOG_LEVEL_WARN:
+        return LOG_WARNING;
+    case MM_LOG_LEVEL_INFO:
+        return LOG_INFO;
+    case MM_LOG_LEVEL_ERR:
+        return LOG_ERR;
+    }
+    g_assert_not_reached();
+    return 0;
+}
+
 void
 _mm_log (const char *loc,
          const char *func,
-         guint32 level,
+         MMLogLevel level,
          const char *fmt,
          ...)
 {
     va_list args;
     GTimeVal tv;
-    int syslog_priority = LOG_INFO;
     ssize_t ign;
 
     if (!(log_level & level))
@@ -85,18 +101,20 @@ _mm_log (const char *loc,
     } else
         g_string_truncate (msgbuf, 0);
 
-    if ((log_level & LOGL_DEBUG) && (level == LOGL_DEBUG))
+    switch (level) {
+    case MM_LOG_LEVEL_DEBUG:
         g_string_append (msgbuf, "<debug> ");
-    else if ((log_level & LOGL_INFO) && (level == LOGL_INFO))
+        break;
+    case MM_LOG_LEVEL_INFO:
         g_string_append (msgbuf, "<info>  ");
-    else if ((log_level & LOGL_WARN) && (level == LOGL_WARN)) {
+        break;
+    case MM_LOG_LEVEL_WARN:
         g_string_append (msgbuf, "<warn>  ");
-        syslog_priority = LOG_WARNING;
-    } else if ((log_level & LOGL_ERR) && (level == LOGL_ERR)) {
+        break;
+    case MM_LOG_LEVEL_ERR:
         g_string_append (msgbuf, "<error> ");
-        syslog_priority = LOG_ERR;
-    } else
-        return;
+        break;
+    }
 
     if (ts_flags == TS_FLAG_WALL) {
         g_get_current_time (&tv);
@@ -127,7 +145,7 @@ _mm_log (const char *loc,
     g_string_append_c (msgbuf, '\n');
 
     if (logfd < 0)
-        syslog (syslog_priority, "%s", msgbuf->str);
+        syslog (mm_to_syslog_priority (level), "%s", msgbuf->str);
     else {
         ign = write (logfd, msgbuf->str, msgbuf->len);
         if (ign) {} /* whatever; really shut up about unused result */
@@ -194,11 +212,11 @@ mm_log_set_level (const char *level, GError **error)
                      "Unknown log level '%s'", level);
 
 #if defined WITH_QMI
-    qmi_utils_set_traces_enabled (log_level & LOGL_DEBUG ? TRUE : FALSE);
+    qmi_utils_set_traces_enabled (log_level & MM_LOG_LEVEL_DEBUG ? TRUE : FALSE);
 #endif
 
 #if defined WITH_MBIM
-    mbim_utils_set_traces_enabled (log_level & LOGL_DEBUG ? TRUE : FALSE);
+    mbim_utils_set_traces_enabled (log_level & MM_LOG_LEVEL_DEBUG ? TRUE : FALSE);
 #endif
 
     return found;
