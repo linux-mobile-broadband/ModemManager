@@ -33,6 +33,7 @@ gboolean     mm_context_get_no_auto_scan          (void);
 /* Logging support */
 const gchar *mm_context_get_log_level               (void);
 const gchar *mm_context_get_log_file                (void);
+gboolean     mm_context_get_log_journal             (void);
 gboolean     mm_context_get_log_timestamps          (void);
 gboolean     mm_context_get_log_relative_timestamps (void);
 

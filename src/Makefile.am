@@ -46,6 +46,11 @@ AM_CFLAGS  += $(POLKIT_CFLAGS)
 AM_LDFLAGS += $(POLKIT_LIBS)
 endif
 
+if WITH_SYSTEMD_JOURNAL
+AM_CFLAGS += $(LIBSYSTEMD_CFLAGS)
+AM_LDFLAGS += $(LIBSYSTEMD_LIBS)
+endif
+
 ################################################################################
 # generic udev rules
 ################################################################################

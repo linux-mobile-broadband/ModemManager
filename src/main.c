@@ -141,6 +141,7 @@ main (int argc, char *argv[])
 
     if (!mm_log_setup (mm_context_get_log_level (),
                        mm_context_get_log_file (),
+                       mm_context_get_log_journal (),
                        mm_context_get_log_timestamps (),
                        mm_context_get_log_relative_timestamps (),
                        &err)) {

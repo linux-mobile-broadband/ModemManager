@@ -35,6 +35,11 @@
 #include <libmbim-glib.h>
 #endif
 
+#if defined WITH_SYSTEMD_JOURNAL
+#define SD_JOURNAL_SUPPRESS_LOCATION
+#include <systemd/sd-journal.h>
+#endif
+
 #include "mm-log.h"
 
 enum {
@@ -148,6 +153,43 @@ log_backend_syslog (const char *loc,
     syslog (syslog_level, "%s", message);
 }
 
+#if defined WITH_SYSTEMD_JOURNAL
+static void
+log_backend_systemd_journal (const char *loc,
+                             const char *func,
+                             int syslog_level,
+                             const char *message,
+                             size_t length)
+{
+    const char *line;
+    size_t file_length;
+
+    if (loc == NULL) {
+        sd_journal_send ("MESSAGE=%s", message,
+                         "PRIORITY=%d", syslog_level,
+                         NULL);
+        return;
+    }
+
+    line = strstr (loc, ":");
+    if (line) {
+        file_length = line - loc;
+        line++;
+    } else {
+        /* This is not supposed to happen but we must be prepared for this */
+        line = loc;
+        file_length = 0;
+    }
+
+    sd_journal_send ("MESSAGE=%s", message,
+                     "PRIORITY=%d", syslog_level,
+                     "CODE_FUNC=%s", func,
+                     "CODE_FILE=%.*s", file_length, loc,
+                     "CODE_LINE=%s", line,
+                     NULL);
+}
+#endif
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -242,6 +284,7 @@ mm_log_set_level (const char *level, GError **error)
 gboolean
 mm_log_setup (const char *level,
               const char *log_file,
+              gboolean log_journal,
               gboolean show_timestamps,
               gboolean rel_timestamps,
               GError **error)
@@ -258,6 +301,12 @@ mm_log_setup (const char *level,
     /* Grab start time for relative timestamps */
     g_get_current_time (&rel_start);
 
+#if defined WITH_SYSTEMD_JOURNAL
+    if (log_journal) {
+        log_backend = log_backend_systemd_journal;
+        append_log_level_text = FALSE;
+    } else
+#endif
     if (log_file == NULL) {
         openlog (G_LOG_DOMAIN, LOG_CONS | LOG_PID | LOG_PERROR, LOG_DAEMON);
         log_backend = log_backend_syslog;

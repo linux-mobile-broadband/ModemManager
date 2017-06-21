@@ -51,6 +51,7 @@ gboolean mm_log_set_level (const char *level, GError **error);
 
 gboolean mm_log_setup (const char *level,
                        const char *log_file,
+                       gboolean log_journal,
                        gboolean show_ts,
                        gboolean rel_ts,
                        GError **error);

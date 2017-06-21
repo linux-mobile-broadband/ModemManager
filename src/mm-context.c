@@ -89,6 +89,7 @@ mm_context_get_no_auto_scan (void)
 
 static const gchar *log_level;
 static const gchar *log_file;
+static gboolean     log_journal;
 static gboolean     log_show_ts;
 static gboolean     log_rel_ts;
 
@@ -103,6 +104,13 @@ static const GOptionEntry log_entries[] = {
         "Path to log file",
         "[PATH]"
     },
+#if WITH_SYSTEMD_JOURNAL
+    {
+        "log-journal", 0, 0, G_OPTION_ARG_NONE, &log_journal,
+        "Log to systemd journal",
+        NULL
+    },
+#endif
     {
         "log-timestamps", 0, 0, G_OPTION_ARG_NONE, &log_show_ts,
         "Show timestamps in log output",
@@ -140,6 +148,12 @@ const gchar *
 mm_context_get_log_file (void)
 {
     return log_file;
+}
+
+gboolean
+mm_context_get_log_journal (void)
+{
+    return log_journal;
 }
 
 gboolean

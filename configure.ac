@@ -243,6 +243,40 @@ esac
 AM_CONDITIONAL(SUSPEND_RESUME_SYSTEMD, test "x$with_suspend_resume" = "xsystemd")
 
 dnl-----------------------------------------------------------------------------
+dnl systemd journal support
+dnl
+
+AC_ARG_WITH(systemd-journal,
+            AS_HELP_STRING([--with-systemd-journal=no|yes|auto],
+                           [Enable systemd journal support [[default=auto]]]),,
+            [with_systemd_journal=auto])
+
+if test "x$with_systemd_journal" = "xauto"; then
+    if test "x$have_libsystemd" = "xyes"; then
+        with_systemd_journal=yes
+    else
+        with_systemd_journal=no
+    fi
+fi
+
+case $with_systemd_journal in
+    no)
+        AC_DEFINE(WITH_SYSTEMD_JOURNAL, 0, [Define if you want systemd journal support])
+        ;;
+    yes)
+        if test "x$have_libsystemd" = "xno"; then
+            AC_MSG_ERROR(libsystemd development headers are required)
+	fi
+        AC_DEFINE(WITH_SYSTEMD_JOURNAL, 1, [Define if you want systemd journal support])
+        ;;
+    *)
+        AC_MSG_ERROR([Wrong value for --with-systemd-journal: $with_systemd_journal])
+        ;;
+esac
+
+AM_CONDITIONAL(WITH_SYSTEMD_JOURNAL, test "x$with_systemd_journal" = "xyes")
+
+dnl-----------------------------------------------------------------------------
 dnl PolicyKit
 dnl
 
@@ -425,6 +459,7 @@ echo "
       mbim support:            ${with_mbim}
       qmi support:             ${with_qmi}
       suspend/resume support:  ${with_suspend_resume}
+      systemd journal support: ${with_systemd_journal}
 
     Miscellaneous:
       gobject introspection:   ${found_introspection}
