@@ -47,6 +47,7 @@ static gboolean ts_flags = TS_FLAG_NONE;
 static guint32 log_level = MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
 static GTimeVal rel_start = { 0, 0 };
 static int logfd = -1;
+static gboolean append_log_level_text = TRUE;
 
 typedef struct {
     guint32 num;
@@ -81,6 +82,23 @@ mm_to_syslog_priority (MMLogLevel level)
     return 0;
 }
 
+static const char *
+log_level_description (MMLogLevel level)
+{
+    switch (level) {
+    case MM_LOG_LEVEL_DEBUG:
+        return "<debug>";
+    case MM_LOG_LEVEL_WARN:
+        return "<warn> ";
+    case MM_LOG_LEVEL_INFO:
+        return "<info> ";
+    case MM_LOG_LEVEL_ERR:
+        return "<error>";
+    }
+    g_assert_not_reached();
+    return NULL;
+}
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -101,20 +119,8 @@ _mm_log (const char *loc,
     } else
         g_string_truncate (msgbuf, 0);
 
-    switch (level) {
-    case MM_LOG_LEVEL_DEBUG:
-        g_string_append (msgbuf, "<debug> ");
-        break;
-    case MM_LOG_LEVEL_INFO:
-        g_string_append (msgbuf, "<info>  ");
-        break;
-    case MM_LOG_LEVEL_WARN:
-        g_string_append (msgbuf, "<warn>  ");
-        break;
-    case MM_LOG_LEVEL_ERR:
-        g_string_append (msgbuf, "<error> ");
-        break;
-    }
+    if (append_log_level_text)
+        g_string_append_printf (msgbuf, "%s ", log_level_description (level));
 
     if (ts_flags == TS_FLAG_WALL) {
         g_get_current_time (&tv);
