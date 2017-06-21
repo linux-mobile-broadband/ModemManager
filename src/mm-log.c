@@ -49,6 +49,12 @@ static GTimeVal rel_start = { 0, 0 };
 static int logfd = -1;
 static gboolean append_log_level_text = TRUE;
 
+static void (*log_backend) (const char *loc,
+                            const char *func,
+                            int syslog_level,
+                            const char *message,
+                            size_t length);
+
 typedef struct {
     guint32 num;
     const char *name;
@@ -118,6 +124,30 @@ log_level_description (MMLogLevel level)
     return NULL;
 }
 
+static void
+log_backend_file (const char *loc,
+                  const char *func,
+                  int syslog_level,
+                  const char *message,
+                  size_t length)
+{
+    ssize_t ign;
+    ign = write (logfd, message, length);
+    if (ign) {} /* whatever; really shut up about unused result */
+
+    fsync (logfd);  /* Make sure output is dumped to disk immediately  */
+}
+
+static void
+log_backend_syslog (const char *loc,
+                    const char *func,
+                    int syslog_level,
+                    const char *message,
+                    size_t length)
+{
+    syslog (syslog_level, "%s", message);
+}
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -127,7 +157,6 @@ _mm_log (const char *loc,
 {
     va_list args;
     GTimeVal tv;
-    ssize_t ign;
 
     if (!(log_level & level))
         return;
@@ -169,14 +198,7 @@ _mm_log (const char *loc,
 
     g_string_append_c (msgbuf, '\n');
 
-    if (logfd < 0)
-        syslog (mm_to_syslog_priority (level), "%s", msgbuf->str);
-    else {
-        ign = write (logfd, msgbuf->str, msgbuf->len);
-        if (ign) {} /* whatever; really shut up about unused result */
-
-        fsync (logfd);  /* Make sure output is dumped to disk immediately */
-    }
+    log_backend (loc, func, mm_to_syslog_priority (level), msgbuf->str, msgbuf->len);
 }
 
 static void
@@ -185,14 +207,7 @@ log_handler (const gchar *log_domain,
              const gchar *message,
              gpointer ignored)
 {
-    ssize_t ign;
-
-    if (logfd < 0)
-        syslog (glib_to_syslog_priority (level), "%s", message);
-    else {
-        ign = write (logfd, message, strlen (message));
-        if (ign) {} /* whatever; really shut up about unused result */
-    }
+    log_backend (NULL, NULL, glib_to_syslog_priority (level), message, strlen(message));
 }
 
 gboolean
@@ -243,9 +258,10 @@ mm_log_setup (const char *level,
     /* Grab start time for relative timestamps */
     g_get_current_time (&rel_start);
 
-    if (log_file == NULL)
+    if (log_file == NULL) {
         openlog (G_LOG_DOMAIN, LOG_CONS | LOG_PID | LOG_PERROR, LOG_DAEMON);
-    else {
+        log_backend = log_backend_syslog;
+    } else {
         logfd = open (log_file,
                       O_CREAT | O_APPEND | O_WRONLY,
                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
@@ -255,6 +271,7 @@ mm_log_setup (const char *level,
                          errno, strerror (errno));
             return FALSE;
         }
+        log_backend = log_backend_file;
     }
 
     g_log_set_handler (G_LOG_DOMAIN,
