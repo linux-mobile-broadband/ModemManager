@@ -104,7 +104,7 @@ static const GOptionEntry log_entries[] = {
         "Path to log file",
         "[PATH]"
     },
-#if WITH_SYSTEMD_JOURNAL
+#if defined WITH_SYSTEMD_JOURNAL
     {
         "log-journal", 0, 0, G_OPTION_ARG_NONE, &log_journal,
         "Log to systemd journal",

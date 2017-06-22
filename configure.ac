@@ -260,17 +260,14 @@ if test "x$with_systemd_journal" = "xauto"; then
 fi
 
 case $with_systemd_journal in
-    no)
-        AC_DEFINE(WITH_SYSTEMD_JOURNAL, 0, [Define if you want systemd journal support])
-        ;;
     yes)
         if test "x$have_libsystemd" = "xno"; then
             AC_MSG_ERROR(libsystemd development headers are required)
-	fi
+        fi
         AC_DEFINE(WITH_SYSTEMD_JOURNAL, 1, [Define if you want systemd journal support])
         ;;
     *)
-        AC_MSG_ERROR([Wrong value for --with-systemd-journal: $with_systemd_journal])
+        with_systemd_journal=no
         ;;
 esac
 
