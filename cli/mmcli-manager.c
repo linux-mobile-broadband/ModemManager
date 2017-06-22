@@ -29,7 +29,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#if WITH_UDEV
+#if defined WITH_UDEV
 # include <gudev/gudev.h>
 #endif
 
@@ -43,7 +43,7 @@
 typedef struct {
     MMManager *manager;
     GCancellable *cancellable;
-#if WITH_UDEV
+#if defined WITH_UDEV
     GUdevClient *udev;
 #endif
 } Context;
@@ -56,7 +56,7 @@ static gboolean scan_modems_flag;
 static gchar *set_logging_str;
 static gchar *report_kernel_event_str;
 
-#if WITH_UDEV
+#if defined WITH_UDEV
 static gboolean report_kernel_event_auto_scan;
 #endif
 
@@ -81,7 +81,7 @@ static GOptionEntry entries[] = {
       "Report kernel event",
       "[\"key=value,...\"]"
     },
-#if WITH_UDEV
+#if defined WITH_UDEV
     { "report-kernel-event-auto-scan", 0, 0, G_OPTION_ARG_NONE, &report_kernel_event_auto_scan,
       "Automatically report kernel events based on udev notifications",
       NULL
@@ -121,7 +121,7 @@ mmcli_manager_options_enabled (void)
                  !!set_logging_str +
                  !!report_kernel_event_str);
 
-#if WITH_UDEV
+#if defined WITH_UDEV
     n_actions += report_kernel_event_auto_scan;
 #endif
 
@@ -133,7 +133,7 @@ mmcli_manager_options_enabled (void)
     if (monitor_modems_flag)
         mmcli_force_async_operation ();
 
-#if WITH_UDEV
+#if defined WITH_UDEV
     if (report_kernel_event_auto_scan)
         mmcli_force_async_operation ();
 #endif
@@ -148,7 +148,7 @@ context_free (Context *ctx)
     if (!ctx)
         return;
 
-#if WITH_UDEV
+#if defined WITH_UDEV
     if (ctx->udev)
         g_object_unref (ctx->udev);
 #endif
@@ -325,7 +325,7 @@ cancelled (GCancellable *cancellable)
     mmcli_async_operation_done ();
 }
 
-#if WITH_UDEV
+#if defined WITH_UDEV
 
 static void
 handle_uevent (GUdevClient *client,
@@ -388,7 +388,7 @@ get_manager_ready (GObject      *source,
         return;
     }
 
-#if WITH_UDEV
+#if defined WITH_UDEV
     if (report_kernel_event_auto_scan) {
         const gchar *subsys[] = { "tty", "usbmisc", "net", NULL };
         guint i;
@@ -480,7 +480,7 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
         exit (EXIT_FAILURE);
     }
 
-#if WITH_UDEV
+#if defined WITH_UDEV
     if (report_kernel_event_auto_scan) {
         g_printerr ("error: monitoring udev events cannot be done synchronously\n");
         exit (EXIT_FAILURE);

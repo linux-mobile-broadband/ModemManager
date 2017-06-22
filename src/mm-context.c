@@ -21,7 +21,7 @@
 /*****************************************************************************/
 /* Application context */
 
-#if WITH_UDEV
+#if defined WITH_UDEV
 # define NO_AUTO_SCAN_OPTION_FLAG 0
 # define NO_AUTO_SCAN_DEFAULT     FALSE
 #else
@@ -293,7 +293,7 @@ mm_context_init (gint argc,
     }
 
     /* Initial kernel events processing may only be used if autoscan is disabled */
-#if WITH_UDEV
+#if defined WITH_UDEV
     if (!no_auto_scan && initial_kernel_events) {
         g_warning ("error: --initial-kernel-events must be used only if --no-auto-scan is also used");
         exit (1);
