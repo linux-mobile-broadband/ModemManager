@@ -21,8 +21,8 @@
 #include "mm-auth.h"
 #include "mm-auth-provider.h"
 
-#ifdef WITH_POLKIT
-#include "mm-auth-provider-polkit.h"
+#if defined WITH_POLKIT
+# include "mm-auth-provider-polkit.h"
 #endif
 
 static MMAuthProvider *authp = NULL;
@@ -31,7 +31,7 @@ MMAuthProvider *
 mm_auth_get_provider (void)
 {
     if (!authp) {
-#if WITH_POLKIT
+#if defined WITH_POLKIT
         authp = mm_auth_provider_polkit_new ();
 #else
         authp = mm_auth_provider_new ();

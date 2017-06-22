@@ -296,9 +296,7 @@ elif test "x$with_polkit" = "xyes"; then
     with_polkit=strict
 fi
 
-if test "x$with_polkit" = "xno"; then
-    AC_DEFINE(WITH_POLKIT, 0, [Define if you have PolicyKit support])
-else
+if test "x$with_polkit" != "xno"; then
 	if test "x$have_polkit" = "xno"; then
 		AC_MSG_ERROR(PolicyKit development headers are required)
 	fi
