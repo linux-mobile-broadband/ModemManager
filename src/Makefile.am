@@ -354,7 +354,7 @@ ModemManager_SOURCES += mm-auth-provider-polkit.h mm-auth-provider-polkit.c
 endif
 
 # Additional suspend/resume support via systemd
-if SUSPEND_RESUME_SYSTEMD
+if WITH_SYSTEMD_SUSPEND_RESUME
 ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor.c
 endif
 
