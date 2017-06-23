@@ -108,7 +108,7 @@ list_call_context_complete_and_free (ListCallsContext *ctx)
     g_object_unref (ctx->result);
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
-    g_object_ref (ctx->self);
+    g_object_unref (ctx->self);
     g_slice_free (ListCallsContext, ctx);
 }
 
