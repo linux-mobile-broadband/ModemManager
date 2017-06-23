@@ -2836,23 +2836,15 @@ mm_modem_get_sim_finish (MMModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    MMSim *sim;
-
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    sim = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    g_return_val_if_fail (sim != NULL, NULL);
-
-    return MM_SIM (g_object_ref (sim));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 modem_get_sim_ready (GDBusConnection *connection,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     GError *error = NULL;
     GObject *sim;
@@ -2863,14 +2855,11 @@ modem_get_sim_ready (GDBusConnection *connection,
     g_object_unref (source_object);
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   sim,
-                                                   g_object_unref);
+        g_task_return_pointer (task, sim, g_object_unref);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 /**
@@ -2893,24 +2882,20 @@ mm_modem_get_sim (MMModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     const gchar *sim_path;
 
     g_return_if_fail (MM_IS_MODEM (self));
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_get_sim);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     sim_path = mm_modem_get_sim_path (self);
     if (!sim_path || g_str_equal (sim_path, "/")) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_NOT_FOUND,
-                                         "No SIM object available");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "No SIM object available");
+        g_object_unref (task);
         return;
     }
 
@@ -2918,7 +2903,7 @@ mm_modem_get_sim (MMModem *self,
                                 G_PRIORITY_DEFAULT,
                                 cancellable,
                                 (GAsyncReadyCallback)modem_get_sim_ready,
-                                result,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
