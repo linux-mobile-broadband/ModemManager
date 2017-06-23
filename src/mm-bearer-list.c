@@ -250,8 +250,9 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
 
     ctx = g_new0 (DisconnectAllContext, 1);
     /* Get a copy of the list */
-    ctx->pending = g_list_copy (self->priv->bearers);
-    g_list_foreach (ctx->pending, (GFunc) g_object_ref, NULL);
+    ctx->pending = g_list_copy_deep (self->priv->bearers,
+                                     (GCopyFunc)g_object_ref,
+                                     NULL);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task,

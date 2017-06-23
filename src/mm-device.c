@@ -509,11 +509,9 @@ mm_device_peek_port_probe_list (MMDevice *self)
 GList *
 mm_device_get_port_probe_list (MMDevice *self)
 {
-    GList *copy;
-
-    copy = g_list_copy (self->priv->port_probes);
-    g_list_foreach (copy, (GFunc)g_object_ref, NULL);
-    return copy;
+    return g_list_copy_deep (self->priv->port_probes,
+                             (GCopyFunc)g_object_ref,
+                             NULL);
 }
 
 gboolean

@@ -706,13 +706,9 @@ mm_base_modem_peek_best_data_port (MMBaseModem *self,
 GList *
 mm_base_modem_get_data_ports (MMBaseModem *self)
 {
-    GList *copy;
-
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
-    copy = g_list_copy (self->priv->data);
-    g_list_foreach (copy, (GFunc)g_object_ref, NULL);
-    return copy;
+    return g_list_copy_deep (self->priv->data, (GCopyFunc)g_object_ref, NULL);
 }
 
 GList *

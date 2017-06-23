@@ -10353,8 +10353,7 @@ firmware_load_list (MMIfaceModemFirmware *_self,
                                         firmware_load_list);
 
     /* We'll return the new list of new references we create here */
-    dup = g_list_copy (self->priv->firmware_list);
-    g_list_foreach (dup, (GFunc)g_object_ref, NULL);
+    dup = g_list_copy_deep (self->priv->firmware_list, (GCopyFunc)g_object_ref, NULL);
 
     g_simple_async_result_set_op_res_gpointer (result, dup, NULL);
     g_simple_async_result_complete_in_idle (result);
