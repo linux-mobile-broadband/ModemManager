@@ -82,21 +82,6 @@ mm_modem_simple_dup_path (MMModemSimple *self)
 
 /*****************************************************************************/
 
-typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-} ConnectContext;
-
-static void
-connect_context_complete_and_free (ConnectContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_slice_free (ConnectContext, ctx);
-}
-
 /**
  * mm_modem_simple_connect_finish:
  * @self: A #MMModemSimple.
@@ -114,16 +99,13 @@ mm_modem_simple_connect_finish (MMModemSimple *self,
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE (self), NULL);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 new_bearer_ready (GDBusConnection *connection,
                   GAsyncResult *res,
-                  ConnectContext *ctx)
+                  GTask *task)
 {
     GError *error = NULL;
     GObject *bearer;
@@ -134,19 +116,17 @@ new_bearer_ready (GDBusConnection *connection,
     g_object_unref (source_object);
 
     if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   bearer,
-                                                   g_object_unref);
+        g_task_return_pointer (task, bearer, g_object_unref);
 
-    connect_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
 simple_connect_ready (MMModemSimple *self,
                       GAsyncResult *res,
-                      ConnectContext *ctx)
+                      GTask *task)
 {
     GError *error = NULL;
     gchar *bearer_path = NULL;
@@ -155,16 +135,16 @@ simple_connect_ready (MMModemSimple *self,
                                                     &bearer_path,
                                                     res,
                                                     &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     g_async_initable_new_async (MM_TYPE_BEARER,
                                 G_PRIORITY_DEFAULT,
-                                ctx->cancellable,
+                                g_task_get_cancellable (task),
                                 (GAsyncReadyCallback)new_bearer_ready,
-                                ctx,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
@@ -196,18 +176,12 @@ mm_modem_simple_connect (MMModemSimple *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    ConnectContext *ctx;
+    GTask *task;
     GVariant *variant;
 
     g_return_if_fail (MM_IS_MODEM_SIMPLE (self));
 
-    ctx = g_slice_new0 (ConnectContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_modem_simple_connect);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     variant = mm_simple_connect_properties_get_dictionary (properties);
     mm_gdbus_modem_simple_call_connect (
@@ -215,7 +189,7 @@ mm_modem_simple_connect (MMModemSimple *self,
         variant,
         cancellable,
         (GAsyncReadyCallback)simple_connect_ready,
-        ctx);
+        task);
 
     g_variant_unref (variant);
 }
