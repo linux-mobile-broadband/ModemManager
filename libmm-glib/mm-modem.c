@@ -1806,8 +1806,7 @@ mm_modem_list_bearers_finish (MMModem *self,
 
     /* The list we got, including the objects within, is owned by the async result;
      * so we'll make sure we return a new list */
-    g_list_foreach (list, (GFunc)g_object_ref, NULL);
-    return g_list_copy (list);
+    return g_list_copy_deep (list, (GCopyFunc)g_object_ref, NULL);
 }
 
 static void create_next_bearer (ListBearersContext *ctx);
