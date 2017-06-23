@@ -1752,9 +1752,6 @@ mm_modem_disable_sync (MMModem *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMModem *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     gchar **bearer_paths;
     GList *bearer_objects;
     guint i;
@@ -1767,16 +1764,10 @@ bearer_object_list_free (GList *list)
 }
 
 static void
-list_bearers_context_complete_and_free (ListBearersContext *ctx)
+list_bearers_context_free (ListBearersContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-
     g_strfreev (ctx->bearer_paths);
     bearer_object_list_free (ctx->bearer_objects);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
     g_slice_free (ListBearersContext, ctx);
 }
 
@@ -1795,69 +1786,73 @@ mm_modem_list_bearers_finish (MMModem *self,
                               GAsyncResult *res,
                               GError **error)
 {
-    GList *list;
-
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    list = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    /* The list we got, including the objects within, is owned by the async result;
-     * so we'll make sure we return a new list */
-    return g_list_copy_deep (list, (GCopyFunc)g_object_ref, NULL);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void create_next_bearer (ListBearersContext *ctx);
+static void create_next_bearer (GTask *task);
 
 static void
 modem_list_bearers_build_object_ready (GDBusConnection *connection,
                                        GAsyncResult *res,
-                                       ListBearersContext *ctx)
+                                       GTask *task)
 {
     GObject *bearer;
     GError *error = NULL;
     GObject *source_object;
+    ListBearersContext *ctx;
 
     source_object = g_async_result_get_source_object (res);
     bearer = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
     g_object_unref (source_object);
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        list_bearers_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Keep the object */
     ctx->bearer_objects = g_list_prepend (ctx->bearer_objects, bearer);
 
     /* If no more bearers, just end here. */
     if (!ctx->bearer_paths[++ctx->i]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   ctx->bearer_objects,
-                                                   (GDestroyNotify)bearer_object_list_free);
-        ctx->bearer_objects = NULL;
-        list_bearers_context_complete_and_free (ctx);
+        GList *bearer_objects;
+
+        bearer_objects = g_list_copy_deep (ctx->bearer_objects,
+                                           (GCopyFunc)g_object_ref,
+                                           NULL);
+        g_task_return_pointer (task,
+                               bearer_objects,
+                               (GDestroyNotify)bearer_object_list_free);
+        g_object_unref (task);
         return;
     }
 
     /* Keep on creating next object */
-    create_next_bearer (ctx);
+    create_next_bearer (task);
 }
 
 static void
-create_next_bearer (ListBearersContext *ctx)
+create_next_bearer (GTask *task)
 {
+    MMModem *self;
+    ListBearersContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     g_async_initable_new_async (MM_TYPE_BEARER,
                                 G_PRIORITY_DEFAULT,
-                                ctx->cancellable,
+                                g_task_get_cancellable (task),
                                 (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
-                                ctx,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
-                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (ctx->self)),
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
                                 "g-object-path",    ctx->bearer_paths[ctx->i],
                                 "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
                                 NULL);
@@ -1884,31 +1879,28 @@ mm_modem_list_bearers (MMModem *self,
                        gpointer user_data)
 {
     ListBearersContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_MODEM (self));
 
     ctx = g_slice_new0 (ListBearersContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_modem_list_bearers);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
 
     /* Read from the property, skip List() */
     ctx->bearer_paths = mm_gdbus_modem_dup_bearers (MM_GDBUS_MODEM (self));
 
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)list_bearers_context_free);
+
     /* If no bearers, just end here. */
     if (!ctx->bearer_paths || !ctx->bearer_paths[0]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
-        list_bearers_context_complete_and_free (ctx);
+        g_task_return_pointer (task, NULL, NULL);
+        g_object_unref (task);
         return;
     }
 
     /* Got list of paths. If at least one found, start creating objects for each */
     ctx->i = 0;
-    create_next_bearer (ctx);
+    create_next_bearer (task);
 }
 
 /**
