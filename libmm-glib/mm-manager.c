@@ -276,13 +276,13 @@ mm_manager_set_logging_finish (MMManager     *manager,
                                GAsyncResult  *res,
                                GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
                    GAsyncResult                       *res,
-                   GSimpleAsyncResult                 *simple)
+                   GTask                              *task)
 {
     GError *error = NULL;
 
@@ -290,12 +290,11 @@ set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
             manager_iface_proxy,
             res,
             &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 /**
@@ -322,20 +321,16 @@ mm_manager_set_logging (MMManager           *manager,
                         GAsyncReadyCallback  callback,
                         gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     GError *inner_error = NULL;
 
     g_return_if_fail (MM_IS_MANAGER (manager));
 
-    result = g_simple_async_result_new (G_OBJECT (manager),
-                                        callback,
-                                        user_data,
-                                        mm_manager_set_logging);
+    task = g_task_new (manager, cancellable, callback, user_data);
 
     if (!ensure_modem_manager1_proxy (manager, &inner_error)) {
-        g_simple_async_result_take_error (result, inner_error);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_error (task, inner_error);
+        g_object_unref (task);
         return;
     }
 
@@ -344,7 +339,7 @@ mm_manager_set_logging (MMManager           *manager,
         level,
         cancellable,
         (GAsyncReadyCallback)set_logging_ready,
-        result);
+        task);
 }
 
 /**
