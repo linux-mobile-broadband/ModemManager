@@ -243,7 +243,7 @@ list_sms_context_complete_and_free (ListSmsContext *ctx)
     g_object_unref (ctx->result);
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
-    g_object_ref (ctx->self);
+    g_object_unref (ctx->self);
     g_slice_free (ListSmsContext, ctx);
 }
 
