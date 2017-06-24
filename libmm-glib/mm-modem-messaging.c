@@ -219,9 +219,6 @@ mm_modem_messaging_get_default_storage (MMModemMessaging *self)
 /*****************************************************************************/
 
 typedef struct {
-    MMModemMessaging *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     gchar **sms_paths;
     GList *sms_objects;
     guint i;
@@ -234,16 +231,10 @@ sms_object_list_free (GList *list)
 }
 
 static void
-list_sms_context_complete_and_free (ListSmsContext *ctx)
+list_sms_context_free (ListSmsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-
     g_strfreev (ctx->sms_paths);
     sms_object_list_free (ctx->sms_objects);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
     g_slice_free (ListSmsContext, ctx);
 }
 
@@ -262,69 +253,69 @@ mm_modem_messaging_list_finish (MMModemMessaging *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    GList *list;
-
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), FALSE);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    list = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    /* The list we got, including the objects within, is owned by the async result;
-     * so we'll make sure we return a new list */
-    return g_list_copy_deep (list, (GCopyFunc)g_object_ref, NULL);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void create_next_sms (ListSmsContext *ctx);
+static void create_next_sms (GTask *task);
 
 static void
 list_build_object_ready (GDBusConnection *connection,
                          GAsyncResult *res,
-                         ListSmsContext *ctx)
+                         GTask *task)
 {
     GError *error = NULL;
     GObject *sms;
     GObject *source_object;
+    ListSmsContext *ctx;
 
     source_object = g_async_result_get_source_object (res);
     sms = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
     g_object_unref (source_object);
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        list_sms_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Keep the object */
     ctx->sms_objects = g_list_prepend (ctx->sms_objects, sms);
 
     /* If no more smss, just end here. */
     if (!ctx->sms_paths[++ctx->i]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   ctx->sms_objects,
-                                                   (GDestroyNotify)sms_object_list_free);
-        ctx->sms_objects = NULL;
-        list_sms_context_complete_and_free (ctx);
+        GList *sms_objects;
+
+        sms_objects = g_list_copy_deep (ctx->sms_objects, (GCopyFunc)g_object_ref, NULL);
+        g_task_return_pointer (task, sms_objects, (GDestroyNotify)sms_object_list_free);
+        g_object_unref (task);
         return;
     }
 
     /* Keep on creating next object */
-    create_next_sms (ctx);
+    create_next_sms (task);
 }
 
 static void
-create_next_sms (ListSmsContext *ctx)
+create_next_sms (GTask *task)
 {
+    MMModemMessaging *self;
+    ListSmsContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     g_async_initable_new_async (MM_TYPE_SMS,
                                 G_PRIORITY_DEFAULT,
-                                ctx->cancellable,
+                                g_task_get_cancellable (task),
                                 (GAsyncReadyCallback)list_build_object_ready,
-                                ctx,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
-                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (ctx->self)),
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
                                 "g-object-path",    ctx->sms_paths[ctx->i],
                                 "g-interface-name", "org.freedesktop.ModemManager1.Sms",
                                 NULL);
@@ -351,30 +342,26 @@ mm_modem_messaging_list (MMModemMessaging *self,
                          gpointer user_data)
 {
     ListSmsContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_MODEM_MESSAGING (self));
 
     ctx = g_slice_new0 (ListSmsContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_modem_messaging_list);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-
     ctx->sms_paths = mm_gdbus_modem_messaging_dup_messages (MM_GDBUS_MODEM_MESSAGING (self));
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)list_sms_context_free);
 
     /* If no SMS, just end here. */
     if (!ctx->sms_paths || !ctx->sms_paths[0]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
-        list_sms_context_complete_and_free (ctx);
+        g_task_return_pointer (task, NULL, NULL);
+        g_object_unref (task);
         return;
     }
 
     /* Got list of paths. If at least one found, start creating objects for each */
     ctx->i = 0;
-    create_next_sms (ctx);
+    create_next_sms (task);
 }
 
 /**
