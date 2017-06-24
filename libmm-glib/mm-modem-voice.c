@@ -84,9 +84,6 @@ mm_modem_voice_dup_path (MMModemVoice *self)
 /*****************************************************************************/
 
 typedef struct {
-    MMModemVoice *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     gchar **call_paths;
     GList *call_objects;
     guint i;
@@ -99,16 +96,10 @@ call_object_list_free (GList *list)
 }
 
 static void
-list_call_context_complete_and_free (ListCallsContext *ctx)
+list_call_context_free (ListCallsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-
     g_strfreev (ctx->call_paths);
     call_object_list_free (ctx->call_objects);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
     g_slice_free (ListCallsContext, ctx);
 }
 
@@ -127,69 +118,69 @@ mm_modem_voice_list_calls_finish (MMModemVoice *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    GList *list;
-
     g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    list = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    /* The list we got, including the objects within, is owned by the async result;
-     * so we'll make sure we return a new list */
-    return g_list_copy_deep (list, (GCopyFunc)g_object_ref, NULL);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void create_next_call (ListCallsContext *ctx);
+static void create_next_call (GTask *task);
 
 static void
 list_build_object_ready (GDBusConnection *connection,
                          GAsyncResult *res,
-                         ListCallsContext *ctx)
+                         GTask *task)
 {
     GError *error = NULL;
     GObject *call;
     GObject *source_object;
+    ListCallsContext *ctx;
 
     source_object = g_async_result_get_source_object (res);
     call = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
     g_object_unref (source_object);
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        list_call_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Keep the object */
     ctx->call_objects = g_list_prepend (ctx->call_objects, call);
 
     /* If no more calls, just end here. */
     if (!ctx->call_paths[++ctx->i]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   ctx->call_objects,
-                                                   (GDestroyNotify)call_object_list_free);
-        ctx->call_objects = NULL;
-        list_call_context_complete_and_free (ctx);
+        GList *call_objects;
+
+        call_objects = g_list_copy_deep (ctx->call_objects, (GCopyFunc)g_object_ref, NULL);
+        g_task_return_pointer (task, call_objects, (GDestroyNotify)call_object_list_free);
+        g_object_unref (task);
         return;
     }
 
     /* Keep on creating next object */
-    create_next_call (ctx);
+    create_next_call (task);
 }
 
 static void
-create_next_call (ListCallsContext *ctx)
+create_next_call (GTask *task)
 {
+    MMModemVoice *self;
+    ListCallsContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     g_async_initable_new_async (MM_TYPE_CALL,
                                 G_PRIORITY_DEFAULT,
-                                ctx->cancellable,
+                                g_task_get_cancellable (task),
                                 (GAsyncReadyCallback)list_build_object_ready,
-                                ctx,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
-                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (ctx->self)),
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
                                 "g-object-path",    ctx->call_paths[ctx->i],
                                 "g-interface-name", "org.freedesktop.ModemManager1.Call",
                                 NULL);
@@ -216,30 +207,26 @@ mm_modem_voice_list_calls (MMModemVoice *self,
                            gpointer user_data)
 {
     ListCallsContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_MODEM_VOICE (self));
 
     ctx = g_slice_new0 (ListCallsContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_modem_voice_list_calls);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-
     ctx->call_paths = mm_gdbus_modem_voice_dup_calls (MM_GDBUS_MODEM_VOICE (self));
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)list_call_context_free);
 
     /* If no CALL, just end here. */
     if (!ctx->call_paths || !ctx->call_paths[0]) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
-        list_call_context_complete_and_free (ctx);
+        g_task_return_pointer (task, NULL, NULL);
+        g_object_unref (task);
         return;
     }
 
     /* Got list of paths. If at least one found, start creating objects for each */
     ctx->i = 0;
-    create_next_call (ctx);
+    create_next_call (task);
 }
 
 /**
