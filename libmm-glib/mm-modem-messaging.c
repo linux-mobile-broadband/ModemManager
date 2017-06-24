@@ -435,21 +435,6 @@ mm_modem_messaging_list_sync (MMModemMessaging *self,
 
 /*****************************************************************************/
 
-typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-} CreateSmsContext;
-
-static void
-create_sms_context_complete_and_free (CreateSmsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_slice_free (CreateSmsContext, ctx);
-}
-
 /**
  * mm_modem_messaging_create_finish:
  * @self: A #MMModemMessaging.
@@ -467,16 +452,13 @@ mm_modem_messaging_create_finish (MMModemMessaging *self,
 {
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), NULL);
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 new_sms_object_ready (GDBusConnection *connection,
                       GAsyncResult *res,
-                      CreateSmsContext *ctx)
+                      GTask *task)
 {
     GError *error = NULL;
     GObject *sms;
@@ -487,19 +469,17 @@ new_sms_object_ready (GDBusConnection *connection,
     g_object_unref (source_object);
 
     if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   sms,
-                                                   g_object_unref);
+        g_task_return_pointer (task, sms, g_object_unref);
 
-    create_sms_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
 create_sms_ready (MMModemMessaging *self,
                   GAsyncResult *res,
-                  CreateSmsContext *ctx)
+                  GTask *task)
 {
     GError *error = NULL;
     gchar *sms_path = NULL;
@@ -508,17 +488,17 @@ create_sms_ready (MMModemMessaging *self,
                                                       &sms_path,
                                                       res,
                                                       &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        create_sms_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_free (sms_path);
         return;
     }
 
     g_async_initable_new_async (MM_TYPE_SMS,
                                 G_PRIORITY_DEFAULT,
-                                ctx->cancellable,
+                                g_task_get_cancellable (task),
                                 (GAsyncReadyCallback)new_sms_object_ready,
-                                ctx,
+                                task,
                                 "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                                 "g-name",           MM_DBUS_SERVICE,
                                 "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
@@ -550,26 +530,19 @@ mm_modem_messaging_create (MMModemMessaging *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    CreateSmsContext *ctx;
+    GTask *task;
     GVariant *dictionary;
 
     g_return_if_fail (MM_IS_MODEM_MESSAGING (self));
 
-    ctx = g_slice_new0 (CreateSmsContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_modem_messaging_create);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-
+    task = g_task_new (self, cancellable, callback, user_data);
     dictionary = (mm_sms_properties_get_dictionary (properties));
     mm_gdbus_modem_messaging_call_create (
         MM_GDBUS_MODEM_MESSAGING (self),
         dictionary,
         cancellable,
         (GAsyncReadyCallback)create_sms_ready,
-        ctx);
+        task);
 
     g_variant_unref (dictionary);
 }
