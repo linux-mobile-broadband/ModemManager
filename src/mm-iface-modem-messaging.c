@@ -680,7 +680,7 @@ mm_iface_modem_messaging_disable (MMIfaceModemMessaging *self,
 /*****************************************************************************/
 
 typedef struct _EnablingContext EnablingContext;
-static void interface_enabling_step (EnablingContext *ctx);
+static void interface_enabling_step (GTask *task);
 
 typedef enum {
     ENABLING_STEP_FIRST,
@@ -693,38 +693,17 @@ typedef enum {
 } EnablingStep;
 
 struct _EnablingContext {
-    MMIfaceModemMessaging *self;
     EnablingStep step;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     MmGdbusModemMessaging *skeleton;
     guint mem1_storage_index;
 };
 
 static void
-enabling_context_complete_and_free (EnablingContext *ctx)
+enabling_context_free (EnablingContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
     g_free (ctx);
-}
-
-static gboolean
-enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Interface enabling cancelled");
-    enabling_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 gboolean
@@ -732,42 +711,47 @@ mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 setup_sms_format_ready (MMIfaceModemMessaging *self,
                         GAsyncResult *res,
-                        EnablingContext *ctx)
+                        GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
 
     MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_enabling_step (ctx);
+    interface_enabling_step (task);
 }
 
-static void load_initial_sms_parts_from_storages (EnablingContext *ctx);
+static void load_initial_sms_parts_from_storages (GTask *task);
 
 static void
 load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
                               GAsyncResult *res,
-                              EnablingContext *ctx)
+                              GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self, res, &error);
     if (error) {
         StorageContext *storage_ctx;
 
-        storage_ctx = get_storage_context (ctx->self);
+        storage_ctx = get_storage_context (self);
         mm_dbg ("Couldn't load SMS parts from storage '%s': '%s'",
                 mm_sms_storage_get_string (g_array_index (storage_ctx->supported_mem1,
                                                           MMSmsStorage,
@@ -778,14 +762,15 @@ load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
 
     /* Go on with the storage iteration */
     ctx->mem1_storage_index++;
-    load_initial_sms_parts_from_storages (ctx);
+    load_initial_sms_parts_from_storages (task);
 }
 
 static void
 set_default_storage_ready (MMIfaceModemMessaging *self,
                            GAsyncResult *res,
-                           EnablingContext *ctx)
+                           GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish (self, res, &error)) {
@@ -794,17 +779,22 @@ set_default_storage_ready (MMIfaceModemMessaging *self,
     }
 
     /* Go on with next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_enabling_step (ctx);
+    interface_enabling_step (task);
 }
 
 static void
-load_initial_sms_parts_from_storages (EnablingContext *ctx)
+load_initial_sms_parts_from_storages (GTask *task)
 {
+    MMIfaceModemMessaging *self;
+    EnablingContext *ctx;
     gboolean all_loaded = FALSE;
     StorageContext *storage_ctx;
 
-    storage_ctx = get_storage_context (ctx->self);
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+    storage_ctx = get_storage_context (self);
 
     if (!storage_ctx->supported_mem1 || ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
         all_loaded = TRUE;
@@ -822,44 +812,46 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
     if (all_loaded) {
         /* Go on with next step */
         ctx->step++;
-        interface_enabling_step (ctx);
+        interface_enabling_step (task);
         return;
     }
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts (
-        ctx->self,
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts (
+        self,
         g_array_index (storage_ctx->supported_mem1,
                        MMSmsStorage,
                        ctx->mem1_storage_index),
         (GAsyncReadyCallback)load_initial_sms_parts_ready,
-        ctx);
-    return;
+        task);
 }
 
 static void
 setup_unsolicited_events_ready (MMIfaceModemMessaging *self,
                                 GAsyncResult *res,
-                                EnablingContext *ctx)
+                                GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
 
     MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_enabling_step (ctx);
+    interface_enabling_step (task);
 }
 
 static void
 enable_unsolicited_events_ready (MMIfaceModemMessaging *self,
                                  GAsyncResult *res,
-                                 EnablingContext *ctx)
+                                 GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
 
     /* Not critical! */
@@ -869,8 +861,9 @@ enable_unsolicited_events_ready (MMIfaceModemMessaging *self,
     }
 
     /* Go on with next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_enabling_step (ctx);
+    interface_enabling_step (task);
 }
 
 static MMSmsStorage
@@ -899,18 +892,26 @@ get_best_initial_default_sms_storage (MMIfaceModemMessaging *self)
 }
 
 static void
-interface_enabling_step (EnablingContext *ctx)
+interface_enabling_step (GTask *task)
 {
+    MMIfaceModemMessaging *self;
+    EnablingContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (enabling_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST: {
         MMSmsList *list;
 
-        list = mm_sms_list_new (MM_BASE_MODEM (ctx->self));
-        g_object_set (ctx->self,
+        list = mm_sms_list_new (MM_BASE_MODEM (self));
+        g_object_set (self,
                       MM_IFACE_MODEM_MESSAGING_SMS_LIST, list,
                       NULL);
 
@@ -932,12 +933,12 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_SETUP_SMS_FORMAT:
         /* Allow setting SMS format to use */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format (
-                ctx->self,
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format (
+                self,
                 (GAsyncReadyCallback)setup_sms_format_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -945,23 +946,23 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_STORAGE_DEFAULTS:
         /* Set storage defaults */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage_finish) {
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish) {
             MMSmsStorage default_storage;
 
-            default_storage = get_best_initial_default_sms_storage (ctx->self);
+            default_storage = get_best_initial_default_sms_storage (self);
 
             /* Already bound to the 'default-storage' property in the skeleton */
-            g_object_set (ctx->self,
+            g_object_set (self,
                           MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
                           NULL);
 
             if (default_storage != MM_SMS_STORAGE_UNKNOWN) {
-                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->set_default_storage (
-                    ctx->self,
+                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage (
+                    self,
                     default_storage,
                     (GAsyncReadyCallback)set_default_storage_ready,
-                    ctx);
+                    task);
                 return;
             }
 
@@ -972,9 +973,9 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
         /* Allow loading the initial list of SMS parts */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts_finish) {
-            load_initial_sms_parts_from_storages (ctx);
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish) {
+            load_initial_sms_parts_from_storages (task);
             return;
         }
         /* Fall down to next step */
@@ -982,12 +983,12 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
-                ctx->self,
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events (
+                self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -995,12 +996,12 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->enable_unsolicited_events (
-                ctx->self,
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events (
+                self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1008,8 +1009,8 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1023,28 +1024,27 @@ mm_iface_modem_messaging_enable (MMIfaceModemMessaging *self,
                                  gpointer user_data)
 {
     EnablingContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_messaging_enable);
     ctx->step = ENABLING_STEP_FIRST;
-    g_object_get (ctx->self,
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_context_free);
+
+    g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        enabling_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
-    interface_enabling_step (ctx);
+    interface_enabling_step (task);
 }
 
 /*****************************************************************************/
