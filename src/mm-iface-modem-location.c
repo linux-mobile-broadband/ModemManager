@@ -524,24 +524,19 @@ update_location_source_status (MMIfaceModemLocation *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMIfaceModemLocation *self;
     MmGdbusModemLocation *skeleton;
-    GSimpleAsyncResult *result;
     MMModemLocationSource to_enable;
     MMModemLocationSource to_disable;
     MMModemLocationSource current;
 } SetupGatheringContext;
 
-static void setup_gathering_step (SetupGatheringContext *ctx);
+static void setup_gathering_step (GTask *task);
 
 static void
-setup_gathering_context_complete_and_free (SetupGatheringContext *ctx)
+setup_gathering_context_free (SetupGatheringContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -550,72 +545,84 @@ setup_gathering_finish (MMIfaceModemLocation *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 enable_location_gathering_ready (MMIfaceModemLocation *self,
                                  GAsyncResult *res,
-                                 SetupGatheringContext *ctx)
+                                 GTask *task)
 {
+    SetupGatheringContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
-        update_location_source_status (ctx->self, ctx->current, FALSE);
+        update_location_source_status (self, ctx->current, FALSE);
 
         str = mm_modem_location_source_build_string_from_mask (ctx->current);
         g_prefix_error (&error,
                         "Couldn't enable location '%s' gathering: ",
                         str);
-        g_simple_async_result_take_error (ctx->result, error);
-        setup_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_free (str);
         return;
     }
 
     /* Keep on with next ones... */
     ctx->current = ctx->current << 1;
-    setup_gathering_step (ctx);
+    setup_gathering_step (task);
 }
 
 static void
 disable_location_gathering_ready (MMIfaceModemLocation *self,
                                   GAsyncResult *res,
-                                  SetupGatheringContext *ctx)
+                                  GTask *task)
 {
+    SetupGatheringContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
         /* Back to enabled then */
-        update_location_source_status (ctx->self, ctx->current, TRUE);
+        update_location_source_status (self, ctx->current, TRUE);
 
         str = mm_modem_location_source_build_string_from_mask (ctx->current);
         g_prefix_error (&error,
                         "Couldn't disable location '%s' gathering: ",
                         str);
-        g_simple_async_result_take_error (ctx->result, error);
-        setup_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_free (str);
         return;
     }
 
     /* Keep on with next ones... */
     ctx->current = ctx->current << 1;
-    setup_gathering_step (ctx);
+    setup_gathering_step (task);
 }
 
 static void
-setup_gathering_step (SetupGatheringContext *ctx)
+setup_gathering_step (GTask *task)
 {
+    MMIfaceModemLocation *self;
+    SetupGatheringContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     /* Are we done? */
     if (ctx->to_enable == MM_MODEM_LOCATION_SOURCE_NONE &&
         ctx->to_disable == MM_MODEM_LOCATION_SOURCE_NONE) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        setup_gathering_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -630,16 +637,16 @@ setup_gathering_step (SetupGatheringContext *ctx)
              * specific actions to enable the gathering, so that we are
              * able to get location updates while the gathering gets
              * enabled. */
-            update_location_source_status (ctx->self, ctx->current, TRUE);
+            update_location_source_status (self, ctx->current, TRUE);
 
             /* Plugins can run custom actions to enable location gathering */
-            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering &&
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering_finish) {
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering (
-                    MM_IFACE_MODEM_LOCATION (ctx->self),
+            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering (
+                    MM_IFACE_MODEM_LOCATION (self),
                     ctx->current,
                     (GAsyncReadyCallback)enable_location_gathering_ready,
-                    ctx);
+                    task);
                 return;
             }
 
@@ -650,16 +657,16 @@ setup_gathering_step (SetupGatheringContext *ctx)
             /* Remove from mask */
             ctx->to_disable &= ~ctx->current;
 
-            update_location_source_status (ctx->self, ctx->current, FALSE);
+            update_location_source_status (self, ctx->current, FALSE);
 
             /* Plugins can run custom actions to disable location gathering */
-            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering &&
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering_finish) {
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering (
-                    MM_IFACE_MODEM_LOCATION (ctx->self),
+            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering (
+                    MM_IFACE_MODEM_LOCATION (self),
                     ctx->current,
                     (GAsyncReadyCallback)disable_location_gathering_ready,
-                    ctx);
+                    task);
                 return;
             }
 
@@ -675,7 +682,7 @@ setup_gathering_step (SetupGatheringContext *ctx)
     /* We just need to finish now */
     g_assert (ctx->to_enable == MM_MODEM_LOCATION_SOURCE_NONE);
     g_assert (ctx->to_disable == MM_MODEM_LOCATION_SOURCE_NONE);
-    setup_gathering_step (ctx);
+    setup_gathering_step (task);
 }
 
 static void
@@ -685,25 +692,25 @@ setup_gathering (MMIfaceModemLocation *self,
                  gpointer user_data)
 {
     SetupGatheringContext *ctx;
+    GTask *task;
     MMModemLocationSource currently_enabled;
     MMModemLocationSource source;
     gchar *str;
 
     ctx = g_new (SetupGatheringContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             setup_gathering);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)setup_gathering_context_free);
+
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        setup_gathering_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
@@ -749,11 +756,11 @@ setup_gathering (MMIfaceModemLocation *self,
          currently_enabled & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) ||
         (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
          ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot have both unmanaged GPS and raw/nmea GPS enabled at the same time");
-        setup_gathering_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot have both unmanaged GPS and raw/nmea GPS enabled at the same time");
+        g_object_unref (task);
         return;
     }
 
@@ -771,7 +778,7 @@ setup_gathering (MMIfaceModemLocation *self,
 
     /* Start enabling/disabling location sources */
     ctx->current = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-    setup_gathering_step (ctx);
+    setup_gathering_step (task);
 }
 
 /*****************************************************************************/
