@@ -1450,7 +1450,7 @@ mm_iface_modem_location_enable (MMIfaceModemLocation *self,
 /*****************************************************************************/
 
 typedef struct _InitializationContext InitializationContext;
-static void interface_initialization_step (InitializationContext *ctx);
+static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -1462,46 +1462,28 @@ typedef enum {
 } InitializationStep;
 
 struct _InitializationContext {
-    MMIfaceModemLocation *self;
     MmGdbusModemLocation *skeleton;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     InitializationStep step;
     MMModemLocationSource capabilities;
 };
 
 static void
-initialization_context_complete_and_free (InitializationContext *ctx)
+initialization_context_free (InitializationContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
-}
-
-static gboolean
-initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Interface initialization cancelled");
-    initialization_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static void
 load_supl_server_ready (MMIfaceModemLocation *self,
                         GAsyncResult *res,
-                        InitializationContext *ctx)
+                        GTask *task)
 {
     GError *error = NULL;
     gchar *supl;
+    InitializationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     supl = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish (self, res, &error);
     if (error) {
@@ -1514,15 +1496,18 @@ load_supl_server_ready (MMIfaceModemLocation *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_capabilities_ready (MMIfaceModemLocation *self,
                          GAsyncResult *res,
-                         InitializationContext *ctx)
+                         GTask *task)
 {
     GError *error = NULL;
+    InitializationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     ctx->capabilities = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish (self, res, &error);
     if (error) {
@@ -1534,15 +1519,23 @@ load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
-interface_initialization_step (InitializationContext *ctx)
+interface_initialization_step (GTask *task)
 {
+    MMIfaceModemLocation *self;
+    InitializationContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (initialization_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
@@ -1554,12 +1547,12 @@ interface_initialization_step (InitializationContext *ctx)
          * the whole lifetime of the modem. Therefore, if we already have it
          * loaded, don't try to load it again. */
         if (!mm_gdbus_modem_location_get_capabilities (ctx->skeleton) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_capabilities &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_capabilities_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_capabilities (
-                ctx->self,
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities &&
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities (
+                self,
                 (GAsyncReadyCallback)load_capabilities_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1569,11 +1562,11 @@ interface_initialization_step (InitializationContext *ctx)
         /* If the modem doesn't support any location capabilities, we won't export
          * the interface. We just report an UNSUPPORTED error. */
         if (ctx->capabilities == MM_MODEM_LOCATION_SOURCE_NONE) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "The modem doesn't have location capabilities");
-            initialization_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "The modem doesn't have location capabilities");
+            g_object_unref (task);
             return;
         }
         /* Fall down to next step */
@@ -1582,12 +1575,12 @@ interface_initialization_step (InitializationContext *ctx)
     case INITIALIZATION_STEP_SUPL_SERVER:
         /* If the modem supports A-GPS, load SUPL server */
         if (ctx->capabilities & MM_MODEM_LOCATION_SOURCE_AGPS &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->load_supl_server (
-                ctx->self,
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server &&
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server (
+                self,
                 (GAsyncReadyCallback)load_supl_server_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1610,26 +1603,26 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-setup",
                           G_CALLBACK (handle_setup),
-                          ctx->self);
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-set-supl-server",
                           G_CALLBACK (handle_set_supl_server),
-                          ctx->self);
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-set-gps-refresh-rate",
                           G_CALLBACK (handle_set_gps_refresh_rate),
-                          ctx->self);
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-get-location",
                           G_CALLBACK (handle_get_location),
-                          ctx->self);
+                          self);
 
         /* Finally, export the new interface */
-        mm_gdbus_object_skeleton_set_modem_location (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+        mm_gdbus_object_skeleton_set_modem_location (MM_GDBUS_OBJECT_SKELETON (self),
                                                      MM_GDBUS_MODEM_LOCATION (ctx->skeleton));
 
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        initialization_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1641,7 +1634,7 @@ mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
@@ -1652,6 +1645,7 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
 {
     InitializationContext *ctx;
     MmGdbusModemLocation *skeleton = NULL;
+    GTask *task;
 
     /* Did we already create it? */
     g_object_get (self,
@@ -1675,17 +1669,14 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
     /* Perform async initialization here */
 
     ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->capabilities = MM_MODEM_LOCATION_SOURCE_NONE;
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_location_initialize);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->skeleton = skeleton;
 
-    interface_initialization_step (ctx);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_context_free);
+
+    interface_initialization_step (task);
 }
 
 void
