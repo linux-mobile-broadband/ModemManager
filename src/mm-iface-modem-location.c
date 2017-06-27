@@ -1189,7 +1189,7 @@ handle_get_location (MmGdbusModemLocation *skeleton,
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
-static void interface_disabling_step (DisablingContext *ctx);
+static void interface_disabling_step (GTask *task);
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -1198,18 +1198,13 @@ typedef enum {
 } DisablingStep;
 
 struct _DisablingContext {
-    MMIfaceModemLocation *self;
     DisablingStep step;
-    GSimpleAsyncResult *result;
     MmGdbusModemLocation *skeleton;
 };
 
 static void
-disabling_context_complete_and_free (DisablingContext *ctx)
+disabling_context_free (DisablingContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1220,47 +1215,55 @@ mm_iface_modem_location_disable_finish (MMIfaceModemLocation *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 disabling_location_gathering_ready (MMIfaceModemLocation *self,
                                     GAsyncResult *res,
-                                    DisablingContext *ctx)
+                                    GTask *task)
 {
+    DisablingContext *ctx;
     GError *error = NULL;
 
     if (!setup_gathering_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_disabling_step (ctx);
+    interface_disabling_step (task);
 }
 
 static void
-interface_disabling_step (DisablingContext *ctx)
+interface_disabling_step (GTask *task)
 {
+    MMIfaceModemLocation *self;
+    DisablingContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
 
     case DISABLING_STEP_DISABLE_GATHERING:
-        setup_gathering (ctx->self,
+        setup_gathering (self,
                          MM_MODEM_LOCATION_SOURCE_NONE,
                          (GAsyncReadyCallback)disabling_location_gathering_ready,
-                         ctx);
+                         task);
         return;
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
-        clear_location_context (ctx->self);
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disabling_context_complete_and_free (ctx);
+        clear_location_context (self);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1273,27 +1276,27 @@ mm_iface_modem_location_disable (MMIfaceModemLocation *self,
                                  gpointer user_data)
 {
     DisablingContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_location_disable);
     ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disabling_context_free);
+
+    g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        disabling_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
-    interface_disabling_step (ctx);
+    interface_disabling_step (task);
 }
 
 /*****************************************************************************/
