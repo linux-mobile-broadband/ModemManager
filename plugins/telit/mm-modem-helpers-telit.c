@@ -57,8 +57,8 @@ mm_telit_get_band_flag (GArray *bands_array,
         }
 
          if (flag4g != NULL &&
-             band >= MM_MODEM_BAND_EUTRAN_I && band <= MM_MODEM_BAND_EUTRAN_XLIV) {
-             mask4g += 1 << (band - MM_MODEM_BAND_EUTRAN_I);
+             band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_44) {
+             mask4g += 1 << (band - MM_MODEM_BAND_EUTRAN_1);
              found4g = TRUE;
         }
     }
@@ -480,7 +480,7 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
 
     for (i = 0; value > 0; i++) {
         if (value % 2 != 0) {
-            band = MM_MODEM_BAND_EUTRAN_I + i;
+            band = MM_MODEM_BAND_EUTRAN_1 + i;
             g_array_append_val (*bands, band);
         }
         value = value >> 1;

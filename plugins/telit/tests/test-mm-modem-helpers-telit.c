@@ -189,14 +189,14 @@ static BNDResponseTest supported_band_mapping_tests [] = {
                                                          MM_MODEM_BAND_U2100,
                                                          MM_MODEM_BAND_U850,
                                                          MM_MODEM_BAND_U900,
-                                                         MM_MODEM_BAND_EUTRAN_I} },
+                                                         MM_MODEM_BAND_EUTRAN_1} },
     { "#BND: (0),(0),(1-3)", TRUE, TRUE, TRUE, 5, { MM_MODEM_BAND_EGSM,
                                                     MM_MODEM_BAND_DCS,
                                                     MM_MODEM_BAND_U2100,
-                                                    MM_MODEM_BAND_EUTRAN_I,
-                                                    MM_MODEM_BAND_EUTRAN_II} },
-    { "#BND: (0),(0),(1-3)", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_I,
-                                                      MM_MODEM_BAND_EUTRAN_II} },
+                                                    MM_MODEM_BAND_EUTRAN_1,
+                                                    MM_MODEM_BAND_EUTRAN_2} },
+    { "#BND: (0),(0),(1-3)", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_1,
+                                                      MM_MODEM_BAND_EUTRAN_2} },
     { NULL, FALSE, FALSE, FALSE, 0, {}},
 };
 
@@ -261,17 +261,17 @@ static BNDResponseTest current_band_mapping_tests [] = {
     { "#BND: 3,0,1", TRUE, TRUE, TRUE, 4, { MM_MODEM_BAND_PCS,
                                             MM_MODEM_BAND_G850,
                                             MM_MODEM_BAND_U2100,
-                                            MM_MODEM_BAND_EUTRAN_I
+                                            MM_MODEM_BAND_EUTRAN_1
                                           }
     },
     { "#BND: 0,0,3", TRUE, FALSE, TRUE, 4, { MM_MODEM_BAND_EGSM,
                                             MM_MODEM_BAND_DCS,
-                                            MM_MODEM_BAND_EUTRAN_I,
-                                            MM_MODEM_BAND_EUTRAN_II
+                                            MM_MODEM_BAND_EUTRAN_1,
+                                            MM_MODEM_BAND_EUTRAN_2
                                           }
     },
-    { "#BND: 0,0,3", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_I,
-                                              MM_MODEM_BAND_EUTRAN_II
+    { "#BND: 0,0,3", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_1,
+                                              MM_MODEM_BAND_EUTRAN_2
                                             }
     },
     { NULL, FALSE, FALSE, FALSE, 0, {}},
@@ -471,8 +471,8 @@ static void
 test_telit_get_4g_bnd_flag (void)
 {
     GArray *bands_array;
-    MMModemBand eutran_i = MM_MODEM_BAND_EUTRAN_I;
-    MMModemBand eutran_ii = MM_MODEM_BAND_EUTRAN_II;
+    MMModemBand eutran_i = MM_MODEM_BAND_EUTRAN_1;
+    MMModemBand eutran_ii = MM_MODEM_BAND_EUTRAN_2;
     MMModemBand egsm = MM_MODEM_BAND_EGSM;
     gint flag = -1;
 

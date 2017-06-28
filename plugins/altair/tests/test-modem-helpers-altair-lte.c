@@ -43,10 +43,10 @@ test_parse_bands (void)
     bands = mm_altair_parse_bands_response ("0, 0, 1, 4,13,44,45");
     g_assert (bands != NULL);
     g_assert_cmpuint (bands->len, ==, 4);
-    g_assert_cmpuint (g_array_index (bands, MMModemBand, 0), ==, MM_MODEM_BAND_EUTRAN_I);
-    g_assert_cmpuint (g_array_index (bands, MMModemBand, 1), ==, MM_MODEM_BAND_EUTRAN_IV);
-    g_assert_cmpuint (g_array_index (bands, MMModemBand, 2), ==, MM_MODEM_BAND_EUTRAN_XIII);
-    g_assert_cmpuint (g_array_index (bands, MMModemBand, 3), ==, MM_MODEM_BAND_EUTRAN_XLIV);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 0), ==, MM_MODEM_BAND_EUTRAN_1);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 1), ==, MM_MODEM_BAND_EUTRAN_4);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 2), ==, MM_MODEM_BAND_EUTRAN_13);
+    g_assert_cmpuint (g_array_index (bands, MMModemBand, 3), ==, MM_MODEM_BAND_EUTRAN_44);
     g_array_free (bands, TRUE);
 }
 

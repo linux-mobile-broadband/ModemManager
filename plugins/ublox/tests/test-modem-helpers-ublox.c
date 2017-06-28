@@ -520,16 +520,16 @@ test_supported_bands_all (void)
 {
     /* All 2G, 3G and 4G bands */
     const MMModemBand expected_bands[] = {
-        /*  700 */ MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII,
-        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_XX,
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
-        /* 1500 */ MM_MODEM_BAND_EUTRAN_XI,
-        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_IV,
-        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
-        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
-        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_I,
-        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_VII,
+        /*  700 */ MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17,
+        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_20,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_8,
+        /* 1500 */ MM_MODEM_BAND_EUTRAN_11,
+        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_4,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_3,
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_2,
+        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_1,
+        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_7,
     };
 
     common_validate_supported_bands (NULL, expected_bands, G_N_ELEMENTS (expected_bands));
@@ -540,16 +540,16 @@ test_supported_bands_toby_l201 (void)
 {
     /* Only 3G and 4G bands */
     const MMModemBand expected_bands[] = {
-        /*  700 */ MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII,
-        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_XX,
-        /*  850 */ MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
-        /*  900 */ MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
-        /* 1500 */ MM_MODEM_BAND_EUTRAN_XI,
-        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_IV,
-        /* 1800 */ MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
-        /* 1900 */ MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
-        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_I,
-        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_VII,
+        /*  700 */ MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17,
+        /*  800 */ MM_MODEM_BAND_U800, MM_MODEM_BAND_EUTRAN_20,
+        /*  850 */ MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
+        /*  900 */ MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_8,
+        /* 1500 */ MM_MODEM_BAND_EUTRAN_11,
+        /* 1700 */ MM_MODEM_BAND_U17IV, MM_MODEM_BAND_EUTRAN_4,
+        /* 1800 */ MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_3,
+        /* 1900 */ MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_2,
+        /* 2100 */ MM_MODEM_BAND_U2100, MM_MODEM_BAND_EUTRAN_1,
+        /* 2600 */ MM_MODEM_BAND_U2600, MM_MODEM_BAND_EUTRAN_7,
     };
 
     common_validate_supported_bands ("TOBY-L201", expected_bands, G_N_ELEMENTS (expected_bands));
@@ -627,10 +627,10 @@ static void
 test_ubandsel_response_four (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
-        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
-        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_II,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_8,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_3,
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_U1900, MM_MODEM_BAND_EUTRAN_2,
     };
 
     common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800,1900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
@@ -640,9 +640,9 @@ static void
 test_ubandsel_response_three (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
-        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_8,
+        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_3,
     };
 
     common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
@@ -652,8 +652,8 @@ static void
 test_ubandsel_response_two (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_VIII,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_U900, MM_MODEM_BAND_EUTRAN_8,
     };
 
     common_validate_ubandsel_response ("+UBANDSEL: 850,900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
@@ -663,7 +663,7 @@ static void
 test_ubandsel_response_one (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_V,
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_U850, MM_MODEM_BAND_EUTRAN_5,
     };
 
     common_validate_ubandsel_response ("+UBANDSEL: 850\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
@@ -718,7 +718,7 @@ static void
 test_ubandsel_request_1800 (void)
 {
     const MMModemBand bands[] = {
-        MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_III
+        MM_MODEM_BAND_DCS, MM_MODEM_BAND_U1800, MM_MODEM_BAND_EUTRAN_3
     };
 
     common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=1800");

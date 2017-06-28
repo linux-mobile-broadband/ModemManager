@@ -552,55 +552,55 @@ typedef struct {
 static const BandConfiguration band_configuration[] = {
     {
         .ubandsel_value = 700,
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_XIII, MM_MODEM_BAND_EUTRAN_XVII }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
     },
     {
         .ubandsel_value = 800,
         .bands_3g = { MM_MODEM_BAND_U800 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_XX }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_20 }
     },
     {
         .ubandsel_value = 850,
         .bands_2g = { MM_MODEM_BAND_G850 },
         .bands_3g = { MM_MODEM_BAND_U850 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_V }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_5 }
     },
     {
         .ubandsel_value = 900,
         .bands_2g = { MM_MODEM_BAND_EGSM },
         .bands_3g = { MM_MODEM_BAND_U900 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_VIII }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_8 }
     },
     {
         .ubandsel_value = 1500,
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_XI }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_11 }
     },
     {
         .ubandsel_value = 1700,
         .bands_3g = { MM_MODEM_BAND_U17IV },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_IV }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_4 }
     },
     {
         .ubandsel_value = 1800,
         .bands_2g = { MM_MODEM_BAND_DCS },
         .bands_3g = { MM_MODEM_BAND_U1800 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_III }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_3 }
     },
     {
         .ubandsel_value = 1900,
         .bands_2g = { MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_U1900 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_II }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2 }
     },
     {
         .ubandsel_value = 2100,
         .bands_3g = { MM_MODEM_BAND_U2100 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_I }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1 }
     },
     {
         .ubandsel_value = 2600,
         .bands_3g = { MM_MODEM_BAND_U2600 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_VII }
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_7 }
     },
 };
 

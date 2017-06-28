@@ -50,12 +50,12 @@ mm_altair_parse_bands_response (const gchar *response)
         MMModemBand band;
 
         band_value = (guint32)strtoul (split[i], NULL, 10);
-        band = MM_MODEM_BAND_EUTRAN_I - 1 + band_value;
+        band = MM_MODEM_BAND_EUTRAN_1 - 1 + band_value;
 
         /* Due to a firmware issue, the modem may incorrectly includes 0 in the
          * bands response. We thus ignore any band value outside the range of
          * E-UTRAN operating bands. */
-        if (band >= MM_MODEM_BAND_EUTRAN_I && band <= MM_MODEM_BAND_EUTRAN_XLIV)
+        if (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_44)
             g_array_append_val (bands, band);
     }
 
