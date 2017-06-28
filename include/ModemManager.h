@@ -37,6 +37,9 @@
 /* Public header with errors */
 #include <ModemManager-errors.h>
 
+/* Public header with compability types and methods */
+#include <ModemManager-compat.h>
+
 /* Public header with version info */
 #include <ModemManager-version.h>
 

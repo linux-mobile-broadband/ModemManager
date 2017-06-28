@@ -90,6 +90,11 @@
   <!-- Part 3, Migration reference -->
   <xi:include href="xml/ModemManager-migration-reference.xml"/>
 
+  <part id="ref-compat">
+    <title>Compatibility with older versions</title>
+    <xi:include href="xml/mm-compat.xml"/>
+  </part>
+
   <index>
     <title>Index</title>
   </index>

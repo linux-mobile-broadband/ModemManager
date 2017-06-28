@@ -186,6 +186,7 @@ PUBLIC_H = \
 	ModemManager-version.h
 	ModemManager-enums.h \
 	ModemManager-errors.h \
+	ModemManager-compat.h \
 	ModemManager.h \
 	$(NULL)
 

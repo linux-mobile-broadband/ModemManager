@@ -8,6 +8,7 @@ include_HEADERS = \
 	ModemManager-names.h \
 	ModemManager-enums.h \
 	ModemManager-errors.h \
+	ModemManager-compat.h \
 	ModemManager-version.h \
 	ModemManager.h
 
