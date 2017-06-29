@@ -645,7 +645,7 @@ handle_cancel_session (MmGdbusModemOma *skeleton,
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
-static void interface_disabling_step (DisablingContext *ctx);
+static void interface_disabling_step (GTask *task);
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -655,18 +655,13 @@ typedef enum {
 } DisablingStep;
 
 struct _DisablingContext {
-    MMIfaceModemOma *self;
     DisablingStep step;
-    GSimpleAsyncResult *result;
     MmGdbusModemOma *skeleton;
 };
 
 static void
-disabling_context_complete_and_free (DisablingContext *ctx)
+disabling_context_free (DisablingContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -677,50 +672,60 @@ mm_iface_modem_oma_disable_finish (MMIfaceModemOma *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 disable_unsolicited_events_ready (MMIfaceModemOma *self,
                                   GAsyncResult *res,
-                                  DisablingContext *ctx)
+                                  GTask *task)
 {
+    DisablingContext *ctx;
     GError *error = NULL;
 
     MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_disabling_step (ctx);
+    interface_disabling_step (task);
 }
 
 static void
 cleanup_unsolicited_events_ready (MMIfaceModemOma *self,
                                   GAsyncResult *res,
-                                  DisablingContext *ctx)
+                                  GTask *task)
 {
+    DisablingContext *ctx;
     GError *error = NULL;
 
     MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    interface_disabling_step (ctx);
+    interface_disabling_step (task);
 }
 
 static void
-interface_disabling_step (DisablingContext *ctx)
+interface_disabling_step (GTask *task)
 {
+    MMIfaceModemOma *self;
+    DisablingContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
@@ -728,12 +733,12 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->disable_unsolicited_events (
-                ctx->self,
+        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events (
+                self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -741,12 +746,12 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
-                ctx->self,
+        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events (
+                self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -754,8 +759,8 @@ interface_disabling_step (DisablingContext *ctx)
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -768,27 +773,27 @@ mm_iface_modem_oma_disable (MMIfaceModemOma *self,
                             gpointer user_data)
 {
     DisablingContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_oma_disable);
     ctx->step = DISABLING_STEP_FIRST;
-    g_object_get (ctx->self,
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disabling_context_free);
+
+    g_object_get (self,
                   MM_IFACE_MODEM_OMA_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        disabling_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
-    interface_disabling_step (ctx);
+    interface_disabling_step (task);
 }
 
 /*****************************************************************************/
