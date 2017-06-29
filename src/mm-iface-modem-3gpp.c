@@ -1842,7 +1842,7 @@ mm_iface_modem_3gpp_enable (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 
 typedef struct _InitializationContext InitializationContext;
-static void interface_initialization_step (InitializationContext *ctx);
+static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -1852,36 +1852,15 @@ typedef enum {
 } InitializationStep;
 
 struct _InitializationContext {
-    MMIfaceModem3gpp *self;
     MmGdbusModem3gpp *skeleton;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     InitializationStep step;
 };
 
 static void
-initialization_context_complete_and_free (InitializationContext *ctx)
+initialization_context_free (InitializationContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
-}
-
-static gboolean
-initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Interface initialization cancelled");
-    initialization_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static void
@@ -1903,10 +1882,13 @@ sim_pin_lock_enabled_cb (MMBaseSim *self,
 static void
 load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
                                    GAsyncResult *res,
-                                   InitializationContext *ctx)
+                                   GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     MMModem3gppFacility facilities;
+
+    ctx = g_task_get_task_data (task);
 
     facilities = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish (self, res, &error);
     mm_gdbus_modem3gpp_set_enabled_facility_locks (ctx->skeleton, facilities);
@@ -1933,16 +1915,19 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_imei_ready (MMIfaceModem3gpp *self,
                  GAsyncResult *res,
-                 InitializationContext *ctx)
+                 GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     gchar *imei;
+
+    ctx = g_task_get_task_data (task);
 
     imei = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei_finish (self, res, &error);
     mm_gdbus_modem3gpp_set_imei (ctx->skeleton, imei);
@@ -1955,15 +1940,23 @@ load_imei_ready (MMIfaceModem3gpp *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
-interface_initialization_step (InitializationContext *ctx)
+interface_initialization_step (GTask *task)
 {
+    MMIfaceModem3gpp *self;
+    InitializationContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (initialization_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
@@ -1975,24 +1968,24 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have it loaded,
          * don't try to load it again. */
         if (!mm_gdbus_modem3gpp_get_imei (ctx->skeleton) &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei_finish) {
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei (
-                ctx->self,
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei (
+                self,
                 (GAsyncReadyCallback)load_imei_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
         ctx->step++;
 
     case INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks_finish) {
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks (
-                ctx->self,
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks (
+                self,
                 (GAsyncReadyCallback)load_enabled_facility_locks_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -2005,19 +1998,19 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-register",
                           G_CALLBACK (handle_register),
-                          ctx->self);
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-scan",
                           G_CALLBACK (handle_scan),
-                          ctx->self);
+                          self);
 
 
         /* Finally, export the new interface */
-        mm_gdbus_object_skeleton_set_modem3gpp (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+        mm_gdbus_object_skeleton_set_modem3gpp (MM_GDBUS_OBJECT_SKELETON (self),
                                                 MM_GDBUS_MODEM3GPP (ctx->skeleton));
 
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        initialization_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2029,7 +2022,7 @@ mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
@@ -2040,6 +2033,7 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
 {
     MmGdbusModem3gpp *skeleton = NULL;
     InitializationContext *ctx;
+    GTask *task;
 
     /* Did we already create it? */
     g_object_get (self,
@@ -2075,17 +2069,14 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
     }
 
     ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_3gpp_initialize);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->skeleton = skeleton;
 
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_context_free);
+
     /* Perform async initialization here */
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 void
