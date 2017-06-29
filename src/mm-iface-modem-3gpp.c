@@ -811,22 +811,17 @@ mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMIfaceModem3gpp *self;
     MmGdbusModem3gpp *skeleton;
-    GSimpleAsyncResult *result;
     gboolean operator_code_loaded;
     gboolean operator_name_loaded;
     gboolean subscription_state_loaded;
 } ReloadCurrentRegistrationInfoContext;
 
 static void
-reload_current_registration_info_context_complete_and_free (ReloadCurrentRegistrationInfoContext *ctx)
+reload_current_registration_info_context_free (ReloadCurrentRegistrationInfoContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
-    g_object_unref (ctx->self);
     g_slice_free (ReloadCurrentRegistrationInfoContext, ctx);
 }
 
@@ -835,18 +830,21 @@ mm_iface_modem_3gpp_reload_current_registration_info_finish (MMIfaceModem3gpp *s
                                                              GAsyncResult *res,
                                                              GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void reload_current_registration_info_context_step (ReloadCurrentRegistrationInfoContext *ctx);
+static void reload_current_registration_info_context_step (GTask *task);
 
 static void
 load_operator_name_ready (MMIfaceModem3gpp *self,
                           GAsyncResult *res,
-                          ReloadCurrentRegistrationInfoContext *ctx)
+                          GTask *task)
 {
+    ReloadCurrentRegistrationInfoContext *ctx;
     GError *error = NULL;
     gchar *str;
+
+    ctx = g_task_get_task_data (task);
 
     str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name_finish (self, res, &error);
     if (error) {
@@ -859,18 +857,21 @@ load_operator_name_ready (MMIfaceModem3gpp *self,
     g_free (str);
 
     ctx->operator_name_loaded = TRUE;
-    reload_current_registration_info_context_step (ctx);
+    reload_current_registration_info_context_step (task);
 }
 
 static void
 load_operator_code_ready (MMIfaceModem3gpp *self,
                           GAsyncResult *res,
-                          ReloadCurrentRegistrationInfoContext *ctx)
+                          GTask *task)
 {
+    ReloadCurrentRegistrationInfoContext *ctx;
     GError *error = NULL;
     gchar *str;
     guint16 mcc = 0;
     guint16 mnc = 0;
+
+    ctx = g_task_get_task_data (task);
 
     str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish (self, res, &error);
     if (error) {
@@ -891,16 +892,19 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     g_free (str);
 
     ctx->operator_code_loaded = TRUE;
-    reload_current_registration_info_context_step (ctx);
+    reload_current_registration_info_context_step (task);
 }
 
 static void
 load_subscription_state_ready (MMIfaceModem3gpp *self,
                                GAsyncResult *res,
-                               ReloadCurrentRegistrationInfoContext *ctx)
+                               GTask *task)
 {
+    ReloadCurrentRegistrationInfoContext *ctx;
     GError *error = NULL;
     MMModem3gppSubscriptionState subscription_state = MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+
+    ctx = g_task_get_task_data (task);
 
     subscription_state = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state_finish (self, res, &error);
     if (error) {
@@ -912,43 +916,49 @@ load_subscription_state_ready (MMIfaceModem3gpp *self,
         mm_gdbus_modem3gpp_set_subscription_state (ctx->skeleton, subscription_state);
 
     ctx->subscription_state_loaded = TRUE;
-    reload_current_registration_info_context_step (ctx);
+    reload_current_registration_info_context_step (task);
 }
 
 
 static void
-reload_current_registration_info_context_step (ReloadCurrentRegistrationInfoContext *ctx)
+reload_current_registration_info_context_step (GTask *task)
 {
+    MMIfaceModem3gpp *self;
+    ReloadCurrentRegistrationInfoContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (!ctx->operator_code_loaded) {
         /* Launch operator code update */
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_operator_code (
-            ctx->self,
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code (
+            self,
             (GAsyncReadyCallback)load_operator_code_ready,
-            ctx);
+            task);
         return;
     }
 
     if (!ctx->operator_name_loaded) {
         /* Launch operator name update */
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_operator_name (
-            ctx->self,
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name (
+            self,
             (GAsyncReadyCallback)load_operator_name_ready,
-            ctx);
+            task);
         return;
     }
 
     if (!ctx->subscription_state_loaded) {
         /* Launch subscription state update */
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_subscription_state (
-            ctx->self,
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state (
+            self,
             (GAsyncReadyCallback)load_subscription_state_ready,
-            ctx);
+            task);
         return;
     }
 
     /* If all are loaded, all done */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    reload_current_registration_info_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
@@ -957,23 +967,22 @@ mm_iface_modem_3gpp_reload_current_registration_info (MMIfaceModem3gpp *self,
                                                       gpointer user_data)
 {
     ReloadCurrentRegistrationInfoContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (ReloadCurrentRegistrationInfoContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_3gpp_reload_current_registration_info);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)reload_current_registration_info_context_free);
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        reload_current_registration_info_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
@@ -995,7 +1004,7 @@ mm_iface_modem_3gpp_reload_current_registration_info (MMIfaceModem3gpp *self,
     if (ctx->subscription_state_loaded)
         mm_gdbus_modem3gpp_set_subscription_state (ctx->skeleton, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
 
-    reload_current_registration_info_context_step (ctx);
+    reload_current_registration_info_context_step (task);
 }
 
 void
