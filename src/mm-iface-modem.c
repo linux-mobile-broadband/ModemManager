@@ -454,17 +454,12 @@ bearer_status_changed (MMBaseBearer *bearer,
 }
 
 typedef struct {
-    MMIfaceModem *self;
     MMBearerList *list;
-    GSimpleAsyncResult *result;
 } CreateBearerContext;
 
 static void
-create_bearer_context_complete_and_free (CreateBearerContext *ctx)
+create_bearer_context_free (CreateBearerContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     if (ctx->list)
         g_object_unref (ctx->list);
     g_slice_free (CreateBearerContext, ctx);
@@ -475,30 +470,30 @@ mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 create_bearer_ready (MMIfaceModem *self,
                      GAsyncResult *res,
-                     CreateBearerContext *ctx)
+                     GTask *task)
 {
+    CreateBearerContext *ctx;
     MMBaseBearer *bearer;
     GError *error = NULL;
 
     bearer = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        create_bearer_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
+
     if (!mm_bearer_list_add_bearer (ctx->list, bearer, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        create_bearer_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_object_unref (bearer);
         return;
     }
@@ -509,8 +504,8 @@ create_bearer_ready (MMIfaceModem *self,
                       "notify::"  MM_BASE_BEARER_STATUS,
                       (GCallback)bearer_status_changed,
                       self);
-    g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
-    create_bearer_context_complete_and_free (ctx);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 void
@@ -520,34 +515,34 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
                               gpointer user_data)
 {
     CreateBearerContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new (CreateBearerContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_create_bearer);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)create_bearer_context_free);
+
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &ctx->list,
                   NULL);
     if (!ctx->list) {
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Cannot add new bearer: bearer list not found");
-        create_bearer_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
     if (mm_bearer_list_get_count (ctx->list) == mm_bearer_list_get_max (ctx->list)) {
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_TOO_MANY,
             "Cannot add new bearer: already reached maximum (%u)",
             mm_bearer_list_get_count (ctx->list));
-        create_bearer_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
@@ -555,7 +550,7 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
         self,
         properties,
         (GAsyncReadyCallback)create_bearer_ready,
-        ctx);
+        task);
 }
 
 typedef struct {
