@@ -2508,19 +2508,14 @@ handle_set_current_bands (MmGdbusModem *skeleton,
 /* Set current modes */
 
 typedef struct {
-    MMIfaceModem *self;
     MmGdbusModem *skeleton;
-    GSimpleAsyncResult *result;
     MMModemMode allowed;
     MMModemMode preferred;
 } SetCurrentModesContext;
 
 static void
-set_current_modes_context_complete_and_free (SetCurrentModesContext *ctx)
+set_current_modes_context_free (SetCurrentModesContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -2531,17 +2526,20 @@ mm_iface_modem_set_current_modes_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 after_set_load_current_modes_ready (MMIfaceModem *self,
                                     GAsyncResult *res,
-                                    SetCurrentModesContext *ctx)
+                                    GTask *task)
 {
+    SetCurrentModesContext *ctx;
     MMModemMode allowed = MM_MODEM_MODE_NONE;
     MMModemMode preferred = MM_MODEM_MODE_NONE;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes_finish (self,
                                                                          res,
@@ -2558,31 +2556,34 @@ after_set_load_current_modes_ready (MMIfaceModem *self,
         mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", allowed, preferred));
 
     /* Done */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    set_current_modes_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 set_current_modes_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         SetCurrentModesContext *ctx)
+                         GTask *task)
 {
+    SetCurrentModesContext *ctx;
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_modes_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        set_current_modes_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes &&
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes_finish) {
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes (
-            ctx->self,
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes (
+            self,
             (GAsyncReadyCallback)after_set_load_current_modes_ready,
-            ctx);
+            task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Default to the ones we requested */
     mm_gdbus_modem_set_current_modes (ctx->skeleton,
@@ -2590,8 +2591,8 @@ set_current_modes_ready (MMIfaceModem *self,
                                                      ctx->allowed,
                                                      ctx->preferred));
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    set_current_modes_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
@@ -2606,37 +2607,38 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
     MMModemMode current_allowed = MM_MODEM_MODE_ANY;
     MMModemMode current_preferred = MM_MODEM_MODE_NONE;
     guint i;
+    GTask *task;
 
     /* If setting allowed modes is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_modes ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_modes_finish) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Setting allowed modes not supported");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_iface_modem_set_current_modes,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Setting allowed modes not supported");
         return;
     }
 
     /* Setup context */
     ctx = g_new0 (SetCurrentModesContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_set_current_modes);
     ctx->allowed = allowed;
     ctx->preferred = preferred;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)set_current_modes_context_free);
+
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        set_current_modes_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
@@ -2646,12 +2648,12 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
 
     /* Don't allow mode switching if only one item given in the supported list */
     if (supported->len == 1) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Cannot change modes: only one combination supported");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot change modes: only one combination supported");
+        g_object_unref (task);
         g_array_unref (supported);
-        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -2675,12 +2677,12 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
         }
 
         if (!matched) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "The given combination of allowed and preferred modes is not supported");
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "The given combination of allowed and preferred modes is not supported");
+            g_object_unref (task);
             g_array_unref (supported);
-            set_current_modes_context_complete_and_free (ctx);
             return;
         }
     }
@@ -2694,8 +2696,8 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
                    &current_preferred);
     if (current_allowed == allowed &&
         current_preferred == preferred) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_current_modes_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2706,16 +2708,15 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
 
         preferred_str = mm_modem_mode_build_string_from_mask (preferred);
         allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Preferred mode (%s) is not allowed (%s)",
-                                         preferred_str,
-                                         allowed_str);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Preferred mode (%s) is not allowed (%s)",
+                                 preferred_str,
+                                 allowed_str);
+        g_object_unref (task);
         g_free (preferred_str);
         g_free (allowed_str);
-
-        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -2725,7 +2726,7 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
                                                             allowed,
                                                             preferred,
                                                             (GAsyncReadyCallback)set_current_modes_ready,
-                                                            ctx);
+                                                            task);
 }
 
 typedef struct {
