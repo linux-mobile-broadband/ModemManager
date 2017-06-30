@@ -89,27 +89,49 @@ mm_iface_modem_bind_simple_status (MMIfaceModem *self,
      state == MM_MODEM_STATE_CONNECTING)
 
 typedef struct {
-    MMIfaceModem *self;
     MMModemState final_state;
-    GSimpleAsyncResult *result;
     gulong state_changed_id;
     guint state_changed_wait_id;
 } WaitForFinalStateContext;
 
 static void
-wait_for_final_state_context_complete_and_free (WaitForFinalStateContext *ctx)
+wait_for_final_state_context_free (WaitForFinalStateContext *ctx)
 {
-    /* The callback associated with 'ctx->result' may update the modem state.
-     * Disconnect the signal handler for modem state changes before completing
-     * 'ctx->result' in order to prevent state_changed from being invoked, which
-     * invokes wait_for_final_state_context_complete_and_free (ctx) again. */
-    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
-
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_source_remove (ctx->state_changed_wait_id);
-    g_object_unref (ctx->self);
     g_slice_free (WaitForFinalStateContext, ctx);
+}
+
+static void
+wait_for_final_state_context_complete (GTask *task,
+                                       MMModemState state,
+                                       GError *error)
+{
+    MMIfaceModem *self;
+    WaitForFinalStateContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    /* The callback associated with 'task' may update the modem state.
+     * Disconnect the signal handler for modem state changes before completing
+     * 'task' in order to prevent state_changed from being invoked, which
+     * invokes wait_for_final_state_context_complete again. */
+    if (ctx->state_changed_id) {
+        g_signal_handler_disconnect (self, ctx->state_changed_id);
+        ctx->state_changed_id = 0;
+    }
+
+    /* Remove any outstanding timeout on waiting for state change. */
+    if (ctx->state_changed_wait_id) {
+        g_source_remove (ctx->state_changed_wait_id);
+        ctx->state_changed_wait_id = 0;
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, state);
+
+    g_object_unref (task);
 }
 
 MMModemState
@@ -117,29 +139,35 @@ mm_iface_modem_wait_for_final_state_finish (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_STATE_UNKNOWN;
+    }
+    return (MMModemState)value;
 }
 
 static gboolean
-state_changed_wait_expired (WaitForFinalStateContext *ctx)
+state_changed_wait_expired (GTask *task)
 {
-    g_simple_async_result_set_error (
-        ctx->result,
-        MM_CORE_ERROR,
-        MM_CORE_ERROR_RETRY,
-        "Too much time waiting to get to a final state");
-    wait_for_final_state_context_complete_and_free (ctx);
+    GError *error;
+
+    error = g_error_new (MM_CORE_ERROR,
+                         MM_CORE_ERROR_RETRY,
+                         "Too much time waiting to get to a final state");
+    wait_for_final_state_context_complete (task, MM_MODEM_STATE_UNKNOWN, error);
     return G_SOURCE_REMOVE;
 }
 
 static void
 state_changed (MMIfaceModem *self,
                GParamSpec *spec,
-               WaitForFinalStateContext *ctx)
+               GTask *task)
 {
+    WaitForFinalStateContext *ctx;
     MMModemState state = MM_MODEM_STATE_UNKNOWN;
 
     g_object_get (self,
@@ -150,6 +178,8 @@ state_changed (MMIfaceModem *self,
     if (MODEM_STATE_IS_INTERMEDIATE (state))
         return;
 
+    ctx = g_task_get_task_data (task);
+
     /* If we want a specific final state and this is not the one we were
      * looking for, then skip */
     if (ctx->final_state != MM_MODEM_STATE_UNKNOWN &&
@@ -158,8 +188,7 @@ state_changed (MMIfaceModem *self,
         return;
 
     /* Done! */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (state), NULL);
-    wait_for_final_state_context_complete_and_free (ctx);
+    wait_for_final_state_context_complete (task, state, NULL);
 }
 
 void
@@ -170,12 +199,9 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
 {
     MMModemState state = MM_MODEM_STATE_UNKNOWN;
     WaitForFinalStateContext *ctx;
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_wait_for_final_state);
+    task = g_task_new (self, NULL, callback, user_data);
 
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &state,
@@ -186,9 +212,8 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
         /* Is this the state we actually wanted? */
         if (final_state == MM_MODEM_STATE_UNKNOWN ||
             (state != MM_MODEM_STATE_UNKNOWN && state == final_state)) {
-            g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (state), NULL);
-            g_simple_async_result_complete_in_idle (result);
-            g_object_unref (result);
+            g_task_return_int (task, state);
+            g_object_unref (task);
             return;
         }
 
@@ -196,19 +221,19 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
     }
 
     ctx = g_slice_new0 (WaitForFinalStateContext);
-    ctx->result = result;
-    ctx->self = g_object_ref (self);
     ctx->final_state = final_state;
 
+    g_task_set_task_data (task, ctx, (GDestroyNotify)wait_for_final_state_context_free);
+
     /* Want to get notified when modem state changes */
-    ctx->state_changed_id = g_signal_connect (ctx->self,
+    ctx->state_changed_id = g_signal_connect (self,
                                               "notify::" MM_IFACE_MODEM_STATE,
                                               G_CALLBACK (state_changed),
-                                              ctx);
+                                              task);
     /* But we don't want to wait forever */
     ctx->state_changed_wait_id = g_timeout_add_seconds (10,
                                                         (GSourceFunc)state_changed_wait_expired,
-                                                        ctx);
+                                                        task);
 }
 
 /*****************************************************************************/
