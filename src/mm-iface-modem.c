@@ -95,12 +95,6 @@ typedef struct {
 } WaitForFinalStateContext;
 
 static void
-wait_for_final_state_context_free (WaitForFinalStateContext *ctx)
-{
-    g_slice_free (WaitForFinalStateContext, ctx);
-}
-
-static void
 wait_for_final_state_context_complete (GTask *task,
                                        MMModemState state,
                                        GError *error)
@@ -220,10 +214,10 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
         /* Otherwise, we'll need to wait for the exact one we want */
     }
 
-    ctx = g_slice_new0 (WaitForFinalStateContext);
+    ctx = g_new0 (WaitForFinalStateContext, 1);
     ctx->final_state = final_state;
 
-    g_task_set_task_data (task, ctx, (GDestroyNotify)wait_for_final_state_context_free);
+    g_task_set_task_data (task, ctx, g_free);
 
     /* Want to get notified when modem state changes */
     ctx->state_changed_id = g_signal_connect (self,
@@ -245,12 +239,6 @@ typedef struct {
     guint retries;
     guint pin_check_timeout_id;
 } InternalLoadUnlockRequiredContext;
-
-static void
-internal_load_unlock_required_context_free (InternalLoadUnlockRequiredContext *ctx)
-{
-    g_slice_free (InternalLoadUnlockRequiredContext, ctx);
-}
 
 static MMModemLock
 internal_load_unlock_required_finish (MMIfaceModem *self,
@@ -365,10 +353,10 @@ internal_load_unlock_required (MMIfaceModem *self,
     InternalLoadUnlockRequiredContext *ctx;
     GTask *task;
 
-    ctx = g_slice_new0 (InternalLoadUnlockRequiredContext);
+    ctx = g_new0 (InternalLoadUnlockRequiredContext, 1);
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)internal_load_unlock_required_context_free);
+    g_task_set_task_data (task, ctx, g_free);
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish) {
