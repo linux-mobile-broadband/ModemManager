@@ -3771,7 +3771,7 @@ mm_iface_modem_enable (MMIfaceModem *self,
 /* MODEM INITIALIZATION */
 
 typedef struct _InitializationContext InitializationContext;
-static void interface_initialization_step (InitializationContext *ctx);
+static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -3797,44 +3797,17 @@ typedef enum {
 } InitializationStep;
 
 struct _InitializationContext {
-    MMIfaceModem *self;
     InitializationStep step;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     MmGdbusModem *skeleton;
     GError *fatal_error;
 };
 
 static void
-initialization_context_complete_and_free (InitializationContext *ctx)
+initialization_context_free (InitializationContext *ctx)
 {
     g_assert (ctx->fatal_error == NULL);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
-}
-
-static gboolean
-initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    /* Simply ignore any fatal error encountered as the initialization is cancelled anyway. */
-    if (ctx->fatal_error) {
-        g_error_free (ctx->fatal_error);
-        ctx->fatal_error = NULL;
-    }
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Interface initialization cancelled");
-    initialization_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 #undef STR_REPLY_READY_FN
@@ -3842,10 +3815,13 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
-                         InitializationContext *ctx)                    \
+                         GTask *task)                                   \
     {                                                                   \
+        InitializationContext *ctx;                                     \
         GError *error = NULL;                                           \
         gchar *val;                                                     \
+                                                                        \
+        ctx = g_task_get_task_data (task);                              \
                                                                         \
         val = MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_modem_set_##NAME (ctx->skeleton, val);                 \
@@ -3858,7 +3834,7 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
-        interface_initialization_step (ctx);                            \
+        interface_initialization_step (task);                           \
     }
 
 #undef UINT_REPLY_READY_FN
@@ -3866,9 +3842,12 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
-                         InitializationContext *ctx)                    \
+                         GTask *task)                                   \
     {                                                                   \
+        InitializationContext *ctx;                                     \
         GError *error = NULL;                                           \
+                                                                        \
+        ctx = g_task_get_task_data (task);                              \
                                                                         \
         mm_gdbus_modem_set_##NAME (                                     \
             ctx->skeleton,                                              \
@@ -3881,15 +3860,18 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
-        interface_initialization_step (ctx);                            \
+        interface_initialization_step (task);                           \
     }
 
 static void
 current_capabilities_internal_load_unlock_required_ready (MMIfaceModem *self,
                                                           GAsyncResult *res,
-                                                          InitializationContext *ctx)
+                                                          GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     internal_load_unlock_required_finish (self, res, &error);
     if (error) {
@@ -3921,16 +3903,19 @@ current_capabilities_internal_load_unlock_required_ready (MMIfaceModem *self,
 
     /* Keep on */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_current_capabilities_ready (MMIfaceModem *self,
                                  GAsyncResult *res,
-                                 InitializationContext *ctx)
+                                 GTask *task)
 {
+    InitializationContext *ctx;
     MMModemCapability caps;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     caps = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self, res, &error);
     if (error) {
@@ -3938,14 +3923,14 @@ load_current_capabilities_ready (MMIfaceModem *self,
         g_prefix_error (&ctx->fatal_error, "couldn't load current capabilities: ");
         /* Jump to the last step */
         ctx->step = INITIALIZATION_STEP_LAST;
-        interface_initialization_step (ctx);
+        interface_initialization_step (task);
         return;
     }
 
     /* If LTE capability is reported, enable EPS network registration checks */
     if (caps & MM_MODEM_CAPABILITY_LTE) {
         mm_dbg ("Setting EPS network as supported");
-        g_object_set (G_OBJECT (ctx->self),
+        g_object_set (G_OBJECT (self),
                       MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, TRUE,
                       NULL);
     }
@@ -3953,7 +3938,7 @@ load_current_capabilities_ready (MMIfaceModem *self,
     /* If LTE capability is the only one reported, disable all other network registration checks */
     if (caps == MM_MODEM_CAPABILITY_LTE) {
         mm_dbg ("Setting CS/PS/CDMA1x/EVDO networks as unsupported");
-        g_object_set (G_OBJECT (ctx->self),
+        g_object_set (G_OBJECT (self),
                       MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED,     FALSE,
                       MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED,     FALSE,
                       MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, FALSE,
@@ -3972,23 +3957,26 @@ load_current_capabilities_ready (MMIfaceModem *self,
         (caps & MM_MODEM_CAPABILITY_GSM_UMTS || caps & MM_MODEM_CAPABILITY_LTE)) {
         mm_dbg ("Checking if multimode device has a SIM...");
         internal_load_unlock_required (
-            ctx->self,
+            self,
             (GAsyncReadyCallback)current_capabilities_internal_load_unlock_required_ready,
-            ctx);
+            task);
         return;
     }
 
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_supported_capabilities_ready (MMIfaceModem *self,
                                    GAsyncResult *res,
-                                   InitializationContext *ctx)
+                                   GTask *task)
 {
+    InitializationContext *ctx;
     GArray *supported_capabilities;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     supported_capabilities = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities_finish (self, res, &error);
     if (error) {
@@ -3996,7 +3984,7 @@ load_supported_capabilities_ready (MMIfaceModem *self,
         g_prefix_error (&ctx->fatal_error, "couldn't load supported capabilities: ");
         /* Jump to the last step */
         ctx->step = INITIALIZATION_STEP_LAST;
-        interface_initialization_step (ctx);
+        interface_initialization_step (task);
         return;
     }
 
@@ -4006,7 +3994,7 @@ load_supported_capabilities_ready (MMIfaceModem *self,
     g_array_unref (supported_capabilities);
 
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
@@ -4018,10 +4006,13 @@ STR_REPLY_READY_FN (device_identifier, "Device Identifier")
 static void
 load_supported_modes_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            InitializationContext *ctx)
+                            GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     GArray *modes_array;
+
+    ctx = g_task_get_task_data (task);
 
     modes_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes_finish (self, res, &error);
     if (modes_array != NULL) {
@@ -4037,19 +4028,21 @@ load_supported_modes_ready (MMIfaceModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_supported_bands_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            InitializationContext *ctx)
+                            GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     GArray *bands_array;
 
-    bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands_finish (self, res, &error);
+    ctx = g_task_get_task_data (task);
 
+    bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands_finish (self, res, &error);
     if (bands_array) {
         mm_common_bands_garray_sort (bands_array);
         mm_gdbus_modem_set_supported_bands (ctx->skeleton,
@@ -4064,16 +4057,19 @@ load_supported_bands_ready (MMIfaceModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_supported_ip_families_ready (MMIfaceModem *self,
                                   GAsyncResult *res,
-                                  InitializationContext *ctx)
+                                  GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     MMBearerIpFamily ip_families;
+
+    ctx = g_task_get_task_data (task);
 
     ip_families = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_ip_families_finish (self, res, &error);
 
@@ -4087,7 +4083,7 @@ load_supported_ip_families_ready (MMIfaceModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 UINT_REPLY_READY_FN (power_state, "Power State")
@@ -4095,8 +4091,12 @@ UINT_REPLY_READY_FN (power_state, "Power State")
 static void
 modem_update_lock_info_ready (MMIfaceModem *self,
                               GAsyncResult *res,
-                              InitializationContext *ctx)
+                              GTask *task)
 {
+    InitializationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     /* NOTE: we already propagated the lock state, no need to do it again */
     mm_iface_modem_update_lock_info_finish (self, res, &ctx->fatal_error);
     if (ctx->fatal_error) {
@@ -4108,22 +4108,27 @@ modem_update_lock_info_ready (MMIfaceModem *self,
         /* Go on to next step */
         ctx->step++;
 
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 sim_new_ready (GAsyncInitable *initable,
                GAsyncResult *res,
-               InitializationContext *ctx)
+               GTask *task)
 {
+    MMIfaceModem *self;
+    InitializationContext *ctx;
     MMBaseSim *sim;
     GError *error = NULL;
 
-    sim = MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish (ctx->self, res, &error);
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    sim = MM_IFACE_MODEM_GET_INTERFACE (self)->create_sim_finish (self, res, &error);
     if (error) {
         mm_warn ("couldn't create SIM: '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -4134,7 +4139,7 @@ sim_new_ready (GAsyncInitable *initable,
                                 ctx->skeleton, "sim",
                                 G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
-        g_object_set (ctx->self,
+        g_object_set (self,
                       MM_IFACE_MODEM_SIM, sim,
                       NULL);
         g_object_unref (sim);
@@ -4142,15 +4147,18 @@ sim_new_ready (GAsyncInitable *initable,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 sim_reinit_ready (MMBaseSim *sim,
                   GAsyncResult *res,
-                  InitializationContext *ctx)
+                  GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_base_sim_initialize_finish (sim, res, &error)) {
         mm_warn ("SIM re-initialization failed: '%s'",
@@ -4160,7 +4168,7 @@ sim_reinit_ready (MMBaseSim *sim,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 void
@@ -4181,10 +4189,13 @@ mm_iface_modem_update_own_numbers (MMIfaceModem *self,
 static void
 load_own_numbers_ready (MMIfaceModem *self,
                         GAsyncResult *res,
-                        InitializationContext *ctx)
+                        GTask *task)
 {
+    InitializationContext *ctx;
     GError *error = NULL;
     GStrv str_list;
+
+    ctx = g_task_get_task_data (task);
 
     str_list = MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish (self, res, &error);
     if (error) {
@@ -4199,17 +4210,20 @@ load_own_numbers_ready (MMIfaceModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_current_modes_ready (MMIfaceModem *self,
                           GAsyncResult *res,
-                          InitializationContext *ctx)
+                          GTask *task)
 {
+    InitializationContext *ctx;
     MMModemMode allowed = MM_MODEM_MODE_NONE;
     MMModemMode preferred = MM_MODEM_MODE_NONE;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes_finish (self,
                                                                          res,
@@ -4224,16 +4238,19 @@ load_current_modes_ready (MMIfaceModem *self,
 
     /* Done, Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
 load_current_bands_ready (MMIfaceModem *self,
                           GAsyncResult *res,
-                          InitializationContext *ctx)
+                          GTask *task)
 {
+    InitializationContext *ctx;
     GArray *current_bands;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     current_bands = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
     if (!current_bands) {
@@ -4262,7 +4279,7 @@ load_current_bands_ready (MMIfaceModem *self,
 
     /* Done, Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 /*****************************************************************************/
@@ -4270,8 +4287,12 @@ load_current_bands_ready (MMIfaceModem *self,
 static void
 setup_sim_hot_swap_ready (MMIfaceModem *self,
                           GAsyncResult *res,
-                          InitializationContext *ctx) {
+                          GTask *task)
+{
+    InitializationContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
     if (error) {
@@ -4283,15 +4304,28 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 static void
-interface_initialization_step (InitializationContext *ctx)
+interface_initialization_step (GTask *task)
 {
+    MMIfaceModem *self;
+    InitializationContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     /* Don't run new steps if we're cancelled */
-    if (initialization_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        /* Simply ignore any fatal error encountered as the initialization is cancelled anyway. */
+        if (ctx->fatal_error) {
+            g_error_free (ctx->fatal_error);
+            ctx->fatal_error = NULL;
+        }
+        g_object_unref (task);
         return;
+    }
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
@@ -4299,7 +4333,7 @@ interface_initialization_step (InitializationContext *ctx)
         if (!mm_gdbus_modem_get_device (ctx->skeleton)) {
             gchar *device;
 
-            g_object_get (ctx->self,
+            g_object_get (self,
                           MM_BASE_MODEM_DEVICE, &device,
                           NULL);
             mm_gdbus_modem_set_device (ctx->skeleton, device);
@@ -4309,7 +4343,7 @@ interface_initialization_step (InitializationContext *ctx)
         if (!mm_gdbus_modem_get_drivers (ctx->skeleton)) {
             gchar **drivers;
 
-            g_object_get (ctx->self,
+            g_object_get (self,
                           MM_BASE_MODEM_DRIVERS, &drivers,
                           NULL);
             mm_gdbus_modem_set_drivers (ctx->skeleton, (const gchar * const *)drivers);
@@ -4319,7 +4353,7 @@ interface_initialization_step (InitializationContext *ctx)
         if (!mm_gdbus_modem_get_plugin (ctx->skeleton)) {
             gchar *plugin;
 
-            g_object_get (ctx->self,
+            g_object_get (self,
                           MM_BASE_MODEM_PLUGIN, &plugin,
                           NULL);
             mm_gdbus_modem_set_plugin (ctx->skeleton, plugin);
@@ -4330,14 +4364,14 @@ interface_initialization_step (InitializationContext *ctx)
             MMPort *primary = NULL;
 
 #if defined WITH_QMI
-            primary = MM_PORT (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (ctx->self)));
+            primary = MM_PORT (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)));
 #endif
 #if defined WITH_MBIM
             if (!primary)
-                primary = MM_PORT (mm_base_modem_peek_port_mbim (MM_BASE_MODEM (ctx->self)));
+                primary = MM_PORT (mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self)));
 #endif
             if (!primary)
-                primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)));
+                primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
 
             g_assert (primary != NULL);
             mm_gdbus_modem_set_primary_port (ctx->skeleton, mm_port_get_device (primary));
@@ -4347,7 +4381,7 @@ interface_initialization_step (InitializationContext *ctx)
             MMModemPortInfo *port_infos;
             guint n_port_infos;
 
-            port_infos = mm_base_modem_get_port_infos (MM_BASE_MODEM (ctx->self), &n_port_infos);
+            port_infos = mm_base_modem_get_port_infos (MM_BASE_MODEM (self), &n_port_infos);
             mm_gdbus_modem_set_ports (ctx->skeleton, mm_common_ports_array_to_variant (port_infos, n_port_infos));
             mm_modem_port_info_array_free (port_infos, n_port_infos);
         }
@@ -4360,12 +4394,12 @@ interface_initialization_step (InitializationContext *ctx)
          * reloaded. So if we're asked to re-initialize, if we already have current capabilities loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_current_capabilities (ctx->skeleton) == MM_MODEM_CAPABILITY_NONE &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities (
+                self,
                 (GAsyncReadyCallback)load_current_capabilities_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4384,12 +4418,12 @@ interface_initialization_step (InitializationContext *ctx)
             g_array_index (supported_capabilities, MMModemCapability, 0) == MM_MODEM_CAPABILITY_NONE) {
             MMModemCapability current;
 
-            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_capabilities (
-                    ctx->self,
+            if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities &&
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities (
+                    self,
                     (GAsyncReadyCallback)load_supported_capabilities_ready,
-                    ctx);
+                    task);
                 g_array_unref (supported_capabilities);
                 return;
             }
@@ -4415,7 +4449,7 @@ interface_initialization_step (InitializationContext *ctx)
         /* Bearers setup is meant to be loaded only once during the whole
          * lifetime of the modem. The list may have been created by the object
          * implementing the interface; if so use it. */
-        g_object_get (ctx->self,
+        g_object_get (self,
                       MM_IFACE_MODEM_BEARER_LIST, &list,
                       NULL);
 
@@ -4424,7 +4458,7 @@ interface_initialization_step (InitializationContext *ctx)
 
             /* The maximum number of available/connected modems is guessed from
              * the size of the data ports list. */
-            n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (ctx->self)));
+            n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
             mm_dbg ("Modem allows up to %u bearers", n);
 
             /* Create new default list */
@@ -4432,8 +4466,8 @@ interface_initialization_step (InitializationContext *ctx)
             g_signal_connect (list,
                               "notify::" MM_BEARER_LIST_NUM_BEARERS,
                               G_CALLBACK (bearer_list_updated),
-                              ctx->self);
-            g_object_set (ctx->self,
+                              self);
+            g_object_set (self,
                           MM_IFACE_MODEM_BEARER_LIST, list,
                           NULL);
         }
@@ -4457,12 +4491,12 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_manufacturer (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_manufacturer &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_manufacturer_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_manufacturer (
+                self,
                 (GAsyncReadyCallback)load_manufacturer_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4473,12 +4507,12 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_model (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_model &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_model_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_model (
+                self,
                 (GAsyncReadyCallback)load_model_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4489,12 +4523,12 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_revision (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_revision &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_revision_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_revision (
+                self,
                 (GAsyncReadyCallback)load_revision_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4505,12 +4539,12 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_equipment_identifier (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_equipment_identifier &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_equipment_identifier_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_equipment_identifier (
+                self,
                 (GAsyncReadyCallback)load_equipment_identifier_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4521,20 +4555,20 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_device_identifier (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_device_identifier &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_device_identifier_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_device_identifier (
+                self,
                 (GAsyncReadyCallback)load_device_identifier_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
         ctx->step++;
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish != NULL) {
+        if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes != NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes_finish != NULL) {
             GArray *supported_modes;
             MMModemModeCombination *mode = NULL;
 
@@ -4548,10 +4582,10 @@ interface_initialization_step (InitializationContext *ctx)
                 mode = &g_array_index (supported_modes, MMModemModeCombination, 0);
             if (supported_modes->len == 0 ||
                 (mode && mode->allowed == MM_MODEM_MODE_ANY && mode->preferred == MM_MODEM_MODE_NONE)) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes (
-                    ctx->self,
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes (
+                    self,
                     (GAsyncReadyCallback)load_supported_modes_ready,
-                    ctx);
+                    task);
                 g_array_unref (supported_modes);
                 return;
             }
@@ -4572,12 +4606,12 @@ interface_initialization_step (InitializationContext *ctx)
          * don't try to load them again. */
         if (supported_bands->len == 0 ||
             g_array_index (supported_bands, MMModemBand, 0)  == MM_MODEM_BAND_UNKNOWN) {
-            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands (
-                    ctx->self,
+            if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands &&
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands (
+                    self,
                     (GAsyncReadyCallback)load_supported_bands_ready,
-                    ctx);
+                    task);
                 g_array_unref (supported_bands);
                 return;
             }
@@ -4596,13 +4630,13 @@ interface_initialization_step (InitializationContext *ctx)
         /* Supported ip_families are meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families != NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families_finish != NULL &&
+        if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_ip_families != NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_ip_families_finish != NULL &&
             mm_gdbus_modem_get_supported_ip_families (ctx->skeleton) == MM_BEARER_IP_FAMILY_NONE) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_ip_families (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_ip_families (
+                self,
                 (GAsyncReadyCallback)load_supported_ip_families_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4612,12 +4646,12 @@ interface_initialization_step (InitializationContext *ctx)
         /* Initial power state is meant to be loaded only once. Therefore, if we
          * already have it loaded, don't try to load it again. */
         if (mm_gdbus_modem_get_power_state (ctx->skeleton) == MM_MODEM_POWER_STATE_UNKNOWN) {
-            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_power_state (
-                    ctx->self,
+            if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_power_state &&
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_power_state_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_power_state (
+                    self,
                     (GAsyncReadyCallback)load_power_state_ready,
-                    ctx);
+                    task);
                 return;
             }
 
@@ -4628,12 +4662,12 @@ interface_initialization_step (InitializationContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_SIM_HOT_SWAP:
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_sim_hot_swap (
-                MM_IFACE_MODEM (ctx->self),
+        if (MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap (
+                MM_IFACE_MODEM (self),
                 (GAsyncReadyCallback) setup_sim_hot_swap_ready,
-                ctx);
+                task);
                 return;
         }
         /* Fall down to next step */
@@ -4642,10 +4676,10 @@ interface_initialization_step (InitializationContext *ctx)
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
-            mm_iface_modem_update_lock_info (ctx->self,
+            mm_iface_modem_update_lock_info (self,
                                              MM_MODEM_LOCK_UNKNOWN, /* ask */
                                              (GAsyncReadyCallback)modem_update_lock_info_ready,
-                                             ctx);
+                                             task);
             return;
         }
         /* Fall down to next step */
@@ -4654,19 +4688,19 @@ interface_initialization_step (InitializationContext *ctx)
     case INITIALIZATION_STEP_SIM:
         /* If the modem doesn't need any SIM (not implemented by plugin, or not
          * needed in CDMA-only modems) */
-        if (!mm_iface_modem_is_cdma_only (ctx->self) &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish) {
+        if (!mm_iface_modem_is_cdma_only (self) &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->create_sim &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->create_sim_finish) {
             MMBaseSim *sim = NULL;
 
-            g_object_get (ctx->self,
+            g_object_get (self,
                           MM_IFACE_MODEM_SIM, &sim,
                           NULL);
             if (!sim) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim (
-                    MM_IFACE_MODEM (ctx->self),
+                MM_IFACE_MODEM_GET_INTERFACE (self)->create_sim (
+                    MM_IFACE_MODEM (self),
                     (GAsyncReadyCallback)sim_new_ready,
-                    ctx);
+                    task);
                 return;
             }
 
@@ -4674,9 +4708,9 @@ interface_initialization_step (InitializationContext *ctx)
              * This will try to load any missing property value that couldn't be
              * retrieved before due to having the SIM locked. */
             mm_base_sim_initialize (sim,
-                                    ctx->cancellable,
+                                    g_task_get_cancellable (task),
                                     (GAsyncReadyCallback)sim_reinit_ready,
-                                    ctx);
+                                    task);
             g_object_unref (sim);
             return;
         }
@@ -4688,12 +4722,12 @@ interface_initialization_step (InitializationContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
-                ctx->self,
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers (
+                self,
                 (GAsyncReadyCallback)load_own_numbers_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -4722,12 +4756,12 @@ interface_initialization_step (InitializationContext *ctx)
 
                 supported_mode = &g_array_index (supported, MMModemModeCombination, 0);
                 mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", supported_mode->allowed, supported_mode->preferred));
-            } else if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes &&
-                       MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_modes (
-                    ctx->self,
+            } else if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes &&
+                       MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes (
+                    self,
                     (GAsyncReadyCallback)load_current_modes_ready,
-                    ctx);
+                    task);
                 if (supported)
                     g_array_unref (supported);
                 return;
@@ -4750,12 +4784,12 @@ interface_initialization_step (InitializationContext *ctx)
         /* Current bands are only meant to be loaded once, so if we have them
          * loaded already, just skip re-loading */
         if (!current || (current->len == 1 && g_array_index (current, MMModemBand, 0) == MM_MODEM_BAND_UNKNOWN)) {
-            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands (
-                    ctx->self,
+            if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands &&
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands (
+                    self,
                     (GAsyncReadyCallback)load_current_bands_ready,
-                    ctx);
+                    task);
                 if (current)
                     g_array_unref (current);
                 return;
@@ -4779,7 +4813,7 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-set-current-capabilities",
                           G_CALLBACK (handle_set_current_capabilities),
-                          ctx->self);
+                          self);
         /* Allow setting the power state to OFF even when the modem is in the
          * FAILED state as this operation does not necessarily depend on the
          * presence of a SIM. handle_set_power_state_auth_ready already ensures
@@ -4788,18 +4822,18 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-set-power-state",
                           G_CALLBACK (handle_set_power_state),
-                          ctx->self);
+                          self);
         /* Allow the reset and factory reset operation in FAILED state to rescue the modem.
          * Also, for a modem that doesn't support SIM hot swapping, a reset is needed to
          * force the modem to detect the newly inserted SIM. */
         g_signal_connect (ctx->skeleton,
                           "handle-reset",
                           G_CALLBACK (handle_reset),
-                          ctx->self);
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-factory-reset",
                           G_CALLBACK (handle_factory_reset),
-                          ctx->self);
+                          self);
 
         if (ctx->fatal_error) {
             if (g_error_matches (ctx->fatal_error,
@@ -4807,55 +4841,59 @@ interface_initialization_step (InitializationContext *ctx)
                                  MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED)) {
                 gboolean is_sim_hot_swap_supported = FALSE;
 
-                g_object_get (ctx->self,
+                g_object_get (self,
                               MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
                               NULL);
 
                 if (is_sim_hot_swap_supported)
-                    mm_iface_modem_update_failed_state (ctx->self, MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
+                    mm_iface_modem_update_failed_state (self, MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
             }
-            g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
-            ctx->fatal_error = NULL;
         } else {
             /* We are done without errors!
              * Handle method invocations */
             g_signal_connect (ctx->skeleton,
                               "handle-create-bearer",
                               G_CALLBACK (handle_create_bearer),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-command",
                               G_CALLBACK (handle_command),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-delete-bearer",
                               G_CALLBACK (handle_delete_bearer),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-list-bearers",
                               G_CALLBACK (handle_list_bearers),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-enable",
                               G_CALLBACK (handle_enable),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-bands",
                               G_CALLBACK (handle_set_current_bands),
-                              ctx->self);
+                              self);
             g_signal_connect (ctx->skeleton,
                               "handle-set-current-modes",
                               G_CALLBACK (handle_set_current_modes),
-                              ctx->self);
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+                              self);
         }
 
         /* Finally, export the new interface, even if we got errors, but only if not
          * done already */
-        if (!mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (ctx->self)))
-            mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+        if (!mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)))
+            mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self),
                                                 MM_GDBUS_MODEM (ctx->skeleton));
-        initialization_context_complete_and_free (ctx);
+
+        if (ctx->fatal_error) {
+            g_task_return_error (task, ctx->fatal_error);
+            ctx->fatal_error = NULL;
+        } else
+            g_task_return_boolean (task, TRUE);
+
+        g_object_unref (task);
         return;
     }
 
@@ -4878,6 +4916,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 {
     InitializationContext *ctx;
     MmGdbusModem *skeleton = NULL;
+    GTask *task;
 
     /* Did we already create it? */
     g_object_get (self,
@@ -4925,16 +4964,13 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 
     /* Perform async initialization here */
     ctx = g_new0 (InitializationContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_initialize);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->skeleton = skeleton;
 
-    interface_initialization_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_context_free);
+
+    interface_initialization_step (task);
 }
 
 void
