@@ -2169,18 +2169,13 @@ handle_set_current_capabilities (MmGdbusModem *skeleton,
 /* Current bands setting */
 
 typedef struct {
-    MMIfaceModem *self;
     MmGdbusModem *skeleton;
-    GSimpleAsyncResult *result;
     GArray *bands_array;
 } SetCurrentBandsContext;
 
 static void
-set_current_bands_context_complete_and_free (SetCurrentBandsContext *ctx)
+set_current_bands_context_free (SetCurrentBandsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
     if (ctx->bands_array)
@@ -2193,19 +2188,23 @@ mm_iface_modem_set_current_bands_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 set_current_bands_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         SetCurrentBandsContext *ctx)
+                         GTask *task)
 {
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish (self, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else {
+        SetCurrentBandsContext *ctx;
+
+        ctx = g_task_get_task_data (task);
+
         /* Never show just 'any' in the interface */
         if (ctx->bands_array->len == 1 &&
             g_array_index (ctx->bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
@@ -2223,10 +2222,10 @@ set_current_bands_ready (MMIfaceModem *self,
                                               mm_common_bands_garray_to_variant (ctx->bands_array));
         }
 
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
 
-    set_current_bands_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -2298,35 +2297,36 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
     GArray *current_bands_array;
     GError *error = NULL;
     gchar *bands_string;
+    GTask *task;
 
     /* If setting allowed bands is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Setting allowed bands not supported");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_iface_modem_set_current_bands,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Setting allowed bands not supported");
         return;
     }
 
     /* Setup context */
     ctx = g_slice_new0 (SetCurrentBandsContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_set_current_bands);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)set_current_bands_context_free);
+
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
@@ -2371,8 +2371,8 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
         g_free (bands_string);
         g_array_unref (supported_bands_array);
         g_array_unref (current_bands_array);
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2392,8 +2392,8 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
         g_free (bands_string);
         g_array_unref (supported_bands_array);
         g_array_unref (current_bands_array);
-        g_simple_async_result_take_error (ctx->result, error);
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -2402,7 +2402,7 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
         self,
         ctx->bands_array,
         (GAsyncReadyCallback)set_current_bands_ready,
-        ctx);
+        task);
 
     g_array_unref (supported_bands_array);
     g_array_unref (current_bands_array);
