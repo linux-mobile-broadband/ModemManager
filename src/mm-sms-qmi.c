@@ -57,12 +57,13 @@ ensure_qmi_client (MMSmsQmi *self,
     g_object_unref (modem);
 
     if (!port) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek QMI port");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 ensure_qmi_client,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek QMI port");
         return FALSE;
     }
 
@@ -70,13 +71,14 @@ ensure_qmi_client (MMSmsQmi *self,
                                       service,
                                       MM_PORT_QMI_FLAG_DEFAULT);
     if (!client) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek client for service '%s'",
-                                             qmi_service_get_string (service));
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 ensure_qmi_client,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek client for service '%s'",
+                                 qmi_service_get_string (service));
         return FALSE;
     }
 
@@ -115,22 +117,17 @@ check_sms_type_support (MMSmsQmi *self,
 /* Store the SMS */
 
 typedef struct {
-    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
-    GSimpleAsyncResult *result;
     MMSmsStorage storage;
     GList *current;
 } SmsStoreContext;
 
 static void
-sms_store_context_complete_and_free (SmsStoreContext *ctx)
+sms_store_context_free (SmsStoreContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (SmsStoreContext, ctx);
 }
 
@@ -139,16 +136,18 @@ sms_store_finish (MMBaseSms *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void sms_store_next_part (SmsStoreContext *ctx);
+static void sms_store_next_part (GTask *task);
 
 static void
 store_ready (QmiClientWms *client,
              GAsyncResult *res,
-             SmsStoreContext *ctx)
+             GTask *task)
 {
+    MMBaseSms *self;
+    SmsStoreContext *ctx;
     QmiMessageWmsRawWriteOutput *output = NULL;
     GError *error = NULL;
     GList *parts;
@@ -157,18 +156,21 @@ store_ready (QmiClientWms *client,
     output = qmi_client_wms_raw_write_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_store_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_wms_raw_write_output_get_result (output, &error)) {
         qmi_message_wms_raw_write_output_unref (output);
         g_prefix_error (&error, "Couldn't write SMS part: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_store_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     qmi_message_wms_raw_write_output_get_memory_index (
         output,
@@ -177,17 +179,18 @@ store_ready (QmiClientWms *client,
     qmi_message_wms_raw_write_output_unref (output);
 
     /* Set the index in the part we hold */
-    parts = mm_base_sms_get_parts (ctx->self);
+    parts = mm_base_sms_get_parts (self);
     mm_sms_part_set_index ((MMSmsPart *)parts->data, (guint)idx);
 
     /* Go on with next one */
     ctx->current = g_list_next (ctx->current);
-    sms_store_next_part (ctx);
+    sms_store_next_part (task);
 }
 
 static void
-sms_store_next_part (SmsStoreContext *ctx)
+sms_store_next_part (GTask *task)
 {
+    SmsStoreContext *ctx;
     QmiMessageWmsRawWriteInput *input;
     guint8 *pdu = NULL;
     guint pdulen = 0;
@@ -195,10 +198,12 @@ sms_store_next_part (SmsStoreContext *ctx)
     GArray *array;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
     if (!ctx->current) {
         /* Done we are */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        sms_store_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -210,16 +215,17 @@ sms_store_next_part (SmsStoreContext *ctx)
 
     if (!pdu) {
         if (error)
-            g_simple_async_result_take_error (ctx->result, error);
+            g_task_return_error (task, error);
         else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unknown or unsupported PDU type in SMS part: %s",
-                                             mm_sms_pdu_type_get_string (
-                                                 mm_sms_part_get_pdu_type (
-                                                     (MMSmsPart *)ctx->current->data)));
-        sms_store_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unknown or unsupported PDU type in SMS part: %s",
+                                     mm_sms_pdu_type_get_string (
+                                         mm_sms_part_get_pdu_type (
+                                             (MMSmsPart *)ctx->current->data)));
+
+        g_object_unref (task);
         return;
     }
 
@@ -244,7 +250,7 @@ sms_store_next_part (SmsStoreContext *ctx)
                               5,
                               NULL,
                               (GAsyncReadyCallback)store_ready,
-                              ctx);
+                              task);
     qmi_message_wms_raw_write_input_unref (input);
     g_array_unref (array);
 }
@@ -258,6 +264,7 @@ sms_store (MMBaseSms *self,
     SmsStoreContext *ctx;
     QmiClient *client = NULL;
     GError *error = NULL;
+    GTask *task;
 
     /* Ensure WMS client */
     if (!ensure_qmi_client (MM_SMS_QMI (self),
@@ -267,11 +274,6 @@ sms_store (MMBaseSms *self,
 
     /* Setup the context */
     ctx = g_slice_new0 (SmsStoreContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             sms_store);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->storage = storage;
     g_object_get (self,
@@ -280,37 +282,35 @@ sms_store (MMBaseSms *self,
 
     ctx->current = mm_base_sms_get_parts (self);
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sms_store_context_free);
+
     /* Check whether we support the given SMS type */
     if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_store_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on */
-    sms_store_next_part (ctx);
+    sms_store_next_part (task);
 }
 
 /*****************************************************************************/
 /* Send the SMS */
 
 typedef struct {
-    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
-    GSimpleAsyncResult *result;
     gboolean from_storage;
     GList *current;
 } SmsSendContext;
 
 static void
-sms_send_context_complete_and_free (SmsSendContext *ctx)
+sms_send_context_free (SmsSendContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (SmsSendContext, ctx);
 }
 
@@ -319,16 +319,17 @@ sms_send_finish (MMBaseSms *self,
                  GAsyncResult *res,
                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void sms_send_next_part (SmsSendContext *ctx);
+static void sms_send_next_part (GTask *task);
 
 static void
 send_generic_ready (QmiClientWms *client,
                     GAsyncResult *res,
-                    SmsSendContext *ctx)
+                    GTask *task)
 {
+    SmsSendContext *ctx;
     QmiMessageWmsRawSendOutput *output = NULL;
     GError *error = NULL;
     guint16 message_id;
@@ -336,8 +337,8 @@ send_generic_ready (QmiClientWms *client,
     output = qmi_client_wms_raw_send_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_send_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -359,10 +360,12 @@ send_generic_ready (QmiClientWms *client,
         qmi_message_wms_raw_send_output_unref (output);
 
         g_prefix_error (&error, "Couldn't write SMS part: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_send_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     if (qmi_message_wms_raw_send_output_get_message_id (output, &message_id, NULL))
         mm_sms_part_set_message_reference ((MMSmsPart *)ctx->current->data,
@@ -372,18 +375,21 @@ send_generic_ready (QmiClientWms *client,
 
     /* Go on with next part */
     ctx->current = g_list_next (ctx->current);
-    sms_send_next_part (ctx);
+    sms_send_next_part (task);
 }
 
 static void
-sms_send_generic (SmsSendContext *ctx)
+sms_send_generic (GTask *task)
 {
+    SmsSendContext *ctx;
     QmiMessageWmsRawSendInput *input;
     guint8 *pdu = NULL;
     guint pdulen = 0;
     guint msgstart = 0;
     GArray *array;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* Get PDU */
     if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
@@ -393,16 +399,16 @@ sms_send_generic (SmsSendContext *ctx)
 
     if (!pdu) {
         if (error)
-            g_simple_async_result_take_error (ctx->result, error);
+            g_task_return_error (task, error);
         else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unknown or unsupported PDU type in SMS part: %s",
-                                             mm_sms_pdu_type_get_string (
-                                                 mm_sms_part_get_pdu_type (
-                                                     (MMSmsPart *)ctx->current->data)));
-        sms_send_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unknown or unsupported PDU type in SMS part: %s",
+                                     mm_sms_pdu_type_get_string (
+                                         mm_sms_part_get_pdu_type (
+                                             (MMSmsPart *)ctx->current->data)));
+        g_object_unref (task);
         return;
     }
 
@@ -426,7 +432,7 @@ sms_send_generic (SmsSendContext *ctx)
                              30,
                              NULL,
                              (GAsyncReadyCallback)send_generic_ready,
-                             ctx);
+                             task);
     qmi_message_wms_raw_send_input_unref (input);
     g_array_unref (array);
 }
@@ -434,11 +440,14 @@ sms_send_generic (SmsSendContext *ctx)
 static void
 send_from_storage_ready (QmiClientWms *client,
                          GAsyncResult *res,
-                         SmsSendContext *ctx)
+                         GTask *task)
 {
+    SmsSendContext *ctx;
     QmiMessageWmsSendFromMemoryStorageOutput *output = NULL;
     GError *error = NULL;
     guint16 message_id;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_wms_send_from_memory_storage_finish (client, res, &error);
     if (!output) {
@@ -449,14 +458,14 @@ send_from_storage_ready (QmiClientWms *client,
                     error->message);
             g_error_free (error);
             ctx->from_storage = FALSE;
-            sms_send_next_part (ctx);
+            sms_send_next_part (task);
             return;
         }
 
         /* Fatal error */
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_send_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -468,7 +477,7 @@ send_from_storage_ready (QmiClientWms *client,
                     error->message);
             g_error_free (error);
             ctx->from_storage = FALSE;
-            sms_send_next_part (ctx);
+            sms_send_next_part (task);
         } else {
             QmiWmsGsmUmtsRpCause rp_cause;
             QmiWmsGsmUmtsTpCause tp_cause;
@@ -506,8 +515,8 @@ send_from_storage_ready (QmiClientWms *client,
             }
 
             g_prefix_error (&error, "Couldn't write SMS part: ");
-            g_simple_async_result_take_error (ctx->result, error);
-            sms_send_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
         }
 
         qmi_message_wms_send_from_memory_storage_output_unref (output);
@@ -522,19 +531,23 @@ send_from_storage_ready (QmiClientWms *client,
 
     /* Go on with next part */
     ctx->current = g_list_next (ctx->current);
-    sms_send_next_part (ctx);
+    sms_send_next_part (task);
 }
 
 static void
-sms_send_from_storage (SmsSendContext *ctx)
+sms_send_from_storage (GTask *task)
 {
+    MMBaseSms *self;
+    SmsSendContext *ctx;
     QmiMessageWmsSendFromMemoryStorageInput *input;
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
     input = qmi_message_wms_send_from_memory_storage_input_new ();
 
     qmi_message_wms_send_from_memory_storage_input_set_information (
         input,
-        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (ctx->self)),
+        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (self)),
         mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
         (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data) ?
          QMI_WMS_MESSAGE_MODE_GSM_WCDMA :
@@ -547,25 +560,29 @@ sms_send_from_storage (SmsSendContext *ctx)
         30,
         NULL,
         (GAsyncReadyCallback)send_from_storage_ready,
-        ctx);
+        task);
     qmi_message_wms_send_from_memory_storage_input_unref (input);
 }
 
 static void
-sms_send_next_part (SmsSendContext *ctx)
+sms_send_next_part (GTask *task)
 {
+    SmsSendContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (!ctx->current) {
         /* Done we are */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        sms_send_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Send from storage? */
     if (ctx->from_storage)
-        sms_send_from_storage (ctx);
+        sms_send_from_storage (task);
     else
-        sms_send_generic (ctx);
+        sms_send_generic (task);
 }
 
 static void
@@ -576,6 +593,7 @@ sms_send (MMBaseSms *self,
     SmsSendContext *ctx;
     QmiClient *client = NULL;
     GError *error = NULL;
+    GTask *task;
 
     /* Ensure WMS client */
     if (!ensure_qmi_client (MM_SMS_QMI (self),
@@ -585,11 +603,6 @@ sms_send (MMBaseSms *self,
 
     /* Setup the context */
     ctx = g_slice_new0 (SmsSendContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             sms_send);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     g_object_get (self,
                   MM_BASE_SMS_MODEM, &ctx->modem,
@@ -600,35 +613,33 @@ sms_send (MMBaseSms *self,
 
     ctx->current = mm_base_sms_get_parts (self);
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sms_send_context_free);
+
     /* Check whether we support the given SMS type */
     if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_send_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    sms_send_next_part (ctx);
+    sms_send_next_part (task);
 }
 
 /*****************************************************************************/
 
 typedef struct {
-    MMBaseSms *self;
     MMBaseModem *modem;
     QmiClientWms *client;
-    GSimpleAsyncResult *result;
     GList *current;
     guint n_failed;
 } SmsDeletePartsContext;
 
 static void
-sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
+sms_delete_parts_context_free (SmsDeletePartsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (SmsDeletePartsContext, ctx);
 }
 
@@ -637,18 +648,21 @@ sms_delete_finish (MMBaseSms *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void delete_next_part (SmsDeletePartsContext *ctx);
+static void delete_next_part (GTask *task);
 
 static void
 delete_part_ready (QmiClientWms *client,
                    GAsyncResult *res,
-                   SmsDeletePartsContext *ctx)
+                   GTask *task)
 {
+    SmsDeletePartsContext *ctx;
     QmiMessageWmsDeleteOutput *output = NULL;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_wms_delete_finish (client, res, &error);
     if (!output) {
@@ -672,13 +686,18 @@ delete_part_ready (QmiClientWms *client,
     mm_sms_part_set_index ((MMSmsPart *)ctx->current->data, SMS_PART_INVALID_INDEX);
 
     ctx->current = g_list_next (ctx->current);
-    delete_next_part (ctx);
+    delete_next_part (task);
 }
 
 static void
-delete_next_part (SmsDeletePartsContext *ctx)
+delete_next_part (GTask *task)
 {
+    MMBaseSms *self;
+    SmsDeletePartsContext *ctx;
     QmiMessageWmsDeleteInput *input;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     /* Skip non-stored parts */
     while (ctx->current &&
@@ -688,22 +707,22 @@ delete_next_part (SmsDeletePartsContext *ctx)
     /* If all removed, we're done */
     if (!ctx->current) {
         if (ctx->n_failed > 0)
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't delete %u parts from this SMS",
-                                             ctx->n_failed);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't delete %u parts from this SMS",
+                                     ctx->n_failed);
         else
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            g_task_return_boolean (task, TRUE);
 
-        sms_delete_parts_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
     input = qmi_message_wms_delete_input_new ();
     qmi_message_wms_delete_input_set_memory_storage (
         input,
-        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (ctx->self)),
+        mm_sms_storage_to_qmi_storage_type (mm_base_sms_get_storage (self)),
         NULL);
     qmi_message_wms_delete_input_set_memory_index (
         input,
@@ -720,7 +739,7 @@ delete_next_part (SmsDeletePartsContext *ctx)
                            5,
                            NULL,
                            (GAsyncReadyCallback)delete_part_ready,
-                           ctx);
+                           task);
     qmi_message_wms_delete_input_unref (input);
 }
 
@@ -731,6 +750,7 @@ sms_delete (MMBaseSms *self,
 {
     SmsDeletePartsContext *ctx;
     QmiClient *client = NULL;
+    GTask *task;
 
     /* Ensure WMS client */
     if (!ensure_qmi_client (MM_SMS_QMI (self),
@@ -739,19 +759,17 @@ sms_delete (MMBaseSms *self,
         return;
 
     ctx = g_slice_new0 (SmsDeletePartsContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             sms_delete);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     g_object_get (self,
                   MM_BASE_SMS_MODEM, &ctx->modem,
                   NULL);
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sms_delete_parts_context_free);
+
     /* Go on deleting parts */
     ctx->current = mm_base_sms_get_parts (self);
-    delete_next_part (ctx);
+    delete_next_part (task);
 }
 
 /*****************************************************************************/
