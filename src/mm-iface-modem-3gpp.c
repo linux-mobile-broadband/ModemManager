@@ -199,7 +199,6 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
 typedef struct {
     MMIfaceModem3gpp *self;
     MmGdbusModem3gpp *skeleton;
-    GSimpleAsyncResult *result;
     GCancellable *cancellable;
     gchar *operator_id;
     GTimer *timer;
@@ -207,11 +206,8 @@ typedef struct {
 } RegisterInNetworkContext;
 
 static void
-register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+register_in_network_context_free (RegisterInNetworkContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-
     if (ctx->timer)
         g_timer_destroy (ctx->timer);
 
@@ -234,16 +230,21 @@ register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
 }
 
 static void
-register_in_network_context_failed (RegisterInNetworkContext *ctx,
-                                    GError *error)
+register_in_network_context_complete_failed (GTask *task,
+                                             GError *error)
 {
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     mm_iface_modem_3gpp_update_cs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_ps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_eps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
     mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
 
-    g_simple_async_result_take_error (ctx->result, error);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 gboolean
@@ -251,38 +252,44 @@ mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                                 GAsyncResult *res,
                                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void run_registration_checks_ready (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
-                                           RegisterInNetworkContext *ctx);
+                                           GTask *task);
 
 static gboolean
-run_registration_checks_again (RegisterInNetworkContext *ctx)
+run_registration_checks_again (GTask *task)
 {
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     /* Get fresh registration state */
     mm_iface_modem_3gpp_run_registration_checks (
         ctx->self,
         (GAsyncReadyCallback)run_registration_checks_ready,
-        ctx);
+        task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 run_registration_checks_ready (MMIfaceModem3gpp *self,
                                GAsyncResult *res,
-                               RegisterInNetworkContext *ctx)
+                               GTask *task)
 {
+    RegisterInNetworkContext *ctx;
     GError *error = NULL;
     RegistrationStateContext *registration_state_context;
     MMModem3gppRegistrationState current_registration_state;
 
+    ctx = g_task_get_task_data (task);
+
     mm_iface_modem_3gpp_run_registration_checks_finish (MM_IFACE_MODEM_3GPP (self), res, &error);
     if (error) {
         mm_dbg ("3GPP registration check failed: '%s'", error->message);
-        register_in_network_context_failed (ctx, error);
-        register_in_network_context_complete_and_free (ctx);
+        register_in_network_context_complete_failed (task, error);
         return;
     }
 
@@ -293,10 +300,9 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
      * finished */
     if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) {
         mm_dbg ("Registration denied");
-        register_in_network_context_failed (
-            ctx,
+        register_in_network_context_complete_failed (
+            task,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED));
-        register_in_network_context_complete_and_free (ctx);
         return;
     }
 
@@ -313,18 +319,17 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
          * the modem never got un-registered during the sequence. */
         mm_iface_modem_refresh_signal (MM_IFACE_MODEM (ctx->self));
         mm_dbg ("Modem is currently registered in a 3GPP network");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        register_in_network_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Don't spend too much time waiting to get registered */
     if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
         mm_dbg ("3GPP registration check timed out");
-        register_in_network_context_failed (
-            ctx,
+        register_in_network_context_complete_failed (
+            task,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
-        register_in_network_context_complete_and_free (ctx);
         return;
     }
 
@@ -335,20 +340,19 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
      * well.
      */
     mm_dbg ("Modem not yet registered in a 3GPP network... will recheck soon");
-    g_timeout_add_seconds (3, (GSourceFunc)run_registration_checks_again, ctx);
+    g_timeout_add_seconds (3, (GSourceFunc)run_registration_checks_again, task);
 }
 
 static void
 register_in_network_ready (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
-                           RegisterInNetworkContext *ctx)
+                           GTask *task)
 {
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res, &error)) {
         /* Propagate error when trying to lock to network */
-        register_in_network_context_failed (ctx, error);
-        register_in_network_context_complete_and_free (ctx);
+        register_in_network_context_complete_failed (task, error);
         return;
     }
 
@@ -357,7 +361,7 @@ register_in_network_ready (MMIfaceModem3gpp *self,
     mm_iface_modem_3gpp_run_registration_checks (
         self,
         (GAsyncReadyCallback)run_registration_checks_ready,
-        ctx);
+        task);
 }
 
 void
@@ -371,32 +375,33 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     const gchar *current_operator_code;
     RegistrationStateContext *registration_state_context;
     GError *error = NULL;
+    GTask *task;
 
     ctx = g_slice_new0 (RegisterInNetworkContext);
     ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_iface_modem_3gpp_register_in_network);
     ctx->operator_id = (operator_id && operator_id[0]) ? g_strdup (operator_id) : NULL;
     ctx->max_registration_time = max_registration_time;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
+
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get interface skeleton");
-        register_in_network_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
         return;
     }
 
     /* Validate input MCC/MNC */
     if (ctx->operator_id && !mm_3gpp_parse_operator_id (ctx->operator_id, NULL, NULL, &error)) {
         g_assert (error != NULL);
-        g_simple_async_result_take_error (ctx->result, error);
-        register_in_network_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -419,8 +424,8 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
             registration_state_context->manual_registration = TRUE;
             mm_dbg ("Already registered in selected network '%s'...",
                     current_operator_code);
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-            register_in_network_context_complete_and_free (ctx);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         }
 
@@ -438,8 +443,8 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
             mm_dbg ("Already registered in network '%s',"
                     " automatic registration not launched...",
                     current_operator_code);
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-            register_in_network_context_complete_and_free (ctx);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         }
 
@@ -461,7 +466,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
         ctx->operator_id,
         ctx->cancellable,
         (GAsyncReadyCallback)register_in_network_ready,
-        ctx);
+        task);
 }
 
 typedef struct {
