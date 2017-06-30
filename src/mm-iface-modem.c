@@ -217,18 +217,13 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
 #define MAX_RETRIES 6
 
 typedef struct {
-    MMIfaceModem *self;
-    GSimpleAsyncResult *result;
     guint retries;
     guint pin_check_timeout_id;
 } InternalLoadUnlockRequiredContext;
 
 static void
-internal_load_unlock_required_context_complete_and_free (InternalLoadUnlockRequiredContext *ctx)
+internal_load_unlock_required_context_free (InternalLoadUnlockRequiredContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (InternalLoadUnlockRequiredContext, ctx);
 }
 
@@ -237,30 +232,37 @@ internal_load_unlock_required_finish (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
+    gssize value;
 
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), error);
+
+    return value < 0 ? MM_MODEM_LOCK_UNKNOWN : (MMModemLock)value;
 }
 
-static void internal_load_unlock_required_context_step (InternalLoadUnlockRequiredContext *ctx);
+static void internal_load_unlock_required_context_step (GTask *task);
 
 static gboolean
-load_unlock_required_again (InternalLoadUnlockRequiredContext *ctx)
+load_unlock_required_again (GTask *task)
 {
+    InternalLoadUnlockRequiredContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     ctx->pin_check_timeout_id = 0;
     /* Retry the step */
-    internal_load_unlock_required_context_step (ctx);
+    internal_load_unlock_required_context_step (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 load_unlock_required_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            InternalLoadUnlockRequiredContext *ctx)
+                            GTask *task)
 {
+    InternalLoadUnlockRequiredContext *ctx;
     GError *error = NULL;
     MMModemLock lock;
+
+    ctx = g_task_get_task_data (task);
 
     lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error);
     if (error) {
@@ -280,8 +282,8 @@ load_unlock_required_ready (MMIfaceModem *self,
             g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
-            g_simple_async_result_take_error (ctx->result, error);
-            internal_load_unlock_required_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -293,37 +295,41 @@ load_unlock_required_ready (MMIfaceModem *self,
             g_assert (ctx->pin_check_timeout_id == 0);
             ctx->pin_check_timeout_id = g_timeout_add_seconds (2,
                                                                (GSourceFunc)load_unlock_required_again,
-                                                               ctx);
+                                                               task);
             g_error_free (error);
             return;
         }
 
         /* If reached max retries and still reporting error... default to SIM error */
         g_error_free (error);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
-                                         "Couldn't get SIM lock status after %u retries",
-                                         MAX_RETRIES);
-        internal_load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_MOBILE_EQUIPMENT_ERROR,
+                                 MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
+                                 "Couldn't get SIM lock status after %u retries",
+                                 MAX_RETRIES);
+        g_object_unref (task);
         return;
     }
 
     /* Got the lock value, return it */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (lock),
-                                               NULL);
-    internal_load_unlock_required_context_complete_and_free (ctx);
+    g_task_return_int (task, lock);
+    g_object_unref (task);
 }
 
 static void
-internal_load_unlock_required_context_step (InternalLoadUnlockRequiredContext *ctx)
+internal_load_unlock_required_context_step (GTask *task)
 {
+    MMIfaceModem *self;
+    InternalLoadUnlockRequiredContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     g_assert (ctx->pin_check_timeout_id == 0);
-    MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
-        ctx->self,
+    MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
+        self,
         (GAsyncReadyCallback)load_unlock_required_ready,
-        ctx);
+        task);
 }
 
 static void
@@ -332,23 +338,22 @@ internal_load_unlock_required (MMIfaceModem *self,
                                gpointer user_data)
 {
     InternalLoadUnlockRequiredContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (InternalLoadUnlockRequiredContext);
-    ctx->self = g_object_ref (self);
-    ctx->result =  g_simple_async_result_new (G_OBJECT (self),
-                                              callback,
-                                              user_data,
-                                              internal_load_unlock_required);
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required ||
-        !MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)internal_load_unlock_required_context_free);
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish) {
         /* Just assume that no lock is required */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        internal_load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
-    internal_load_unlock_required_context_step (ctx);
+    internal_load_unlock_required_context_step (task);
 }
 
 /*****************************************************************************/
