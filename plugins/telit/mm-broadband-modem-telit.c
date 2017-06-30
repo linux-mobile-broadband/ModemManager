@@ -153,17 +153,15 @@ modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
 }
 
 static void
-telit_qss_enable_ready (MMBaseModem *modem,
+telit_qss_enable_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GTask *task)
 {
-    MMBroadbandModemTelit *self;
     QssSetupContext *ctx;
     MMPortSerialAt *port;
     GError **error;
     GRegex *pattern;
 
-    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
     if (ctx->step == QSS_SETUP_STEP_ENABLE_PRIMARY_PORT) {
@@ -175,7 +173,7 @@ telit_qss_enable_ready (MMBaseModem *modem,
     } else
         g_assert_not_reached ();
 
-    if (!mm_base_modem_at_command_full_finish (modem, res, error)) {
+    if (!mm_base_modem_at_command_full_finish (self, res, error)) {
         mm_warn ("QSS: error enabling unsolicited on port %s: %s", mm_port_get_device (MM_PORT (port)), (*error)->message);
         goto next_step;
     }
@@ -196,7 +194,7 @@ next_step:
 }
 
 static void
-telit_qss_query_ready (MMBaseModem *modem,
+telit_qss_query_ready (MMBaseModem *_self,
                        GAsyncResult *res,
                        GTask *task)
 {
@@ -206,10 +204,10 @@ telit_qss_query_ready (MMBaseModem *modem,
     MMTelitQssStatus qss_status;
     QssSetupContext *ctx;
 
-    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    self = MM_BROADBAND_MODEM_TELIT (_self);
     ctx = g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (error) {
         mm_warn ("Could not get \"#QSS?\" reply: %s", error->message);
         g_error_free (error);
@@ -325,18 +323,17 @@ modem_set_current_bands_finish (MMIfaceModem *self,
 }
 
 static void
-modem_set_current_bands_ready (MMIfaceModem *self,
+modem_set_current_bands_ready (MMBaseModem *self,
                                GAsyncResult *res,
                                GTask *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error)
         g_task_return_error (task, error);
-    } else {
+    else
         g_task_return_boolean (task, TRUE);
-    }
 
     g_object_unref (task);
 }
@@ -459,7 +456,7 @@ load_bands_ready (MMBaseModem *self,
     LoadBandsContext *ctx;
 
     ctx = g_task_get_task_data (task);
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
 
     if (!response)
         g_task_return_error (task, error);
@@ -592,33 +589,31 @@ modem_load_unlock_retries_finish (MMIfaceModem *self,
 }
 
 static void
-csim_unlock_ready (MMBaseModem              *self,
-                   GAsyncResult             *res,
-                   GTask                    *task)
+csim_unlock_ready (MMBaseModem  *_self,
+                   GAsyncResult *res,
+                   GTask        *task)
 {
     const gchar *response;
     GError      *error = NULL;
-    MMBroadbandModemTelit *modem_telit;
+    MMBroadbandModemTelit *self;
     LoadUnlockRetriesContext *ctx;
 
-    modem_telit = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    self = MM_BROADBAND_MODEM_TELIT (_self);
     ctx = g_task_get_task_data (task);
 
     /* Ignore errors */
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response) {
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
-            modem_telit->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
-        }
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED))
+            self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
         mm_warn ("Couldn't unlock SIM card: %s", error->message);
         g_error_free (error);
     }
 
-    if (modem_telit->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
-        modem_telit->priv->csim_lock_support = FEATURE_SUPPORTED;
-    }
+    if (self->priv->csim_lock_support != FEATURE_NOT_SUPPORTED)
+        self->priv->csim_lock_support = FEATURE_SUPPORTED;
 
     ctx->step++;
     load_unlock_retries_step (task);
@@ -678,24 +673,24 @@ next_step:
 }
 
 static void
-csim_lock_ready (MMBaseModem              *self,
-                 GAsyncResult             *res,
-                 GTask                    *task)
+csim_lock_ready (MMBaseModem  *_self,
+                 GAsyncResult *res,
+                 GTask        *task)
 {
     const gchar *response;
     GError      *error = NULL;
-    MMBroadbandModemTelit *modem_telit;
+    MMBroadbandModemTelit *self;
     LoadUnlockRetriesContext *ctx;
 
-    modem_telit = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    self = MM_BROADBAND_MODEM_TELIT (_self);
     ctx = g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response) {
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
-            modem_telit->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
+            self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
             mm_warn ("Couldn't lock SIM card: %s. Continuing without CSIM lock.", error->message);
             g_error_free (error);
         } else {
@@ -706,8 +701,8 @@ csim_lock_ready (MMBaseModem              *self,
         }
     }
 
-    if (modem_telit->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
-        modem_telit->priv->csim_lock_support = FEATURE_SUPPORTED;
+    if (self->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
+        self->priv->csim_lock_support = FEATURE_SUPPORTED;
     }
 
     ctx->step++;
@@ -715,26 +710,27 @@ csim_lock_ready (MMBaseModem              *self,
 }
 
 static void
-handle_csim_locking (GTask *task, gboolean is_lock)
+handle_csim_locking (GTask    *task,
+                     gboolean  is_lock)
 {
-    MMBroadbandModemTelit *modem_telit;
+    MMBroadbandModemTelit *self;
     LoadUnlockRetriesContext *ctx;
 
-    modem_telit = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
-    switch (modem_telit->priv->csim_lock_support) {
+    switch (self->priv->csim_lock_support) {
         case FEATURE_SUPPORT_UNKNOWN:
         case FEATURE_SUPPORTED:
             if (is_lock) {
-                mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+                mm_base_modem_at_command (MM_BASE_MODEM (self),
                                           CSIM_LOCK_STR,
                                           CSIM_QUERY_TIMEOUT,
                                           FALSE,
                                           (GAsyncReadyCallback) csim_lock_ready,
                                           task);
             } else {
-                mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+                mm_base_modem_at_command (MM_BASE_MODEM (self),
                                           CSIM_UNLOCK_STR,
                                           CSIM_QUERY_TIMEOUT,
                                           FALSE,
@@ -757,10 +753,10 @@ handle_csim_locking (GTask *task, gboolean is_lock)
 static void
 load_unlock_retries_step (GTask *task)
 {
-    MMBroadbandModemTelit *modem_telit;
+    MMBroadbandModemTelit *self;
     LoadUnlockRetriesContext *ctx;
 
-    modem_telit = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
+    self = MM_BROADBAND_MODEM_TELIT (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
     switch (ctx->step) {
         case LOAD_UNLOCK_RETRIES_STEP_FIRST:
@@ -770,7 +766,7 @@ load_unlock_retries_step (GTask *task)
             handle_csim_locking (task, TRUE);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PIN:
-            mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       CSIM_QUERY_PIN_RETRIES_STR,
                                       CSIM_QUERY_TIMEOUT,
                                       FALSE,
@@ -778,7 +774,7 @@ load_unlock_retries_step (GTask *task)
                                       task);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PUK:
-            mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       CSIM_QUERY_PUK_RETRIES_STR,
                                       CSIM_QUERY_TIMEOUT,
                                       FALSE,
@@ -786,7 +782,7 @@ load_unlock_retries_step (GTask *task)
                                       task);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PIN2:
-            mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       CSIM_QUERY_PIN2_RETRIES_STR,
                                       CSIM_QUERY_TIMEOUT,
                                       FALSE,
@@ -794,7 +790,7 @@ load_unlock_retries_step (GTask *task)
                                       task);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_PUK2:
-            mm_base_modem_at_command (MM_BASE_MODEM (modem_telit),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       CSIM_QUERY_PUK2_RETRIES_STR,
                                       CSIM_QUERY_TIMEOUT,
                                       FALSE,
@@ -805,13 +801,11 @@ load_unlock_retries_step (GTask *task)
             handle_csim_locking (task, FALSE);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_LAST:
-            if (ctx->succeded_requests == 0) {
+            if (ctx->succeded_requests == 0)
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                          "Could not get any of the SIM unlock retries values");
-            } else {
+            else
                 g_task_return_pointer (task, g_object_ref (ctx->retries), g_object_unref);
-            }
-
             g_object_unref (task);
             break;
         default:
@@ -1126,13 +1120,13 @@ set_current_modes_finish (MMIfaceModem *self,
 }
 
 static void
-ws46_set_ready (MMIfaceModem *self,
+ws46_set_ready (MMBaseModem *self,
                 GAsyncResult *res,
                 GTask *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    mm_base_modem_at_command_finish (self, res, &error);
     if (error)
         /* Let the error be critical. */
         g_task_return_error (task, error);
