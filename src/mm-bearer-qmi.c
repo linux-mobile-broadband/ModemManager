@@ -69,8 +69,6 @@ typedef struct {
 } ReloadStatsResult;
 
 typedef struct {
-    MMBearerQmi *self;
-    GSimpleAsyncResult *result;
     QmiMessageWdsGetPacketStatisticsInput *input;
     ReloadStatsContextStep step;
     ReloadStatsResult stats;
@@ -85,52 +83,54 @@ reload_stats_finish (MMBaseBearer *bearer,
 {
     ReloadStatsResult *stats;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    stats = g_task_propagate_pointer (G_TASK (res), error);
+    if (!stats)
         return FALSE;
 
-    stats = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     if (rx_bytes)
         *rx_bytes = stats->rx_bytes;
     if (tx_bytes)
         *tx_bytes = stats->tx_bytes;
+
+    g_free (stats);
     return TRUE;
 }
 
 static void
-reload_stats_context_complete_and_free (ReloadStatsContext *ctx)
+reload_stats_context_free (ReloadStatsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     qmi_message_wds_get_packet_statistics_input_unref (ctx->input);
     g_slice_free (ReloadStatsContext, ctx);
 }
 
-static void reload_stats_context_step (ReloadStatsContext *ctx);
+static void reload_stats_context_step (GTask *task);
 
 static void
 get_packet_statistics_ready (QmiClientWds *client,
                              GAsyncResult *res,
-                             ReloadStatsContext *ctx)
+                             GTask *task)
 {
+    ReloadStatsContext *ctx;
     GError *error = NULL;
     QmiMessageWdsGetPacketStatisticsOutput *output;
     guint64 tx_bytes_ok = 0;
     guint64 rx_bytes_ok = 0;
 
+    ctx = g_task_get_task_data (task);
+
     output = qmi_client_wds_get_packet_statistics_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        reload_stats_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_wds_get_packet_statistics_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get packet statistics: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_wds_get_packet_statistics_output_unref (output);
-        reload_stats_context_complete_and_free (ctx);
         return;
     }
 
@@ -143,43 +143,52 @@ get_packet_statistics_ready (QmiClientWds *client,
 
     /* Go on */
     ctx->step++;
-    reload_stats_context_step (ctx);
+    reload_stats_context_step (task);
 }
 
 static void
-reload_stats_context_step (ReloadStatsContext *ctx)
+reload_stats_context_step (GTask *task)
 {
+    MMBearerQmi *self;
+    ReloadStatsContext *ctx;
+    ReloadStatsResult *stats;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case RELOAD_STATS_CONTEXT_STEP_FIRST:
         /* Fall through */
         ctx->step++;
     case RELOAD_STATS_CONTEXT_STEP_IPV4:
-        if (ctx->self->priv->client_ipv4) {
-            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (ctx->self->priv->client_ipv4),
+        if (self->priv->client_ipv4) {
+            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (self->priv->client_ipv4),
                                                   ctx->input,
                                                   10,
                                                   NULL,
                                                   (GAsyncReadyCallback)get_packet_statistics_ready,
-                                                  ctx);
+                                                  task);
             return;
         }
         ctx->step++;
         /* Fall through */
     case RELOAD_STATS_CONTEXT_STEP_IPV6:
-        if (ctx->self->priv->client_ipv6) {
-            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (ctx->self->priv->client_ipv6),
+        if (self->priv->client_ipv6) {
+            qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (self->priv->client_ipv6),
                                                   ctx->input,
                                                   10,
                                                   NULL,
                                                   (GAsyncReadyCallback)get_packet_statistics_ready,
-                                                  ctx);
+                                                  task);
             return;
         }
         ctx->step++;
         /* Fall through */
     case RELOAD_STATS_CONTEXT_STEP_LAST:
-        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->stats, NULL);
-        reload_stats_context_complete_and_free (ctx);
+        stats = g_new (ReloadStatsResult, 1);
+        memcpy (stats, &ctx->stats, sizeof (ctx->stats));
+        g_task_return_pointer (task, stats, g_free);
+        g_object_unref (task);
         return;
     }
 }
@@ -190,13 +199,9 @@ reload_stats (MMBaseBearer *self,
               gpointer user_data)
 {
     ReloadStatsContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (ReloadStatsContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             reload_stats);
     ctx->input = qmi_message_wds_get_packet_statistics_input_new ();
     qmi_message_wds_get_packet_statistics_input_set_mask (
         ctx->input,
@@ -205,7 +210,10 @@ reload_stats (MMBaseBearer *self,
         NULL);
     ctx->step = RELOAD_STATS_CONTEXT_STEP_FIRST;
 
-    reload_stats_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)reload_stats_context_free);
+
+    reload_stats_context_step (task);
 }
 
 /*****************************************************************************/
