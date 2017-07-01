@@ -1534,8 +1534,6 @@ typedef enum {
 } DisconnectStep;
 
 typedef struct {
-    MMBearerQmi *self;
-    GSimpleAsyncResult *result;
     MMPort *data;
     DisconnectStep step;
 
@@ -1551,10 +1549,8 @@ typedef struct {
 } DisconnectContext;
 
 static void
-disconnect_context_complete_and_free (DisconnectContext *ctx)
+disconnect_context_free (DisconnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->error_ipv4)
         g_error_free (ctx->error_ipv4);
     if (ctx->error_ipv6)
@@ -1564,7 +1560,6 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
     if (ctx->client_ipv6)
         g_object_unref (ctx->client_ipv6);
     g_object_unref (ctx->data);
-    g_object_unref (ctx->self);
     g_slice_free (DisconnectContext, ctx);
 }
 
@@ -1573,7 +1568,7 @@ disconnect_finish (MMBaseBearer *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -1601,15 +1596,20 @@ reset_bearer_connection (MMBearerQmi *self,
     }
 }
 
-static void disconnect_context_step (DisconnectContext *ctx);
+static void disconnect_context_step (GTask *task);
 
 static void
 stop_network_ready (QmiClientWds *client,
                     GAsyncResult *res,
-                    DisconnectContext *ctx)
+                    GTask *task)
 {
+    MMBearerQmi *self;
+    DisconnectContext *ctx;
     GError *error = NULL;
     QmiMessageWdsStopNetworkOutput *output;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_wds_stop_network_finish (client, res, &error);
     if (output &&
@@ -1630,7 +1630,7 @@ stop_network_ready (QmiClientWds *client,
             ctx->error_ipv6 = error;
     } else {
         /* Clear internal status */
-        reset_bearer_connection (ctx->self,
+        reset_bearer_connection (self,
                                  ctx->running_ipv4,
                                  ctx->running_ipv6);
     }
@@ -1640,12 +1640,18 @@ stop_network_ready (QmiClientWds *client,
 
     /* Keep on */
     ctx->step++;
-    disconnect_context_step (ctx);
+    disconnect_context_step (task);
 }
 
 static void
-disconnect_context_step (DisconnectContext *ctx)
+disconnect_context_step (GTask *task)
 {
+    MMBearerQmi *self;
+    DisconnectContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case DISCONNECT_STEP_FIRST:
         /* Fall down */
@@ -1655,13 +1661,13 @@ disconnect_context_step (DisconnectContext *ctx)
         if (ctx->packet_data_handle_ipv4) {
             QmiMessageWdsStopNetworkInput *input;
 
-            common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
+            common_setup_cleanup_packet_service_status_unsolicited_events (self,
                                                                            ctx->client_ipv4,
                                                                            FALSE,
-                                                                           &ctx->self->priv->packet_service_status_ipv4_indication_id);
-            cleanup_event_report_unsolicited_events (ctx->self,
+                                                                           &self->priv->packet_service_status_ipv4_indication_id);
+            cleanup_event_report_unsolicited_events (self,
                                                      ctx->client_ipv4,
-                                                     &ctx->self->priv->event_report_ipv4_indication_id);
+                                                     &self->priv->event_report_ipv4_indication_id);
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
@@ -1673,7 +1679,7 @@ disconnect_context_step (DisconnectContext *ctx)
                                          30,
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
-                                         ctx);
+                                         task);
             return;
         }
 
@@ -1684,13 +1690,13 @@ disconnect_context_step (DisconnectContext *ctx)
         if (ctx->packet_data_handle_ipv6) {
             QmiMessageWdsStopNetworkInput *input;
 
-            common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
+            common_setup_cleanup_packet_service_status_unsolicited_events (self,
                                                                            ctx->client_ipv6,
                                                                            FALSE,
-                                                                           &ctx->self->priv->packet_service_status_ipv6_indication_id);
-            cleanup_event_report_unsolicited_events (ctx->self,
+                                                                           &self->priv->packet_service_status_ipv6_indication_id);
+            cleanup_event_report_unsolicited_events (self,
                                                      ctx->client_ipv6,
-                                                     &ctx->self->priv->event_report_ipv6_indication_id);
+                                                     &self->priv->event_report_ipv6_indication_id);
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
@@ -1702,7 +1708,7 @@ disconnect_context_step (DisconnectContext *ctx)
                                          30,
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
-                                         ctx);
+                                         task);
             return;
         }
 
@@ -1711,7 +1717,7 @@ disconnect_context_step (DisconnectContext *ctx)
 
     case DISCONNECT_STEP_LAST:
         if (!ctx->error_ipv4 && !ctx->error_ipv6)
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            g_task_return_boolean (task, TRUE);
         else {
             GError *error;
 
@@ -1724,10 +1730,10 @@ disconnect_context_step (DisconnectContext *ctx)
                 ctx->error_ipv6 = NULL;
             }
 
-            g_simple_async_result_take_error (ctx->result, error);
+            g_task_return_error (task, error);
         }
 
-        disconnect_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 }
@@ -1739,14 +1745,16 @@ disconnect (MMBaseBearer *_self,
 {
     MMBearerQmi *self = MM_BEARER_QMI (_self);
     DisconnectContext *ctx;
+    GTask *task;
 
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
         (!self->priv->client_ipv4 && !self->priv->client_ipv6) ||
         !self->priv->data) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            disconnect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Couldn't disconnect QMI bearer: this bearer is not connected");
@@ -1754,20 +1762,18 @@ disconnect (MMBaseBearer *_self,
     }
 
     ctx = g_slice_new0 (DisconnectContext);
-    ctx->self = g_object_ref (self);
     ctx->data = g_object_ref (self->priv->data);
     ctx->client_ipv4 = self->priv->client_ipv4 ? g_object_ref (self->priv->client_ipv4) : NULL;
     ctx->packet_data_handle_ipv4 = self->priv->packet_data_handle_ipv4;
     ctx->client_ipv6 = self->priv->client_ipv6 ? g_object_ref (self->priv->client_ipv6) : NULL;
     ctx->packet_data_handle_ipv6 = self->priv->packet_data_handle_ipv6;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disconnect);
     ctx->step = DISCONNECT_STEP_FIRST;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disconnect_context_free);
+
     /* Run! */
-    disconnect_context_step (ctx);
+    disconnect_context_step (task);
 }
 
 /*****************************************************************************/
