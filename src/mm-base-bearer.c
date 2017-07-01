@@ -922,35 +922,34 @@ mm_base_bearer_disconnect_finish (MMBaseBearer *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 disconnect_ready (MMBaseBearer *self,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     GError *error = NULL;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
         bearer_update_status (self, MM_BEARER_STATUS_CONNECTED);
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     }
     else {
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 status_changed_complete_disconnect (MMBaseBearer *self,
                                     GParamSpec *pspec,
-                                    GSimpleAsyncResult *simple)
+                                    GTask *task)
 {
     /* We may get other states here before DISCONNECTED, like DISCONNECTING or
      * even CONNECTED. */
@@ -965,9 +964,8 @@ status_changed_complete_disconnect (MMBaseBearer *self,
 
     /* Note: interface state is updated when the DISCONNECTED state is set */
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
@@ -975,33 +973,28 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *simple;
+    GTask *task;
 
     g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect != NULL);
     g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
 
-    simple = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_base_bearer_disconnect);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If already disconnected, done */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* If already disconnecting, return error, don't allow a second request. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING) {
-        g_simple_async_result_set_error (
-            simple,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_IN_PROGRESS,
             "Bearer already being disconnected");
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_object_unref (task);
         return;
     }
 
@@ -1022,7 +1015,7 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
             g_signal_connect (self,
                               "notify::" MM_BASE_BEARER_STATUS,
                               (GCallback)status_changed_complete_disconnect,
-                              simple); /* takes ownership */
+                              task); /* takes ownership */
 
         return;
     }
@@ -1032,7 +1025,7 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
     MM_BASE_BEARER_GET_CLASS (self)->disconnect (
         self,
         (GAsyncReadyCallback)disconnect_ready,
-        simple); /* takes ownership */
+        task); /* takes ownership */
 }
 
 typedef struct {
