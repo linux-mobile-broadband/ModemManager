@@ -1482,13 +1482,13 @@ mm_base_sms_delete_finish (MMBaseSms *self,
         return deleted;
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
 mm_base_sms_delete (MMBaseSms *self,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
 {
     if (MM_BASE_SMS_GET_CLASS (self)->delete &&
         MM_BASE_SMS_GET_CLASS (self)->delete_finish) {
@@ -1496,12 +1496,13 @@ mm_base_sms_delete (MMBaseSms *self,
         return;
     }
 
-    g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                         callback,
-                                         user_data,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Deleting SMS is not supported by this modem");
+    g_task_report_new_error (self,
+                             callback,
+                             user_data,
+                             mm_base_sms_delete,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Deleting SMS is not supported by this modem");
 }
 
 /*****************************************************************************/
