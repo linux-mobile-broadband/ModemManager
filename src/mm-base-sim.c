@@ -1291,7 +1291,7 @@ load_operator_name (MMBaseSim *self,
 /*****************************************************************************/
 
 typedef struct _InitAsyncContext InitAsyncContext;
-static void interface_initialization_step (InitAsyncContext *ctx);
+static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -1303,22 +1303,9 @@ typedef enum {
 } InitializationStep;
 
 struct _InitAsyncContext {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    MMBaseSim *self;
     InitializationStep step;
     guint sim_identifier_tries;
 };
-
-static void
-init_async_context_free (InitAsyncContext *ctx)
-{
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_free (ctx);
-}
 
 MMBaseSim *
 mm_base_sim_new_finish (GAsyncResult  *res,
@@ -1345,18 +1332,20 @@ initable_init_finish (GAsyncInitable  *initable,
                       GAsyncResult    *result,
                       GError         **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+    return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 static void
 load_sim_identifier_ready (MMBaseSim *self,
                            GAsyncResult *res,
-                           InitAsyncContext *ctx)
+                           GTask *task)
 {
+    InitAsyncContext *ctx;
     GError *error = NULL;
     gchar *simid;
 
-    simid  = MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish (self, res, &error);
+    ctx = g_task_get_task_data (task);
+    simid  = MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish (self, res, &error);
     if (!simid) {
         /* TODO: make the retries gobi-specific? */
 
@@ -1366,7 +1355,7 @@ load_sim_identifier_ready (MMBaseSim *self,
          */
         if (++ctx->sim_identifier_tries < 2) {
             g_clear_error (&error);
-            interface_initialization_step (ctx);
+            interface_initialization_step (task);
             return;
         }
 
@@ -1380,20 +1369,21 @@ load_sim_identifier_ready (MMBaseSim *self,
 
     /* Go on to next step */
     ctx->step++;
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
     static void                                                         \
-    load_##NAME##_ready (MMBaseSim *self,                                   \
+    load_##NAME##_ready (MMBaseSim *self,                               \
                          GAsyncResult *res,                             \
-                         InitAsyncContext *ctx)                         \
+                         GTask *task)                                   \
     {                                                                   \
+        InitAsyncContext *ctx;                                          \
         GError *error = NULL;                                           \
         gchar *val;                                                     \
                                                                         \
-        val = MM_BASE_SIM_GET_CLASS (ctx->self)->load_##NAME##_finish (self, res, &error); \
+        val = MM_BASE_SIM_GET_CLASS (self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);             \
         g_free (val);                                                   \
                                                                         \
@@ -1403,8 +1393,9 @@ load_sim_identifier_ready (MMBaseSim *self,
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
         ctx->step++;                                                    \
-        interface_initialization_step (ctx);                            \
+        interface_initialization_step (task);                           \
     }
 
 STR_REPLY_READY_FN (imsi, "IMSI")
@@ -1412,17 +1403,18 @@ STR_REPLY_READY_FN (operator_identifier, "Operator identifier")
 STR_REPLY_READY_FN (operator_name, "Operator name")
 
 static void
-interface_initialization_step (InitAsyncContext *ctx)
+interface_initialization_step (GTask *task)
 {
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Interface initialization cancelled");
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx);
+    MMBaseSim *self;
+    InitAsyncContext *ctx;
+
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
@@ -1433,13 +1425,13 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* SIM ID is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish) {
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_sim_identifier (
-                ctx->self,
+        if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier &&
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier (
+                self,
                 (GAsyncReadyCallback)load_sim_identifier_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1449,13 +1441,13 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* IMSI is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi_finish) {
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_imsi (
-                ctx->self,
+        if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_imsi &&
+            MM_BASE_SIM_GET_CLASS (self)->load_imsi_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_imsi (
+                self,
                 (GAsyncReadyCallback)load_imsi_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1465,13 +1457,13 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* Operator ID is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier_finish) {
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_identifier (
-                ctx->self,
+        if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier &&
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier (
+                self,
                 (GAsyncReadyCallback)load_operator_identifier_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1481,13 +1473,13 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* Operator Name is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name &&
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name_finish) {
-            MM_BASE_SIM_GET_CLASS (ctx->self)->load_operator_name (
-                ctx->self,
+        if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_name &&
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_name_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_operator_name (
+                self,
                 (GAsyncReadyCallback)load_operator_name_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -1495,12 +1487,10 @@ interface_initialization_step (InitAsyncContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
-
 
     g_assert_not_reached ();
 }
@@ -1512,21 +1502,20 @@ common_init_async (GAsyncInitable *initable,
                    gpointer user_data)
 
 {
+    MMBaseSim *self;
     InitAsyncContext *ctx;
+    GTask *task;
+
+    self = MM_BASE_SIM (initable);
 
     ctx = g_new (InitAsyncContext, 1);
-    ctx->self = g_object_ref (initable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (initable),
-                                             callback,
-                                             user_data,
-                                             common_init_async);
-    ctx->cancellable = (cancellable ?
-                        g_object_ref (cancellable) :
-                        NULL);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->sim_identifier_tries = 0;
 
-    interface_initialization_step (ctx);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    interface_initialization_step (task);
 }
 
 static void
