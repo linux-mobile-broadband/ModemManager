@@ -907,21 +907,18 @@ mm_base_sim_get_path (MMBaseSim *self)
     static void                                                         \
     NAME##_command_ready (MMBaseModem *modem,                           \
                           GAsyncResult *res,                            \
-                          GSimpleAsyncResult *operation_result)         \
+                          GTask *task)                                  \
     {                                                                   \
         GError *error = NULL;                                           \
         const gchar *response;                                          \
                                                                         \
         response = mm_base_modem_at_command_finish (modem, res, &error); \
         if (error)                                                      \
-            g_simple_async_result_take_error (operation_result, error); \
+            g_task_return_error (task, error);                          \
         else                                                            \
-            g_simple_async_result_set_op_res_gpointer (operation_result, \
-                                                       (gpointer)response, \
-                                                       NULL);           \
+            g_task_return_pointer (task, g_strdup (response), g_free);  \
                                                                         \
-        g_simple_async_result_complete (operation_result);              \
-        g_object_unref (operation_result);                              \
+        g_object_unref (task);                                          \
     }
 
 /*****************************************************************************/
@@ -966,14 +963,15 @@ load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    const gchar *result;
+    gchar *result;
     gchar *sim_identifier;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return NULL;
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
     sim_identifier = parse_iccid (result, error);
+    g_free (result);
     if (!sim_identifier)
         return NULL;
 
@@ -997,10 +995,7 @@ load_sim_identifier (MMBaseSim *self,
         20,
         FALSE,
         (GAsyncReadyCallback)load_sim_identifier_command_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_sim_identifier));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
@@ -1036,14 +1031,15 @@ load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    const gchar *result;
+    gchar *result;
     gchar *imsi;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return NULL;
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
     imsi = parse_imsi (result, error);
+    g_free (result);
     if (!imsi)
         return NULL;
 
@@ -1066,10 +1062,7 @@ load_imsi (MMBaseSim *self,
         3,
         FALSE,
         (GAsyncReadyCallback)load_imsi_command_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_imsi));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
@@ -1145,12 +1138,19 @@ load_operator_identifier_finish (MMBaseSim *self,
 {
     GError *inner_error = NULL;
     const gchar *imsi;
-    const gchar *result;
+    gchar *result;
     guint mnc_length;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return NULL;
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    mnc_length = parse_mnc_length (result, &inner_error);
+    g_free (result);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
 
     imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self));
     if (!imsi) {
@@ -1158,12 +1158,6 @@ load_operator_identifier_finish (MMBaseSim *self,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Cannot load Operator ID without IMSI");
-        return NULL;
-    }
-
-    mnc_length = parse_mnc_length (result, &inner_error);
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
         return NULL;
     }
 
@@ -1187,10 +1181,7 @@ load_operator_identifier (MMBaseSim *self,
         10,
         FALSE,
         (GAsyncReadyCallback)load_operator_identifier_command_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_operator_identifier));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
@@ -1257,13 +1248,16 @@ load_operator_name_finish (MMBaseSim *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    const gchar *result;
+    gchar *result;
+    gchar *spn;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return NULL;
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
-    return parse_spn (result, error);
+    spn = parse_spn (result, error);
+    g_free (result);
+    return spn;
 }
 
 STR_REPLY_READY_FN (load_operator_name)
@@ -1282,10 +1276,7 @@ load_operator_name (MMBaseSim *self,
         10,
         FALSE,
         (GAsyncReadyCallback)load_operator_name_command_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_operator_name));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
