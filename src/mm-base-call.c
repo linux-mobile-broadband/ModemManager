@@ -856,33 +856,18 @@ call_send_dtmf (MMBaseCall *self,
 }
 
 /*****************************************************************************/
-typedef struct {
-    MMBaseCall *self;
-    MMBaseModem *modem;
-    GSimpleAsyncResult *result;
-} CallDeleteContext;
 
 static void
 call_delete (MMBaseCall *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    CallDeleteContext *ctx;
+    GTask *task;
 
-    ctx = g_new0 (CallDeleteContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             call_delete);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (self->priv->modem);
-
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
-    g_free (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -890,7 +875,7 @@ call_delete_finish (MMBaseCall *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 /*****************************************************************************/
