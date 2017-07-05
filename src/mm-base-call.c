@@ -804,34 +804,18 @@ call_hangup (MMBaseCall *self,
 /*****************************************************************************/
 /* Send DTMF tone to call */
 
-typedef struct {
-    MMBaseCall *self;
-    MMBaseModem *modem;
-    GSimpleAsyncResult *result;
-} CallSendDtmfContext;
-
-static void
-call_send_dtmf_context_complete_and_free (CallSendDtmfContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 call_send_dtmf_finish (MMBaseCall *self,
                        GAsyncResult *res,
                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 call_send_dtmf_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      CallSendDtmfContext *ctx)
+                      GTask *task)
 {
     GError *error = NULL;
     const gchar *response = NULL;
@@ -839,13 +823,13 @@ call_send_dtmf_ready (MMBaseModem *modem,
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         mm_dbg ("Couldn't send_dtmf: '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        call_send_dtmf_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    call_send_dtmf_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -854,25 +838,19 @@ call_send_dtmf (MMBaseCall *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    CallSendDtmfContext *ctx;
+    GTask *task;
     gchar *cmd;
 
-    /* Setup the context */
-    ctx = g_new0 (CallSendDtmfContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             call_send_dtmf);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (self->priv->modem);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
     cmd = g_strdup_printf ("AT+VTS=%c", dtmf[0]);
-    mm_base_modem_at_command (ctx->modem,
+    mm_base_modem_at_command (self->priv->modem,
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)call_send_dtmf_ready,
-                              ctx);
+                              task);
 
     g_free (cmd);
 }
