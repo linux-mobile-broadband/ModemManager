@@ -738,43 +738,30 @@ call_accept (MMBaseCall *self,
 
 /* Hangup the CALL */
 
-typedef struct {
-    MMBaseCall *self;
-    MMBaseModem *modem;
-    GSimpleAsyncResult *result;
-} CallHangupContext;
-
-static void
-call_hangup_context_complete_and_free (CallHangupContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 call_hangup_finish (MMBaseCall *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 call_hangup_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  CallHangupContext *ctx)
+                  GTask *task)
 {
+    MMBaseCall *self;
     GError *error = NULL;
     const gchar *response;
+
+    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            g_simple_async_result_take_error (ctx->result, error);
-            call_hangup_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -784,16 +771,16 @@ call_hangup_ready (MMBaseModem *modem,
     }
 
     /* Update state */
-    mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+    mm_base_call_change_state(self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        call_hangup_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    call_hangup_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -801,23 +788,17 @@ call_hangup (MMBaseCall *self,
              GAsyncReadyCallback callback,
              gpointer user_data)
 {
-    CallHangupContext *ctx;
+    GTask *task;
 
-    /* Setup the context */
-    ctx = g_new0 (CallHangupContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             call_hangup);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (self->priv->modem);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
-    mm_base_modem_at_command (ctx->modem,
+    mm_base_modem_at_command (self->priv->modem,
                               "+CHUP",
                               2,
                               FALSE,
                               (GAsyncReadyCallback)call_hangup_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
