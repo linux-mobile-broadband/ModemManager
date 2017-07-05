@@ -9902,20 +9902,16 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     InitializeStep step;
     gpointer ports_ctx;
 } InitializeContext;
 
-static void initialize_step (InitializeContext *ctx);
+static void initialize_step (GTask *task);
 
 static void
-initialize_context_complete_and_free (InitializeContext *ctx)
+initialize_context_free (InitializeContext *ctx)
 {
     GError *error = NULL;
-
-    g_simple_async_result_complete_in_idle (ctx->result);
 
     if (ctx->ports_ctx &&
         MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped &&
@@ -9924,24 +9920,8 @@ initialize_context_complete_and_free (InitializeContext *ctx)
         g_error_free (error);
     }
 
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
-}
-
-static gboolean
-initialize_context_complete_and_free_if_cancelled (InitializeContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Initialization cancelled");
-    initialize_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static gboolean
@@ -9949,19 +9929,19 @@ initialize_finish (MMBaseModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 initialization_started_ready (MMBroadbandModem *self,
                               GAsyncResult *result,
-                              InitializeContext *ctx)
+                              GTask *task)
 {
+    InitializeContext *ctx;
     GError *error = NULL;
     gpointer ports_ctx;
+
+    ctx = g_task_get_task_data (task);
 
     /* May return NULL without error */
     ports_ctx = MM_BROADBAND_MODEM_GET_CLASS (self)->initialization_started_finish (self, result, &error);
@@ -9974,7 +9954,7 @@ initialization_started_ready (MMBroadbandModem *self,
 
         /* Just jump to the last step */
         ctx->step = INITIALIZE_STEP_LAST;
-        initialize_step (ctx);
+        initialize_step (task);
         return;
     }
 
@@ -9983,15 +9963,18 @@ initialization_started_ready (MMBroadbandModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    initialize_step (ctx);
+    initialize_step (task);
 }
 
 static void
 iface_modem_initialize_ready (MMBroadbandModem *self,
                               GAsyncResult *result,
-                              InitializeContext *ctx)
+                              GTask *task)
 {
+    InitializeContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* If the modem interface fails to get initialized, we will move the modem
      * to a FAILED state. Note that in this case we still export the interface. */
@@ -10020,7 +10003,7 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
         /* Jump to the firmware step. We allow firmware switching even in failed
          * state */
         ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
-        initialize_step (ctx);
+        initialize_step (task);
         return;
     }
 
@@ -10035,13 +10018,13 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
         /* Jump to the Firmware interface. We do allow modems to export
          * both the Firmware and Simple interfaces when locked. */
         ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
-        initialize_step (ctx);
+        initialize_step (task);
         return;
     }
 
     /* Go on to next step */
     ctx->step++;
-    initialize_step (ctx);
+    initialize_step (task);
 }
 
 #undef INTERFACE_INIT_READY_FN
@@ -10049,9 +10032,12 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
     static void                                                         \
     NAME##_initialize_ready (MMBroadbandModem *self,                    \
                              GAsyncResult *result,                      \
-                             InitializeContext *ctx)                    \
+                             GTask *task)                               \
     {                                                                   \
+        InitializeContext *ctx;                                         \
         GError *error = NULL;                                           \
+                                                                        \
+        ctx = g_task_get_task_data (task);                              \
                                                                         \
         if (!mm_##NAME##_initialize_finish (TYPE (self), result, &error)) { \
             if (FATAL_ERRORS) {                                         \
@@ -10065,7 +10051,7 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                                                                         \
                 /* Just jump to the last step */                        \
                 ctx->step = INITIALIZE_STEP_LAST;                       \
-                initialize_step (ctx);                                  \
+                initialize_step (task);                                 \
                 return;                                                 \
             }                                                           \
                                                                         \
@@ -10081,7 +10067,7 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
-        initialize_step (ctx);                                          \
+        initialize_step (task);                                         \
     }
 
 INTERFACE_INIT_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
@@ -10096,11 +10082,17 @@ INTERFACE_INIT_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_firmware,  MM_IFACE_MODEM_FIRMWARE,  FALSE)
 
 static void
-initialize_step (InitializeContext *ctx)
+initialize_step (GTask *task)
 {
+    InitializeContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (initialize_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST:
@@ -10118,7 +10110,7 @@ initialize_step (InitializeContext *ctx)
             MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started_finish) {
             MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started (ctx->self,
                                                                               (GAsyncReadyCallback)initialization_started_ready,
-                                                                              ctx);
+                                                                              task);
             return;
         }
         /* Fall down to next step */
@@ -10136,18 +10128,18 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
         mm_iface_modem_initialize (MM_IFACE_MODEM (ctx->self),
-                                   ctx->cancellable,
+                                   g_task_get_cancellable (task),
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
-                                   ctx);
+                                   task);
         return;
 
     case INITIALIZE_STEP_IFACE_3GPP:
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the 3GPP interface */
             mm_iface_modem_3gpp_initialize (MM_IFACE_MODEM_3GPP (ctx->self),
-                                            ctx->cancellable,
+                                            g_task_get_cancellable (task),
                                             (GAsyncReadyCallback)iface_modem_3gpp_initialize_ready,
-                                            ctx);
+                                            task);
             return;
         }
 
@@ -10159,7 +10151,7 @@ initialize_step (InitializeContext *ctx)
             /* Initialize the 3GPP/USSD interface */
             mm_iface_modem_3gpp_ussd_initialize (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
                                                  (GAsyncReadyCallback)iface_modem_3gpp_ussd_initialize_ready,
-                                                 ctx);
+                                                 task);
             return;
         }
         /* Fall down to next step */
@@ -10169,9 +10161,9 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the CDMA interface */
             mm_iface_modem_cdma_initialize (MM_IFACE_MODEM_CDMA (ctx->self),
-                                            ctx->cancellable,
+                                            g_task_get_cancellable (task),
                                             (GAsyncReadyCallback)iface_modem_cdma_initialize_ready,
-                                            ctx);
+                                            task);
             return;
         }
         /* Fall down to next step */
@@ -10184,57 +10176,57 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_LOCATION:
         /* Initialize the Location interface */
         mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
-                                            ctx->cancellable,
+                                            g_task_get_cancellable (task),
                                             (GAsyncReadyCallback)iface_modem_location_initialize_ready,
-                                            ctx);
+                                            task);
         return;
 
     case INITIALIZE_STEP_IFACE_MESSAGING:
         /* Initialize the Messaging interface */
         mm_iface_modem_messaging_initialize (MM_IFACE_MODEM_MESSAGING (ctx->self),
-                                             ctx->cancellable,
+                                             g_task_get_cancellable (task),
                                              (GAsyncReadyCallback)iface_modem_messaging_initialize_ready,
-                                             ctx);
+                                             task);
         return;
 
     case INITIALIZE_STEP_IFACE_VOICE:
         /* Initialize the Voice interface */
         mm_iface_modem_voice_initialize (MM_IFACE_MODEM_VOICE (ctx->self),
-                                         ctx->cancellable,
+                                         g_task_get_cancellable (task),
                                          (GAsyncReadyCallback)iface_modem_voice_initialize_ready,
-                                         ctx);
+                                         task);
         return;
 
     case INITIALIZE_STEP_IFACE_TIME:
         /* Initialize the Time interface */
         mm_iface_modem_time_initialize (MM_IFACE_MODEM_TIME (ctx->self),
-                                        ctx->cancellable,
+                                        g_task_get_cancellable (task),
                                         (GAsyncReadyCallback)iface_modem_time_initialize_ready,
-                                        ctx);
+                                        task);
         return;
 
     case INITIALIZE_STEP_IFACE_SIGNAL:
         /* Initialize the Signal interface */
         mm_iface_modem_signal_initialize (MM_IFACE_MODEM_SIGNAL (ctx->self),
-                                          ctx->cancellable,
+                                          g_task_get_cancellable (task),
                                           (GAsyncReadyCallback)iface_modem_signal_initialize_ready,
-                                          ctx);
+                                          task);
         return;
 
     case INITIALIZE_STEP_IFACE_OMA:
         /* Initialize the Oma interface */
         mm_iface_modem_oma_initialize (MM_IFACE_MODEM_OMA (ctx->self),
-                                       ctx->cancellable,
+                                       g_task_get_cancellable (task),
                                        (GAsyncReadyCallback)iface_modem_oma_initialize_ready,
-                                       ctx);
+                                       task);
         return;
 
     case INITIALIZE_STEP_IFACE_FIRMWARE:
         /* Initialize the Firmware interface */
         mm_iface_modem_firmware_initialize (MM_IFACE_MODEM_FIRMWARE (ctx->self),
-                                            ctx->cancellable,
+                                            g_task_get_cancellable (task),
                                             (GAsyncReadyCallback)iface_modem_firmware_initialize_ready,
-                                            ctx);
+                                            task);
         return;
 
     case INITIALIZE_STEP_SIM_HOT_SWAP:
@@ -10278,16 +10270,15 @@ initialize_step (InitializeContext *ctx)
 
     case INITIALIZE_STEP_LAST:
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
-
+            GError *error;
 
             if (!ctx->self->priv->modem_dbus_skeleton) {
                 /* Error setting up ports. Abort without even exporting the
                  * Modem interface */
-                g_simple_async_result_set_error (ctx->result,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_ABORTED,
-                                                 "Modem is unusable, "
-                                                 "cannot fully initialize");
+                error = g_error_new (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_ABORTED,
+                                     "Modem is unusable, "
+                                     "cannot fully initialize");
             } else {
                 /* Fatal SIM, firmware, or modem failure :-( */
                 gboolean is_sim_hot_swap_supported = FALSE;
@@ -10303,20 +10294,18 @@ initialize_step (InitializeContext *ctx)
                 if (reason == MM_MODEM_STATE_FAILED_REASON_SIM_MISSING &&
                     is_sim_hot_swap_supported &&
                     ctx->self->priv->sim_hot_swap_ports_ctx) {
-                        mm_info ("SIM is missing, but the modem supports SIM hot swap. Waiting for SIM...");
-                        g_simple_async_result_set_error (ctx->result,
-                                                         MM_CORE_ERROR,
-                                                         MM_CORE_ERROR_WRONG_STATE,
-                                                         "Modem is unusable due to SIM missing, "
-                                                         "cannot fully initialize, "
-                                                         "waiting for SIM insertion.");
+                    mm_info ("SIM is missing, but the modem supports SIM hot swap. Waiting for SIM...");
+                    error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Modem is unusable due to SIM missing, "
+                                         "cannot fully initialize, "
+                                         "waiting for SIM insertion.");
                 } else {
                     mm_dbg ("SIM is missing and Modem does not support SIM Hot Swap");
-                    g_simple_async_result_set_error (ctx->result,
-                                                     MM_CORE_ERROR,
-                                                     MM_CORE_ERROR_WRONG_STATE,
-                                                     "Modem is unusable, "
-                                                     "cannot fully initialize");
+                    error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Modem is unusable, "
+                                         "cannot fully initialize");
                 }
 
                 /* Ensure we only leave the Modem, OMA, and Firmware interfaces
@@ -10332,18 +10321,20 @@ initialize_step (InitializeContext *ctx)
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
                 mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
             }
-            initialize_context_complete_and_free (ctx);
+
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
             /* We're locked :-/ */
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_WRONG_STATE,
-                                             "Modem is currently locked, "
-                                             "cannot fully initialize");
-            initialize_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_WRONG_STATE,
+                                     "Modem is currently locked, "
+                                     "cannot fully initialize");
+            g_object_unref (task);
             return;
         }
 
@@ -10353,8 +10344,8 @@ initialize_step (InitializeContext *ctx)
                                      MM_MODEM_STATE_DISABLED,
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        initialize_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -10367,19 +10358,19 @@ initialize (MMBaseModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, initialize);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* Check state before launching modem initialization */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_FAILED:
         /* NOTE: this will only happen if we ever support hot-plugging SIMs */
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cannot initialize modem: "
-                                         "device is unusable");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot initialize modem: "
+                                 "device is unusable");
         break;
 
     case MM_MODEM_STATE_UNKNOWN:
@@ -10388,25 +10379,25 @@ initialize (MMBaseModem *self,
 
         ctx = g_new0 (InitializeContext, 1);
         ctx->self = g_object_ref (self);
-        ctx->cancellable = g_object_ref (cancellable);
-        ctx->result = result;
         ctx->step = INITIALIZE_STEP_FIRST;
+
+        g_task_set_task_data (task, ctx, (GDestroyNotify)initialize_context_free);
 
         /* Set as being initialized, even if we were locked before */
         mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                      MM_MODEM_STATE_INITIALIZING,
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
-        initialize_step (ctx);
+        initialize_step (task);
         return;
     }
 
     case MM_MODEM_STATE_INITIALIZING:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "Cannot initialize modem: "
-                                         "already being initialized");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "Cannot initialize modem: "
+                                 "already being initialized");
         break;
 
     case MM_MODEM_STATE_DISABLED:
@@ -10419,12 +10410,11 @@ initialize (MMBaseModem *self,
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
         /* Just return success, don't relaunch initialization */
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
         break;
     }
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
