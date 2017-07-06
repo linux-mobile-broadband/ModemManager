@@ -582,10 +582,14 @@ load_access_technologies_finish (MMIfaceModem             *self,
                                  guint                    *mask,
                                  GError                  **error)
 {
+    GError *inner_error = NULL;
     gssize val;
 
-    if ((val = g_task_propagate_int (G_TASK (res), error)) < 0)
+    val = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return FALSE;
+    }
 
     *access_technologies = (MMModemAccessTechnology) val;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;

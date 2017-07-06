@@ -122,11 +122,14 @@ mm_common_cinterion_location_load_capabilities_finish (MMIfaceModemLocation  *se
                                                        GAsyncResult          *res,
                                                        GError               **error)
 {
+    GError *inner_error = NULL;
     gssize aux;
 
-    if ((aux = g_task_propagate_int (G_TASK (res), error)) < 0)
+    aux = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return MM_MODEM_LOCATION_SOURCE_NONE;
-
+    }
     return (MMModemLocationSource) aux;
 }
 
