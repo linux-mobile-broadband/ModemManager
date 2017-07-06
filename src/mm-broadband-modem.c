@@ -9094,21 +9094,17 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     DisablingStep step;
     MMModemState previous_state;
     gboolean disabled;
 } DisablingContext;
 
-static void disabling_step (DisablingContext *ctx);
+static void disabling_step (GTask *task);
 
 static void
-disabling_context_complete_and_free (DisablingContext *ctx)
+disabling_context_free (DisablingContext *ctx)
 {
     GError *error = NULL;
-
-    g_simple_async_result_complete_in_idle (ctx->result);
 
     if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->disabling_stopped &&
         !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->disabling_stopped (ctx->self, &error)) {
@@ -9127,25 +9123,8 @@ disabling_context_complete_and_free (DisablingContext *ctx)
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
     }
 
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
-}
-
-static gboolean
-disabling_context_complete_and_free_if_cancelled (DisablingContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Disabling cancelled");
-    disabling_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static gboolean
@@ -9153,7 +9132,7 @@ disable_finish (MMBaseModem *self,
                GAsyncResult *res,
                GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 #undef INTERFACE_DISABLE_READY_FN
@@ -9161,16 +9140,17 @@ disable_finish (MMBaseModem *self,
     static void                                                         \
     NAME##_disable_ready (MMBroadbandModem *self,                       \
                           GAsyncResult *result,                         \
-                          DisablingContext *ctx)                        \
+                          GTask *task)                                  \
     {                                                                   \
+        DisablingContext *ctx;                                          \
         GError *error = NULL;                                           \
                                                                         \
         if (!mm_##NAME##_disable_finish (TYPE (self),                   \
                                          result,                        \
                                          &error)) {                     \
             if (FATAL_ERRORS) {                                         \
-                g_simple_async_result_take_error (ctx->result, error);  \
-                disabling_context_complete_and_free (ctx);              \
+                g_task_return_error (task, error);                      \
+                g_object_unref (task);                                  \
                 return;                                                 \
             }                                                           \
                                                                         \
@@ -9181,8 +9161,9 @@ disable_finish (MMBaseModem *self,
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
         ctx->step++;                                                    \
-        disabling_step (ctx);                                           \
+        disabling_step (task);                                          \
     }
 
 INTERFACE_DISABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
@@ -9199,32 +9180,37 @@ INTERFACE_DISABLE_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FAL
 static void
 bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
                                           GAsyncResult *res,
-                                          DisablingContext *ctx)
+                                          GTask *task)
 {
+    DisablingContext *ctx;
     GError *error = NULL;
 
     if (!mm_bearer_list_disconnect_all_bearers_finish (list, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    disabling_step (ctx);
+    disabling_step (task);
 }
 
 static void
 disabling_wait_for_final_state_ready (MMIfaceModem *self,
                                       GAsyncResult *res,
-                                      DisablingContext *ctx)
+                                      GTask *task)
 {
+    DisablingContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     ctx->previous_state = mm_iface_modem_wait_for_final_state_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -9237,8 +9223,8 @@ disabling_wait_for_final_state_ready (MMIfaceModem *self,
          * Note that we do consider here UNKNOWN and FAILED status on purpose,
          * as the MMManager will try to disable every modem before removing
          * it. */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     default:
         break;
@@ -9251,15 +9237,20 @@ disabling_wait_for_final_state_ready (MMIfaceModem *self,
                                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     ctx->step++;
-    disabling_step (ctx);
+    disabling_step (task);
 }
 
 static void
-disabling_step (DisablingContext *ctx)
+disabling_step (GTask *task)
 {
+    DisablingContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (disabling_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
@@ -9270,7 +9261,7 @@ disabling_step (DisablingContext *ctx)
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
                                              MM_MODEM_STATE_UNKNOWN, /* just any */
                                              (GAsyncReadyCallback)disabling_wait_for_final_state_ready,
-                                             ctx);
+                                             task);
         return;
 
     case DISABLING_STEP_DISCONNECT_BEARERS:
@@ -9278,7 +9269,7 @@ disabling_step (DisablingContext *ctx)
             mm_bearer_list_disconnect_all_bearers (
                 ctx->self->priv->modem_bearer_list,
                 (GAsyncReadyCallback)bearer_list_disconnect_all_bearers_ready,
-                ctx);
+                task);
             return;
         }
         /* Fall down to next step */
@@ -9298,7 +9289,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Signal interface */
             mm_iface_modem_signal_disable (MM_IFACE_MODEM_SIGNAL (ctx->self),
                                            (GAsyncReadyCallback)iface_modem_signal_disable_ready,
-                                           ctx);
+                                           task);
             return;
         }
         /* Fall down to next step */
@@ -9310,7 +9301,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Oma interface */
             mm_iface_modem_oma_disable (MM_IFACE_MODEM_OMA (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_oma_disable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9322,7 +9313,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Time interface */
             mm_iface_modem_time_disable (MM_IFACE_MODEM_TIME (ctx->self),
                                          (GAsyncReadyCallback)iface_modem_time_disable_ready,
-                                         ctx);
+                                         task);
             return;
         }
         /* Fall down to next step */
@@ -9334,7 +9325,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Messaging interface */
             mm_iface_modem_messaging_disable (MM_IFACE_MODEM_MESSAGING (ctx->self),
                                               (GAsyncReadyCallback)iface_modem_messaging_disable_ready,
-                                              ctx);
+                                              task);
             return;
         }
         /* Fall down to next step */
@@ -9346,7 +9337,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Voice interface */
             mm_iface_modem_voice_disable (MM_IFACE_MODEM_VOICE (ctx->self),
                                           (GAsyncReadyCallback)iface_modem_voice_disable_ready,
-                                          ctx);
+                                          task);
             return;
         }
         /* Fall down to next step */
@@ -9358,7 +9349,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem Location interface */
             mm_iface_modem_location_disable (MM_IFACE_MODEM_LOCATION (ctx->self),
                                              (GAsyncReadyCallback)iface_modem_location_disable_ready,
-                                             ctx);
+                                             task);
             return;
         }
         /* Fall down to next step */
@@ -9374,7 +9365,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem CDMA interface */
             mm_iface_modem_cdma_disable (MM_IFACE_MODEM_CDMA (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_cdma_disable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9386,7 +9377,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem 3GPP USSD interface */
             mm_iface_modem_3gpp_ussd_disable (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
                                               (GAsyncReadyCallback)iface_modem_3gpp_ussd_disable_ready,
-                                              ctx);
+                                              task);
             return;
         }
         /* Fall down to next step */
@@ -9398,7 +9389,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem 3GPP interface */
             mm_iface_modem_3gpp_disable (MM_IFACE_MODEM_3GPP (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_3gpp_disable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9411,7 +9402,7 @@ disabling_step (DisablingContext *ctx)
             /* Disabling the Modem interface */
             mm_iface_modem_disable (MM_IFACE_MODEM (ctx->self),
                                     (GAsyncReadyCallback)iface_modem_disable_ready,
-                                    ctx);
+                                    task);
             return;
         }
         /* Fall down to next step */
@@ -9420,8 +9411,8 @@ disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_LAST:
         ctx->disabled = TRUE;
         /* All disabled without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9435,14 +9426,16 @@ disable (MMBaseModem *self,
          gpointer user_data)
 {
     DisablingContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (DisablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, disable);
-    ctx->cancellable = (cancellable ? g_object_ref (cancellable) : NULL);
     ctx->step = DISABLING_STEP_FIRST;
 
-    disabling_step (ctx);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disabling_context_free);
+
+    disabling_step (task);
 }
 
 /*****************************************************************************/
