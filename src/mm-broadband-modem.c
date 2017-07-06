@@ -8306,7 +8306,7 @@ enable_location_gathering_finish (MMIfaceModemLocation *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -8315,12 +8315,7 @@ enable_location_gathering (MMIfaceModemLocation *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        enable_location_gathering);
+    GTask *task;
 
     /* 3GPP modems need to re-run registration checks when enabling the 3GPP
      * location source, so that we get up to date LAC/CI location information.
@@ -8337,9 +8332,9 @@ enable_location_gathering (MMIfaceModemLocation *self,
     }
 
     /* Done we are */
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
