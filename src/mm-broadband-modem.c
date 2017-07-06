@@ -8665,18 +8665,13 @@ initialization_stopped (MMBroadbandModem *self,
 }
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     PortsContext *ports;
 } InitializationStartedContext;
 
 static void
-initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+initialization_started_context_free (InitializationStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     ports_context_unref (ctx->ports);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -8685,13 +8680,7 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    gpointer ref;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    ref = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    return ref ? ports_context_ref (ref) : NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static gboolean
@@ -8740,25 +8729,24 @@ initialization_started (MMBroadbandModem *self,
 {
     GError *error = NULL;
     InitializationStartedContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (InitializationStartedContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_started);
     ctx->ports = g_new0 (PortsContext, 1);
     ctx->ports->ref_count = 1;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
+
     if (!open_ports_initialization (self, ctx->ports, &error)) {
         g_prefix_error (&error, "Couldn't open ports during modem initialization: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   ports_context_ref (ctx->ports),
-                                                   (GDestroyNotify)ports_context_unref);
+        g_task_return_pointer (task,
+                               ports_context_ref (ctx->ports),
+                               (GDestroyNotify)ports_context_unref);
 
-    initialization_started_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
