@@ -895,7 +895,7 @@ mm_base_call_delete_finish (MMBaseCall *self,
         return deleted;
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
@@ -909,12 +909,9 @@ mm_base_call_delete (MMBaseCall *self,
         return;
     }
 
-    g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                         callback,
-                                         user_data,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Deleting call is not supported by this modem");
+    g_task_report_new_error (self, callback, user_data, mm_base_call_delete,
+                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Deleting call is not supported by this modem");
 }
 
 /*****************************************************************************/
