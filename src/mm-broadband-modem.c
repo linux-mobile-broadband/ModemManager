@@ -3278,16 +3278,21 @@ modem_load_power_state_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_POWER_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+    }
+    return (MMModemPowerState)value;
 }
 
 static void
 cfun_query_ready (MMBaseModem *self,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     const gchar *result;
     MMModemPowerState state;
@@ -3295,11 +3300,11 @@ cfun_query_ready (MMBaseModem *self,
 
     result = mm_base_modem_at_command_finish (self, res, &error);
     if (!result || !mm_3gpp_parse_cfun_query_generic_response (result, &state, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (state), NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_int (task, state);;
+
+    g_object_unref (task);
 }
 
 static void
@@ -3307,19 +3312,15 @@ modem_load_power_state (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_power_state);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self)) {
         mm_dbg ("Assuming full power state in CDMA-only modem...");
-        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_int (task, MM_MODEM_POWER_STATE_ON);
+        g_object_unref (task);
         return;
     }
 
@@ -3329,7 +3330,7 @@ modem_load_power_state (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cfun_query_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
