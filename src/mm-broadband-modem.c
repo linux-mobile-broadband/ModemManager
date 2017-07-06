@@ -9469,21 +9469,16 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     EnablingStep step;
     MMModemState previous_state;
     gboolean enabled;
 } EnablingContext;
 
-static void enabling_step (EnablingContext *ctx);
+static void enabling_step (GTask *task);
 
 static void
-enabling_context_complete_and_free (EnablingContext *ctx)
+enabling_context_free (EnablingContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-
     if (ctx->enabled)
         mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
                                      MM_MODEM_STATE_ENABLED,
@@ -9495,23 +9490,8 @@ enabling_context_complete_and_free (EnablingContext *ctx)
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
     }
 
-    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
-}
-
-static gboolean
-enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Enabling cancelled");
-    enabling_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static gboolean
@@ -9519,10 +9499,7 @@ enable_finish (MMBaseModem *self,
                GAsyncResult *res,
                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 #undef INTERFACE_ENABLE_READY_FN
@@ -9530,16 +9507,17 @@ enable_finish (MMBaseModem *self,
     static void                                                         \
     NAME##_enable_ready (MMBroadbandModem *self,                        \
                          GAsyncResult *result,                          \
-                         EnablingContext *ctx)                          \
+                         GTask *task)                                   \
     {                                                                   \
+        EnablingContext *ctx;                                           \
         GError *error = NULL;                                           \
                                                                         \
         if (!mm_##NAME##_enable_finish (TYPE (self),                    \
                                         result,                         \
                                         &error)) {                      \
             if (FATAL_ERRORS) {                                         \
-                g_simple_async_result_take_error (ctx->result, error);  \
-                enabling_context_complete_and_free (ctx);               \
+                g_task_return_error (task, error);                      \
+                g_object_unref (task);                                  \
                 return;                                                 \
             }                                                           \
                                                                         \
@@ -9549,8 +9527,9 @@ enable_finish (MMBaseModem *self,
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
         ctx->step++;                                                    \
-        enabling_step (ctx);                                            \
+        enabling_step (task);                                           \
     }
 
 INTERFACE_ENABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
@@ -9567,39 +9546,44 @@ INTERFACE_ENABLE_READY_FN (iface_modem_oma,       MM_IFACE_MODEM_OMA,       FALS
 static void
 enabling_started_ready (MMBroadbandModem *self,
                         GAsyncResult *result,
-                        EnablingContext *ctx)
+                        GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
 
     if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_started_finish (self, result, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    enabling_step (ctx);
+    enabling_step (task);
 }
 
 static void
 enabling_wait_for_final_state_ready (MMIfaceModem *self,
                                      GAsyncResult *res,
-                                     EnablingContext *ctx)
+                                     GTask *task)
 {
+    EnablingContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     ctx->previous_state = mm_iface_modem_wait_for_final_state_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (ctx->previous_state >= MM_MODEM_STATE_ENABLED) {
         /* Just return success, don't relaunch enabling */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9610,15 +9594,21 @@ enabling_wait_for_final_state_ready (MMIfaceModem *self,
                                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     ctx->step++;
-    enabling_step (ctx);
+    enabling_step (task);
 }
 
 static void
-enabling_step (EnablingContext *ctx)
+enabling_step (GTask *task)
 {
+    EnablingContext *ctx;
+
     /* Don't run new steps if we're cancelled */
-    if (enabling_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
+
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
@@ -9629,7 +9619,7 @@ enabling_step (EnablingContext *ctx)
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
                                              MM_MODEM_STATE_UNKNOWN, /* just any */
                                              (GAsyncReadyCallback)enabling_wait_for_final_state_ready,
-                                             ctx);
+                                             task);
         return;
 
     case ENABLING_STEP_STARTED:
@@ -9637,7 +9627,7 @@ enabling_step (EnablingContext *ctx)
             MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started_finish) {
             MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started (ctx->self,
                                                                         (GAsyncReadyCallback)enabling_started_ready,
-                                                                        ctx);
+                                                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9647,9 +9637,9 @@ enabling_step (EnablingContext *ctx)
         g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
         /* Enabling the Modem interface */
         mm_iface_modem_enable (MM_IFACE_MODEM (ctx->self),
-                               ctx->cancellable,
+                               g_task_get_cancellable (task),
                                (GAsyncReadyCallback)iface_modem_enable_ready,
-                               ctx);
+                               task);
         return;
 
     case ENABLING_STEP_IFACE_3GPP:
@@ -9657,9 +9647,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has 3GPP capabilities, enabling the Modem 3GPP interface...");
             /* Enabling the Modem 3GPP interface */
             mm_iface_modem_3gpp_enable (MM_IFACE_MODEM_3GPP (ctx->self),
-                                        ctx->cancellable,
+                                        g_task_get_cancellable (task),
                                         (GAsyncReadyCallback)iface_modem_3gpp_enable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9670,7 +9660,7 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has 3GPP/USSD capabilities, enabling the Modem 3GPP/USSD interface...");
             mm_iface_modem_3gpp_ussd_enable (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
                                              (GAsyncReadyCallback)iface_modem_3gpp_ussd_enable_ready,
-                                             ctx);
+                                             task);
             return;
         }
         /* Fall down to next step */
@@ -9681,9 +9671,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has CDMA capabilities, enabling the Modem CDMA interface...");
             /* Enabling the Modem CDMA interface */
             mm_iface_modem_cdma_enable (MM_IFACE_MODEM_CDMA (ctx->self),
-                                        ctx->cancellable,
+                                        g_task_get_cancellable (task),
                                         (GAsyncReadyCallback)iface_modem_cdma_enable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9698,9 +9688,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has location capabilities, enabling the Location interface...");
             /* Enabling the Modem Location interface */
             mm_iface_modem_location_enable (MM_IFACE_MODEM_LOCATION (ctx->self),
-                                            ctx->cancellable,
+                                            g_task_get_cancellable (task),
                                             (GAsyncReadyCallback)iface_modem_location_enable_ready,
-                                            ctx);
+                                            task);
             return;
         }
         /* Fall down to next step */
@@ -9711,9 +9701,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has messaging capabilities, enabling the Messaging interface...");
             /* Enabling the Modem Messaging interface */
             mm_iface_modem_messaging_enable (MM_IFACE_MODEM_MESSAGING (ctx->self),
-                                             ctx->cancellable,
+                                             g_task_get_cancellable (task),
                                              (GAsyncReadyCallback)iface_modem_messaging_enable_ready,
-                                             ctx);
+                                             task);
             return;
         }
         /* Fall down to next step */
@@ -9724,9 +9714,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has voice capabilities, enabling the Voice interface...");
             /* Enabling the Modem Voice interface */
             mm_iface_modem_voice_enable (MM_IFACE_MODEM_VOICE (ctx->self),
-                                             ctx->cancellable,
-                                             (GAsyncReadyCallback)iface_modem_voice_enable_ready,
-                                             ctx);
+                                         g_task_get_cancellable (task),
+                                         (GAsyncReadyCallback)iface_modem_voice_enable_ready,
+                                         task);
             return;
         }
         /* Fall down to next step */
@@ -9737,9 +9727,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has time capabilities, enabling the Time interface...");
             /* Enabling the Modem Time interface */
             mm_iface_modem_time_enable (MM_IFACE_MODEM_TIME (ctx->self),
-                                        ctx->cancellable,
+                                        g_task_get_cancellable (task),
                                         (GAsyncReadyCallback)iface_modem_time_enable_ready,
-                                        ctx);
+                                        task);
             return;
         }
         /* Fall down to next step */
@@ -9750,9 +9740,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has extended signal reporting capabilities, enabling the Signal interface...");
             /* Enabling the Modem Signal interface */
             mm_iface_modem_signal_enable (MM_IFACE_MODEM_SIGNAL (ctx->self),
-                                          ctx->cancellable,
+                                          g_task_get_cancellable (task),
                                           (GAsyncReadyCallback)iface_modem_signal_enable_ready,
-                                          ctx);
+                                          task);
             return;
         }
         /* Fall down to next step */
@@ -9763,9 +9753,9 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has OMA capabilities, enabling the OMA interface...");
             /* Enabling the Modem Oma interface */
             mm_iface_modem_oma_enable (MM_IFACE_MODEM_OMA (ctx->self),
-                                       ctx->cancellable,
+                                       g_task_get_cancellable (task),
                                        (GAsyncReadyCallback)iface_modem_oma_enable_ready,
-                                       ctx);
+                                       task);
             return;
         }
         /* Fall down to next step */
@@ -9792,8 +9782,8 @@ enabling_step (EnablingContext *ctx)
         schedule_initial_registration_checks (ctx->self);
 
         /* All enabled without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enabling_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9806,9 +9796,9 @@ enable (MMBaseModem *self,
         GAsyncReadyCallback callback,
         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, enable);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* Check state before launching modem enabling */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
@@ -9819,18 +9809,18 @@ enable (MMBaseModem *self,
 
     case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_INITIALIZING:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cannot enable modem: "
-                                         "device not fully initialized yet");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot enable modem: "
+                                 "device not fully initialized yet");
         break;
 
     case MM_MODEM_STATE_LOCKED:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cannot enable modem: device locked");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot enable modem: device locked");
         break;
 
     case MM_MODEM_STATE_DISABLED: {
@@ -9838,27 +9828,28 @@ enable (MMBaseModem *self,
 
         ctx = g_new0 (EnablingContext, 1);
         ctx->self = g_object_ref (self);
-        ctx->result = result;
-        ctx->cancellable = g_object_ref (cancellable);
         ctx->step = ENABLING_STEP_FIRST;
-        enabling_step (ctx);
+
+        g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_context_free);
+
+        enabling_step (task);
         return;
     }
 
     case MM_MODEM_STATE_DISABLING:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_WRONG_STATE,
-                                         "Cannot enable modem: "
-                                         "currently being disabled");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot enable modem: "
+                                 "currently being disabled");
         break;
 
     case MM_MODEM_STATE_ENABLING:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "Cannot enable modem: "
-                                         "already being enabled");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "Cannot enable modem: "
+                                 "already being enabled");
         break;
 
     case MM_MODEM_STATE_ENABLED:
@@ -9868,12 +9859,11 @@ enable (MMBaseModem *self,
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
         /* Just return success, don't relaunch enabling */
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
         break;
     }
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
