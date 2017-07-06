@@ -8263,11 +8263,15 @@ modem_location_load_capabilities_finish (MMIfaceModemLocation *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCATION_SOURCE_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLocationSource) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                         G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCATION_SOURCE_NONE;
+    }
+    return (MMModemLocationSource)value;
 }
 
 static void
@@ -8275,27 +8279,19 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_location_load_capabilities);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Default location capabilities supported by the generic broadband
      * implementation are only LAC-CI in 3GPP-enabled modems. And even this,
      * will only be true if the modem supports CREG/CGREG=2 */
     if (!mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)))
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_NONE),
-                                                   NULL);
+        g_task_return_int (task, MM_MODEM_LOCATION_SOURCE_NONE);
     else
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI),
-                                                   NULL);
+        g_task_return_int (task, MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI);
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
