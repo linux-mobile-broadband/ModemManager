@@ -245,11 +245,15 @@ internal_load_unlock_required_finish (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
+    GError *inner_error = NULL;
     gssize value;
 
-    value = g_task_propagate_int (G_TASK (res), error);
-
-    return value < 0 ? MM_MODEM_LOCK_UNKNOWN : (MMModemLock)value;
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
 }
 
 static void internal_load_unlock_required_context_step (GTask *task);
@@ -2990,10 +2994,15 @@ mm_iface_modem_update_lock_info_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
+    GError *inner_error = NULL;
     gssize value;
 
-    value = g_task_propagate_int (G_TASK (res), error);
-    return value < 0 ? MM_MODEM_LOCK_UNKNOWN : (MMModemLock)value;
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
 }
 
 static void update_lock_info_context_step (GTask *task);
