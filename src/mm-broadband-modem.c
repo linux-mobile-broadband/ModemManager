@@ -3115,17 +3115,21 @@ modem_load_supported_charsets_finish (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_CHARSET_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                 G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_CHARSET_UNKNOWN;
+    }
+    return (MMModemCharset)value;
 }
 
 static void
 cscs_format_check_ready (MMBaseModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     const gchar *response;
@@ -3133,20 +3137,17 @@ cscs_format_check_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else if (!mm_3gpp_parse_cscs_test_response (response, &charsets))
-        g_simple_async_result_set_error (
-            simple,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
-            "Failed to parse the supported character "
-            "sets response");
+            "Failed to parse the supported character sets response");
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (charsets),
-                                                   NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_int (task, charsets);
+
+    g_object_unref (task);
 }
 
 static void
@@ -3154,21 +3155,15 @@ modem_load_supported_charsets (MMIfaceModem *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_charsets);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self)) {
         mm_dbg ("Skipping supported charset loading in CDMA-only modem...");
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   GUINT_TO_POINTER (MM_MODEM_CHARSET_UNKNOWN),
-                                                   NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_int (task, MM_MODEM_CHARSET_UNKNOWN);
+        g_object_unref (task);
         return;
     }
 
@@ -3177,7 +3172,7 @@ modem_load_supported_charsets (MMIfaceModem *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cscs_format_check_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
