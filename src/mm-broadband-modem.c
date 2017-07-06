@@ -1035,17 +1035,12 @@ modem_load_device_identifier (MMIfaceModem *self,
 /* Load own numbers (Modem interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortSerialQcdm *qcdm;
 } OwnNumbersContext;
 
 static void
-own_numbers_context_complete_and_free (OwnNumbersContext *ctx)
+own_numbers_context_free (OwnNumbersContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     if (ctx->qcdm) {
         mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
         g_object_unref (ctx->qcdm);
@@ -1058,16 +1053,13 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 mdn_qcdm_ready (MMPortSerialQcdm *port,
                 GAsyncResult *res,
-                OwnNumbersContext *ctx)
+                GTask *task)
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
@@ -1077,8 +1069,8 @@ mdn_qcdm_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        own_numbers_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1088,12 +1080,12 @@ mdn_qcdm_ready (MMPortSerialQcdm *port,
                                          &err);
     g_byte_array_unref (response);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse NV MDN command result: %d",
-                                         err);
-        own_numbers_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse NV MDN command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
 
@@ -1112,36 +1104,39 @@ mdn_qcdm_ready (MMPortSerialQcdm *port,
             valid = g_ascii_isdigit (*p++) || (*p == '+');
 
         if (valid) {
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       g_strdupv ((gchar **) numbers),
-                                                       NULL);
+            g_task_return_pointer (task,
+                                   g_strdupv ((gchar **) numbers),
+                                   (GDestroyNotify)g_strfreev);
         } else {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "%s",
-                                             "MDN from NV memory appears invalid");
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "%s",
+                                     "MDN from NV memory appears invalid");
         }
     } else {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "%s",
-                                         "Failed retrieve MDN");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "%s",
+                                 "Failed retrieve MDN");
     }
+    g_object_unref (task);
 
     qcdm_result_unref (result);
-    own_numbers_context_complete_and_free (ctx);
 }
 
 static void
 modem_load_own_numbers_done (MMIfaceModem *self,
                              GAsyncResult *res,
-                             OwnNumbersContext *ctx)
+                             GTask *task)
 {
+    OwnNumbersContext *ctx;
     const gchar *result;
     GError *error = NULL;
     GStrv numbers;
+
+    ctx = g_task_get_task_data (task);
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!result) {
@@ -1160,20 +1155,20 @@ modem_load_own_numbers_done (MMIfaceModem *self,
                                          3,
                                          NULL,
                                          (GAsyncReadyCallback)mdn_qcdm_ready,
-                                         ctx);
+                                         task);
             g_byte_array_unref (mdn);
             return;
         }
     } else {
         numbers = mm_3gpp_parse_cnum_exec_response (result, &error);
         if (numbers)
-            g_simple_async_result_set_op_res_gpointer (ctx->result, numbers, NULL);
+            g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
     }
 
     if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
 
-    own_numbers_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
@@ -1183,13 +1178,9 @@ modem_load_own_numbers (MMIfaceModem *self,
 {
     OwnNumbersContext *ctx;
     GError *error = NULL;
+    GTask *task;
 
     ctx = g_new0 (OwnNumbersContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_own_numbers);
     ctx->qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (ctx->qcdm) {
         if (mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), &error)) {
@@ -1202,13 +1193,16 @@ modem_load_own_numbers (MMIfaceModem *self,
         }
     }
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)own_numbers_context_free);
+
     mm_dbg ("loading own numbers...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CNUM",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)modem_load_own_numbers_done,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
