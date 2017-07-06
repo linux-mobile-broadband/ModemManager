@@ -1623,17 +1623,21 @@ modem_load_supported_ip_families_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_BEARER_IP_FAMILY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                    G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+    return (MMBearerIpFamily)value;
 }
 
 static void
 supported_ip_families_cgdcont_test_ready (MMBaseModem *self,
                                           GAsyncResult *res,
-                                          GSimpleAsyncResult *simple)
+                                          GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1651,12 +1655,11 @@ supported_ip_families_cgdcont_test_ready (MMBaseModem *self,
     }
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (mask), NULL);
+        g_task_return_int (task, mask);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -1664,21 +1667,14 @@ modem_load_supported_ip_families (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     mm_dbg ("loading supported IP families...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_ip_families);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (mm_iface_modem_is_cdma_only (self)) {
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
-            NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_int (task, MM_BEARER_IP_FAMILY_IPV4);
+        g_object_unref (task);
         return;
     }
 
@@ -1689,7 +1685,7 @@ modem_load_supported_ip_families (MMIfaceModem *self,
         3,
         TRUE, /* allow caching, it's a test command */
         (GAsyncReadyCallback)supported_ip_families_cgdcont_test_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
