@@ -1325,73 +1325,70 @@ modem_load_unlock_required (MMIfaceModem *self,
 /* Supported modes loading (Modem interface) */
 
 typedef struct {
-    GSimpleAsyncResult *result;
-    MMBroadbandModem *self;
     MMModemMode mode;
     gboolean run_cnti;
     gboolean run_ws46;
     gboolean run_gcap;
 } LoadSupportedModesContext;
 
-static void
-load_supported_modes_context_complete_and_free (LoadSupportedModesContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadSupportedModesContext, ctx);
-}
-
 static GArray *
 modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
+    GError *inner_error = NULL;
+    gssize value;
     GArray *modes;
     MMModemModeCombination mode;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return NULL;
+    }
 
     /* Build a mask with all supported modes */
     modes = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
-    mode.allowed = (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                       G_SIMPLE_ASYNC_RESULT (res)));
+    mode.allowed = (MMModemMode) value;
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (modes, mode);
 
     return modes;
 }
 
-static void load_supported_modes_step (LoadSupportedModesContext *ctx);
+static void load_supported_modes_step (GTask *task);
 
 static void
-supported_modes_gcap_ready (MMBaseModem *self,
+supported_modes_gcap_ready (MMBaseModem *_self,
                             GAsyncResult *res,
-                            LoadSupportedModesContext *ctx)
+                            GTask *task)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    LoadSupportedModesContext *ctx;
     const gchar *response;
     GError *error = NULL;
 
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!error) {
         MMModemMode mode = MM_MODEM_MODE_NONE;
 
         if (strstr (response, "IS")) {
             /* IS-856 is the EV-DO family */
             if (strstr (response, "856")) {
-                if (!ctx->self->priv->modem_cdma_evdo_network_supported) {
-                    ctx->self->priv->modem_cdma_evdo_network_supported = TRUE;
-                    g_object_notify (G_OBJECT (ctx->self), MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED);
+                if (!self->priv->modem_cdma_evdo_network_supported) {
+                    self->priv->modem_cdma_evdo_network_supported = TRUE;
+                    g_object_notify (G_OBJECT (self), MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED);
                 }
                 mm_dbg ("Device allows (CDMA) 3G network mode");
                 mode |= MM_MODEM_MODE_3G;
             }
             /* IS-707 is the 1xRTT family, which we consider as 2G */
             if (strstr (response, "707")) {
-                if (!ctx->self->priv->modem_cdma_cdma1x_network_supported) {
-                    ctx->self->priv->modem_cdma_cdma1x_network_supported = TRUE;
-                    g_object_notify (G_OBJECT (ctx->self), MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED);
+                if (!self->priv->modem_cdma_cdma1x_network_supported) {
+                    self->priv->modem_cdma_cdma1x_network_supported = TRUE;
+                    g_object_notify (G_OBJECT (self), MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED);
                 }
                 mm_dbg ("Device allows (CDMA) 2G network mode");
                 mode |= MM_MODEM_MODE_2G;
@@ -1416,11 +1413,11 @@ supported_modes_gcap_ready (MMBaseModem *self,
         g_error_free (error);
 
         /* Use defaults */
-        if (ctx->self->priv->modem_cdma_cdma1x_network_supported) {
+        if (self->priv->modem_cdma_cdma1x_network_supported) {
             mm_dbg ("Assuming device allows (CDMA) 2G network mode");
             ctx->mode |= MM_MODEM_MODE_2G;
         }
-        if (ctx->self->priv->modem_cdma_evdo_network_supported) {
+        if (self->priv->modem_cdma_evdo_network_supported) {
             mm_dbg ("Assuming device allows (CDMA) 3G network mode");
             ctx->mode |= MM_MODEM_MODE_3G;
         }
@@ -1428,18 +1425,21 @@ supported_modes_gcap_ready (MMBaseModem *self,
 
     /* Now keep on with the loading, we're probably finishing now */
     ctx->run_gcap = FALSE;
-    load_supported_modes_step (ctx);
+    load_supported_modes_step (task);
 }
 
 static void
 supported_modes_ws46_test_ready (MMBroadbandModem *self,
                                  GAsyncResult *res,
-                                 LoadSupportedModesContext *ctx)
+                                 GTask *task)
 {
+    LoadSupportedModesContext *ctx;
     const gchar *response;
     GArray      *modes;
     GError      *error = NULL;
     guint        i;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -1473,16 +1473,19 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
 out:
     /* Now keep on with the loading, we may need CDMA-specific checks */
     ctx->run_ws46 = FALSE;
-    load_supported_modes_step (ctx);
+    load_supported_modes_step (task);
 }
 
 static void
 supported_modes_cnti_ready (MMBroadbandModem *self,
                             GAsyncResult *res,
-                            LoadSupportedModesContext *ctx)
+                            GTask *task)
 {
+    LoadSupportedModesContext *ctx;
     const gchar *response;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!error) {
@@ -1525,57 +1528,62 @@ supported_modes_cnti_ready (MMBroadbandModem *self,
 
     /* Now keep on with the loading */
     ctx->run_cnti = FALSE;
-    load_supported_modes_step (ctx);
+    load_supported_modes_step (task);
 }
 
 static void
-load_supported_modes_step (LoadSupportedModesContext *ctx)
+load_supported_modes_step (GTask *task)
 {
+    MMBroadbandModem *self;
+    LoadSupportedModesContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (ctx->run_cnti) {
         mm_base_modem_at_command (
-            MM_BASE_MODEM (ctx->self),
+            MM_BASE_MODEM (self),
             "*CNTI=2",
             3,
             FALSE,
             (GAsyncReadyCallback)supported_modes_cnti_ready,
-            ctx);
+            task);
         return;
     }
 
     if (ctx->run_ws46) {
         mm_base_modem_at_command (
-            MM_BASE_MODEM (ctx->self),
+            MM_BASE_MODEM (self),
             "+WS46=?",
             3,
             TRUE, /* allow caching, it's a test command */
             (GAsyncReadyCallback)supported_modes_ws46_test_ready,
-            ctx);
+            task);
         return;
     }
 
     if (ctx->run_gcap) {
         mm_base_modem_at_command (
-            MM_BASE_MODEM (ctx->self),
+            MM_BASE_MODEM (self),
             "+GCAP",
             3,
             TRUE, /* allow caching */
             (GAsyncReadyCallback)supported_modes_gcap_ready,
-            ctx);
+            task);
         return;
     }
 
     /* All done.
      * If no mode found, error */
     if (ctx->mode == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't retrieve supported modes");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't retrieve supported modes");
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (ctx->mode),
-                                                   NULL);
-    load_supported_modes_context_complete_and_free (ctx);
+        g_task_return_int (task, ctx->mode);
+
+    g_object_unref (task);
 }
 
 static void
@@ -1584,14 +1592,10 @@ modem_load_supported_modes (MMIfaceModem *self,
                             gpointer user_data)
 {
     LoadSupportedModesContext *ctx;
+    GTask *task;
 
     mm_dbg ("loading supported modes...");
-    ctx = g_slice_new0 (LoadSupportedModesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_supported_modes);
+    ctx = g_new0 (LoadSupportedModesContext, 1);
     ctx->mode = MM_MODEM_MODE_NONE;
 
     if (mm_iface_modem_is_3gpp (self)) {
@@ -1605,7 +1609,10 @@ modem_load_supported_modes (MMIfaceModem *self,
         ctx->run_gcap = TRUE;
     }
 
-    load_supported_modes_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    load_supported_modes_step (task);
 }
 
 /*****************************************************************************/
