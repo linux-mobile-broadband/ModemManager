@@ -1995,10 +1995,15 @@ load_connection_status_finish (MMBaseBearer  *bearer,
                                GAsyncResult  *res,
                                GError       **error)
 {
+    GError *inner_error = NULL;
     gssize value;
 
-    value = g_task_propagate_int (G_TASK (res), error);
-    return (value < 0 ? MM_BEARER_CONNECTION_STATUS_UNKNOWN : (MMBearerConnectionStatus) value);
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    }
+    return (MMBearerConnectionStatus)value;
 }
 
 static void
