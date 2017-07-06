@@ -641,7 +641,6 @@ call_start (MMBaseCall *self,
     gchar *cmd;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
     cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
     mm_base_modem_at_command (self->priv->modem,
@@ -724,7 +723,6 @@ call_accept (MMBaseCall *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
     mm_base_modem_at_command (self->priv->modem,
                               "ATA",
@@ -791,7 +789,6 @@ call_hangup (MMBaseCall *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
     mm_base_modem_at_command (self->priv->modem,
                               "+CHUP",
@@ -842,7 +839,6 @@ call_send_dtmf (MMBaseCall *self,
     gchar *cmd;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
 
     cmd = g_strdup_printf ("AT+VTS=%c", dtmf[0]);
     mm_base_modem_at_command (self->priv->modem,
@@ -865,7 +861,6 @@ call_delete (MMBaseCall *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_object_ref (self->priv->modem), g_object_unref);
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
