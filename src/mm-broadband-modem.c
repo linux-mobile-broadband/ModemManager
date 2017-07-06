@@ -3352,7 +3352,7 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self))
@@ -3365,13 +3365,9 @@ modem_power_up (MMIfaceModem *self,
                                   NULL,
                                   NULL);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_up);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
