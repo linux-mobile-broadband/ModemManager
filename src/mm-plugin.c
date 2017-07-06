@@ -666,10 +666,18 @@ mm_plugin_supports_port_finish (MMPlugin      *self,
                                 GAsyncResult  *result,
                                 GError       **error)
 {
+    GError *inner_error = NULL;
+    gssize value;
+
     g_return_val_if_fail (MM_IS_PLUGIN (self), MM_PLUGIN_SUPPORTS_PORT_UNKNOWN);
     g_return_val_if_fail (G_IS_TASK (result), MM_PLUGIN_SUPPORTS_PORT_UNKNOWN);
 
-    return (MMPluginSupportsResult) g_task_propagate_int (G_TASK (result), error);
+    value = g_task_propagate_int (G_TASK (result), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_PLUGIN_SUPPORTS_PORT_UNKNOWN;
+    }
+    return (MMPluginSupportsResult)value;
 }
 
 void
