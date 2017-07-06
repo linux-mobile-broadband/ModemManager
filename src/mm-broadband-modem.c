@@ -8816,19 +8816,14 @@ enabling_modem_init (MMBroadbandModem *self,
 /* Enabling started */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     PortsContext *ports;
     gboolean modem_init_required;
 } EnablingStartedContext;
 
 static void
-enabling_started_context_complete_and_free (EnablingStartedContext *ctx)
+enabling_started_context_free (EnablingStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     ports_context_unref (ctx->ports);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (EnablingStartedContext, ctx);
 }
 
@@ -8837,12 +8832,18 @@ enabling_started_finish (MMBroadbandModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
-enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
+enabling_after_modem_init_timeout (GTask *task)
 {
+    MMBroadbandModem *self;
+    EnablingStartedContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     /* Reset init sequence enabled flags and run them explicitly */
     g_object_set (ctx->ports->primary,
                   MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE,
@@ -8856,59 +8857,67 @@ enabling_after_modem_init_timeout (EnablingStartedContext *ctx)
     }
 
     /* Store enabled ports context and complete */
-    ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enabling_started_context_complete_and_free (ctx);
+    self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 enabling_modem_init_ready (MMBroadbandModem *self,
                            GAsyncResult *res,
-                           EnablingStartedContext *ctx)
+                           GTask *task)
 {
+    EnablingStartedContext *ctx;
     GError *error = NULL;
 
-    if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_started_context_complete_and_free (ctx);
+    if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_modem_init_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
+
     /* Specify that the modem init was run once */
-    ctx->self->priv->modem_init_run = TRUE;
+    self->priv->modem_init_run = TRUE;
 
     /* After the modem init sequence, give a 500ms period for the modem to settle */
     mm_dbg ("Giving some time to settle the modem...");
-    g_timeout_add (500, (GSourceFunc)enabling_after_modem_init_timeout, ctx);
+    g_timeout_add (500, (GSourceFunc)enabling_after_modem_init_timeout, task);
 }
 
 static void
 enabling_flash_done (MMPortSerial *port,
                      GAsyncResult *res,
-                     EnablingStartedContext *ctx)
+                     GTask *task)
 {
+    MMBroadbandModem *self;
+    EnablingStartedContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_serial_flash_finish (port, res, &error)) {
         g_prefix_error (&error, "Primary port flashing failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (ctx->modem_init_required) {
         mm_dbg ("Running modem initialization sequence...");
-        MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init (ctx->self,
-                                                                       (GAsyncReadyCallback)enabling_modem_init_ready,
-                                                                       ctx);
+        MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_modem_init (self,
+                                                                  (GAsyncReadyCallback)enabling_modem_init_ready,
+                                                                  task);
         return;
     }
 
     /* Store enabled ports context and complete */
-    ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enabling_started_context_complete_and_free (ctx);
+    self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -8976,35 +8985,34 @@ enabling_started (MMBroadbandModem *self,
 {
     GError *error = NULL;
     EnablingStartedContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (EnablingStartedContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_started);
     ctx->ports = g_new0 (PortsContext, 1);
     ctx->ports->ref_count = 1;
 
     /* Skip modem initialization if the device was hotplugged OR if we already
      * did it (i.e. don't reinitialize if the modem got disabled and enabled
      * again) */
-    if (ctx->self->priv->modem_init_run)
+    if (self->priv->modem_init_run)
         mm_dbg ("Skipping modem initialization: not first enabling");
-    else if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (ctx->self))) {
-        ctx->self->priv->modem_init_run = TRUE;
+    else if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (self))) {
+        self->priv->modem_init_run = TRUE;
         mm_dbg ("Skipping modem initialization: device hotplugged");
-    } else if (!MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init ||
-               !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_modem_init_finish)
+    } else if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_modem_init ||
+               !MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_modem_init_finish)
         mm_dbg ("Skipping modem initialization: not required");
     else
         ctx->modem_init_required = TRUE;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_started_context_free);
+
     /* Enabling */
     if (!open_ports_enabling (self, ctx->ports, ctx->modem_init_required, &error)) {
         g_prefix_error (&error, "Couldn't open ports during modem enabling: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -9014,7 +9022,7 @@ enabling_started (MMBroadbandModem *self,
                           100,
                           FALSE,
                           (GAsyncReadyCallback)enabling_flash_done,
-                          ctx);
+                          task);
 }
 
 /*****************************************************************************/
