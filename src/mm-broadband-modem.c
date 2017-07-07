@@ -2804,20 +2804,15 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
 /* Enabling/disabling unsolicited events (3GPP interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
     gchar *command;
     gboolean enable;
-    GSimpleAsyncResult *result;
     gboolean cmer_primary_done;
     gboolean cmer_secondary_done;
 } UnsolicitedEventsContext;
 
 static void
-unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
+unsolicited_events_context_free (UnsolicitedEventsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx->command);
     g_free (ctx);
 }
@@ -2827,50 +2822,58 @@ modem_3gpp_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
                                                      GAsyncResult *res,
                                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void run_unsolicited_events_setup (UnsolicitedEventsContext *ctx);
+static void run_unsolicited_events_setup (GTask *task);
 
 static void
 unsolicited_events_setup_ready (MMBroadbandModem *self,
                                 GAsyncResult *res,
-                                UnsolicitedEventsContext *ctx)
+                                GTask *task)
 {
+    UnsolicitedEventsContext *ctx;
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!error) {
         /* Run on next port, if any */
-        run_unsolicited_events_setup (ctx);
+        run_unsolicited_events_setup (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     mm_dbg ("Couldn't %s event reporting: '%s'",
             ctx->enable ? "enable" : "disable",
             error->message);
     g_error_free (error);
     /* Consider this operation complete, ignoring errors */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    unsolicited_events_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
+run_unsolicited_events_setup (GTask *task)
 {
+    MMBroadbandModem *self;
+    UnsolicitedEventsContext *ctx;
     MMPortSerialAt *port = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     if (!ctx->cmer_primary_done) {
         ctx->cmer_primary_done = TRUE;
-        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self));
+        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     } else if (!ctx->cmer_secondary_done) {
         ctx->cmer_secondary_done = TRUE;
-        port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
+        port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
     }
 
     /* Enable unsolicited events in given port */
     if (port) {
-        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                        port,
                                        ctx->command,
                                        3,
@@ -2878,13 +2881,13 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)unsolicited_events_setup_ready,
-                                       ctx);
+                                       task);
         return;
     }
 
     /* If no more ports, we're fully done now */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    unsolicited_events_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -2893,12 +2896,9 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
                                       gpointer user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_enable_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
@@ -2910,19 +2910,19 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
             UnsolicitedEventsContext *ctx;
 
             ctx = g_new0 (UnsolicitedEventsContext, 1);
-            ctx->self = g_object_ref (self);
             ctx->enable = TRUE;
             ctx->command = cmd;
-            ctx->result = result;
-            run_unsolicited_events_setup (ctx);
+
+            g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
+
+            run_unsolicited_events_setup (task);
             return;
         }
         mm_dbg ("Skipping +CMER enable command: not supported");
     }
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -2931,12 +2931,9 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                        gpointer user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_disable_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If CIND supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
@@ -2948,18 +2945,18 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
             UnsolicitedEventsContext *ctx;
 
             ctx = g_new0 (UnsolicitedEventsContext, 1);
-            ctx->self = g_object_ref (self);
             ctx->command = cmd;
-            ctx->result = result;
-            run_unsolicited_events_setup (ctx);
+
+            g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
+
+            run_unsolicited_events_setup (task);
             return;
         }
         mm_dbg ("Skipping +CMER disable command: not supported");
     }
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
