@@ -2966,7 +2966,6 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
 /* Setting modem charset (Modem interface) */
 
 typedef struct {
-    GSimpleAsyncResult *result;
     MMModemCharset charset;
     /* Commands to try in the sequence:
      *  First one with quotes
@@ -2978,7 +2977,6 @@ typedef struct {
 static void
 setup_charset_context_free (SetupCharsetContext *ctx)
 {
-    g_object_unref (ctx->result);
     g_free (ctx->charset_commands[0].command);
     g_free (ctx->charset_commands[1].command);
     g_free (ctx);
@@ -2989,23 +2987,23 @@ modem_setup_charset_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 current_charset_query_ready (MMBroadbandModem *self,
                              GAsyncResult *res,
-                             SetupCharsetContext *ctx)
+                             GTask *task)
 {
+    SetupCharsetContext *ctx;
     GError *error = NULL;
     const gchar *response;
 
+    ctx = g_task_get_task_data (task);
+
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else {
         MMModemCharset current;
         const gchar *p;
@@ -3018,35 +3016,33 @@ current_charset_query_ready (MMBroadbandModem *self,
 
         current = mm_modem_charset_from_string (p);
         if (ctx->charset != current)
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Modem failed to change character set to %s",
-                                             mm_modem_charset_to_string (ctx->charset));
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Modem failed to change character set to %s",
+                                     mm_modem_charset_to_string (ctx->charset));
         else {
             /* We'll keep track ourselves of the current charset.
              * TODO: Make this a property so that plugins can also store it. */
             self->priv->modem_current_charset = current;
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+            g_task_return_boolean (task, TRUE);
         }
     }
 
-    g_simple_async_result_complete (ctx->result);
-    setup_charset_context_free (ctx);
+    g_object_unref (task);
 }
 
 static void
 charset_change_ready (MMBroadbandModem *self,
                       GAsyncResult *res,
-                      SetupCharsetContext *ctx)
+                      GTask *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        g_simple_async_result_complete (ctx->result);
-        setup_charset_context_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -3056,7 +3052,7 @@ charset_change_ready (MMBroadbandModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)current_charset_query_ready,
-                              ctx);
+                              task);
 }
 
 static void
@@ -3067,6 +3063,7 @@ modem_setup_charset (MMIfaceModem *self,
 {
     SetupCharsetContext *ctx;
     const gchar *charset_str;
+    GTask *task;
 
     /* NOTE: we already notified that CDMA-only modems couldn't load supported
      * charsets, so we'll never get here in such a case */
@@ -3075,22 +3072,19 @@ modem_setup_charset (MMIfaceModem *self,
     /* Build charset string to use */
     charset_str = mm_modem_charset_to_string (charset);
     if (!charset_str) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled character set 0x%X",
-                                             charset);
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_setup_charset,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unhandled character set 0x%X",
+                                 charset);
         return;
     }
 
     /* Setup context, including commands to try */
     ctx = g_new0 (SetupCharsetContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_setup_charset);
     ctx->charset = charset;
     /* First try, with quotes */
     ctx->charset_commands[0].command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
@@ -3106,6 +3100,9 @@ modem_setup_charset (MMIfaceModem *self,
     ctx->charset_commands[1].allow_cached = FALSE;
     ctx->charset_commands[1].response_processor = mm_base_modem_response_processor_no_result;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)setup_charset_context_free);
+
     /* Launch sequence */
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
@@ -3113,7 +3110,7 @@ modem_setup_charset (MMIfaceModem *self,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)charset_change_ready,
-        ctx);
+        task);
 }
 
 /*****************************************************************************/
