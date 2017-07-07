@@ -2534,7 +2534,7 @@ modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
                                                     GAsyncResult *res,
                                                     GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -2610,7 +2610,7 @@ set_unsolicited_events_handlers (MMBroadbandModem *self,
 static void
 cmer_format_check_ready (MMBroadbandModem   *self,
                          GAsyncResult       *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     MM3gppCmerMode  supported_modes = MM_3GPP_CMER_MODE_NONE;
     MM3gppCmerInd   supported_inds = MM_3GPP_CMER_IND_NONE;
@@ -2622,9 +2622,8 @@ cmer_format_check_ready (MMBroadbandModem   *self,
     if (error || !mm_3gpp_parse_cmer_test_response (result, &supported_modes, &supported_inds, &error)) {
         mm_dbg ("+CMER check failed, marking indications as unsupported: '%s'", error->message);
         g_error_free (error);
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2668,15 +2667,14 @@ cmer_format_check_ready (MMBroadbandModem   *self,
     /* Now, keep on setting up the ports */
     set_unsolicited_events_handlers (self, TRUE);
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 cind_format_check_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     GHashTable *indicators = NULL;
     GError *error = NULL;
@@ -2689,9 +2687,8 @@ cind_format_check_ready (MMBroadbandModem *self,
         /* unsupported indications */
         mm_dbg ("+CIND check failed, marking indications as unsupported: '%s'", error->message);
         g_error_free (error);
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2740,7 +2737,7 @@ cind_format_check_ready (MMBroadbandModem *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cmer_format_check_ready,
-                              simple);
+                              task);
 }
 
 static void
@@ -2749,12 +2746,9 @@ modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
                                      gpointer user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_setup_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Load supported indicators */
     if (!self->priv->modem_cind_support_checked) {
@@ -2765,7 +2759,7 @@ modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
                                   3,
                                   TRUE,
                                   (GAsyncReadyCallback)cind_format_check_ready,
-                                  result);
+                                  task);
         return;
     }
 
@@ -2773,9 +2767,8 @@ modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
     if (self->priv->modem_cind_supported)
         set_unsolicited_events_handlers (self, TRUE);
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
