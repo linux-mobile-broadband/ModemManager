@@ -1400,7 +1400,7 @@ supported_modes_gcap_ready (MMBaseModem *self,
     const gchar *response;
     GError *error = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!error) {
         MMModemMode mode = MM_MODEM_MODE_NONE;
 
@@ -1621,13 +1621,13 @@ modem_load_supported_modes (MMIfaceModem *self,
                                              modem_load_supported_modes);
     ctx->mode = MM_MODEM_MODE_NONE;
 
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+    if (mm_iface_modem_is_3gpp (self)) {
         /* Run +WS46=? and *CNTI=2 */
         ctx->run_ws46 = TRUE;
         ctx->run_cnti = TRUE;
     }
 
-    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
+    if (mm_iface_modem_is_cdma (self)) {
         /* Run +GCAP in order to know if the modem is CDMA1x only or CDMA1x/EV-DO */
         ctx->run_gcap = TRUE;
     }
@@ -1692,7 +1692,7 @@ modem_load_supported_ip_families (MMIfaceModem *self,
                                         user_data,
                                         modem_load_supported_ip_families);
 
-    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
+    if (mm_iface_modem_is_cdma_only (self)) {
         g_simple_async_result_set_op_res_gpointer (
             result,
             GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
@@ -3152,7 +3152,7 @@ cscs_format_check_ready (MMBaseModem *self,
     const gchar *response;
     GError *error = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (error)
         g_simple_async_result_take_error (simple, error);
     else if (!mm_3gpp_parse_cscs_test_response (response, &charsets))
@@ -3310,7 +3310,7 @@ cfun_query_ready (MMBaseModem *self,
     MMModemPowerState state;
     GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    result = mm_base_modem_at_command_finish (self, res, &error);
     if (!result || !mm_3gpp_parse_cfun_query_generic_response (result, &state, &error))
         g_simple_async_result_take_error (simple, error);
     else
@@ -4869,7 +4869,7 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                                              user_data,
                                              modem_3gpp_ussd_send);
 
-    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+    mm_iface_modem_3gpp_ussd_update_state (self,
                                            MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
 
     modem_3gpp_ussd_context_step (ctx);
@@ -8250,7 +8250,7 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
     /* Get fresh registration state */
     ctx->timer = g_timer_new ();
     mm_iface_modem_cdma_run_registration_checks (
-        MM_IFACE_MODEM_CDMA (self),
+        self,
         (GAsyncReadyCallback)run_cdma_registration_checks_ready,
         ctx);
 }
@@ -10469,13 +10469,13 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                 ati,
                 ati1,
                 mm_gdbus_modem_get_equipment_identifier (
-                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
                 mm_gdbus_modem_get_revision (
-                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
                 mm_gdbus_modem_get_model (
-                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
                 mm_gdbus_modem_get_manufacturer (
-                    MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton))));
+                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton))));
 }
 
 
@@ -10491,7 +10491,7 @@ after_hotswap_event_disable_ready (MMBaseModem *self,
         mm_err ("Disable modem error: %s", error->message);
         g_error_free (error);
     } else {
-        mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+        mm_base_modem_set_valid (self, FALSE);
     }
 }
 
