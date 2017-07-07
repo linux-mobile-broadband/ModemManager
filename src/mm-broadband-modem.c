@@ -1731,18 +1731,13 @@ qcdm_evdo_pilot_sets_log_handle (MMPortSerialQcdm *port,
 }
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortSerial *at_port;
     MMPortSerial *qcdm_port;
 } SignalQualityContext;
 
 static void
-signal_quality_context_complete_and_free (SignalQualityContext *ctx)
+signal_quality_context_free (SignalQualityContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_clear_object (&ctx->at_port);
     if (ctx->qcdm_port) {
         mm_port_serial_close (ctx->qcdm_port);
@@ -1756,11 +1751,10 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return 0;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                 G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), error);
+    return value < 0 ? 0 : value;
 }
 
 static guint
@@ -1781,18 +1775,21 @@ signal_quality_evdo_pilot_sets (MMBroadbandModem *self)
 static void
 signal_quality_csq_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
-                          SignalQualityContext *ctx)
+                          GTask *task)
 {
+    SignalQualityContext *ctx;
     GError *error = NULL;
     GVariant *result;
     const gchar *result_str;
 
     result = mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     result_str = g_variant_get_string (result, NULL);
     if (result_str) {
@@ -1812,19 +1809,17 @@ signal_quality_csq_ready (MMBroadbandModem *self,
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
             }
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       GUINT_TO_POINTER (quality),
-                                                       NULL);
-            signal_quality_context_complete_and_free (ctx);
+            g_task_return_int (task, quality);
+            g_object_unref (task);
             return;
         }
     }
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Could not parse signal quality results");
-    signal_quality_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Could not parse signal quality results");
+    g_object_unref (task);
 }
 
 /* Some modems want +CSQ, others want +CSQ?, and some of both types
@@ -1838,17 +1833,23 @@ static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
 };
 
 static void
-signal_quality_csq (SignalQualityContext *ctx)
+signal_quality_csq (GTask *task)
 {
+    MMBroadbandModem *self;
+    SignalQualityContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     mm_base_modem_at_sequence_full (
-        MM_BASE_MODEM (ctx->self),
+        MM_BASE_MODEM (self),
         MM_PORT_SERIAL_AT (ctx->at_port),
         signal_quality_csq_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
         (GAsyncReadyCallback)signal_quality_csq_ready,
-        ctx);
+        task);
 }
 
 static guint
@@ -1875,12 +1876,15 @@ normalize_ciev_cind_signal_quality (guint quality,
 static void
 signal_quality_cind_ready (MMBroadbandModem *self,
                            GAsyncResult *res,
-                           SignalQualityContext *ctx)
+                           GTask *task)
 {
+    SignalQualityContext *ctx;
     GError *error = NULL;
     const gchar *result;
     GByteArray *indicators;
     guint quality = 0;
+
+    ctx = g_task_get_task_data (task);
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -1915,10 +1919,8 @@ signal_quality_cind_ready (MMBroadbandModem *self,
 
     if (quality > 0) {
         /* +CIND success */
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (quality),
-                                                   NULL);
-        signal_quality_context_complete_and_free (ctx);
+        g_task_return_int (task, quality);
+        g_object_unref (task);
         return;
     }
 
@@ -1928,13 +1930,19 @@ try_csq:
      * report zero even though they have signal.  So if we get zero signal
      * from +CIND, try CSQ too.  (bgo #636040)
      */
-    signal_quality_csq (ctx);
+    signal_quality_csq (task);
 }
 
 static void
-signal_quality_cind (SignalQualityContext *ctx)
+signal_quality_cind (GTask *task)
 {
-    mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+    MMBroadbandModem *self;
+    SignalQualityContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    MM_PORT_SERIAL_AT (ctx->at_port),
                                    "+CIND?",
                                    3,
@@ -1942,14 +1950,15 @@ signal_quality_cind (SignalQualityContext *ctx)
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)signal_quality_cind_ready,
-                                   ctx);
+                                   task);
 }
 
 static void
 signal_quality_qcdm_ready (MMPortSerialQcdm *port,
                            GAsyncResult *res,
-                           SignalQualityContext *ctx)
+                           GTask *task)
 {
+    SignalQualityContext *ctx;
     QcdmResult *result;
     guint32 num = 0, quality = 0, i;
     gfloat best_db = -28;
@@ -1959,10 +1968,12 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Parse the response */
     result = qcdm_cmd_pilot_sets_result ((const gchar *) response->data,
@@ -1970,12 +1981,12 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
                                          &err);
     g_byte_array_unref (response);
     if (!result) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse pilot sets command result: %d",
-                                         err);
-        signal_quality_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse pilot sets command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
 
@@ -2006,25 +2017,26 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
         quality = (guint32) (100 - (best_db * 100 / (WORST_ECIO - BEST_ECIO)));
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (quality),
-                                               NULL);
-    signal_quality_context_complete_and_free (ctx);
+    g_task_return_int (task, quality);
+    g_object_unref (task);
 }
 
 static void
-signal_quality_qcdm (SignalQualityContext *ctx)
+signal_quality_qcdm (GTask *task)
 {
+    MMBroadbandModem *self;
+    SignalQualityContext *ctx;
     GByteArray *pilot_sets;
     guint quality;
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     /* If EVDO is active try that signal strength first */
-    quality = signal_quality_evdo_pilot_sets (ctx->self);
+    quality = signal_quality_evdo_pilot_sets (self);
     if (quality > 0) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (quality),
-                                                   NULL);
-        signal_quality_context_complete_and_free (ctx);
+        g_task_return_int (task, quality);
+        g_object_unref (task);
         return;
     }
 
@@ -2038,34 +2050,34 @@ signal_quality_qcdm (SignalQualityContext *ctx)
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)signal_quality_qcdm_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (pilot_sets);
 }
 
 static void
-modem_load_signal_quality (MMIfaceModem *self,
+modem_load_signal_quality (MMIfaceModem *_self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     SignalQualityContext *ctx;
     GError *error = NULL;
+    GTask *task;
 
     mm_dbg ("loading signal quality...");
     ctx = g_new0 (SignalQualityContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_signal_quality);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)signal_quality_context_free);
 
     /* Check whether we can get a non-connected AT port */
     ctx->at_port = (MMPortSerial *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (ctx->at_port) {
-        if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported &&
-            CIND_INDICATOR_IS_VALID (MM_BROADBAND_MODEM (self)->priv->modem_cind_indicator_signal_quality))
-            signal_quality_cind (ctx);
+        if (self->priv->modem_cind_supported &&
+            CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_signal_quality))
+            signal_quality_cind (task);
         else
-            signal_quality_csq (ctx);
+            signal_quality_csq (task);
         return;
     }
 
@@ -2077,7 +2089,7 @@ modem_load_signal_quality (MMIfaceModem *self,
         /* Need to open QCDM port as it may be closed/blocked */
         if (mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm_port), &error)) {
             g_object_ref (ctx->qcdm_port);
-            signal_quality_qcdm (ctx);
+            signal_quality_qcdm (task);
             return;
         }
 
@@ -2086,8 +2098,8 @@ modem_load_signal_quality (MMIfaceModem *self,
     }
 
     /* Return the error we got when getting best AT port */
-    g_simple_async_result_take_error (ctx->result, error);
-    signal_quality_context_complete_and_free (ctx);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
