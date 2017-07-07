@@ -2777,20 +2777,16 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
                                        gpointer user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_cleanup_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
         set_unsolicited_events_handlers (self, FALSE);
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
