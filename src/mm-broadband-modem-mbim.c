@@ -240,7 +240,7 @@ modem_load_manufacturer_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    return g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -248,14 +248,14 @@ modem_load_manufacturer (MMIfaceModem *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
+    gchar *manufacturer;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_manufacturer);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    manufacturer = g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, manufacturer, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
