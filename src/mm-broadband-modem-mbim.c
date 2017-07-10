@@ -294,30 +294,28 @@ modem_load_revision_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info)
-        return g_strdup (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Firmware revision information not given in device capabilities");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_load_revision (MMIfaceModem *self,
+modem_load_revision (MMIfaceModem *_self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just complete */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_revision);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->caps_firmware_info)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->caps_firmware_info),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Firmware revision information not given in device capabilities");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
