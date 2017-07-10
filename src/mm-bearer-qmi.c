@@ -151,7 +151,6 @@ reload_stats_context_step (GTask *task)
 {
     MMBearerQmi *self;
     ReloadStatsContext *ctx;
-    ReloadStatsResult *stats;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
@@ -185,9 +184,9 @@ reload_stats_context_step (GTask *task)
         ctx->step++;
         /* Fall through */
     case RELOAD_STATS_CONTEXT_STEP_LAST:
-        stats = g_new (ReloadStatsResult, 1);
-        memcpy (stats, &ctx->stats, sizeof (ctx->stats));
-        g_task_return_pointer (task, stats, g_free);
+        g_task_return_pointer (task,
+                               g_memdup (&ctx->stats, sizeof (ctx->stats)),
+                               g_free);
         g_object_unref (task);
         return;
     }
