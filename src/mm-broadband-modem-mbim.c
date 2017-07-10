@@ -358,13 +358,7 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    gchar *device_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    device_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    return device_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -372,22 +366,16 @@ modem_load_device_identifier (MMIfaceModem *self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     gchar *device_identifier;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_device_identifier);
+    GTask *task;
 
     /* Just use dummy ATI/ATI1 replies, all the other internal info should be
      * enough for uniqueness */
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "");
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               device_identifier,
-                                               g_free);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, device_identifier, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
