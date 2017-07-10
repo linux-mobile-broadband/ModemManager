@@ -2569,37 +2569,32 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *_self,
 /* Load operator code (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *_self,
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-
-    if (self->priv->current_operator_id)
-        return g_strdup (self->priv->current_operator_id);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Current operator MCC/MNC is still unknown");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *_self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just finish the async operation */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_operator_code);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->current_operator_id)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->current_operator_id),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Current operator MCC/MNC is still unknown");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
