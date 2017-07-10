@@ -2849,8 +2849,7 @@ messaging_check_support_finish (MMIfaceModemMessaging *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -2859,25 +2858,20 @@ messaging_check_support (MMIfaceModemMessaging *_self,
                          gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* We only handle 3GPP messaging (PDU based) currently */
     if (self->priv->caps_sms & MBIM_SMS_CAPS_PDU_RECEIVE &&
         self->priv->caps_sms & MBIM_SMS_CAPS_PDU_SEND) {
         mm_dbg ("Messaging capabilities supported");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
     } else {
         mm_dbg ("Messaging capabilities not supported by this modem");
-        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+        g_task_return_boolean (task, FALSE);
     }
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
