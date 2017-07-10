@@ -266,10 +266,7 @@ modem_load_model_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return g_strdup_printf ("MBIM [%04X:%04X]",
-                            (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
-                            (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
-
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -277,14 +274,16 @@ modem_load_model (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    gchar *model;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_model);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    model = g_strdup_printf ("MBIM [%04X:%04X]",
+                             (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
+                             (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, model, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
