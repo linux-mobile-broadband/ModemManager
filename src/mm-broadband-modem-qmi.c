@@ -7309,22 +7309,20 @@ messaging_check_support_finish (MMIfaceModemMessaging *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_messaging_check_support_ready (MMIfaceModemMessaging *_self,
                                       GAsyncResult *res,
-                                      GSimpleAsyncResult *simple)
+                                      GTask *task)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
 
     self->priv->messaging_fallback_at = iface_modem_messaging_parent->check_support_finish (_self, res, NULL);
 
-    g_simple_async_result_set_op_res_gboolean (simple, self->priv->messaging_fallback_at);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, self->priv->messaging_fallback_at);
+    g_object_unref (task);
 }
 
 static void
@@ -7332,13 +7330,10 @@ messaging_check_support (MMIfaceModemMessaging *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortQmi *port;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the WMS client, messaging is supported */
@@ -7347,14 +7342,13 @@ messaging_check_support (MMIfaceModemMessaging *self,
         iface_modem_messaging_parent->check_support (
             self,
             (GAsyncReadyCallback)parent_messaging_check_support_ready,
-            result);
+            task);
         return;
     }
 
     mm_dbg ("Messaging capabilities supported");
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
