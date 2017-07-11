@@ -7389,7 +7389,7 @@ messaging_load_supported_storages (MMIfaceModemMessaging *_self,
                                    gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* Handle fallback */
     if (self->priv->messaging_fallback_at) {
@@ -7397,13 +7397,9 @@ messaging_load_supported_storages (MMIfaceModemMessaging *_self,
         return;
     }
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_load_supported_storages);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
