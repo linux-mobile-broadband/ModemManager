@@ -2636,11 +2636,15 @@ modem_load_supported_ip_families_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_BEARER_IP_FAMILY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                    G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+    return (MMBearerIpFamily)value;
 }
 
 static void
@@ -2648,28 +2652,19 @@ modem_load_supported_ip_families (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_ip_families);
-
+    task = g_task_new (self, NULL, callback, user_data);
     if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self)))
         /* CDMA-only: IPv4 */
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
-            NULL);
+        g_task_return_int (task, MM_BEARER_IP_FAMILY_IPV4);
     else
         /* Assume IPv4 + IPv6 supported */
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6),
-            NULL);
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_int (task,
+                           MM_BEARER_IP_FAMILY_IPV4 |
+                           MM_BEARER_IP_FAMILY_IPV6 |
+                           MM_BEARER_IP_FAMILY_IPV4V6);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
