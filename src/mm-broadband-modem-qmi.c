@@ -10710,7 +10710,7 @@ signal_check_support_finish (MMIfaceModemSignal *self,
                              GError **error)
 {
 
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -10718,14 +10718,9 @@ signal_check_support (MMIfaceModemSignal *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     MMPortQmi *port;
     gboolean supported = FALSE;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        signal_check_support);
+    GTask *task;
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
 
@@ -10734,9 +10729,10 @@ signal_check_support (MMIfaceModemSignal *self,
         supported = !!mm_port_qmi_peek_client (port, QMI_SERVICE_NAS, MM_PORT_QMI_FLAG_DEFAULT);
 
     mm_dbg ("Extended signal capabilities %ssupported", supported ? "" : "not ");
-    g_simple_async_result_set_op_res_gboolean (result, supported);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, supported);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
