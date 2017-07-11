@@ -11178,13 +11178,13 @@ enabling_started_finish (MMBroadbandModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_enabling_started_ready (MMBroadbandModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     GError *error = NULL;
 
@@ -11198,9 +11198,8 @@ parent_enabling_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -11208,16 +11207,14 @@ enabling_started (MMBroadbandModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        enabling_started);
+    task = g_task_new (self, NULL, callback, user_data);
+
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started (
         self,
         (GAsyncReadyCallback)parent_enabling_started_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
