@@ -6634,14 +6634,7 @@ modem_cdma_load_meid_finish (MMIfaceModemCdma *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    gchar *meid;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    meid = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded MEID: %s", meid);
-    return meid;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -6650,24 +6643,18 @@ modem_cdma_load_meid (MMIfaceModemCdma *_self,
                       gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_load_meid);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->meid)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->meid,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->meid), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid MEID");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid MEID");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
