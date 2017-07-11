@@ -3968,14 +3968,7 @@ modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    gchar *imei;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    imei = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded IMEI: %s", imei);
-    return imei;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -3984,24 +3977,18 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
                       gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_imei);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->imei)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->imei,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->imei), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid IMEI");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid IMEI");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
