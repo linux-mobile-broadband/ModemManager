@@ -11224,21 +11224,16 @@ enabling_started (MMBroadbandModem *self,
 /* First initialization step */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortQmi *qmi;
     QmiService services[32];
     guint service_index;
 } InitializationStartedContext;
 
 static void
-initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+initialization_started_context_free (InitializationStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->qmi)
         g_object_unref (ctx->qmi);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -11247,17 +11242,13 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* Just parent's pointer passed here */
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_initialization_started_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
-                                     InitializationStartedContext *ctx)
+                                     GTask *task)
 {
     gpointer parent_ctx;
     GError *error = NULL;
@@ -11273,27 +11264,34 @@ parent_initialization_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
-    initialization_started_context_complete_and_free (ctx);
+    /* Just parent's pointer passed here */
+    g_task_return_pointer (task, parent_ctx, NULL);
+    g_object_unref (task);
 }
 
 static void
-parent_initialization_started (InitializationStartedContext *ctx)
+parent_initialization_started (GTask *task)
 {
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->initialization_started (
-        ctx->self,
+        self,
         (GAsyncReadyCallback)parent_initialization_started_ready,
-        ctx);
+        task);
 }
 
-static void allocate_next_client (InitializationStartedContext *ctx);
+static void allocate_next_client (GTask *task);
 
 static void
 qmi_port_allocate_client_ready (MMPortQmi *qmi,
                                 GAsyncResult *res,
-                                InitializationStartedContext *ctx)
+                                GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
         mm_dbg ("Couldn't allocate client for service '%s': %s",
@@ -11303,15 +11301,19 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
     }
 
     ctx->service_index++;
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
-allocate_next_client (InitializationStartedContext *ctx)
+allocate_next_client (GTask *task)
 {
+    InitializationStartedContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (ctx->services[ctx->service_index] == QMI_SERVICE_UNKNOWN) {
         /* Done we are, launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -11321,32 +11323,35 @@ allocate_next_client (InitializationStartedContext *ctx)
                                  MM_PORT_QMI_FLAG_DEFAULT,
                                  NULL,
                                  (GAsyncReadyCallback)qmi_port_allocate_client_ready,
-                                 ctx);
+                                 task);
 }
 
 
 static void
 qmi_port_open_ready_no_data_format (MMPortQmi *qmi,
                                     GAsyncResult *res,
-                                    InitializationStartedContext *ctx)
+                                    GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_port_qmi_open_finish (qmi, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
 qmi_port_open_ready (MMPortQmi *qmi,
                      GAsyncResult *res,
-                     InitializationStartedContext *ctx)
+                     GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_port_qmi_open_finish (qmi, res, &error)) {
         /* Really, really old devices (Gobi 1K, 2008-era firmware) may not
@@ -11358,11 +11363,11 @@ qmi_port_open_ready (MMPortQmi *qmi,
                           FALSE,
                           NULL,
                           (GAsyncReadyCallback)qmi_port_open_ready_no_data_format,
-                          ctx);
+                          task);
         return;
     }
 
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
@@ -11371,28 +11376,27 @@ initialization_started (MMBroadbandModem *self,
                         gpointer user_data)
 {
     InitializationStartedContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (InitializationStartedContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_started);
     ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
 
     /* This may happen if we unplug the modem unexpectedly */
     if (!ctx->qmi) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot initialize: QMI port went missing");
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot initialize: QMI port went missing");
+        g_object_unref (task);
         return;
     }
 
     if (mm_port_qmi_is_open (ctx->qmi)) {
         /* Nothing to be done, just launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -11410,7 +11414,7 @@ initialization_started (MMBroadbandModem *self,
                       TRUE,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
-                      ctx);
+                      task);
 }
 
 /*****************************************************************************/
