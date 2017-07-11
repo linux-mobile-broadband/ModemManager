@@ -1524,19 +1524,14 @@ enabling_started (MMBroadbandModem *self,
 /* First initialization step */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortMbim *mbim;
 } InitializationStartedContext;
 
 static void
-initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+initialization_started_context_free (InitializationStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->mbim)
         g_object_unref (ctx->mbim);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (InitializationStartedContext, ctx);
 }
 
@@ -1545,21 +1540,19 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* Just parent's pointer passed here */
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_initialization_started_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
-                                     InitializationStartedContext *ctx)
+                                     GTask *task)
 {
+    InitializationStartedContext *ctx;
     gpointer parent_ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     parent_ctx = MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->initialization_started_finish (
         self,
         res,
@@ -1571,34 +1564,39 @@ parent_initialization_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
-    initialization_started_context_complete_and_free (ctx);
+    /* Just parent's pointer passed here */
+    g_task_return_pointer (task, parent_ctx, NULL);
+    g_object_unref (task);
 }
 
 static void
-parent_initialization_started (InitializationStartedContext *ctx)
+parent_initialization_started (GTask *task)
 {
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->initialization_started (
-        ctx->self,
+        self,
         (GAsyncReadyCallback)parent_initialization_started_ready,
-        ctx);
+        task);
 }
 
 static void
 mbim_port_open_ready (MMPortMbim *mbim,
                       GAsyncResult *res,
-                      InitializationStartedContext *ctx)
+                      GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_mbim_open_finish (mbim, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Done we are, launch parent's callback */
-    parent_initialization_started (ctx);
+    parent_initialization_started (task);
 }
 
 static void
@@ -1607,28 +1605,27 @@ initialization_started (MMBroadbandModem *self,
                         gpointer user_data)
 {
     InitializationStartedContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (InitializationStartedContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_started);
     ctx->mbim = mm_base_modem_get_port_mbim (MM_BASE_MODEM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
 
     /* This may happen if we unplug the modem unexpectedly */
     if (!ctx->mbim) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot initialize: MBIM port went missing");
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot initialize: MBIM port went missing");
+        g_object_unref (task);
         return;
     }
 
     if (mm_port_mbim_is_open (ctx->mbim)) {
         /* Nothing to be done, just launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -1636,7 +1633,7 @@ initialization_started (MMBroadbandModem *self,
     mm_port_mbim_open (ctx->mbim,
                        NULL,
                        (GAsyncReadyCallback)mbim_port_open_ready,
-                       ctx);
+                       task);
 }
 
 /*****************************************************************************/
