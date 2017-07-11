@@ -298,12 +298,7 @@ modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBaseBearer *bearer;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -313,18 +308,14 @@ modem_create_bearer (MMIfaceModem *self,
                      gpointer user_data)
 {
     MMBaseBearer *bearer;
-    GSimpleAsyncResult *result;
-    /* Set a new ref to the bearer object as result */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_bearer);
+    GTask *task;
 
     /* We just create a MMBearerQmi */
     bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties);
-    g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
