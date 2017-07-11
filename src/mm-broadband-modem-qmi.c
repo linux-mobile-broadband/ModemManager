@@ -10406,12 +10406,18 @@ firmware_check_support (MMIfaceModemFirmware *self,
 /*****************************************************************************/
 /* Load firmware list (Firmware interface) */
 
+static void
+firmware_list_free (GList *firmware_list)
+{
+    g_list_free_full (firmware_list, g_object_unref);
+}
+
 static GList *
 firmware_load_list_finish (MMIfaceModemFirmware *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    return (GList *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -10420,20 +10426,15 @@ firmware_load_list (MMIfaceModemFirmware *_self,
                     gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
     GList *dup;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        firmware_load_list);
+    GTask *task;
 
     /* We'll return the new list of new references we create here */
     dup = g_list_copy_deep (self->priv->firmware_list, (GCopyFunc)g_object_ref, NULL);
 
-    g_simple_async_result_set_op_res_gpointer (result, dup, NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, dup, (GDestroyNotify)firmware_list_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
