@@ -2503,7 +2503,7 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -2512,22 +2512,18 @@ modem_load_supported_modes (MMIfaceModem *_self,
                             gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
     GArray *combinations;
     MMModemModeCombination mode;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!self->priv->supported_radio_interfaces) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot load supported modes, no radio interface list");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot load supported modes, no radio interface list");
+        g_object_unref (task);
         return;
     }
 
@@ -2628,9 +2624,8 @@ modem_load_supported_modes (MMIfaceModem *_self,
         combinations = filtered;
     }
 
-    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
