@@ -1495,35 +1495,28 @@ typedef enum {
 } LoadUnlockRequiredStep;
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
     LoadUnlockRequiredStep step;
     QmiClient *dms;
     QmiClient *uim;
 } LoadUnlockRequiredContext;
-
-static void
-load_unlock_required_context_complete_and_free (LoadUnlockRequiredContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadUnlockRequiredContext, ctx);
-}
 
 static MMModemLock
 modem_load_unlock_required_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
 }
 
-static void load_unlock_required_context_step (LoadUnlockRequiredContext *ctx);
+static void load_unlock_required_context_step (GTask *task);
 
 /* Used also when loading unlock retries left */
 static gboolean
@@ -1758,7 +1751,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
 static void
 unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            GAsyncResult *res,
-                                           LoadUnlockRequiredContext *ctx)
+                                           GTask *task)
 {
     QmiMessageUimGetCardStatusOutput *output;
     GError *error = NULL;
@@ -1767,8 +1760,8 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1777,19 +1770,21 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            NULL, NULL, NULL, NULL,
                                            &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
+        g_task_return_int (task, lock);
+    g_object_unref (task);
 
     qmi_message_uim_get_card_status_output_unref (output);
-    load_unlock_required_context_complete_and_free (ctx);
 }
 
 static void
 dms_uim_get_pin_status_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              LoadUnlockRequiredContext *ctx)
+                              GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadUnlockRequiredContext *ctx;
     QmiMessageDmsUimGetPinStatusOutput *output;
     GError *error = NULL;
     MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
@@ -1798,10 +1793,13 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
         /* We get InvalidQmiCommand on newer devices which don't like the legacy way */
@@ -1814,9 +1812,9 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
             /* Flag that the command is unsupported, and try with the new way */
-            ctx->self->priv->dms_uim_deprecated = TRUE;
+            self->priv->dms_uim_deprecated = TRUE;
             ctx->step++;
-            load_unlock_required_context_step (ctx);
+            load_unlock_required_context_step (task);
             return;
         }
 
@@ -1827,22 +1825,22 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
                              QMI_PROTOCOL_ERROR_UIM_UNINITIALIZED)) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_RETRY,
-                                             "Couldn't get PIN status (retry): %s",
-                                             error->message);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_RETRY,
+                                     "Couldn't get PIN status (retry): %s",
+                                     error->message);
+            g_object_unref (task);
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
-            load_unlock_required_context_complete_and_free (ctx);
             return;
         }
 
         /* Other errors, just propagate them */
         g_prefix_error (&error, "Couldn't get PIN status: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_dms_uim_get_pin_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
         return;
     }
 
@@ -1872,16 +1870,20 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
     }
 
     /* We're done! */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
-    qmi_message_dms_uim_get_pin_status_output_unref (output);
-    load_unlock_required_context_complete_and_free (ctx);
+    g_task_return_int (task, lock);
+    g_object_unref (task);
 }
 
 static void
-load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
+load_unlock_required_context_step (GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadUnlockRequiredContext *ctx;
     GError *error = NULL;
     QmiClient *client;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case LOAD_UNLOCK_REQUIRED_STEP_FIRST:
@@ -1890,22 +1892,22 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
 
     case LOAD_UNLOCK_REQUIRED_STEP_CDMA:
         /* CDMA-only modems don't need this */
-        if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self))) {
+        if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
             mm_dbg ("Skipping unlock check in CDMA-only modem...");
-            g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (MM_MODEM_LOCK_NONE), NULL);
-            load_unlock_required_context_complete_and_free (ctx);
+            g_task_return_int (task, MM_MODEM_LOCK_NONE);
+            g_object_unref (task);
             return;
         }
         ctx->step++;
         /* Go on to next step */
 
     case LOAD_UNLOCK_REQUIRED_STEP_DMS:
-        if (!ctx->self->priv->dms_uim_deprecated) {
+        if (!self->priv->dms_uim_deprecated) {
             /* Failure to get DMS client is hard really */
-            client = peek_qmi_client (ctx->self, QMI_SERVICE_DMS, &error);
+            client = peek_qmi_client (self, QMI_SERVICE_DMS, &error);
             if (!client) {
-                g_simple_async_result_take_error (ctx->result, error);
-                load_unlock_required_context_complete_and_free (ctx);
+                g_task_return_error (task, error);
+                g_object_unref (task);
                 return;
             }
 
@@ -1915,7 +1917,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
                                                5,
                                                NULL,
                                                (GAsyncReadyCallback) dms_uim_get_pin_status_ready,
-                                               ctx);
+                                               task);
             return;
         }
         ctx->step++;
@@ -1923,10 +1925,10 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
 
     case LOAD_UNLOCK_REQUIRED_STEP_UIM:
         /* Failure to get UIM client at this point is hard as well */
-        client = peek_qmi_client (ctx->self, QMI_SERVICE_UIM, &error);
+        client = peek_qmi_client (self, QMI_SERVICE_UIM, &error);
         if (!client) {
-            g_simple_async_result_take_error (ctx->result, error);
-            load_unlock_required_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -1936,7 +1938,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
                                         5,
                                         NULL,
                                         (GAsyncReadyCallback) unlock_required_uim_get_card_status_ready,
-                                        ctx);
+                                        task);
         return;
     }
 }
@@ -1947,16 +1949,15 @@ modem_load_unlock_required (MMIfaceModem *self,
                             gpointer user_data)
 {
     LoadUnlockRequiredContext *ctx;
+    GTask *task;
 
-    ctx = g_slice_new0 (LoadUnlockRequiredContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_unlock_required);
+    ctx = g_new0 (LoadUnlockRequiredContext, 1);
     ctx->step = LOAD_UNLOCK_REQUIRED_STEP_FIRST;
 
-    load_unlock_required_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    load_unlock_required_context_step (task);
 }
 
 /*****************************************************************************/
