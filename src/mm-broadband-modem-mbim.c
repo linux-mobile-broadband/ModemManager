@@ -95,19 +95,17 @@ struct _MMBroadbandModemMbimPrivate {
 static gboolean
 peek_device (gpointer self,
              MbimDevice **o_device,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+             GTask *task)
 {
     MMPortMbim *port;
 
     port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     if (!port) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't peek MBIM port");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek MBIM port");
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -118,48 +116,33 @@ peek_device (gpointer self,
 /*****************************************************************************/
 /* Current Capabilities loading (Modem interface) */
 
-typedef struct {
-    MMBroadbandModemMbim *self;
-    GSimpleAsyncResult *result;
-} LoadCapabilitiesContext;
-
-static void
-load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadCapabilitiesContext, ctx);
-}
-
 static MMModemCapability
 modem_load_current_capabilities_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    MMModemCapability caps;
-    gchar *caps_str;
+    GError *inner_error = NULL;
+    gssize value;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return MM_MODEM_CAPABILITY_NONE;
-
-    caps = ((MMModemCapability) GPOINTER_TO_UINT (
-                g_simple_async_result_get_op_res_gpointer (
-                    G_SIMPLE_ASYNC_RESULT (res))));
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("loaded modem capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
+    }
+    return (MMModemCapability)value;
 }
 
 static void
 device_caps_query_ready (MbimDevice *device,
                          GAsyncResult *res,
-                         LoadCapabilitiesContext *ctx)
+                         GTask *task)
 {
+    MMBroadbandModemMbim *self;
     MMModemCapability mask;
     MbimMessage *response;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -167,39 +150,38 @@ device_caps_query_ready (MbimDevice *device,
         mbim_message_device_caps_response_parse (
             response,
             NULL, /* device_type */
-            &ctx->self->priv->caps_cellular_class,
+            &self->priv->caps_cellular_class,
             NULL, /* voice_class */
             NULL, /* sim_class */
-            &ctx->self->priv->caps_data_class,
-            &ctx->self->priv->caps_sms,
+            &self->priv->caps_data_class,
+            &self->priv->caps_sms,
             NULL, /* ctrl_caps */
-            &ctx->self->priv->caps_max_sessions,
+            &self->priv->caps_max_sessions,
             NULL, /* custom_data_class */
-            &ctx->self->priv->caps_device_id,
-            &ctx->self->priv->caps_firmware_info,
+            &self->priv->caps_device_id,
+            &self->priv->caps_firmware_info,
             NULL, /* hardware_info */
             &error)) {
         /* Build mask of modem capabilities */
         mask = 0;
-        if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
+        if (self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
             mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
 
 #if 0  /* Disable until we add MBIM CDMA support */
-        if (ctx->self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
+        if (self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
             mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
 #endif
 
-        if (ctx->self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
+        if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
             mask |= MM_MODEM_CAPABILITY_LTE;
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (mask),
-                                                   NULL);
+        g_task_return_int (task, mask);
     } else
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    load_capabilities_context_complete_and_free (ctx);
 }
 
 static void
@@ -207,19 +189,14 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    LoadCapabilitiesContext *ctx;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    ctx = g_slice_new (LoadCapabilitiesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_current_capabilities);
+    if (!peek_device (self, &device, task))
+        return;
 
     mm_dbg ("loading current capabilities...");
     message = mbim_message_device_caps_query_new (NULL);
@@ -228,7 +205,7 @@ modem_load_current_capabilities (MMIfaceModem *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)device_caps_query_ready,
-                         ctx);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -240,7 +217,7 @@ modem_load_manufacturer_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    return g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -248,14 +225,14 @@ modem_load_manufacturer (MMIfaceModem *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
+    gchar *manufacturer;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_manufacturer);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    manufacturer = g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, manufacturer, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -266,10 +243,7 @@ modem_load_model_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return g_strdup_printf ("MBIM [%04X:%04X]",
-                            (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
-                            (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
-
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -277,14 +251,16 @@ modem_load_model (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    gchar *model;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_model);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    model = g_strdup_printf ("MBIM [%04X:%04X]",
+                             (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
+                             (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, model, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -295,30 +271,28 @@ modem_load_revision_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info)
-        return g_strdup (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_firmware_info);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Firmware revision information not given in device capabilities");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_load_revision (MMIfaceModem *self,
+modem_load_revision (MMIfaceModem *_self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just complete */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_revision);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->caps_firmware_info)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->caps_firmware_info),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Firmware revision information not given in device capabilities");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -329,30 +303,28 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_device_id)
-        return g_strdup (MM_BROADBAND_MODEM_MBIM (self)->priv->caps_device_id);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Device ID not given in device capabilities");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_load_equipment_identifier (MMIfaceModem *self,
+modem_load_equipment_identifier (MMIfaceModem *_self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just complete */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_equipment_identifier);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->caps_device_id)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->caps_device_id),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device ID not given in device capabilities");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -363,13 +335,7 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    gchar *device_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    device_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    return device_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -377,22 +343,16 @@ modem_load_device_identifier (MMIfaceModem *self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     gchar *device_identifier;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_device_identifier);
+    GTask *task;
 
     /* Just use dummy ATI/ATI1 replies, all the other internal info should be
      * enough for uniqueness */
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "");
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               device_identifier,
-                                               g_free);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, device_identifier, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -403,7 +363,7 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -414,23 +374,17 @@ modem_load_supported_modes (MMIfaceModem *_self,
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
     GArray *combinations;
     MMModemModeCombination mode;
-    GSimpleAsyncResult *result;
     MMModemMode all;
+    GTask *task;
 
-    /* Just complete */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_modes);
-
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->caps_data_class == 0) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Data class not given in device capabilities");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Data class not given in device capabilities");
+        g_object_unref (task);
         return;
     }
 
@@ -465,9 +419,8 @@ modem_load_supported_modes (MMIfaceModem *_self,
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (combinations, mode);
 
-    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, combinations, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -478,11 +431,15 @@ modem_load_supported_ip_families_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_BEARER_IP_FAMILY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                    G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+    return (MMBearerIpFamily)value;
 }
 
 static void
@@ -490,41 +447,29 @@ modem_load_supported_ip_families (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_ip_families);
-
+    task = g_task_new (self, NULL, callback, user_data);
     /* Assume IPv4 + IPv6 + IPv4v6 supported */
-    g_simple_async_result_set_op_res_gpointer (
-        result,
-        GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4 |
-                          MM_BEARER_IP_FAMILY_IPV6 |
-                          MM_BEARER_IP_FAMILY_IPV4V6),
-        NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_int (task,
+                       MM_BEARER_IP_FAMILY_IPV4 |
+                       MM_BEARER_IP_FAMILY_IPV6 |
+                       MM_BEARER_IP_FAMILY_IPV4V6);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
 /* Unlock required loading (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemMbim *self;
-    GSimpleAsyncResult *result;
     guint n_ready_status_checks;
     MbimDevice *device;
 } LoadUnlockRequiredContext;
 
 static void
-load_unlock_required_context_complete_and_free (LoadUnlockRequiredContext *ctx)
+load_unlock_required_context_free (LoadUnlockRequiredContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->device);
-    g_object_unref (ctx->self);
     g_slice_free (LoadUnlockRequiredContext, ctx);
 }
 
@@ -533,16 +478,21 @@ modem_load_unlock_required_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
 }
 
 static void
 pin_query_ready (MbimDevice *device,
                  GAsyncResult *res,
-                 LoadUnlockRequiredContext *ctx)
+                 GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -564,35 +514,36 @@ pin_query_ready (MbimDevice *device,
             unlock_required = MM_MODEM_LOCK_NONE;
         else
             unlock_required = mm_modem_lock_from_mbim_pin_type (pin_type);
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (unlock_required),
-                                                   NULL);
+
+        g_task_return_int (task, unlock_required);
     }
     /* VZ20M reports an error when SIM-PIN is required... */
     else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_PIN_REQUIRED)) {
         g_error_free (error);
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (MBIM_PIN_TYPE_PIN1),
-                                                   NULL);
+        g_task_return_int (task, MBIM_PIN_TYPE_PIN1);
     }
     else
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    load_unlock_required_context_complete_and_free (ctx);
 }
 
-static gboolean wait_for_sim_ready (LoadUnlockRequiredContext *ctx);
+static gboolean wait_for_sim_ready (GTask *task);
 
 static void
 unlock_required_subscriber_ready_state_ready (MbimDevice *device,
                                               GAsyncResult *res,
-                                              LoadUnlockRequiredContext *ctx)
+                                              GTask *task)
 {
+    LoadUnlockRequiredContext *ctx;
     MbimMessage *response;
     GError *error = NULL;
     MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+
+    ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -629,8 +580,8 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
 
     /* Fatal errors are reported right away */
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
     }
     /* Need to retry? */
     else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED ||
@@ -638,18 +589,18 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
         if (--ctx->n_ready_status_checks == 0) {
             /* All retries consumed, issue error */
             if (ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)
-                g_simple_async_result_take_error (
-                    ctx->result,
+                g_task_return_error (
+                    task,
                     mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED));
             else
-                g_simple_async_result_set_error (ctx->result,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_FAILED,
-                                                 "Error waiting for SIM to get initialized");
-            load_unlock_required_context_complete_and_free (ctx);
+                g_task_return_new_error (task,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Error waiting for SIM to get initialized");
+            g_object_unref (task);
         } else {
             /* Retry */
-            g_timeout_add_seconds (1, (GSourceFunc)wait_for_sim_ready, ctx);
+            g_timeout_add_seconds (1, (GSourceFunc)wait_for_sim_ready, task);
         }
     }
     /* Initialized but locked? */
@@ -663,15 +614,13 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
                              10,
                              NULL,
                              (GAsyncReadyCallback)pin_query_ready,
-                             ctx);
+                             task);
         mbim_message_unref (message);
     }
     /* Initialized but locked? */
     else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
-                                                   NULL);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
     } else
         g_assert_not_reached ();
 
@@ -680,17 +629,19 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
 }
 
 static gboolean
-wait_for_sim_ready (LoadUnlockRequiredContext *ctx)
+wait_for_sim_ready (GTask *task)
 {
+    LoadUnlockRequiredContext *ctx;
     MbimMessage *message;
 
+    ctx = g_task_get_task_data (task);
     message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (ctx->device,
                          message,
                          10,
                          NULL,
                          (GAsyncReadyCallback)unlock_required_subscriber_ready_state_ready,
-                         ctx);
+                         task);
     mbim_message_unref (message);
     return G_SOURCE_REMOVE;
 }
@@ -700,22 +651,23 @@ modem_load_unlock_required (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    GTask *task;
     LoadUnlockRequiredContext *ctx;
     MbimDevice *device;
 
-    if (!peek_device (self, &device, callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!peek_device (self, &device, task))
         return;
 
     ctx = g_slice_new (LoadUnlockRequiredContext);
-    ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_unlock_required);
     ctx->n_ready_status_checks = 10;
 
-    wait_for_sim_ready (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_unlock_required_context_free);
+
+    wait_for_sim_ready (task);
 }
 
 /*****************************************************************************/
@@ -726,16 +678,13 @@ modem_load_unlock_retries_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_UNLOCK_RETRIES (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 pin_query_unlock_retries_ready (MbimDevice *device,
                                 GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+                                GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -761,14 +710,14 @@ pin_query_unlock_retries_ready (MbimDevice *device,
                                    mm_modem_lock_from_mbim_pin_type (pin_type),
                                    remaining_attempts);
         }
-        g_simple_async_result_set_op_res_gpointer (simple, retries, g_object_unref);
+        g_task_return_pointer (task, retries, g_object_unref);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -776,17 +725,14 @@ modem_load_unlock_retries (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_unlock_retries);
+    if (!peek_device (self, &device, task))
+        return;
 
     message = mbim_message_pin_query_new (NULL);
     mbim_device_command (device,
@@ -794,7 +740,7 @@ modem_load_unlock_retries (MMIfaceModem *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)pin_query_unlock_retries_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -806,16 +752,13 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 own_numbers_subscriber_ready_state_ready (MbimDevice *device,
                                           GAsyncResult *res,
-                                          GSimpleAsyncResult *simple)
+                                          GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -833,14 +776,14 @@ own_numbers_subscriber_ready_state_ready (MbimDevice *device,
             NULL, /* telephone_numbers_count */
             &telephone_numbers,
             &error)) {
-        g_simple_async_result_set_op_res_gpointer (simple, telephone_numbers, NULL);
+        g_task_return_pointer (task, telephone_numbers, (GDestroyNotify)g_strfreev);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -848,17 +791,14 @@ modem_load_own_numbers (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_own_numbers);
+    if (!peek_device (self, &device, task))
+        return;
 
     message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
@@ -866,7 +806,7 @@ modem_load_own_numbers (MMIfaceModem *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)own_numbers_subscriber_ready_state_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -878,16 +818,21 @@ modem_load_power_state_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_POWER_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemPowerState) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+    }
+    return (MMModemPowerState)value;
 }
 
 static void
 radio_state_query_ready (MbimDevice *device,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -909,16 +854,13 @@ radio_state_query_ready (MbimDevice *device,
             state = MM_MODEM_POWER_STATE_LOW;
         else
             state = MM_MODEM_POWER_STATE_ON;
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (state),
-                                                   NULL);
+        g_task_return_int (task, state);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -926,17 +868,14 @@ modem_load_power_state (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_power_state);
+    if (!peek_device (self, &device, task))
+        return;
 
     message = mbim_message_radio_state_query_new (NULL);
     mbim_device_command (device,
@@ -944,7 +883,7 @@ modem_load_power_state (MMIfaceModem *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)radio_state_query_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -965,9 +904,7 @@ typedef enum {
 } PowerUpContextStep;
 
 typedef struct {
-    MMBroadbandModemMbim *self;
     MbimDevice *device;
-    GSimpleAsyncResult *result;
     PowerUpContextStep step;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     QmiDevice *qmi_device;
@@ -977,7 +914,7 @@ typedef struct {
 } PowerUpContext;
 
 static void
-power_up_context_complete_and_free (PowerUpContext *ctx)
+power_up_context_free (PowerUpContext *ctx)
 {
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (ctx->qmi_device) {
@@ -993,10 +930,7 @@ power_up_context_complete_and_free (PowerUpContext *ctx)
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
 #endif
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->device);
-    g_object_unref (ctx->self);
     g_slice_free (PowerUpContext, ctx);
 }
 
@@ -1005,19 +939,22 @@ power_up_finish (MMIfaceModem *self,
                  GAsyncResult *res,
                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void power_up_context_step (PowerUpContext *ctx);
+static void power_up_context_step (GTask *task);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static void
-release_qmi_client_dms_ready (QmiDevice      *dev,
-                              GAsyncResult   *res,
-                              PowerUpContext *ctx)
+release_qmi_client_dms_ready (QmiDevice *dev,
+                              GAsyncResult *res,
+                              GTask *task)
 {
+    PowerUpContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* Non-fatal error */
     if (!qmi_device_release_client_finish (dev, res, &error)) {
@@ -1026,42 +963,47 @@ release_qmi_client_dms_ready (QmiDevice      *dev,
     }
 
     ctx->step++;
-    power_up_context_step (ctx);
+    power_up_context_step (task);
 }
 
 static void
-set_radio_state_release_qmi_client_dms (PowerUpContext *ctx)
+set_radio_state_release_qmi_client_dms (GTask *task)
 {
+    PowerUpContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     qmi_device_release_client (ctx->qmi_device,
                                ctx->qmi_client,
                                QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
                                10,
                                NULL,
                                (GAsyncReadyCallback)release_qmi_client_dms_ready,
-                               ctx);
+                               task);
 }
 
 static void
-set_fcc_authentication_ready (QmiClientDms   *client,
-                              GAsyncResult   *res,
-                              PowerUpContext *ctx)
+set_fcc_authentication_ready (QmiClientDms *client,
+                              GAsyncResult *res,
+                              GTask *task)
 {
+    PowerUpContext *ctx;
     QmiMessageDmsSetFccAuthenticationOutput *output;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
         mm_dbg ("error: couldn't set FCC auth: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
-        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        g_task_return_error (task, ctx->saved_error);
         ctx->saved_error = NULL;
-        power_up_context_complete_and_free (ctx);
+        g_object_unref (task);
         goto out;
     }
 
     ctx->step++;
-    power_up_context_step (ctx);
+    power_up_context_step (task);
 
 out:
     if (output)
@@ -1069,41 +1011,49 @@ out:
 }
 
 static void
-set_radio_state_fcc_auth (PowerUpContext *ctx)
+set_radio_state_fcc_auth (GTask *task)
 {
+    PowerUpContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->qmi_client),
                                            NULL,
                                            10,
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)set_fcc_authentication_ready,
-                                           ctx);
+                                           task);
 }
 
 static void
-qmi_client_dms_ready (QmiDevice      *dev,
-                      GAsyncResult   *res,
-                      PowerUpContext *ctx)
+qmi_client_dms_ready (QmiDevice *dev,
+                      GAsyncResult *res,
+                      GTask *task)
 {
+    PowerUpContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     ctx->qmi_client = qmi_device_allocate_client_finish (dev, res, &error);
     if (!ctx->qmi_client) {
         mm_dbg ("error: couldn't create DMS client: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
-        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        g_task_return_error (task, ctx->saved_error);
         ctx->saved_error = NULL;
-        power_up_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
     ctx->step++;
-    power_up_context_step (ctx);
+    power_up_context_step (task);
 }
 
 static void
-set_radio_state_allocate_qmi_client_dms (PowerUpContext *ctx)
+set_radio_state_allocate_qmi_client_dms (GTask *task)
 {
+    PowerUpContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     g_assert (ctx->qmi_device);
     qmi_device_allocate_client (ctx->qmi_device,
                                 QMI_SERVICE_DMS,
@@ -1111,90 +1061,101 @@ set_radio_state_allocate_qmi_client_dms (PowerUpContext *ctx)
                                 10,
                                 NULL, /* cancellable */
                                 (GAsyncReadyCallback) qmi_client_dms_ready,
-                                ctx);
+                                task);
 }
 
 static void
-device_open_ready (QmiDevice      *dev,
-                   GAsyncResult   *res,
-                   PowerUpContext *ctx)
+device_open_ready (QmiDevice *dev,
+                   GAsyncResult *res,
+                   GTask *task)
 {
+    PowerUpContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     if (!qmi_device_open_finish (dev, res, &error)) {
         mm_dbg ("error: couldn't open QmiDevice: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
-        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        g_task_return_error (task, ctx->saved_error);
         ctx->saved_error = NULL;
-        power_up_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
     ctx->step++;
-    power_up_context_step (ctx);
+    power_up_context_step (task);
 }
 
 static void
-set_radio_state_qmi_device_open (PowerUpContext *ctx)
+set_radio_state_qmi_device_open (GTask *task)
 {
+    PowerUpContext *ctx;
+
     /* Open the device */
+    ctx = g_task_get_task_data (task);
     g_assert (ctx->qmi_device);
     qmi_device_open (ctx->qmi_device,
                      (QMI_DEVICE_OPEN_FLAGS_PROXY | QMI_DEVICE_OPEN_FLAGS_MBIM),
                      15,
                      NULL, /* cancellable */
                      (GAsyncReadyCallback)device_open_ready,
-                     ctx);
+                     task);
 }
 
 static void
-qmi_device_new_ready (GObject        *unused,
-                      GAsyncResult   *res,
-                      PowerUpContext *ctx)
+qmi_device_new_ready (GObject *unused,
+                      GAsyncResult *res,
+                      GTask *task)
 {
+    PowerUpContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     ctx->qmi_device = qmi_device_new_finish (res, &error);
     if (!ctx->qmi_device) {
         mm_dbg ("error: couldn't create QmiDevice: %s", error->message);
         g_error_free (error);
         g_assert (ctx->saved_error);
-        g_simple_async_result_take_error (ctx->result, ctx->saved_error);
+        g_task_return_error (task, ctx->saved_error);
         ctx->saved_error = NULL;
-        power_up_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
     ctx->step++;
-    power_up_context_step (ctx);
+    power_up_context_step (task);
 }
 
 static void
-set_radio_state_qmi_device_new (PowerUpContext *ctx)
+set_radio_state_qmi_device_new (GTask *task)
 {
+    PowerUpContext *ctx;
     GFile *file;
 
+    ctx = g_task_get_task_data (task);
     file = mbim_device_get_file (ctx->device);
     qmi_device_new (file,
                     NULL, /* cancellable */
                     (GAsyncReadyCallback) qmi_device_new_ready,
-                    ctx);
+                    task);
     g_object_unref (file);
 }
 
 #endif
 
 static void
-radio_state_set_up_ready (MbimDevice     *device,
-                          GAsyncResult   *res,
-                          PowerUpContext *ctx)
+radio_state_set_up_ready (MbimDevice *device,
+                          GAsyncResult *res,
+                          GTask *task)
 {
+    PowerUpContext *ctx;
     MbimMessage *response;
     GError *error = NULL;
     MbimRadioSwitchState hardware_radio_state;
     MbimRadioSwitchState software_radio_state;
 
+    ctx = g_task_get_task_data (task);
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
@@ -1219,7 +1180,7 @@ radio_state_set_up_ready (MbimDevice     *device,
     /* Nice! we're done, quick exit */
     if (!error) {
         ctx->step = POWER_UP_CONTEXT_STEP_LAST;
-        power_up_context_step (ctx);
+        power_up_context_step (task);
         return;
     }
 
@@ -1231,71 +1192,77 @@ radio_state_set_up_ready (MbimDevice     *device,
         g_assert (!ctx->saved_error);
         ctx->saved_error = error;
         ctx->step++;
-        power_up_context_step (ctx);
+        power_up_context_step (task);
         return;
     }
 #endif
 
     /* Fatal */
-    g_simple_async_result_take_error (ctx->result, error);
-    power_up_context_complete_and_free (ctx);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 static void
-set_radio_state_up (PowerUpContext *ctx)
+set_radio_state_up (GTask *task)
 {
+    PowerUpContext *ctx;
     MbimMessage *message;
 
+    ctx = g_task_get_task_data (task);
     message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_ON, NULL);
     mbim_device_command (ctx->device,
                          message,
                          20,
                          NULL,
                          (GAsyncReadyCallback)radio_state_set_up_ready,
-                         ctx);
+                         task);
     mbim_message_unref (message);
 }
 
 static void
-power_up_context_step (PowerUpContext *ctx)
+power_up_context_step (GTask *task)
 {
+    PowerUpContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case POWER_UP_CONTEXT_STEP_FIRST:
-        set_radio_state_up (ctx);
+        set_radio_state_up (task);
         return;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
     case POWER_UP_CONTEXT_STEP_QMI_DEVICE_NEW:
-        set_radio_state_qmi_device_new (ctx);
+        set_radio_state_qmi_device_new (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_QMI_DEVICE_OPEN:
-        set_radio_state_qmi_device_open (ctx);
+        set_radio_state_qmi_device_open (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_ALLOCATE_QMI_CLIENT_DMS:
-        set_radio_state_allocate_qmi_client_dms (ctx);
+        set_radio_state_allocate_qmi_client_dms (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_FCC_AUTH:
-        set_radio_state_fcc_auth (ctx);
+        set_radio_state_fcc_auth (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_RELEASE_QMI_CLIENT_DMS:
-        set_radio_state_release_qmi_client_dms (ctx);
+        set_radio_state_release_qmi_client_dms (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_RETRY:
-        set_radio_state_up (ctx);
+        set_radio_state_up (task);
         return;
 
 #endif
 
     case POWER_UP_CONTEXT_STEP_LAST:
         /* Good! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        power_up_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
 
     default:
@@ -1308,21 +1275,23 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
+    GTask *task;
     PowerUpContext *ctx;
     MbimDevice *device;
 
-    if (!peek_device (self, &device, callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!peek_device (self, &device, task))
         return;
 
     ctx = g_slice_new0 (PowerUpContext);
-    ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
     ctx->step = POWER_UP_CONTEXT_STEP_FIRST;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_power_up);
-    power_up_context_step (ctx);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)power_up_context_free);
+
+    power_up_context_step (task);
 }
 
 /*****************************************************************************/
@@ -1333,13 +1302,13 @@ power_down_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-radio_state_set_down_ready (MbimDevice         *device,
-                            GAsyncResult       *res,
-                            GSimpleAsyncResult *simple)
+radio_state_set_down_ready (MbimDevice *device,
+                            GAsyncResult *res,
+                            GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -1351,11 +1320,10 @@ radio_state_set_down_ready (MbimDevice         *device,
     }
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -1363,24 +1331,22 @@ modem_power_down (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *simple;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!peek_device (self, &device, task))
         return;
 
-    simple = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_down);
     message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_OFF, NULL);
     mbim_device_command (device,
                          message,
                          20,
                          NULL,
                          (GAsyncReadyCallback)radio_state_set_down_ready,
-                         simple);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -1392,12 +1358,7 @@ modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBaseBearer *bearer;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 typedef struct {
@@ -1458,25 +1419,19 @@ modem_create_bearer (MMIfaceModem *self,
                      gpointer user_data)
 {
     MMBaseBearer *bearer;
-    GSimpleAsyncResult *result;
+    GTask *task;
     gint session_id;
 
-    /* Set a new ref to the bearer object as result */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_bearer);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Find a new session ID */
     session_id = find_next_bearer_session_id (MM_BROADBAND_MODEM_MBIM (self));
     if (session_id < 0) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Not enough session IDs");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Not enough session IDs");
+        g_object_unref (task);
         return;
     }
 
@@ -1485,10 +1440,8 @@ modem_create_bearer (MMIfaceModem *self,
     bearer = mm_bearer_mbim_new (MM_BROADBAND_MODEM_MBIM (self),
                                  properties,
                                  (guint)session_id);
-
-    g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1522,13 +1475,13 @@ enabling_started_finish (MMBroadbandModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_enabling_started_ready (MMBroadbandModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     GError *error = NULL;
 
@@ -1542,9 +1495,8 @@ parent_enabling_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -1552,35 +1504,27 @@ enabling_started (MMBroadbandModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        enabling_started);
+    task = g_task_new (self, NULL, callback, user_data);
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->enabling_started (
         self,
         (GAsyncReadyCallback)parent_enabling_started_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortMbim *mbim;
 } InitializationStartedContext;
 
 static void
-initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+initialization_started_context_free (InitializationStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->mbim)
         g_object_unref (ctx->mbim);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (InitializationStartedContext, ctx);
 }
 
@@ -1589,21 +1533,19 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* Just parent's pointer passed here */
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_initialization_started_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
-                                     InitializationStartedContext *ctx)
+                                     GTask *task)
 {
+    InitializationStartedContext *ctx;
     gpointer parent_ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     parent_ctx = MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->initialization_started_finish (
         self,
         res,
@@ -1615,34 +1557,39 @@ parent_initialization_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
-    initialization_started_context_complete_and_free (ctx);
+    /* Just parent's pointer passed here */
+    g_task_return_pointer (task, parent_ctx, NULL);
+    g_object_unref (task);
 }
 
 static void
-parent_initialization_started (InitializationStartedContext *ctx)
+parent_initialization_started (GTask *task)
 {
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->initialization_started (
-        ctx->self,
+        self,
         (GAsyncReadyCallback)parent_initialization_started_ready,
-        ctx);
+        task);
 }
 
 static void
 mbim_port_open_ready (MMPortMbim *mbim,
                       GAsyncResult *res,
-                      InitializationStartedContext *ctx)
+                      GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_mbim_open_finish (mbim, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Done we are, launch parent's callback */
-    parent_initialization_started (ctx);
+    parent_initialization_started (task);
 }
 
 static void
@@ -1651,28 +1598,27 @@ initialization_started (MMBroadbandModem *self,
                         gpointer user_data)
 {
     InitializationStartedContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (InitializationStartedContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_started);
     ctx->mbim = mm_base_modem_get_port_mbim (MM_BASE_MODEM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
 
     /* This may happen if we unplug the modem unexpectedly */
     if (!ctx->mbim) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot initialize: MBIM port went missing");
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot initialize: MBIM port went missing");
+        g_object_unref (task);
         return;
     }
 
     if (mm_port_mbim_is_open (ctx->mbim)) {
         /* Nothing to be done, just launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -1680,7 +1626,7 @@ initialization_started (MMBroadbandModem *self,
     mm_port_mbim_open (ctx->mbim,
                        NULL,
                        (GAsyncReadyCallback)mbim_port_open_ready,
-                       ctx);
+                       task);
 }
 
 /*****************************************************************************/
@@ -1691,10 +1637,7 @@ modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -1703,24 +1646,19 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
                       gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_imei);
-
+    task = g_task_new (self, NULL, callback, user_data);
     if (self->priv->caps_device_id)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->caps_device_id,
-                                                   NULL);
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->caps_device_id),
+                               g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid IMEI");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid IMEI");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1731,17 +1669,21 @@ modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
                                                GAsyncResult *res,
                                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_3GPP_FACILITY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return ((MMModem3gppFacility) GPOINTER_TO_UINT (
-                g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_FACILITY_NONE;
+    }
+    return (MMModem3gppFacility)value;
 }
 
 static void
 pin_list_query_ready (MbimDevice *device,
                       GAsyncResult *res,
-                      GSimpleAsyncResult *simple)
+                      GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -1804,16 +1746,14 @@ pin_list_query_ready (MbimDevice *device,
             mask |= MM_MODEM_3GPP_FACILITY_CORP_PERS;
         mbim_pin_desc_free (pin_desc_corporate_pin);
 
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (mask),
-                                                   NULL);
+        g_task_return_int (task, mask);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -1821,17 +1761,14 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                                         GAsyncReadyCallback callback,
                                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_enabled_facility_locks);
+    if (!peek_device (self, &device, task))
+        return;
 
     message = mbim_message_pin_list_query_new (NULL);
     mbim_device_command (device,
@@ -1839,7 +1776,7 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)pin_list_query_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -2272,7 +2209,7 @@ common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemMbim *self,
                                                 GAsyncResult *res,
                                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -2281,16 +2218,13 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
+    GTask *task;
     MbimDevice *device;
-    GSimpleAsyncResult *result;
 
-    if (!peek_device (self, &device, callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!peek_device (self, &device, task))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_setup_cleanup_unsolicited_events);
 
     mm_dbg ("Supported notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s), packet (%s)",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
@@ -2318,8 +2252,8 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
         }
     }
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -2386,30 +2320,28 @@ common_enable_disable_unsolicited_events_finish (MMBroadbandModemMbim *self,
                                                  GAsyncResult *res,
                                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 subscribe_list_set_ready_cb (MbimDevice *device,
                              GAsyncResult *res,
-                             GSimpleAsyncResult *simple)
+                             GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response)
+    if (response) {
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+        mbim_message_unref (response);
+    }
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    if (response)
-        mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -2417,19 +2349,16 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                                           GAsyncReadyCallback callback,
                                           gpointer user_data)
 {
+    GTask *task;
     MbimMessage *request;
     MbimDevice *device;
-    GSimpleAsyncResult *result;
     MbimEventEntry **entries;
     guint n_entries = 0;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_enable_disable_unsolicited_events);
+    if (!peek_device (self, &device, task))
+        return;
 
     mm_dbg ("Enabled notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s), packet (%s)",
             self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
@@ -2484,7 +2413,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)subscribe_list_set_ready_cb,
-                         result);
+                         task);
     mbim_message_unref (request);
     mbim_event_entry_array_free (entries);
 }
@@ -2564,74 +2493,64 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
 /* Load operator name (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *_self,
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-
-    if (self->priv->current_operator_name)
-        return g_strdup (self->priv->current_operator_name);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Current operator name is still unknown");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
+modem_3gpp_load_operator_name (MMIfaceModem3gpp *_self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just finish the async operation */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_operator_name);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->current_operator_name)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->current_operator_name),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Current operator name is still unknown");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
 /* Load operator code (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *_self,
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-
-    if (self->priv->current_operator_id)
-        return g_strdup (self->priv->current_operator_id);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Current operator MCC/MNC is still unknown");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *_self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
 
-    /* Just finish the async operation */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_operator_code);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->current_operator_id)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->current_operator_id),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Current operator MCC/MNC is still unknown");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -2642,13 +2561,13 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 register_state_query_ready (MbimDevice *device,
                             GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+                            GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -2674,22 +2593,21 @@ register_state_query_ready (MbimDevice *device,
             NULL)) {
         MMBroadbandModemMbim *self;
 
-        self = MM_BROADBAND_MODEM_MBIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
+        self = g_task_get_source_object (task);
         update_registration_info (self,
                                   register_state,
                                   available_data_classes,
                                   provider_id,
                                   provider_name);
-        g_object_unref (self);
 
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
     } else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -2700,17 +2618,14 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_run_registration_checks);
+    if (!peek_device (self, &device, task))
+        return;
 
     message = mbim_message_register_state_query_new (NULL);
     mbim_device_command (device,
@@ -2718,7 +2633,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)register_state_query_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -2729,13 +2644,13 @@ modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 register_state_set_ready (MbimDevice *device,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          GTask *task)
 {
     MbimMessage *response;
     GError *error = NULL;
@@ -2760,15 +2675,14 @@ register_state_set_ready (MbimDevice *device,
             error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
     }
 
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
     if (response)
         mbim_message_unref (response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -2778,17 +2692,14 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_register_in_network);
+    if (!peek_device (self, &device, task))
+        return;
 
     if (operator_id && operator_id[0])
         message = (mbim_message_register_state_set_new (
@@ -2807,7 +2718,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                          60,
                          NULL,
                          (GAsyncReadyCallback)register_state_set_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -2819,43 +2730,40 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    MbimMessage *response;
-    MbimProvider **providers;
-    guint n_providers;
-    GList *info_list = NULL;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    response = (MbimMessage *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    if (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, error) &&
-        mbim_message_visible_providers_response_parse (response,
-                                                       &n_providers,
-                                                       &providers,
-                                                       error)) {
-        info_list = mm_3gpp_network_info_list_from_mbim_providers ((const MbimProvider *const *)providers,
-                                                                   n_providers);
-        mbim_provider_array_free (providers);
-    }
-    return info_list;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 visible_providers_query_ready (MbimDevice *device,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     MbimMessage *response;
+    MbimProvider **providers;
+    guint n_providers;
     GError *error = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response)
-        g_simple_async_result_set_op_res_gpointer (simple, response, (GDestroyNotify)mbim_message_unref);
-    else
-        g_simple_async_result_take_error (simple, error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_visible_providers_response_parse (response,
+                                                       &n_providers,
+                                                       &providers,
+                                                       &error)) {
+        GList *info_list;
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        info_list = mm_3gpp_network_info_list_from_mbim_providers ((const MbimProvider *const *)providers,
+                                                                   n_providers);
+        mbim_provider_array_free (providers);
+
+        g_task_return_pointer (task, info_list, (GDestroyNotify)mm_3gpp_network_info_list_free);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
 }
 
 static void
@@ -2863,17 +2771,14 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    task = g_task_new (self, NULL, callback, user_data);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_scan_networks);
+    if (!peek_device (self, &device, task))
+        return;
 
     mm_dbg ("scanning networks...");
     message = mbim_message_visible_providers_query_new (MBIM_VISIBLE_PROVIDERS_ACTION_FULL_SCAN, NULL);
@@ -2882,7 +2787,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                          300,
                          NULL,
                          (GAsyncReadyCallback)visible_providers_query_ready,
-                         result);
+                         task);
     mbim_message_unref (message);
 }
 
@@ -2894,8 +2799,7 @@ messaging_check_support_finish (MMIfaceModemMessaging *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -2904,25 +2808,20 @@ messaging_check_support (MMIfaceModemMessaging *_self,
                          gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* We only handle 3GPP messaging (PDU based) currently */
     if (self->priv->caps_sms & MBIM_SMS_CAPS_PDU_RECEIVE &&
         self->priv->caps_sms & MBIM_SMS_CAPS_PDU_SEND) {
         mm_dbg ("Messaging capabilities supported");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
     } else {
         mm_dbg ("Messaging capabilities not supported by this modem");
-        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+        g_task_return_boolean (task, FALSE);
     }
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -2951,40 +2850,22 @@ messaging_load_supported_storages (MMIfaceModemMessaging *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_load_supported_storages);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
 /* Load initial SMS parts */
-
-typedef struct {
-    MMBroadbandModemMbim *self;
-    GSimpleAsyncResult *result;
-} LoadInitialSmsPartsContext;
-
-static void
-load_initial_sms_parts_context_complete_and_free (LoadInitialSmsPartsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadInitialSmsPartsContext, ctx);
-}
 
 static gboolean
 load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -3016,12 +2897,15 @@ add_sms_part (MMBroadbandModemMbim *self,
 static void
 sms_read_query_ready (MbimDevice *device,
                       GAsyncResult *res,
-                      LoadInitialSmsPartsContext *ctx)
+                      GTask *task)
 {
+    MMBroadbandModemMbim *self;
     MbimMessage *response;
     GError *error = NULL;
     guint32 messages_count;
     MbimSmsPduReadRecord **pdu_messages;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -3036,15 +2920,16 @@ sms_read_query_ready (MbimDevice *device,
         guint i;
 
         for (i = 0; i < messages_count; i++)
-            add_sms_part (ctx->self, pdu_messages[i]);
+            add_sms_part (self, pdu_messages[i]);
         mbim_sms_pdu_read_record_array_free (pdu_messages);
+        g_task_return_boolean (task, TRUE);
     } else
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
 
     if (response)
         mbim_message_unref (response);
-
-    load_initial_sms_parts_context_complete_and_free (ctx);
 }
 
 static void
@@ -3053,21 +2938,16 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    LoadInitialSmsPartsContext *ctx;
+    GTask *task;
     MbimDevice *device;
     MbimMessage *message;
 
-    if (!peek_device (self, &device, callback, user_data))
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!peek_device (self, &device, task))
         return;
 
     g_assert (storage == MM_SMS_STORAGE_MT);
-
-    ctx = g_slice_new0 (LoadInitialSmsPartsContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_initial_sms_parts);
 
     mm_dbg ("loading SMS parts...");
     message = mbim_message_sms_read_query_new (MBIM_SMS_FORMAT_PDU,
@@ -3079,7 +2959,7 @@ load_initial_sms_parts (MMIfaceModemMessaging *self,
                          10,
                          NULL,
                          (GAsyncReadyCallback)sms_read_query_ready,
-                         ctx);
+                         task);
     mbim_message_unref (message);
 }
 
