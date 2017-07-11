@@ -10444,7 +10444,7 @@ firmware_load_current_finish (MMIfaceModemFirmware *self,
                               GAsyncResult *res,
                               GError **error)
 {
-    return (MMFirmwareProperties *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -10453,20 +10453,14 @@ firmware_load_current (MMIfaceModemFirmware *_self,
                        gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        firmware_load_current);
-
-    /* We'll return the reference we create here */
-    g_simple_async_result_set_op_res_gpointer (
-        result,
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (
+        task,
         self->priv->current_firmware ? g_object_ref (self->priv->current_firmware) : NULL,
-        NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
