@@ -88,6 +88,10 @@ struct _MMBroadbandModemMbimPrivate {
     /* Access technology updates */
     MbimDataClass available_data_classes;
     MbimDataClass highest_available_data_class;
+
+    /* For checking whether the SIM has been hot swapped */
+    gboolean sim_hot_swap_on;
+    MbimSubscriberReadyState last_ready_state;
 };
 
 /*****************************************************************************/
@@ -542,11 +546,13 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
                                               GTask *task)
 {
     LoadUnlockRequiredContext *ctx;
+    MMBroadbandModemMbim *self;
     MbimMessage *response;
     GError *error = NULL;
     MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 
     ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -580,6 +586,8 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
             break;
         }
     }
+
+    self->priv->last_ready_state = ready_state;
 
     /* Fatal errors are reported right away */
     if (error) {
@@ -1976,8 +1984,15 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED)
         mm_iface_modem_update_own_numbers (MM_IFACE_MODEM (self), telephone_numbers);
 
-    /* TODO: handle SIM removal using MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED */
+    if ((self->priv->last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
+         ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
+        (self->priv->last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
+               ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
+        /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
+        mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    }
 
+    self->priv->last_ready_state = ready_state;
     g_strfreev (telephone_numbers);
 }
 
@@ -2271,7 +2286,8 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    if (!MM_BROADBAND_MODEM_MBIM (self)->priv->sim_hot_swap_on)
+        MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), FALSE, callback, user_data);
 }
@@ -2452,6 +2468,74 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Setup SIM hot swap */
+
+static gboolean
+modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
+                                                 GAsyncResult *res,
+                                                 GTask *task)
+{
+    GError *error = NULL;
+
+    if (!common_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_dbg ("Failed to enable subscriber info events: %s", error->message);
+        self->priv->sim_hot_swap_on = FALSE;
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+setup_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
+                                                GAsyncResult *res,
+                                                GTask *task)
+{
+    GError *error = NULL;
+
+    if (!common_setup_cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_dbg ("Failed to set up subscriber info events: %s", error->message);
+        self->priv->sim_hot_swap_on = FALSE;
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    common_enable_disable_unsolicited_events (self,
+                                              (GAsyncReadyCallback)enable_subscriber_info_unsolicited_events_ready,
+                                              task);
+}
+
+static void
+modem_setup_sim_hot_swap (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    MM_BROADBAND_MODEM_MBIM (self)->priv->sim_hot_swap_on = TRUE;
+    MM_BROADBAND_MODEM_MBIM (self)->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    common_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self),
+                                             TRUE,
+                                             (GAsyncReadyCallback)setup_subscriber_info_unsolicited_events_ready,
+                                             task);
+}
+
+/*****************************************************************************/
 /* Enable/Disable unsolicited events (3GPP interface) */
 
 static gboolean
@@ -2469,7 +2553,8 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 {
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    if (!MM_BROADBAND_MODEM_MBIM (self)->priv->sim_hot_swap_on)
+        MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     MM_BROADBAND_MODEM_MBIM (self)->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     common_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_MBIM (self), callback, user_data);
 }
@@ -3042,6 +3127,7 @@ mm_broadband_modem_mbim_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          NULL);
 }
 
@@ -3128,6 +3214,10 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create MBIM-specific bearer */
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+
+    /* SIM hot swapping */
+    iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
 }
 
 static void
