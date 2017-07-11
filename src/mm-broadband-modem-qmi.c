@@ -9416,8 +9416,7 @@ oma_check_support_finish (MMIfaceModemOma *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -9425,26 +9424,22 @@ oma_check_support (MMIfaceModemOma *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortQmi *port;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        oma_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the OMA client, OMA is supported */
     if (!port || !mm_port_qmi_peek_client (port, QMI_SERVICE_OMA, MM_PORT_QMI_FLAG_DEFAULT)) {
         mm_dbg ("OMA capabilities not supported");
-        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+        g_task_return_boolean (task, FALSE);
     } else {
         mm_dbg ("OMA capabilities supported");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
