@@ -6678,14 +6678,7 @@ modem_cdma_load_esn_finish (MMIfaceModemCdma *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *esn;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    esn = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded ESN: %s", esn);
-    return esn;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -6694,24 +6687,18 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
                      gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_load_esn);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->esn)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->esn,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->esn), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid ESN");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid ESN");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
