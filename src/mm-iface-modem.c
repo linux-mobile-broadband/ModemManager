@@ -4940,7 +4940,7 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
