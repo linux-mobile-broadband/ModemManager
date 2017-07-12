@@ -6567,7 +6567,7 @@ modem_voice_setup_cleanup_unsolicited_events_finish (MMIfaceModemVoice *self,
                                                      GAsyncResult *res,
                                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -6627,17 +6627,12 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     MMPortSerialAt *ports[2];
     GRegex *cring_regex;
     GRegex *ring_regex;
     GRegex *clip_regex;
     guint i;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_voice_unsolicited_events_handlers);
+    GTask *task;
 
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
@@ -6677,9 +6672,10 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
     g_regex_unref (clip_regex);
     g_regex_unref (cring_regex);
     g_regex_unref (ring_regex);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
