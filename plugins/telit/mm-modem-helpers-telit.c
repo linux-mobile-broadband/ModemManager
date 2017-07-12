@@ -446,7 +446,6 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
                          GArray **bands,
                          GError **error)
 {
-    GArray *flags = NULL;
     MMModemBand band;
     gboolean ret = TRUE;
     gchar *match_str = NULL;
@@ -488,9 +487,6 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
 end:
     if (match_str != NULL)
         g_free (match_str);
-
-    if (flags != NULL)
-        g_array_free (flags, TRUE);
 
     return ret;
 }
