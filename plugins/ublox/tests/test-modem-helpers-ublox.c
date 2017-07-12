@@ -480,6 +480,7 @@ test_urat_write_command (void)
         command = mm_ublox_build_urat_set_command (urat_tests[i].allowed, urat_tests[i].preferred, &error);
         g_assert_no_error (error);
         g_assert_cmpstr (command, ==, urat_tests[i].command);
+        g_free (command);
     }
 }
 
