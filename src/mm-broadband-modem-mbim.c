@@ -1578,7 +1578,6 @@ mbim_port_open_ready (MMPortMbim *mbim,
                       GAsyncResult *res,
                       GTask *task)
 {
-    InitializationStartedContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_mbim_open_finish (mbim, res, &error)) {
