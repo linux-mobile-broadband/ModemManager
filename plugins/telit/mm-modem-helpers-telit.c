@@ -472,6 +472,7 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
             goto end;
         }
         sscanf (tokens[1], "%d", &value);
+        g_strfreev (tokens);
     } else {
         sscanf (match_str, "%d", &value);
     }
