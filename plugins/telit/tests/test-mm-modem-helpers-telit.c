@@ -230,7 +230,7 @@ test_parse_supported_bands_response (void) {
 
         g_assert_cmpint (bands->len, ==, supported_band_mapping_tests[i].mm_bands_len);
 
-        g_array_free (bands, FALSE);
+        g_array_free (bands, TRUE);
         bands = NULL;
     }
 }
@@ -307,7 +307,7 @@ test_parse_current_bands_response (void) {
 
         g_assert_cmpint (bands->len, ==, current_band_mapping_tests[i].mm_bands_len);
 
-        g_array_free (bands, FALSE);
+        g_array_free (bands, TRUE);
         bands = NULL;
     }
 }
