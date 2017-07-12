@@ -5433,13 +5433,13 @@ modem_messaging_init_current_storages_finish (MMIfaceModemMessaging *_self,
                                               GAsyncResult *res,
                                               GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 cpms_query_ready (MMBroadbandModem *self,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -5448,9 +5448,8 @@ cpms_query_ready (MMBroadbandModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -5459,7 +5458,7 @@ cpms_query_ready (MMBroadbandModem *self,
                                             &mem1,
                                             &mem2,
                                             &error)) {
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         self->priv->current_sms_mem1_storage = mem1;
         self->priv->current_sms_mem2_storage = mem2;
@@ -5469,10 +5468,9 @@ cpms_query_ready (MMBroadbandModem *self,
                 mm_common_build_sms_storages_string (&mem1, 1));
         mm_dbg ("  mem2 (write/send) storages:       '%s'",
                 mm_common_build_sms_storages_string (&mem2, 1));
+        g_task_return_boolean (task, TRUE);
     }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -5480,12 +5478,9 @@ modem_messaging_init_current_storages (MMIfaceModemMessaging *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_init_current_storages);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Check support storages */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -5493,7 +5488,7 @@ modem_messaging_init_current_storages (MMIfaceModemMessaging *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cpms_query_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
