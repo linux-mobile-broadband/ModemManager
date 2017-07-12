@@ -308,9 +308,7 @@ end:
     if (!ret && bands != NULL)
         g_array_free (bands, TRUE);
 
-    if(match_info)
-        g_match_info_free (match_info);
-
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;
@@ -361,8 +359,7 @@ mm_telit_get_2g_mm_bands (GMatchInfo *match_info,
     }
 
 end:
-    if (match_str != NULL)
-        g_free (match_str);
+    g_free (match_str);
 
     if (flags != NULL)
         g_array_free (flags, TRUE);
@@ -432,8 +429,7 @@ mm_telit_get_3g_mm_bands (GMatchInfo *match_info,
     }
 
 end:
-    if (match_str != NULL)
-        g_free (match_str);
+    g_free (match_str);
 
     if (flags != NULL)
         g_array_free (flags, TRUE);
@@ -486,8 +482,7 @@ mm_telit_get_4g_mm_bands(GMatchInfo *match_info,
         value = value >> 1;
     }
 end:
-    if (match_str != NULL)
-        g_free (match_str);
+    g_free (match_str);
 
     return ret;
 }
