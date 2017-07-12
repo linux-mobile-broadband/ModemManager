@@ -5678,23 +5678,22 @@ modem_messaging_set_default_storage_finish (MMIfaceModemMessaging *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 cpms_set_ready (MMBroadbandModem *self,
                 GAsyncResult *res,
-                GSimpleAsyncResult *simple)
+                GTask *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -5705,18 +5704,19 @@ modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     gchar *cmd;
-    GSimpleAsyncResult *result;
     gchar *mem1_str;
     gchar *mem_str;
+    GTask *task;
 
     /* We provide the current sms storage for mem1 if not UNKNOWN */
     if (self->priv->current_sms_mem1_storage == MM_SMS_STORAGE_UNKNOWN) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_INVALID_ARGS,
-                                             "Cannot set default storage when current mem1 storage is unknown");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_messaging_set_default_storage,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Cannot set default storage when current mem1 storage is unknown");
         return;
     }
 
@@ -5728,17 +5728,14 @@ modem_messaging_set_default_storage (MMIfaceModemMessaging *_self,
 
     cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"", mem1_str, mem_str, mem_str);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_set_default_storage);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cpms_set_ready,
-                              result);
+                              task);
     g_free (mem1_str);
     g_free (mem_str);
     g_free (cmd);
