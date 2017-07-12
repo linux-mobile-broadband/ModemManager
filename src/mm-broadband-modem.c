@@ -6136,7 +6136,7 @@ modem_messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
                                                   GAsyncResult *res,
                                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
@@ -6180,7 +6180,7 @@ static const MMBaseModemAtCommand cnmi_sequence[] = {
 static void
 modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem *self,
                                                            GAsyncResult *res,
-                                                           GSimpleAsyncResult *final_result)
+                                                           GTask *task)
 {
     GError *inner_error = NULL;
     MMPortSerialAt *secondary;
@@ -6199,14 +6199,14 @@ modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem *self,
     mm_dbg ("(%s) Messaging unsolicited events enabled on secondary",
             mm_port_get_device (MM_PORT (secondary)));
 
-    g_simple_async_result_complete (final_result);
-    g_object_unref (final_result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
                                                          GAsyncResult *res,
-                                                         GSimpleAsyncResult *final_result)
+                                                         GTask *task)
 {
     GError *inner_error = NULL;
     MMPortSerialAt *primary;
@@ -6217,9 +6217,8 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
 
     mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
     if (inner_error) {
-        g_simple_async_result_take_error (final_result, inner_error);
-        g_simple_async_result_complete (final_result);
-        g_object_unref (final_result);
+        g_task_return_error (task, inner_error);
+        g_object_unref (task);
         return;
     }
 
@@ -6238,12 +6237,12 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
             NULL, /* response_processor_context_free */
             NULL,
             (GAsyncReadyCallback)modem_messaging_enable_unsolicited_events_secondary_ready,
-            final_result);
+            task);
         return;
     }
 
-    g_simple_async_result_complete (final_result);
-    g_object_unref (final_result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -6251,14 +6250,10 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortSerialAt *primary;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_enable_unsolicited_events);
-
+    task = g_task_new (self, NULL, callback, user_data);
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events for primary port */
@@ -6272,7 +6267,7 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
         NULL, /* response_processor_context_free */
         NULL,
         (GAsyncReadyCallback)modem_messaging_enable_unsolicited_events_primary_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
