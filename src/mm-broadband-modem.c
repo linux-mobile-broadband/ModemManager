@@ -7572,42 +7572,46 @@ modem_cdma_get_service_status_finish (MMIfaceModemCdma *self,
                                       gboolean *has_cdma_service,
                                       GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+    GError *inner_error = NULL;
+    gboolean value;
 
-    *has_cdma_service = g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    value = g_task_propagate_boolean (G_TASK (res), error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *has_cdma_service = value;
     return TRUE;
 }
 
 static void
 cad_query_ready (MMIfaceModemCdma *self,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 GTask *task)
 {
     GError *error = NULL;
     const gchar *result;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         guint cad;
 
         /* Strip any leading command tag and spaces */
         result = mm_strip_tag (result, "+CAD:");
         if (!mm_get_uint_from_str (result, &cad))
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Failed to parse +CAD response '%s'",
-                                             result);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Failed to parse +CAD response '%s'",
+                                     result);
         else
             /* 1 == CDMA service */
-            g_simple_async_result_set_op_res_gboolean (simple, (cad == 1));
+            g_task_return_boolean (task, (cad == 1));
     }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -7615,19 +7619,16 @@ modem_cdma_get_service_status (MMIfaceModemCdma *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_get_service_status);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CAD?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cad_query_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
