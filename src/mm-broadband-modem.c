@@ -5142,27 +5142,25 @@ modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish (MMIfaceModem3gpp
                                                                 GAsyncResult *res,
                                                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 urc_enable_disable_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          GTask *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -5170,19 +5168,16 @@ modem_3gpp_ussd_disable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
                                                   GAsyncReadyCallback callback,
                                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_ussd_disable_unsolicited_result_codes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CUSD=0",
                               3,
                               TRUE,
                               (GAsyncReadyCallback)urc_enable_disable_ready,
-                              result);
+                              task);
 }
 
 static void
@@ -5190,19 +5185,16 @@ modem_3gpp_ussd_enable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
                                                  GAsyncReadyCallback callback,
                                                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_ussd_enable_unsolicited_result_codes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CUSD=1",
                               3,
                               TRUE,
                               (GAsyncReadyCallback)urc_enable_disable_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
