@@ -3679,11 +3679,15 @@ modem_3gpp_load_subscription_state_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModem3gppSubscriptionState) GPOINTER_TO_UINT (
-        g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+    }
+    return (MMModem3gppSubscriptionState)value;
 }
 
 static void
@@ -3691,20 +3695,11 @@ modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_subscription_state);
-
-    g_simple_async_result_set_op_res_gpointer (
-        result,
-        GUINT_TO_POINTER (MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN),
-        NULL);
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_int (task, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
