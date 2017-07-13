@@ -5831,7 +5831,7 @@ modem_messaging_setup_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *
                                                          GAsyncResult *res,
                                                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 typedef struct {
@@ -6009,16 +6009,11 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     MMPortSerialAt *ports[2];
     GRegex *cmti_regex;
     GRegex *cds_regex;
     guint i;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_messaging_unsolicited_events_handlers);
+    GTask *task;
 
     cmti_regex = mm_3gpp_cmti_regex_get ();
     cds_regex = mm_3gpp_cds_regex_get ();
@@ -6050,9 +6045,10 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
 
     g_regex_unref (cmti_regex);
     g_regex_unref (cds_regex);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
