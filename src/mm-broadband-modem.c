@@ -3430,43 +3430,39 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *self,
 /* Facility locks status loading (3GPP interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     guint current;
     MMModem3gppFacility facilities;
     MMModem3gppFacility locks;
 } LoadEnabledFacilityLocksContext;
 
-static void get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx);
-
-static void
-load_enabled_facility_locks_context_complete_and_free (LoadEnabledFacilityLocksContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
+static void get_next_facility_lock_status (GTask *task);
 
 static MMModem3gppFacility
 modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
                                                GAsyncResult *res,
                                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_3GPP_FACILITY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return ((MMModem3gppFacility) GPOINTER_TO_UINT (
-                g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_FACILITY_NONE;
+    }
+    return (MMModem3gppFacility)value;
 }
 
 static void
 clck_single_query_ready (MMBaseModem *self,
                          GAsyncResult *res,
-                         LoadEnabledFacilityLocksContext *ctx)
+                         GTask *task)
 {
+    LoadEnabledFacilityLocksContext *ctx;
     const gchar *response;
     gboolean enabled = FALSE;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response &&
@@ -3480,13 +3476,18 @@ clck_single_query_ready (MMBaseModem *self,
 
     /* And go on with the next one */
     ctx->current++;
-    get_next_facility_lock_status (ctx);
+    get_next_facility_lock_status (task);
 }
 
 static void
-get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
+get_next_facility_lock_status (GTask *task)
 {
+    MMBroadbandModem *self;
+    LoadEnabledFacilityLocksContext *ctx;
     guint i;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     for (i = ctx->current; i < sizeof (MMModem3gppFacility) * 8; i++) {
         guint32 facility = 1u << i;
@@ -3501,46 +3502,47 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
             /* Query current */
             cmd = g_strdup_printf ("+CLCK=\"%s\",2",
                                    mm_3gpp_facility_to_acronym (facility));
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       cmd,
                                       3,
                                       FALSE,
                                       (GAsyncReadyCallback)clck_single_query_ready,
-                                      ctx);
+                                      task);
             g_free (cmd);
             return;
         }
     }
 
     /* No more facilities to query, all done */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               GUINT_TO_POINTER (ctx->locks),
-                                               NULL);
-    load_enabled_facility_locks_context_complete_and_free (ctx);
+    g_task_return_int (task, ctx->locks);
+    g_object_unref (task);
 }
 
 static void
 clck_test_ready (MMBaseModem *self,
                  GAsyncResult *res,
-                 LoadEnabledFacilityLocksContext *ctx)
+                 GTask *task)
 {
+    LoadEnabledFacilityLocksContext *ctx;
     const gchar *response;
     GError *error = NULL;
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_enabled_facility_locks_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
+
     if (!mm_3gpp_parse_clck_test_response (response, &ctx->facilities)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse list of available lock facilities: '%s'",
-                                         response);
-        load_enabled_facility_locks_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse list of available lock facilities: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
@@ -3556,7 +3558,7 @@ clck_test_ready (MMBaseModem *self,
     }
 
     /* Go on... */
-    get_next_facility_lock_status (ctx);
+    get_next_facility_lock_status (task);
 }
 
 static void
@@ -3565,16 +3567,15 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                                         gpointer user_data)
 {
     LoadEnabledFacilityLocksContext *ctx;
+    GTask *task;
 
     ctx = g_new (LoadEnabledFacilityLocksContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_load_enabled_facility_locks);
     ctx->facilities = MM_MODEM_3GPP_FACILITY_NONE;
     ctx->locks = MM_MODEM_3GPP_FACILITY_NONE;
     ctx->current = 0;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     mm_dbg ("loading enabled facility locks...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -3582,7 +3583,7 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)clck_test_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
