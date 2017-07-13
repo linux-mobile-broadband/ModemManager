@@ -5857,25 +5857,15 @@ modem_messaging_setup_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *
 }
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     guint idx;
 } SmsPartContext;
 
 static void
-sms_part_context_complete_and_free (SmsPartContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static void
 sms_part_ready (MMBroadbandModem *self,
                 GAsyncResult *res,
-                SmsPartContext *ctx)
+                GTask *task)
 {
+    SmsPartContext *ctx;
     MMSmsPart *part;
     MM3gppPduInfo *info;
     const gchar *response;
@@ -5890,17 +5880,19 @@ sms_part_ready (MMBroadbandModem *self,
          * passed to the async operation, so just log the error here. */
         mm_warn ("Couldn't retrieve SMS part: '%s'",
                  error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_part_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     info = mm_3gpp_parse_cmgr_read_response (response, ctx->idx, &error);
     if (!info) {
         mm_warn ("Couldn't parse SMS part: '%s'",
                  error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_part_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -5919,36 +5911,38 @@ sms_part_ready (MMBroadbandModem *self,
 
     /* All done */
     mm_3gpp_pdu_info_free (info);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    sms_part_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 indication_lock_storages_ready (MMBroadbandModem *self,
                                 GAsyncResult *res,
-                                SmsPartContext *ctx)
+                                GTask *task)
 {
+    SmsPartContext *ctx;
     gchar *command;
     GError *error = NULL;
 
     if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
         /* TODO: we should either make this lock() never fail, by automatically
          * retrying after some time, or otherwise retry here. */
-        g_simple_async_result_take_error (ctx->result, error);
-        sms_part_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Storage now set and locked */
 
     /* Retrieve the message */
+    ctx = g_task_get_task_data (task);
     command = g_strdup_printf ("+CMGR=%d", ctx->idx);
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               command,
                               10,
                               FALSE,
                               (GAsyncReadyCallback)sms_part_ready,
-                              ctx);
+                              task);
     g_free (command);
 }
 
@@ -5958,6 +5952,7 @@ cmti_received (MMPortSerialAt *port,
                MMBroadbandModem *self)
 {
     SmsPartContext *ctx;
+    GTask *task;
     guint idx = 0;
     MMSmsStorage storage;
     gchar *str;
@@ -5983,17 +5978,18 @@ cmti_received (MMPortSerialAt *port,
         return;
     }
 
-    ctx = g_new0 (SmsPartContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
+    ctx = g_new (SmsPartContext, 1);
     ctx->idx = idx;
 
+    task = g_task_new (self, NULL, NULL, NULL);
+    g_task_set_task_data (task, ctx, g_free);
+
     /* First, request to set the proper storage to read from */
-    mm_broadband_modem_lock_sms_storages (ctx->self,
+    mm_broadband_modem_lock_sms_storages (self,
                                           storage,
                                           MM_SMS_STORAGE_UNKNOWN,
                                           (GAsyncReadyCallback)indication_lock_storages_ready,
-                                          ctx);
+                                          task);
 }
 
 static void
