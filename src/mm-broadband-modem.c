@@ -4204,8 +4204,6 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 /* Enable/Disable unsolicited registration events (3GPP interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     gboolean enable; /* TRUE for enabling, FALSE for disabling */
     gboolean run_cs;
     gboolean run_ps;
@@ -4221,43 +4219,40 @@ typedef struct {
 } UnsolicitedRegistrationEventsContext;
 
 static void
-unsolicited_registration_events_context_complete_and_free (UnsolicitedRegistrationEventsContext *ctx)
+unsolicited_registration_events_context_free (UnsolicitedRegistrationEventsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->cs_error)
         g_error_free (ctx->cs_error);
     if (ctx->ps_error)
         g_error_free (ctx->ps_error);
     if (ctx->eps_error)
         g_error_free (ctx->eps_error);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
-static UnsolicitedRegistrationEventsContext *
-unsolicited_registration_events_context_new (MMBroadbandModem *self,
-                                             gboolean enable,
-                                             gboolean cs_supported,
-                                             gboolean ps_supported,
-                                             gboolean eps_supported,
-                                             GAsyncReadyCallback callback,
-                                             gpointer user_data)
+static GTask *
+unsolicited_registration_events_task_new (MMBroadbandModem *self,
+                                          gboolean enable,
+                                          gboolean cs_supported,
+                                          gboolean ps_supported,
+                                          gboolean eps_supported,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
 {
     UnsolicitedRegistrationEventsContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (UnsolicitedRegistrationEventsContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             unsolicited_registration_events_context_new);
     ctx->enable = enable;
     ctx->run_cs = cs_supported;
     ctx->run_ps = ps_supported;
     ctx->run_eps = eps_supported;
 
-    return ctx;
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)unsolicited_registration_events_context_free);
+    return task;
 }
 
 static gboolean
@@ -4265,7 +4260,7 @@ modem_3gpp_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3g
                                                                   GAsyncResult *res,
                                                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
@@ -4329,16 +4324,19 @@ static const MMBaseModemAtCommand eps_unregistration_sequence[] = {
     { NULL }
 };
 
-static void unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsContext *ctx);
+static void unsolicited_registration_events_context_step (GTask *task);
 
 static void
 unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
                                                 GAsyncResult *res,
-                                                UnsolicitedRegistrationEventsContext *ctx)
+                                                GTask *task)
 {
+    UnsolicitedRegistrationEventsContext *ctx;
     GError *error = NULL;
     GVariant *command;
     MMPortSerialAt *secondary;
+
+    ctx = g_task_get_task_data (task);
 
     /* Only one must be running */
     g_assert ((ctx->running_cs ? 1 : 0) +
@@ -4381,7 +4379,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
         }
 
         /* Done with primary and secondary, keep on */
-        unsolicited_registration_events_context_step (ctx);
+        unsolicited_registration_events_context_step (task);
         return;
     }
 
@@ -4422,7 +4420,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
                 FALSE, /* raw */
                 NULL, /* cancellable */
                 (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
-                ctx);
+                task);
             return;
         }
 
@@ -4442,17 +4440,24 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
             NULL,  /* response processor context free */
             NULL, /* cancellable */
             (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
-            ctx);
+            task);
         return;
     }
 
     /* We're done */
-    unsolicited_registration_events_context_step (ctx);
+    unsolicited_registration_events_context_step (task);
 }
 
 static void
-unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsContext *ctx)
+unsolicited_registration_events_context_step (GTask *task)
 {
+    MMBroadbandModem *self;
+    UnsolicitedRegistrationEventsContext *ctx;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     ctx->running_cs = FALSE;
     ctx->running_ps = FALSE;
     ctx->running_eps = FALSE;
@@ -4462,14 +4467,14 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         ctx->running_cs = TRUE;
         ctx->run_cs = FALSE;
         mm_base_modem_at_sequence_full (
-            MM_BASE_MODEM (ctx->self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+            MM_BASE_MODEM (self),
+            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
             ctx->enable ? cs_registration_sequence : cs_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
             (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -4477,14 +4482,14 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         ctx->running_ps = TRUE;
         ctx->run_ps = FALSE;
         mm_base_modem_at_sequence_full (
-            MM_BASE_MODEM (ctx->self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+            MM_BASE_MODEM (self),
+            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
             ctx->enable ? ps_registration_sequence : ps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
             (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -4492,14 +4497,14 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
         ctx->running_eps = TRUE;
         ctx->run_eps = FALSE;
         mm_base_modem_at_sequence_full (
-            MM_BASE_MODEM (ctx->self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+            MM_BASE_MODEM (self),
+            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
             ctx->enable ? eps_registration_sequence : eps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
             NULL,  /* cancellable */
             (GAsyncReadyCallback)unsolicited_registration_events_sequence_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -4507,17 +4512,21 @@ unsolicited_registration_events_context_step (UnsolicitedRegistrationEventsConte
      * If we have any error reported, we'll propagate it. EPS errors take
      * precedence over PS errors and PS errors take precedence over CS errors. */
     if (ctx->eps_error) {
-        g_simple_async_result_take_error (ctx->result, ctx->eps_error);
+        g_propagate_error (&error, ctx->eps_error);
         ctx->eps_error = NULL;
     } else if (ctx->ps_error) {
-        g_simple_async_result_take_error (ctx->result, ctx->ps_error);
+        g_propagate_error (&error, ctx->ps_error);
         ctx->ps_error = NULL;
     } else if (ctx->cs_error) {
-        g_simple_async_result_take_error (ctx->result, ctx->cs_error);
+        g_propagate_error (&error, ctx->cs_error);
         ctx->cs_error = NULL;
-    } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    unsolicited_registration_events_context_complete_and_free (ctx);
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -4529,13 +4538,13 @@ modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                     gpointer user_data)
 {
     unsolicited_registration_events_context_step (
-        unsolicited_registration_events_context_new (MM_BROADBAND_MODEM (self),
-                                                     FALSE,
-                                                     cs_supported,
-                                                     ps_supported,
-                                                     eps_supported,
-                                                     callback,
-                                                     user_data));
+        unsolicited_registration_events_task_new (MM_BROADBAND_MODEM (self),
+                                                  FALSE,
+                                                  cs_supported,
+                                                  ps_supported,
+                                                  eps_supported,
+                                                  callback,
+                                                  user_data));
 }
 
 static void
@@ -4547,13 +4556,13 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
                                                    gpointer user_data)
 {
     unsolicited_registration_events_context_step (
-        unsolicited_registration_events_context_new (MM_BROADBAND_MODEM (self),
-                                                     TRUE,
-                                                     cs_supported,
-                                                     ps_supported,
-                                                     eps_supported,
-                                                     callback,
-                                                     user_data));
+        unsolicited_registration_events_task_new (MM_BROADBAND_MODEM (self),
+                                                  TRUE,
+                                                  cs_supported,
+                                                  ps_supported,
+                                                  eps_supported,
+                                                  callback,
+                                                  user_data));
 }
 
 /*****************************************************************************/
