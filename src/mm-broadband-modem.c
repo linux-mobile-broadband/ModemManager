@@ -5528,12 +5528,10 @@ mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
                                              GAsyncResult *res,
                                              GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 typedef struct {
-    GSimpleAsyncResult *result;
-    MMBroadbandModem *self;
     MMSmsStorage previous_mem1;
     gboolean mem1_locked;
     MMSmsStorage previous_mem2;
@@ -5541,38 +5539,33 @@ typedef struct {
 } LockSmsStoragesContext;
 
 static void
-lock_sms_storages_context_complete_and_free (LockSmsStoragesContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LockSmsStoragesContext, ctx);
-}
-
-static void
-lock_storages_cpms_set_ready (MMBaseModem *self,
+lock_storages_cpms_set_ready (MMBaseModem *_self,
                               GAsyncResult *res,
-                              LockSmsStoragesContext *ctx)
+                              GTask *task)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    LockSmsStoragesContext *ctx;
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (self, res, &error);
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_finish (_self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
         /* Reset previous storages and set unlocked */
         if (ctx->mem1_locked) {
-            ctx->self->priv->current_sms_mem1_storage = ctx->previous_mem1;
-            ctx->self->priv->mem1_storage_locked = FALSE;
+            self->priv->current_sms_mem1_storage = ctx->previous_mem1;
+            self->priv->mem1_storage_locked = FALSE;
         }
         if (ctx->mem2_locked) {
-            ctx->self->priv->current_sms_mem2_storage = ctx->previous_mem2;
-            ctx->self->priv->mem2_storage_locked = FALSE;
+            self->priv->current_sms_mem2_storage = ctx->previous_mem2;
+            self->priv->mem2_storage_locked = FALSE;
         }
+        g_task_return_error (task, error);
     }
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    lock_sms_storages_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 void
@@ -5583,6 +5576,7 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
                                       gpointer user_data)
 {
     LockSmsStoragesContext *ctx;
+    GTask *task;
     gchar *cmd = NULL;
     gchar *mem1_str = NULL;
     gchar *mem2_str = NULL;
@@ -5591,10 +5585,11 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
      * error */
     if ((mem1 != MM_SMS_STORAGE_UNKNOWN && self->priv->mem1_storage_locked) ||
         (mem2 != MM_SMS_STORAGE_UNKNOWN && self->priv->mem2_storage_locked)) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            mm_broadband_modem_lock_sms_storages,
             MM_CORE_ERROR,
             MM_CORE_ERROR_RETRY,
             "SMS storage currently locked, try again later");
@@ -5605,12 +5600,10 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
     g_assert (mem1 != MM_SMS_STORAGE_UNKNOWN ||
               mem2 != MM_SMS_STORAGE_UNKNOWN);
 
-    ctx = g_slice_new0 (LockSmsStoragesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_broadband_modem_lock_sms_storages);
+    ctx = g_new0 (LockSmsStoragesContext, 1);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     /* Some modems may not support empty string parameters, then if mem1 is
      * UNKNOWN, and current sms mem1 storage has a valid value, we send again
@@ -5628,11 +5621,11 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
         mm_dbg ("Given sms mem1 storage is unknown. Using current sms mem1 storage value '%s' instead",
                 mm_sms_storage_get_string (self->priv->current_sms_mem1_storage));
     } else {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_RETRY,
-                                        "Cannot lock mem2 storage alone when current mem1 storage is unknown");
-        lock_sms_storages_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_RETRY,
+                                 "Cannot lock mem2 storage alone when current mem1 storage is unknown");
+        g_object_unref (task);
         return;
     }
     mem1_str = g_ascii_strup (mm_sms_storage_get_string (self->priv->current_sms_mem1_storage), -1);
@@ -5664,7 +5657,7 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)lock_storages_cpms_set_ready,
-                              ctx);
+                              task);
     g_free (mem1_str);
     g_free (mem2_str);
     g_free (cmd);
