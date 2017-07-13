@@ -5749,13 +5749,13 @@ modem_messaging_setup_sms_format_finish (MMIfaceModemMessaging *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 cmgf_set_ready (MMBroadbandModem *self,
                 GAsyncResult *res,
-                GSimpleAsyncResult *simple)
+                GTask *task)
 {
     GError *error = NULL;
 
@@ -5769,14 +5769,13 @@ cmgf_set_ready (MMBroadbandModem *self,
         mm_dbg ("Successfully set preferred SMS mode: '%s'",
                 self->priv->modem_messaging_sms_pdu_mode ? "PDU" : "text");
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 set_preferred_sms_format (MMBroadbandModem *self,
-                          GSimpleAsyncResult *result)
+                          GTask *task)
 {
     gchar *cmd;
 
@@ -5787,14 +5786,14 @@ set_preferred_sms_format (MMBroadbandModem *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cmgf_set_ready,
-                              result);
+                              task);
     g_free (cmd);
 }
 
 static void
 cmgf_format_check_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
@@ -5825,7 +5824,7 @@ cmgf_format_check_ready (MMBroadbandModem *self,
 
     self->priv->sms_supported_modes_checked = TRUE;
 
-    set_preferred_sms_format (self, simple);
+    set_preferred_sms_format (self, task);
 }
 
 static void
@@ -5833,17 +5832,14 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_setup_sms_format);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If we already checked for supported SMS types, go on to select the
      * preferred format. */
     if (MM_BROADBAND_MODEM (self)->priv->sms_supported_modes_checked) {
-        set_preferred_sms_format (MM_BROADBAND_MODEM (self), result);
+        set_preferred_sms_format (MM_BROADBAND_MODEM (self), task);
         return;
     }
 
@@ -5853,7 +5849,7 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cmgf_format_check_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
