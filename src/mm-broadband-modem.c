@@ -7640,32 +7640,27 @@ typedef struct {
 } DetailedRegistrationStateResults;
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortSerialAt *port;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
-    GError *error;
 } DetailedRegistrationStateContext;
 
-static void
-detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
+static DetailedRegistrationStateResults *
+detailed_registration_state_result_new (DetailedRegistrationStateContext *ctx)
 {
-    if (ctx->error)
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    else {
-        DetailedRegistrationStateResults *results;
+    DetailedRegistrationStateResults *results;
 
-        results = g_new (DetailedRegistrationStateResults, 1);
-        results->detailed_cdma1x_state = ctx->cdma1x_state;
-        results->detailed_evdo_state = ctx->evdo_state;
-        g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    }
+    results = g_new (DetailedRegistrationStateResults, 1);
+    results->detailed_cdma1x_state = ctx->cdma1x_state;
+    results->detailed_evdo_state = ctx->evdo_state;
 
-    g_simple_async_result_complete (ctx->result);
+    return results;
+}
+
+static void
+detailed_registration_state_context_free (DetailedRegistrationStateContext *ctx)
+{
     g_object_unref (ctx->port);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -7678,29 +7673,36 @@ modem_cdma_get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 {
     DetailedRegistrationStateResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *detailed_cdma1x_state = results->detailed_cdma1x_state;
     *detailed_evdo_state = results->detailed_evdo_state;
+    g_free (results);
     return TRUE;
 }
 
 static void
 speri_ready (MMIfaceModemCdma *self,
              GAsyncResult *res,
-             DetailedRegistrationStateContext *ctx)
+             GTask *task)
 {
+    DetailedRegistrationStateContext *ctx;
     gboolean roaming = FALSE;
     const gchar *response;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         /* silently discard SPERI errors */
         g_error_free (error);
-        detailed_registration_state_context_complete_and_free (ctx);
+        g_task_return_pointer (task,
+                               detailed_registration_state_result_new (ctx),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -7709,7 +7711,10 @@ speri_ready (MMIfaceModemCdma *self,
     if (!response ||
         !mm_cdma_parse_eri (response, &roaming, NULL, NULL)) {
         mm_warn ("Couldn't parse SPERI response '%s'", response);
-        detailed_registration_state_context_complete_and_free (ctx);
+        g_task_return_pointer (task,
+                               detailed_registration_state_result_new (ctx),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -7729,21 +7734,27 @@ speri_ready (MMIfaceModemCdma *self,
             ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
     }
 
-    detailed_registration_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task,
+                           detailed_registration_state_result_new (ctx),
+                           g_free);
+    g_object_unref (task);
 }
 
 static void
 spservice_ready (MMIfaceModemCdma *self,
                  GAsyncResult *res,
-                 DetailedRegistrationStateContext *ctx)
+                 GTask *task)
 {
+    DetailedRegistrationStateContext *ctx;
+    GError *error = NULL;
     const gchar *response;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &ctx->error);
-    if (ctx->error) {
-        detailed_registration_state_context_complete_and_free (ctx);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7753,21 +7764,27 @@ spservice_ready (MMIfaceModemCdma *self,
     if (!mm_cdma_parse_spservice_read_response (response,
                                                 &cdma1x_state,
                                                 &evdo_state)) {
-        ctx->error = g_error_new (MM_CORE_ERROR,
-                                  MM_CORE_ERROR_FAILED,
-                                  "Couldn't parse SPSERVICE response '%s'",
-                                  response);
-        detailed_registration_state_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse SPSERVICE response '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Store new intermediate results */
     ctx->cdma1x_state = cdma1x_state;
     ctx->evdo_state = evdo_state;
 
     /* If SPERI not supported, we're done */
-    if (!ctx->self->priv->has_speri) {
-        detailed_registration_state_context_complete_and_free (ctx);
+    if (!MM_BROADBAND_MODEM (self)->priv->has_speri) {
+        g_task_return_pointer (task,
+                               detailed_registration_state_result_new (ctx),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -7777,7 +7794,7 @@ spservice_ready (MMIfaceModemCdma *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)speri_ready,
-                              ctx);
+                              task);
 }
 
 static void
@@ -7790,29 +7807,29 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     MMPortSerialAt *port;
     GError *error = NULL;
     DetailedRegistrationStateContext *ctx;
+    GTask *task;
 
     /* The default implementation to get detailed registration state
      * requires the use of an AT port; so if we cannot get any, just
      * return the error */
     port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
     if (!port) {
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
+        g_task_report_error (self,
+                             callback,
+                             user_data,
+                             modem_cdma_get_detailed_registration_state,
+                             error);
         return;
     }
 
     /* Setup context */
     ctx = g_new0 (DetailedRegistrationStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_get_detailed_registration_state);
     ctx->port = g_object_ref (port);
     ctx->cdma1x_state = cdma1x_state;
     ctx->evdo_state = evdo_state;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_registration_state_context_free);
 
     /* NOTE: If we get this generic implementation of getting detailed
      * registration state called, we DO know that we have Sprint commands
@@ -7822,7 +7839,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)spservice_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
