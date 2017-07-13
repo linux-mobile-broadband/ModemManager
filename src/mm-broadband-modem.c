@@ -3926,8 +3926,6 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
 /* Registration checks (3GPP interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     gboolean cs_supported;
     gboolean ps_supported;
     gboolean eps_supported;
@@ -3943,17 +3941,14 @@ typedef struct {
 } RunRegistrationChecksContext;
 
 static void
-run_registration_checks_context_complete_and_free (RunRegistrationChecksContext *ctx)
+run_registration_checks_context_free (RunRegistrationChecksContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->cs_error)
         g_error_free (ctx->cs_error);
     if (ctx->ps_error)
         g_error_free (ctx->ps_error);
     if (ctx->eps_error)
         g_error_free (ctx->eps_error);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -3962,16 +3957,17 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void run_registration_checks_context_step (RunRegistrationChecksContext *ctx);
+static void run_registration_checks_context_step (GTask *task);
 
 static void
 registration_status_check_ready (MMBroadbandModem *self,
                                  GAsyncResult *res,
-                                 RunRegistrationChecksContext *ctx)
+                                 GTask *task)
 {
+    RunRegistrationChecksContext *ctx;
     const gchar *response;
     GError *error = NULL;
     GMatchInfo *match_info;
@@ -3983,6 +3979,8 @@ registration_status_check_ready (MMBroadbandModem *self,
     MMModemAccessTechnology act;
     gulong lac;
     gulong cid;
+
+    ctx = g_task_get_task_data (task);
 
     /* Only one must be running */
     g_assert ((ctx->running_cs ? 1 : 0) +
@@ -3999,7 +3997,7 @@ registration_status_check_ready (MMBroadbandModem *self,
         else
             ctx->eps_error = error;
 
-        run_registration_checks_context_step (ctx);
+        run_registration_checks_context_step (task);
         return;
     }
 
@@ -4008,7 +4006,7 @@ registration_status_check_ready (MMBroadbandModem *self,
      */
     if (!response[0]) {
         /* Done */
-        run_registration_checks_context_step (ctx);
+        run_registration_checks_context_step (task);
         return;
     }
 
@@ -4038,7 +4036,7 @@ registration_status_check_ready (MMBroadbandModem *self,
         else
             ctx->eps_error = error;
 
-        run_registration_checks_context_step (ctx);
+        run_registration_checks_context_step (task);
         return;
     }
 
@@ -4070,7 +4068,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             ctx->ps_error = error;
         else
             ctx->eps_error = error;
-        run_registration_checks_context_step (ctx);
+        run_registration_checks_context_step (task);
         return;
     }
 
@@ -4098,12 +4096,19 @@ registration_status_check_ready (MMBroadbandModem *self,
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
 
-    run_registration_checks_context_step (ctx);
+    run_registration_checks_context_step (task);
 }
 
 static void
-run_registration_checks_context_step (RunRegistrationChecksContext *ctx)
+run_registration_checks_context_step (GTask *task)
 {
+    MMBroadbandModem *self;
+    RunRegistrationChecksContext *ctx;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     ctx->running_cs = FALSE;
     ctx->running_ps = FALSE;
     ctx->running_eps = FALSE;
@@ -4112,12 +4117,12 @@ run_registration_checks_context_step (RunRegistrationChecksContext *ctx)
         ctx->running_cs = TRUE;
         ctx->run_cs = FALSE;
         /* Check current CS-registration state. */
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CREG?",
                                   10,
                                   FALSE,
                                   (GAsyncReadyCallback)registration_status_check_ready,
-                                  ctx);
+                                  task);
         return;
     }
 
@@ -4125,12 +4130,12 @@ run_registration_checks_context_step (RunRegistrationChecksContext *ctx)
         ctx->running_ps = TRUE;
         ctx->run_ps = FALSE;
         /* Check current PS-registration state. */
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CGREG?",
                                   10,
                                   FALSE,
                                   (GAsyncReadyCallback)registration_status_check_ready,
-                                  ctx);
+                                  task);
         return;
     }
 
@@ -4138,12 +4143,12 @@ run_registration_checks_context_step (RunRegistrationChecksContext *ctx)
         ctx->running_eps = TRUE;
         ctx->run_eps = FALSE;
         /* Check current EPS-registration state. */
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CEREG?",
                                   10,
                                   FALSE,
                                   (GAsyncReadyCallback)registration_status_check_ready,
-                                  ctx);
+                                  task);
         return;
     }
 
@@ -4154,20 +4159,23 @@ run_registration_checks_context_step (RunRegistrationChecksContext *ctx)
         (!ctx->eps_supported || ctx->eps_error)) {
         /* Prefer the EPS, and then PS error if any */
         if (ctx->eps_error) {
-            g_simple_async_result_set_from_error (ctx->result, ctx->eps_error);
+            g_propagate_error (&error, ctx->eps_error);
             ctx->eps_error = NULL;
         } else if (ctx->ps_error) {
-            g_simple_async_result_set_from_error (ctx->result, ctx->ps_error);
+            g_propagate_error (&error, ctx->ps_error);
             ctx->ps_error = NULL;
         } else if (ctx->cs_error) {
-            g_simple_async_result_set_from_error (ctx->result, ctx->cs_error);
+            g_propagate_error (&error, ctx->cs_error);
             ctx->cs_error = NULL;
         } else
             g_assert_not_reached ();
-    } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
 
-    run_registration_checks_context_complete_and_free (ctx);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -4179,13 +4187,9 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     gpointer user_data)
 {
     RunRegistrationChecksContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (RunRegistrationChecksContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_run_registration_checks);
     ctx->cs_supported = cs_supported;
     ctx->ps_supported = ps_supported;
     ctx->eps_supported = eps_supported;
@@ -4193,7 +4197,10 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
     ctx->run_ps = ps_supported;
     ctx->run_eps = eps_supported;
 
-    run_registration_checks_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)run_registration_checks_context_free);
+
+    run_registration_checks_context_step (task);
 }
 
 /*****************************************************************************/
