@@ -328,22 +328,17 @@ modem_create_sim (MMIfaceModem *self,
 /* Capabilities loading (Modem interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMModemCapability caps;
     MMPortSerialQcdm *qcdm_port;
 } LoadCapabilitiesContext;
 
 static void
-load_capabilities_context_complete_and_free (LoadCapabilitiesContext *ctx)
+load_capabilities_context_free (LoadCapabilitiesContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
     if (ctx->qcdm_port) {
         mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm_port));
         g_object_unref (ctx->qcdm_port);
     }
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (LoadCapabilitiesContext, ctx);
 }
 
@@ -352,27 +347,28 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    MMModemCapability caps;
-    gchar *caps_str;
+    GError *inner_error = NULL;
+    gssize value;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return MM_MODEM_CAPABILITY_NONE;
-
-    caps = (MMModemCapability) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("loaded current capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
+    }
+    return (MMModemCapability)value;
 }
 
 static void
 current_capabilities_ws46_test_ready (MMBaseModem *self,
                                       GAsyncResult *res,
-                                      LoadCapabilitiesContext *ctx)
+                                      GTask *task)
 {
+    LoadCapabilitiesContext *ctx;
     const gchar *response;
     GArray      *modes;
     guint        i;
+
+    ctx = g_task_get_task_data (task);
 
     /* Completely ignore errors in AT+WS46=? */
     response = mm_base_modem_at_command_finish (self, res, NULL);
@@ -408,11 +404,8 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
     g_array_unref (modes);
 
 out:
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (ctx->caps),
-        NULL);
-    load_capabilities_context_complete_and_free (ctx);
+    g_task_return_int (task, ctx->caps);
+    g_object_unref (task);
 }
 
 typedef struct {
@@ -548,23 +541,25 @@ static const MMBaseModemAtCommand capabilities[] = {
 static void
 capabilities_sequence_ready (MMBaseModem *self,
                              GAsyncResult *res,
-                             LoadCapabilitiesContext *ctx)
+                             GTask *task)
 {
+    LoadCapabilitiesContext *ctx;
     GError *error = NULL;
     GVariant *result;
+
+    ctx = g_task_get_task_data (task);
 
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (!result) {
         if (error)
-            g_simple_async_result_take_error (ctx->result, error);
-        else {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "%s",
-                                             "Failed to determine modem capabilities.");
-        }
-        load_capabilities_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+        else
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "%s",
+                                     "Failed to determine modem capabilities.");
+        g_object_unref (task);
         return;
     }
 
@@ -585,46 +580,50 @@ capabilities_sequence_ready (MMBaseModem *self,
     if (ctx->caps & MM_MODEM_CAPABILITY_GSM_UMTS &&
         !(ctx->caps & MM_MODEM_CAPABILITY_LTE)) {
         mm_base_modem_at_command (
-            MM_BASE_MODEM (ctx->self),
+            self,
             "+WS46=?",
             3,
             TRUE, /* allow caching, it's a test command */
             (GAsyncReadyCallback)current_capabilities_ws46_test_ready,
-            ctx);
+            task);
         return;
     }
 
     /* Otherwise, just set the already retrieved capabilities */
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (ctx->caps),
-        NULL);
-    load_capabilities_context_complete_and_free (ctx);
+    g_task_return_int (task, ctx->caps);
+    g_object_unref (task);
 }
 
 static void
-load_current_capabilities_at (LoadCapabilitiesContext *ctx)
+load_current_capabilities_at (GTask *task)
 {
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
+
     /* Launch sequence, we will expect a "u" GVariant */
     mm_base_modem_at_sequence (
-        MM_BASE_MODEM (ctx->self),
+        MM_BASE_MODEM (self),
         capabilities,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)capabilities_sequence_ready,
-        ctx);
+        task);
 }
 
 static void
 mode_pref_qcdm_ready (MMPortSerialQcdm *port,
                       GAsyncResult *res,
-                      LoadCapabilitiesContext *ctx)
+                      GTask *task)
 {
+    LoadCapabilitiesContext *ctx;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     uint8_t pref = 0;
     GError *error = NULL;
     GByteArray *response;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
@@ -680,25 +679,27 @@ mode_pref_qcdm_ready (MMPortSerialQcdm *port,
     }
 
     if (ctx->caps != MM_MODEM_CAPABILITY_NONE) {
-        g_simple_async_result_set_op_res_gpointer (
-            ctx->result,
-            GUINT_TO_POINTER (ctx->caps),
-            NULL);
-        load_capabilities_context_complete_and_free (ctx);
+        g_task_return_int (task, ctx->caps);
+        g_object_unref (task);
         return;
     }
 
 at_caps:
-    load_current_capabilities_at (ctx);
+    load_current_capabilities_at (task);
 }
 
 static void
-load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
+load_current_capabilities_qcdm (GTask *task)
 {
+    MMBroadbandModem *self;
+    LoadCapabilitiesContext *ctx;
     GByteArray *cmd;
     GError *error = NULL;
 
-    ctx->qcdm_port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (ctx->self));
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    ctx->qcdm_port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     g_assert (ctx->qcdm_port);
 
     if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm_port), &error)) {
@@ -706,7 +707,7 @@ load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
                 error->message);
         g_error_free (error);
         ctx->qcdm_port = NULL;
-        load_current_capabilities_at (ctx);
+        load_current_capabilities_at (task);
         return;
     }
 
@@ -721,7 +722,7 @@ load_current_capabilities_qcdm (LoadCapabilitiesContext *ctx)
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)mode_pref_qcdm_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (cmd);
 }
 
@@ -731,20 +732,19 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                  gpointer user_data)
 {
     LoadCapabilitiesContext *ctx;
+    GTask *task;
 
     mm_dbg ("loading current capabilities...");
 
     ctx = g_slice_new0 (LoadCapabilitiesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_current_capabilities);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_capabilities_context_free);
 
     if (mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self)))
-        load_current_capabilities_qcdm (ctx);
+        load_current_capabilities_qcdm (task);
     else
-        load_current_capabilities_at (ctx);
+        load_current_capabilities_at (task);
 }
 
 /*****************************************************************************/
