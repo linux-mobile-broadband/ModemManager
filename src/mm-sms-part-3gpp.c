@@ -135,7 +135,7 @@ sms_decode_address (const guint8 *address, int len)
         unpacked = gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
         utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 (unpacked,
                                                         unpacked_len);
-        g_free(unpacked);
+        g_free (unpacked);
     } else if (addrtype == SMS_NUMBER_TYPE_INTL &&
                addrplan == SMS_NUMBER_PLAN_TELEPHONE) {
         /* International telphone number, format as "+1234567890" */
@@ -523,7 +523,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
                 break;
             default:
                 /* Cannot happen as we AND with the 0x18 mask */
-                g_assert_not_reached();
+                g_assert_not_reached ();
             }
         }
 
@@ -580,7 +580,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         PDU_SIZE_CHECK (tp_dcs_offset + 1, "cannot read TP-DCS");
 
         /* Encoding given in the 'alphabet' bits */
-        user_data_encoding = sms_encoding_type(pdu[tp_dcs_offset]);
+        user_data_encoding = sms_encoding_type (pdu[tp_dcs_offset]);
         switch (user_data_encoding) {
         case MM_SMS_ENCODING_GSM7:
             mm_dbg ("  user data encoding is GSM7");
