@@ -378,7 +378,7 @@ handle_send_dtmf_context_free (HandleSendDtmfContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free(ctx->dtmf);
+    g_free (ctx->dtmf);
     g_free (ctx);
 }
 
@@ -451,7 +451,7 @@ handle_send_dtmf (MMBaseCall *self,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
 
-    ctx->dtmf = g_strdup(dtmf);
+    ctx->dtmf = g_strdup (dtmf);
     g_object_get (self,
                   MM_BASE_CALL_MODEM, &ctx->modem,
                   NULL);
@@ -954,8 +954,8 @@ mm_base_call_new_from_properties (MMBaseModem *modem,
     /* Create a call object as defined by the interface */
     self = mm_iface_modem_voice_create_call (MM_IFACE_MODEM_VOICE (modem));
     g_object_set (self,
-                  "state",        mm_call_properties_get_state(properties),
-                  "state-reason", mm_call_properties_get_state_reason(properties),
+                  "state",        mm_call_properties_get_state (properties),
+                  "state-reason", mm_call_properties_get_state_reason (properties),
                   "direction",    direction,
                   "number",       number,
                   NULL);
