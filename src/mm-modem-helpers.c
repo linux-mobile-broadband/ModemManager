@@ -2619,7 +2619,7 @@ mm_3gpp_parse_cpms_query_response (const gchar *reply,
 
     r = g_regex_new (CPMS_QUERY_REGEX, G_REGEX_RAW, 0, NULL);
 
-    g_assert(r);
+    g_assert (r);
 
     if (!g_regex_match (r, reply, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -2627,7 +2627,7 @@ mm_3gpp_parse_cpms_query_response (const gchar *reply,
         goto end;
     }
 
-    if (!g_match_info_matches(match_info)) {
+    if (!g_match_info_matches (match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not find matches in CPMS query reply '%s'", reply);
         goto end;
@@ -2662,7 +2662,7 @@ mm_3gpp_get_cpms_storage_match (GMatchInfo *match_info,
     gboolean ret = TRUE;
     gchar *str = NULL;
 
-    str = g_match_info_fetch_named(match_info, match_name);
+    str = g_match_info_fetch_named (match_info, match_name);
     if (str == NULL || str[0] == '\0') {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not find '%s' from CPMS reply", match_name);

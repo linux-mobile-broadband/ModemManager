@@ -2674,7 +2674,7 @@ test_cpms_query_response (void *f, gpointer d) {
                                                  &mem1,
                                                  &mem2,
                                                  &error);
-        g_assert(ret);
+        g_assert (ret);
         g_assert_no_error (error);
         g_assert_cmpuint (cpms_query_test[i].mem1_want, ==, mem1);
         g_assert_cmpuint (cpms_query_test[i].mem2_want, ==, mem2);
@@ -3297,7 +3297,7 @@ test_crsm_response (void)
 
         g_assert_cmpstr (crsm_tests[i].hex, ==, hex);
 
-        g_free(hex);
+        g_free (hex);
     }
 }
 

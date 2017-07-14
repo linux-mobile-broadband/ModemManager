@@ -91,9 +91,9 @@ GArray *mm_filter_supported_capabilities (MMModemCapability all,
 /*****************************************************************************/
 /* VOICE specific helpers and utilities */
 /*****************************************************************************/
-GRegex *mm_voice_ring_regex_get (void);
-GRegex *mm_voice_cring_regex_get(void);
-GRegex *mm_voice_clip_regex_get (void);
+GRegex *mm_voice_ring_regex_get  (void);
+GRegex *mm_voice_cring_regex_get (void);
+GRegex *mm_voice_clip_regex_get  (void);
 
 /*****************************************************************************/
 /* SERIAL specific helpers and utilities */
