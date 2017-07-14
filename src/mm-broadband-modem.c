@@ -3291,9 +3291,9 @@ modem_setup_flow_control (MMIfaceModem *self,
 /* Power state loading (Modem interface) */
 
 static MMModemPowerState
-load_power_state_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
+modem_load_power_state_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_POWER_STATE_UNKNOWN;
@@ -3320,16 +3320,16 @@ cfun_query_ready (MMBaseModem *self,
 }
 
 static void
-load_power_state (MMIfaceModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+modem_load_power_state (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_power_state);
+                                        modem_load_power_state);
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -10884,8 +10884,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_sim_finish = modem_create_sim_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
-    iface->load_power_state = load_power_state;
-    iface->load_power_state_finish = load_power_state_finish;
+    iface->load_power_state = modem_load_power_state;
+    iface->load_power_state_finish = modem_load_power_state_finish;
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
