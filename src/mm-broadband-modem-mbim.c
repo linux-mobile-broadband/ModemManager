@@ -2017,8 +2017,8 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     }
 
     str = mbim_data_class_build_string_from_mask (highest_available_data_class);
-    mm_dbg("Packet service state: '%s', data class: '%s'",
-           mbim_packet_service_state_get_string(packet_service_state), str);
+    mm_dbg ("Packet service state: '%s', data class: '%s'",
+            mbim_packet_service_state_get_string (packet_service_state), str);
     g_free (str);
 
     if (packet_service_state == MBIM_PACKET_SERVICE_STATE_ATTACHED) {
