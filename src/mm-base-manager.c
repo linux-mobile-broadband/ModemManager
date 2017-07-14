@@ -694,7 +694,7 @@ set_logging_auth_ready (MMAuthProvider *authp,
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else if (!mm_log_set_level(ctx->level, &error))
+    else if (!mm_log_set_level (ctx->level, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_info ("logging: level '%s'", ctx->level);
