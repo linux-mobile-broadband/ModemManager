@@ -3201,7 +3201,7 @@ update_lock_info_context_step (GTask *task)
         return;
 
     default:
-        g_assert_not_reached();
+        g_assert_not_reached ();
     }
 }
 
