@@ -284,7 +284,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     }
     else
         /* We already filter out before all non-tty, non-net, non-cdc-wdm ports */
-        g_assert_not_reached();
+        g_assert_not_reached ();
 
     mm_dbg ("(%s) type '%s' claimed by %s",
             name,
