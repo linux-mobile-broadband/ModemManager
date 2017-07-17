@@ -955,7 +955,7 @@ parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
     else {
         /* Our own setup now */
         set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MBM (self), TRUE);
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
     g_simple_async_result_complete (simple);
@@ -991,7 +991,7 @@ parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
     if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
         g_simple_async_result_take_error (simple, error);
     else
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
