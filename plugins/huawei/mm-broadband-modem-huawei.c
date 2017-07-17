@@ -2671,7 +2671,7 @@ modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
 
     /* Otherwise just run our setup and complete */
     set_cdma_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), TRUE);
-    g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (result), TRUE);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -2717,7 +2717,7 @@ modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
     }
 
     /* Otherwise we're done */
-    g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (result), TRUE);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
