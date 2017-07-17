@@ -89,7 +89,7 @@ mm_to_syslog_priority (MMLogLevel level)
     case MM_LOG_LEVEL_ERR:
         return LOG_ERR;
     }
-    g_assert_not_reached();
+    g_assert_not_reached ();
     return 0;
 }
 
@@ -125,7 +125,7 @@ log_level_description (MMLogLevel level)
     case MM_LOG_LEVEL_ERR:
         return "<error>";
     }
-    g_assert_not_reached();
+    g_assert_not_reached ();
     return NULL;
 }
 
@@ -249,7 +249,7 @@ log_handler (const gchar *log_domain,
              const gchar *message,
              gpointer ignored)
 {
-    log_backend (NULL, NULL, glib_to_syslog_priority (level), message, strlen(message));
+    log_backend (NULL, NULL, glib_to_syslog_priority (level), message, strlen (message));
 }
 
 gboolean
