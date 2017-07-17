@@ -95,7 +95,7 @@ plugin_manager_build_plugins_list (MMPluginManager *self,
             supported_found = TRUE;
             break;
         default:
-            g_assert_not_reached();
+            g_assert_not_reached ();
         }
     }
 
