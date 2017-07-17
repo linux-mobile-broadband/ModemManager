@@ -3132,9 +3132,8 @@ parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
     else {
         /* Our own setup now */
         set_voice_unsolicited_events_handlers (MM_BROADBAND_MODEM_HUAWEI (self), TRUE);
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
-
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
@@ -3168,7 +3167,7 @@ parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
     if (!iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error))
         g_simple_async_result_take_error (simple, error);
     else
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }
