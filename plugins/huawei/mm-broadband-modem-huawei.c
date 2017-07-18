@@ -205,10 +205,9 @@ sysinfo_finish (MMBroadbandModemHuawei *self,
 {
     SysinfoResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
-
-    result = (SysinfoResult *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
     if (extended)
         *extended = result->extended;
@@ -227,13 +226,14 @@ sysinfo_finish (MMBroadbandModemHuawei *self,
     if (sys_submode)
         *sys_submode = result->sys_submode;
 
+    g_free (result);
     return TRUE;
 }
 
 static void
 run_sysinfo_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
@@ -242,9 +242,8 @@ run_sysinfo_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
         mm_dbg ("^SYSINFO failed: %s", error->message);
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -260,34 +259,32 @@ run_sysinfo_ready (MMBaseModem *self,
                                            &result->sys_submode,
                                            &error)) {
         mm_dbg ("^SYSINFO parsing failed: %s", error->message);
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_free (result);
         return;
     }
 
-    g_simple_async_result_set_op_res_gpointer (simple, result, g_free);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 }
 
 static void
 run_sysinfo (MMBroadbandModemHuawei *self,
-             GSimpleAsyncResult *result)
+             GTask *task)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SYSINFO",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)run_sysinfo_ready,
-                              result);
+                              task);
 }
 
 static void
 run_sysinfoex_ready (MMBaseModem *_self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
     GError *error = NULL;
@@ -301,15 +298,14 @@ run_sysinfoex_ready (MMBaseModem *_self,
             self->priv->sysinfoex_support = FEATURE_NOT_SUPPORTED;
             mm_dbg ("^SYSINFOEX failed: %s, assuming unsupported", error->message);
             g_error_free (error);
-            run_sysinfo (self, simple);
+            run_sysinfo (self, task);
             return;
         }
 
         /* Otherwise, propagate error */
         mm_dbg ("^SYSINFOEX failed: %s", error->message);
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -327,30 +323,28 @@ run_sysinfoex_ready (MMBaseModem *_self,
                                              &result->sys_submode,
                                              &error)) {
         mm_dbg ("^SYSINFOEX parsing failed: %s", error->message);
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_free (result);
         return;
     }
 
     /* Submode from SYSINFOEX always valid */
     result->sys_submode_valid = TRUE;
-    g_simple_async_result_set_op_res_gpointer (simple, result, g_free);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 }
 
 static void
 run_sysinfoex (MMBroadbandModemHuawei *self,
-               GSimpleAsyncResult *result)
+               GTask *task)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SYSINFOEX",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)run_sysinfoex_ready,
-                              result);
+                              task);
 }
 
 static void
@@ -358,17 +352,15 @@ sysinfo (MMBroadbandModemHuawei *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        sysinfo);
+    task = g_task_new (self, NULL, callback, user_data);
+
     if (self->priv->sysinfoex_support == FEATURE_SUPPORT_UNKNOWN ||
         self->priv->sysinfoex_support == FEATURE_SUPPORTED)
-        run_sysinfoex (self, result);
+        run_sysinfoex (self, task);
     else
-        run_sysinfo (self, result);
+        run_sysinfo (self, task);
 }
 
 /*****************************************************************************/
