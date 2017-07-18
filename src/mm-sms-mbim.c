@@ -53,12 +53,13 @@ peek_device (gpointer self,
 
         port = mm_base_modem_peek_port_mbim (modem);
         if (!port) {
-            g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                                 callback,
-                                                 user_data,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_FAILED,
-                                                 "Couldn't peek MBIM port");
+            g_task_report_new_error (self,
+                                     callback,
+                                     user_data,
+                                     peek_device,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't peek MBIM port");
             g_object_unref (modem);
             return FALSE;
         }
