@@ -327,12 +327,13 @@ update_network_timezone (MMIfaceModemTime *self,
     /* If loading network timezone not supported, just finish here */
     if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone ||
         !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone_finish) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Loading network timezone is not supported");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 update_network_timezone,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Loading network timezone is not supported");
         return;
     }
 
