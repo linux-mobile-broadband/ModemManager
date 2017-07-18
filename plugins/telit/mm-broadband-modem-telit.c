@@ -360,32 +360,35 @@ modem_set_current_bands (MMIfaceModem *self,
     is_4g = mm_iface_modem_is_4g (self);
 
     if (is_2g && flag2g == -1) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "None or invalid 2G bands combination in the provided list");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_set_current_bands,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "None or invalid 2G bands combination in the provided list");
         return;
     }
 
     if (is_3g && flag3g == -1) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "None or invalid 3G bands combination in the provided list");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_set_current_bands,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "None or invalid 3G bands combination in the provided list");
         return;
     }
 
     if (is_4g && flag4g == -1) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "None or invalid 4G bands combination in the provided list");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_set_current_bands,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "None or invalid 4G bands combination in the provided list");
         return;
     }
 
@@ -403,12 +406,12 @@ modem_set_current_bands (MMIfaceModem *self,
     else if (is_2g && !is_3g && is_4g)
         cmd = g_strdup_printf ("AT#BND=%d,0,%d", flag2g, flag4g);
     else {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unexpectd error: could not compose AT#BND command");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unexpectd error: could not compose AT#BND command");
         return;
     }
     task = g_task_new (self, NULL, callback, user_data);
