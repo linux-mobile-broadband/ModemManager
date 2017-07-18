@@ -888,24 +888,23 @@ set_current_bands_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 syscfg_set_ready (MMBaseModem *self,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *operation_result)
+                  GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
         /* Let the error be critical */
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_object_unref (task);
 }
 
 static void
@@ -914,27 +913,23 @@ set_current_bands (MMIfaceModem *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     gchar *cmd;
     guint32 huawei_band = 0x3FFFFFFF;
     gchar *bands_string;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
                                                  bands_array->len);
 
     if (!bands_array_to_huawei (bands_array, &huawei_band)) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid bands requested: '%s'",
-                                         bands_string);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Invalid bands requested: '%s'",
+                                 bands_string);
+        g_object_unref (task);
         g_free (bands_string);
         return;
     }
@@ -945,7 +940,7 @@ set_current_bands (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)syscfg_set_ready,
-                              result);
+                              task);
     g_free (cmd);
     g_free (bands_string);
 }
