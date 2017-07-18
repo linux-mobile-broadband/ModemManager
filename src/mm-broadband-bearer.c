@@ -2210,6 +2210,7 @@ crm_range_ready (MMBaseModem *modem,
                 /* Fine, go on with next step */
                 ctx->step++;
                 interface_initialization_step (ctx);
+                return;
             }
 
             g_assert (error == NULL);
