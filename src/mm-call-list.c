@@ -283,13 +283,14 @@ mm_call_list_delete_call (MMCallList *self,
                             (gpointer)call_path,
                             (GCompareFunc)cmp_call_by_path);
     if (!l) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "No CALL found with path '%s'",
-                                             call_path);
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_call_list_delete_call,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "No CALL found with path '%s'",
+                                 call_path);
         return;
     }
 
