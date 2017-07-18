@@ -1188,19 +1188,21 @@ load_current_modes_finish (MMIfaceModem *self,
 {
     MMModemModeCombination *out;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    out = g_task_propagate_pointer (G_TASK (res), error);
+    if (!out)
         return FALSE;
 
-    out = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *allowed = out->allowed;
     *preferred = out->preferred;
+
+    g_free (out);
     return TRUE;
 }
 
 static void
 prefmode_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+                                   GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1213,22 +1215,22 @@ prefmode_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                                      &error);
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
-        MMModemModeCombination out;
+        MMModemModeCombination *out;
 
-        out.allowed = current->allowed;
-        out.preferred = current->preferred;
-        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+        out = g_new (MMModemModeCombination, 1);
+        out->allowed = current->allowed;
+        out->preferred = current->preferred;
+        g_task_return_pointer (task, out, g_free);
     }
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 syscfg_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                  GAsyncResult *res,
-                                 GSimpleAsyncResult *simple)
+                                 GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1241,23 +1243,22 @@ syscfg_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                                    &error);
 
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
-        MMModemModeCombination out;
+        MMModemModeCombination *out;
 
-        out.allowed = current->allowed;
-        out.preferred = current->preferred;
-        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+        out = g_new (MMModemModeCombination, 1);
+        out->allowed = current->allowed;
+        out->preferred = current->preferred;
+        g_task_return_pointer (task, out, g_free);
     }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 syscfgex_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+                                   GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1269,17 +1270,16 @@ syscfgex_load_current_modes_ready (MMBroadbandModemHuawei *self,
                                                      self->priv->syscfgex_supported_modes,
                                                      &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
-        MMModemModeCombination out;
+        MMModemModeCombination *out;
 
-        out.allowed = current->allowed;
-        out.preferred = current->preferred;
-        g_simple_async_result_set_op_res_gpointer (simple, &out, NULL);
+        out = g_new (MMModemModeCombination, 1);
+        out->allowed = current->allowed;
+        out->preferred = current->preferred;
+        g_task_return_pointer (task, out, g_free);
     }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -1288,14 +1288,11 @@ load_current_modes (MMIfaceModem *_self,
                     gpointer user_data)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     mm_dbg ("loading current modes (huawei)...");
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->syscfgex_support == FEATURE_SUPPORTED) {
         g_assert (self->priv->syscfgex_supported_modes != NULL);
@@ -1305,7 +1302,7 @@ load_current_modes (MMIfaceModem *_self,
             3,
             FALSE,
             (GAsyncReadyCallback)syscfgex_load_current_modes_ready,
-            result);
+            task);
         return;
     }
 
@@ -1317,7 +1314,7 @@ load_current_modes (MMIfaceModem *_self,
             3,
             FALSE,
             (GAsyncReadyCallback)syscfg_load_current_modes_ready,
-            result);
+            task);
         return;
     }
 
@@ -1329,16 +1326,15 @@ load_current_modes (MMIfaceModem *_self,
             3,
             FALSE,
             (GAsyncReadyCallback)prefmode_load_current_modes_ready,
-            result);
+            task);
         return;
     }
 
-    g_simple_async_result_set_error (result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Unable to load current modes");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Unable to load current modes");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
