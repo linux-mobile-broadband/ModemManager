@@ -953,16 +953,13 @@ load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 syscfg_test_ready (MMBroadbandModemHuawei *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1004,9 +1001,9 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
         }
 
         self->priv->syscfg_support = FEATURE_SUPPORTED;
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   combinations,
-                                                   (GDestroyNotify)g_array_unref);
+        g_task_return_pointer (task,
+                               combinations,
+                               (GDestroyNotify)g_array_unref);
     } else {
         mm_dbg ("Error while checking ^SYSCFG format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
@@ -1014,17 +1011,16 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
                               MM_MOBILE_EQUIPMENT_ERROR,
                               MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN))
             self->priv->syscfg_support = FEATURE_NOT_SUPPORTED;
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 syscfgex_test_ready (MMBroadbandModemHuawei *self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1056,11 +1052,10 @@ syscfgex_test_ready (MMBroadbandModemHuawei *self,
 
         self->priv->syscfgex_support = FEATURE_SUPPORTED;
 
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   combinations,
-                                                   (GDestroyNotify)g_array_unref);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_pointer (task,
+                               combinations,
+                               (GDestroyNotify)g_array_unref);
+        g_object_unref (task);
         return;
     }
 
@@ -1070,9 +1065,8 @@ syscfgex_test_ready (MMBroadbandModemHuawei *self,
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN)) {
-            g_simple_async_result_take_error (simple, error);
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
         g_error_free (error);
@@ -1086,13 +1080,13 @@ syscfgex_test_ready (MMBroadbandModemHuawei *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)syscfg_test_ready,
-                              simple);
+                              task);
 }
 
 static void
 prefmode_test_ready (MMBroadbandModemHuawei *self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -1123,9 +1117,9 @@ prefmode_test_ready (MMBroadbandModemHuawei *self,
         }
 
         self->priv->prefmode_support = FEATURE_SUPPORTED;
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   combinations,
-                                                   (GDestroyNotify)g_array_unref);
+        g_task_return_pointer (task,
+                               combinations,
+                               (GDestroyNotify)g_array_unref);
     } else {
         mm_dbg ("Error while checking ^PREFMODE format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
@@ -1133,11 +1127,10 @@ prefmode_test_ready (MMBroadbandModemHuawei *self,
                               MM_MOBILE_EQUIPMENT_ERROR,
                               MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN))
             self->priv->prefmode_support = FEATURE_NOT_SUPPORTED;
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -1146,12 +1139,9 @@ load_supported_modes (MMIfaceModem *_self,
                       gpointer user_data)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (mm_iface_modem_is_cdma_only (_self)) {
         /* ^PREFMODE only in CDMA-only modems */
@@ -1162,7 +1152,7 @@ load_supported_modes (MMIfaceModem *_self,
                                   3,
                                   TRUE,
                                   (GAsyncReadyCallback)prefmode_test_ready,
-                                  result);
+                                  task);
         return;
     }
 
@@ -1173,7 +1163,7 @@ load_supported_modes (MMIfaceModem *_self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)syscfgex_test_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
