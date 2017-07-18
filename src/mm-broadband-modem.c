@@ -5421,14 +5421,21 @@ cpms_query_ready (MMBroadbandModem *self,
                                             &error)) {
         g_task_return_error (task, error);
     } else {
+        gchar *aux;
+
         self->priv->current_sms_mem1_storage = mem1;
         self->priv->current_sms_mem2_storage = mem2;
 
         mm_dbg ("Current storages initialized:");
-        mm_dbg ("  mem1 (list/read/delete) storages: '%s'",
-                mm_common_build_sms_storages_string (&mem1, 1));
-        mm_dbg ("  mem2 (write/send) storages:       '%s'",
-                mm_common_build_sms_storages_string (&mem2, 1));
+
+        aux = mm_common_build_sms_storages_string (&mem1, 1);
+        mm_dbg ("  mem1 (list/read/delete) storages: '%s'", aux);
+        g_free (aux);
+
+        aux = mm_common_build_sms_storages_string (&mem2, 1);
+        mm_dbg ("  mem2 (write/send) storages:       '%s'", aux);
+        g_free (aux);
+
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
