@@ -41,38 +41,30 @@ load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *iccid;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    iccid = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("loaded SIM identifier: %s", iccid);
-    return g_strdup (iccid);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_load_sim_identifier_ready (MMSimHuawei *self,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask *task)
 {
     GError *error = NULL;
     gchar *simid;
 
     simid = MM_BASE_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier_finish (MM_BASE_SIM (self), res, &error);
     if (simid)
-        g_simple_async_result_set_op_res_gpointer (simple, simid, g_free);
+        g_task_return_pointer (task, simid, g_free);
     else
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 iccid_read_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     MMBaseSim *self;
     const gchar *response;
@@ -89,19 +81,17 @@ iccid_read_ready (MMBaseModem *modem,
 
     parsed = mm_3gpp_parse_iccid (p, NULL);
     if (parsed) {
-        g_simple_async_result_set_op_res_gpointer (simple, parsed, g_free);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_pointer (task, parsed, g_free);
+        g_object_unref (task);
         return;
     }
 
 error:
     /* Chain up to parent method; older devices don't support ^ICCID */
-    self = MM_BASE_SIM (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
+    self = g_task_get_source_object (task);
     MM_BASE_SIM_CLASS (mm_sim_huawei_parent_class)->load_sim_identifier (self,
                                                                          (GAsyncReadyCallback) parent_load_sim_identifier_ready,
-                                                                         simple);
-    g_object_unref (self);
+                                                                         task);
 }
 
 static void
@@ -122,10 +112,7 @@ load_sim_identifier (MMBaseSim *self,
         5,
         FALSE,
         (GAsyncReadyCallback)iccid_read_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_sim_identifier));
+        g_task_new (self, NULL, callback, user_data));
     g_object_unref (modem);
 }
 
