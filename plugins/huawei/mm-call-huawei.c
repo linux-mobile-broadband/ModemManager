@@ -33,29 +33,16 @@ G_DEFINE_TYPE (MMCallHuawei, mm_call_huawei, MM_TYPE_BASE_CALL)
 /*****************************************************************************/
 /* Start the CALL */
 
-typedef struct {
-    MMBaseCall *self;
-    MMBaseModem *modem;
-    GSimpleAsyncResult *result;
-} CallStartContext;
-
-static void
-call_start_context_complete_and_free (CallStartContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static void
 call_start_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  CallStartContext *ctx)
+                  GTask *task)
 {
+    MMBaseCall *self;
     GError *error = NULL;
     const gchar *response = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
@@ -65,19 +52,19 @@ call_start_ready (MMBaseModem *modem,
 
         if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_DIALTONE)) {
             /* Update state */
-            mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
+            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         }
 
         if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)      ||
             g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER) ||
             g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)) {
             /* Update state */
-            mm_base_call_change_state(ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
         }
 
         mm_dbg ("Couldn't start call : '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        call_start_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -88,20 +75,20 @@ call_start_ready (MMBaseModem *modem,
                              "Modem response '%s'", response);
 
         /* Update state */
-        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
     } else {
         /* Update state */
-        mm_base_call_change_state (ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+        mm_base_call_change_state (self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
     }
 
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        call_start_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    call_start_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -109,27 +96,24 @@ call_start (MMBaseCall *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    CallStartContext *ctx;
+    MMBaseModem *modem;
+    GTask *task;
     gchar *cmd;
 
-    /* Setup the context */
-    ctx = g_new0 (CallStartContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             call_start);
-    ctx->self = g_object_ref (self);
-    g_object_get (ctx->self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &modem,
                   NULL);
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, modem, g_object_unref);
+
     cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
-    mm_base_modem_at_command (ctx->modem,
+    mm_base_modem_at_command (modem,
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)call_start_ready,
-                              ctx);
+                              task);
     g_free (cmd);
 }
 
