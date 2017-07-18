@@ -411,7 +411,7 @@ modem_set_current_bands (MMIfaceModem *self,
                                  user_data,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
-                                 "Unexpectd error: could not compose AT#BND command");
+                                 "Unexpected error: could not compose AT#BND command");
         return;
     }
     task = g_task_new (self, NULL, callback, user_data);
