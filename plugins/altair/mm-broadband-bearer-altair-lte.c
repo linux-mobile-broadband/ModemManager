@@ -226,52 +226,27 @@ typedef struct {
     GSimpleAsyncResult *result;
 } DetailedDisconnectContext;
 
-static DetailedDisconnectContext *
-detailed_disconnect_context_new (MMBroadbandBearer *self,
-                                 MMBroadbandModem *modem,
-                                 MMPortSerialAt *primary,
-                                 MMPort *data,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
-{
-    DetailedDisconnectContext *ctx;
-
-    ctx = g_new0 (DetailedDisconnectContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             detailed_disconnect_context_new);
-    return ctx;
-}
-
 static gboolean
 disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
+detailed_disconnect_context_free (DetailedDisconnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
 static void
 disconnect_3gpp_check_status (MMBaseModem *modem,
                               GAsyncResult *res,
-                              DetailedDisconnectContext *ctx)
+                              GTask *task)
 {
 
     const gchar *result;
@@ -280,12 +255,12 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("Disconnect failed: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     }
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    detailed_disconnect_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
@@ -300,6 +275,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
 {
     DetailedDisconnectContext *ctx;
     MMModem3gppRegistrationState registration_state;
+    GTask *task;
 
     /* There is a known firmware bug that can leave the modem unusable if a
      * disconnect attempt is made when out of coverage. So, fail without trying.
@@ -308,16 +284,23 @@ disconnect_3gpp (MMBroadbandBearer *self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &registration_state,
                   NULL);
     if (registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK,
-                                             "Out of coverage, can't disconnect.");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 disconnect_3gpp,
+                                 MM_MOBILE_EQUIPMENT_ERROR,
+                                 MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK,
+                                 "Out of coverage, can't disconnect.");
         return;
     }
 
-    ctx = detailed_disconnect_context_new (self, modem, primary, data, callback, user_data);
+    ctx = g_new0 (DetailedDisconnectContext, 1);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->data = g_object_ref (data);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
 
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
@@ -327,7 +310,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                    FALSE, /* is_raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)disconnect_3gpp_check_status,
-                                   ctx); /* user_data */
+                                   task); /* user_data */
 }
 
 /*****************************************************************************/
