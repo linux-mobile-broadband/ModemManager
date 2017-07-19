@@ -2031,7 +2031,7 @@ report_connection_status (MMBaseBearer *self,
 /*****************************************************************************/
 
 typedef struct _InitAsyncContext InitAsyncContext;
-static void interface_initialization_step (InitAsyncContext *ctx);
+static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -2040,28 +2040,19 @@ typedef enum {
 } InitializationStep;
 
 struct _InitAsyncContext {
-    MMBroadbandBearer *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     MMBaseModem *modem;
     InitializationStep step;
     MMPortSerialAt *port;
 };
 
 static void
-init_async_context_free (InitAsyncContext *ctx,
-                         gboolean close_port)
+init_async_context_free (InitAsyncContext *ctx)
 {
     if (ctx->port) {
-        if (close_port)
-            mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
         g_object_unref (ctx->port);
     }
-    g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_free (ctx);
 }
 
@@ -2090,22 +2081,26 @@ initable_init_finish (GAsyncInitable  *initable,
                       GAsyncResult    *result,
                       GError         **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+    return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 static void
 crm_range_ready (MMBaseModem *modem,
                  GAsyncResult *res,
-                 InitAsyncContext *ctx)
+                 GTask *task)
 {
+    MMBroadbandModem *self;
+    InitAsyncContext *ctx;
     GError *error = NULL;
     const gchar *response;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         /* We should possibly take this error as fatal. If we were told to use a
          * specific Rm protocol, we must be able to check if it is supported. */
-        g_simple_async_result_take_error (ctx->result, error);
     } else {
         MMModemCdmaRmProtocol min = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
         MMModemCdmaRmProtocol max = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
@@ -2115,13 +2110,13 @@ crm_range_ready (MMBaseModem *modem,
                                              &error)) {
             MMModemCdmaRmProtocol current;
 
-            current = mm_bearer_properties_get_rm_protocol (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+            current = mm_bearer_properties_get_rm_protocol (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
             /* Check if value within the range */
             if (current >= min &&
                 current <= max) {
                 /* Fine, go on with next step */
                 ctx->step++;
-                interface_initialization_step (ctx);
+                interface_initialization_step (task);
                 return;
             }
 
@@ -2131,18 +2126,22 @@ crm_range_ready (MMBaseModem *modem,
                                  "Requested RM protocol '%s' is not supported",
                                  mm_modem_cdma_rm_protocol_get_string (current));
         }
-
         /* Failed, set as fatal as well */
-        g_simple_async_result_take_error (ctx->result, error);
     }
 
-    g_simple_async_result_complete (ctx->result);
-    init_async_context_free (ctx, TRUE);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 static void
-interface_initialization_step (InitAsyncContext *ctx)
+interface_initialization_step (GTask *task)
 {
+    MMBroadbandModem *self;
+    InitAsyncContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
         /* Fall down to next step */
@@ -2153,7 +2152,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * supported. */
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->modem)) &&
             mm_bearer_properties_get_rm_protocol (
-                mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+                mm_base_bearer_peek_config (MM_BASE_BEARER (self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->port,
                                            "+CRM=?",
@@ -2162,7 +2161,7 @@ interface_initialization_step (InitAsyncContext *ctx)
                                            FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)crm_range_ready,
-                                           ctx);
+                                           task);
             return;
         }
 
@@ -2171,9 +2170,8 @@ interface_initialization_step (InitAsyncContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx, TRUE);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -2188,41 +2186,38 @@ initable_init_async (GAsyncInitable *initable,
                      gpointer user_data)
 {
     InitAsyncContext *ctx;
+    GTask *task;
     GError *error = NULL;
 
     ctx = g_new0 (InitAsyncContext, 1);
-    ctx->self = g_object_ref (initable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (initable),
-                                             callback,
-                                             user_data,
-                                             initable_init_async);
-    ctx->cancellable = (cancellable ?
-                        g_object_ref (cancellable) :
-                        NULL);
-
     g_object_get (initable,
                   MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
+    task = g_task_new (MM_BROADBAND_BEARER (initable),
+                       cancellable,
+                       callback,
+                       user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)init_async_context_free);
+
     ctx->port = mm_base_modem_get_port_primary (ctx->modem);
     if (!ctx->port) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get primary port");
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx, FALSE);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get primary port");
+        g_object_unref (task);
         return;
     }
 
     if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx, FALSE);
+        g_clear_object (&ctx->port);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    interface_initialization_step (ctx);
+    interface_initialization_step (task);
 }
 
 void
