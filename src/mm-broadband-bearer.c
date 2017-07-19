@@ -1360,12 +1360,10 @@ connect (MMBaseBearer *self,
 /* Detailed disconnect context, used in both CDMA and 3GPP sequences */
 
 typedef struct {
-    MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPortSerialAt *secondary;
     MMPort *data;
-    GSimpleAsyncResult *result;
 
     /* 3GPP-specific */
     gchar *cgact_command;
@@ -1377,46 +1375,36 @@ detailed_disconnect_finish (MMBroadbandBearer *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
+detailed_disconnect_context_free (DetailedDisconnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->cgact_command)
         g_free (ctx->cgact_command);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     if (ctx->secondary)
         g_object_unref (ctx->secondary);
-    g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_free (ctx);
 }
 
 static DetailedDisconnectContext *
-detailed_disconnect_context_new (MMBroadbandBearer *self,
-                                 MMBroadbandModem *modem,
+detailed_disconnect_context_new (MMBroadbandModem *modem,
                                  MMPortSerialAt *primary,
                                  MMPortSerialAt *secondary,
-                                 MMPort *data,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+                                 MMPort *data)
 {
     DetailedDisconnectContext *ctx;
 
     ctx = g_new0 (DetailedDisconnectContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
     ctx->data = g_object_ref (data);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             detailed_disconnect_context_new);
+
     return ctx;
 }
 
@@ -1426,14 +1414,19 @@ detailed_disconnect_context_new (MMBroadbandBearer *self,
 static void
 data_flash_cdma_ready (MMPortSerial *data,
                        GAsyncResult *res,
-                       DetailedDisconnectContext *ctx)
+                       GTask *task)
 {
+    MMBroadbandBearer *self;
+    DetailedDisconnectContext *ctx;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     mm_port_serial_flash_finish (data, res, &error);
 
     /* Cleanup flow control */
-    if (ctx->self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
+    if (self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
         GError *flow_control_error = NULL;
 
         if (!mm_port_serial_set_flow_control (MM_PORT_SERIAL (data), MM_FLOW_CONTROL_NONE, &flow_control_error)) {
@@ -1460,8 +1453,8 @@ data_flash_cdma_ready (MMPortSerial *data,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            g_simple_async_result_take_error (ctx->result, error);
-            detailed_disconnect_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -1469,23 +1462,26 @@ data_flash_cdma_ready (MMPortSerial *data,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    detailed_disconnect_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 data_reopen_cdma_ready (MMPortSerial *data,
                         GAsyncResult *res,
-                        DetailedDisconnectContext *ctx)
+                        GTask *task)
 {
+    DetailedDisconnectContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_disconnect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Just flash the data port */
     mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
@@ -1493,7 +1489,7 @@ data_reopen_cdma_ready (MMPortSerial *data,
                           1000,
                           TRUE,
                           (GAsyncReadyCallback)data_flash_cdma_ready,
-                          ctx);
+                          task);
 }
 
 static void
@@ -1506,26 +1502,24 @@ disconnect_cdma (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+    GTask *task;
 
     g_assert (primary != NULL);
 
     /* Generic CDMA plays only with SERIAL data ports */
     g_assert (MM_IS_PORT_SERIAL (data));
 
-    ctx = detailed_disconnect_context_new (self,
-                                           modem,
-                                           primary,
-                                           secondary,
-                                           data,
-                                           callback,
-                                           user_data);
+    ctx = detailed_disconnect_context_new (modem, primary, secondary, data);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
 
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
     mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
                            (GAsyncReadyCallback)data_reopen_cdma_ready,
-                           ctx);
+                           task);
 }
 
 /*****************************************************************************/
@@ -1534,7 +1528,7 @@ disconnect_cdma (MMBroadbandBearer *self,
 static void
 cgact_data_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  DetailedDisconnectContext *ctx)
+                  GTask *task)
 {
 
     GError *error = NULL;
@@ -1546,21 +1540,26 @@ cgact_data_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    detailed_disconnect_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 data_flash_3gpp_ready (MMPortSerial *data,
                        GAsyncResult *res,
-                       DetailedDisconnectContext *ctx)
+                       GTask *task)
 {
+    MMBroadbandBearer *self;
+    DetailedDisconnectContext *ctx;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     mm_port_serial_flash_finish (data, res, &error);
 
     /* Cleanup flow control */
-    if (ctx->self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
+    if (self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
         GError *flow_control_error = NULL;
 
         if (!mm_port_serial_set_flow_control (MM_PORT_SERIAL (data), MM_FLOW_CONTROL_NONE, &flow_control_error)) {
@@ -1587,8 +1586,8 @@ data_flash_3gpp_ready (MMPortSerial *data,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            g_simple_async_result_take_error (ctx->result, error);
-            detailed_disconnect_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -1600,8 +1599,8 @@ data_flash_3gpp_ready (MMPortSerial *data,
      * primary or secondary port */
     if (ctx->cgact_sent) {
         mm_dbg ("PDP disconnection already sent");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        detailed_disconnect_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1623,22 +1622,25 @@ data_flash_3gpp_ready (MMPortSerial *data,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)cgact_data_ready,
-                                   ctx);
+                                   task);
 }
 
 static void
 data_reopen_3gpp_ready (MMPortSerial *data,
                         GAsyncResult *res,
-                        DetailedDisconnectContext *ctx)
+                        GTask *task)
 {
+    DetailedDisconnectContext *ctx;
     GError *error = NULL;
 
     if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_disconnect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Just flash the data port */
     mm_dbg ("Flashing data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
@@ -1646,26 +1648,33 @@ data_reopen_3gpp_ready (MMPortSerial *data,
                           1000,
                           TRUE,
                           (GAsyncReadyCallback)data_flash_3gpp_ready,
-                          ctx);
+                          task);
 }
 
 static void
-data_reopen_3gpp (DetailedDisconnectContext *ctx)
+data_reopen_3gpp (GTask *task)
 {
+    DetailedDisconnectContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
     mm_port_serial_reopen (MM_PORT_SERIAL (ctx->data),
                            1000,
                            (GAsyncReadyCallback)data_reopen_3gpp_ready,
-                           ctx);
+                           task);
 }
 
 static void
 cgact_ready (MMBaseModem *modem,
              GAsyncResult *res,
-             DetailedDisconnectContext *ctx)
+             GTask *task)
 {
+    DetailedDisconnectContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!error)
@@ -1675,7 +1684,7 @@ cgact_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    data_reopen_3gpp (ctx);
+    data_reopen_3gpp (task);
 }
 
 static void
@@ -1689,24 +1698,22 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+    GTask *task;
 
     g_assert (primary != NULL);
 
     /* Generic 3GPP plays only with SERIAL data ports */
     g_assert (MM_IS_PORT_SERIAL (data));
 
-    ctx = detailed_disconnect_context_new (self,
-                                           modem,
-                                           primary,
-                                           secondary,
-                                           data,
-                                           callback,
-                                           user_data);
+    ctx = detailed_disconnect_context_new (modem, primary, secondary, data);
 
     /* If no specific CID was used, disable all PDP contexts */
     ctx->cgact_command = (cid > 0 ?
                           g_strdup_printf ("+CGACT=0,%d", cid) :
                           g_strdup_printf ("+CGACT=0"));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
 
     /* If the primary port is NOT connected (doesn't have to be the data port),
      * we'll send CGACT there */
@@ -1720,7 +1727,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)cgact_ready,
-                                       ctx);
+                                       task);
         return;
     }
 
@@ -1739,12 +1746,12 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)cgact_ready,
-                                       ctx);
+                                       task);
         return;
     }
 
     /* If no secondary port, go on to reopen & flash the data/primary port */
-    data_reopen_3gpp (ctx);
+    data_reopen_3gpp (task);
 }
 
 /*****************************************************************************/
