@@ -221,15 +221,15 @@ load_current_capabilities_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    MMModemCapability caps;
-    gchar *caps_str;
+    GError *inner_error = NULL;
+    gssize value;
 
-    /* This modem is LTE only.*/
-    caps = MM_MODEM_CAPABILITY_LTE;
-    caps_str = mm_modem_capability_build_string_from_mask (caps);
-    mm_dbg ("Loaded current capabilities: %s", caps_str);
-    g_free (caps_str);
-    return caps;
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_CAPABILITY_NONE;
+    }
+    return (MMModemCapability)value;
 }
 
 static void
@@ -237,16 +237,14 @@ load_current_capabilities (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     mm_dbg ("Loading (Altair LTE) current capabilities...");
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_capabilities);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    /* This modem is LTE only.*/
+    g_task_return_int (task, MM_MODEM_CAPABILITY_LTE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
