@@ -457,14 +457,13 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
-                                                   error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
                                                   GAsyncResult *res,
-                                                  GSimpleAsyncResult *operation_result)
+                                                  GTask *task)
 {
     GError *error = NULL;
     const gchar *at_response;
@@ -474,15 +473,14 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
      * ignore the error. This allows the registration attempt to continue.
      * So, the async response from this function is *always* True.
      */
-    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
 
     at_response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!at_response) {
         g_assert (error);
         mm_warn ("AT+CEER failed: %s", error->message);
         g_error_free (error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -491,8 +489,8 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
         g_assert (error);
         mm_warn ("Failed to parse AT+CEER response: %s", error->message);
         g_error_free (error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -503,15 +501,15 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
         mm_dbg ("Failed to find a better reason for registration failure.");
     }
 
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     g_free (ceer_response);
 }
 
 static void
 run_registration_checks_ready (MMIfaceModem3gpp *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *operation_result)
+                               GTask *task)
 {
     GError *error = NULL;
     gboolean success;
@@ -520,9 +518,8 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
     success = iface_modem_3gpp_parent->run_registration_checks_finish (self, res, &error);
     if (!success) {
         g_assert (error);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -532,7 +529,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
                               6,
                               FALSE,
                               (GAsyncReadyCallback) run_registration_checks_subscription_state_ready,
-                              operation_result);
+                              task);
 }
 
 static void
@@ -543,12 +540,9 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    GSimpleAsyncResult *operation_result;
+    GTask *task;
 
-    operation_result = g_simple_async_result_new (G_OBJECT (self),
-                                                  callback,
-                                                  user_data,
-                                                  modem_3gpp_run_registration_checks);
+    task = g_task_new (self, NULL, callback, user_data);
 
     g_assert (iface_modem_3gpp_parent->run_registration_checks);
     iface_modem_3gpp_parent->run_registration_checks (self,
@@ -556,7 +550,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                                       ps_supported,
                                                       eps_supported,
                                                       (GAsyncReadyCallback) run_registration_checks_ready,
-                                                      operation_result);
+                                                      task);
 }
 
 /*****************************************************************************/
