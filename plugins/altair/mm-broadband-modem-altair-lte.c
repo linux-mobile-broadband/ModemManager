@@ -149,16 +149,13 @@ load_unlock_retries_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-    return (MMUnlockRetries *) g_object_ref (g_simple_async_result_get_op_res_gpointer (
-                                                 G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_unlock_retries_ready (MMBaseModem *self,
                            GAsyncResult *res,
-                           GSimpleAsyncResult *operation_result)
+                           GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -167,9 +164,8 @@ load_unlock_retries_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
         mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -182,18 +178,15 @@ load_unlock_retries_ready (MMBaseModem *self,
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, puk1);
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, pin2);
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2);
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   retries,
-                                                   g_object_unref);
+        g_task_return_pointer (task, retries, g_object_unref);
     } else {
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid unlock retries response: '%s'",
-                                         response);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Invalid unlock retries response: '%s'",
+                                 response);
     }
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_object_unref (task);
 }
 
 static void
@@ -201,16 +194,16 @@ load_unlock_retries (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        "%CPININFO",
-        3,
-        FALSE,
-        (GAsyncReadyCallback)load_unlock_retries_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_unlock_retries));
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%CPININFO",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)load_unlock_retries_ready,
+                              task);
 }
 
 /*****************************************************************************/
