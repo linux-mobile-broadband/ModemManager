@@ -1750,28 +1750,12 @@ disconnect_3gpp (MMBroadbandBearer *self,
 /*****************************************************************************/
 /* DISCONNECT */
 
-typedef struct {
-    MMBroadbandBearer *self;
-    GSimpleAsyncResult *result;
-    MMPort *data;
-} DisconnectContext;
-
-static void
-disconnect_context_complete_and_free (DisconnectContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->data);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 disconnect_finish (MMBaseBearer *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -1791,56 +1775,47 @@ reset_bearer_connection (MMBroadbandBearer *self)
 }
 
 static void
-disconnect_succeeded (DisconnectContext *ctx)
-{
-    /* Cleanup all connection related data */
-    reset_bearer_connection (ctx->self);
-
-    /* Set operation result */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disconnect_context_complete_and_free (ctx);
-}
-
-static void
-disconnect_failed (DisconnectContext *ctx,
-                   GError *error)
-{
-    g_simple_async_result_take_error (ctx->result, error);
-    disconnect_context_complete_and_free (ctx);
-}
-
-static void
 disconnect_cdma_ready (MMBroadbandBearer *self,
                        GAsyncResult *res,
-                       DisconnectContext *ctx)
+                       GTask *task)
 {
     GError *error = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_cdma_finish (self,
                                                                        res,
                                                                        &error))
-        disconnect_failed (ctx, error);
-    else
-        disconnect_succeeded (ctx);
+        g_task_return_error (task, error);
+    else {
+        /* Cleanup all connection related data */
+        reset_bearer_connection (self);
+
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
 }
 
 static void
 disconnect_3gpp_ready (MMBroadbandBearer *self,
                        GAsyncResult *res,
-                       DisconnectContext *ctx)
+                       GTask *task)
 {
     GError *error = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp_finish (self,
                                                                        res,
                                                                        &error))
-        disconnect_failed (ctx, error);
+        g_task_return_error (task, error);
     else {
         /* Clear CID if we got any set */
-        if (ctx->self->priv->cid)
-            ctx->self->priv->cid = 0;
-        disconnect_succeeded (ctx);
+        if (self->priv->cid)
+            self->priv->cid = 0;
+
+        /* Cleanup all connection related data */
+        reset_bearer_connection (self);
+
+        g_task_return_boolean (task, TRUE);
     }
+    g_object_unref (task);
 }
 
 static void
@@ -1850,13 +1825,14 @@ disconnect (MMBaseBearer *self,
 {
     MMPortSerialAt *primary;
     MMBaseModem *modem = NULL;
-    DisconnectContext *ctx;
+    GTask *task;
 
     if (!MM_BROADBAND_BEARER (self)->priv->port) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            disconnect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Couldn't disconnect: this bearer is not connected");
@@ -1871,10 +1847,11 @@ disconnect (MMBaseBearer *self,
     /* We need the primary port to disconnect... */
     primary = mm_base_modem_peek_port_primary (modem);
     if (!primary) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            disconnect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Couldn't disconnect: couldn't get primary port");
@@ -1882,14 +1859,7 @@ disconnect (MMBaseBearer *self,
         return;
     }
 
-    /* In this context, we only keep the stuff we'll need later */
-    ctx = g_new0 (DisconnectContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->data = g_object_ref (MM_BROADBAND_BEARER (self)->priv->port);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disconnect);
+    task = g_task_new (self, NULL, callback , user_data);
 
     switch (MM_BROADBAND_BEARER (self)->priv->connection_type) {
     case CONNECTION_TYPE_3GPP:
@@ -1901,7 +1871,7 @@ disconnect (MMBaseBearer *self,
                 MM_BROADBAND_BEARER (self)->priv->port,
                 MM_BROADBAND_BEARER (self)->priv->cid,
                 (GAsyncReadyCallback) disconnect_3gpp_ready,
-                ctx);
+                task);
         break;
 
     case CONNECTION_TYPE_CDMA:
@@ -1912,7 +1882,7 @@ disconnect (MMBaseBearer *self,
             mm_base_modem_peek_port_secondary (modem),
             MM_BROADBAND_BEARER (self)->priv->port,
             (GAsyncReadyCallback) disconnect_cdma_ready,
-            ctx);
+            task);
         break;
 
     case CONNECTION_TYPE_NONE:
