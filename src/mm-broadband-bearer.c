@@ -480,58 +480,23 @@ connect_cdma (MMBroadbandBearer *self,
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
 
 typedef struct {
-    MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     GError *saved_error;
-
     MMPortSerialAt *dial_port;
     gboolean close_dial_port_on_exit;
 } Dial3gppContext;
 
 static void
-dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
+dial_3gpp_context_free (Dial3gppContext *ctx)
 {
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
     if (ctx->dial_port)
         g_object_unref (ctx->dial_port);
-    g_object_unref (ctx->cancellable);
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (Dial3gppContext, ctx);
-}
-
-static gboolean
-dial_3gpp_context_set_error_if_cancelled (Dial3gppContext *ctx,
-                                          GError **error)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_CANCELLED,
-                 "Dial operation has been cancelled");
-    return TRUE;
-}
-
-static gboolean
-dial_3gpp_context_complete_and_free_if_cancelled (Dial3gppContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!dial_3gpp_context_set_error_if_cancelled (ctx, &error))
-        return FALSE;
-
-    g_simple_async_result_take_error (ctx->result, error);
-    dial_3gpp_context_complete_and_free (ctx);
-    return TRUE;
 }
 
 static MMPort *
@@ -539,51 +504,58 @@ dial_3gpp_finish (MMBroadbandBearer *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 extended_error_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      Dial3gppContext *ctx)
+                      GTask *task)
 {
+    Dial3gppContext *ctx;
     const gchar *result;
+    GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* Close the dialling port as we got an error */
     mm_port_serial_close (MM_PORT_SERIAL (ctx->dial_port));
 
     /* If cancelled, complete */
-    if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
 
     result = mm_base_modem_at_command_full_finish (modem, res, NULL);
     if (result &&
         g_str_has_prefix (result, "+CEER: ") &&
         strlen (result) > 7) {
-        g_simple_async_result_set_error (ctx->result,
-                                         ctx->saved_error->domain,
-                                         ctx->saved_error->code,
-                                         "%s", &result[7]);
+        error = g_error_new (ctx->saved_error->domain,
+                             ctx->saved_error->code,
+                             "%s",
+                             &result[7]);
         g_error_free (ctx->saved_error);
     } else
-        g_simple_async_result_take_error (ctx->result,
-                                          ctx->saved_error);
+        g_propagate_error (&error, ctx->saved_error);
 
     ctx->saved_error = NULL;
 
     /* Done with errors */
-    dial_3gpp_context_complete_and_free (ctx);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 static void
 atd_ready (MMBaseModem *modem,
            GAsyncResult *res,
-           Dial3gppContext *ctx)
+           GTask *task)
 {
-    GError *error = NULL;
+    MMBroadbandBearer *self;
+    Dial3gppContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
@@ -600,19 +572,20 @@ atd_ready (MMBaseModem *modem,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)extended_error_ready,
-                                       ctx);
+                                       task);
         return;
     }
 
     /* Configure flow control to use while connected */
-    if (ctx->self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
+    if (self->priv->flow_control != MM_FLOW_CONTROL_NONE) {
         gchar *flow_control_str;
+        GError *error = NULL;
 
-        flow_control_str = mm_flow_control_build_string_from_mask (ctx->self->priv->flow_control);
+        flow_control_str = mm_flow_control_build_string_from_mask (self->priv->flow_control);
         mm_dbg ("[%s] Setting flow control: %s", mm_port_get_device (MM_PORT (ctx->dial_port)), flow_control_str);
         g_free (flow_control_str);
 
-        if (!mm_port_serial_set_flow_control (MM_PORT_SERIAL (ctx->dial_port), ctx->self->priv->flow_control, &error)) {
+        if (!mm_port_serial_set_flow_control (MM_PORT_SERIAL (ctx->dial_port), self->priv->flow_control, &error)) {
             mm_warn ("Couldn't set flow control settings: %s", error->message);
             g_clear_error (&error);
         }
@@ -623,10 +596,10 @@ atd_ready (MMBaseModem *modem,
      * connect_succeeded(), we do it right away so that we stop our polling. */
     mm_port_set_connected (MM_PORT (ctx->dial_port), TRUE);
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               g_object_ref (ctx->dial_port),
-                                               g_object_unref);
-    dial_3gpp_context_complete_and_free (ctx);
+    g_task_return_pointer (task,
+                           g_object_ref (ctx->dial_port),
+                           g_object_unref);
+    g_object_unref (task);
 }
 
 static void
@@ -640,26 +613,24 @@ dial_3gpp (MMBroadbandBearer *self,
 {
     gchar *command;
     Dial3gppContext *ctx;
+    GTask *task;
     GError *error = NULL;
 
     g_assert (primary != NULL);
 
     ctx = g_slice_new0 (Dial3gppContext);
-    ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             dial_3gpp);
-    ctx->cancellable = g_object_ref (cancellable);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)dial_3gpp_context_free);
 
     /* Grab dial port. This gets a reference to the dial port and OPENs it.
      * If we fail, we'll need to close it ourselves. */
     ctx->dial_port = common_get_at_data_port (ctx->modem, &error);
     if (!ctx->dial_port) {
-        g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -673,7 +644,7 @@ dial_3gpp (MMBroadbandBearer *self,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)atd_ready,
-                                   ctx);
+                                   task);
     g_free (command);
 }
 
