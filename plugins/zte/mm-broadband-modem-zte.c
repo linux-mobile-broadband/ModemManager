@@ -112,42 +112,34 @@ load_unlock_retries (MMIfaceModem *self,
 /* After SIM unlock (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemZte *self;
-    GSimpleAsyncResult *result;
     guint retries;
 } ModemAfterSimUnlockContext;
-
-static void
-modem_after_sim_unlock_context_complete_and_free (ModemAfterSimUnlockContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
 
 static gboolean
 modem_after_sim_unlock_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void modem_after_sim_unlock_context_step (ModemAfterSimUnlockContext *ctx);
+static void modem_after_sim_unlock_context_step (GTask *task);
 
 static gboolean
-cpms_timeout_cb (ModemAfterSimUnlockContext *ctx)
+cpms_timeout_cb (GTask *task)
 {
+    ModemAfterSimUnlockContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     ctx->retries--;
-    modem_after_sim_unlock_context_step (ctx);
+    modem_after_sim_unlock_context_step (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 cpms_try_ready (MMBaseModem *self,
                 GAsyncResult *res,
-                ModemAfterSimUnlockContext *ctx)
+                GTask *task)
 {
     GError *error = NULL;
 
@@ -156,7 +148,7 @@ cpms_try_ready (MMBaseModem *self,
                          MM_MOBILE_EQUIPMENT_ERROR,
                          MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY)) {
             /* Retry in 2 seconds */
-        g_timeout_add_seconds (2, (GSourceFunc)cpms_timeout_cb, ctx);
+        g_timeout_add_seconds (2, (GSourceFunc)cpms_timeout_cb, task);
         g_error_free (error);
         return;
     }
@@ -165,30 +157,36 @@ cpms_try_ready (MMBaseModem *self,
         g_error_free (error);
 
     /* Well, we're done */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    modem_after_sim_unlock_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-modem_after_sim_unlock_context_step (ModemAfterSimUnlockContext *ctx)
+modem_after_sim_unlock_context_step (GTask *task)
 {
+    MMBroadbandModemZte *self;
+    ModemAfterSimUnlockContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (ctx->retries == 0) {
         /* Well... just return without error */
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Consumed all attempts to wait for SIM not being busy");
-        modem_after_sim_unlock_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CPMS?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cpms_try_ready,
-                              ctx);
+                              task);
 }
 
 static void
@@ -197,21 +195,20 @@ modem_after_sim_unlock (MMIfaceModem *self,
                         gpointer user_data)
 {
     ModemAfterSimUnlockContext *ctx;
+    GTask *task;
 
-    ctx = g_new0 (ModemAfterSimUnlockContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_after_sim_unlock);
+    ctx = g_new (ModemAfterSimUnlockContext, 1);
     ctx->retries = 3;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     /* Attempt to disable floods of "+ZUSIMR:2" unsolicited responses that
      * eventually fill up the device's buffers and make it crash.  Normally
      * done during probing, but if the device has a PIN enabled it won't
      * accept the +CPMS? during the probe and we have to do it here.
      */
-    modem_after_sim_unlock_context_step (ctx);
+    modem_after_sim_unlock_context_step (task);
 }
 
 /*****************************************************************************/
