@@ -42,51 +42,17 @@ G_DEFINE_TYPE (MMBroadbandBearerAltairLte, mm_broadband_bearer_altair_lte, MM_TY
 /* 3GPP Connect sequence */
 
 typedef struct {
-    MMBroadbandBearerAltairLte *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
 } DetailedConnectContext;
 
-static DetailedConnectContext *
-detailed_connect_context_new (MMBroadbandBearer *self,
-                              MMBroadbandModem *modem,
-                              MMPortSerialAt *primary,
-                              MMPort *data,
-                              GCancellable *cancellable,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
-{
-    DetailedConnectContext *ctx;
-
-    ctx = g_new0 (DetailedConnectContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    /* NOTE:
-     * We don't currently support cancelling AT commands, so we'll just check
-     * whether the operation is to be cancelled at each step. */
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             detailed_connect_context_new);
-    return ctx;
-}
-
 static void
-detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
+detailed_connect_context_free (DetailedConnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -95,17 +61,15 @@ connect_3gpp_finish (MMBroadbandBearer *self,
                      GAsyncResult *res,
                      GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 connect_3gpp_connect_ready (MMBaseModem *modem,
                             GAsyncResult *res,
-                            DetailedConnectContext *ctx)
+                            GTask *task)
 {
+    DetailedConnectContext *ctx;
     const gchar *result;
     GError *error = NULL;
     MMBearerIpConfig *config;
@@ -113,45 +77,47 @@ connect_3gpp_connect_ready (MMBaseModem *modem,
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("connect failed: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     mm_dbg ("Connected");
+
+    ctx = g_task_get_task_data (task);
 
     config = mm_bearer_ip_config_new ();
 
     mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
 
     /* Set operation result */
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        mm_bearer_connect_result_new (ctx->data,
-                                      config,
-                                      config),
+    g_task_return_pointer (
+        task,
+        mm_bearer_connect_result_new (ctx->data, config, config),
         (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (task);
 
     g_object_unref (config);
-
-    detailed_connect_context_complete_and_free (ctx);
 }
 
 static void
 connect_3gpp_apnsettings_ready (MMBaseModem *modem,
                                 GAsyncResult *res,
-                                DetailedConnectContext *ctx)
+                                GTask *task)
 {
+    DetailedConnectContext *ctx;
     const gchar *result;
     GError *error = NULL;
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("setting APN failed: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     mm_dbg ("APN set - connecting bearer");
     mm_base_modem_at_command_full (ctx->modem,
@@ -160,9 +126,9 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
                                    20, /* timeout */
                                    FALSE, /* allow_cached */
                                    FALSE, /* is_raw */
-                                   ctx->cancellable,
+                                   g_task_get_cancellable (task),
                                    (GAsyncReadyCallback)connect_3gpp_connect_ready,
-                                   ctx); /* user_data */
+                                   task); /* user_data */
 }
 
 static void
@@ -179,6 +145,7 @@ connect_3gpp (MMBroadbandBearer *self,
     MMBearerProperties *config;
     MMModem3gppRegistrationState registration_state;
     MMPort *data;
+    GTask *task;
 
     /* There is a known firmware bug that can leave the modem unusable if a
      * connect attempt is made when out of coverage. So, fail without trying.
@@ -187,12 +154,13 @@ connect_3gpp (MMBroadbandBearer *self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &registration_state,
                   NULL);
     if (registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_MOBILE_EQUIPMENT_ERROR,
-                                             MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK,
-                                             "Out of coverage, can't connect.");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 connect_3gpp,
+                                 MM_MOBILE_EQUIPMENT_ERROR,
+                                 MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK,
+                                 "Out of coverage, can't connect.");
         return;
     }
 
@@ -201,37 +169,39 @@ connect_3gpp (MMBroadbandBearer *self,
      * */
     if (mm_broadband_modem_altair_lte_is_sim_refresh_detach_in_progress (modem)) {
         mm_dbg ("Detached from network to process SIM refresh, failing connect request");
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_RETRY,
-                                             "Detached from network to process SIM refresh, can't connect.");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 connect_3gpp,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_RETRY,
+                                 "Detached from network to process SIM refresh, can't connect.");
         return;
     }
 
     data = mm_base_modem_peek_best_data_port (MM_BASE_MODEM (modem), MM_PORT_TYPE_NET);
     if (!data) {
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_CONNECTED,
-                                             "Couldn't connect: no available net port available");
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 connect_3gpp,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_CONNECTED,
+                                 "Couldn't connect: no available net port available");
         return;
     }
 
-    ctx = detailed_connect_context_new (self,
-                                        modem,
-                                        primary,
-                                        data,
-                                        cancellable,
-                                        callback,
-                                        user_data);
+    ctx = g_new0 (DetailedConnectContext, 1);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->data = g_object_ref (data);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_connect_context_free);
 
     config = mm_base_bearer_peek_config (MM_BASE_BEARER (self));
     apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
-    command = g_strdup_printf ("%%APNN=%s",apn);
+    command = g_strdup_printf ("%%APNN=%s", apn);
     g_free (apn);
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
@@ -239,9 +209,9 @@ connect_3gpp (MMBroadbandBearer *self,
                                    10, /* timeout */
                                    FALSE, /* allow_cached */
                                    FALSE, /* is_raw */
-                                   ctx->cancellable,
+                                   cancellable,
                                    (GAsyncReadyCallback)connect_3gpp_apnsettings_ready,
-                                   ctx); /* user_data */
+                                   task); /* user_data */
     g_free (command);
 }
 
