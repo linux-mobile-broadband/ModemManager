@@ -1159,15 +1159,11 @@ modem_load_own_numbers_done (MMIfaceModem *self,
             g_byte_array_unref (mdn);
             return;
         }
-    } else {
-        numbers = mm_3gpp_parse_cnum_exec_response (result, &error);
-        if (numbers)
-            g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
-    }
-
-    if (error)
         g_task_return_error (task, error);
-
+    } else {
+        numbers = mm_3gpp_parse_cnum_exec_response (result, NULL);
+        g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
+    }
     g_object_unref (task);
 }
 
