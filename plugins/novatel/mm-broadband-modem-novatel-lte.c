@@ -223,7 +223,7 @@ response_processor_cnum_ignore_at_errors (MMBaseModem *self,
         return FALSE;
     }
 
-    own_numbers = mm_3gpp_parse_cnum_exec_response (response, result_error);
+    own_numbers = mm_3gpp_parse_cnum_exec_response (response);
     if (!own_numbers)
         return FALSE;
 

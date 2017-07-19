@@ -2817,8 +2817,7 @@ mm_3gpp_parse_clck_write_response (const gchar *reply,
 /*************************************************************************/
 
 GStrv
-mm_3gpp_parse_cnum_exec_response (const gchar *reply,
-                                  GError **error)
+mm_3gpp_parse_cnum_exec_response (const gchar *reply)
 {
     GArray *array = NULL;
     GRegex *r;

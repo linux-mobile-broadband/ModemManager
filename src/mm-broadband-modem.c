@@ -1161,7 +1161,7 @@ modem_load_own_numbers_done (MMIfaceModem *self,
         }
         g_task_return_error (task, error);
     } else {
-        numbers = mm_3gpp_parse_cnum_exec_response (result, NULL);
+        numbers = mm_3gpp_parse_cnum_exec_response (result);
         g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
     }
     g_object_unref (task);

@@ -226,8 +226,7 @@ gboolean mm_3gpp_parse_clck_write_response (const gchar *reply,
                                             gboolean *enabled);
 
 /* AT+CNUM (Own numbers) response parser */
-GStrv mm_3gpp_parse_cnum_exec_response (const gchar *reply,
-                                        GError **error);
+GStrv mm_3gpp_parse_cnum_exec_response (const gchar *reply);
 
 /* AT+CMER=? (Mobile Equipment Event Reporting) response parser */
 typedef enum {  /*< underscore_name=mm_3gpp_cmer_mode >*/

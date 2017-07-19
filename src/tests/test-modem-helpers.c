@@ -2690,14 +2690,12 @@ test_cnum_results (const gchar *desc,
                    const GStrv expected)
 {
     GStrv results;
-    GError *error = NULL;
     guint i;
 
     trace ("\nTesting +CNUM response (%s)...\n", desc);
 
-    results = mm_3gpp_parse_cnum_exec_response (reply, &error);
+    results = mm_3gpp_parse_cnum_exec_response (reply);
     g_assert (results);
-    g_assert_no_error (error);
     g_assert_cmpuint (g_strv_length (results), ==, g_strv_length (expected));
 
     for (i = 0; results[i]; i++) {
