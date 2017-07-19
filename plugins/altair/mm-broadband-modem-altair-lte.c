@@ -1088,18 +1088,13 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
 /* Subscription State loading (3GPP interface) */
 
 typedef struct {
-    MMIfaceModem3gpp *self;
-    GSimpleAsyncResult *result;
     gchar *pco_info;
 } LoadSubscriptionStateContext;
 
 static void
-load_subscription_state_context_complete_and_free (LoadSubscriptionStateContext *ctx)
+load_subscription_state_context_free (LoadSubscriptionStateContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
     g_free (ctx->pco_info);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (LoadSubscriptionStateContext, ctx);
 }
 
@@ -1123,52 +1118,62 @@ modem_3gpp_load_subscription_state_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+    }
+    return (MMModem3gppSubscriptionState)value;
 }
 
 static void
 altair_get_subscription_state (MMIfaceModem3gpp *self,
-                               LoadSubscriptionStateContext *ctx)
+                               GTask *task)
 {
+    LoadSubscriptionStateContext *ctx;
     guint pco_value = -1;
     GError *error = NULL;
     MMModem3gppSubscriptionState subscription_state;
 
+    ctx = g_task_get_task_data (task);
+
     mm_dbg ("Parsing vendor PCO info: %s", ctx->pco_info);
     pco_value = mm_altair_parse_vendor_pco_info (ctx->pco_info, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_subscription_state_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
     mm_dbg ("PCO value = %d", pco_value);
 
     subscription_state = altair_vzw_pco_value_to_mm_modem_3gpp_subscription_state (pco_value);
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (subscription_state), NULL);
-    load_subscription_state_context_complete_and_free (ctx);
+    g_task_return_int (task, subscription_state);
+    g_object_unref (task);
 }
 
 static void
 altair_load_vendor_pco_info_ready (MMIfaceModem3gpp *self,
                                    GAsyncResult *res,
-                                   LoadSubscriptionStateContext *ctx)
+                                   GTask *task)
 {
+    LoadSubscriptionStateContext *ctx;
     const gchar *response;
     GError *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         mm_dbg ("Failed to load vendor PCO info.");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_subscription_state_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
     g_assert (response);
+    ctx = g_task_get_task_data (task);
     ctx->pco_info = g_strdup (response);
-    altair_get_subscription_state (self, ctx);
+    altair_get_subscription_state (self, task);
 }
 
 static void
@@ -1177,13 +1182,12 @@ modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
                                     gpointer user_data)
 {
     LoadSubscriptionStateContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (LoadSubscriptionStateContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_load_subscription_state);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_subscription_state_context_free);
 
     mm_dbg ("Loading vendor PCO info...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -1191,7 +1195,7 @@ modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
                               6,
                               FALSE,
                               (GAsyncReadyCallback)altair_load_vendor_pco_info_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
@@ -1205,13 +1209,13 @@ altair_get_subscription_state_ready (MMBroadbandModemAltairLte *self,
     GError *error = NULL;
     MMModem3gppSubscriptionState subscription_state;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), &error)) {
+    subscription_state = (MMModem3gppSubscriptionState)g_task_propagate_int (G_TASK (res), &error);
+    if (error) {
         mm_warn ("Couldn't load Subscription State: '%s'", error->message);
         g_error_free (error);
         return;
     }
 
-    subscription_state = GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
     if (subscription_state != MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN)
         mm_iface_modem_3gpp_update_subscription_state (MM_IFACE_MODEM_3GPP (self), subscription_state);
 }
@@ -1223,16 +1227,19 @@ altair_pco_info_changed (MMPortSerialAt *port,
 {
     LoadSubscriptionStateContext *ctx;
     const gchar *response;
+    GTask *task;
 
     ctx = g_slice_new0 (LoadSubscriptionStateContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             (GAsyncReadyCallback)altair_get_subscription_state_ready,
-                                             NULL,
-                                             altair_pco_info_changed);
     response = g_match_info_fetch (match_info, 0);
     ctx->pco_info = g_strdup (response);
-    altair_get_subscription_state (MM_IFACE_MODEM_3GPP (self), ctx);
+
+    task = g_task_new (self,
+                       NULL,
+                       (GAsyncReadyCallback)altair_get_subscription_state_ready,
+                       NULL);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_subscription_state_context_free);
+
+    altair_get_subscription_state (MM_IFACE_MODEM_3GPP (self), task);
 }
 
 /*****************************************************************************/
