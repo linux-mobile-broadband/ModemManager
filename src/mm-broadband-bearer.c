@@ -1164,87 +1164,74 @@ connect_3gpp (MMBroadbandBearer   *self,
 /*****************************************************************************/
 /* CONNECT */
 
-typedef struct {
-    MMBroadbandBearer *self;
-    GSimpleAsyncResult *result;
-} ConnectContext;
-
-static void
-connect_context_complete_and_free (ConnectContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (ConnectContext, ctx);
-}
-
 static MMBearerConnectResult *
 connect_finish (MMBaseBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-connect_succeeded (ConnectContext *ctx,
+connect_succeeded (GTask *task,
                    ConnectionType connection_type,
                    MMBearerConnectResult *result)
 {
+    MMBroadbandBearer *self;
+
+    self = g_task_get_source_object (task);
+
     /* Keep connected port and type of connection */
-    ctx->self->priv->port = g_object_ref (mm_bearer_connect_result_peek_data (result));
-    ctx->self->priv->connection_type = connection_type;
+    self->priv->port = g_object_ref (mm_bearer_connect_result_peek_data (result));
+    self->priv->connection_type = connection_type;
 
     /* Port is connected; update the state. For ATD based connections, the port
      * may already be set as connected, but no big deal. */
-    mm_port_set_connected (ctx->self->priv->port, TRUE);
+    mm_port_set_connected (self->priv->port, TRUE);
 
     /* Set operation result */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               result,
-                                               (GDestroyNotify)mm_bearer_connect_result_unref);
-    connect_context_complete_and_free (ctx);
+    g_task_return_pointer (task,
+                           result,
+                           (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (task);
 }
 
 static void
 connect_cdma_ready (MMBroadbandBearer *self,
                     GAsyncResult *res,
-                    ConnectContext *ctx)
+                    GTask *task)
 {
     MMBearerConnectResult *result;
     GError *error = NULL;
 
     result = MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma_finish (self, res, &error);
     if (!result) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* take result */
-    connect_succeeded (ctx, CONNECTION_TYPE_CDMA, result);
+    connect_succeeded (task, CONNECTION_TYPE_CDMA, result);
 }
 
 static void
 connect_3gpp_ready (MMBroadbandBearer *self,
                     GAsyncResult *res,
-                    ConnectContext *ctx)
+                    GTask *task)
 {
     MMBearerConnectResult *result;
     GError *error = NULL;
 
     result = MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp_finish (self, res, &error);
     if (!result) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* take result */
-    connect_succeeded (ctx, CONNECTION_TYPE_3GPP, result);
+    connect_succeeded (task, CONNECTION_TYPE_3GPP, result);
 }
 
 static void
@@ -1255,15 +1242,16 @@ connect (MMBaseBearer *self,
 {
     MMBaseModem *modem = NULL;
     MMPortSerialAt *primary;
-    ConnectContext *ctx;
     const gchar *apn;
+    GTask *task;
 
     /* Don't try to connect if already connected */
     if (MM_BROADBAND_BEARER (self)->priv->port) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            connect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Couldn't connect: this bearer is already connected");
@@ -1279,10 +1267,11 @@ connect (MMBaseBearer *self,
     /* We will launch the ATD call in the primary port... */
     primary = mm_base_modem_peek_port_primary (modem);
     if (!primary) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            connect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Couldn't connect: couldn't get primary port");
@@ -1292,10 +1281,11 @@ connect (MMBaseBearer *self,
 
     /* ...only if not already connected */
     if (mm_port_get_connected (MM_PORT (primary))) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            connect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Couldn't connect: primary AT port is already connected");
@@ -1327,10 +1317,11 @@ connect (MMBaseBearer *self,
 
     /* Is this a 3GPP only modem and no APN was given? If so, error */
     if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            connect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_INVALID_ARGS,
             "3GPP connection logic requires APN setting");
@@ -1340,10 +1331,11 @@ connect (MMBaseBearer *self,
 
     /* Is this a 3GPP2 only modem and APN was given? If so, error */
     if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem)) && apn) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
+        g_task_report_new_error (
+            self,
             callback,
             user_data,
+            connect,
             MM_CORE_ERROR,
             MM_CORE_ERROR_INVALID_ARGS,
             "3GPP2 doesn't support APN setting");
@@ -1352,12 +1344,7 @@ connect (MMBaseBearer *self,
     }
 
     /* In this context, we only keep the stuff we'll need later */
-    ctx = g_slice_new0 (ConnectContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* If the modem has 3GPP capabilities and an APN, launch 3GPP-based connection */
     if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) && apn) {
@@ -1369,7 +1356,7 @@ connect (MMBaseBearer *self,
             mm_base_modem_peek_port_secondary (modem),
             cancellable,
             (GAsyncReadyCallback) connect_3gpp_ready,
-            ctx);
+            task);
         g_object_unref (modem);
         return;
     }
@@ -1384,7 +1371,7 @@ connect (MMBaseBearer *self,
             mm_base_modem_peek_port_secondary (modem),
             cancellable,
             (GAsyncReadyCallback) connect_cdma_ready,
-            ctx);
+            task);
         g_object_unref (modem);
         return;
     }
