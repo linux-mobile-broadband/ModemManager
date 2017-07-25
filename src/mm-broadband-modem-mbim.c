@@ -89,8 +89,6 @@ struct _MMBroadbandModemMbimPrivate {
     MbimDataClass available_data_classes;
     MbimDataClass highest_available_data_class;
 
-    /* For checking whether the SIM has been hot swapped */
-    gboolean sim_hot_swap_on;
     MbimSubscriberReadyState last_ready_state;
 };
 
@@ -1990,6 +1988,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
         (self->priv->last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
                ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
+        mm_dbg ("SIM hot swap detected");
         mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
     }
 
@@ -2286,10 +2285,15 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
                                  gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    gboolean is_sim_hot_swap_configured = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
+                  NULL);
 
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    if (self->priv->sim_hot_swap_on)
+    if (is_sim_hot_swap_configured)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
@@ -2500,7 +2504,6 @@ enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
 
     if (!common_enable_disable_unsolicited_events_finish (self, res, &error)) {
         mm_dbg ("Failed to enable subscriber info events: %s", error->message);
-        self->priv->sim_hot_swap_on = FALSE;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -2519,7 +2522,6 @@ setup_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
 
     if (!common_setup_cleanup_unsolicited_events_finish (self, res, &error)) {
         mm_dbg ("Failed to set up subscriber info events: %s", error->message);
-        self->priv->sim_hot_swap_on = FALSE;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -2541,7 +2543,6 @@ modem_setup_sim_hot_swap (MMIfaceModem *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    self->priv->sim_hot_swap_on = TRUE;
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_setup_cleanup_unsolicited_events (self,
                                              TRUE,
@@ -2566,10 +2567,15 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                        gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    gboolean is_sim_hot_swap_configured = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
+                  NULL);
 
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    if (!self->priv->sim_hot_swap_on)
+    if (is_sim_hot_swap_configured)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     common_enable_disable_unsolicited_events (self, callback, user_data);
@@ -3154,6 +3160,7 @@ mm_broadband_modem_mbim_new (const gchar *device,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          NULL);
 }
 

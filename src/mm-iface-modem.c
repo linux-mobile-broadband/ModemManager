@@ -4335,6 +4335,9 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
         g_error_free (error);
     } else {
         mm_dbg ("Iface modem: SIM hot swap setup succeded");
+        g_object_set (self,
+                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
+                      NULL);
     }
 
     /* Go on to next step */
@@ -4880,8 +4883,9 @@ interface_initialization_step (GTask *task)
                               MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
                               NULL);
 
-                if (is_sim_hot_swap_supported)
+                if (is_sim_hot_swap_supported) {
                     mm_iface_modem_update_failed_state (self, MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
+                }
             }
         } else {
             /* We are done without errors!
@@ -5284,6 +5288,7 @@ iface_modem_init (gpointer g_iface)
                               "List of bearers handled by the modem",
                               MM_TYPE_BEARER_LIST,
                               G_PARAM_READWRITE));
+
     g_object_interface_install_property
         (g_iface,
          g_param_spec_boolean (MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
@@ -5292,6 +5297,13 @@ iface_modem_init (gpointer g_iface)
                                FALSE,
                                G_PARAM_READWRITE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,
+                               "Sim Hot Swap Configured",
+                               "Whether the sim hot swap support is configured correctly.",
+                               FALSE,
+                               G_PARAM_READWRITE));
     initialized = TRUE;
 }
 

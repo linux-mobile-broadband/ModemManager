@@ -37,6 +37,7 @@
 #define MM_IFACE_MODEM_SIM                     "iface-modem-sim"
 #define MM_IFACE_MODEM_BEARER_LIST             "iface-modem-bearer-list"
 #define MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED  "iface-modem-sim-hot-swap-supported"
+#define MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED "iface-modem-sim-hot-swap-configured"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
