@@ -1460,6 +1460,9 @@ data_flash_cdma_ready (MMPortSerial *data,
         g_error_free (error);
     }
 
+    /* Run init port sequence in the data port */
+    mm_port_serial_at_run_init_sequence (MM_PORT_SERIAL_AT (data));
+
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -1471,6 +1474,8 @@ data_reopen_cdma_ready (MMPortSerial *data,
 {
     DetailedDisconnectContext *ctx;
     GError *error = NULL;
+
+    g_object_set (data, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE, NULL);
 
     if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
@@ -1511,6 +1516,10 @@ disconnect_cdma (MMBroadbandBearer *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
+
+    /* We don't want to run init sequence right away during the reopen, as we're
+     * going to flash afterwards. */
+    g_object_set (data, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
 
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
@@ -1593,6 +1602,9 @@ data_flash_3gpp_ready (MMPortSerial *data,
         g_error_free (error);
     }
 
+    /* Run init port sequence in the data port */
+    mm_port_serial_at_run_init_sequence (MM_PORT_SERIAL_AT (data));
+
     /* Don't bother doing the CGACT again if it was already done on the
      * primary or secondary port */
     if (ctx->cgact_sent) {
@@ -1631,6 +1643,8 @@ data_reopen_3gpp_ready (MMPortSerial *data,
     DetailedDisconnectContext *ctx;
     GError *error = NULL;
 
+    g_object_set (data, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE, NULL);
+
     if (!mm_port_serial_reopen_finish (data, res, &error)) {
         /* Fatal */
         g_task_return_error (task, error);
@@ -1655,6 +1669,10 @@ data_reopen_3gpp (GTask *task)
     DetailedDisconnectContext *ctx;
 
     ctx = g_task_get_task_data (task);
+
+    /* We don't want to run init sequence right away during the reopen, as we're
+     * going to flash afterwards. */
+    g_object_set (ctx->data, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
 
     /* Fully reopen the port before flashing */
     mm_dbg ("Reopening data port (%s)...", mm_port_get_device (MM_PORT (ctx->data)));
