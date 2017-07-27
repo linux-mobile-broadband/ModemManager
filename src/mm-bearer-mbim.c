@@ -181,7 +181,8 @@ packet_statistics_query_ready (MbimDevice *device,
         g_simple_async_result_take_error (ctx->result, error);
 
     reload_stats_context_complete_and_free (ctx);
-    mbim_message_unref (response);
+    if (response)
+        mbim_message_unref (response);
 }
 
 static void
