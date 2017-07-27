@@ -173,7 +173,9 @@ packet_statistics_query_ready (MbimDevice *device,
         g_task_return_error (task, error);
 
     g_object_unref (task);
-    mbim_message_unref (response);
+
+    if (response)
+        mbim_message_unref (response);
 }
 
 static void
