@@ -110,4 +110,13 @@ typedef enum { /*< underscore_name=mm_telit_qss_status >*/
 
 MMTelitQssStatus mm_telit_parse_qss_query (const gchar *response, GError **error);
 
+/* CSIM lock state */
+typedef enum { /*< underscore_name=mm_telit_csim_lock_state >*/
+    CSIM_LOCK_STATE_UNKNOWN,
+    CSIM_LOCK_STATE_UNLOCKED,
+    CSIM_LOCK_STATE_LOCK_REQUESTED,
+    CSIM_LOCK_STATE_LOCKED,
+} MMTelitCsimLockState;
+
+
 #endif  /* MM_MODEM_HELPERS_TELIT_H */

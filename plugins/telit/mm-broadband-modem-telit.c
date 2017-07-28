@@ -44,6 +44,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
+#define CSIM_UNLOCK_MAX_TIMEOUT 3
+
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
     FEATURE_NOT_SUPPORTED,
@@ -53,6 +55,9 @@ typedef enum {
 struct _MMBroadbandModemTelitPrivate {
     FeatureSupport csim_lock_support;
     MMTelitQssStatus qss_status;
+    MMTelitCsimLockState csim_lock_state;
+    GTask *csim_lock_task;
+    guint csim_lock_timeout_id;
 };
 
 /*****************************************************************************/
@@ -107,6 +112,7 @@ typedef struct {
 } QssSetupContext;
 
 static void qss_setup_step (GTask *task);
+static void pending_csim_unlock_complete (MMBroadbandModemTelit *self);
 
 static void
 telit_qss_unsolicited_handler (MMPortSerialAt *port,
@@ -122,14 +128,36 @@ telit_qss_unsolicited_handler (MMPortSerialAt *port,
     prev_qss_status = self->priv->qss_status;
     self->priv->qss_status = cur_qss_status;
 
+    if (self->priv->csim_lock_state >= CSIM_LOCK_STATE_LOCK_REQUESTED) {
+
+        if (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED) {
+            mm_dbg ("QSS handler: #QSS=0 after +CSIM=1 -> CSIM locked!");
+            self->priv->csim_lock_state = CSIM_LOCK_STATE_LOCKED;
+        }
+
+        if (prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) {
+            mm_dbg ("QSS handler: #QSS>=1 after +CSIM=0 -> CSIM unlocked!");
+            self->priv->csim_lock_state = CSIM_LOCK_STATE_UNLOCKED;
+
+            if (self->priv->csim_lock_timeout_id) {
+                g_source_remove (self->priv->csim_lock_timeout_id);
+                self->priv->csim_lock_timeout_id = 0;
+            }
+
+            pending_csim_unlock_complete (self);
+        }
+
+        return;
+    }
+
     if (cur_qss_status != prev_qss_status)
-        mm_dbg ("QSS: status changed '%s -> %s",
+        mm_dbg ("QSS handler: status changed '%s -> %s",
                 mm_telit_qss_status_get_string (prev_qss_status),
                 mm_telit_qss_status_get_string (cur_qss_status));
 
     if ((prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) ||
         (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED)) {
-        mm_info ("QSS: SIM swap detected");
+        mm_info ("QSS handler: SIM swap detected");
         mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
     }
 }
@@ -610,8 +638,9 @@ csim_unlock_ready (MMBaseModem  *_self,
     if (!response) {
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED))
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
             self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
+        }
         mm_warn ("Couldn't unlock SIM card: %s", error->message);
         g_error_free (error);
     }
@@ -703,6 +732,8 @@ csim_lock_ready (MMBaseModem  *_self,
             g_object_unref (task);
             return;
         }
+    } else {
+        self->priv->csim_lock_state = CSIM_LOCK_STATE_LOCK_REQUESTED;
     }
 
     if (self->priv->csim_lock_support != FEATURE_NOT_SUPPORTED) {
@@ -752,6 +783,37 @@ handle_csim_locking (GTask    *task,
             g_assert_not_reached ();
             break;
     }
+}
+
+static void
+pending_csim_unlock_complete (MMBroadbandModemTelit *self)
+{
+    LoadUnlockRetriesContext *ctx;
+
+    ctx = g_task_get_task_data (self->priv->csim_lock_task);
+
+    if (ctx->succeded_requests == 0) {
+        g_task_return_new_error (self->priv->csim_lock_task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Could not get any of the SIM unlock retries values");
+    } else {
+        g_task_return_pointer (self->priv->csim_lock_task, g_object_ref (ctx->retries), g_object_unref);
+    }
+
+    g_clear_object (&self->priv->csim_lock_task);
+}
+
+static gboolean
+csim_unlock_periodic_check (MMBroadbandModemTelit *self)
+{
+    if (self->priv->csim_lock_state != CSIM_LOCK_STATE_UNLOCKED) {
+        mm_warn ("CSIM is still locked after %d seconds. Trying to continue anyway", CSIM_UNLOCK_MAX_TIMEOUT);
+    }
+
+    self->priv->csim_lock_timeout_id = 0;
+    pending_csim_unlock_complete (self);
+    g_object_unref (self);
+
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -805,12 +867,16 @@ load_unlock_retries_step (GTask *task)
             handle_csim_locking (task, FALSE);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_LAST:
-            if (ctx->succeded_requests == 0)
-                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                         "Could not get any of the SIM unlock retries values");
-            else
-                g_task_return_pointer (task, g_object_ref (ctx->retries), g_object_unref);
-            g_object_unref (task);
+            self->priv->csim_lock_task = task;
+            if (self->priv->csim_lock_state == CSIM_LOCK_STATE_LOCKED) {
+                mm_dbg ("CSIM is locked. Waiting for #QSS=1");
+                self->priv->csim_lock_timeout_id = g_timeout_add_seconds (CSIM_UNLOCK_MAX_TIMEOUT,
+                                                                          (GSourceFunc) csim_unlock_periodic_check,
+                                                                          g_object_ref(self));
+            } else {
+                self->priv->csim_lock_state = CSIM_LOCK_STATE_UNLOCKED;
+                pending_csim_unlock_complete (self);
+            }
             break;
         default:
             break;
@@ -1389,6 +1455,7 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
                                               MMBroadbandModemTelitPrivate);
 
     self->priv->csim_lock_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->csim_lock_state = CSIM_LOCK_STATE_UNKNOWN;
     self->priv->qss_status = QSS_STATUS_UNKNOWN;
 }
 
