@@ -366,6 +366,11 @@ port.
 .TP
 .B \-\-location\-disable\-gps\-unmanaged
 Disable location discovery using GPS and unmanaged port.
+.TP
+.B \-\-location\-set\-gps\-refresh\-rate=SEC
+Set the location refresh rate on the DBus interface to SEC seconds. If set to
+0, the new location is published on the DBus interface as soon as ModemManager
+detects it.
 
 .SH MESSAGING OPTIONS
 All messaging options must be used with \fB\-\-modem\fR or \fB\-m\fR.
