@@ -10103,10 +10103,7 @@ initialize_step (GTask *task)
             gboolean is_sim_hot_swap_configured = FALSE;
 
             g_object_get (ctx->self,
-                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
-                          NULL);
-
-            g_object_get (ctx->self,
+                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,  &is_sim_hot_swap_supported,
                           MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
                           NULL);
 
@@ -10166,13 +10163,8 @@ initialize_step (GTask *task)
                         (MmGdbusModem*)ctx->self->priv->modem_dbus_skeleton);
 
                 g_object_get (ctx->self,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
-                              &is_sim_hot_swap_supported,
-                              NULL);
-
-                g_object_get (ctx->self,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,
-                              &is_sim_hot_swap_configured,
+                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
+                              MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
                               NULL);
 
                 if (reason == MM_MODEM_STATE_FAILED_REASON_SIM_MISSING) {
