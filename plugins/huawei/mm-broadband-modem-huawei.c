@@ -3954,24 +3954,23 @@ modem_time_check_support_finish (MMIfaceModemTime *_self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-
-    if (self->priv->nwtime_support == FEATURE_SUPPORTED)
-        return TRUE;
-    if (self->priv->time_support == FEATURE_SUPPORTED)
-        return TRUE;
-    return FALSE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-modem_time_check_ready (MMBaseModem *self,
+modem_time_check_ready (MMBaseModem *_self,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
     /* Responses are checked in the sequence parser, ignore overall result */
-    mm_base_modem_at_sequence_finish (self, res, NULL, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    mm_base_modem_at_sequence_finish (_self, res, NULL, NULL);
+
+    g_task_return_boolean (task,
+                           (self->priv->nwtime_support == FEATURE_SUPPORTED ||
+                            self->priv->time_support == FEATURE_SUPPORTED));
+    g_object_unref (task);
 }
 
 static gboolean
@@ -4012,19 +4011,16 @@ modem_time_check_support (MMIfaceModemTime *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_time_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_sequence (MM_BASE_MODEM (self),
                                time_cmd_sequence,
                                NULL, /* response_processor_context */
                                NULL, /* response_processor_context_free */
                                (GAsyncReadyCallback)modem_time_check_ready,
-                               result);
+                               task);
 }
 
 /*****************************************************************************/
