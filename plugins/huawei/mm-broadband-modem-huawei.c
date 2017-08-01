@@ -3409,14 +3409,14 @@ enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
 static void
 parent_load_power_state_ready (MMIfaceModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *result)
+                               GTask *task)
 {
     GError *error = NULL;
     MMModemPowerState power_state;
 
     power_state = iface_modem_parent->load_power_state_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (result, error);
+        g_task_return_error (task, error);
     else {
         /* As modem_power_down uses +CFUN=0 to put the modem in low state, we treat
          * CFUN 0 as 'LOW' power state instead of 'OFF'. Otherwise, MMIfaceModem
@@ -3424,17 +3424,16 @@ parent_load_power_state_ready (MMIfaceModem *self,
         if (power_state == MM_MODEM_POWER_STATE_OFF)
             power_state = MM_MODEM_POWER_STATE_LOW;
 
-        g_simple_async_result_set_op_res_gpointer (result, GUINT_TO_POINTER (power_state), NULL);
+        g_task_return_int (task, power_state);
     }
 
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 static void
 huawei_rfswitch_check_ready (MMBaseModem *_self,
                              GAsyncResult *res,
-                             GSimpleAsyncResult *result)
+                             GTask *task)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
     GError *error = NULL;
@@ -3466,7 +3465,7 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
             /* Fall back to parent's load_power_state */
             iface_modem_parent->load_power_state (MM_IFACE_MODEM (self),
                                                   (GAsyncReadyCallback)parent_load_power_state_ready,
-                                                  result);
+                                                  task);
             return;
         }
 
@@ -3481,16 +3480,12 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
     }
 
     if (error)
-        g_simple_async_result_take_error (result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   sw_state ?
-                                                   GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON) :
-                                                   GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW),
-                                                   NULL);
+        g_task_return_int (task,
+                           sw_state ? MM_MODEM_POWER_STATE_ON : MM_MODEM_POWER_STATE_LOW);
 
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 static MMModemPowerState
@@ -3498,10 +3493,15 @@ load_power_state_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_POWER_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+    }
+    return (MMModemPowerState)value;
 }
 
 static void
@@ -3509,12 +3509,9 @@ load_power_state (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_power_state);
+    task = g_task_new (self, NULL, callback, user_data);
 
     switch (MM_BROADBAND_MODEM_HUAWEI (self)->priv->rfswitch_support) {
     case FEATURE_SUPPORT_UNKNOWN:
@@ -3530,14 +3527,14 @@ load_power_state (MMIfaceModem *self,
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)huawei_rfswitch_check_ready,
-                                  result);
+                                  task);
         break;
     }
     case FEATURE_NOT_SUPPORTED:
       /* Run parent's load_power_state */
       iface_modem_parent->load_power_state (self,
                                             (GAsyncReadyCallback)parent_load_power_state_ready,
-                                            result);
+                                            task);
       break;
     default:
       g_assert_not_reached ();
