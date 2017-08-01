@@ -2758,20 +2758,8 @@ typedef struct {
 } DetailedRegistrationStateResults;
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     DetailedRegistrationStateResults state;
 } DetailedRegistrationStateContext;
-
-static void
-detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
-{
-    /* Always not in idle! we're passing a struct in stack as result */
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
 
 static gboolean
 get_detailed_registration_state_finish (MMIfaceModemCdma *self,
@@ -2782,24 +2770,28 @@ get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 {
     DetailedRegistrationStateResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *detailed_cdma1x_state = results->detailed_cdma1x_state;
     *detailed_evdo_state = results->detailed_evdo_state;
+    g_free (results);
     return TRUE;
 }
 
 static void
 registration_state_sysinfo_ready (MMBroadbandModemHuawei *self,
                                   GAsyncResult *res,
-                                  DetailedRegistrationStateContext *ctx)
+                                  GTask *task)
 {
+    DetailedRegistrationStateContext *ctx;
     gboolean extended = FALSE;
     guint srv_status = 0;
     guint sys_mode = 0;
     guint roam_status = 0;
+
+    ctx = g_task_get_task_data (task);
 
     if (!sysinfo_finish (self,
                          res,
@@ -2812,10 +2804,11 @@ registration_state_sysinfo_ready (MMBroadbandModemHuawei *self,
                          NULL, /* sys_submode_valid */
                          NULL, /* sys_submode */
                          NULL)) {
-        /* If error, leave superclass' reg state alone if ^SYSINFO isn't supported.
-         * NOTE: always complete NOT in idle here */
-        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
-        detailed_registration_state_context_complete_and_free (ctx);
+        /* If error, leave superclass' reg state alone if ^SYSINFO isn't supported. */
+        g_task_return_pointer (task,
+                               g_memdup (&ctx->state, sizeof (ctx->state)),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -2855,9 +2848,10 @@ registration_state_sysinfo_ready (MMBroadbandModemHuawei *self,
         }
     }
 
-    /* NOTE: always complete NOT in idle here */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
-    detailed_registration_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task,
+                           g_memdup (&ctx->state, sizeof (ctx->state)),
+                           g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -2868,20 +2862,19 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
                                  gpointer user_data)
 {
     DetailedRegistrationStateContext *ctx;
+    GTask *task;
 
     /* Setup context */
-    ctx = g_new0 (DetailedRegistrationStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             get_detailed_registration_state);
+    ctx = g_new (DetailedRegistrationStateContext, 1);
     ctx->state.detailed_cdma1x_state = cdma1x_state;
     ctx->state.detailed_evdo_state = evdo_state;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
     sysinfo (MM_BROADBAND_MODEM_HUAWEI (self),
              (GAsyncReadyCallback)registration_state_sysinfo_ready,
-             ctx);
+             task);
 }
 
 /*****************************************************************************/
