@@ -2432,36 +2432,37 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return 0;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                 G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return 0;
+    }
+    return (guint)value;
 }
 
 static void
 parent_load_signal_quality_ready (MMIfaceModem *self,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask *task)
 {
     GError *error = NULL;
     guint signal_quality;
 
     signal_quality = iface_modem_parent->load_signal_quality_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (signal_quality),
-                                                   NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_int (task, signal_quality);
+    g_object_unref (task);
 }
 
 static void
 signal_ready (MMBaseModem *self,
               GAsyncResult *res,
-              GSimpleAsyncResult *simple)
+              GTask *task)
 {
     const gchar *response, *command;
     gchar buf[5];
@@ -2473,11 +2474,11 @@ signal_ready (MMBaseModem *self,
         iface_modem_parent->load_signal_quality (
             MM_IFACE_MODEM (self),
             (GAsyncReadyCallback)parent_load_signal_quality_ready,
-            simple);
+            task);
         return;
     }
 
-    command = g_object_get_data (G_OBJECT (simple), "command");
+    command = g_task_get_task_data (task);
     g_assert (command);
     response = mm_strip_tag (response, command);
     /* 'command' won't include the trailing ':' in the response, so strip that */
@@ -2491,19 +2492,16 @@ signal_ready (MMBaseModem *self,
 
     if (mm_get_uint_from_str (buf, &quality)) {
         quality = CLAMP (quality, 0, 100);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (quality),
-                                                   NULL);
+        g_task_return_int (task, quality);
     } else {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse %s response: '%s'",
-                                         command, response);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse %s response: '%s'",
+                                 command, response);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -2511,22 +2509,19 @@ modem_load_signal_quality (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     const char *command = "^CSQLVL";
 
     mm_dbg ("loading signal quality...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_signal_quality);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* 3GPP modems can just run parent's signal quality loading */
     if (mm_iface_modem_is_3gpp (self)) {
         iface_modem_parent->load_signal_quality (
             self,
             (GAsyncReadyCallback)parent_load_signal_quality_ready,
-            result);
+            task);
         return;
     }
 
@@ -2537,7 +2532,8 @@ modem_load_signal_quality (MMIfaceModem *self,
                   NULL);
     if (evdo_state > MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
         command = "^HDRCSQLVL";
-    g_object_set_data (G_OBJECT (result), "command", (gpointer) command);
+
+    g_task_set_task_data (task, g_strdup (command), g_free);
 
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
@@ -2545,7 +2541,7 @@ modem_load_signal_quality (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)signal_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
