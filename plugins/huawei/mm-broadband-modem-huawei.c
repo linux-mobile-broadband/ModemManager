@@ -1349,31 +1349,30 @@ set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 set_current_modes_ready (MMBroadbandModemHuawei *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
         /* Let the error be critical. */
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static gboolean
 prefmode_set_current_modes (MMBroadbandModemHuawei *self,
                             MMModemMode allowed,
                             MMModemMode preferred,
-                            GSimpleAsyncResult *simple,
+                            GTask *task,
                             GError **error)
 {
     guint i;
@@ -1407,7 +1406,7 @@ prefmode_set_current_modes (MMBroadbandModemHuawei *self,
         3,
         FALSE,
         (GAsyncReadyCallback)set_current_modes_ready,
-        simple);
+        task);
     g_free (command);
     return TRUE;
 }
@@ -1416,7 +1415,7 @@ static gboolean
 syscfg_set_current_modes (MMBroadbandModemHuawei *self,
                           MMModemMode allowed,
                           MMModemMode preferred,
-                          GSimpleAsyncResult *simple,
+                          GTask *task,
                           GError **error)
 {
     guint i;
@@ -1452,7 +1451,7 @@ syscfg_set_current_modes (MMBroadbandModemHuawei *self,
         3,
         FALSE,
         (GAsyncReadyCallback)set_current_modes_ready,
-        simple);
+        task);
     g_free (command);
     return TRUE;
 }
@@ -1461,7 +1460,7 @@ static gboolean
 syscfgex_set_current_modes (MMBroadbandModemHuawei *self,
                             MMModemMode allowed,
                             MMModemMode preferred,
-                            GSimpleAsyncResult *simple,
+                            GTask *task,
                             GError **error)
 {
     guint i;
@@ -1496,7 +1495,7 @@ syscfgex_set_current_modes (MMBroadbandModemHuawei *self,
         3,
         FALSE,
         (GAsyncReadyCallback)set_current_modes_ready,
-        simple);
+        task);
     g_free (command);
     return TRUE;
 }
@@ -1509,31 +1508,27 @@ set_current_modes (MMIfaceModem *_self,
                    gpointer user_data)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
     GError *error = NULL;
 
     mm_dbg ("setting current modes (huawei)...");
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->syscfgex_support == FEATURE_SUPPORTED)
-        syscfgex_set_current_modes (self, allowed, preferred, result, &error);
+        syscfgex_set_current_modes (self, allowed, preferred, task, &error);
     else if (self->priv->syscfg_support == FEATURE_SUPPORTED)
-        syscfg_set_current_modes (self, allowed, preferred, result, &error);
+        syscfg_set_current_modes (self, allowed, preferred, task, &error);
     else if (self->priv->prefmode_support == FEATURE_SUPPORTED)
-        prefmode_set_current_modes (self, allowed, preferred, result, &error);
+        prefmode_set_current_modes (self, allowed, preferred, task, &error);
     else
         error = g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
                              "Setting current modes is not supported");
 
     if (error) {
-        g_simple_async_result_take_error (result, error);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
     }
 }
 
