@@ -129,10 +129,6 @@ connect_dhcp_check_ready (MMBaseModem *modem,
     /* Balance refcount */
     g_object_unref (self);
 
-    /* Default to automatic/DHCP addressing */
-    ctx->ipv4_config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
-
     /* Cache IPv4 details if available, otherwise clients will have to use DHCP */
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (response) {
@@ -482,14 +478,10 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         ctx->self->priv->connect_pending = NULL;
 
         /* Setup result */
-        {
-            if (ctx->ipv4_config) {
-                g_simple_async_result_set_op_res_gpointer (
-                    ctx->result,
-                    mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
-                    (GDestroyNotify)mm_bearer_connect_result_unref);
-            }
-        }
+        g_simple_async_result_set_op_res_gpointer (
+            ctx->result,
+            mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
+            (GDestroyNotify)mm_bearer_connect_result_unref);
 
         connect_3gpp_context_complete_and_free (ctx);
         return;
@@ -539,6 +531,10 @@ connect_3gpp (MMBroadbandBearer *self,
 
     /* Get correct dial port to use */
     ctx->primary = get_dial_port (MM_BROADBAND_MODEM_HUAWEI (ctx->modem), ctx->data, primary);
+
+    /* Default to automatic/DHCP addressing */
+    ctx->ipv4_config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
 
     /* Run! */
     connect_3gpp_context_step (ctx);
