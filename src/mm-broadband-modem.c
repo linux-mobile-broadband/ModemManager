@@ -3952,7 +3952,7 @@ registration_status_check_ready (MMBroadbandModem *self,
     RunRegistrationChecksContext *ctx;
     const gchar *response;
     GError *error = NULL;
-    GMatchInfo *match_info;
+    GMatchInfo *match_info = NULL;
     guint i;
     gboolean parsed;
     gboolean cgreg;
