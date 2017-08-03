@@ -77,8 +77,10 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     gchar *trace_type;
 
     i = strchr (trace, ',');
-    if (!i || i == trace)
+    if (!i || i == trace) {
+        g_free (trace);
         return FALSE;
+    }
 
     trace_type = g_malloc (i - trace + 1);
     memcpy (trace_type, trace, i - trace);
@@ -96,8 +98,11 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
             gchar *sequence;
 
             /* Skip the trace if we already have it there */
-            if (strstr (previous, trace))
+            if (strstr (previous, trace)) {
+                g_free (trace_type);
+                g_free (trace);
                 return TRUE;
+            }
 
             sequence = g_strdup_printf ("%s%s%s",
                                         previous,
@@ -222,8 +227,7 @@ mm_location_gps_nmea_new_from_string_variant (GVariant *string,
     self = mm_location_gps_nmea_new ();
 
     for (i = 0; split[i]; i++) {
-        if (!location_gps_nmea_take_trace (self, split[i]))
-            g_free (split[i]);
+        location_gps_nmea_take_trace (self, split[i]);
     }
 
     /* Note that the strings in the array of strings were already taken
