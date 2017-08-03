@@ -901,7 +901,7 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
 
         /* Modems put all sorts of things into the GSN response; sanitize it */
         if (mm_parse_gsn (equip_id, &imei, &meid, &esn)) {
-            g_free (equip_id);
+            g_clear_pointer (&equip_id, g_free);
 
             if (imei)
                 equip_id = g_strdup (imei);
@@ -909,11 +909,12 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
                 equip_id = g_strdup (meid);
             else if (esn)
                 equip_id = g_strdup (esn);
+            else
+                g_assert_not_reached ();
+
             g_free (esn);
             g_free (meid);
             g_free (imei);
-
-            g_assert (equip_id);
         } else {
             /* Leave whatever the modem returned alone */
         }
