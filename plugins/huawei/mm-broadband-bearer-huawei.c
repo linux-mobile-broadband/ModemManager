@@ -389,7 +389,7 @@ connect_3gpp_context_step (Connect3gppContext *ctx)
         encoded_auth = huawei_parse_auth_type (auth);
 
         /* Default to no authentication if not specified */
-        if ((encoded_auth = huawei_parse_auth_type (auth)) == MM_BEARER_HUAWEI_AUTH_UNKNOWN)
+        if (encoded_auth == MM_BEARER_HUAWEI_AUTH_UNKNOWN)
             encoded_auth = MM_BEARER_HUAWEI_AUTH_NONE;
 
         if (!user && !passwd)
