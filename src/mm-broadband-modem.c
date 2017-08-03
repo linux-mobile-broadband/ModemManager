@@ -1775,7 +1775,6 @@ signal_quality_csq_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
                           GTask *task)
 {
-    SignalQualityContext *ctx;
     GError *error = NULL;
     GVariant *result;
     const gchar *result_str;
@@ -1786,8 +1785,6 @@ signal_quality_csq_ready (MMBroadbandModem *self,
         g_object_unref (task);
         return;
     }
-
-    ctx = g_task_get_task_data (task);
 
     result_str = g_variant_get_string (result, NULL);
     if (result_str) {
@@ -1956,7 +1953,6 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
                            GAsyncResult *res,
                            GTask *task)
 {
-    SignalQualityContext *ctx;
     QcdmResult *result;
     guint32 num = 0, quality = 0, i;
     gfloat best_db = -28;
@@ -1970,8 +1966,6 @@ signal_quality_qcdm_ready (MMPortSerialQcdm *port,
         g_object_unref (task);
         return;
     }
-
-    ctx = g_task_get_task_data (task);
 
     /* Parse the response */
     result = qcdm_cmd_pilot_sets_result ((const gchar *) response->data,
@@ -6439,7 +6433,6 @@ list_parts_lock_storages_ready (MMBroadbandModem *self,
                                 GAsyncResult *res,
                                 GTask *task)
 {
-    ListPartsContext *ctx;
     GError *error = NULL;
 
     if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
@@ -6449,8 +6442,6 @@ list_parts_lock_storages_ready (MMBroadbandModem *self,
         g_object_unref (task);
         return;
     }
-
-    ctx = g_task_get_task_data (task);
 
     /* Storage now set and locked */
 
@@ -8743,7 +8734,6 @@ enabling_modem_init_ready (MMBroadbandModem *self,
                            GAsyncResult *res,
                            GTask *task)
 {
-    EnablingStartedContext *ctx;
     GError *error = NULL;
 
     if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_modem_init_finish (self, res, &error)) {
@@ -8751,8 +8741,6 @@ enabling_modem_init_ready (MMBroadbandModem *self,
         g_object_unref (task);
         return;
     }
-
-    ctx = g_task_get_task_data (task);
 
     /* Specify that the modem init was run once */
     self->priv->modem_init_run = TRUE;
