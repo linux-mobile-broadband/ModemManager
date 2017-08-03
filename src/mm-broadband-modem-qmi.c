@@ -1229,6 +1229,7 @@ dms_get_ids_ready (QmiClientDms *client,
     if (qmi_message_dms_get_ids_output_get_esn (output, &str, NULL) &&
         str[0] != '\0') {
         g_free (ctx->self->priv->esn);
+        ctx->self->priv->esn = NULL;
         len = strlen (str);
         if (len == 7)
             ctx->self->priv->esn = g_strdup_printf ("0%s", str);  /* zero-pad to 8 chars */
@@ -1241,6 +1242,7 @@ dms_get_ids_ready (QmiClientDms *client,
     if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
         str[0] != '\0') {
         g_free (ctx->self->priv->meid);
+        ctx->self->priv->meid = NULL;
         len = strlen (str);
         if (len == 14)
             ctx->self->priv->meid = g_strdup (str);
