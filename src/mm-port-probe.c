@@ -1431,12 +1431,10 @@ gboolean
 mm_port_probe_is_at (MMPortProbe *self)
 {
     const gchar *subsys;
-    const gchar *name;
 
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
     subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
     if (g_str_equal (subsys, "net"))
         return FALSE;
 
