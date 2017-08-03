@@ -444,7 +444,6 @@ nw_snapshot_old_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
     g_byte_array_unref (response);
     if (!result) {
-        qcdm_result_unref (result);
         mm_dbg ("Failed to get QCDM Novatel Modem MSM6500 snapshot: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
