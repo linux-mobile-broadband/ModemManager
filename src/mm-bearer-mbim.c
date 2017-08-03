@@ -1132,11 +1132,15 @@ disconnect_set_ready (MbimDevice *device,
         } else if (g_error_matches (error,
                                     MBIM_STATUS_ERROR,
                                     MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
-            mm_dbg ("Session ID '%u' already disconnected.", session_id);
+            if (parsed_result)
+                mm_dbg ("Session ID '%u' already disconnected.", session_id);
+            else
+                mm_dbg ("Session ID '<unknown>' already disconnected.");
+
             g_clear_error (&error);
             g_clear_error (&inner_error);
         } else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE)) {
-            if (nw_error) {
+            if (parsed_result && nw_error != 0) {
                 g_error_free (error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
             }
