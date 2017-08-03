@@ -128,7 +128,7 @@ mm_modem_firmware_select (MMModemFirmware *self,
                           gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_FIRMWARE (self));
-    g_return_if_fail (unique_id != NULL || unique_id[0] == '\0');
+    g_return_if_fail (unique_id != NULL && unique_id[0] != '\0');
 
     mm_gdbus_modem_firmware_call_select (MM_GDBUS_MODEM_FIRMWARE (self), unique_id, cancellable, callback, user_data);
 }
@@ -157,7 +157,7 @@ mm_modem_firmware_select_sync (MMModemFirmware *self,
                                GError **error)
 {
     g_return_val_if_fail (MM_IS_MODEM_FIRMWARE (self), FALSE);
-    g_return_val_if_fail (unique_id != NULL || unique_id[0] == '\0', FALSE);
+    g_return_val_if_fail (unique_id != NULL && unique_id[0] != '\0', FALSE);
 
     return mm_gdbus_modem_firmware_call_select_sync (MM_GDBUS_MODEM_FIRMWARE (self), unique_id, cancellable, error);
 }
