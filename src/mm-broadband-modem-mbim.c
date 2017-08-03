@@ -1547,11 +1547,9 @@ parent_initialization_started_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
                                      GTask *task)
 {
-    InitializationStartedContext *ctx;
     gpointer parent_ctx;
     GError *error = NULL;
 
-    ctx = g_task_get_task_data (task);
     parent_ctx = MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_parent_class)->initialization_started_finish (
         self,
         res,
