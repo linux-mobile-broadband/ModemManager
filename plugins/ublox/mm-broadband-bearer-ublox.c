@@ -370,9 +370,6 @@ uauthreq_ready (MMBaseModem  *modem,
 {
     const gchar          *response;
     GError               *error = NULL;
-    CommonConnectContext *ctx;
-
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
