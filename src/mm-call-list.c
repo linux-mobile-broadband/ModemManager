@@ -88,9 +88,8 @@ MMBaseCall* mm_call_list_get_new_incoming(MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
-    guint i;
 
-    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
 
         MMCallState         state;
         MMCallStateReason   reason;
@@ -118,9 +117,8 @@ MMBaseCall* mm_call_list_get_first_ringing_call(MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
-    guint i;
 
-    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
 
         MMCallState         state;
 
@@ -143,9 +141,8 @@ MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
-    guint i;
 
-    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
 
         MMCallState         state;
         MMCallDirection     direct;
@@ -170,9 +167,8 @@ MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
-    guint i;
 
-    for (i = 0, l = self->priv->list; l && !call; l = g_list_next (l)) {
+    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
 
         MMCallState         state;
 
@@ -193,9 +189,8 @@ gboolean mm_call_list_send_dtmf_to_active_calls(MMCallList *self, gchar *dtmf)
 {
     gboolean signaled = FALSE;
     GList *l;
-    guint i;
 
-    for (i = 0, l = self->priv->list; l; l = g_list_next (l)) {
+    for (l = self->priv->list; l; l = g_list_next (l)) {
 
         MMCallState         state;
 
