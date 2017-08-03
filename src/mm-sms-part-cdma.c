@@ -273,8 +273,10 @@ cause_code_to_delivery_state (guint8 error_class,
         return MM_SMS_DELIVERY_STATE_COMPLETED_RECEIVED;
     case ERROR_CLASS_TEMPORARY:
         delivery_state += 0x300;
+        break;
     case ERROR_CLASS_PERMANENT:
         delivery_state += 0x200;
+        break;
     default:
         return MM_SMS_DELIVERY_STATE_UNKNOWN;
     }
