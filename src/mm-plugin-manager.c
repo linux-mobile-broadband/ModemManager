@@ -1100,11 +1100,7 @@ device_context_run_port_context (DeviceContext *device_context,
 static gboolean
 device_context_min_wait_time_elapsed (DeviceContext *device_context)
 {
-    MMPluginManager *self;
     GList           *l;
-
-    /* Recover plugin manager */
-    self = MM_PLUGIN_MANAGER (device_context->self);
 
     device_context->min_wait_time_id = 0;
     mm_dbg ("[plugin manager] task %s: min wait time elapsed", device_context->name);
