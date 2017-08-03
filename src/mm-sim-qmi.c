@@ -480,9 +480,6 @@ dms_uim_verify_pin_ready (QmiClientDms *client,
 {
     QmiMessageDmsUimVerifyPinOutput *output = NULL;
     GError *error = NULL;
-    MMSimQmi *self;
-
-    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_verify_pin_finish (client, res, &error);
     if (!output) {
@@ -642,9 +639,6 @@ dms_uim_unblock_pin_ready (QmiClientDms *client,
 {
     QmiMessageDmsUimUnblockPinOutput *output = NULL;
     GError *error = NULL;
-    MMSimQmi *self;
-
-    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_unblock_pin_finish (client, res, &error);
     if (!output) {
@@ -812,9 +806,6 @@ dms_uim_change_pin_ready (QmiClientDms *client,
 {
     QmiMessageDmsUimChangePinOutput *output = NULL;
     GError *error = NULL;
-    MMSimQmi *self;
-
-    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_change_pin_finish (client, res, &error);
     if (!output) {
@@ -981,9 +972,6 @@ dms_uim_set_pin_protection_ready (QmiClientDms *client,
 {
     QmiMessageDmsUimSetPinProtectionOutput *output = NULL;
     GError *error = NULL;
-    MMSimQmi *self;
-
-    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_set_pin_protection_finish (client, res, &error);
     if (!output) {
