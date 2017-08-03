@@ -1417,11 +1417,9 @@ data_flash_cdma_ready (MMPortSerial *data,
                        GTask *task)
 {
     MMBroadbandBearer *self;
-    DetailedDisconnectContext *ctx;
     GError *error = NULL;
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
 
     mm_port_serial_flash_finish (data, res, &error);
 
