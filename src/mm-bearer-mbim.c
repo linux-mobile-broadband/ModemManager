@@ -1120,9 +1120,9 @@ disconnect_set_ready (MbimDevice *device,
                                     MBIM_STATUS_ERROR,
                                     MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
             if (parsed_result)
-                mm_dbg ("Session ID '%u' already disconnected.", session_id);
+                mm_dbg ("Context not activated: session ID '%u' already disconnected", session_id);
             else
-                mm_dbg ("Session ID '<unknown>' already disconnected.");
+                mm_dbg ("Context not activated: already disconnected");
 
             g_clear_error (&error);
             g_clear_error (&inner_error);
