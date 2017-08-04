@@ -81,6 +81,7 @@ ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d103", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Dell 5560
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{ID_MM_ERICSSON_MBM}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_ERICSSON_MBM_GPS_PORT}="1"
 
 # Dell 5550
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818d", ENV{ID_MM_ERICSSON_MBM}="1"
