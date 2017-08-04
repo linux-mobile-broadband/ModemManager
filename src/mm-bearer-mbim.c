@@ -1086,58 +1086,68 @@ disconnect_set_ready (MbimDevice *device,
     guint32 session_id;
     MbimActivationState activation_state;
     guint32 nw_error;
+    GError *inner_error = NULL;
+    gboolean result = FALSE, parsed_result = FALSE;
 
     ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response) {
-        GError *inner_error = NULL;
-        gboolean result = FALSE, parsed_result = FALSE;
+    if (!response)
+        goto out;
 
-        result = mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
-        /* Parse the response only for the cases we need to */
-        if (result ||
-            g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) ||
-            g_error_matches (error, MBIM_STATUS_ERROR,
-                             MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
-            parsed_result = mbim_message_connect_response_parse (
-                    response,
-                    &session_id,
-                    &activation_state,
-                    NULL, /* voice_call_state */
-                    NULL, /* ip_type */
-                    NULL, /* context_type */
-                    &nw_error,
-                    &inner_error);
-        }
+    result = mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
 
-        /* Now handle different response / error cases */
-        if (result && parsed_result) {
-            mm_dbg ("Session ID '%u': %s",
-                    session_id,
-                    mbim_activation_state_get_string (activation_state));
-        } else if (g_error_matches (error,
-                                    MBIM_STATUS_ERROR,
-                                    MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
-            if (parsed_result)
-                mm_dbg ("Context not activated: session ID '%u' already disconnected", session_id);
-            else
-                mm_dbg ("Context not activated: already disconnected");
-
-            g_clear_error (&error);
-            g_clear_error (&inner_error);
-        } else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE)) {
-            if (parsed_result && nw_error != 0) {
-                g_error_free (error);
-                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
-            }
-        }  /* else: For other errors, give precedence to error over nw_error */
-
-        /* Give precedence to original error over parsing error */
-        if (!error && inner_error)
-            error = g_error_copy (inner_error);
-        g_clear_error (&inner_error);
+    /* Parse the response only for the cases we need to */
+    if (result ||
+        g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) ||
+        g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
+        parsed_result = mbim_message_connect_response_parse (
+                             response,
+                             &session_id,
+                             &activation_state,
+                             NULL, /* voice_call_state */
+                             NULL, /* ip_type */
+                             NULL, /* context_type */
+                             &nw_error,
+                             &inner_error);
     }
+
+    /* Now handle different response / error cases */
+
+    if (result && parsed_result) {
+        g_assert (!error);
+        g_assert (!inner_error);
+        mm_dbg ("Session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
+        /* success */
+        goto out;
+    }
+
+    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
+        if (parsed_result)
+            mm_dbg ("Context not activated: session ID '%u' already disconnected", session_id);
+        else
+            mm_dbg ("Context not activated: already disconnected");
+
+        g_clear_error (&error);
+        g_clear_error (&inner_error);
+        /* success */
+        goto out;
+    }
+
+    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) && parsed_result && nw_error != 0) {
+        g_assert (!inner_error);
+        g_error_free (error);
+        error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+        /* error out with nw_error error */
+        goto out;
+    }
+
+    /* Give precedence to original error over parsing error */
+    if (!error && inner_error)
+        error = g_error_copy (inner_error);
+    g_clear_error (&inner_error);
+
+out:
 
     if (response)
         mbim_message_unref (response);
