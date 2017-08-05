@@ -840,9 +840,8 @@ create_bearer_step (GTask *task)
 
     case CREATE_BEARER_STEP_CREATE_BEARER:
         /* If we have a net interface, we'll create a u-blox bearer, unless for
-         * any reason we have the back-compatible profile selected, or if we don't
-         * know the mode to use. */
-        if ((ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_ECM || ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_RNDIS) &&
+         * any reason we have the back-compatible profile selected. */
+        if ((ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_BACK_COMPATIBLE) &&
             (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_BRIDGE || ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_ROUTER) &&
             mm_base_modem_peek_best_data_port (MM_BASE_MODEM (ctx->self), MM_PORT_TYPE_NET)) {
             mm_dbg ("u-blox: creating u-blox broadband bearer (%s profile, %s mode)...",

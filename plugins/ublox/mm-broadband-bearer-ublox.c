@@ -707,7 +707,6 @@ mm_broadband_bearer_ublox_new (MMBroadbandModem      *modem,
                                GAsyncReadyCallback    callback,
                                gpointer               user_data)
 {
-    g_assert (profile == MM_UBLOX_USB_PROFILE_ECM || profile == MM_UBLOX_USB_PROFILE_RNDIS);
     g_assert (mode == MM_UBLOX_NETWORKING_MODE_ROUTER || mode == MM_UBLOX_NETWORKING_MODE_BRIDGE);
 
     g_async_initable_new_async (
