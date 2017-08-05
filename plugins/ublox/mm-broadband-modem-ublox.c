@@ -669,6 +669,7 @@ typedef struct {
     CreateBearerStep       step;
     MMBearerProperties    *properties;
     MMBaseBearer          *bearer;
+    gboolean               has_net;
 } CreateBearerContext;
 
 static void
@@ -760,7 +761,15 @@ mode_check_ready (MMBaseModem  *self,
         mm_dbg ("u-blox: networking mode loaded: %s", mm_ublox_networking_mode_get_string (ctx->self->priv->mode));
     }
 
-    /* Assume the operation has been performed, even if it may have failed */
+    /* If checking networking mode isn't supported, we'll fallback to
+     * assume the device is in router mode, which is the mode asking for
+     * less connection setup rules from our side (just request DHCP).
+     */
+    if (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_UNKNOWN && ctx->has_net) {
+        mm_dbg ("u-blox: fallback to default networking mode: router");
+        ctx->self->priv->mode = MM_UBLOX_NETWORKING_MODE_ROUTER;
+    }
+
     ctx->self->priv->mode_checked = TRUE;
 
     ctx->step++;
@@ -841,9 +850,9 @@ create_bearer_step (GTask *task)
     case CREATE_BEARER_STEP_CREATE_BEARER:
         /* If we have a net interface, we'll create a u-blox bearer, unless for
          * any reason we have the back-compatible profile selected. */
-        if ((ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_BACK_COMPATIBLE) &&
-            (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_BRIDGE || ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_ROUTER) &&
-            mm_base_modem_peek_best_data_port (MM_BASE_MODEM (ctx->self), MM_PORT_TYPE_NET)) {
+        if ((ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_BACK_COMPATIBLE) && ctx->has_net) {
+            /* whenever there is a net port, we should have loaded a valid networking mode */
+            g_assert (ctx->self->priv->mode != MM_UBLOX_NETWORKING_MODE_UNKNOWN);
             mm_dbg ("u-blox: creating u-blox broadband bearer (%s profile, %s mode)...",
                     mm_ublox_usb_profile_get_string (ctx->self->priv->profile),
                     mm_ublox_networking_mode_get_string (ctx->self->priv->mode));
@@ -891,6 +900,9 @@ modem_create_bearer (MMIfaceModem        *self,
     ctx->step = CREATE_BEARER_STEP_FIRST;
     ctx->self = g_object_ref (self);
     ctx->properties = g_object_ref (properties);
+
+    /* Flag whether this modem has exposed a network interface */
+    ctx->has_net = !!mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify) create_bearer_context_free);
