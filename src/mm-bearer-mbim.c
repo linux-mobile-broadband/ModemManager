@@ -169,6 +169,9 @@ packet_statistics_query_ready (MbimDevice *device,
         stats->rx_bytes = in_octets;
         stats->tx_bytes = out_octets;
         g_task_return_pointer (task, stats, g_free);
+    } else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_OPERATION_NOT_ALLOWED)) {
+        g_clear_error (&error);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "operation not allowed");
     } else
         g_task_return_error (task, error);
 
