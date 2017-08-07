@@ -2875,7 +2875,6 @@ update_unlock_retries (MMIfaceModem *self,
                        MMUnlockRetries *unlock_retries)
 {
     MmGdbusModem *skeleton = NULL;
-    GError *error = NULL;
     GVariant *previous_dictionary;
     MMUnlockRetries *previous_unlock_retries;
 
@@ -2888,18 +2887,13 @@ update_unlock_retries (MMIfaceModem *self,
     previous_dictionary = mm_gdbus_modem_get_unlock_retries (skeleton);
     previous_unlock_retries = mm_unlock_retries_new_from_dictionary (previous_dictionary);
 
-    if (error) {
-        mm_warn ("Couldn't build previous unlock retries: '%s'", error->message);
-        g_error_free (error);
-    } else {
-        /* If they are different, update */
-        if (!mm_unlock_retries_cmp (unlock_retries, previous_unlock_retries)) {
-            GVariant *new_dictionary;
+    /* If they are different, update */
+    if (!mm_unlock_retries_cmp (unlock_retries, previous_unlock_retries)) {
+        GVariant *new_dictionary;
 
-            new_dictionary = mm_unlock_retries_get_dictionary (unlock_retries);
-            mm_gdbus_modem_set_unlock_retries (skeleton, new_dictionary);
-            g_variant_unref (new_dictionary);
-        }
+        new_dictionary = mm_unlock_retries_get_dictionary (unlock_retries);
+        mm_gdbus_modem_set_unlock_retries (skeleton, new_dictionary);
+        g_variant_unref (new_dictionary);
     }
 
     g_object_unref (previous_unlock_retries);
