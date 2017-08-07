@@ -25,7 +25,9 @@
 #include <libmm-glib.h>
 
 #include "mm-error-helpers.h"
+#include "mm-iface-modem.h"
 #include "mm-log.h"
+#include "mm-modem-helpers-mbim.h"
 #include "mm-sim-mbim.h"
 
 G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
@@ -62,6 +64,29 @@ peek_device (gpointer self,
 
     *o_device = mm_port_mbim_peek_device (port);
     return TRUE;
+}
+
+static void
+update_modem_unlock_retries (MMSimMbim *self,
+                             MbimPinType pin_type,
+                             guint32 remaining_attempts)
+{
+    MMBaseModem *modem = NULL;
+    MMUnlockRetries *unlock_retries;
+
+    g_object_get (G_OBJECT (self),
+                  MM_BASE_SIM_MODEM, &modem,
+                  NULL);
+    g_assert (MM_IS_BASE_MODEM (modem));
+
+    unlock_retries = mm_unlock_retries_new ();
+    mm_unlock_retries_set (unlock_retries,
+                           mm_modem_lock_from_mbim_pin_type (pin_type),
+                           remaining_attempts);
+    mm_iface_modem_update_unlock_retries (MM_IFACE_MODEM (modem),
+                                          unlock_retries);
+    g_object_unref (unlock_retries);
+    g_object_unref (modem);
 }
 
 /*****************************************************************************/
@@ -332,30 +357,40 @@ pin_set_enter_ready (MbimDevice *device,
                      GAsyncResult *res,
                      GTask *task)
 {
+    MMSimMbim *self;
     GError *error = NULL;
     MbimMessage *response;
+    gboolean success;
     MbimPinType pin_type;
     MbimPinState pin_state;
+    guint32 remaining_attempts;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
-        /* Sending PIN failed, build a better error to report */
-        if (mbim_message_pin_response_parse (
-                response,
-                &pin_type,
-                &pin_state,
-                NULL,
-                NULL)) {
-            /* Create the errors ourselves */
-            if (pin_type == MBIM_PIN_TYPE_PIN1 && pin_state == MBIM_PIN_STATE_LOCKED) {
-                g_error_free (error);
-                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
-            } else if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
-                g_error_free (error);
-                error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK);
+    if (response) {
+        success = mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+
+        if (mbim_message_pin_response_parse (response,
+                                             &pin_type,
+                                             &pin_state,
+                                             &remaining_attempts,
+                                             NULL)) {
+            update_modem_unlock_retries (self, pin_type, remaining_attempts);
+
+            if (!success) {
+                /* Sending PIN failed, build a better error to report */
+                if (pin_type == MBIM_PIN_TYPE_PIN1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                    g_error_free (error);
+                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+                } else if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                    g_error_free (error);
+                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK);
+                }
             }
         }
+
+        mbim_message_unref (response);
     }
 
     if (error)
@@ -363,9 +398,6 @@ pin_set_enter_ready (MbimDevice *device,
     else
         g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -422,31 +454,40 @@ puk_set_enter_ready (MbimDevice *device,
                      GAsyncResult *res,
                      GTask *task)
 {
+    MMSimMbim *self;
     GError *error = NULL;
     MbimMessage *response;
+    gboolean success;
     MbimPinType pin_type;
     MbimPinState pin_state;
     guint32 remaining_attempts;
 
+    self = g_task_get_source_object (task);
+
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
-        /* Sending PUK failed, build a better error to report */
-        if (mbim_message_pin_response_parse (
-                response,
-                &pin_type,
-                &pin_state,
-                &remaining_attempts,
-                NULL)) {
-            /* Create the errors ourselves */
-            if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
-                g_error_free (error);
-                if (remaining_attempts == 0)
-                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
-                else
-                    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+    if (response) {
+        success = mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+
+        if (mbim_message_pin_response_parse (response,
+                                             &pin_type,
+                                             &pin_state,
+                                             &remaining_attempts,
+                                             NULL)) {
+            update_modem_unlock_retries (self, pin_type, remaining_attempts);
+
+            if (!success) {
+                /* Sending PUK failed, build a better error to report */
+                if (pin_type == MBIM_PIN_TYPE_PUK1 && pin_state == MBIM_PIN_STATE_LOCKED) {
+                    g_error_free (error);
+                    if (remaining_attempts == 0)
+                        error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
+                    else
+                        error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD);
+                }
             }
         }
+
+        mbim_message_unref (response);
     }
 
     if (error)
@@ -454,9 +495,6 @@ puk_set_enter_ready (MbimDevice *device,
     else
         g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -514,12 +552,25 @@ pin_set_enable_ready (MbimDevice *device,
                       GAsyncResult *res,
                       GTask *task)
 {
+    MMSimMbim *self;
     GError *error = NULL;
     MbimMessage *response;
+    MbimPinType pin_type;
+    guint32 remaining_attempts;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response) {
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+
+        if (mbim_message_pin_response_parse (response,
+                                             &pin_type,
+                                             NULL,
+                                             &remaining_attempts,
+                                             NULL))
+            update_modem_unlock_retries (self, pin_type, remaining_attempts);
+
         mbim_message_unref (response);
     }
 
@@ -592,12 +643,25 @@ pin_set_change_ready (MbimDevice *device,
                       GAsyncResult *res,
                       GTask *task)
 {
+    MMSimMbim *self;
     GError *error = NULL;
     MbimMessage *response;
+    MbimPinType pin_type;
+    guint32 remaining_attempts;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response) {
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
+
+        if (mbim_message_pin_response_parse (response,
+                                             &pin_type,
+                                             NULL,
+                                             &remaining_attempts,
+                                             NULL))
+            update_modem_unlock_retries (self, pin_type, remaining_attempts);
+
         mbim_message_unref (response);
     }
 
