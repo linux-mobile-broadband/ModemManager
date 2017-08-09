@@ -4157,8 +4157,11 @@ mm_parse_cclk_response (const char *response,
 
     g_assert (iso8601p || tzp); /* at least one */
 
-    /* Sample reply: +CCLK: "15/03/05,14:14:26-32" */
-    r = g_regex_new ("[+]CCLK: \"(\\d+)/(\\d+)/(\\d+),(\\d+):(\\d+):(\\d+)([-+]\\d+)?\"", 0, 0, NULL);
+    /* Sample replies:
+     *  +CCLK: "15/03/05,14:14:26-32"
+     *  +CCLK: 17/07/26,11:42:15+01
+     */
+    r = g_regex_new ("\\+CCLK:\\s*\"?(\\d+)/(\\d+)/(\\d+),(\\d+):(\\d+):(\\d+)([-+]\\d+)?\"?", 0, 0, NULL);
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
