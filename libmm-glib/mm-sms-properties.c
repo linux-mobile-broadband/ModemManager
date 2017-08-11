@@ -157,10 +157,10 @@ mm_sms_properties_get_data (MMSmsProperties *self,
 {
     g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
 
-    if (self->priv->data && data_len)
-        *data_len = self->priv->data->len;
+    if (data_len)
+        *data_len = (self->priv->data ? self->priv->data->len : 0);
 
-    return self->priv->data->data;
+    return (self->priv->data ? self->priv->data->data : NULL);
 }
 
 /**
