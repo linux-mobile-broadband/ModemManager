@@ -407,10 +407,11 @@ mm_cdma_manual_activation_properties_get_prl (MMCdmaManualActivationProperties *
                                               gsize *prl_len)
 {
     g_return_val_if_fail (MM_IS_CDMA_MANUAL_ACTIVATION_PROPERTIES (self), NULL);
-    if (self->priv->prl && prl_len)
-        *prl_len = self->priv->prl->len;
 
-    return self->priv->prl->data;
+    if (prl_len)
+        *prl_len = (self->priv->prl ? self->priv->prl->len : 0);
+
+    return (self->priv->prl ? self->priv->prl->data : NULL);
 }
 
 /**
