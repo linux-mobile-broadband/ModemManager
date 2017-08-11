@@ -536,8 +536,8 @@ apply_post_probing_filters (MMPlugin *self,
                 gchar *casefolded_vendor;
                 gchar *casefolded_product;
 
-                casefolded_vendor = g_utf8_casefold (self->priv->product_strings[i].l, -1);
-                casefolded_product = g_utf8_casefold (self->priv->product_strings[i].r, -1);
+                casefolded_vendor = g_utf8_casefold (self->priv->forbidden_product_strings[i].l, -1);
+                casefolded_product = g_utf8_casefold (self->priv->forbidden_product_strings[i].r, -1);
                 found = (!!strstr (vendor, casefolded_vendor) &&
                          !!strstr (product, casefolded_product));
                 g_free (casefolded_vendor);
