@@ -595,7 +595,7 @@ mm_charset_get_encoded_len (const char *utf8,
                             MMModemCharset charset,
                             guint *out_unsupported)
 {
-    const char *p = utf8, *next;
+    const char *p = utf8;
     guint len = 0, unsupported = 0;
     SubsetEntry *e;
 
@@ -618,17 +618,17 @@ mm_charset_get_encoded_len (const char *utf8,
 
         c = g_utf8_get_char_validated (p, -1);
         g_return_val_if_fail (c != (gunichar) -1, 0);
-        end = next = g_utf8_find_next_char (p, NULL);
+        end = g_utf8_find_next_char (p, NULL);
         if (end == NULL) {
-            /* Find the end... */
+            /* Find the string terminating NULL */
             end = p;
-            while (*end++);
+            while (*++end);
         }
 
         if (!e->func (c, p, (end - p), &clen))
             unsupported++;
         len += clen;
-        p = next;
+        p = end;
     }
 
     if (out_unsupported)
