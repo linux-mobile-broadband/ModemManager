@@ -2264,30 +2264,13 @@ device_notification_cb (MbimDevice *device,
     }
 }
 
-static gboolean
-common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemMbim *self,
-                                                GAsyncResult *res,
-                                                GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
 static void
-common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
-                                         gboolean setup,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data)
+common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
+                                              MbimDevice           *device,
+                                              gboolean              setup)
 {
-    MbimDevice *device;
-    GSimpleAsyncResult *result;
-
-    if (!peek_device (self, &device, callback, user_data))
+    if (!device)
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_setup_cleanup_unsolicited_events);
 
     mm_dbg ("Supported notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s), packet (%s)",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
@@ -2314,6 +2297,34 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
             self->priv->notification_id = 0;
         }
     }
+}
+
+static gboolean
+common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemMbim  *self,
+                                                GAsyncResult          *res,
+                                                GError               **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
+                                         gboolean              setup,
+                                         GAsyncReadyCallback   callback,
+                                         gpointer              user_data)
+{
+    GSimpleAsyncResult *result;
+    MbimDevice         *device;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_setup_cleanup_unsolicited_events);
+
+    common_setup_cleanup_unsolicited_events_sync (self, device, setup);
 
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
@@ -3177,19 +3188,23 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
 static void
 finalize (GObject *object)
 {
-    MMPortMbim *mbim;
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
+    MMPortMbim *mbim;
+
+    mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (mbim) {
+        /* Explicitly remove notification handler */
+        self->priv->setup_flags = PROCESS_NOTIFICATION_FLAG_NONE;
+        common_setup_cleanup_unsolicited_events_sync (self, mm_port_mbim_peek_device (mbim), FALSE);
+        /* If we did open the MBIM port during initialization, close it now */
+        if (mm_port_mbim_is_open (mbim))
+            mm_port_mbim_close (mbim, NULL, NULL);
+    }
 
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
     g_free (self->priv->current_operator_id);
     g_free (self->priv->current_operator_name);
-
-    mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
-    /* If we did open the MBIM port during initialization, close it now */
-    if (mbim && mm_port_mbim_is_open (mbim)) {
-        mm_port_mbim_close (mbim, NULL, NULL);
-    }
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->finalize (object);
 }
