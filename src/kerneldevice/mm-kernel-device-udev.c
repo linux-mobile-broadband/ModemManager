@@ -57,6 +57,8 @@ get_device_ids (GUdevDevice *device,
     gboolean success = FALSE;
     char *pci_vid = NULL, *pci_pid = NULL;
 
+    g_assert (vendor != NULL && product != NULL);
+
     parent = g_udev_device_get_parent (device);
     if (parent) {
         parent_subsys = g_udev_device_get_subsystem (parent);
