@@ -90,6 +90,9 @@ struct _MMBroadbandModemMbimPrivate {
     MbimDataClass highest_available_data_class;
 
     MbimSubscriberReadyState last_ready_state;
+
+    /* For notifying when the mbim-proxy connection is dead */
+    gulong mbim_device_removed_id;
 };
 
 /*****************************************************************************/
@@ -1579,10 +1582,62 @@ parent_initialization_started (GTask *task)
 }
 
 static void
+mbim_device_removed_cb (MbimDevice *device,
+                        MMBroadbandModemMbim *self)
+{
+    /* We have to do a full re-probe here because simply reopening the device
+     * and restarting mbim-proxy will leave us without MBIM notifications. */
+    mm_info ("Connection to mbim-proxy for %s lost, reprobing",
+             mbim_device_get_path_display (device));
+
+    g_signal_handler_disconnect (device,
+                                 self->priv->mbim_device_removed_id);
+    self->priv->mbim_device_removed_id = 0;
+
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+}
+
+static void
+track_mbim_device_removed (MMBroadbandModemMbim *self,
+                           MMPortMbim *mbim)
+{
+    MbimDevice *device;
+
+    device = mm_port_mbim_peek_device (mbim);
+    g_assert (device);
+
+    /* Register removal handler so we can handle mbim-proxy crashes */
+    self->priv->mbim_device_removed_id = g_signal_connect (
+        device,
+        MBIM_DEVICE_SIGNAL_REMOVED,
+        G_CALLBACK (mbim_device_removed_cb),
+        self);
+}
+
+static void
+untrack_mbim_device_removed (MMBroadbandModemMbim *self,
+                             MMPortMbim *mbim)
+{
+    MbimDevice *device;
+
+    if (self->priv->mbim_device_removed_id == 0)
+        return;
+
+    device = mm_port_mbim_peek_device (mbim);
+    if (!device)
+        return;
+
+    g_signal_handler_disconnect (device, self->priv->mbim_device_removed_id);
+    self->priv->mbim_device_removed_id = 0;
+}
+
+static void
 mbim_port_open_ready (MMPortMbim *mbim,
                       GAsyncResult *res,
                       GTask *task)
 {
+    MMBroadbandModemMbim *self;
     GError *error = NULL;
 
     if (!mm_port_mbim_open_finish (mbim, res, &error)) {
@@ -1591,7 +1646,10 @@ mbim_port_open_ready (MMPortMbim *mbim,
         return;
     }
 
-    /* Done we are, launch parent's callback */
+    /* Make sure we know if mbim-proxy dies on us, and then do the parent's
+     * initialization */
+    self = MM_BROADBAND_MODEM_MBIM (g_task_get_source_object (task));
+    track_mbim_device_removed (self, mbim);
     parent_initialization_started (task);
 }
 
@@ -1620,7 +1678,9 @@ initialization_started (MMBroadbandModem *self,
     }
 
     if (mm_port_mbim_is_open (ctx->mbim)) {
-        /* Nothing to be done, just launch parent's callback */
+        /* Nothing to be done, just connect to a signal and launch parent's
+         * callback */
+        track_mbim_device_removed (MM_BROADBAND_MODEM_MBIM (self), ctx->mbim);
         parent_initialization_started (task);
         return;
     }
@@ -3193,6 +3253,8 @@ finalize (GObject *object)
         /* Explicitly remove notification handler */
         self->priv->setup_flags = PROCESS_NOTIFICATION_FLAG_NONE;
         common_setup_cleanup_unsolicited_events_sync (self, mm_port_mbim_peek_device (mbim), FALSE);
+        /* Disconnect signal handler for mbim-proxy disappearing, if it exists */
+        untrack_mbim_device_removed (self, mbim);
         /* If we did open the MBIM port during initialization, close it now */
         if (mm_port_mbim_is_open (mbim))
             mm_port_mbim_close (mbim, NULL, NULL);
