@@ -57,10 +57,9 @@ guint8 *mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len);
 
 guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm, guint32 len);
 
-/* Returns the size in bytes required to hold the UTF-8 string in the given charset */
-guint mm_charset_get_encoded_len (const char *utf8,
-                                  MMModemCharset charset,
-                                  guint *out_unsupported);
+/* Checks whether conversion to the given charset may be done without errors */
+gboolean mm_charset_can_convert_to (const char *utf8,
+                                    MMModemCharset charset);
 
 guint8 *mm_charset_gsm_unpack (const guint8 *gsm,
                                guint32 num_septets,

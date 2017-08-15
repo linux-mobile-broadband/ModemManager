@@ -463,43 +463,37 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
 }
 
 static gboolean
-gsm_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+gsm_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
     guint8 gsm;
 
-    *out_clen = 1;
     if (utf8_to_gsm_def_char (utf8, ulen, &gsm))
         return TRUE;
-    if (utf8_to_gsm_ext_char (utf8, ulen, &gsm)) {
-        *out_clen = 2;
+    if (utf8_to_gsm_ext_char (utf8, ulen, &gsm))
         return TRUE;
-    }
     return FALSE;
 }
 
 static gboolean
-ira_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+ira_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
-    *out_clen = 1;
     return (ulen == 1);
 }
 
 static gboolean
-ucs2_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+ucs2_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
-    *out_clen = 2;
     return (c <= 0xFFFF);
 }
 
 static gboolean
-iso88591_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+iso88591_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
-    *out_clen = 1;
     return (c <= 0xFF);
 }
 
 static gboolean
-pccp437_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+pccp437_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
     static const gunichar t[] = {
         0x00c7, 0x00fc, 0x00e9, 0x00e2, 0x00e4, 0x00e0, 0x00e5, 0x00e7, 0x00ea,
@@ -520,8 +514,6 @@ pccp437_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
     };
     int i;
 
-    *out_clen = 1;
-
     if (c <= 0x7F)
         return TRUE;
     for (i = 0; i < sizeof (t) / sizeof (t[0]); i++) {
@@ -532,7 +524,7 @@ pccp437_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
 }
 
 static gboolean
-pcdn_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
+pcdn_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
     static const gunichar t[] = {
         0x00c7, 0x00fc, 0x00e9, 0x00e2, 0x00e4, 0x00e0, 0x00e5, 0x00e7, 0x00ea,
@@ -553,8 +545,6 @@ pcdn_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
     };
     int i;
 
-    *out_clen = 1;
-
     if (c <= 0x7F)
         return TRUE;
     for (i = 0; i < sizeof (t) / sizeof (t[0]); i++) {
@@ -566,7 +556,7 @@ pcdn_is_subset (gunichar c, const char *utf8, gsize ulen, guint *out_clen)
 
 typedef struct {
     MMModemCharset cs;
-    gboolean (*func) (gunichar c, const char *utf8, gsize ulen, guint *out_clen);
+    gboolean (*func) (gunichar c, const char *utf8, gsize ulen);
     guint charsize;
 } SubsetEntry;
 
@@ -581,40 +571,34 @@ SubsetEntry subset_table[] = {
 };
 
 /**
- * mm_charset_get_encoded_len:
+ * mm_charset_can_covert_to:
+ * @utf8: UTF-8 valid string.
+ * @charset: the #MMModemCharset to validate the conversion from @utf8.
  *
- * @utf8: UTF-8 valid string
- * @charset: the #MMModemCharset to check the length of @utf8 in
- * @out_unsupported: on return, number of characters of @utf8 that are not fully
- * representable in @charset
- *
- * Returns: the size in bytes of the string if converted from UTF-8 into @charset.
- **/
-guint
-mm_charset_get_encoded_len (const char *utf8,
-                            MMModemCharset charset,
-                            guint *out_unsupported)
+ * Returns: %TRUE if the conversion is possible without errors, %FALSE otherwise.
+ */
+gboolean
+mm_charset_can_convert_to (const char *utf8,
+                           MMModemCharset charset)
 {
     const char *p = utf8;
-    guint len = 0, unsupported = 0;
     SubsetEntry *e;
 
-    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, 0);
-    g_return_val_if_fail (utf8 != NULL, 0);
+    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, FALSE);
+    g_return_val_if_fail (utf8 != NULL, FALSE);
 
     if (charset == MM_MODEM_CHARSET_UTF8)
-        return strlen (utf8);
+        return TRUE;
 
     /* Find the charset in our subset table */
     for (e = &subset_table[0];
          e->cs != charset && e->cs != MM_MODEM_CHARSET_UNKNOWN;
          e++);
-    g_return_val_if_fail (e->cs != MM_MODEM_CHARSET_UNKNOWN, 0);
+    g_return_val_if_fail (e->cs != MM_MODEM_CHARSET_UNKNOWN, FALSE);
 
     while (*p) {
         gunichar c;
         const char *end;
-        guint clen = 0;
 
         c = g_utf8_get_char_validated (p, -1);
         g_return_val_if_fail (c != (gunichar) -1, 0);
@@ -625,15 +609,13 @@ mm_charset_get_encoded_len (const char *utf8,
             while (*++end);
         }
 
-        if (!e->func (c, p, (end - p), &clen))
-            unsupported++;
-        len += clen;
+        if (!e->func (c, p, (end - p)))
+            return FALSE;
+
         p = end;
     }
 
-    if (out_unsupported)
-        *out_unsupported = unsupported;
-    return len;
+    return TRUE;
 }
 
 guint8 *

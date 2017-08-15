@@ -1365,7 +1365,6 @@ decide_best_encoding (const gchar *text,
                       guint *num_bits_per_field,
                       Encoding *encoding)
 {
-    guint latin_unsupported = 0;
     guint ascii_unsupported = 0;
     guint i;
     guint len;
@@ -1391,10 +1390,7 @@ decide_best_encoding (const gchar *text,
     }
 
     /* Check if we can do Latin encoding */
-    mm_charset_get_encoded_len (text,
-                                MM_MODEM_CHARSET_8859_1,
-                                &latin_unsupported);
-    if (!latin_unsupported) {
+    if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_8859_1)) {
         *out = g_byte_array_sized_new (len);
         mm_modem_charset_byte_array_append (*out,
                                             text,

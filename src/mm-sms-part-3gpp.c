@@ -1026,7 +1026,6 @@ gchar **
 mm_sms_part_3gpp_util_split_text (const gchar *text,
                                   MMSmsEncoding *encoding)
 {
-    guint gsm_unsupported = 0;
     gchar **out;
     guint n_chunks;
     guint i;
@@ -1058,10 +1057,7 @@ mm_sms_part_3gpp_util_split_text (const gchar *text,
      */
 
     /* Check if we can do GSM encoding */
-    mm_charset_get_encoded_len (text,
-                                MM_MODEM_CHARSET_GSM,
-                                &gsm_unsupported);
-    if (gsm_unsupported > 0) {
+    if (!mm_charset_can_convert_to (text, MM_MODEM_CHARSET_GSM)) {
         /* If cannot do it in GSM encoding, do it in UCS-2 */
         GByteArray *array;
 

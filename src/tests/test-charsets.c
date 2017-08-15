@@ -20,6 +20,12 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
+#if defined ENABLE_TEST_MESSAGE_TRACES
+#define trace(message, ...) g_print (message, ##__VA_ARGS__)
+#else
+#define trace(...)
+#endif
+
 static void
 test_gsm7_default_chars (void)
 {
@@ -344,6 +350,66 @@ test_take_convert_ucs2_bad_ascii2 (void)
     g_assert (converted == NULL);
 }
 
+struct charset_can_convert_to_test_s {
+    const char *utf8;
+    gboolean    to_gsm;
+    gboolean    to_ira;
+    gboolean    to_8859_1;
+    gboolean    to_ucs2;
+    gboolean    to_pccp437;
+    gboolean    to_pcdn;
+};
+
+static void
+test_charset_can_covert_to (void)
+{
+    static const struct charset_can_convert_to_test_s charset_can_convert_to_test[] = {
+        {
+            .utf8 = "",
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+        },
+        {
+            .utf8 = " ",
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+        },
+        {
+            .utf8 = "some basic ascii",
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+        },
+        {
+            .utf8 = "ホモ・サピエンス 喂人类 katakana, chinese, english: UCS2 takes it all",
+            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+        },
+        {
+            .utf8 = "Some from the GSM7 basic set: a % Ψ Ω ñ ö è æ",
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+        },
+        {
+            .utf8 = "More from the GSM7 extended set: {} [] ~ € |",
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+        },
+        {
+            .utf8 = "patín cannot be encoded in GSM7 or IRA, but is valid UCS2, ISO-8859-1, CP437 and CP850",
+            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+        },
+        {
+            .utf8 = "ècole can be encoded in multiple ways, but not in IRA",
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+        },
+    };
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (charset_can_convert_to_test); i++) {
+        trace ("testing charset conversion: '%s'\n", charset_can_convert_to_test[i].utf8);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_GSM)     == charset_can_convert_to_test[i].to_gsm);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_IRA)     == charset_can_convert_to_test[i].to_ira);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_8859_1)  == charset_can_convert_to_test[i].to_8859_1);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_UCS2)    == charset_can_convert_to_test[i].to_ucs2);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCCP437) == charset_can_convert_to_test[i].to_pccp437);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCDN)    == charset_can_convert_to_test[i].to_pcdn);
+    }
+}
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -386,6 +452,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/charsets/take-convert/ucs2/hex",         test_take_convert_ucs2_hex_utf8);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii",   test_take_convert_ucs2_bad_ascii);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii-2", test_take_convert_ucs2_bad_ascii2);
+
+    g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
 
     return g_test_run ();
 }
