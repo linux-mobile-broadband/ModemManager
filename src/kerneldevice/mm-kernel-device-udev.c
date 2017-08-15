@@ -119,29 +119,21 @@ get_device_ids (GUdevDevice *device,
     if (strlen (vid) != 4)
         goto out;
 
-    if (vendor) {
-        *vendor = (guint16) (mm_utils_hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint16) ((mm_utils_hex2byte (vid) & 0xFF) << 8);
-    }
-
     if (!pid)
         pid = g_udev_device_get_property (device, "ID_MODEL_ID");
-    if (!pid) {
-        *vendor = 0;
+    if (!pid)
         goto out;
-    }
 
     if (strncmp (pid, "0x", 2) == 0)
         pid += 2;
-    if (strlen (pid) != 4) {
-        *vendor = 0;
+    if (strlen (pid) != 4)
         goto out;
-    }
 
-    if (product) {
-        *product = (guint16) (mm_utils_hex2byte (pid + 2) & 0xFF);
-        *product |= (guint16) ((mm_utils_hex2byte (pid) & 0xFF) << 8);
-    }
+    *vendor = (guint16) (mm_utils_hex2byte (vid + 2) & 0xFF);
+    *vendor |= (guint16) ((mm_utils_hex2byte (vid) & 0xFF) << 8);
+
+    *product = (guint16) (mm_utils_hex2byte (pid + 2) & 0xFF);
+    *product |= (guint16) ((mm_utils_hex2byte (pid) & 0xFF) << 8);
 
     success = TRUE;
 
