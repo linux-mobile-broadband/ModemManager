@@ -15,12 +15,13 @@
 
 #include <glib.h>
 #include <string.h>
+#include <locale.h>
 
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
 static void
-test_def_chars (void *f, gpointer d)
+test_gsm7_default_chars (void)
 {
     /* Test that a string with all the characters in the GSM 03.38 charset
      * are converted from UTF-8 to GSM and back to UTF-8 successfully.
@@ -44,7 +45,7 @@ test_def_chars (void *f, gpointer d)
 }
 
 static void
-test_esc_chars (void *f, gpointer d)
+test_gsm7_extended_chars (void)
 {
     /* Test that a string with all the characters in the extended GSM 03.38
      * charset are converted from UTF-8 to GSM and back to UTF-8 successfully.
@@ -68,7 +69,7 @@ test_esc_chars (void *f, gpointer d)
 }
 
 static void
-test_mixed_chars (void *f, gpointer d)
+test_gsm7_mixed_chars (void)
 {
     /* Test that a string with a mix of GSM 03.38 default and extended characters
      * is converted from UTF-8 to GSM and back to UTF-8 successfully.
@@ -92,7 +93,7 @@ test_mixed_chars (void *f, gpointer d)
 }
 
 static void
-test_unpack_gsm7 (void *f, gpointer d)
+test_gsm7_unpack_basic (void)
 {
     static const guint8 gsm[] = { 0xC8, 0xF7, 0x1D, 0x14, 0x96, 0x97, 0x41, 0xF9, 0x77, 0xFD, 0x07 };
     static const guint8 expected[] = { 0x48, 0x6f, 0x77, 0x20, 0x61, 0x72, 0x65, 0x20, 0x79, 0x6f, 0x75, 0x3f };
@@ -108,7 +109,7 @@ test_unpack_gsm7 (void *f, gpointer d)
 }
 
 static void
-test_unpack_gsm7_7_chars (void *f, gpointer d)
+test_gsm7_unpack_7_chars (void)
 {
     static const guint8 gsm[] = { 0xF1, 0x7B, 0x59, 0x4E, 0xCF, 0xD7, 0x01 };
     static const guint8 expected[] = { 0x71, 0x77, 0x65, 0x72, 0x74, 0x79, 0x75};
@@ -129,7 +130,7 @@ test_unpack_gsm7_7_chars (void *f, gpointer d)
 }
 
 static void
-test_unpack_gsm7_all_chars (void *f, gpointer d)
+test_gsm7_unpack_all_chars (void)
 {
     /* Packed array of all chars in GSM default and extended charset */
     static const guint8 gsm[] = {
@@ -168,7 +169,7 @@ test_unpack_gsm7_all_chars (void *f, gpointer d)
 }
 
 static void
-test_pack_gsm7 (void *f, gpointer d)
+test_gsm7_pack_basic (void)
 {
     static const guint8 unpacked[] = { 0x48, 0x6f, 0x77, 0x20, 0x61, 0x72, 0x65, 0x20, 0x79, 0x6f, 0x75, 0x3f };
     static const guint8 expected[] = { 0xC8, 0xF7, 0x1D, 0x14, 0x96, 0x97, 0x41, 0xF9, 0x77, 0xFD, 0x07 };
@@ -184,7 +185,7 @@ test_pack_gsm7 (void *f, gpointer d)
 }
 
 static void
-test_pack_gsm7_7_chars (void *f, gpointer d)
+test_gsm7_pack_7_chars (void)
 {
     static const guint8 unpacked[] = { 0x71, 0x77, 0x65, 0x72, 0x74, 0x79, 0x75 };
     static const guint8 expected[] = { 0xF1, 0x7B, 0x59, 0x4E, 0xCF, 0xD7, 0x01 };
@@ -205,27 +206,8 @@ test_pack_gsm7_7_chars (void *f, gpointer d)
     g_free (packed);
 }
 
-#if 0
 static void
-print_array (const guint8 *array, guint32 len)
-{
-    int col;
-    guint8 c;
-
-    g_print ("\n");
-    for (c = 0, col = 0; c < len; c++) {
-        g_print ("0x%02X, ", array[c] & 0xFF);
-        if (col++ == 11) {
-            col = 0;
-            g_print ("\n");
-        }
-    }
-    g_print ("\n");
-}
-#endif
-
-static void
-test_pack_gsm7_all_chars (void *f, gpointer d)
+test_gsm7_pack_all_chars (void)
 {
     /* Packed array of all chars in GSM default and extended charset */
     static const guint8 expected[] = {
@@ -265,7 +247,7 @@ test_pack_gsm7_all_chars (void *f, gpointer d)
 }
 
 static void
-test_pack_gsm7_24_chars (void *f, gpointer d)
+test_gsm7_pack_24_chars (void)
 {
     static const guint8 unpacked[] = {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -286,7 +268,7 @@ test_pack_gsm7_24_chars (void *f, gpointer d)
 }
 
 static void
-test_pack_gsm7_last_septet_alone (void *f, gpointer d)
+test_gsm7_pack_last_septet_alone (void)
 {
     static const guint8 unpacked[] = {
         0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x72, 0x65, 0x61, 0x6C,
@@ -312,7 +294,7 @@ test_pack_gsm7_last_septet_alone (void *f, gpointer d)
 }
 
 static void
-test_pack_gsm7_7_chars_offset (void *f, gpointer d)
+test_gsm7_pack_7_chars_offset (void)
 {
     static const guint8 unpacked[] = { 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x10, 0x2F };
     static const guint8 expected[] = { 0x00, 0x5D, 0x66, 0xB3, 0xDF, 0x90, 0x17 };
@@ -328,7 +310,7 @@ test_pack_gsm7_7_chars_offset (void *f, gpointer d)
 }
 
 static void
-test_take_convert_ucs2_hex_utf8 (void *f, gpointer d)
+test_take_convert_ucs2_hex_utf8 (void)
 {
     gchar *src, *converted;
 
@@ -340,7 +322,7 @@ test_take_convert_ucs2_hex_utf8 (void *f, gpointer d)
 }
 
 static void
-test_take_convert_ucs2_bad_ascii (void *f, gpointer d)
+test_take_convert_ucs2_bad_ascii (void)
 {
     gchar *src, *converted;
 
@@ -352,7 +334,7 @@ test_take_convert_ucs2_bad_ascii (void *f, gpointer d)
 }
 
 static void
-test_take_convert_ucs2_bad_ascii2 (void *f, gpointer d)
+test_take_convert_ucs2_bad_ascii2 (void)
 {
     gchar *src, *converted;
 
@@ -382,40 +364,28 @@ _mm_log (const char *loc,
 #endif
 }
 
-typedef GTestFixtureFunc TCFunc;
-
-#define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
-
 int main (int argc, char **argv)
 {
-    GTestSuite *suite;
-    gint result;
+    setlocale (LC_ALL, "");
 
     g_test_init (&argc, &argv, NULL);
 
-    suite = g_test_get_root ();
+    g_test_add_func ("/MM/charsets/gsm7/default-chars",          test_gsm7_default_chars);
+    g_test_add_func ("/MM/charsets/gsm7/extended-chars",         test_gsm7_extended_chars);
+    g_test_add_func ("/MM/charsets/gsm7/mixed-chars",            test_gsm7_mixed_chars);
+    g_test_add_func ("/MM/charsets/gsm7/unpack/basic",           test_gsm7_unpack_basic);
+    g_test_add_func ("/MM/charsets/gsm7/unpack/7-chars",         test_gsm7_unpack_7_chars);
+    g_test_add_func ("/MM/charsets/gsm7/unpack/all-chars",       test_gsm7_unpack_all_chars);
+    g_test_add_func ("/MM/charsets/gsm7/pack/basic",             test_gsm7_pack_basic);
+    g_test_add_func ("/MM/charsets/gsm7/pack/7-chars",           test_gsm7_pack_7_chars);
+    g_test_add_func ("/MM/charsets/gsm7/pack/all-chars",         test_gsm7_pack_all_chars);
+    g_test_add_func ("/MM/charsets/gsm7/pack/24-chars",          test_gsm7_pack_24_chars);
+    g_test_add_func ("/MM/charsets/gsm7/pack/last-septet-alone", test_gsm7_pack_last_septet_alone);
+    g_test_add_func ("/MM/charsets/gsm7/pack/7-chars-offset",    test_gsm7_pack_7_chars_offset);
 
-    g_test_suite_add (suite, TESTCASE (test_def_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_esc_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_mixed_chars, NULL));
+    g_test_add_func ("/MM/charsets/take-convert/ucs2/hex",         test_take_convert_ucs2_hex_utf8);
+    g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii",   test_take_convert_ucs2_bad_ascii);
+    g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii-2", test_take_convert_ucs2_bad_ascii2);
 
-    g_test_suite_add (suite, TESTCASE (test_unpack_gsm7, NULL));
-    g_test_suite_add (suite, TESTCASE (test_unpack_gsm7_7_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_unpack_gsm7_all_chars, NULL));
-
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7, NULL));
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_7_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_all_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_24_chars, NULL));
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_last_septet_alone, NULL));
-
-    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_7_chars_offset, NULL));
-
-    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_hex_utf8, NULL));
-    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_bad_ascii, NULL));
-    g_test_suite_add (suite, TESTCASE (test_take_convert_ucs2_bad_ascii2, NULL));
-
-    result = g_test_run ();
-
-    return result;
+    return g_test_run ();
 }
