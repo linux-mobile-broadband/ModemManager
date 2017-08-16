@@ -2395,7 +2395,7 @@ encode (MMIfaceModem3gppUssd *self,
         len++;
     }
 
-    packed = gsm_pack (gsm, len, 0, &packed_len);
+    packed = mm_charset_gsm_pack (gsm, len, 0, &packed_len);
     hex = mm_utils_bin2hexstr (packed, packed_len);
     g_free (packed);
     g_free (gsm);
@@ -2414,7 +2414,7 @@ decode (MMIfaceModem3gppUssd *self,
     guint32 unpacked_len;
 
     bin = mm_utils_hexstr2bin (reply, &bin_len);
-    unpacked = gsm_unpack ((guint8*) bin, (bin_len * 8) / 7, 0, &unpacked_len);
+    unpacked = mm_charset_gsm_unpack ((guint8*) bin, (bin_len * 8) / 7, 0, &unpacked_len);
     /* if the last character in a 7-byte block is padding, then drop it */
     if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))
         unpacked_len--;

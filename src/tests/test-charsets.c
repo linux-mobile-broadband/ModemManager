@@ -100,7 +100,7 @@ test_gsm7_unpack_basic (void)
     guint8 *unpacked;
     guint32 unpacked_len = 0;
 
-    unpacked = gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
+    unpacked = mm_charset_gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (unpacked, expected, unpacked_len), ==, 0);
@@ -121,7 +121,7 @@ test_gsm7_unpack_7_chars (void)
      * we expect to get the number of characters that were specified.
      */
 
-    unpacked = gsm_unpack (gsm, 7 , 0, &unpacked_len);
+    unpacked = mm_charset_gsm_unpack (gsm, 7 , 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (unpacked, expected, unpacked_len), ==, 0);
@@ -154,7 +154,7 @@ test_gsm7_unpack_all_chars (void)
     guint32 unpacked_len = 0;
     int i;
 
-    unpacked = gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
+    unpacked = mm_charset_gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, 148);
 
@@ -176,7 +176,7 @@ test_gsm7_pack_basic (void)
     guint8 *packed;
     guint32 packed_len = 0;
 
-    packed = gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (packed, expected, packed_len), ==, 0);
@@ -198,7 +198,7 @@ test_gsm7_pack_7_chars (void)
      * the intended message to remove it when required.
      */
 
-    packed = gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (packed, expected, packed_len), ==, 0);
@@ -237,7 +237,7 @@ test_gsm7_pack_all_chars (void)
     for (c = 0; c < sizeof (ext); c++)
         g_byte_array_append (unpacked, &ext[c], 1);
 
-    packed = gsm_pack (unpacked->data, unpacked->len, 0, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked->data, unpacked->len, 0, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (packed, expected, packed_len), ==, 0);
@@ -260,7 +260,7 @@ test_gsm7_pack_24_chars (void)
      * are packed into an exact number of bytes.
      */
 
-    packed = gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, 21);
 
@@ -286,7 +286,7 @@ test_gsm7_pack_last_septet_alone (void)
      * septet will be in an octet by itself) packs correctly.
      */
 
-    packed = gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, sizeof (expected));
 
@@ -301,7 +301,7 @@ test_gsm7_pack_7_chars_offset (void)
     guint8 *packed;
     guint32 packed_len = 0;
 
-    packed = gsm_pack (unpacked, sizeof (unpacked), 5, &packed_len);
+    packed = mm_charset_gsm_pack (unpacked, sizeof (unpacked), 5, &packed_len);
     g_assert (packed);
     g_assert_cmpint (packed_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (packed, expected, packed_len), ==, 0);

@@ -637,10 +637,10 @@ mm_charset_get_encoded_len (const char *utf8,
 }
 
 guint8 *
-gsm_unpack (const guint8 *gsm,
-            guint32 num_septets,
-            guint8 start_offset,  /* in _bits_ */
-            guint32 *out_unpacked_len)
+mm_charset_gsm_unpack (const guint8 *gsm,
+                       guint32 num_septets,
+                       guint8 start_offset,  /* in _bits_ */
+                       guint32 *out_unpacked_len)
 {
     GByteArray *unpacked;
     int i;
@@ -673,10 +673,10 @@ gsm_unpack (const guint8 *gsm,
 }
 
 guint8 *
-gsm_pack (const guint8 *src,
-          guint32 src_len,
-          guint8 start_offset,
-          guint32 *out_packed_len)
+mm_charset_gsm_pack (const guint8 *src,
+                     guint32 src_len,
+                     guint8 start_offset,
+                     guint32 *out_packed_len)
 {
     guint8 *packed;
     guint octet = 0, lshift, plen;

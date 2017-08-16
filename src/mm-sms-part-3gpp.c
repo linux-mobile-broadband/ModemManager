@@ -132,7 +132,7 @@ sms_decode_address (const guint8 *address, int len)
     if (addrtype == SMS_NUMBER_TYPE_ALPHA) {
         guint8 *unpacked;
         guint32 unpacked_len;
-        unpacked = gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
+        unpacked = mm_charset_gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
         utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 (unpacked,
                                                         unpacked_len);
         g_free (unpacked);
@@ -242,7 +242,7 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
         mm_dbg ("Converting SMS part text from GSM7 to UTF8...");
-        unpacked = gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
+        unpacked = mm_charset_gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
         mm_dbg ("   Got UTF-8 text: '%s'", utf8);
         g_free (unpacked);
@@ -956,7 +956,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
                 *udl_ptr,
                 mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
-        packed = gsm_pack (unpacked, unlen, shift, &packlen);
+        packed = mm_charset_gsm_pack (unpacked, unlen, shift, &packlen);
         g_free (unpacked);
         if (!packed || packlen == 0) {
             g_free (packed);
