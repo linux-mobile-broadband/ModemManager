@@ -487,4 +487,204 @@ typedef int MMModemBandDeprecated;
  */
 #define MM_MODEM_BAND_EUTRAN_XLIV ((MMModemBandDeprecated)MM_MODEM_BAND_EUTRAN_44)
 
+/**
+ * MM_MODEM_BAND_CDMA_BC0_CELLULAR_800:
+ *
+ * CDMA Band Class 0 (US Cellular 850MHz)
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC0 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC0_CELLULAR_800 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC0)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC1_PCS_1900:
+ *
+ * CDMA Band Class 1 (US PCS 1900MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC1 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC1_PCS_1900 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC1)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC2_TACS:
+ *
+ * CDMA Band Class 2 (UK TACS 900MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC2 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC2_TACS ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC2)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC3_JTACS:
+ *
+ * CDMA Band Class 3 (Japanese TACS).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC3 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC3_JTACS ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC3)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS:
+ *
+ * CDMA Band Class 4 (Korean PCS).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC4 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC4)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC5_NMT450:
+ *
+ * CDMA Band Class 5 (NMT 450MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC5 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC5_NMT450 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC5)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC6_IMT2000:
+ *
+ * CDMA Band Class 6 (IMT2000 2100MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC6 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC6_IMT2000 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC6)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC7_CELLULAR_700:
+ *
+ * CDMA Band Class 7 (Cellular 700MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC7 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC7_CELLULAR_700 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC7)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC8_1800:
+ *
+ * CDMA Band Class 8 (1800MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC8 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC8_1800 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC8)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC9_900:
+ *
+ * CDMA Band Class 9 (900MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC9 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC9_900 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC9)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC10_SECONDARY_800:
+ *
+ * CDMA Band Class 10 (US Secondary 800).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC10 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC10_SECONDARY_800 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC10)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC11_PAMR_400:
+ *
+ * CDMA Band Class 11 (European PAMR 400MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC11 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC11_PAMR_400 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC11)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC12_PAMR_800:
+ *
+ * CDMA Band Class 12 (PAMR 800MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC12 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC12_PAMR_800 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC12)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC13_IMT2000_2500:
+ *
+ * CDMA Band Class 13 (IMT2000 2500MHz Expansion).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC13 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC13_IMT2000_2500 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC13)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC14_PCS2_1900:
+ *
+ * CDMA Band Class 14 (More US PCS 1900MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC14 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC14_PCS2_1900 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC14)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC15_AWS:
+ *
+ * CDMA Band Class 15 (AWS 1700MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC15 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC15_AWS ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC15)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC16_US_2500:
+ *
+ * CDMA Band Class 16 (US 2500MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC16 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC16_US_2500 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC16)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC17_US_FLO_2500:
+ *
+ * CDMA Band Class 17 (US 2500MHz Forward Link Only).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC17 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC17_US_FLO_2500 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC17)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC18_US_PS_700:
+ *
+ * CDMA Band Class 18 (US 700MHz Public Safety).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC18 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC18_US_PS_700 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC18)
+
+/**
+ * MM_MODEM_BAND_CDMA_BC19_US_LOWER_700:
+ *
+ * CDMA Band Class 19 (US Lower 700MHz).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC19 instead.
+ */
+#define MM_MODEM_BAND_CDMA_BC19_US_LOWER_700 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC19)
+
 #endif /* _MODEMMANAGER_COMPAT_H_ */
