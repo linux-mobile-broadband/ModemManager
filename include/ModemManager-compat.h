@@ -38,6 +38,96 @@ G_DEPRECATED
 typedef int MMModemBandDeprecated;
 
 /**
+ * MM_MODEM_BAND_U2100:
+ *
+ * WCDMA 2100 MHz (UTRAN band 1).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_1 instead.
+ */
+#define MM_MODEM_BAND_U2100 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_1)
+
+/**
+ * MM_MODEM_BAND_U1900:
+ *
+ * WCDMA 1900 MHz (UTRAN band 2).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_2 instead.
+ */
+#define MM_MODEM_BAND_U1900 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_2)
+
+/**
+ * MM_MODEM_BAND_U1800:
+ *
+ * WCDMA 1800 MHz (UTRAN band 3).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_3 instead.
+ */
+#define MM_MODEM_BAND_U1800 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_3)
+
+/**
+ * MM_MODEM_BAND_U17IV:
+ *
+ * AWS 1700/2100 MHz (UTRAN band 4).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_4 instead.
+ */
+#define MM_MODEM_BAND_U17IV ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_4)
+
+/**
+ * MM_MODEM_BAND_U850:
+ *
+ * UMTS 850 MHz (UTRAN band 5).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_5 instead.
+ */
+#define MM_MODEM_BAND_U850 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_5)
+
+/**
+ * MM_MODEM_BAND_U800:
+ *
+ * UMTS 800 MHz (UTRAN band 6).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_6 instead.
+ */
+#define MM_MODEM_BAND_U800 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_6)
+
+/**
+ * MM_MODEM_BAND_U2600:
+ *
+ * UMTS 2600 MHz (UTRAN band 7).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_7 instead.
+ */
+#define MM_MODEM_BAND_U2600 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_7)
+
+/**
+ * MM_MODEM_BAND_U900:
+ *
+ * UMTS 900 MHz (UTRAN band 8).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_8 instead.
+ */
+#define MM_MODEM_BAND_U900 ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_8)
+
+/**
+ * MM_MODEM_BAND_U17IX:
+ *
+ * UMTS 1700 MHz (UTRAN band 9).
+ *
+ * Since: 1.0
+ * Deprecated: 1.8.0: Use #MM_MODEM_BAND_UTRAN_9 instead.
+ */
+#define MM_MODEM_BAND_U17IX ((MMModemBandDeprecated)MM_MODEM_BAND_UTRAN_9)
+
+/**
  * MM_MODEM_BAND_EUTRAN_I:
  *
  * E-UTRAN band 1.
