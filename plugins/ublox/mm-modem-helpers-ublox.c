@@ -556,50 +556,51 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .ubandsel_value = 800,
-        .bands_3g = { MM_MODEM_BAND_U800 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_20 }
     },
     {
         .ubandsel_value = 850,
         .bands_2g = { MM_MODEM_BAND_G850 },
-        .bands_3g = { MM_MODEM_BAND_U850 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_5 }
     },
     {
         .ubandsel_value = 900,
         .bands_2g = { MM_MODEM_BAND_EGSM },
-        .bands_3g = { MM_MODEM_BAND_U900 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_8 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_8 }
     },
     {
         .ubandsel_value = 1500,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_11 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_11 }
     },
     {
         .ubandsel_value = 1700,
-        .bands_3g = { MM_MODEM_BAND_U17IV },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_4 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_4 }
     },
     {
         .ubandsel_value = 1800,
         .bands_2g = { MM_MODEM_BAND_DCS },
-        .bands_3g = { MM_MODEM_BAND_U1800 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_3 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_3 }
     },
     {
         .ubandsel_value = 1900,
         .bands_2g = { MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_U1900 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_2 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_2 }
     },
     {
         .ubandsel_value = 2100,
-        .bands_3g = { MM_MODEM_BAND_U2100 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_1 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_1 }
     },
     {
         .ubandsel_value = 2600,
-        .bands_3g = { MM_MODEM_BAND_U2600 },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_7 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_7 }
     },
 };
