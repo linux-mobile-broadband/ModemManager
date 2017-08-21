@@ -74,15 +74,15 @@ typedef struct {
     MMModemBand mm_band;
 } WavecomBand3G;
 static const WavecomBand3G bands_3g[] = {
-    { (1 << 0), MM_MODEM_BAND_U2100 },
-    { (1 << 1), MM_MODEM_BAND_U1900 },
-    { (1 << 2), MM_MODEM_BAND_U1800 },
-    { (1 << 3), MM_MODEM_BAND_U17IV },
-    { (1 << 4), MM_MODEM_BAND_U850  },
-    { (1 << 5), MM_MODEM_BAND_U800  },
-    { (1 << 6), MM_MODEM_BAND_U2600 },
-    { (1 << 7), MM_MODEM_BAND_U900  },
-    { (1 << 8), MM_MODEM_BAND_U17IX }
+    { (1 << 0), MM_MODEM_BAND_UTRAN_1 },
+    { (1 << 1), MM_MODEM_BAND_UTRAN_2 },
+    { (1 << 2), MM_MODEM_BAND_UTRAN_3 },
+    { (1 << 3), MM_MODEM_BAND_UTRAN_4 },
+    { (1 << 4), MM_MODEM_BAND_UTRAN_5 },
+    { (1 << 5), MM_MODEM_BAND_UTRAN_6 },
+    { (1 << 6), MM_MODEM_BAND_UTRAN_7 },
+    { (1 << 7), MM_MODEM_BAND_UTRAN_8 },
+    { (1 << 8), MM_MODEM_BAND_UTRAN_9 }
 };
 
 /*****************************************************************************/
@@ -604,16 +604,15 @@ load_supported_bands (MMIfaceModem *self,
     /* Add 3G-specific bands */
     if (mm_iface_modem_is_3g (self)) {
         bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 10);
-        _g_array_insert_enum (bands, 0, MMModemBand, MM_MODEM_BAND_U2100);
-        _g_array_insert_enum (bands, 1, MMModemBand, MM_MODEM_BAND_U1800);
-        _g_array_insert_enum (bands, 2, MMModemBand, MM_MODEM_BAND_U17IV);
-        _g_array_insert_enum (bands, 3, MMModemBand, MM_MODEM_BAND_U800);
-        _g_array_insert_enum (bands, 4, MMModemBand, MM_MODEM_BAND_U850);
-        _g_array_insert_enum (bands, 5, MMModemBand, MM_MODEM_BAND_U900);
-        _g_array_insert_enum (bands, 6, MMModemBand, MM_MODEM_BAND_U900);
-        _g_array_insert_enum (bands, 7, MMModemBand, MM_MODEM_BAND_U17IX);
-        _g_array_insert_enum (bands, 8, MMModemBand, MM_MODEM_BAND_U1900);
-        _g_array_insert_enum (bands, 9, MMModemBand, MM_MODEM_BAND_U2600);
+        _g_array_insert_enum (bands, 0, MMModemBand, MM_MODEM_BAND_UTRAN_1);
+        _g_array_insert_enum (bands, 1, MMModemBand, MM_MODEM_BAND_UTRAN_2);
+        _g_array_insert_enum (bands, 2, MMModemBand, MM_MODEM_BAND_UTRAN_3);
+        _g_array_insert_enum (bands, 3, MMModemBand, MM_MODEM_BAND_UTRAN_4);
+        _g_array_insert_enum (bands, 4, MMModemBand, MM_MODEM_BAND_UTRAN_5);
+        _g_array_insert_enum (bands, 5, MMModemBand, MM_MODEM_BAND_UTRAN_6);
+        _g_array_insert_enum (bands, 6, MMModemBand, MM_MODEM_BAND_UTRAN_7);
+        _g_array_insert_enum (bands, 7, MMModemBand, MM_MODEM_BAND_UTRAN_8);
+        _g_array_insert_enum (bands, 8, MMModemBand, MM_MODEM_BAND_UTRAN_9);
     }
     /* Add 2G-specific bands */
     else {
