@@ -757,12 +757,12 @@ typedef struct {
 
 static BandTable bands[] = {
     /* Sort 3G first since it's preferred */
-    { MM_MODEM_BAND_U2100, 0x00400000 },
-    { MM_MODEM_BAND_U1900, 0x00800000 },
-    { MM_MODEM_BAND_U850,  0x04000000 },
-    { MM_MODEM_BAND_U900,  0x00020000 },
-    { MM_MODEM_BAND_G850,  0x00080000 },
+    { MM_MODEM_BAND_UTRAN_1, 0x00400000 },
+    { MM_MODEM_BAND_UTRAN_2, 0x00800000 },
+    { MM_MODEM_BAND_UTRAN_5, 0x04000000 },
+    { MM_MODEM_BAND_UTRAN_8, 0x00020000 },
     /* 2G second */
+    { MM_MODEM_BAND_G850,  0x00080000 },
     { MM_MODEM_BAND_DCS,   0x00000080 },
     { MM_MODEM_BAND_EGSM,  0x00000100 },
     { MM_MODEM_BAND_PCS,   0x00200000 }
