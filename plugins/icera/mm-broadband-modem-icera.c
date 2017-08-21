@@ -1137,20 +1137,20 @@ band_free (Band *b)
 
 static const Band modem_bands[] = {
     /* Sort 3G first since it's preferred */
-    { MM_MODEM_BAND_U2100, "FDD_BAND_I",    FALSE },
-    { MM_MODEM_BAND_U1900, "FDD_BAND_II",   FALSE },
-    { MM_MODEM_BAND_U1800, "FDD_BAND_III",  FALSE },
-    { MM_MODEM_BAND_U17IV, "FDD_BAND_IV",   FALSE },
-    { MM_MODEM_BAND_U800,  "FDD_BAND_VI",   FALSE },
-    { MM_MODEM_BAND_U850,  "FDD_BAND_V",    FALSE },
-    { MM_MODEM_BAND_U900,  "FDD_BAND_VIII", FALSE },
+    { MM_MODEM_BAND_UTRAN_1, "FDD_BAND_I",    FALSE },
+    { MM_MODEM_BAND_UTRAN_2, "FDD_BAND_II",   FALSE },
+    { MM_MODEM_BAND_UTRAN_3, "FDD_BAND_III",  FALSE },
+    { MM_MODEM_BAND_UTRAN_4, "FDD_BAND_IV",   FALSE },
+    { MM_MODEM_BAND_UTRAN_5, "FDD_BAND_V",    FALSE },
+    { MM_MODEM_BAND_UTRAN_6, "FDD_BAND_VI",   FALSE },
+    { MM_MODEM_BAND_UTRAN_8, "FDD_BAND_VIII", FALSE },
     /* 2G second */
-    { MM_MODEM_BAND_G850,  "G850",          FALSE },
-    { MM_MODEM_BAND_DCS,   "DCS",           FALSE },
-    { MM_MODEM_BAND_EGSM,  "EGSM",          FALSE },
-    { MM_MODEM_BAND_PCS,   "PCS",           FALSE },
+    { MM_MODEM_BAND_G850,    "G850",          FALSE },
+    { MM_MODEM_BAND_DCS,     "DCS",           FALSE },
+    { MM_MODEM_BAND_EGSM,    "EGSM",          FALSE },
+    { MM_MODEM_BAND_PCS,     "PCS",           FALSE },
     /* And ANY last since it's most inclusive */
-    { MM_MODEM_BAND_ANY,   "ANY",           FALSE },
+    { MM_MODEM_BAND_ANY,     "ANY",           FALSE },
 };
 
 static const guint modem_band_any_bit = 1 << (G_N_ELEMENTS (modem_bands) - 1);
