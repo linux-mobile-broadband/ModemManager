@@ -107,6 +107,12 @@ gchar *mm_ublox_build_ubandsel_set_command (GArray  *bands,
                                             GError **error);
 
 /*****************************************************************************/
+/* UACT? response parser */
+
+GArray *mm_ublox_parse_uact_response (const gchar  *response,
+                                      GError      **error);
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode mm_ublox_get_modem_mode_any (const GArray *combinations);
