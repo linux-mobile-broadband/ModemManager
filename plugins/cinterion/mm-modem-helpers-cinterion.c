@@ -42,15 +42,15 @@ typedef struct {
  * set, so you shouldn't for example set 3G frequency bands, and then use a
  * 2G-only allowed mode. */
 static const CinterionBand cinterion_bands[] = {
-    { (1 << 0), MM_MODEM_BAND_EGSM  },
-    { (1 << 1), MM_MODEM_BAND_DCS   },
-    { (1 << 2), MM_MODEM_BAND_PCS   },
-    { (1 << 3), MM_MODEM_BAND_G850  },
-    { (1 << 4), MM_MODEM_BAND_U2100 },
-    { (1 << 5), MM_MODEM_BAND_U1900 },
-    { (1 << 6), MM_MODEM_BAND_U850  },
-    { (1 << 7), MM_MODEM_BAND_U900  },
-    { (1 << 8), MM_MODEM_BAND_U800  }
+    { (1 << 0), MM_MODEM_BAND_EGSM    },
+    { (1 << 1), MM_MODEM_BAND_DCS     },
+    { (1 << 2), MM_MODEM_BAND_PCS     },
+    { (1 << 3), MM_MODEM_BAND_G850    },
+    { (1 << 4), MM_MODEM_BAND_UTRAN_1 },
+    { (1 << 5), MM_MODEM_BAND_UTRAN_2 },
+    { (1 << 6), MM_MODEM_BAND_UTRAN_5 },
+    { (1 << 7), MM_MODEM_BAND_UTRAN_8 },
+    { (1 << 8), MM_MODEM_BAND_UTRAN_6 }
 };
 
 /* Check valid combinations in 2G-only devices */

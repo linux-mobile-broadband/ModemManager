@@ -103,15 +103,15 @@ test_scfg (void)
         "^SCFG: \"URC/Ringline/ActiveTime\",(\"0\",\"1\",\"2\",\"keep\")\r\n";
 
     expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
-    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_PCS,   g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_G850,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U2100, g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U1900, g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U850,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U900,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U800,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EGSM,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,     g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_PCS,     g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_G850,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_1, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_2, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_5, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_8, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_6, g_array_append_val (expected_bands, single);
 
     common_test_scfg (response, expected_bands);
 
@@ -176,10 +176,10 @@ test_scfg_ehs5 (void)
         "^SCFG: \"Userware/Watchdog\",(\"0\",\"1\",\"2\")\r\n";
 
     expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
-    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U2100, g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U900,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EGSM,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,     g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_1, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_8, g_array_append_val (expected_bands, single);
 
     common_test_scfg (response, expected_bands);
 
@@ -267,13 +267,13 @@ test_scfg_response_3g (void)
         "\r\n";
 
     expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
-    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_DCS,   g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_PCS,   g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_G850,  g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U2100, g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U1900, g_array_append_val (expected_bands, single);
-    single = MM_MODEM_BAND_U850,  g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EGSM,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,     g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_PCS,     g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_G850,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_1, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_2, g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_UTRAN_5, g_array_append_val (expected_bands, single);
 
     common_test_scfg_response (response, MM_MODEM_CHARSET_UNKNOWN, expected_bands);
 
