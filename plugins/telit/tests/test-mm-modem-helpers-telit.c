@@ -159,40 +159,40 @@ static BNDResponseTest supported_band_mapping_tests [] = {
                                                       MM_MODEM_BAND_DCS,
                                                       MM_MODEM_BAND_PCS,
                                                       MM_MODEM_BAND_G850,
-                                                      MM_MODEM_BAND_U2100,
-                                                      MM_MODEM_BAND_U850,
-                                                      MM_MODEM_BAND_U900} },
+                                                      MM_MODEM_BAND_UTRAN_1,
+                                                      MM_MODEM_BAND_UTRAN_5,
+                                                      MM_MODEM_BAND_UTRAN_8 } },
     { "#BND: (0,3),(0,2,5,6)", TRUE, TRUE, FALSE, 7, { MM_MODEM_BAND_EGSM,
                                                        MM_MODEM_BAND_DCS,
                                                        MM_MODEM_BAND_PCS,
                                                        MM_MODEM_BAND_G850,
-                                                       MM_MODEM_BAND_U2100,
-                                                       MM_MODEM_BAND_U850,
-                                                       MM_MODEM_BAND_U900} },
+                                                       MM_MODEM_BAND_UTRAN_1,
+                                                       MM_MODEM_BAND_UTRAN_5,
+                                                       MM_MODEM_BAND_UTRAN_8} },
     { "#BND: (0,2),(0,2,5,6)", TRUE, TRUE, FALSE, 6, { MM_MODEM_BAND_EGSM,
                                                        MM_MODEM_BAND_DCS,
                                                        MM_MODEM_BAND_G850,
-                                                       MM_MODEM_BAND_U2100,
-                                                       MM_MODEM_BAND_U850,
-                                                       MM_MODEM_BAND_U900} },
+                                                       MM_MODEM_BAND_UTRAN_1,
+                                                       MM_MODEM_BAND_UTRAN_5,
+                                                       MM_MODEM_BAND_UTRAN_8} },
     { "#BND: (0,2),(0-4,5,6)", TRUE, TRUE, FALSE, 7, { MM_MODEM_BAND_EGSM,
                                                        MM_MODEM_BAND_DCS,
                                                        MM_MODEM_BAND_G850,
-                                                       MM_MODEM_BAND_U2100,
-                                                       MM_MODEM_BAND_U1900,
-                                                       MM_MODEM_BAND_U850,
-                                                       MM_MODEM_BAND_U900} },
+                                                       MM_MODEM_BAND_UTRAN_1,
+                                                       MM_MODEM_BAND_UTRAN_2,
+                                                       MM_MODEM_BAND_UTRAN_5,
+                                                       MM_MODEM_BAND_UTRAN_8} },
     { "#BND: (0-3),(0,2,5,6),(1-1)", TRUE, TRUE, TRUE, 8, { MM_MODEM_BAND_EGSM,
                                                          MM_MODEM_BAND_DCS,
                                                          MM_MODEM_BAND_PCS,
                                                          MM_MODEM_BAND_G850,
-                                                         MM_MODEM_BAND_U2100,
-                                                         MM_MODEM_BAND_U850,
-                                                         MM_MODEM_BAND_U900,
+                                                         MM_MODEM_BAND_UTRAN_1,
+                                                         MM_MODEM_BAND_UTRAN_5,
+                                                         MM_MODEM_BAND_UTRAN_8,
                                                          MM_MODEM_BAND_EUTRAN_1} },
     { "#BND: (0),(0),(1-3)", TRUE, TRUE, TRUE, 5, { MM_MODEM_BAND_EGSM,
                                                     MM_MODEM_BAND_DCS,
-                                                    MM_MODEM_BAND_U2100,
+                                                    MM_MODEM_BAND_UTRAN_1,
                                                     MM_MODEM_BAND_EUTRAN_1,
                                                     MM_MODEM_BAND_EUTRAN_2} },
     { "#BND: (0),(0),(1-3)", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_1,
@@ -243,32 +243,32 @@ static BNDResponseTest current_band_mapping_tests [] = {
     },
     { "#BND: 0,5", TRUE, TRUE, FALSE, 3, { MM_MODEM_BAND_EGSM,
                                            MM_MODEM_BAND_DCS,
-                                           MM_MODEM_BAND_U900
+                                           MM_MODEM_BAND_UTRAN_8
                                          }
     },
     { "#BND: 1,3", TRUE, TRUE, FALSE, 5, { MM_MODEM_BAND_EGSM,
                                            MM_MODEM_BAND_PCS,
-                                           MM_MODEM_BAND_U2100,
-                                           MM_MODEM_BAND_U1900,
-                                           MM_MODEM_BAND_U850,
+                                           MM_MODEM_BAND_UTRAN_1,
+                                           MM_MODEM_BAND_UTRAN_2,
+                                           MM_MODEM_BAND_UTRAN_5,
                                          }
     },
     { "#BND: 2,7", TRUE, TRUE, FALSE, 3, { MM_MODEM_BAND_DCS,
                                            MM_MODEM_BAND_G850,
-                                           MM_MODEM_BAND_U17IV
-                                         },
+                                           MM_MODEM_BAND_UTRAN_4
+                                         }
     },
     { "#BND: 3,0,1", TRUE, TRUE, TRUE, 4, { MM_MODEM_BAND_PCS,
                                             MM_MODEM_BAND_G850,
-                                            MM_MODEM_BAND_U2100,
+                                            MM_MODEM_BAND_UTRAN_1,
                                             MM_MODEM_BAND_EUTRAN_1
                                           }
     },
     { "#BND: 0,0,3", TRUE, FALSE, TRUE, 4, { MM_MODEM_BAND_EGSM,
-                                            MM_MODEM_BAND_DCS,
-                                            MM_MODEM_BAND_EUTRAN_1,
-                                            MM_MODEM_BAND_EUTRAN_2
-                                          }
+                                             MM_MODEM_BAND_DCS,
+                                             MM_MODEM_BAND_EUTRAN_1,
+                                             MM_MODEM_BAND_EUTRAN_2
+                                           }
     },
     { "#BND: 0,0,3", FALSE, FALSE, TRUE, 2, { MM_MODEM_BAND_EUTRAN_1,
                                               MM_MODEM_BAND_EUTRAN_2
@@ -373,12 +373,12 @@ static void
 test_telit_get_3g_bnd_flag (void)
 {
     GArray *bands_array;
-    MMModemBand u2100 = MM_MODEM_BAND_U2100;
-    MMModemBand u1900 = MM_MODEM_BAND_U1900;
-    MMModemBand u850 = MM_MODEM_BAND_U850;
-    MMModemBand u900 = MM_MODEM_BAND_U900;
-    MMModemBand u17iv = MM_MODEM_BAND_U17IV;
-    MMModemBand u17ix = MM_MODEM_BAND_U17IX;
+    MMModemBand u2100 = MM_MODEM_BAND_UTRAN_1;
+    MMModemBand u1900 = MM_MODEM_BAND_UTRAN_2;
+    MMModemBand u850 = MM_MODEM_BAND_UTRAN_5;
+    MMModemBand u900 = MM_MODEM_BAND_UTRAN_8;
+    MMModemBand u17iv = MM_MODEM_BAND_UTRAN_4;
+    MMModemBand u17ix = MM_MODEM_BAND_UTRAN_9;
     gint flag;
 
     /* Test flag 0 */

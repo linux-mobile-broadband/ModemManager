@@ -46,14 +46,35 @@ mm_telit_get_band_flag (GArray *bands_array,
     for (i = 0; i < bands_array->len; i++) {
         MMModemBand band = g_array_index (bands_array, MMModemBand, i);
 
-        if (flag2g != NULL &&
-            band > MM_MODEM_BAND_UNKNOWN && band <= MM_MODEM_BAND_G850) {
-            mask2g += 1 << band;
+        if (flag2g != NULL) {
+            switch (band) {
+                case MM_MODEM_BAND_EGSM:
+                case MM_MODEM_BAND_DCS:
+                case MM_MODEM_BAND_PCS:
+                case MM_MODEM_BAND_G850:
+                    mask2g += 1 << band;
+                    break;
+                default:
+                    break;
+            }
         }
 
-        if (flag3g != NULL &&
-            band >= MM_MODEM_BAND_U2100 && band <= MM_MODEM_BAND_U2600) {
-            mask3g += 1 << band;
+        if (flag3g != NULL) {
+            switch (band) {
+                case MM_MODEM_BAND_UTRAN_1:
+                case MM_MODEM_BAND_UTRAN_2:
+                case MM_MODEM_BAND_UTRAN_3:
+                case MM_MODEM_BAND_UTRAN_4:
+                case MM_MODEM_BAND_UTRAN_5:
+                case MM_MODEM_BAND_UTRAN_6:
+                case MM_MODEM_BAND_UTRAN_7:
+                case MM_MODEM_BAND_UTRAN_8:
+                case MM_MODEM_BAND_UTRAN_9:
+                    mask3g += 1 << band;
+                    break;
+                default:
+                    break;
+            }
         }
 
          if (flag4g != NULL &&
@@ -79,25 +100,25 @@ mm_telit_get_band_flag (GArray *bands_array,
 
     /* Get 3G flag */
     if (flag3g != NULL) {
-        if (mask3g == (1 << MM_MODEM_BAND_U2100))
+        if (mask3g == (1 << MM_MODEM_BAND_UTRAN_1))
             *flag3g = 0;
-        else if (mask3g == (1 << MM_MODEM_BAND_U1900))
+        else if (mask3g == (1 << MM_MODEM_BAND_UTRAN_2))
             *flag3g = 1;
-        else if (mask3g == (1 << MM_MODEM_BAND_U850))
+        else if (mask3g == (1 << MM_MODEM_BAND_UTRAN_5))
             *flag3g = 2;
-        else if (mask3g == ((1 << MM_MODEM_BAND_U2100) +
-                            (1 << MM_MODEM_BAND_U1900) +
-                            (1 << MM_MODEM_BAND_U850)))
+        else if (mask3g == ((1 << MM_MODEM_BAND_UTRAN_1) +
+                            (1 << MM_MODEM_BAND_UTRAN_2) +
+                            (1 << MM_MODEM_BAND_UTRAN_5)))
             *flag3g = 3;
-        else if (mask3g == ((1 << MM_MODEM_BAND_U1900) +
-                            (1 << MM_MODEM_BAND_U850)))
+        else if (mask3g == ((1 << MM_MODEM_BAND_UTRAN_2) +
+                            (1 << MM_MODEM_BAND_UTRAN_5)))
             *flag3g = 4;
-        else if (mask3g == (1 << MM_MODEM_BAND_U900))
+        else if (mask3g == (1 << MM_MODEM_BAND_UTRAN_8))
             *flag3g = 5;
-        else if (mask3g == ((1 << MM_MODEM_BAND_U2100) +
-                            (1 << MM_MODEM_BAND_U900)))
+        else if (mask3g == ((1 << MM_MODEM_BAND_UTRAN_1) +
+                            (1 << MM_MODEM_BAND_UTRAN_8)))
             *flag3g = 6;
-        else if (mask3g == (1 << MM_MODEM_BAND_U17IV))
+        else if (mask3g == (1 << MM_MODEM_BAND_UTRAN_4))
             *flag3g = 7;
         else
             *flag3g = -1;
@@ -378,27 +399,27 @@ mm_telit_get_3g_mm_bands (GMatchInfo *match_info,
     gboolean ret = TRUE;
 
     TelitToMMBandMap map [] = {
-        { BND_FLAG_0, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_1, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_2, { MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_3, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U1900, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_4, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_5, { MM_MODEM_BAND_U900, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_6, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U900, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_7, { MM_MODEM_BAND_U17IV, MM_MODEM_BAND_UNKNOWN} },
-        { BND_FLAG_8, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_9, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U900, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_10, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_U17IV, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_12, { MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN}},
+        { BND_FLAG_0, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_1, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_2, { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_3, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_4, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_5, { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_6, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_7, { MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UNKNOWN} },
+        { BND_FLAG_8, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_9, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_10, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_12, { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN}},
         { BND_FLAG_13, { MM_MODEM_BAND_U1800, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_14, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U900, MM_MODEM_BAND_U17IV, MM_MODEM_BAND_U850, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_15, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U900, MM_MODEM_BAND_U1800, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_16, { MM_MODEM_BAND_U900, MM_MODEM_BAND_U850, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_17, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_U17IV, MM_MODEM_BAND_U850, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_18, { MM_MODEM_BAND_U2100, MM_MODEM_BAND_U1900, MM_MODEM_BAND_U850, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN}},
-        { BND_FLAG_19, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN }},
-        { BND_FLAG_20, { MM_MODEM_BAND_U850, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN}},
-        { BND_FLAG_21, { MM_MODEM_BAND_U1900, MM_MODEM_BAND_U850, MM_MODEM_BAND_U800, MM_MODEM_BAND_UNKNOWN}},
+        { BND_FLAG_14, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_15, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_U1800, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_16, { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_17, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_18, { MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN}},
+        { BND_FLAG_19, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN }},
+        { BND_FLAG_20, { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN}},
+        { BND_FLAG_21, { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UNKNOWN}},
         { BND_FLAG_UNKNOWN, {}},
     };
 
