@@ -293,38 +293,38 @@ load_own_numbers (MMIfaceModem *self,
  * The bit positions and band names on the right come from the response to $NWBAND=?
  */
 static MMModemBand bandbits[] = {
-    MM_MODEM_BAND_CDMA_BC0_CELLULAR_800,   /* "00 CDMA2000 Band Class 0, A-System" */
-    MM_MODEM_BAND_CDMA_BC0_CELLULAR_800,   /* "01 CDMA2000 Band Class 0, B-System" */
-    MM_MODEM_BAND_CDMA_BC1_PCS_1900,       /* "02 CDMA2000 Band Class 1, all blocks" */
-    MM_MODEM_BAND_CDMA_BC2_TACS,           /* "03 CDMA2000 Band Class 2, place holder" */
-    MM_MODEM_BAND_CDMA_BC3_JTACS,          /* "04 CDMA2000 Band Class 3, A-System" */
-    MM_MODEM_BAND_CDMA_BC4_KOREAN_PCS,     /* "05 CDMA2000 Band Class 4, all blocks" */
-    MM_MODEM_BAND_CDMA_BC5_NMT450,         /* "06 CDMA2000 Band Class 5, all blocks" */
-    MM_MODEM_BAND_DCS,                     /* "07 GSM DCS band" */
-    MM_MODEM_BAND_EGSM,                    /* "08 GSM Extended GSM (E-GSM) band" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "09 GSM Primary GSM (P-GSM) band" */
-    MM_MODEM_BAND_CDMA_BC6_IMT2000,        /* "10 CDMA2000 Band Class 6" */
-    MM_MODEM_BAND_CDMA_BC7_CELLULAR_700,   /* "11 CDMA2000 Band Class 7" */
-    MM_MODEM_BAND_CDMA_BC8_1800,           /* "12 CDMA2000 Band Class 8" */
-    MM_MODEM_BAND_CDMA_BC9_900,            /* "13 CDMA2000 Band Class 9" */
-    MM_MODEM_BAND_CDMA_BC10_SECONDARY_800, /* "14 CDMA2000 Band Class 10 */
-    MM_MODEM_BAND_CDMA_BC11_PAMR_400,      /* "15 CDMA2000 Band Class 11 */
-    MM_MODEM_BAND_UNKNOWN,                 /* "16 GSM 450 band" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "17 GSM 480 band" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "18 GSM 750 band" */
-    MM_MODEM_BAND_G850,                    /* "19 GSM 850 band" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "20 GSM band" */
-    MM_MODEM_BAND_PCS,                     /* "21 GSM PCS band" */
-    MM_MODEM_BAND_U2100,                   /* "22 WCDMA I IMT 2000 band" */
-    MM_MODEM_BAND_U1900,                   /* "23 WCDMA II PCS band" */
-    MM_MODEM_BAND_U1800,                   /* "24 WCDMA III 1700 band" */
-    MM_MODEM_BAND_U17IV,                   /* "25 WCDMA IV 1700 band" */
-    MM_MODEM_BAND_U850,                    /* "26 WCDMA V US850 band" */
-    MM_MODEM_BAND_U800,                    /* "27 WCDMA VI JAPAN 800 band" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "28 Reserved for BC12/BC14 */
-    MM_MODEM_BAND_UNKNOWN,                 /* "29 Reserved for BC12/BC14 */
-    MM_MODEM_BAND_UNKNOWN,                 /* "30 Reserved" */
-    MM_MODEM_BAND_UNKNOWN,                 /* "31 Reserved" */
+    MM_MODEM_BAND_CDMA_BC0,  /* "00 CDMA2000 Band Class 0, A-System" */
+    MM_MODEM_BAND_CDMA_BC0,  /* "01 CDMA2000 Band Class 0, B-System" */
+    MM_MODEM_BAND_CDMA_BC1,  /* "02 CDMA2000 Band Class 1, all blocks" */
+    MM_MODEM_BAND_CDMA_BC2,  /* "03 CDMA2000 Band Class 2, place holder" */
+    MM_MODEM_BAND_CDMA_BC3,  /* "04 CDMA2000 Band Class 3, A-System" */
+    MM_MODEM_BAND_CDMA_BC4,  /* "05 CDMA2000 Band Class 4, all blocks" */
+    MM_MODEM_BAND_CDMA_BC5,  /* "06 CDMA2000 Band Class 5, all blocks" */
+    MM_MODEM_BAND_DCS,       /* "07 GSM DCS band" */
+    MM_MODEM_BAND_EGSM,      /* "08 GSM Extended GSM (E-GSM) band" */
+    MM_MODEM_BAND_UNKNOWN,   /* "09 GSM Primary GSM (P-GSM) band" */
+    MM_MODEM_BAND_CDMA_BC6,  /* "10 CDMA2000 Band Class 6" */
+    MM_MODEM_BAND_CDMA_BC7,  /* "11 CDMA2000 Band Class 7" */
+    MM_MODEM_BAND_CDMA_BC8,  /* "12 CDMA2000 Band Class 8" */
+    MM_MODEM_BAND_CDMA_BC9,  /* "13 CDMA2000 Band Class 9" */
+    MM_MODEM_BAND_CDMA_BC10, /* "14 CDMA2000 Band Class 10 */
+    MM_MODEM_BAND_CDMA_BC11, /* "15 CDMA2000 Band Class 11 */
+    MM_MODEM_BAND_G450,      /* "16 GSM 450 band" */
+    MM_MODEM_BAND_G480,      /* "17 GSM 480 band" */
+    MM_MODEM_BAND_G750,      /* "18 GSM 750 band" */
+    MM_MODEM_BAND_G850,      /* "19 GSM 850 band" */
+    MM_MODEM_BAND_UNKNOWN,   /* "20 GSM 900 Railways band" */
+    MM_MODEM_BAND_PCS,       /* "21 GSM PCS band" */
+    MM_MODEM_BAND_UTRAN_1,   /* "22 WCDMA I IMT 2000 band" */
+    MM_MODEM_BAND_UTRAN_2,   /* "23 WCDMA II PCS band" */
+    MM_MODEM_BAND_UTRAN_3,   /* "24 WCDMA III 1700 band" */
+    MM_MODEM_BAND_UTRAN_4,   /* "25 WCDMA IV 1700 band" */
+    MM_MODEM_BAND_UTRAN_5,   /* "26 WCDMA V US850 band" */
+    MM_MODEM_BAND_UTRAN_6,   /* "27 WCDMA VI JAPAN 800 band" */
+    MM_MODEM_BAND_UNKNOWN,   /* "28 Reserved for BC12/BC14 */
+    MM_MODEM_BAND_UNKNOWN,   /* "29 Reserved for BC12/BC14 */
+    MM_MODEM_BAND_UNKNOWN,   /* "30 Reserved" */
+    MM_MODEM_BAND_UNKNOWN,   /* "31 Reserved" */
 };
 
 static GArray *
