@@ -179,24 +179,43 @@ load_supported_bands (MMIfaceModem        *self,
 /* Load current bands (Modem interface) */
 
 static GArray *
-load_current_bands_finish (MMIfaceModem  *self,
+load_current_bands_finish (MMIfaceModem  *_self,
                            GAsyncResult  *res,
                            GError       **error)
 {
-    const gchar *response;
+    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
+    const gchar           *response;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
         return NULL;
 
+    if (self->priv->uact == FEATURE_SUPPORTED)
+        return mm_ublox_parse_uact_response (response, error);
+
     return mm_ublox_parse_ubandsel_response (response, error);
 }
 
 static void
-load_current_bands (MMIfaceModem        *self,
+load_current_bands (MMIfaceModem        *_self,
                     GAsyncReadyCallback  callback,
                     gpointer             user_data)
 {
+    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
+
+    g_assert (self->priv->uact != FEATURE_SUPPORT_UNKNOWN);
+
+    if (self->priv->uact == FEATURE_SUPPORTED) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+UACT?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)callback,
+            user_data);
+        return;
+    }
+
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "+UBANDSEL?",
