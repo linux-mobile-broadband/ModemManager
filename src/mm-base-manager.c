@@ -280,6 +280,17 @@ device_removed (MMBaseManager *self,
         return;
     }
 
+    /* When a USB modem is switching its USB configuration, udev may deliver
+     * the remove events of USB interfaces associated with the old USB
+     * configuration and the add events of USB interfaces associated with the
+     * new USB configuration in an interleaved fashion. As we don't want a
+     * remove event of an USB interface trigger the removal of a MMDevice for
+     * the special case being handled here, we ignore any remove event with
+     * DEVTYPE != usb_device.
+     */
+    if (g_strcmp0 (g_udev_device_get_property (udev_device, "DEVTYPE"), "usb_device") != 0)
+        return;
+
     /* This case is designed to handle the case where, at least with kernel 2.6.31, unplugging
      * an in-use ttyACMx device results in udev generating remove events for the usb, but the
      * ttyACMx device (subsystem tty) is not removed, since it was in-use.  So if we have not
