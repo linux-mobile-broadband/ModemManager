@@ -113,6 +113,15 @@ GArray *mm_ublox_parse_uact_response (const gchar  *response,
                                       GError      **error);
 
 /*****************************************************************************/
+/* UACT=? test parser */
+
+gboolean mm_ublox_parse_uact_test (const gchar  *response,
+                                   GArray      **bands_2g,
+                                   GArray      **bands_3g,
+                                   GArray      **bands_4g,
+                                   GError      **error);
+
+/*****************************************************************************/
 /* Get mode to apply when ANY */
 
 MMModemMode mm_ublox_get_modem_mode_any (const GArray *combinations);

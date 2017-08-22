@@ -792,6 +792,100 @@ test_uact_response_2g3g4g (void)
 }
 
 /*****************************************************************************/
+/* Test +UACT=? test parser */
+
+static void
+common_validate_uact_test (const gchar       *str,
+                           const MMModemBand *expected_bands_2g,
+                           guint              n_expected_bands_2g,
+                           const MMModemBand *expected_bands_3g,
+                           guint              n_expected_bands_3g,
+                           const MMModemBand *expected_bands_4g,
+                           guint              n_expected_bands_4g)
+{
+    GError   *error = NULL;
+    gboolean  result;
+    GArray   *bands_2g = NULL;
+    GArray   *bands_3g = NULL;
+    GArray   *bands_4g = NULL;
+
+    result = mm_ublox_parse_uact_test (str, &bands_2g, &bands_3g, &bands_4g, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    common_compare_bands (bands_2g, expected_bands_2g, n_expected_bands_2g);
+    common_compare_bands (bands_3g, expected_bands_3g, n_expected_bands_3g);
+    common_compare_bands (bands_4g, expected_bands_4g, n_expected_bands_4g);
+}
+
+static void
+test_uact_test_2g (void)
+{
+    const MMModemBand expected_bands_2g[] = {
+        MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS
+    };
+
+    common_validate_uact_test ("+UACT: ,,,(900,1800)\r\n",
+                               expected_bands_2g, G_N_ELEMENTS (expected_bands_2g),
+                               NULL, 0,
+                               NULL, 0);
+}
+
+static void
+test_uact_test_2g3g (void)
+{
+    const MMModemBand expected_bands_2g[] = {
+        MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS
+    };
+    const MMModemBand expected_bands_3g[] = {
+        MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8
+    };
+
+    common_validate_uact_test ("+UACT: ,,,(900,1800),(1,8)\r\n",
+                               expected_bands_2g, G_N_ELEMENTS (expected_bands_2g),
+                               expected_bands_3g, G_N_ELEMENTS (expected_bands_3g),
+                               NULL, 0);
+}
+
+static void
+test_uact_test_2g3g4g (void)
+{
+    const MMModemBand expected_bands_2g[] = {
+        MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS
+    };
+    const MMModemBand expected_bands_3g[] = {
+        MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8
+    };
+    const MMModemBand expected_bands_4g[] = {
+        MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20
+    };
+
+    common_validate_uact_test ("+UACT: ,,,(900,1800),(1,8),(101,103,107,108,120)\r\n",
+                               expected_bands_2g, G_N_ELEMENTS (expected_bands_2g),
+                               expected_bands_3g, G_N_ELEMENTS (expected_bands_3g),
+                               expected_bands_4g, G_N_ELEMENTS (expected_bands_4g));
+}
+
+static void
+test_uact_test_2g3g4g_2 (void)
+{
+    const MMModemBand expected_bands_2g[] = {
+        MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS
+    };
+    const MMModemBand expected_bands_3g[] = {
+        MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8
+    };
+    const MMModemBand expected_bands_4g[] = {
+        MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20
+    };
+
+    common_validate_uact_test ("+UACT: ,,,(900,1800),(1,8),(101,103,107,108,120),(138)\r\n",
+                               expected_bands_2g, G_N_ELEMENTS (expected_bands_2g),
+                               expected_bands_3g, G_N_ELEMENTS (expected_bands_3g),
+                               expected_bands_4g, G_N_ELEMENTS (expected_bands_4g));
+}
+
+/*****************************************************************************/
 /* Test +UGCNTRD responses */
 
 typedef struct {
@@ -925,6 +1019,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/uact/response/2g",         test_uact_response_2g);
     g_test_add_func ("/MM/ublox/uact/response/2g3g",       test_uact_response_2g3g);
     g_test_add_func ("/MM/ublox/uact/response/2g3g4g",     test_uact_response_2g3g4g);
+    g_test_add_func ("/MM/ublox/uact/test/2g",       test_uact_test_2g);
+    g_test_add_func ("/MM/ublox/uact/test/2g3g",     test_uact_test_2g3g);
+    g_test_add_func ("/MM/ublox/uact/test/2g3g4g",   test_uact_test_2g3g4g);
+    g_test_add_func ("/MM/ublox/uact/test/2g3g4g/2", test_uact_test_2g3g4g_2);
     g_test_add_func ("/MM/ublox/ugcntrd/response", test_ugcntrd_response);
 
     return g_test_run ();

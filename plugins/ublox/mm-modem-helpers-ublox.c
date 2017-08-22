@@ -989,6 +989,124 @@ mm_ublox_parse_uact_response (const gchar  *response,
 }
 
 /*****************************************************************************/
+/* UACT=? response parser */
+
+static GArray *
+parse_bands_from_string (const gchar *str,
+                         const gchar *group)
+{
+    GArray *bands = NULL;
+    GError *inner_error = NULL;
+    GArray *nums;
+
+    nums = mm_parse_uint_list (str, &inner_error);
+    if (nums) {
+        gchar *tmpstr;
+
+        bands = uact_num_array_to_band_array (nums);
+        tmpstr = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
+        mm_dbg ("modem reports support for %s bands: %s", group, tmpstr);
+        g_free (tmpstr);
+
+        g_array_unref (nums);
+    } else if (inner_error) {
+        mm_warn ("couldn't parse list of supported %s bands: %s", group, inner_error->message);
+        g_clear_error (&inner_error);
+    }
+
+    return bands;
+}
+
+gboolean
+mm_ublox_parse_uact_test (const gchar  *response,
+                          GArray      **bands2g_out,
+                          GArray      **bands3g_out,
+                          GArray      **bands4g_out,
+                          GError      **error)
+{
+    GRegex       *r;
+    GMatchInfo   *match_info;
+    GError       *inner_error = NULL;
+    const gchar  *bands2g_str = NULL;
+    const gchar  *bands3g_str = NULL;
+    const gchar  *bands4g_str = NULL;
+    GArray       *bands2g = NULL;
+    GArray       *bands3g = NULL;
+    GArray       *bands4g = NULL;
+    gchar       **split = NULL;
+
+    g_assert (bands2g_out && bands3g_out && bands4g_out);
+
+    /*
+     * AT+UACT=?
+     * +UACT: ,,,(900,1800),(1,8),(101,103,107,108,120),(138)
+     */
+    r = g_regex_new ("\\+UACT: ([^,]*),([^,]*),([^,]*),(.*)(?:\\r\\n)?",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (g_match_info_matches (match_info)) {
+        gchar *aux;
+        guint n_groups;
+
+        aux  = mm_get_string_unquoted_from_match_info (match_info, 4);
+        split = mm_split_string_groups (aux);
+        n_groups = g_strv_length (split);
+        if (n_groups >= 1)
+            bands2g_str = split[0];
+        if (n_groups >= 2)
+            bands3g_str = split[1];
+        if (n_groups >= 3)
+            bands4g_str = split[2];
+        g_free (aux);
+    }
+
+    if (!bands2g_str && !bands3g_str && !bands4g_str) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "frequency groups not found: %s", response);
+        goto out;
+    }
+
+    bands2g = parse_bands_from_string (bands2g_str, "2G");
+    bands3g = parse_bands_from_string (bands3g_str, "3G");
+    bands4g = parse_bands_from_string (bands4g_str, "4G");
+
+    if (!bands2g->len && !bands3g->len && !bands4g->len) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "no supported frequencies reported: %s", response);
+        goto out;
+    }
+
+    /* success */
+
+out:
+    g_strfreev (split);
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        if (bands2g)
+            g_array_unref (bands2g);
+        if (bands3g)
+            g_array_unref (bands3g);
+        if (bands4g)
+            g_array_unref (bands4g);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *bands2g_out = bands2g;
+    *bands3g_out = bands3g;
+    *bands4g_out = bands4g;
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* URAT? response parser */
 
 gboolean
