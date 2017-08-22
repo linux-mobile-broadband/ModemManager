@@ -475,26 +475,31 @@ set_current_modes (MMIfaceModem        *self,
 }
 
 static void
-set_current_bands (MMIfaceModem         *self,
+set_current_bands (MMIfaceModem        *_self,
                    GArray              *bands_array,
                    GAsyncReadyCallback  callback,
                    gpointer             user_data)
 {
-    GTask  *task;
-    gchar  *command;
-    GError *error = NULL;
+    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
+    GTask                 *task;
+    gchar                 *command;
+    GError                *error = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Build command */
-    command = mm_ublox_build_ubandsel_set_command (bands_array, &error);
+    if (self->priv->uact == FEATURE_SUPPORTED)
+        command = mm_ublox_build_uact_set_command (bands_array, &error);
+    else
+        command = mm_ublox_build_ubandsel_set_command (bands_array, &error);
+
     if (!command) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    set_current_modes_bands_context_new (task, self, command);
+    set_current_modes_bands_context_new (task, _self, command);
     set_current_modes_bands_step (task);
 }
 
