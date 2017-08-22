@@ -899,6 +899,8 @@ test_udev_rules_LDADD = \
 # plugin: u-blox
 ################################################################################
 
+dist_udevrules_DATA += ublox/77-mm-ublox-port-types.rules
+
 PLUGIN_UBLOX_COMPILER_FLAGS = \
 	-I$(top_srcdir)/plugins/ublox \
 	-I$(top_builddir)/plugins/ublox \
