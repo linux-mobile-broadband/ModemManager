@@ -920,6 +920,18 @@ uact_num_to_band (guint num)
     return MM_MODEM_BAND_UNKNOWN;
 }
 
+static guint
+uact_band_to_num (MMModemBand band)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (uact_band_config); i++) {
+        if (band == uact_band_config[i].band)
+            return uact_band_config[i].num;
+    }
+    return 0;
+}
+
 /*****************************************************************************/
 /* UACT? response parser */
 
@@ -1104,6 +1116,43 @@ out:
     *bands3g_out = bands3g;
     *bands4g_out = bands4g;
     return TRUE;
+}
+
+/*****************************************************************************/
+/* UACT=X command builder */
+
+gchar *
+mm_ublox_build_uact_set_command (GArray  *bands,
+                                 GError **error)
+{
+    GString *command;
+
+    /* Build command */
+    command = g_string_new ("+UACT=,,,");
+
+    if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
+        g_string_append (command, "0");
+    else {
+        guint i;
+
+        for (i = 0; i < bands->len; i++) {
+            MMModemBand band;
+            guint       num;
+
+            band = g_array_index (bands, MMModemBand, i);
+            num = uact_band_to_num (band);
+            if (!num) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Band unsupported by this plugin: %s", mm_modem_band_get_string (band));
+                g_string_free (command, TRUE);
+                return NULL;
+            }
+
+            g_string_append_printf (command, "%s%u", i == 0 ? "" : ",", num);
+        }
+    }
+
+    return g_string_free (command, FALSE);
 }
 
 /*****************************************************************************/

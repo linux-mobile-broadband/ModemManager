@@ -886,6 +886,71 @@ test_uact_test_2g3g4g_2 (void)
 }
 
 /*****************************************************************************/
+/* +UACT=x command builder */
+
+static void
+common_validate_uact_request (const MMModemBand *bands,
+                              guint              n_bands,
+                              const gchar       *expected_request)
+{
+    GError *error = NULL;
+    GArray *bands_array;
+    gchar  *request;
+
+    bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
+    g_array_append_vals (bands_array, bands, n_bands);
+
+    request = mm_ublox_build_uact_set_command (bands_array, &error);
+    g_assert_no_error (error);
+    g_assert (request);
+
+    g_assert_cmpstr (request, ==, expected_request);
+
+    g_array_unref (bands_array);
+    g_free (request);
+}
+
+static void
+test_uact_request_any (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_ANY
+    };
+
+    common_validate_uact_request (bands, G_N_ELEMENTS (bands), "+UACT=,,,0");
+}
+
+static void
+test_uact_request_2g (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS,
+    };
+
+    common_validate_uact_request (bands, G_N_ELEMENTS (bands), "+UACT=,,,900,1800");
+}
+
+static void
+test_uact_request_3g (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_UTRAN_1, MM_MODEM_BAND_UTRAN_8,
+    };
+
+    common_validate_uact_request (bands, G_N_ELEMENTS (bands), "+UACT=,,,1,8");
+}
+
+static void
+test_uact_request_4g (void)
+{
+    const MMModemBand bands[] = {
+        MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20
+    };
+
+    common_validate_uact_request (bands, G_N_ELEMENTS (bands), "+UACT=,,,101,103,107,108,120");
+}
+
+/*****************************************************************************/
 /* Test +UGCNTRD responses */
 
 typedef struct {
@@ -1023,6 +1088,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/uact/test/2g3g",     test_uact_test_2g3g);
     g_test_add_func ("/MM/ublox/uact/test/2g3g4g",   test_uact_test_2g3g4g);
     g_test_add_func ("/MM/ublox/uact/test/2g3g4g/2", test_uact_test_2g3g4g_2);
+    g_test_add_func ("/MM/ublox/uact/request/any", test_uact_request_any);
+    g_test_add_func ("/MM/ublox/uact/request/2g",  test_uact_request_2g);
+    g_test_add_func ("/MM/ublox/uact/request/3g",  test_uact_request_3g);
+    g_test_add_func ("/MM/ublox/uact/request/4g",  test_uact_request_4g);
     g_test_add_func ("/MM/ublox/ugcntrd/response", test_ugcntrd_response);
 
     return g_test_run ();
