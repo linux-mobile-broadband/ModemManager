@@ -37,6 +37,12 @@ static void iface_modem_init (MMIfaceModem *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemUblox, mm_broadband_modem_ublox, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_SUPPORTED,
+    FEATURE_UNSUPPORTED,
+} FeatureSupport;
+
 struct _MMBroadbandModemUbloxPrivate {
     /* USB profile in use */
     MMUbloxUsbProfile profile;
@@ -50,6 +56,9 @@ struct _MMBroadbandModemUbloxPrivate {
 
     /* Mode combination to apply if "any" requested */
     MMModemMode any_allowed;
+
+    /* Band management */
+    FeatureSupport uact;
 };
 
 /*****************************************************************************/
@@ -86,30 +95,84 @@ load_supported_bands_finish (MMIfaceModem  *self,
 }
 
 static void
+uact_test_ready (MMBaseModem  *_self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    MMBroadbandModemUblox  *self = MM_BROADBAND_MODEM_UBLOX (_self);
+    const gchar            *response;
+    GError                 *error = NULL;
+    GArray                 *bands = NULL;
+    GArray                 *bands_2g = NULL;
+    GArray                 *bands_3g = NULL;
+    GArray                 *bands_4g = NULL;
+
+    response = mm_base_modem_at_command_finish (_self, res, NULL);
+    if (!response) {
+        /* Flag as unsupported */
+        self->priv->uact = FEATURE_UNSUPPORTED;
+
+        /* The list of supported tasks we give here must include not only the bands
+         * allowed in the current AcT, but the whole list of bands allowed in all
+         * AcTs. This is because the list of supported bands is loaded only once
+         * during modem initialization. Not ideal, but the current API is like that.
+         *
+         * So, we give a predefined list of supported bands and we filter them in the
+         * same way we filter the allowed AcTs.
+         */
+        bands = mm_ublox_get_supported_bands (mm_iface_modem_get_model (MM_IFACE_MODEM (self)), &error);
+        goto out;
+    }
+
+    /* Flag as supported */
+    self->priv->uact = FEATURE_SUPPORTED;
+
+    /* Parse UACT=? test response */
+    if (!mm_ublox_parse_uact_test (response, &bands_2g, &bands_3g, &bands_4g, &error))
+        goto out;
+
+    /* Build a combined array */
+    bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+    if (bands_2g) {
+        bands = g_array_append_vals (bands, bands_2g->data, bands_2g->len);
+        g_array_unref (bands_2g);
+    }
+    if (bands_3g) {
+        bands = g_array_append_vals (bands, bands_3g->data, bands_3g->len);
+        g_array_unref (bands_3g);
+    }
+    if (bands_4g) {
+        bands = g_array_append_vals (bands, bands_4g->data, bands_4g->len);
+        g_array_unref (bands_4g);
+    }
+    g_assert (bands->len > 0);
+
+out:
+    if (!bands) {
+        g_assert (error);
+        g_task_return_error (task, error);
+    } else
+        g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
+}
+
+static void
 load_supported_bands (MMIfaceModem        *self,
                       GAsyncReadyCallback  callback,
                       gpointer             user_data)
 {
-    GTask  *task;
-    GError *error = NULL;
-    GArray *bands;
+    GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* The list of supported tasks we give here must include not only the bands
-     * allowed in the current AcT, but the whole list of bands allowed in all
-     * AcTs. This is because the list of supported bands is loaded only once
-     * during modem initialization. Not ideal, but the current API is like that.
-     *
-     * So, we give a predefined list of supported bands and we filter them in the
-     * same way we filter the allowed AcTs.
-     */
-    bands = mm_ublox_get_supported_bands (mm_iface_modem_get_model (self), &error);
-    if (!bands)
-        g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
-    g_object_unref (task);
+    /* See if AT+UACT is supported to query bands */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+UACT=?",
+        3,
+        TRUE, /* allow cached */
+        (GAsyncReadyCallback) uact_test_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -963,6 +1026,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
     self->priv->profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
     self->priv->mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
     self->priv->any_allowed = MM_MODEM_MODE_NONE;
+    self->priv->uact = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
