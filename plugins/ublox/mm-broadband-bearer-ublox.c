@@ -65,6 +65,7 @@ typedef struct {
     MMPortSerialAt         *primary;
     MMPort                 *data;
     guint                   cid;
+    gboolean                auth_required;
     /* For IPv4 settings */
     MMBearerIpConfig       *ip_config;
 } CommonConnectContext;
@@ -368,14 +369,22 @@ uauthreq_ready (MMBaseModem  *modem,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    const gchar          *response;
-    GError               *error = NULL;
+    const gchar *response;
+    GError      *error = NULL;
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+        CommonConnectContext *ctx;
+
+        ctx = (CommonConnectContext *) g_task_get_task_data (task);
+        /* If authentication required and the +UAUTHREQ failed, abort */
+        if (ctx->auth_required) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+        /* Otherwise, ignore */
+        g_error_free (error);
     }
 
     activate_3gpp (task);
@@ -396,7 +405,10 @@ authenticate_3gpp (GTask *task)
     password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
     allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
-    if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
+    /* Flag whether authentication is required. If it isn't, we won't fail
+     * connection attempt if the +UAUTHREQ command fails */
+    ctx->auth_required = (user && password && allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE);
+    if (!ctx->auth_required) {
         mm_dbg ("Not using authentication");
         cmd = g_strdup_printf ("+UAUTHREQ=%u,0", ctx->cid);
     } else {
