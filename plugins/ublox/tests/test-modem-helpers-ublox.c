@@ -488,18 +488,19 @@ test_urat_write_command (void)
 /* Supported bands */
 
 static void
-common_validate_supported_bands (const gchar       *model,
-                                 const MMModemBand *expected_bands,
-                                 guint              n_expected_bands)
+common_compare_bands (GArray            *bands,
+                      const MMModemBand *expected_bands,
+                      guint              n_expected_bands)
 {
-    GError *error = NULL;
-    GArray *bands;
     gchar  *bands_str;
     GArray *expected_bands_array;
     gchar  *expected_bands_str;
 
-    bands = mm_ublox_get_supported_bands (model, &error);
-    g_assert_no_error (error);
+    if (!expected_bands || !n_expected_bands) {
+        g_assert (!bands);
+        return;
+    }
+
     g_assert (bands);
     mm_common_bands_garray_sort (bands);
     bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
@@ -514,6 +515,21 @@ common_validate_supported_bands (const gchar       *model,
     g_assert_cmpstr (bands_str, ==, expected_bands_str);
     g_free (bands_str);
     g_free (expected_bands_str);
+}
+
+static void
+common_validate_supported_bands (const gchar       *model,
+                                 const MMModemBand *expected_bands,
+                                 guint              n_expected_bands)
+{
+    GError *error = NULL;
+    GArray *bands;
+
+    bands = mm_ublox_get_supported_bands (model, &error);
+    g_assert_no_error (error);
+    g_assert (bands);
+
+    common_compare_bands (bands, expected_bands, n_expected_bands);
 }
 
 static void
@@ -604,26 +620,12 @@ common_validate_ubandsel_response (const gchar       *str,
 {
     GError *error = NULL;
     GArray *bands;
-    gchar  *bands_str;
-    GArray *expected_bands_array;
-    gchar  *expected_bands_str;
 
     bands = mm_ublox_parse_ubandsel_response (str, &error);
     g_assert_no_error (error);
     g_assert (bands);
-    mm_common_bands_garray_sort (bands);
-    bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
-    g_array_unref (bands);
 
-    expected_bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_expected_bands);
-    g_array_append_vals (expected_bands_array, expected_bands, n_expected_bands);
-    mm_common_bands_garray_sort (expected_bands_array);
-    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(expected_bands_array->data), expected_bands_array->len);
-    g_array_unref (expected_bands_array);
-
-    g_assert_cmpstr (bands_str, ==, expected_bands_str);
-    g_free (bands_str);
-    g_free (expected_bands_str);
+    common_compare_bands (bands, expected_bands, n_expected_bands);
 }
 
 static void
