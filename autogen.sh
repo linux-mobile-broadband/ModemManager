@@ -15,8 +15,7 @@ PKG_NAME=ModemManager
 
 (cd $srcdir;
     gtkdocize || exit 1
-    autopoint --force
-    AUTOPOINT='intltoolize --automake --copy' autoreconf --force --install --verbose
+    autoreconf --force --install --verbose
 )
 
 if test -z "$NOCONFIGURE"; then

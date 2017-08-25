@@ -59,15 +59,22 @@ diagrams = \
 	ModemManager-interface-initialization-sequence.png \
 	ModemManager-interface-initialization-sequence-subclassed.png
 
-
 # Polkit
-polkit_policy_in_in_files = org.freedesktop.ModemManager1.policy.in.in
-if WITH_POLKIT
-polkit_policydir = $(datadir)/polkit-1/actions
-polkit_policy_DATA = $(polkit_policy_in_in_files:.policy.in.in=.policy)
-@INTLTOOL_POLICY_RULE@
-endif
 
+# build file with translations, which we will include in dist
+org.freedesktop.ModemManager1.policy.in: org.freedesktop.ModemManager1.policy.in.in
+	$(AM_V_GEN) GETTEXTDATADIR=$(top_srcdir)/data $(MSGFMT) --xml -d $(top_srcdir)/po/ -o $@ --template $<
+
+if WITH_POLKIT
+
+# build with requested user policy
+org.freedesktop.ModemManager1.policy: org.freedesktop.ModemManager1.policy.in
+	$(AM_V_GEN) sed -e s,@MM_DEFAULT_USER_POLICY\@,$(MM_DEFAULT_USER_POLICY), $< > $@.tmp && mv $@.tmp $@
+
+polkit_policydir = $(datadir)/polkit-1/actions
+polkit_policy_DATA = org.freedesktop.ModemManager1.policy
+
+endif
 
 # Set up pkg-config .pc files for exported libraries
 pkgconfigdir = $(libdir)/pkgconfig
@@ -75,23 +82,26 @@ pkgconfig_DATA = \
 	ModemManager.pc \
 	mm-glib.pc
 
+MAINTAINERCLEANFILES = \
+	org.freedesktop.ModemManager1.policy.in
 
 DISTCLEANFILES = \
+	org.freedesktop.ModemManager1.policy \
 	$(dbusactivation_DATA) \
-	$(dbusservice_DATA) \
-	$(polkit_policy_DATA)
+	$(dbusservice_DATA)
 
 if HAVE_SYSTEMD
 DISTCLEANFILES += $(systemdsystemunit_DATA)
 endif
 
-
 EXTRA_DIST = \
+	its \
+	org.freedesktop.ModemManager1.policy.in.in \
+	org.freedesktop.ModemManager1.policy.in \
 	$(systemdsystemunit_in_files) \
 	$(dbusactivation_in_files) \
 	$(dbusservice_file_polkit) \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
-	$(polkit_policy_in_in_files) \
 	$(logos) \
 	$(diagrams)

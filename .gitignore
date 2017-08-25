@@ -22,7 +22,6 @@ Makefile.in
 /depcomp
 /install-sh
 /ltmain.sh
-/intltool-*
 /missing
 /stamp-h1
 /gtk-doc.make
@@ -84,7 +83,6 @@ Makefile.in
 /po/Makefile.in.in
 /po/POTFILES
 /po/stamp-it
-/po/.intltool-merge-cache
 /po/ModemManager.pot
 /po/Makevars.template
 /po/Rules-quot
@@ -94,6 +92,8 @@ Makefile.in
 /po/insert-header.sin
 /po/quot.sed
 /po/remove-potcdate.sin
+/po/remove-potcdate.sed
+/po/stamp-po
 /po/*.gmo
 
 /docs/reference/api/version.xml
@@ -122,7 +122,6 @@ Makefile.in
 /docs/reference/libmm-glib/xml
 
 /m4/gtk-doc.m4
-/m4/intltool.m4
 /m4/libtool.m4
 /m4/lt*.m4
 /m4/codeset.m4

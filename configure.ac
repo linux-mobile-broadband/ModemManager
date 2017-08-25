@@ -82,10 +82,8 @@ dnl-----------------------------------------------------------------------------
 dnl i18n
 dnl
 
-IT_PROG_INTLTOOL([0.40.0])
-
 AM_GNU_GETTEXT([external])
-AM_GNU_GETTEXT_VERSION([0.19.3])
+AM_GNU_GETTEXT_VERSION([0.19.8])
 
 GETTEXT_PACKAGE=ModemManager
 AC_SUBST(GETTEXT_PACKAGE)
@@ -389,7 +387,6 @@ Makefile
 data/Makefile
 data/ModemManager.pc
 data/mm-glib.pc
-data/org.freedesktop.ModemManager1.policy.in
 data/tests/Makefile
 data/tests/org.freedesktop.ModemManager1.service
 include/Makefile

@@ -2,6 +2,7 @@
 SUBDIRS = \
 	. \
 	build-aux \
+	po \
 	data \
 	include \
 	libqcdm \
@@ -13,7 +14,6 @@ SUBDIRS = \
 	vapi \
 	introspection \
 	uml290 \
-	po \
 	test \
 	examples \
 	docs \
@@ -25,21 +25,7 @@ AM_DISTCHECK_CONFIGURE_FLAGS = \
 	--enable-gtk-doc=yes \
 	$(NULL)
 
-INTLTOOL_FILES = \
-	intltool-extract.in \
-	intltool-merge.in \
-	intltool-update.in \
-	$(NULL)
-
-DISTCLEANFILES = \
-	intltool-extract \
-	intltool-merge \
-	intltool-update \
-	po/.intltool-merge-cache \
-	$(NULL)
-
 EXTRA_DIST = \
-	$(INTLTOOL_FILES) \
 	autogen.sh \
 	gtester.make \
 	COPYING.LIB \
