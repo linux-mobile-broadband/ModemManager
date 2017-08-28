@@ -14,7 +14,6 @@ PKG_NAME=ModemManager
 }
 
 (cd $srcdir;
-    gtkdocize || exit 1
     autoreconf --force --install --verbose
 )
 
