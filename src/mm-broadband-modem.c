@@ -8640,10 +8640,6 @@ disabling_stopped (MMBroadbandModem *self,
         self->priv->enabled_ports_ctx = NULL;
     }
 
-    if (self->priv->sim_hot_swap_ports_ctx) {
-        ports_context_unref (self->priv->sim_hot_swap_ports_ctx);
-        self->priv->sim_hot_swap_ports_ctx = NULL;
-    }
     return TRUE;
 }
 
@@ -10660,6 +10656,9 @@ finalize (GObject *object)
 
     if (self->priv->enabled_ports_ctx)
         ports_context_unref (self->priv->enabled_ports_ctx);
+
+    if (self->priv->sim_hot_swap_ports_ctx)
+        ports_context_unref (self->priv->sim_hot_swap_ports_ctx);
 
     if (self->priv->modem_3gpp_registration_regex)
         mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
