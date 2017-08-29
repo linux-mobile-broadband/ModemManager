@@ -1074,7 +1074,7 @@ register_in_network_finish (MMIfaceModem3gpp *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
