@@ -1220,7 +1220,7 @@ serial_open_at (MMPortProbe *self)
 
         g_object_set (ctx->serial,
                       MM_PORT_SERIAL_SPEW_CONTROL,   TRUE,
-                      MM_PORT_SERIAL_SEND_DELAY,     (subsys == MM_PORT_SUBSYS_TTY ? ctx->at_send_delay : 0),
+                      MM_PORT_SERIAL_SEND_DELAY,     (guint64)(subsys == MM_PORT_SUBSYS_TTY ? ctx->at_send_delay : 0),
                       MM_PORT_SERIAL_AT_REMOVE_ECHO, ctx->at_remove_echo,
                       MM_PORT_SERIAL_AT_SEND_LF,     ctx->at_send_lf,
                       NULL);
