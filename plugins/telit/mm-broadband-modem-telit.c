@@ -1005,6 +1005,7 @@ after_power_up_step (GTask *task)
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
                                      "could not acquire sim object");
+            g_object_unref (task);
             return;
         }
 
