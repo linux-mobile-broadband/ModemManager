@@ -985,32 +985,36 @@ after_power_up_step (GTask *task)
 {
     AfterPowerUpContext *ctx;
     MMBroadbandModemTelit *self;
-    MMBaseSim *sim = NULL;
 
     ctx = g_task_get_task_data (task);
     self = g_task_get_source_object (task);
-
-    g_object_get (MM_BROADBAND_MODEM_TELIT (self),
-                  MM_IFACE_MODEM_SIM, &sim,
-                  NULL);
-    if (!sim) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "could not acquire sim object");
-        return;
-    }
 
     switch (ctx->step) {
     case AFTER_POWER_UP_STEP_FIRST:
         /* Fall back on next step */
         ctx->step++;
-    case AFTER_POWER_UP_STEP_GET_SIM_IDENTIFIER:
+
+    case AFTER_POWER_UP_STEP_GET_SIM_IDENTIFIER: {
+        MMBaseSim *sim = NULL;
+
+        g_object_get (MM_BROADBAND_MODEM_TELIT (self),
+                      MM_IFACE_MODEM_SIM, &sim,
+                      NULL);
+        if (!sim) {
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "could not acquire sim object");
+            return;
+        }
+
         mm_base_sim_load_sim_identifier (sim,
                                          (GAsyncReadyCallback)load_sim_identifier_ready,
                                          task);
         g_object_unref (sim);
         return;
+    }
+
     case AFTER_POWER_UP_STEP_ENABLE_QSS_PARSING:
         mm_dbg ("Stop ignoring #QSS");
         self->priv->parse_qss = TRUE;
