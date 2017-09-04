@@ -701,6 +701,59 @@ mm_base_sim_send_puk (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* LOAD SIM IDENTIFIER */
+
+gchar *
+mm_base_sim_load_sim_identifier_finish (MMBaseSim *self,
+                                        GAsyncResult *res,
+                                        GError **error)
+{
+    GError *inner_error = NULL;
+    gchar *simid;
+
+    if (g_async_result_is_tagged (res, mm_base_sim_load_sim_identifier) ||
+        !MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                   "not implemented");
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
+    simid = MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish (self, res, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
+    return simid;
+}
+
+void
+mm_base_sim_load_sim_identifier (MMBaseSim *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    if (!MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier &&
+        !MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 mm_base_sim_load_sim_identifier,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "not implemented");
+        return;
+    }
+
+    MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier (
+            self,
+            (GAsyncReadyCallback)callback,
+            user_data);
+
+    return;
+}
+
+/*****************************************************************************/
 /* SEND PIN (DBus call handling) */
 
 typedef struct {

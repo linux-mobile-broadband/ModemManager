@@ -129,40 +129,47 @@ struct _MMBaseSimClass {
 
 GType mm_base_sim_get_type (void);
 
-void         mm_base_sim_new               (MMBaseModem *modem,
-                                            GCancellable *cancellable,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data);
-MMBaseSim   *mm_base_sim_new_finish        (GAsyncResult  *res,
-                                            GError       **error);
+void         mm_base_sim_new                        (MMBaseModem *modem,
+                                                     GCancellable *cancellable,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+MMBaseSim   *mm_base_sim_new_finish                 (GAsyncResult  *res,
+                                                     GError       **error);
 
-void         mm_base_sim_initialize        (MMBaseSim *self,
-                                            GCancellable *cancellable,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data);
-gboolean     mm_base_sim_initialize_finish (MMBaseSim *self,
-                                            GAsyncResult *result,
-                                            GError **error);
+void         mm_base_sim_initialize                 (MMBaseSim *self,
+                                                     GCancellable *cancellable,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+gboolean     mm_base_sim_initialize_finish          (MMBaseSim *self,
+                                                     GAsyncResult *result,
+                                                     GError **error);
 
-void         mm_base_sim_send_pin          (MMBaseSim *self,
-                                            const gchar *pin,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data);
-gboolean     mm_base_sim_send_pin_finish   (MMBaseSim *self,
-                                            GAsyncResult *res,
-                                            GError **error);
+void         mm_base_sim_send_pin                   (MMBaseSim *self,
+                                                     const gchar *pin,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+gboolean     mm_base_sim_send_pin_finish            (MMBaseSim *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
-void         mm_base_sim_send_puk          (MMBaseSim *self,
-                                            const gchar *puk,
-                                            const gchar *new_pin,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data);
-gboolean     mm_base_sim_send_puk_finish   (MMBaseSim *self,
-                                            GAsyncResult *res,
-                                            GError **error);
+void         mm_base_sim_send_puk                   (MMBaseSim *self,
+                                                     const gchar *puk,
+                                                     const gchar *new_pin,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+gboolean     mm_base_sim_send_puk_finish            (MMBaseSim *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
-void         mm_base_sim_export            (MMBaseSim *self);
+void         mm_base_sim_export                     (MMBaseSim *self);
 
-const gchar *mm_base_sim_get_path          (MMBaseSim *sim);
+const gchar *mm_base_sim_get_path                   (MMBaseSim *sim);
+
+void         mm_base_sim_load_sim_identifier        (MMBaseSim *self,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+gchar       *mm_base_sim_load_sim_identifier_finish (MMBaseSim *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
 #endif /* MM_BASE_SIM_H */

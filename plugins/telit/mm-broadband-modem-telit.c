@@ -58,10 +58,12 @@ struct _MMBroadbandModemTelitPrivate {
     MMTelitCsimLockState csim_lock_state;
     GTask *csim_lock_task;
     guint csim_lock_timeout_id;
+    gboolean parse_qss;
 };
 
 /*****************************************************************************/
 /* After Sim Unlock (Modem interface) */
+
 static gboolean
 modem_after_sim_unlock_finish (MMIfaceModem *self,
                                GAsyncResult *res,
@@ -151,9 +153,14 @@ telit_qss_unsolicited_handler (MMPortSerialAt *port,
     }
 
     if (cur_qss_status != prev_qss_status)
-        mm_dbg ("QSS handler: status changed '%s -> %s",
+        mm_dbg ("QSS handler: status changed '%s -> %s'",
                 mm_telit_qss_status_get_string (prev_qss_status),
                 mm_telit_qss_status_get_string (cur_qss_status));
+
+    if (self->priv->parse_qss == FALSE) {
+        mm_dbg ("QSS: message ignored");
+        return;
+    }
 
     if ((prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) ||
         (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED)) {
@@ -903,14 +910,174 @@ modem_load_unlock_retries (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Modem after power up (Modem interface) */
+typedef enum {
+    AFTER_POWER_UP_STEP_FIRST,
+    AFTER_POWER_UP_STEP_GET_SIM_IDENTIFIER,
+    AFTER_POWER_UP_STEP_ENABLE_QSS_PARSING,
+    AFTER_POWER_UP_STEP_LAST
+} ModemAfterPowerUpStep;
+
+typedef struct {
+    gboolean has_sim_changed;
+    guint retries;
+    ModemAfterPowerUpStep step;
+} AfterPowerUpContext;
+
+static void after_power_up_step (GTask *task);
+
+static gboolean
+modem_after_power_up_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+load_sim_identifier_ready (MMBaseSim *sim,
+                           GAsyncResult *res,
+                           GTask *task)
+{
+    AfterPowerUpContext *ctx;
+    GError *error = NULL;
+    gchar *current_simid;
+    gchar *cached_simid;
+
+    ctx = g_task_get_task_data (task);
+
+    cached_simid = (gchar *)mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (sim));
+    current_simid = mm_base_sim_load_sim_identifier_finish (sim, res, &error);
+
+    if (error) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            mm_warn ("could not load SIM identifier: %s", error->message);
+            g_clear_error (&error);
+            goto out;
+        }
+
+        if (ctx->retries-- > 0) {
+            mm_warn ("could not load SIM identifier: %s (%d retries left)",
+                     error->message, ctx->retries);
+            g_clear_error (&error);
+            g_timeout_add_seconds (1, (GSourceFunc) after_power_up_step, task);
+            return;
+        }
+
+        mm_warn ("could not load SIM identifier: %s", error->message);
+        g_clear_error (&error);
+        goto out;
+    }
+
+    if (g_strcmp0 (current_simid, cached_simid) != 0) {
+        mm_warn ("sim identifier has changed: possible SIM swap during power down/low");
+        ctx->has_sim_changed = TRUE;
+    }
+
+out:
+    g_free (current_simid);
+    ctx->step++;
+    after_power_up_step (task);
+}
+
+static void
+after_power_up_step (GTask *task)
+{
+    AfterPowerUpContext *ctx;
+    MMBroadbandModemTelit *self;
+    MMBaseSim *sim = NULL;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    g_object_get (MM_BROADBAND_MODEM_TELIT (self),
+                  MM_IFACE_MODEM_SIM, &sim,
+                  NULL);
+    if (!sim) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "could not acquire sim object");
+        return;
+    }
+
+    switch (ctx->step) {
+    case AFTER_POWER_UP_STEP_FIRST:
+        /* Fall back on next step */
+        ctx->step++;
+    case AFTER_POWER_UP_STEP_GET_SIM_IDENTIFIER:
+        mm_base_sim_load_sim_identifier (sim,
+                                         (GAsyncReadyCallback)load_sim_identifier_ready,
+                                         task);
+        g_object_unref (sim);
+        return;
+    case AFTER_POWER_UP_STEP_ENABLE_QSS_PARSING:
+        mm_dbg ("Stop ignoring #QSS");
+        self->priv->parse_qss = TRUE;
+
+        /* Fall back on next step */
+        ctx->step++;
+    case AFTER_POWER_UP_STEP_LAST:
+        if (ctx->has_sim_changed)
+            mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+modem_after_power_up (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GTask *task;
+    AfterPowerUpContext *ctx;
+
+    ctx = g_new0 (AfterPowerUpContext, 1);
+    ctx->step = AFTER_POWER_UP_STEP_FIRST;
+    ctx->has_sim_changed = FALSE;
+    ctx->retries = 3;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) g_free);
+
+    after_power_up_step (task);
+}
+
+/*****************************************************************************/
 /* Modem power down (Modem interface) */
+
+static void
+telit_modem_power_down_ready (MMBaseModem *self,
+                              GAsyncResult *res,
+                              GTask *task)
+{
+    GError *error = NULL;
+
+    if (mm_base_modem_at_command_finish (self, res, &error)) {
+        mm_dbg ("Ignore #QSS unsolicited during power down/low");
+        MM_BROADBAND_MODEM_TELIT (self)->priv->parse_qss = FALSE;
+    }
+
+    if (error) {
+        mm_err ("modem power down: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
 
 static gboolean
 modem_power_down_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -918,12 +1085,15 @@ modem_power_down (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN=4",
                               20,
                               FALSE,
-                              callback,
-                              user_data);
+                              (GAsyncReadyCallback) telit_modem_power_down_ready,
+                              task);
 }
 
 /*****************************************************************************/
@@ -1457,6 +1627,7 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
     self->priv->csim_lock_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->csim_lock_state = CSIM_LOCK_STATE_UNKNOWN;
     self->priv->qss_status = QSS_STATUS_UNKNOWN;
+    self->priv->parse_qss = TRUE;
 }
 
 static void
@@ -1474,6 +1645,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->reset = modem_reset;
     iface->reset_finish = modem_reset_finish;
+    iface->modem_after_power_up = modem_after_power_up;
+    iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->load_access_technologies = load_access_technologies;
