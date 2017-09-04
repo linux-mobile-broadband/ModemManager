@@ -708,24 +708,23 @@ mm_base_sim_load_sim_identifier_finish (MMBaseSim *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    GError *inner_error = NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_sim_identifier_ready (MMBaseSim *self,
+                           GAsyncResult *res,
+                           GTask *task)
+{
     gchar *simid;
+    GError *error = NULL;
 
-    if (g_async_result_is_tagged (res, mm_base_sim_load_sim_identifier) ||
-        !MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                   "not implemented");
-        g_propagate_error (error, inner_error);
-        return NULL;
-    }
-
-    simid = MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish (self, res, &inner_error);
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return NULL;
-    }
-
-    return simid;
+    simid = MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish (self, res, &error);
+    if (!simid)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, simid, g_free);
+    g_object_unref (task);
 }
 
 void
@@ -733,24 +732,22 @@ mm_base_sim_load_sim_identifier (MMBaseSim *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    if (!MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier &&
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier ||
         !MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_base_sim_load_sim_identifier,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "not implemented");
+        g_object_unref (task);
         return;
     }
 
     MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier (
             self,
-            (GAsyncReadyCallback)callback,
-            user_data);
-
-    return;
+            (GAsyncReadyCallback)load_sim_identifier_ready,
+            task);
 }
 
 /*****************************************************************************/
@@ -1381,9 +1378,9 @@ initable_init_finish (GAsyncInitable  *initable,
 }
 
 static void
-load_sim_identifier_ready (MMBaseSim *self,
-                           GAsyncResult *res,
-                           GTask *task)
+init_load_sim_identifier_ready (MMBaseSim *self,
+                                GAsyncResult *res,
+                                GTask *task)
 {
     InitAsyncContext *ctx;
     GError *error = NULL;
@@ -1420,9 +1417,9 @@ load_sim_identifier_ready (MMBaseSim *self,
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
     static void                                                         \
-    load_##NAME##_ready (MMBaseSim *self,                               \
-                         GAsyncResult *res,                             \
-                         GTask *task)                                   \
+    init_load_##NAME##_ready (MMBaseSim *self,                          \
+                              GAsyncResult *res,                        \
+                              GTask *task)                              \
     {                                                                   \
         InitAsyncContext *ctx;                                          \
         GError *error = NULL;                                           \
@@ -1475,7 +1472,7 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier (
                 self,
-                (GAsyncReadyCallback)load_sim_identifier_ready,
+                (GAsyncReadyCallback)init_load_sim_identifier_ready,
                 task);
             return;
         }
@@ -1491,7 +1488,7 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_imsi_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_imsi (
                 self,
-                (GAsyncReadyCallback)load_imsi_ready,
+                (GAsyncReadyCallback)init_load_imsi_ready,
                 task);
             return;
         }
@@ -1507,7 +1504,7 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier (
                 self,
-                (GAsyncReadyCallback)load_operator_identifier_ready,
+                (GAsyncReadyCallback)init_load_operator_identifier_ready,
                 task);
             return;
         }
@@ -1523,7 +1520,7 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_operator_name_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_operator_name (
                 self,
-                (GAsyncReadyCallback)load_operator_name_ready,
+                (GAsyncReadyCallback)init_load_operator_name_ready,
                 task);
             return;
         }
