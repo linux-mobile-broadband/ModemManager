@@ -1056,6 +1056,14 @@ modem_after_power_up (MMIfaceModem *self,
 /*****************************************************************************/
 /* Modem power down (Modem interface) */
 
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
 static void
 telit_modem_power_down_ready (MMBaseModem *self,
                               GAsyncResult *res,
@@ -1075,14 +1083,6 @@ telit_modem_power_down_ready (MMBaseModem *self,
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-}
-
-static gboolean
-modem_power_down_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
