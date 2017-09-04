@@ -942,7 +942,7 @@ load_sim_identifier_ready (MMBaseSim *sim,
     AfterPowerUpContext *ctx;
     GError *error = NULL;
     gchar *current_simid;
-    gchar *cached_simid;
+    const gchar *cached_simid;
 
     ctx = g_task_get_task_data (task);
 
