@@ -1,0 +1,109 @@
+# Polish translation for ModemManager.
+# Copyright © 2017 the ModemManager authors.
+# This file is distributed under the same license as the ModemManager package.
+# Piotr Drąg <piotrdrag@gmail.com>, 2017.
+# Aviary.pl <community-poland@mozilla.org>, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2017-09-07 13:12+0200\n"
+"PO-Revision-Date: 2017-09-06 19:15+0200\n"
+"Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
+"Language-Team: Polish <community-poland@mozilla.org>\n"
+"Language: pl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2);\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Sterowanie usługą ModemManager"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Ustawienia systemu uniemożliwiają sterowanie usługą ModemManager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Odblokowanie i sterowanie urządzeniem komórkowym"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Ustawienia systemu uniemożliwiają odblokowanie lub sterowanie urządzeniem "
+"komórkowym."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Dodawanie, modyfikowanie i usuwanie kontaktów urządzenia komórkowego"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Ustawienia systemu uniemożliwiają dodawanie, modyfikowanie lub usuwanie "
+"kontaktów tego urządzenia."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Wysyłanie, zapisywanie, modyfikowanie i usuwanie wiadomości SMS"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Ustawienia systemu uniemożliwiają wysyłanie lub manipulowanie wiadomościami "
+"SMS tego urządzenia."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Przyjmowanie połączeń przychodzących lub dzwonienie"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Ustawienia systemu uniemożliwiają dzwonienie."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Włączanie i wyświetlanie informacji o położeniu geograficznym "
+"i pozycjonowaniu"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Ustawienia systemu uniemożliwiają włączanie lub wyświetlanie informacji "
+"o położeniu geograficznym."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Odpytywanie i używanie informacji i usług sieciowych"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Ustawienia systemu uniemożliwiają odpytywanie lub używanie informacji "
+"i usług sieciowych."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr ""
+"Odpytywanie i zarządzanie oprogramowaniem sprzętowym urządzenia komórkowego"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Ustawienia systemu uniemożliwiają odpytywanie lub zarządzanie "
+"oprogramowaniem sprzętowym tego urządzenia."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "Usługa ModemManager musi ponownie uruchomić urządzenia"
