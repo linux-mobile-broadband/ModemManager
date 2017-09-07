@@ -740,40 +740,39 @@ load_current_bands (MMIfaceModem *self,
 /* Set current_bands (Modem interface) */
 
 static gboolean
-set_current_bands_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
+set_current_bands_finish (MMIfaceModem  *self,
+                          GAsyncResult  *res,
+                          GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-wmbs_set_ready (MMBaseModem *self,
+wmbs_set_ready (MMBaseModem  *self,
                 GAsyncResult *res,
-                GSimpleAsyncResult *operation_result)
+                GTask        *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        /* Let the error be critical */
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-set_bands_3g (MMIfaceModem *self,
-              GArray *bands_array,
-              GSimpleAsyncResult *result)
+set_bands_3g (GTask  *task,
+              GArray *bands_array)
 {
-    GArray *bands_array_final;
-    guint wavecom_band = 0;
-    guint i;
-    gchar *bands_string;
-    gchar *cmd;
+    MMBroadbandModemWavecom *self;
+    GArray                  *bands_array_final;
+    guint                    wavecom_band = 0;
+    guint                    i;
+    gchar                   *bands_string;
+    gchar                   *cmd;
+
+    self = g_task_get_source_object (task);
 
     /* The special case of ANY should be treated separately. */
     if (bands_array->len == 1 &&
@@ -803,13 +802,12 @@ set_bands_3g (MMIfaceModem *self,
     g_array_unref (bands_array_final);
 
     if (wavecom_band == 0) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "The given band combination is not supported: '%s'",
-                                         bands_string);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "The given band combination is not supported: '%s'",
+                                 bands_string);
+        g_object_unref (task);
         g_free (bands_string);
         return;
     }
@@ -821,21 +819,23 @@ set_bands_3g (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)wmbs_set_ready,
-                              result);
+                              task);
     g_free (cmd);
     g_free (bands_string);
 }
 
 static void
-set_bands_2g (MMIfaceModem *self,
-              GArray *bands_array,
-              GSimpleAsyncResult *result)
+set_bands_2g (GTask  *task,
+              GArray *bands_array)
 {
-    GArray *bands_array_final;
-    gchar wavecom_band = '\0';
-    guint i;
-    gchar *bands_string;
-    gchar *cmd;
+    MMBroadbandModemWavecom *self;
+    GArray                  *bands_array_final;
+    gchar                    wavecom_band = '\0';
+    guint                    i;
+    gchar                   *bands_string;
+    gchar                   *cmd;
+
+    self = g_task_get_source_object (task);
 
     /* If the iface properly checked the given list against the supported bands,
      * it's not possible to get an array longer than 4 here. */
@@ -875,13 +875,12 @@ set_bands_2g (MMIfaceModem *self,
     g_array_unref (bands_array_final);
 
     if (wavecom_band == '\0') {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "The given band combination is not supported: '%s'",
-                                         bands_string);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "The given band combination is not supported: '%s'",
+                                 bands_string);
+        g_object_unref (task);
         g_free (bands_string);
         return;
     }
@@ -893,19 +892,19 @@ set_bands_2g (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)wmbs_set_ready,
-                              result);
+                              task);
 
     g_free (cmd);
     g_free (bands_string);
 }
 
 static void
-set_current_bands (MMIfaceModem *self,
-                   GArray *bands_array,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+set_current_bands (MMIfaceModem        *self,
+                   GArray              *bands_array,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* The bands that we get here are previously validated by the interface, and
      * that means that ALL the bands given here were also given in the list of
@@ -913,15 +912,12 @@ set_current_bands (MMIfaceModem *self,
      * will end up being valid, as not all combinations are possible. E.g,
      * Wavecom modems supporting only 2G have specific combinations allowed.
      */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (mm_iface_modem_is_3g (self))
-        set_bands_3g (self, bands_array, result);
+        set_bands_3g (task, bands_array);
     else
-        set_bands_2g (self, bands_array, result);
+        set_bands_2g (task, bands_array);
 }
 
 /*****************************************************************************/
