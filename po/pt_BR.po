@@ -1,0 +1,104 @@
+# Brazilian Portuguese translation for ModemManager.
+# Copyright (C) 2017 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Rafael Fontenelle <rafaelff@gnome.org>, 2017.
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2017-09-07 13:35+0200\n"
+"PO-Revision-Date: 2017-09-05 21:49-0200\n"
+"Last-Translator: Rafael Fontenelle <rafaelff@gnome.org>\n"
+"Language-Team: Brazilian Portuguese <gnome-pt_br-list@gnome.org>\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Generator: Virtaal 1.0.0-beta1\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Controlar o daemon do ModemManager"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "A política de sistema impede de controlar o ModemManager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Desbloquear e controlar um dispositivo de banda larga móvel"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"A política de sistema impede de desbloquear ou controlar o dispositivo de "
+"banda larga móvel."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Adicionar, modificar e excluir contatos de banda larga móvel"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"A política de sistema impede de adicionar, modificar ou excluir os contatos "
+"deste dispositivo."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Enviar, salvar, modificar e excluir mensagens de texto"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"A política de sistema impede de enviar ou manipular as mensagens de texto "
+"deste dispositivo."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Aceitar chamadas de voz recebidas ou iniciar chamadas de voz de saída."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "A política de sistema impede chamadas de voz."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Habilitar e ver informações de posicionamento e localização geográfica"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"A política de sistema impede de habilitar ou ver informações de localização "
+"geográfica."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Consultar ou utilizar serviços e informações de rede."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"A política de sistema impede de consultar ou utilizar serviços e informações "
+"de rede."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Consultar e gerenciar firmware em um dispositivo de banda larga móvel"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"A política de sistema impede de consultar ou gerenciar o firmware do "
+"dispositivo."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "O ModemManager precisa reiniciar os dispositivos"
