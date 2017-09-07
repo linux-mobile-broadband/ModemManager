@@ -551,27 +551,22 @@ set_current_modes (MMIfaceModem        *self,
 /* Load supported bands (Modem interface) */
 
 static GArray *
-load_supported_bands_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+load_supported_bands_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
-    /* Never fails */
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-load_supported_bands (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+load_supported_bands (MMIfaceModem        *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask  *task;
     GArray *bands;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* We do assume that we already know if the modem is 2G-only, 3G-only or
      * 2G+3G. This is checked quite before trying to load supported bands. */
@@ -603,11 +598,8 @@ load_supported_bands (MMIfaceModem *self,
         _g_array_insert_enum (bands, 3, MMModemBand, MM_MODEM_BAND_G850);
     }
 
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
