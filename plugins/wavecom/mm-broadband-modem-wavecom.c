@@ -89,35 +89,30 @@ static const WavecomBand3G bands_3g[] = {
 /* Load supported modes (Modem interface) */
 
 static GArray *
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+load_supported_modes_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-supported_ms_classes_query_ready (MMBaseModem *self,
+supported_ms_classes_query_ready (MMBaseModem  *self,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask        *task)
 {
-    GArray *all;
-    GArray *combinations;
-    GArray *filtered;
-    const gchar *response;
-    GError *error = NULL;
-    MMModemModeCombination mode;
-    MMModemMode mode_all;
+    GArray                 *all;
+    GArray                 *combinations;
+    GArray                 *filtered;
+    const gchar            *response;
+    GError                 *error = NULL;
+    MMModemModeCombination  mode;
+    MMModemMode             mode_all;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -134,13 +129,12 @@ supported_ms_classes_query_ready (MMBaseModem *self,
 
     /* If none received, error */
     if (mode_all == MM_MODEM_MODE_NONE) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get supported mobile station classes: '%s'",
-                                         response);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get supported mobile station classes: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
@@ -186,26 +180,26 @@ supported_ms_classes_query_ready (MMBaseModem *self,
     g_array_unref (all);
     g_array_unref (combinations);
 
-    g_simple_async_result_set_op_res_gpointer (simple, filtered, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 static void
-load_supported_modes (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+load_supported_modes (MMIfaceModem        *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "+CGCLASS=?",
         3,
         FALSE,
         (GAsyncReadyCallback)supported_ms_classes_query_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_supported_modes));
+        task);
 }
 
 /*****************************************************************************/
