@@ -24,6 +24,8 @@
 
 #include <ModemManager-enums.h>
 
+#ifndef MM_DISABLE_DEPRECATED
+
 /**
  * SECTION:mm-compat
  * @title: API break replacements
@@ -686,5 +688,7 @@ typedef int MMModemBandDeprecated;
  * Deprecated: 1.8.0: Use #MM_MODEM_BAND_CDMA_BC19 instead.
  */
 #define MM_MODEM_BAND_CDMA_BC19_US_LOWER_700 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC19)
+
+#endif /* MM_DISABLE_DEPRECATED */
 
 #endif /* _MODEMMANAGER_COMPAT_H_ */
