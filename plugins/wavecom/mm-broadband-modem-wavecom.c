@@ -1136,37 +1136,33 @@ register_in_network (MMIfaceModem3gpp    *self,
 /* After SIM unlock (Modem interface) */
 
 static gboolean
-modem_after_sim_unlock_finish (MMIfaceModem *self,
-                               GAsyncResult *res,
-                               GError **error)
+modem_after_sim_unlock_finish (MMIfaceModem  *self,
+                               GAsyncResult  *res,
+                               GError       **error)
 {
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
-after_sim_unlock_wait_cb (GSimpleAsyncResult *result)
+after_sim_unlock_wait_cb (GTask *task)
 {
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
-modem_after_sim_unlock (MMIfaceModem *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+modem_after_sim_unlock (MMIfaceModem        *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* A short wait is necessary for SIM to become ready, otherwise reloading
      * facility lock states may fail with a +CME ERROR: 515 error.
      */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_after_sim_unlock);
-
-    g_timeout_add_seconds (5, (GSourceFunc)after_sim_unlock_wait_cb, result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_timeout_add_seconds (5, (GSourceFunc)after_sim_unlock_wait_cb, task);
 }
 
 /*****************************************************************************/
