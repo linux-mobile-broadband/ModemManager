@@ -211,45 +211,45 @@ typedef struct {
 } LoadCurrentModesResult;
 
 static gboolean
-load_current_modes_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           MMModemMode *allowed,
-                           MMModemMode *preferred,
-                           GError **error)
+load_current_modes_finish (MMIfaceModem  *self,
+                           GAsyncResult  *res,
+                           MMModemMode   *allowed,
+                           MMModemMode   *preferred,
+                           GError       **error)
 {
     LoadCurrentModesResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
 
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-
-    *allowed = result->allowed;
+    *allowed   = result->allowed;
     *preferred = result->preferred;
+    g_free (result);
     return TRUE;
 }
 
 static void
-wwsm_read_ready (MMBaseModem *self,
+wwsm_read_ready (MMBaseModem  *self,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 GTask        *task)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    LoadCurrentModesResult result;
-    const gchar *response;
-    GError *error = NULL;
+    GRegex                 *r;
+    GMatchInfo             *match_info = NULL;
+    LoadCurrentModesResult *result;
+    const gchar            *response;
+    GError                 *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    result.allowed = MM_MODEM_MODE_NONE;
-    result.preferred = MM_MODEM_MODE_NONE;
+    result = g_new0 (LoadCurrentModesResult, 1);
+    result->allowed = MM_MODEM_MODE_NONE;
+    result->preferred = MM_MODEM_MODE_NONE;
 
     /* Possible responses:
      *   +WWSM: 0    (2G only)
@@ -267,29 +267,29 @@ wwsm_read_ready (MMBaseModem *self,
         if (mm_get_uint_from_match_info (match_info, 1, &allowed)) {
             switch (allowed) {
             case 0:
-                result.allowed = MM_MODEM_MODE_2G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = MM_MODEM_MODE_2G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 1:
-                result.allowed = MM_MODEM_MODE_3G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = MM_MODEM_MODE_3G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 2: {
                 guint preferred = 0;
 
-                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
 
                 /* 3, to avoid the comma */
                 if (mm_get_uint_from_match_info (match_info, 3, &preferred)) {
                     switch (preferred) {
                     case 0:
-                        result.preferred = MM_MODEM_MODE_NONE;
+                        result->preferred = MM_MODEM_MODE_NONE;
                         break;
                     case 1:
-                        result.preferred = MM_MODEM_MODE_2G;
+                        result->preferred = MM_MODEM_MODE_2G;
                         break;
                     case 2:
-                        result.preferred = MM_MODEM_MODE_3G;
+                        result->preferred = MM_MODEM_MODE_3G;
                         break;
                     default:
                         g_warn_if_reached ();
@@ -305,16 +305,15 @@ wwsm_read_ready (MMBaseModem *self,
         }
     }
 
-    if (result.allowed == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Unknown wireless data service reply: '%s'",
-                                         response);
+    if (result->allowed == MM_MODEM_MODE_NONE)
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unknown wireless data service reply: '%s'",
+                                 response);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, &result, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 
     g_regex_unref (r);
     if (match_info)
@@ -322,19 +321,18 @@ wwsm_read_ready (MMBaseModem *self,
 }
 
 static void
-current_ms_class_ready (MMBaseModem *self,
+current_ms_class_ready (MMBaseModem  *self,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask        *task)
 {
-    LoadCurrentModesResult result;
-    const gchar *response;
-    GError *error = NULL;
+    LoadCurrentModesResult  result;
+    const gchar            *response;
+    GError                 *error = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -345,12 +343,12 @@ current_ms_class_ready (MMBaseModem *self,
                  strlen (WAVECOM_MS_CLASS_A_IDSTR)) == 0) {
         mm_dbg ("Modem configured as a Class A mobile station");
         /* For 3G devices, query WWSM status */
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
+        mm_base_modem_at_command (self,
                                   "+WWSM?",
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)wwsm_read_ready,
-                                  simple);
+                                  task);
         return;
     }
 
@@ -378,35 +376,31 @@ current_ms_class_ready (MMBaseModem *self,
     }
 
     if (result.allowed == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Unknown mobile station class: '%s'",
-                                         response);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unknown mobile station class: '%s'",
+                                 response);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, &result, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-load_current_modes (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+load_current_modes (MMIfaceModem        *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CGCLASS?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)current_ms_class_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
