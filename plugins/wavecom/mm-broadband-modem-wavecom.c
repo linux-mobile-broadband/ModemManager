@@ -998,65 +998,52 @@ load_access_technologies (MMIfaceModem *self,
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
-typedef struct {
-    MMBroadbandModemWavecom *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    gchar *operator_id;
-} RegisterInNetworkContext;
-
-static void
-register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_free (ctx->operator_id);
-    g_slice_free (RegisterInNetworkContext, ctx);
-}
-
 static gboolean
-register_in_network_finish (MMIfaceModem3gpp *self,
-                            GAsyncResult *res,
-                            GError **error)
+register_in_network_finish (MMIfaceModem3gpp  *self,
+                            GAsyncResult      *res,
+                            GError           **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_registration_ready (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           RegisterInNetworkContext *ctx)
+                           GAsyncResult     *res,
+                           GTask            *task)
 {
     GError *error = NULL;
 
     if (!iface_modem_3gpp_parent->register_in_network_finish (self, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    register_in_network_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-run_parent_registration (RegisterInNetworkContext *ctx)
+run_parent_registration (GTask *task)
 {
+    MMBroadbandModemWavecom *self;
+    const gchar             *operator_id;
+
+    self = g_task_get_source_object (task);
+    operator_id = g_task_get_task_data (task);
+
     iface_modem_3gpp_parent->register_in_network (
-        MM_IFACE_MODEM_3GPP (ctx->self),
-        ctx->operator_id,
-        ctx->cancellable,
+        MM_IFACE_MODEM_3GPP (self),
+        operator_id,
+        g_task_get_cancellable (task),
         (GAsyncReadyCallback)parent_registration_ready,
-        ctx);
+        task);
 }
 
 static gboolean
 parse_network_registration_mode (const gchar *reply,
-                                 guint *mode)
+                                 guint       *mode)
 {
-    GRegex *r;
+    GRegex     *r;
     GMatchInfo *match_info;
-    gboolean parsed = FALSE;
+    gboolean    parsed = FALSE;
 
     g_assert (mode != NULL);
 
@@ -1078,61 +1065,54 @@ parse_network_registration_mode (const gchar *reply,
 }
 
 static void
-cops_ready (MMBaseModem *self,
+cops_ready (MMBaseModem  *self,
             GAsyncResult *res,
-            RegisterInNetworkContext *ctx)
+            GTask        *task)
 {
     const gchar *response;
-    GError *error = NULL;
-    guint mode;
+    GError      *error = NULL;
+    guint        mode;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (ctx->result, error);
-        register_in_network_context_complete_and_free (ctx);
-        return;
-    }
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        goto out;
 
     if (!parse_network_registration_mode (response, &mode)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse current network registration mode");
-        register_in_network_context_complete_and_free (ctx);
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Couldn't parse current network registration mode: '%s'",
+                             response);
+        goto out;
+    }
+
+    /* If the modem is not configured for automatic registration, run parent */
+    if (mode != 0) {
+        run_parent_registration (task);
         return;
     }
 
-    /* If the modem is already configured for automatic registration, don't do
-     * anything else */
-    if (mode == 0) {
-        mm_dbg ("Device is already in automatic registration mode, not requesting it again");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        register_in_network_context_complete_and_free (ctx);
-        return;
-    }
+    mm_dbg ("Device is already in automatic registration mode, not requesting it again");
 
-    /* Otherwise, run parent's implementation */
-    run_parent_registration (ctx);
+out:
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-register_in_network (MMIfaceModem3gpp *self,
-                     const gchar *operator_id,
-                     GCancellable *cancellable,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+register_in_network (MMIfaceModem3gpp    *self,
+                     const gchar         *operator_id,
+                     GCancellable        *cancellable,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
-    RegisterInNetworkContext *ctx;
+    GTask *task;
 
-    ctx = g_slice_new0 (RegisterInNetworkContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             register_in_network);
-    ctx->operator_id = g_strdup (operator_id);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    /* Store operator id as task data */
+    g_task_set_task_data (task, g_strdup (operator_id), g_free);
 
     /* If requesting automatic registration, we first need to query what the
      * current mode is. We must NOT send +COPS=0 if it already is in 0 mode,
@@ -1144,12 +1124,12 @@ register_in_network (MMIfaceModem3gpp *self,
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)cops_ready,
-                                  ctx);
+                                  task);
         return;
     }
 
     /* Otherwise, run parent's implementation right away */
-    run_parent_registration (ctx);
+    run_parent_registration (task);
 }
 
 /*****************************************************************************/
