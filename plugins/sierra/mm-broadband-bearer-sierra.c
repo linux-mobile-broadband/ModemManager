@@ -355,13 +355,13 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
                               GAsyncResult *res,
-                              GSimpleAsyncResult *simple)
+                              GTask *task)
 {
     GError *error = NULL;
 
@@ -370,15 +370,14 @@ parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 disconnect_scact_ready (MMBaseModem *modem,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     GError *error = NULL;
 
@@ -389,9 +388,8 @@ disconnect_scact_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -404,14 +402,11 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     g_assert (primary != NULL);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        disconnect_3gpp);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!MM_IS_PORT_SERIAL_AT (data)) {
         gchar *command;
@@ -426,7 +421,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)disconnect_scact_ready,
-                                       result);
+                                       task);
         g_free (command);
         return;
     }
@@ -440,7 +435,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
         data,
         cid,
         (GAsyncReadyCallback)parent_disconnect_3gpp_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
