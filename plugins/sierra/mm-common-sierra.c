@@ -77,23 +77,14 @@ mm_common_sierra_port_probe_list_is_icera (GList *probes)
 }
 
 typedef struct {
-    MMPortProbe *probe;
     MMPortSerialAt *port;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     guint retries;
 } SierraCustomInitContext;
 
 static void
-sierra_custom_init_context_complete_and_free (SierraCustomInitContext *ctx)
+sierra_custom_init_context_free (SierraCustomInitContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_object_unref (ctx->port);
-    g_object_unref (ctx->probe);
-    g_object_unref (ctx->result);
     g_slice_free (SierraCustomInitContext, ctx);
 }
 
@@ -102,18 +93,23 @@ mm_common_sierra_custom_init_finish (MMPortProbe *probe,
                                      GAsyncResult *result,
                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+    return g_task_propagate_boolean (G_TASK (result), error);
 }
 
-static void sierra_custom_init_step (SierraCustomInitContext *ctx);
+static void sierra_custom_init_step (GTask *task);
 
 static void
 gcap_ready (MMPortSerialAt *port,
             GAsyncResult *res,
-            SierraCustomInitContext *ctx)
+            GTask *task)
 {
+    MMPortProbe *probe;
+    SierraCustomInitContext *ctx;
     const gchar *response;
     GError *error = NULL;
+
+    probe = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
@@ -121,12 +117,12 @@ gcap_ready (MMPortSerialAt *port,
          * port is not AT */
         if (ctx->retries == 0 &&
             g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            mm_port_probe_set_result_at (ctx->probe, FALSE);
+            mm_port_probe_set_result_at (probe, FALSE);
         }
         /* If reported a hard parse error, this port is definitely not an AT
          * port, skip trying. */
         else if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_PARSE_FAILED)) {
-            mm_port_probe_set_result_at (ctx->probe, FALSE);
+            mm_port_probe_set_result_at (probe, FALSE);
             ctx->retries = 0;
         }
         /* Some Icera-based devices (eg, USB305) have an AT-style port that
@@ -134,16 +130,16 @@ gcap_ready (MMPortSerialAt *port,
          * the real AT ports do this too, so let a retry tag the port as
          * supported if it responds correctly later. */
         else if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
-            mm_port_probe_set_result_at (ctx->probe, FALSE);
+            mm_port_probe_set_result_at (probe, FALSE);
         }
 
         /* Just retry... */
-        sierra_custom_init_step (ctx);
+        sierra_custom_init_step (task);
         goto out;
     }
 
     /* A valid reply to ATI tells us this is an AT port already */
-    mm_port_probe_set_result_at (ctx->probe, TRUE);
+    mm_port_probe_set_result_at (probe, TRUE);
 
     /* Sierra APPx ports have limited AT command parsers that just reply with
      * "OK" to most commands.  These can sometimes be used for PPP while the
@@ -152,20 +148,20 @@ gcap_ready (MMPortSerialAt *port,
      * secondary APP ports.
      */
     if (strstr (response, "APP1")) {
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
+        g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
 
         /* PPP-on-APP1-port whitelist */
         if (strstr (response, "C885") ||
             strstr (response, "USB 306") ||
             strstr (response, "MC8790"))
-            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
 
         /* For debugging: let users figure out if their device supports PPP
          * on the APP1 port or not.
          */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
             mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
-            g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
     } else if (strstr (response, "APP2") ||
                strstr (response, "APP3") ||
@@ -173,11 +169,11 @@ gcap_ready (MMPortSerialAt *port,
         /* Additional APP ports don't support most AT commands, so they cannot
          * be used as the primary port.
          */
-        g_object_set_data (G_OBJECT (ctx->probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
+        g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP_PORT, GUINT_TO_POINTER (TRUE));
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    sierra_custom_init_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 
 out:
     if (error)
@@ -185,22 +181,28 @@ out:
 }
 
 static void
-sierra_custom_init_step (SierraCustomInitContext *ctx)
+sierra_custom_init_step (GTask *task)
 {
+    SierraCustomInitContext *ctx;
+    GCancellable *cancellable;
+
+    ctx = g_task_get_task_data (task);
+    cancellable = g_task_get_cancellable (task);
+
     /* If cancelled, end */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+    if (g_cancellable_is_cancelled (cancellable)) {
         mm_dbg ("(Sierra) no need to keep on running custom init in '%s'",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        sierra_custom_init_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     if (ctx->retries == 0) {
         mm_dbg ("(Sierra) Couldn't get port type hints from '%s'",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        sierra_custom_init_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -211,9 +213,9 @@ sierra_custom_init_step (SierraCustomInitContext *ctx)
         3,
         FALSE, /* raw */
         FALSE, /* allow_cached */
-        ctx->cancellable,
+        cancellable,
         (GAsyncReadyCallback)gcap_ready,
-        ctx);
+        task);
 }
 
 void
@@ -224,18 +226,17 @@ mm_common_sierra_custom_init (MMPortProbe *probe,
                               gpointer user_data)
 {
     SierraCustomInitContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new (SierraCustomInitContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (probe),
-                                             callback,
-                                             user_data,
-                                             mm_common_sierra_custom_init);
-    ctx->probe = g_object_ref (probe);
     ctx->port = g_object_ref (port);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
     ctx->retries = 3;
 
-    sierra_custom_init_step (ctx);
+    task = g_task_new (probe, cancellable, callback, user_data);
+    g_task_set_check_cancellable (task, FALSE);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sierra_custom_init_context_free);
+
+    sierra_custom_init_step (task);
 }
 
 /*****************************************************************************/
