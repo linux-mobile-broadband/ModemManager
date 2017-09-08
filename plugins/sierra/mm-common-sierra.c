@@ -247,22 +247,21 @@ mm_common_sierra_modem_power_up_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
-sierra_power_up_wait_cb (GSimpleAsyncResult *result)
+sierra_power_up_wait_cb (GTask *task)
 {
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 cfun_enable_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GTask *task)
 {
     GError *error = NULL;
     guint i;
@@ -270,9 +269,8 @@ cfun_enable_ready (MMBaseModem *self,
     gboolean is_new_sierra = FALSE;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -291,24 +289,23 @@ cfun_enable_ready (MMBaseModem *self,
         }
     }
 
-    /* The modem object will be valid in the callback as 'result' keeps a
+    /* The modem object will be valid in the callback as 'task' keeps a
      * reference to it. */
-    g_timeout_add_seconds (is_new_sierra ? 5 : 10, (GSourceFunc)sierra_power_up_wait_cb, simple);
+    g_timeout_add_seconds (is_new_sierra ? 5 : 10, (GSourceFunc)sierra_power_up_wait_cb, task);
 }
 
 static void
 pcstate_enable_ready (MMBaseModem *self,
                       GAsyncResult *res,
-                      GSimpleAsyncResult *simple)
+                      GTask *task)
 {
     /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
      * at!pcstate.
      */
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
@@ -316,12 +313,9 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_common_sierra_modem_power_up);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* For CDMA modems, run !pcstate */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -330,7 +324,7 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
                                   5,
                                   FALSE,
                                   (GAsyncReadyCallback)pcstate_enable_ready,
-                                  result);
+                                  task);
         return;
     }
 
@@ -345,7 +339,7 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
                               10,
                               FALSE,
                               (GAsyncReadyCallback)cfun_enable_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
