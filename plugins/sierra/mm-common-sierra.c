@@ -350,33 +350,38 @@ mm_common_sierra_load_power_state_finish (MMIfaceModem *self,
                                           GAsyncResult *res,
                                           GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_POWER_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+    }
+    return (MMModemPowerState)value;
 }
 
 static void
 parent_load_power_state_ready (MMIfaceModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     GError *error = NULL;
     MMModemPowerState state;
 
     state = iface_modem_parent->load_power_state_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (state), NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_int (task, state);
+
+    g_object_unref (task);
 }
 
 static void
 pcstate_query_ready (MMBaseModem *self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     const gchar *result;
     guint state;
@@ -384,40 +389,38 @@ pcstate_query_ready (MMBaseModem *self,
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!result) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Parse power state reply */
     result = mm_strip_tag (result, "!PCSTATE:");
     if (!mm_get_uint_from_str (result, &state)) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse !PCSTATE response '%s'",
-                                         result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse !PCSTATE response '%s'",
+                                 result);
     } else {
         switch (state) {
         case 0:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
+            g_task_return_int (task, MM_MODEM_POWER_STATE_LOW);
             break;
         case 1:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+            g_task_return_int (task, MM_MODEM_POWER_STATE_ON);
             break;
         default:
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled power state: '%u'",
-                                             state);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unhandled power state: '%u'",
+                                     state);
             break;
         }
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 void
@@ -425,12 +428,9 @@ mm_common_sierra_load_power_state (MMIfaceModem *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_common_sierra_load_power_state);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Check power state with AT!PCSTATE? */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -439,14 +439,14 @@ mm_common_sierra_load_power_state (MMIfaceModem *self,
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)pcstate_query_ready,
-                                  result);
+                                  task);
         return;
     }
 
     /* Otherwise run parent's */
     iface_modem_parent->load_power_state (self,
                                           (GAsyncReadyCallback)parent_load_power_state_ready,
-                                          result);
+                                          task);
 }
 
 /*****************************************************************************/
