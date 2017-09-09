@@ -790,23 +790,23 @@ set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 selrat_set_ready (MMBaseModem *self,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
         /* Let the error be critical. */
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 }
 
 static void
@@ -816,37 +816,31 @@ set_current_modes (MMIfaceModem *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortSerialAt *primary;
     gint idx = -1;
     gchar *command;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!mm_iface_modem_is_3gpp (self)) {
         /* Cannot do this in CDMA modems */
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Cannot set allowed modes in CDMA modems");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot set allowed modes in CDMA modems");
+        g_object_unref (task);
         return;
     }
 
     /* Sierra secondary ports don't have full AT command interpreters */
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (!primary || mm_port_get_connected (MM_PORT (primary))) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Cannot set allowed modes while connected");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_CONNECTED,
+                                 "Cannot set allowed modes while connected");
+        g_object_unref (task);
         return;
     }
 
@@ -880,18 +874,17 @@ set_current_modes (MMIfaceModem *self,
 
         allowed_str = mm_modem_mode_build_string_from_mask (allowed);
         preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Requested mode (allowed: '%s', preferred: '%s') not "
-                                         "supported by the modem.",
-                                         allowed_str,
-                                         preferred_str);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Requested mode (allowed: '%s', preferred: '%s') not "
+                                 "supported by the modem.",
+                                 allowed_str,
+                                 preferred_str);
+        g_object_unref (task);
+
         g_free (allowed_str);
         g_free (preferred_str);
-
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
         return;
     }
 
@@ -904,7 +897,7 @@ set_current_modes (MMIfaceModem *self,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)selrat_set_ready,
-                                   result);
+                                   task);
     g_free (command);
 }
 
