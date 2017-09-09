@@ -626,22 +626,22 @@ load_current_modes_finish (MMIfaceModem *self,
 {
     LoadCurrentModesResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
-
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
     *allowed = result->allowed;
     *preferred = result->preferred;
+    g_free (result);
     return TRUE;
 }
 
 static void
 selrat_query_ready (MMBaseModem *self,
                     GAsyncResult *res,
-                    GSimpleAsyncResult *simple)
+                    GTask *task)
 {
-    LoadCurrentModesResult result;
+    LoadCurrentModesResult *result;
     const gchar *response;
     GError *error = NULL;
     GRegex *r = NULL;
@@ -649,11 +649,12 @@ selrat_query_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    result = g_new0 (LoadCurrentModesResult, 1);
 
     /* Example response: !SELRAT: 03, UMTS 3G Preferred */
     r = g_regex_new ("!SELRAT:\\s*(\\d+).*$", 0, 0, NULL);
@@ -665,51 +666,51 @@ selrat_query_ready (MMBaseModem *self,
         if (mm_get_uint_from_match_info (match_info, 1, &mode) && mode <= 7) {
             switch (mode) {
             case 0:
-                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                result->preferred = MM_MODEM_MODE_NONE;
                 if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-                    result.allowed |=  MM_MODEM_MODE_4G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                    result->allowed |=  MM_MODEM_MODE_4G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 1:
-                result.allowed = MM_MODEM_MODE_3G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = MM_MODEM_MODE_3G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 2:
-                result.allowed = MM_MODEM_MODE_2G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = MM_MODEM_MODE_2G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 3:
                 /* in Sierra LTE devices, mode 3 is automatic, including LTE, no preference */
                 if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-                    result.preferred = MM_MODEM_MODE_NONE;
+                    result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+                    result->preferred = MM_MODEM_MODE_NONE;
                 } else {
-                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                    result.preferred = MM_MODEM_MODE_3G;
+                    result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                    result->preferred = MM_MODEM_MODE_3G;
                 }
                 break;
             case 4:
                 /* in Sierra LTE devices, mode 4 is automatic, including LTE, no preference */
                 if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
-                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-                    result.preferred = MM_MODEM_MODE_NONE;
+                    result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+                    result->preferred = MM_MODEM_MODE_NONE;
                 } else {
-                    result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                    result.preferred = MM_MODEM_MODE_2G;
+                    result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                    result->preferred = MM_MODEM_MODE_2G;
                 }
                 break;
             case 5:
-                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 6:
-                result.allowed = MM_MODEM_MODE_4G;
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = MM_MODEM_MODE_4G;
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             case 7:
-                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-                result.preferred = MM_MODEM_MODE_NONE;
+                result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+                result->preferred = MM_MODEM_MODE_NONE;
                 break;
             default:
                 g_assert_not_reached ();
@@ -730,12 +731,13 @@ selrat_query_ready (MMBaseModem *self,
         g_match_info_free (match_info);
     g_regex_unref (r);
 
-    if (error)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gpointer (simple, &result, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    if (error) {
+        g_free (result);
+        g_task_return_error (task, error);
+    } else
+        g_task_return_pointer (task, result, g_free);
+
+    g_object_unref (task);
 }
 
 static void
@@ -743,35 +745,29 @@ load_current_modes (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortSerialAt *primary;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!mm_iface_modem_is_3gpp (self)) {
         /* Cannot do this in CDMA modems */
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Cannot load allowed modes in CDMA modems");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot load allowed modes in CDMA modems");
+        g_object_unref (task);
         return;
     }
 
     /* Sierra secondary ports don't have full AT command interpreters */
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (!primary || mm_port_get_connected (MM_PORT (primary))) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Cannot load allowed modes while connected");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_CONNECTED,
+                                 "Cannot load allowed modes while connected");
+        g_object_unref (task);
         return;
     }
 
@@ -783,7 +779,7 @@ load_current_modes (MMIfaceModem *self,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)selrat_query_ready,
-                                   result);
+                                   task);
 }
 
 /*****************************************************************************/
