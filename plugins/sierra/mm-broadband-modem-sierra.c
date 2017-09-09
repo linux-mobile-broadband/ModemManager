@@ -381,10 +381,9 @@ typedef struct {
     guint mask;
 } AccessTechInfo;
 
-static void
-access_tech_set_result (GSimpleAsyncResult *simple,
-                        MMModemAccessTechnology act,
-                        guint mask)
+static AccessTechInfo *
+access_tech_info_new (MMModemAccessTechnology act,
+                      guint mask)
 {
     AccessTechInfo *info;
 
@@ -392,7 +391,7 @@ access_tech_set_result (GSimpleAsyncResult *simple,
     info->act = act;
     info->mask = mask;
 
-    g_simple_async_result_set_op_res_gpointer (simple, info, g_free);
+    return info;
 }
 
 static gboolean
@@ -404,27 +403,27 @@ load_access_technologies_finish (MMIfaceModem *self,
 {
     AccessTechInfo *info;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    info = g_task_propagate_pointer (G_TASK (res), error);
+    if (!info)
         return FALSE;
 
-    info = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    g_assert (info);
     *access_technologies = info->act;
     *mask = info->mask;
+    g_free (info);
     return TRUE;
 }
 
 static void
 access_tech_3gpp_ready (MMBaseModem *self,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         const gchar *p;
@@ -435,49 +434,53 @@ access_tech_3gpp_ready (MMBaseModem *self,
             act = mm_string_to_access_tech (p + 1);
 
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
-            g_simple_async_result_set_error (
-                simple,
+            g_task_return_new_error (
+                task,
                 MM_CORE_ERROR,
                 MM_CORE_ERROR_FAILED,
                 "Couldn't parse access technologies result: '%s'",
                 response);
         else
-            access_tech_set_result (simple, act, MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+            g_task_return_pointer (
+                task,
+                access_tech_info_new (act, MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK),
+                g_free);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
 access_tech_cdma_ready (MMIfaceModemCdma *self,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         MMModemCdmaRegistrationState cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
         MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
 
         if (!parse_status (response, &cdma1x_state, &evdo_state, &act))
-            g_simple_async_result_set_error (
-                simple,
+            g_task_return_new_error (
+                task,
                 MM_CORE_ERROR,
                 MM_CORE_ERROR_FAILED,
                 "Couldn't parse access technologies result: '%s'",
                 response);
         else
-            access_tech_set_result (simple, act, MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK);
+            g_task_return_pointer (
+                task,
+                access_tech_info_new (act, MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK),
+                g_free);
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -485,12 +488,9 @@ load_access_technologies (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_access_technologies);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (mm_iface_modem_is_3gpp (self)) {
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -498,7 +498,7 @@ load_access_technologies (MMIfaceModem *self,
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)access_tech_3gpp_ready,
-                                  result);
+                                  task);
         return;
     }
 
@@ -508,7 +508,7 @@ load_access_technologies (MMIfaceModem *self,
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)access_tech_cdma_ready,
-                                  result);
+                                  task);
         return;
     }
 
