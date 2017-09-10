@@ -117,6 +117,9 @@ ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a7", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Garmin GPS devices
 DRIVERS=="garmin_gps", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Garmin ANT+ stick
+ATTRS{idVendor}=="0fcf", ATTRS{idProduct}=="1009", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 # Cypress M8-based GPS devices, UPSes, and serial converters
 DRIVERS=="cypress_m8", ENV{ID_MM_DEVICE_IGNORE}="1"
 
