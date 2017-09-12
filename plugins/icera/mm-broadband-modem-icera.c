@@ -597,12 +597,16 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
                                        guint *mask,
                                        GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    *access_technologies = ((MMModemAccessTechnology) GPOINTER_TO_UINT (
-                                g_simple_async_result_get_op_res_gpointer (
-                                    G_SIMPLE_ASYNC_RESULT (res))));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *access_technologies = (MMModemAccessTechnology) value;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     return TRUE;
 }
@@ -610,26 +614,23 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
 static void
 nwstate_query_ready (MMBroadbandModemIcera *self,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *operation_result)
+                     GTask *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         mm_dbg ("Couldn't query access technology: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     } else {
         /*
          * The unsolicited message handler will already have run and
          * removed the NWSTATE response, so we use the result from there.
          */
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   GUINT_TO_POINTER (self->priv->last_act),
-                                                   NULL);
+        g_task_return_int (task, self->priv->last_act);
     }
 
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_object_unref (task);
 }
 
 static void
@@ -637,12 +638,9 @@ modem_load_access_technologies (MMIfaceModem *self,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_access_technologies);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
@@ -650,7 +648,7 @@ modem_load_access_technologies (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)nwstate_query_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
