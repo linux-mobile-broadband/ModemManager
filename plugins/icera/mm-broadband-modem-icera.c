@@ -1231,17 +1231,13 @@ modem_load_supported_bands_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_supported_bands_ready (MMBaseModem *self,
                             GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+                            GTask *task)
 {
     GError *error = NULL;
     SupportedBandsContext *ctx = NULL;
@@ -1250,7 +1246,7 @@ load_supported_bands_ready (MMBaseModem *self,
 
     mm_base_modem_at_sequence_finish (self, res, (gpointer) &ctx, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), ctx->idx);
 
@@ -1270,12 +1266,9 @@ load_supported_bands_ready (MMBaseModem *self,
                 g_array_prepend_val (bands, b->band);
         }
 
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bands,
-                                                   (GDestroyNotify) g_array_unref);
+        g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
     }
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -1303,7 +1296,7 @@ load_supported_bands_response_processor (MMBaseModem *self,
 static void
 load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
                                               GAsyncResult *res,
-                                              GSimpleAsyncResult *operation_result)
+                                              GTask *task)
 {
     SupportedBandsContext *ctx;
     const gchar *response;
@@ -1314,9 +1307,8 @@ load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         mm_dbg ("Couldn't query current bands: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1354,7 +1346,7 @@ load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
                                ctx,
                                (GDestroyNotify) supported_bands_context_free,
                                (GAsyncReadyCallback) load_supported_bands_ready,
-                               operation_result);
+                               task);
 }
 
 static void
@@ -1373,10 +1365,7 @@ modem_load_supported_bands (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)load_supported_bands_get_current_bands_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   modem_load_supported_bands));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
