@@ -145,26 +145,19 @@ load_connection_status (MMBaseBearer        *bearer,
 /* 3GPP Connection sequence */
 
 typedef struct {
-    MMBroadbandBearerNovatelLte *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     gint retries;
 } DetailedConnectContext;
 
 static void
-detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
+detailed_connect_context_free (DetailedConnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->cancellable);
     if (ctx->data)
         g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (DetailedConnectContext, ctx);
 }
 
@@ -173,29 +166,34 @@ connect_3gpp_finish (MMBroadbandBearer *self,
                      GAsyncResult *res,
                      GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static gboolean connect_3gpp_qmistatus (DetailedConnectContext *ctx);
+static gboolean connect_3gpp_qmistatus (GTask *task);
 
 static void
 connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                               GAsyncResult *res,
-                              DetailedConnectContext *ctx)
+                              GTask *task)
 {
+    DetailedConnectContext *ctx;
     const gchar *result;
     gchar *normalized_result;
     GError *error = NULL;
+
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
         if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
-            g_simple_async_result_take_error (ctx->result, error);
-            detailed_connect_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
         g_error_free (error);
@@ -206,12 +204,12 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         mm_dbg("Connected");
         config = mm_bearer_ip_config_new ();
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-        g_simple_async_result_set_op_res_gpointer (
-            ctx->result,
+        g_task_return_pointer (
+            task,
             mm_bearer_connect_result_new (ctx->data, config, NULL),
             (GDestroyNotify)mm_bearer_connect_result_unref);
+        g_object_unref (task);
         g_object_unref (config);
-        detailed_connect_context_complete_and_free (ctx);
         return;
     } else if (is_qmistatus_call_failed (result)) {
         /* Don't retry if the call failed */
@@ -220,37 +218,32 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
 
     mm_dbg ("Error: '%s'", result);
 
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Connection setup operation has been cancelled");
-        detailed_connect_context_complete_and_free (ctx);
-        return;
-    }
-
     if (ctx->retries > 0) {
         ctx->retries--;
         mm_dbg ("Retrying status check in a second. %d retries left.",
                 ctx->retries);
-        g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, ctx);
+        g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, task);
         return;
     }
 
     /* Already exhausted all retries */
     normalized_result = normalize_qmistatus (result);
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "QMI connect failed: %s",
-                                     normalized_result);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "QMI connect failed: %s",
+                             normalized_result);
+    g_object_unref (task);
     g_free (normalized_result);
-    detailed_connect_context_complete_and_free (ctx);
 }
 
 static gboolean
-connect_3gpp_qmistatus (DetailedConnectContext *ctx)
+connect_3gpp_qmistatus (GTask *task)
 {
+    DetailedConnectContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     mm_base_modem_at_command_full (
         ctx->modem,
         ctx->primary,
@@ -258,9 +251,9 @@ connect_3gpp_qmistatus (DetailedConnectContext *ctx)
         3, /* timeout */
         FALSE, /* allow_cached */
         FALSE, /* is_raw */
-        ctx->cancellable,
+        g_task_get_cancellable (task),
         (GAsyncReadyCallback)connect_3gpp_qmistatus_ready, /* callback */
-        ctx); /* user_data */
+        task); /* user_data */
 
     return G_SOURCE_REMOVE;
 }
@@ -268,7 +261,7 @@ connect_3gpp_qmistatus (DetailedConnectContext *ctx)
 static void
 connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
                                GAsyncResult *res,
-                               DetailedConnectContext *ctx)
+                               GTask *task)
 {
     const gchar *result;
     GError *error = NULL;
@@ -276,8 +269,8 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
         mm_warn ("QMI connection failed: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        detailed_connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -287,16 +280,21 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
      * happened. Instead, we need to poll the modem to see if it's
      * ready.
      */
-    g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, ctx);
+    g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, task);
 }
 
 static void
-connect_3gpp_authenticate (DetailedConnectContext *ctx)
+connect_3gpp_authenticate (GTask *task)
 {
+    MMBroadbandBearerNovatelLte *self;
+    DetailedConnectContext *ctx;
     MMBearerProperties *config;
     gchar *command, *apn, *user, *password;
 
-    config = mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self));
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    config = mm_base_bearer_peek_config (MM_BASE_BEARER (self));
     apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
     user = mm_port_serial_at_quote_string (mm_bearer_properties_get_user (config));
     password = mm_port_serial_at_quote_string (mm_bearer_properties_get_password (config));
@@ -312,9 +310,9 @@ connect_3gpp_authenticate (DetailedConnectContext *ctx)
         10, /* timeout */
         FALSE, /* allow_cached */
         FALSE, /* is_raw */
-        ctx->cancellable,
+        g_task_get_cancellable (task),
         (GAsyncReadyCallback)connect_3gpp_qmiconnect_ready,
-        ctx); /* user_data */
+        task); /* user_data */
     g_free (command);
 }
 
@@ -328,31 +326,29 @@ connect_3gpp (MMBroadbandBearer *self,
               gpointer user_data)
 {
     DetailedConnectContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (DetailedConnectContext);
-    ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect_3gpp);
     ctx->retries = 60;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_connect_context_free);
 
     /* Get a 'net' data port */
     ctx->data = mm_base_modem_get_best_data_port (ctx->modem, MM_PORT_TYPE_NET);
     if (!ctx->data) {
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Couldn't connect: no available net port available");
-        detailed_connect_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
-    connect_3gpp_authenticate (ctx);
+    connect_3gpp_authenticate (task);
 }
 
 /*****************************************************************************/
