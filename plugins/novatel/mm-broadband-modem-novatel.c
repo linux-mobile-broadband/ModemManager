@@ -710,30 +710,31 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return 0;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                 G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return 0;
+    }
+    return (guint)value;
 }
 
 static void
 parent_load_signal_quality_ready (MMIfaceModem *self,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask *task)
 {
     GError *error = NULL;
     guint signal_quality;
 
     signal_quality = iface_modem_parent->load_signal_quality_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER (signal_quality),
-                                                   NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_int (task, signal_quality);
+    g_object_unref (task);
 }
 
 static gint
@@ -792,7 +793,7 @@ get_one_quality (const gchar *reply,
 static void
 nwrssi_ready (MMBaseModem *self,
               GAsyncResult *res,
-              GSimpleAsyncResult *simple)
+              GTask *task)
 {
     const gchar *response;
     gint quality;
@@ -803,7 +804,7 @@ nwrssi_ready (MMBaseModem *self,
         iface_modem_parent->load_signal_quality (
             MM_IFACE_MODEM (self),
             (GAsyncReadyCallback)parent_load_signal_quality_ready,
-            simple);
+            task);
         return;
     }
 
@@ -817,17 +818,14 @@ nwrssi_ready (MMBaseModem *self,
         quality = get_one_quality (response, "HDR RSSI=");
 
     if (quality >= 0)
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   GUINT_TO_POINTER ((guint)quality),
-                                                   NULL);
+        g_task_return_int (task, quality);
     else
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse $NWRSSI response: '%s'",
-                                         response);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse $NWRSSI response: '%s'",
+                                 response);
+    g_object_unref (task);
 }
 
 static void
@@ -835,20 +833,17 @@ modem_load_signal_quality (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     mm_dbg ("loading signal quality...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_signal_quality);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* 3GPP modems can just run parent's signal quality loading */
     if (mm_iface_modem_is_3gpp (self)) {
         iface_modem_parent->load_signal_quality (
             self,
             (GAsyncReadyCallback)parent_load_signal_quality_ready,
-            result);
+            task);
         return;
     }
 
@@ -859,7 +854,7 @@ modem_load_signal_quality (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)nwrssi_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
