@@ -409,12 +409,16 @@ load_access_technologies_finish (MMIfaceModem *self,
                                  guint *mask,
                                  GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    *access_technologies = (MMModemAccessTechnology) GPOINTER_TO_UINT (
-        g_simple_async_result_get_op_res_gpointer (
-            G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *access_technologies = (MMModemAccessTechnology) value;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     return TRUE;
 }
@@ -422,7 +426,7 @@ load_access_technologies_finish (MMIfaceModem *self,
 static void
 load_access_technologies_ready (MMIfaceModem *self,
                                 GAsyncResult *res,
-                                GSimpleAsyncResult *operation_result)
+                                GTask *task)
 {
     const gchar *response;
     MMModemAccessTechnology act;
@@ -431,9 +435,8 @@ load_access_technologies_ready (MMIfaceModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         mm_dbg ("Couldn't query access technology: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -451,11 +454,8 @@ load_access_technologies_ready (MMIfaceModem *self,
     if (strstr (response, "GSM"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
 
-    g_simple_async_result_set_op_res_gpointer (operation_result,
-                                               GUINT_TO_POINTER (act),
-                                               NULL);
-    g_simple_async_result_complete_in_idle (operation_result);
-    g_object_unref (operation_result);
+    g_task_return_int (task, act);
+    g_object_unref (task);
 }
 
 static void
@@ -463,20 +463,13 @@ load_access_technologies (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_access_technologies);
-
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "$NWSYSMODE",
         3,
         FALSE,
         (GAsyncReadyCallback)load_access_technologies_ready,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
