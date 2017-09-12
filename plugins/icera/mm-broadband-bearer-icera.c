@@ -63,43 +63,16 @@ struct _MMBroadbandBearerIceraPrivate {
 /* 3GPP IP config retrieval (sub-step of the 3GPP Connection sequence) */
 
 typedef struct {
-    MMBroadbandBearerIcera *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     guint cid;
-    GSimpleAsyncResult *result;
 } GetIpConfig3gppContext;
 
-static GetIpConfig3gppContext *
-get_ip_config_3gpp_context_new (MMBroadbandBearerIcera *self,
-                                MMBaseModem *modem,
-                                MMPortSerialAt *primary,
-                                guint cid,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
-{
-    GetIpConfig3gppContext *ctx;
-
-    ctx = g_new0 (GetIpConfig3gppContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (modem);
-    ctx->primary = g_object_ref (primary);
-    ctx->cid = cid;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             get_ip_config_3gpp_context_new);
-    return ctx;
-}
-
 static void
-get_ip_config_context_complete_and_free (GetIpConfig3gppContext *ctx)
+get_ip_config_context_free (GetIpConfig3gppContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -113,11 +86,9 @@ get_ip_config_3gpp_finish (MMBroadbandBearer *self,
     MMBearerConnectResult *configs;
     MMBearerIpConfig *ipv4, *ipv6;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    configs = g_task_propagate_pointer (G_TASK (res), error);
+    if (!configs)
         return FALSE;
-
-    configs = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    g_assert (configs);
 
     ipv4 = mm_bearer_connect_result_peek_ipv4_config (configs);
     ipv6 = mm_bearer_connect_result_peek_ipv6_config (configs);
@@ -127,23 +98,27 @@ get_ip_config_3gpp_finish (MMBroadbandBearer *self,
     if (ipv6_config && ipv6)
         *ipv6_config = g_object_ref (ipv6);
 
+    mm_bearer_connect_result_unref (configs);
     return TRUE;
 }
 
 static void
 ip_config_ready (MMBaseModem *modem,
                  GAsyncResult *res,
-                 GetIpConfig3gppContext *ctx)
+                 GTask *task)
 {
+    GetIpConfig3gppContext *ctx;
     MMBearerIpConfig *ipv4_config = NULL;
     MMBearerIpConfig *ipv6_config = NULL;
     const gchar *response;
     GError *error = NULL;
     MMBearerConnectResult *connect_result;
 
+    ctx = g_task_get_task_data (task);
+
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
         goto out;
     }
 
@@ -152,34 +127,34 @@ ip_config_ready (MMBaseModem *modem,
                                            &ipv4_config,
                                            &ipv6_config,
                                            &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
         goto out;
     }
 
     if (!ipv4_config && !ipv6_config) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get IP config: couldn't parse response '%s'",
-                                         response);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get IP config: couldn't parse response '%s'",
+                                 response);
         goto out;
     }
 
     connect_result = mm_bearer_connect_result_new (MM_PORT (ctx->primary),
                                                    ipv4_config,
                                                    ipv6_config);
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               connect_result,
-                                               (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_task_return_pointer (task,
+                           connect_result,
+                           (GDestroyNotify)mm_bearer_connect_result_unref);
 
 out:
+    g_object_unref (task);
     g_clear_object (&ipv4_config);
     g_clear_object (&ipv6_config);
-    get_ip_config_context_complete_and_free (ctx);
 }
 
 static void
-get_ip_config_3gpp (MMBroadbandBearer *self,
+get_ip_config_3gpp (MMBroadbandBearer *_self,
                     MMBroadbandModem *modem,
                     MMPortSerialAt *primary,
                     MMPortSerialAt *secondary,
@@ -189,16 +164,19 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
+    MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (_self);
     GetIpConfig3gppContext *ctx;
+    GTask *task;
 
-    ctx = get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_ICERA (self),
-                                          MM_BASE_MODEM (modem),
-                                          primary,
-                                          cid,
-                                          callback,
-                                          user_data);
+    ctx = g_new0 (GetIpConfig3gppContext, 1);
+    ctx->modem = g_object_ref (MM_BASE_MODEM (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->cid = cid;
 
-    if (ctx->self->priv->default_ip_method == MM_BEARER_IP_METHOD_STATIC) {
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)get_ip_config_context_free);
+
+    if (self->priv->default_ip_method == MM_BEARER_IP_METHOD_STATIC) {
         gchar *command;
 
         command = g_strdup_printf ("%%IPDPADDR=%u", cid);
@@ -210,13 +188,13 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)ip_config_ready,
-                                       ctx);
+                                       task);
         g_free (command);
         return;
     }
 
     /* Otherwise, DHCP */
-    if (ctx->self->priv->default_ip_method == MM_BEARER_IP_METHOD_DHCP) {
+    if (self->priv->default_ip_method == MM_BEARER_IP_METHOD_DHCP) {
         MMBearerConnectResult *connect_result;
         MMBearerIpConfig *ipv4_config = NULL, *ipv6_config = NULL;
 
@@ -236,10 +214,10 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
         g_clear_object (&ipv4_config);
         g_clear_object (&ipv6_config);
 
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   connect_result,
-                                                   (GDestroyNotify)mm_bearer_connect_result_unref);
-        get_ip_config_context_complete_and_free (ctx);
+        g_task_return_pointer (task,
+                               connect_result,
+                               (GDestroyNotify)mm_bearer_connect_result_unref);
+        g_object_unref (task);
         return;
     }
 
