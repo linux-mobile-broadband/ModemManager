@@ -854,50 +854,41 @@ modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_BASE_BEARER (g_object_ref (
-                               g_simple_async_result_get_op_res_gpointer (
-                                   G_SIMPLE_ASYNC_RESULT (res))));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 broadband_bearer_icera_new_ready (GObject *source,
                                   GAsyncResult *res,
-                                  GSimpleAsyncResult *simple)
+                                  GTask *task)
 {
     MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_icera_new_finish (res, &error);
     if (!bearer)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_pointer (task, bearer, g_object_unref);
+
+    g_object_unref (task);
 }
 
 static void
 broadband_bearer_new_ready (GObject *source,
                             GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+                            GTask *task)
 {
     MMBaseBearer *bearer = NULL;
     GError *error = NULL;
 
     bearer = mm_broadband_bearer_new_finish (res, &error);
     if (!bearer)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_pointer (task, bearer, g_object_unref);
+
+    g_object_unref (task);
 }
 
 static void
@@ -906,12 +897,9 @@ modem_create_bearer (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_bearer);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If we get a NET port, create Icera bearer */
     if (mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
@@ -921,7 +909,7 @@ modem_create_bearer (MMIfaceModem *self,
             properties,
             NULL, /* cancellable */
             (GAsyncReadyCallback)broadband_bearer_icera_new_ready,
-            result);
+            task);
         return;
     }
 
@@ -931,7 +919,7 @@ modem_create_bearer (MMIfaceModem *self,
         properties,
         NULL, /* cancellable */
         (GAsyncReadyCallback)broadband_bearer_new_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
